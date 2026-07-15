@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { GameStateSchema } from "@vtt/domain";
 import { describe, expect, it } from "vitest";
 import { GameStore, RevisionConflictError } from "../src/game-store.js";
+import { createInitialGameState } from "../src/initial-game-state.js";
 
 const actor = { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16b", name: "Test Character", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null };
 
@@ -31,8 +32,33 @@ describe("SQLite GameStore", () => {
       expect((database.prepare("SELECT COUNT(*) AS count FROM domain_events").get() as { count: number }).count).toBe(50);
       expect((database.prepare("SELECT COUNT(*) AS count FROM command_receipts").get() as { count: number }).count).toBe(50);
       expect((database.prepare("SELECT COUNT(*) AS count FROM snapshots").get() as { count: number }).count).toBe(2);
-      expect((database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count).toBe(1);
+      expect((database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count).toBe(2);
       database.close();
+    } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("adds the placeholder roster once to an existing empty database", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-roster-seed-"));
+    const databasePath = join(directory, "vtt.sqlite");
+    let store: GameStore | undefined;
+    try {
+      store = new GameStore(databasePath); await store.initialize(); store.close(); store = undefined;
+      const database = new DatabaseSync(databasePath);
+      database.prepare("DELETE FROM application_seeds").run();
+      database.close();
+
+      store = new GameStore(databasePath, createInitialGameState()); await store.initialize();
+      expect(store.snapshot.actors).toHaveLength(3);
+      expect(new Set(store.snapshot.actors.map(({ id }) => id)).size).toBe(3);
+      store.close(); store = undefined;
+
+      const reopened = new GameStore(databasePath, createInitialGameState()); await reopened.initialize();
+      expect(reopened.snapshot.actors).toHaveLength(3);
+      reopened.close(); store = undefined;
+
+      const persisted = new DatabaseSync(databasePath, { readOnly: true });
+      expect((persisted.prepare("SELECT COUNT(*) AS count FROM application_seeds").get() as { count: number }).count).toBe(1);
+      persisted.close();
     } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
   });
 });
