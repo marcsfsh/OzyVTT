@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomInt, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,14 +10,18 @@ import { z } from "zod";
 import { RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { AuthService } from "./auth.js";
+import { developmentClientUrl } from "./client-hosting.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 
 const port = Number(process.env.PORT ?? 3001);
+const developmentClientPort = 5173;
 const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const clientOrigin = process.env.CLIENT_ORIGIN;
 const webDist = join(fileURLToPath(new URL("../../client/dist", import.meta.url)));
+const hasBuiltClient = existsSync(join(webDist, "index.html"));
+const useDevelopmentClient = process.env.npm_lifecycle_event === "dev" || !hasBuiltClient;
 const app = express();
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: clientOrigin ? { origin: clientOrigin } : undefined });
@@ -64,8 +69,13 @@ app.get("/api/state", (req, res) => {
   const state = store.snapshot;
   res.json(auth.verify(token) ? projectGmView(state) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId));
 });
-app.use(express.static(webDist));
-app.get("/{*path}", (_req, res) => res.sendFile(join(webDist, "index.html")));
+app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
+if (!useDevelopmentClient) {
+  app.use(express.static(webDist));
+  app.get("/{*path}", (_req, res) => res.sendFile(join(webDist, "index.html")));
+} else {
+  app.get("/{*path}", (req, res) => res.redirect(307, developmentClientUrl(req.hostname, req.originalUrl, developmentClientPort)));
+}
 
 io.on("connection", (socket) => {
   socket.on("session:join", ({ token }, acknowledge) => {
@@ -146,6 +156,12 @@ io.on("connection", (socket) => {
 
 await Promise.all([auth.initialize(), store.initialize()]);
 httpServer.listen(port, "0.0.0.0", () => {
-  console.log(`VTT server ready on http://localhost:${port}`);
-  for (const url of lanUrls(port)) console.log(`LAN join URL: ${url}`);
+  if (!useDevelopmentClient) {
+    console.log(`VTT server ready on http://localhost:${port}`);
+    for (const url of lanUrls(port)) console.log(`LAN join URL: ${url}`);
+  } else {
+    console.log(`VTT API ready on http://localhost:${port}`);
+    console.log(`Development client: http://localhost:${developmentClientPort}`);
+    for (const url of lanUrls(developmentClientPort)) console.log(`LAN development client: ${url}`);
+  }
 });
