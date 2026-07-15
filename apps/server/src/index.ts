@@ -10,6 +10,7 @@ import { RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, typ
 import { rollDice } from "@vtt/rules-5e";
 import { AuthService } from "./auth.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
+import { createInitialGameState } from "./initial-game-state.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -20,7 +21,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: clientOrigin ? { origin: clientOrigin } : undefined });
 const auth = new AuthService(join(dataDir, "auth.json"));
-const store = new GameStore(join(dataDir, "vtt.sqlite"));
+const store = new GameStore(join(dataDir, "vtt.sqlite"), createInitialGameState());
 
 function lanUrls(portNumber: number) {
   const addresses = new Set<string>();
@@ -88,6 +89,7 @@ io.on("connection", (socket) => {
         const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
         if (!actor) throw new CommandRejectedError("Character is unavailable.");
         if (actor.ownerSessionId && actor.ownerSessionId !== sessionId) throw new CommandRejectedError("That character is already claimed.");
+        if (state.actors.some((item) => item.ownerSessionId === sessionId && item.id !== actorId)) throw new CommandRejectedError("Release your current character before claiming another one.");
         actor.ownerSessionId = sessionId;
       });
       if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
