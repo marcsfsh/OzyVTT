@@ -10,6 +10,7 @@ import { z } from "zod";
 import { RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { AuthService } from "./auth.js";
+import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
@@ -95,22 +96,23 @@ io.on("connection", (socket) => {
     if (roleFor(socket.id) !== "player") return acknowledge({ ok: false, message: "GM sessions do not claim player characters." });
     const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
     try {
-      const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision }, (state) => {
-        const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
-        if (!actor) throw new CommandRejectedError("Character is unavailable.");
-        if (actor.ownerSessionId && actor.ownerSessionId !== sessionId) throw new CommandRejectedError("That character is already claimed.");
-        if (state.actors.some((item) => item.ownerSessionId === sessionId && item.id !== actorId)) throw new CommandRejectedError("Release your current character before claiming another one.");
-        actor.ownerSessionId = sessionId;
-      });
+      const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision }, (state) => claimCharacter(state, actorId, sessionId));
       if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
     } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character claim failed." }); }
   });
   socket.on("character:release", async ({ commandId, expectedRevision }, acknowledge) => {
     const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
     try {
-      const result = await store.execute({ id: commandId, type: "character.release", expectedRevision }, (state) => state.actors.forEach((actor) => { if (actor.ownerSessionId === sessionId) actor.ownerSessionId = null; }));
+      const result = await store.execute({ id: commandId, type: "character.release", expectedRevision }, (state) => releaseCharactersForSession(state, sessionId));
       if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
     } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character release failed." }); }
+  });
+  socket.on("character:force-release", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
+    if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can force-release a character." });
+    try {
+      const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision }, (state) => forceReleaseCharacter(state, actorId, "gm"));
+      if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+    } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character force-release failed." }); }
   });
   socket.on("dice:roll", async ({ commandId, formula, purpose, visibility, actorId, expectedRevision }, acknowledge) => {
     const request = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).safeParse({ commandId, formula, purpose, visibility, actorId, expectedRevision });
