@@ -1,14 +1,13 @@
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
 import type { ClientToServerEvents, ClientRole, GmView, PlayerView, ServerToClientEvents } from "@vtt/domain";
 import { AuthService } from "./auth.js";
-import { GameStore } from "./game-store.js";
+import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 
 const port = Number(process.env.PORT ?? 3001);
 const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
@@ -33,7 +32,7 @@ function lanUrls(portNumber: number) {
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 const playerView = (): PlayerView => {
   const state = store.snapshot;
-  return { combat: state.combat, actors: state.actors.filter((actor) => actor.visibility === "public").map(({ notes: _notes, ownerSessionId: _owner, ...actor }) => actor) };
+  return { revision: state.revision, combat: state.combat, actors: state.actors.filter((actor) => actor.visibility === "public").map(({ notes: _notes, ownerSessionId: _owner, ...actor }) => actor) };
 };
 const gmView = (): GmView => store.snapshot;
 function roleFor(socketId: string): ClientRole { return auth.verify(io.sockets.sockets.get(socketId)?.handshake.auth?.token) ? "gm" : "player"; }
@@ -73,17 +72,25 @@ io.on("connection", (socket) => {
     const player = auth.verifyPlayer(playerToken)!;
     acknowledge({ ok: true, role: "player", sessionId: player.sessionId, token: playerToken });
   });
-  socket.on("character:claim", async ({ actorId }, acknowledge) => {
+  socket.on("character:claim", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
     if (roleFor(socket.id) !== "player") return acknowledge({ ok: false, message: "GM sessions do not claim player characters." });
     const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
-    let message: string | undefined;
-    await store.mutate((state) => { const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character"); if (!actor) message = "Character is unavailable."; else if (actor.ownerSessionId && actor.ownerSessionId !== sessionId) message = "That character is already claimed."; else actor.ownerSessionId = sessionId; });
-    if (message) return acknowledge({ ok: false, message }); broadcast(); acknowledge({ ok: true });
+    try {
+      const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision }, (state) => {
+        const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
+        if (!actor) throw new CommandRejectedError("Character is unavailable.");
+        if (actor.ownerSessionId && actor.ownerSessionId !== sessionId) throw new CommandRejectedError("That character is already claimed.");
+        actor.ownerSessionId = sessionId;
+      });
+      if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+    } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character claim failed." }); }
   });
-  socket.on("character:release", async (acknowledge) => {
+  socket.on("character:release", async ({ commandId, expectedRevision }, acknowledge) => {
     const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
-    await store.mutate((state) => state.actors.forEach((actor) => { if (actor.ownerSessionId === sessionId) actor.ownerSessionId = null; }));
-    broadcast(); acknowledge({ ok: true });
+    try {
+      const result = await store.execute({ id: commandId, type: "character.release", expectedRevision }, (state) => state.actors.forEach((actor) => { if (actor.ownerSessionId === sessionId) actor.ownerSessionId = null; }));
+      if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+    } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character release failed." }); }
   });
   socket.emit("state:updated", playerView());
 });
