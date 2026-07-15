@@ -18,3 +18,18 @@ describe("recipient-specific roll projections", () => {
   it("does not show another player self-only, blind, or GM-only rolls", () => { expect(projectPlayerView(state, playerB).rolls.map(({ visibility }) => visibility)).toEqual(["public"]); });
   it("shows the GM every roll", () => { expect(projectGmView(state).rolls).toHaveLength(4); });
 });
+
+describe("player-safe character claim projections", () => {
+  const actors = [
+    { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16b", name: "Available", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, notes: "GM only" },
+    { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16c", name: "Mine", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: playerA, notes: "GM only" },
+    { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16d", name: "Claimed", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: playerB, notes: "GM only" }
+  ];
+  const state = GameStateSchema.parse({ schemaVersion: 1, actors });
+
+  it("reports safe claim states without owner IDs or notes", () => {
+    const projected = projectPlayerView(state, playerA);
+    expect(projected.actors.map(({ claimStatus }) => claimStatus)).toEqual(["available", "mine", "claimed"]);
+    expect(projected.actors.every((actor) => !("ownerSessionId" in actor) && !("notes" in actor))).toBe(true);
+  });
+});
