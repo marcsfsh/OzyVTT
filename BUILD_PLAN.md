@@ -117,6 +117,8 @@ The following are deliberately outside the core promise unless this plan is revi
 - Automated encounter balancing as a prerequisite for running combat
 - Replacing the GM's judgment about line of sight, cover, unusual movement, or ambiguous rules
 
+The later regional/world-map atlas and spatial session-note system described in Sections 18.6–18.8 is a bounded post-Version-1 extension, not a reversal of the initial “no general campaign wiki” constraint. Its purpose is visual, map-anchored recall rather than a general-purpose knowledge-management suite.
+
 ## 3. Product design principles
 
 Every significant feature and UI decision should be evaluated against these principles.
@@ -283,6 +285,9 @@ Version 1 is not defined by automating the entire SRD. It is defined by being de
 - Optional 3D tabletop dice presentation, implemented behind the replaceable dice-presentation boundary
 - Public spectator links
 - Assistant GM role
+- Regional and world atlas maps with configurable real-world/fantasy scales
+- Clickable categorized map markers with safe Markdown notes
+- Session-note and recap markers that visually locate where play occurred
 - PWA/offline-first mode
 
 ## 6. Core user journeys
@@ -597,6 +602,10 @@ The exact schema remains an implementation task, but the following concepts must
 | Effect definition | Reusable description of a condition/buff/debuff | Modifiers, stacking rule, default timing, icon |
 | Effect instance | A particular applied effect | Source, target, start, duration, expiry trigger, concentration link, visibility |
 | Map asset | Reusable image content | File metadata, dimensions, checksum, thumbnails, source |
+| Atlas map | Regional/world spatial workspace separate from combat scenes | Map asset, configurable scale, image-local coordinates, marker layers, optional later geographic calibration |
+| Map marker | Clickable point or area anchored to a battle/regional/world map | Position, category/icon, title, visibility, tags, linked notes/entities/session records |
+| Markdown note | Inert, sanitized authored content | Source Markdown, rendered projection, attachments/links, revisions, author/timestamps, visibility |
+| Session record | Notes and recap for one session or a portion of one | Date/title, Markdown notes, participants, linked encounters, one or more spatial markers |
 | Scene | Shared spatial workspace | Map references, grid, fog, drawings, token references, viewport defaults |
 | Encounter | Prepared and/or live combat | Scene, baseline roster, state, round, initiative, ruleset version |
 | Combatant | Actor instance's participation in initiative | Initiative value, tie-break, current turn, group, visibility, defeated status |
@@ -777,7 +786,8 @@ Do not promise perfect automatic conversion from the extracted Markdown. Its tab
 
 ### 12.1 Map import and lifecycle
 
-- [ ] Support common safe raster formats initially; explicitly decide whether SVG/PDF/WebP/GIF are accepted and how active content is neutralized.
+- [ ] Accept standard image formats for battle, regional, and world maps through one shared upload path: PNG, JPEG/JPG, WebP, GIF, BMP, AVIF, HEIF/HEIC, TIFF, and SVG where the selected decoder can process them safely.
+- [ ] Normalize uploaded maps into safe internal display renditions; rasterize/sanitize SVG, flatten or explicitly select a frame for animated formats, and preserve the original file separately when feasible.
 - [ ] Validate type from file contents, not only extension.
 - [ ] Extract dimensions, calculate checksum, and create thumbnails/previews.
 - [ ] Detect browser/GPU texture limits and downsample or tile oversized maps safely.
@@ -804,6 +814,25 @@ The exact calibration interaction requires a prototype. The delivered workflow m
 - optional assisted grid detection only if it is reliable and easy to override.
 
 Initial recommendation: support square grids only in the first vertical slice; make coordinate and measurement abstractions capable of adding hex/gridless modes later.
+
+### 12.2.1 Easy battlemap grid wizard
+
+Grid calibration is required product functionality, not an advanced configuration screen. The normal map-upload flow should immediately offer a short visual wizard:
+
+1. **Choose map type:** printed square grid, gridless, or unsure.
+2. **Show one known span:** drag across one square or between two grid intersections; for a longer sample, enter how many cells the span represents.
+3. **Align:** drag one visible grid intersection onto the overlay and use large, direct nudge controls only if necessary.
+4. **Preview:** inspect several areas/zoom levels with the overlay, token footprint, snap, and five-foot scale visible.
+5. **Confirm:** create the scene with safe defaults; retain a clear **Recalibrate grid** action that preserves world/token placement.
+
+Wizard requirements:
+
+- [ ] No pixel dimensions, coordinate math, or manual X/Y offset entry in the normal path.
+- [ ] Optional assisted line/grid detection may prefill values but must never be required or difficult to override.
+- [ ] Touch controls must be fully usable on a phone, including zoomed precision placement and nudge controls.
+- [ ] Gridless selection skips calibration cleanly while still allowing a configurable distance scale.
+- [ ] An Advanced section may expose exact cell size/offset/rotation values for recovery without competing with the wizard.
+- [ ] Calibration stores source-image and world transforms explicitly so replacing/downsampling a rendition does not alter scene coordinates.
 
 Questions to resolve in ADR-009:
 
@@ -1740,6 +1769,49 @@ Avoid building a full schema editor early. Prioritize:
 - Never delete a shared map because one scene was removed.
 - Include orphan cleanup in diagnostics, not automatic background destruction.
 
+### 18.6 Regional and world atlas maps — post-Version-1
+
+Regional and world maps use the same safe image-upload/asset pipeline as battlemaps but are distinct spatial workspaces. They are not combat scenes and do not inherit initiative, token ownership, fog, or five-foot grid assumptions.
+
+- [ ] Create an atlas map from any supported standard image-format asset.
+- [ ] Classify it as regional or world scale without locking the data model to only those two labels.
+- [ ] Configure scale by drawing a known-distance line and entering miles, kilometers, leagues, days of travel, or a custom campaign unit.
+- [ ] Support scale bars, distance measurement, pan/zoom, and optional grid/coordinate overlays.
+- [ ] Store marker positions in stable source/world coordinates so thumbnails, responsive layouts, and derived renditions do not move them.
+- [ ] Treat image-local coordinates as the baseline; true latitude/longitude projection or georeferencing is an optional later capability, not a prerequisite.
+- [ ] Allow separate marker layers/categories to be shown, hidden, filtered, and searched without turning the interface into a GIS application.
+- [ ] Permit linking an atlas marker to a battle scene, encounter, actor, place, faction, other marker, or session record.
+
+### 18.7 Spatial markers and Markdown notes — post-Version-1
+
+Selecting a marker opens its notes in a responsive side sheet/bottom sheet while retaining map context.
+
+Marker capabilities:
+
+- [ ] Point markers initially; bounded areas/routes may follow only when a real use case requires them.
+- [ ] Configurable category, icon, color, title, tags, visibility, and layer.
+- [ ] Categories suitable for settlements, landmarks, factions, hazards, dungeons, travel events, encounters, lore, and sessions without hard-coding an exhaustive taxonomy.
+- [ ] Safe Markdown authoring and preview for notes; Markdown is inert, sanitized, versioned content and never executes scripts or trusted HTML.
+- [ ] Internal links/backlinks among markers, maps, encounters, actors, and session records.
+- [ ] Search across titles, tags, and rendered note text, with results that focus the relevant marker.
+- [ ] GM-only versus shared note/marker visibility enforced in server projections.
+- [ ] Export/backup preserves the original Markdown and stable marker/map links.
+
+This is deliberately narrower than a general campaign wiki: content is organized around maps, markers, sessions, and existing game entities.
+
+### 18.8 Spatial session notes and recaps — post-Version-1
+
+A session record may have one marker or several markers when play moves between locations. The result should make campaign history visually browsable: select a place or session marker and immediately open the relevant notes/recap.
+
+- [ ] Create a **Session** marker at the current regional/world-map location and attach Markdown notes, date, title, participants, and linked encounters.
+- [ ] Support “part of session” markers so one session can be represented at several locations without duplicating the canonical note record.
+- [ ] Show session markers by date/session order and optionally trace the session/campaign route.
+- [ ] Provide concise recap content separately from detailed GM/session notes, with independent visibility.
+- [ ] During a later integrated session workflow, automatically save the active session note draft and associate it with its explicitly selected marker(s).
+- [ ] Automatic association must be visible and reversible; the VTT must not guess a location silently.
+- [ ] Preserve autosave revisions and recover unsaved drafts after reconnect/restart.
+- [ ] Allow a completed encounter to contribute a structured summary/link to the session record without replacing human-authored notes.
+
 ## 19. Deployment and operations
 
 ### 19.1 Deployment goals
@@ -2459,6 +2531,9 @@ Promote only when real play demonstrates value greater than complexity:
 - encounter analysis/balancing aids;
 - deeper content editor;
 - homebrew operation builder that remains declarative and safe.
+- regional/world atlas maps with configurable scale and marker layers;
+- safe Markdown marker notes and linked worldbuilding records;
+- spatial session notes/recaps, multi-location sessions, and optional route history.
 
 ## 26. Rules-assistance coverage register
 
@@ -2542,6 +2617,9 @@ For each promoted mechanic, add:
 - Initial dice presentation is 2D; 3D tabletop dice are deferred behind a replaceable presentation boundary.
 - Automation assists and proposes; GM override is always available.
 - Character building is external; canonical JSON import is primary.
+- Battle, regional, and world maps accept standard image files through a common safe normalization pipeline.
+- Battlemap upload includes a short visual grid-calibration wizard; normal use never requires pixel/offset math.
+- Regional/world atlas maps, spatial Markdown notes, and session-recap markers are required long-term capabilities but remain post-Version-1 work unless this plan is explicitly reprioritized.
 
 ### 27.3 Open product decisions
 
