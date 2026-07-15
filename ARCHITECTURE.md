@@ -27,7 +27,7 @@ The server maintains the canonical `GameState`. Every outbound state update is p
 - GM projection includes all actors and management metadata.
 - Socket actions are checked against the signed session and, for player actions, the actor claim.
 
-The first proof uses local JSON behind a `GameStore` interface. The first usable persistence implementation will be SQLite with transactional command/event history; changing that implementation must not change client contracts or socket events.
+The durable store is an embedded SQLite database using WAL mode and versioned migrations. Each accepted command transaction writes its idempotency receipt, ordered domain event, and current state projection atomically; periodic snapshots bound future replay/recovery work. The database implementation does not change client contracts or socket events.
 
 ## Networking
 
