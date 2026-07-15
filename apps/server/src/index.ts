@@ -19,7 +19,6 @@ const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: clientOrigin ? { origin: clientOrigin } : undefined });
 const auth = new AuthService(join(dataDir, "auth.json"));
 const store = new GameStore(join(dataDir, "game-state.json"));
-const playerSessions = new Map<string, string>(); // socket.id -> stable browser session id (future cookie-backed)
 
 function lanUrls(portNumber: number) {
   const addresses = new Set<string>();
@@ -66,19 +65,23 @@ io.on("connection", (socket) => {
     socket.handshake.auth.token = token;
     const gm = auth.verify(token);
     if (gm) return acknowledge({ ok: true, role: "gm", sessionId: gm.sessionId });
-    const sessionId = playerSessions.get(socket.id) ?? randomUUID();
-    playerSessions.set(socket.id, sessionId);
-    acknowledge({ ok: true, role: "player", sessionId });
+    const existingPlayer = auth.verifyPlayer(token);
+    if (existingPlayer) return acknowledge({ ok: true, role: "player", sessionId: existingPlayer.sessionId, token });
+    if (!auth.isBootstrapped) return acknowledge({ ok: false, message: "The host must complete GM setup before players join." });
+    const playerToken = auth.issuePlayerSession();
+    socket.handshake.auth.token = playerToken;
+    const player = auth.verifyPlayer(playerToken)!;
+    acknowledge({ ok: true, role: "player", sessionId: player.sessionId, token: playerToken });
   });
   socket.on("character:claim", async ({ actorId }, acknowledge) => {
     if (roleFor(socket.id) !== "player") return acknowledge({ ok: false, message: "GM sessions do not claim player characters." });
-    const sessionId = playerSessions.get(socket.id); if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
+    const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
     let message: string | undefined;
     await store.mutate((state) => { const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character"); if (!actor) message = "Character is unavailable."; else if (actor.ownerSessionId && actor.ownerSessionId !== sessionId) message = "That character is already claimed."; else actor.ownerSessionId = sessionId; });
     if (message) return acknowledge({ ok: false, message }); broadcast(); acknowledge({ ok: true });
   });
   socket.on("character:release", async (acknowledge) => {
-    const sessionId = playerSessions.get(socket.id); if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
+    const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
     await store.mutate((state) => state.actors.forEach((actor) => { if (actor.ownerSessionId === sessionId) actor.ownerSessionId = null; }));
     broadcast(); acknowledge({ ok: true });
   });
