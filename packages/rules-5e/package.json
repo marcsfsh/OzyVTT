@@ -1,0 +1,9 @@
+{
+  "name": "@vtt/rules-5e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "check": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.8.2" }
+}

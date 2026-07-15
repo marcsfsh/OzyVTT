@@ -1,0 +1,16 @@
+{
+  "name": "vtt",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Private, locally hosted D&D 5e combat VTT",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n web,server -c cyan,magenta \"npm run dev --workspace=@vtt/web\" \"npm run dev --workspace=@vtt/server\"",
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "start": "npm run build && npm run start --workspace=@vtt/server"
+  },
+  "engines": { "node": ">=22" },
+  "devDependencies": { "concurrently": "^9.1.2" }
+}
