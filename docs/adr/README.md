@@ -17,5 +17,7 @@
 | 013 | Proposed | Transactional command/event log with snapshots and bounded undo |
 | 014 | Accepted | Functional parity on phone and desktop; exact browser baseline pending |
 | 015 | Proposed | Curated, versioned SRD bundle separate from executable code |
+| 016 | Proposed | Versioned public integration API over shared authoritative commands, events, authorization, and projections |
+| 017 | Proposed | Open-source self-host distribution, licensing boundaries, contribution policy, and release governance |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
