@@ -4,12 +4,14 @@
 
 | Document field | Value |
 | --- | --- |
-| Status | Initial planning baseline |
-| Product stage | Pre-implementation |
+| Status | Active living execution plan |
+| Product stage | Phase 0 proof and Phase 1 foundation in progress |
 | Rules baseline | System Reference Document 5.2.1 (2024 fifth-edition rules) |
 | Primary use | One GM locally hosting a private home game for a small, known group |
 | Primary content path | Imported player-character and monster JSON |
+| Current checkpoint | Transactional SQLite foundation complete; character roster/claim workflow next |
 | Last updated | 2026-07-15 |
+| Last implementation audit | 2026-07-15 |
 
 ## 1. Purpose of this document
 
@@ -28,10 +30,12 @@ This plan should be updated as implementation reveals better answers. Major arch
 ### 1.1 Status conventions
 
 - `[ ]` — not started
-- `[~]` — in progress
-- `[x]` — complete and verified
+- `[~]` — started, partially implemented, or awaiting acceptance verification
+- `[x]` — complete, verified against the stated acceptance criteria, and linked to evidence
 - `[-]` — deliberately deferred or removed from scope
-- `BLOCKED:` — cannot proceed until the named decision or dependency is resolved
+- `[!]` — blocked; the blocking condition must also appear in the open-risks table
+
+Do not mark an umbrella item complete when only some clauses are implemented. Leave it `[~]` and name the missing clauses in the current snapshot or outcome ledger. A checkmark records an outcome, not merely code having been written.
 
 ### 1.2 Planning hierarchy
 
@@ -42,6 +46,74 @@ Use this order when requirements conflict:
 3. Milestone scope and exit gates
 4. Epic-level acceptance criteria
 5. Individual implementation tasks
+
+### 1.3 Living-plan update protocol
+
+Every implementation checkpoint must update this document in the same repository change, or in the immediately following plan-only reconciliation change. The update must:
+
+1. change the relevant milestone and detailed-work checkboxes;
+2. add or revise an entry in the implementation outcome ledger;
+3. record material architectural/product decisions in Section 8 and `docs/adr/`;
+4. add newly discovered blockers, risks, validation gaps, or dependencies to the open-risks table;
+5. update the current delivery snapshot and ordered next queue; and
+6. advance `Last updated` and `Last implementation audit` when a full reconciliation is performed.
+
+Completion evidence may be an automated test, a manual device/browser result, a schema fixture, a product proof document, an ADR, or a commit. Exit gates remain unchecked until their full multi-user/device scenario has actually been run.
+
+### 1.4 Current delivery snapshot
+
+This table is the fast operational view. The detailed requirements and milestone checklists remain authoritative.
+
+| Workstream | State | Verified outcome so far | Remaining before the next gate | Evidence |
+| --- | --- | --- | --- | --- |
+| Repository and application shell | Active | TypeScript npm workspaces, React/Vite client, Express/Socket.IO server, locked dependencies, type/test/build commands, and CI workflow exist | Add formatter/linter policy; verify protected `main`; complete error boundary and diagnostics | `package.json`, `.github/workflows/ci.yml`, `README.md` |
+| Identity and local hosting | Active | Host-only first-run GM bootstrap, bcrypt password hash, signed GM/player sessions, LAN binding/URL console output, and player-token memory exist | Logout/revocation, login rate limiting, password change, QR/copy UI, GM force-release, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/index.ts`, ADR-001/002 |
+| Renderer and responsive shell | Prototype implemented; validation active | Pixi renderer proof demonstrates grid/token rendering, pointer pan, wheel zoom, pinch zoom, high-DPI handling, and an accessible wrapper; responsive shell and touch-oriented CSS exist | Validate expected-size maps, 100 tokens, targeting/drag/multi-cell input, frame performance, and the physical-device matrix before accepting ADR-003 | `docs/product/phase-0-renderer-spike.md`, `apps/client/src/scene/` |
+| Actor content contract | Version 1 draft complete | Versioned character/monster schemas and representative fixtures validate | Build import preview/errors, adapters/migrations, live actor instances, and content library | `docs/product/actor-definition-v1.md`, `packages/schemas/`, `packages/test-fixtures/` |
+| Realtime command model | Active | Authoritative Socket.IO state projection, monotonic revisions, command IDs, duplicate suppression, and reconnect snapshot primitives exist | Presence, simultaneous-client convergence, role-revocation, retention fallback, and injected-disconnect tests | `apps/server/src/index.ts`, `apps/server/src/game-store.ts` |
+| Dice | Phase 0 proof complete | Server-authoritative parser/evaluator, cryptographic live rolls, deterministic tests, recipient-specific visibility, and replaceable 2D results are implemented | Connect rolls to imported actions/combat consequences and complete browser/device accessibility validation | `docs/product/phase-0-dice-spike.md`, `packages/rules-5e/`, `apps/client/src/dice/` |
+| Persistence | Phase 1 foundation complete | SQLite migrations, WAL, atomic receipt/event/projection commits, idempotency, restart recovery, and periodic snapshots are verified | Backup/restore, rollback policy, bounded undo, migration backup, and production data lifecycle | ADR-006, `apps/server/src/game-store.ts`, `apps/server/test/game-store.test.ts` |
+| Battle/regional/world maps | Planned | Easy battlemap grid-calibration wizard and later atlas/marker/session-note requirements are recorded without changing current priority | Implement battlemap upload/normalization and calibration in Phase 2; atlas features remain post-Version-1 | Sections 18.6–18.8 and Phase 2 |
+
+**Current milestone assessment:** Phase 0 and Phase 1 overlap intentionally. The app opens and demonstrates foundational behavior, but neither exit gate is claimed until phone/laptop LAN testing and the complete placeholder-character claim/reconnect scenario pass.
+
+### 1.5 Ordered next queue
+
+This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
+
+1. Seed placeholder player characters into the durable store and build the visible roster/claim/release workflow.
+2. Add claim-race, remembered-session, restart, and GM force-release integration coverage.
+3. Finish GM logout/session revocation and failed-login rate limiting.
+4. Add presence/reconnect/convergence coverage with multiple simulated clients.
+5. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
+6. Begin the Phase 2 battlemap upload and easy grid-calibration vertical slice after the Phase 1 join gate is satisfied.
+
+### 1.6 Open blockers, risks, and validation gaps
+
+There are no active hard blockers to the next queued implementation item.
+
+| ID | Type/state | Affects | Condition | Resolution / trigger |
+| --- | --- | --- | --- | --- |
+| RISK-001 | Open technical risk | Packaging and persistence | Node 24 built-in `node:sqlite` remains marked release-candidate/experimental in current Node documentation | Pin the host runtime; review API status before production packaging or Node upgrades |
+| GAP-001 | Open validation gap | Phase 0 and Phase 1 exit gates | No recorded physical iOS/Android and laptop LAN acceptance pass yet | Run the documented device matrix after roster/claim UI is visible |
+| DEC-001 | Open decision | Packaging and support baseline | First supported host OS/deployment form is not selected | Decide before packaging work; development can continue meanwhile |
+| GAP-002 | Open process gap | Delivery confidence | CI workflow exists, but branch protection and a recorded remote green run have not been verified in this plan | Verify GitHub settings and link a green run |
+| GAP-003 | Open documentation gap | Phase 0 decision gate | ADR index marks several decisions accepted while only ADR-001, ADR-002, and ADR-006 currently have dedicated files | Expand accepted ADR-004/005/007/008/011/012/014 decisions into numbered records before claiming the Phase 0 exit gate |
+| RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
+
+### 1.7 Implementation outcome ledger
+
+| Date | ID | Status | Outcome | Verification / evidence | Follow-up |
+| --- | --- | --- | --- | --- | --- |
+| 2026-07-15 | FND-001 | Complete | Created the TypeScript workspace, React/Vite client, Express/Socket.IO authoritative server, shared packages, lockfile, and development/build commands | Local type-check and production build; `README.md`, `ARCHITECTURE.md` | Formatter/linter and packaging remain |
+| 2026-07-15 | FND-002 | Partial | Implemented localhost-only GM bootstrap, bcrypt hashing, signed sessions, player session memory, LAN binding, and projected GM/player state | Auth/server source and working browser shell | Rate limiting, logout/revocation, force-release, and device acceptance remain |
+| 2026-07-15 | SPIKE-001 | Partial | Implemented a PixiJS map/grid/token interaction proof with pan/zoom/pinch/high-DPI and accessible status output | `docs/product/phase-0-renderer-spike.md`, renderer proof source, successful type-check/build | Complete actual-device, expected-map, 100-token, targeting/drag, and performance validation before accepting ADR-003 |
+| 2026-07-15 | SCHEMA-001 | Complete | Drafted and tested version 1 player-character and monster definition schemas with representative JSON fixtures | Four schema/fixture tests; schema reference and fixtures | Import UI and migrations remain |
+| 2026-07-15 | SPIKE-002 | Complete/superseded | Proved command IDs, expected revisions, idempotent receipts, events, and restart persistence with JSON files | Phase 0 persistence proof document | Superseded by FND-004 without changing the command contract |
+| 2026-07-15 | SPIKE-003 | Complete | Implemented authoritative dice parsing/evaluation and public, self, blind, and GM-only projections with 2D results | Twelve rules/projection tests; dice proof document | Connect to actor actions and combat state |
+| 2026-07-15 | FND-003 | Partial | Added GitHub Actions validation for install, tests, type-check, and production build on pushes and pull requests | `.github/workflows/ci.yml`; local commands pass | Verify remote green run and branch protection |
+| 2026-07-15 | PLAN-001 | Complete | Added easy battlemap grid calibration plus deferred regional/world atlas, scale, marker, safe Markdown, and spatial session-note requirements | Sections 18.6–18.8; roadmap placement reviewed | Implement battlemap workflow in Phase 2; atlas remains post-Version-1 |
+| 2026-07-15 | FND-004 | Complete | Replaced the JSON proof with embedded SQLite migrations and atomic command receipt/event/projection persistence plus periodic snapshots | All 16 repository tests, TypeScript checks, production builds, ADR-006; GitHub checkpoint `523c8d8` | Backup/restore and undo are later Phase 1/Version 1 work |
 
 ## 2. Product definition
 
@@ -476,36 +548,36 @@ Imported actions and spells should contain structured fields for common, determi
 
 ## 8. Product and architecture decisions to record
 
-Create one ADR per material decision. The recommendations below are starting positions, not substitutes for prototypes.
+Create one ADR per material decision. Status here must match `docs/adr/README.md`; accepted index entries still need a dedicated record before the Phase 0 exit gate if no numbered file exists yet.
 
-| ADR | Decision | Recommended starting position | Must be settled by |
-| --- | --- | --- | --- |
-| ADR-001 | Product platform | Browser-based application with full phone/desktop functional parity and responsive role-specific layouts | Before repository scaffold |
-| ADR-002 | Hosting topology | **Resolved direction:** locally hosted, single authoritative server reached by host IP and port; package as one simple service with persistent local data | Record before scaffold |
-| ADR-003 | Client renderer | Prototype a mature Canvas/WebGL scene library; do not build low-level rendering/input primitives unless testing proves necessary | End of technical spikes |
-| ADR-004 | Application language/stack | TypeScript end to end unless a spike demonstrates a concrete blocker | Before scaffold |
-| ADR-005 | Realtime protocol | Server-authoritative WebSocket command/event flow with reconnect snapshots | Before vertical slice |
-| ADR-006 | Persistence | **Resolved direction:** embedded SQLite for structured state, command receipts, events, migrations, and snapshots; filesystem storage for uploaded assets | Accepted 2026-07-15 |
-| ADR-007 | Canonical content format | Versioned, documented JSON schemas with extension fields and adapters | Before importing production data |
-| ADR-008 | Rules representation | Typed declarative operations plus text fallback; never evaluate imported JavaScript | Before action automation |
-| ADR-009 | Grid baseline | Square grid with five-foot cells for MVP; record diagonal and occupied-cell conventions explicitly | Before movement/measurement tests |
-| ADR-010 | Fog and vision | Manual fog for alpha; dynamic walls/vision remain a separate later epic | Before map tool implementation |
-| ADR-011 | Identity | **Resolved direction:** same direct-IP landing page for all users; players claim an available character without an account; GM role requires password authentication | Record before room workflow |
-| ADR-012 | Dice authority and presentation | Generate and record rolls on the authoritative server; show an initial 2D result component only to authorized clients; preserve formula, individual faces, modifiers, result, visibility, and actor provenance; keep presentation replaceable | Before dice implementation |
-| ADR-013 | State history | Transactional command/event log with periodic snapshots and bounded undo | Before combat mutations |
-| ADR-014 | Device support | **Resolved requirement:** phone and desktop/laptop functional parity with responsive/touch-specific UX; finalize exact iOS Safari and Android Chrome support versions | Before UI scaffold |
-| ADR-015 | SRD content packaging | Curated, normalized, versioned content bundle separate from executable code; never parse the PDF/Markdown extraction at runtime | Before bulk monster conversion |
+| ADR | Decision | Status | Current direction | Must be settled by |
+| --- | --- | --- | --- | --- |
+| ADR-001 | Product platform | Accepted | Browser-based application with full phone/desktop functional parity and responsive role-specific layouts | Recorded |
+| ADR-002 | Hosting topology | Accepted | Locally hosted, single authoritative server reached by host IP and port; package as one simple service with persistent local data | Recorded |
+| ADR-003 | Client renderer | Proposed / spike active | Evaluate PixiJS through actual-device, representative-map, 100-token, input, and performance tests | End of technical spikes |
+| ADR-004 | Application language/stack | Accepted | TypeScript end to end with React/Vite, Express, Socket.IO, and embedded SQLite | Dedicated ADR file still required |
+| ADR-005 | Realtime protocol | Accepted | Server-authoritative Socket.IO command/event flow with reconnect snapshots and recipient-specific projections | Dedicated ADR file still required |
+| ADR-006 | Persistence | Accepted 2026-07-15 | Embedded SQLite for structured state, command receipts, events, migrations, and snapshots; filesystem storage for uploaded assets | Recorded |
+| ADR-007 | Canonical content format | Accepted | Versioned, documented JSON schemas with extension fields, fixtures, and adapters | Dedicated ADR file still required |
+| ADR-008 | Rules representation | Accepted | Typed declarative operations plus inert text fallback; never evaluate imported JavaScript | Dedicated ADR file still required |
+| ADR-009 | Grid baseline | Proposed | Square grid with five-foot cells for MVP; diagonal and occupied-cell conventions await measurement tests | Before movement/measurement tests |
+| ADR-010 | Fog and vision | Proposed | Manual fog for alpha; dynamic walls/vision remain a separate later epic | Before map tool implementation |
+| ADR-011 | Identity | Accepted | Same direct-IP landing page; accountless player character claims; password-authenticated GM role | Dedicated ADR file still required |
+| ADR-012 | Dice authority and presentation | Accepted | Server-generated and recorded rolls; authorized 2D presentation; immutable formula/faces/modifiers/result/visibility/provenance | Dedicated ADR file still required |
+| ADR-013 | State history | Proposed / partial foundation | Transactional command/event log and periodic snapshots exist; bounded undo remains undecided/unfinished | Before combat mutations |
+| ADR-014 | Device support | Accepted requirement / baseline pending | Functional phone/desktop parity with responsive/touch-specific UX; exact supported browser versions remain open | Before Phase 1 exit |
+| ADR-015 | SRD content packaging | Proposed | Curated, normalized, versioned content bundle separate from executable code; never parse source documents at runtime | Before bulk monster conversion |
 
 ### 8.1 Technical spikes
 
-- [ ] Render a large map with smooth pan/zoom and at least 100 tokens.
-- [ ] Exercise pointer, mouse, trackpad, and touch input on the candidate renderer.
-- [ ] Test grid overlay, coordinate conversion, snapping, multi-cell tokens, and high-DPI scaling.
-- [ ] Test selection, independent targeting, marquee selection, drag movement, and waypoint measurement.
+- [~] Render a large map with smooth pan/zoom and at least 100 tokens. Pan/zoom proof exists; representative large-map and 100-token validation remain.
+- [~] Exercise pointer, mouse, trackpad, and touch input on the candidate renderer. Pointer, wheel, and pinch paths exist; device-matrix validation remains.
+- [~] Test grid overlay, coordinate conversion, snapping, multi-cell tokens, and high-DPI scaling. Grid and high-DPI proof exists; conversion/snapping/multi-cell validation remains.
+- [~] Test selection, independent targeting, marquee selection, drag movement, and waypoint measurement. Selection proof exists; the other interactions remain.
 - [ ] Validate map image limits across supported browsers and decide whether oversized images must be tiled/downsampled.
 - [ ] Synchronize token movement and HP between GM and player browsers through the candidate realtime design.
 - [ ] Disconnect/reconnect during several simultaneous state changes and verify convergence.
-- [ ] Validate a versioned player-character and monster schema with actionable path-based errors.
+- [x] Validate a versioned player-character and monster schema with representative fixtures. Actionable import-UI error presentation remains a Phase 2 workflow.
 - [ ] Exercise action resolution containing an attack, multiple typed damage components, a save, and an applied condition.
 - [ ] Prototype the core combat layout at desktop and tablet widths before committing to component structure.
 - [ ] Prototype every core combat workflow at narrow phone portrait, phone landscape, tablet, and desktop widths; reject any architecture that requires a reduced mobile feature set.
@@ -714,12 +786,12 @@ The canonical actor model must be able to represent:
 
 ### 11.3 Formula safety
 
-- [ ] Define a small dice-expression grammar or structured dice AST.
-- [ ] Support common arithmetic and labeled modifiers needed by imported content.
-- [ ] Reject or quarantine unrecognized operators.
-- [ ] Never pass imported formulas to `eval`, `Function`, shell commands, templates with code execution, or database expressions.
-- [ ] Preserve the original formula for display and round-trip export.
-- [ ] Add deterministic parsing and evaluation tests, including malformed and adversarial inputs.
+- [x] Define a small bounded dice-expression grammar and parsed representation.
+- [~] Support common arithmetic and labeled modifiers needed by imported content. Signed integer modifiers work; labels remain outside the proof.
+- [x] Reject unrecognized operators and unsupported die sizes with specific errors.
+- [x] Never pass imported formulas to `eval`, `Function`, shell commands, templates with code execution, or database expressions.
+- [x] Preserve the original and normalized formula for display and persistence.
+- [x] Add deterministic parsing and evaluation tests, including malformed and bounded-input cases.
 
 ### 11.4 Import experience
 
@@ -1114,29 +1186,29 @@ The authoritative engine must not depend on any particular visual renderer. The 
 
 #### Formula and resolution requirements
 
-- [ ] Common polyhedral dice: d4, d6, d8, d10, d12, d20, d100/percentile.
-- [ ] Quantities, multiple dice groups, integer arithmetic, and labeled bonuses/penalties.
-- [ ] Keep-high/keep-low sufficient for Advantage/Disadvantage.
+- [x] Common polyhedral dice: d4, d6, d8, d10, d12, d20, d100/percentile.
+- [~] Quantities, multiple dice groups, integer arithmetic, and labeled bonuses/penalties. Everything except labels is implemented in the proof grammar.
+- [x] Keep-high/keep-low sufficient for Advantage/Disadvantage.
 - [ ] Critical-damage transformation based on structured damage dice.
 - [ ] Reroll/replace operations required by supported features, with original dice retained in history.
 - [ ] Optional default/average damage versus rolled damage for monsters.
-- [ ] Deterministic injected random source for tests.
-- [ ] Cryptographically sound or otherwise appropriate server-side randomness for live rolls.
-- [ ] Immutable result record containing formula, parsed representation, each die, transformations, modifiers, total, roll purpose, actor/action, initiator, timestamp, and visibility.
-- [ ] Malformed or unsupported formulas produce a specific error without executing arbitrary input.
+- [x] Deterministic injected random source for tests.
+- [x] Cryptographically sound server-side randomness for live rolls.
+- [~] Immutable result record containing formula, parsed representation, each die, transformations, modifiers, total, roll purpose, actor/action, initiator, timestamp, and visibility. The proof records all fields except a distinct imported-action reference and future transformation history.
+- [x] Malformed or unsupported formulas produce a specific error without executing arbitrary input.
 
 #### Quick manual dice tray
 
 The VTT must support rolling even when no actor or action is selected.
 
-- [ ] Persistent but compact dice button/tray available to GM and players.
+- [~] Persistent but compact dice button/tray available to GM and players. A responsive formula/purpose/visibility panel exists; tap-to-build shortcuts remain.
 - [ ] Tap/click a die type to add it; repeat to increase quantity; clear and decrement controls.
 - [ ] Optional numeric modifier and short roll label.
 - [ ] One-click d20, Advantage, and Disadvantage shortcuts.
-- [ ] Formula text entry for users who prefer it, but never as the only interface.
+- [~] Formula text entry for users who prefer it, but never as the only interface. Formula entry exists; the required non-text tray remains.
 - [ ] Recent rolls and optional user-pinned formulas.
-- [ ] Visibility selector that remembers a safe per-user preference while clearly indicating secret mode.
-- [ ] Roll from the tray without requiring a selected token.
+- [~] Visibility selector that remembers a safe per-user preference while clearly indicating secret mode. Role-safe options and labels exist; preference memory remains.
+- [x] Roll from the tray without requiring a selected token.
 - [ ] Attribute a manual roll to an actor when the user explicitly chooses one.
 
 #### Roll visibility modes
@@ -1162,20 +1234,20 @@ Security requirements:
 
 #### Initial 2D dice presentation
 
-- [ ] Show die-type icons/faces, each individual result, kept/discarded dice, modifiers, total, label/purpose, roller, and visibility indicator.
-- [ ] Present public rolls promptly to all authorized clients and secret rolls only to authorized clients.
-- [ ] Support a brief lightweight reveal/pop motion if desired, but do not make animation or WebGL part of the requirement.
-- [ ] Make Advantage/Disadvantage and rerolls visually obvious, retaining discarded/original dice in the detail view.
+- [~] Show die-type icons/faces, each individual result, kept/discarded dice, modifiers, total, label/purpose, roller, and visibility indicator. The proof shows formula, purpose, visibility, faces/discards, and total; explicit modifier/roller display remains.
+- [x] Present public rolls promptly to all authorized clients and secret rolls only to authorized clients.
+- [x] Keep animation/WebGL outside the presentation requirement; the proof uses lightweight accessible DOM.
+- [~] Make Advantage/Disadvantage and rerolls visually obvious, retaining discarded/original dice in the detail view. Kept/discarded dice work; rerolls remain future work.
 - [ ] Group large damage pools readably and label distinct damage components.
 - [ ] Keep a transient result visible without permanently covering the map; the complete result remains in the event log.
 - [ ] Allow immediate dismiss and provide reduced-motion/no-transition behavior.
-- [ ] Use ordinary accessible DOM for the complete presentation.
-- [ ] Use the same component on phone and desktop, rearranged for available width.
+- [x] Use ordinary accessible DOM for the complete proof presentation.
+- [~] Use the same component on phone and desktop, rearranged for available width. One responsive component exists; physical-device acceptance remains.
 
 #### Replaceable presentation boundary
 
 - [ ] Define a presentation input contract containing only authorized roll-result data and display metadata.
-- [ ] Keep random generation, result calculation, permission filtering, and persistence outside the presentation component.
+- [x] Keep random generation, result calculation, permission filtering, and persistence outside the presentation component.
 - [ ] Ensure action resolution can proceed if the presentation is disabled or fails.
 - [ ] Test the engine and roll visibility without any visual presentation mounted.
 - [ ] Add **3D tabletop dice** to the post-Version-1 candidate backlog; evaluate libraries, mobile performance, deterministic face display, and accessibility only if that feature is later promoted.
@@ -1585,23 +1657,23 @@ Observer and assistant-GM roles remain post-Version-1 candidates. Do not add the
 
 There is no public account or invitation system. The host exposes one landing page at its local IP address and configured port.
 
-- [ ] Server binds to the configured LAN interface (`0.0.0.0` as a convenient default with a security notice) rather than loopback only.
-- [ ] Startup UI/console displays the useful LAN URL(s), not merely `localhost`.
+- [x] Server binds to the configured LAN interface (`0.0.0.0` as the current default) rather than loopback only. The external-exposure security notice remains deployment-documentation work.
+- [x] Startup console displays useful LAN URL(s), not merely `localhost`.
 - [ ] Optionally display a QR code for the current host URL so phone players do not have to type it.
-- [ ] Landing page provides two unambiguous choices: **Join as Player** and **Enter as GM**.
+- [x] Landing page provides two unambiguous choices: **Join as Player** and **Enter as GM**.
 - [ ] Player path lists eligible player-character actor definitions/instances with portrait, name, and concise identifying details.
-- [ ] Character claim is an atomic server operation so two devices cannot claim the same character concurrently.
-- [ ] Store a scoped participant/character-claim credential in the browser and allow the GM to invalidate it.
-- [ ] Retain claims through brief disconnects/reloads; define a stale-claim timeout and GM force-release control.
+- [x] Character claim is an atomic serialized server operation with revision and duplicate-command protection.
+- [~] Store a scoped participant/character-claim credential in the browser and allow the GM to invalidate it. Browser persistence exists; GM invalidation remains.
+- [~] Retain claims through brief disconnects/reloads; define a stale-claim timeout and GM force-release control. Signed player sessions and persisted ownership exist; timeout/force-release and browser acceptance remain.
 - [ ] Decide whether one player may claim multiple characters and expose it as a simple GM policy if needed.
 - [ ] Handle duplicate tabs/devices deliberately: share the claim, reject the second controller, or require takeover confirmation.
 - [ ] Display presence, controlling character, and disconnected state without exposing unnecessary network details.
-- [ ] Do not require external identity providers, email, invite links, or room codes.
-- [ ] GM path verifies the password server-side and issues a role-bearing session credential.
-- [ ] Initial GM-password bootstrap is restricted to localhost or a one-time code displayed only on the host, preventing the first LAN visitor from claiming GM ownership.
-- [ ] Hash the GM password with a modern memory-hard or established password-hashing function and per-password salt.
+- [x] Do not require external identity providers, email, invite links, or room codes.
+- [x] GM path verifies the password server-side and issues a role-bearing signed session credential.
+- [x] Initial GM-password bootstrap is restricted to localhost, preventing the first LAN visitor from claiming GM ownership.
+- [x] Hash the GM password with bcrypt and a per-password salt.
 - [ ] Rate-limit failed GM authentication and support session revocation/password change.
-- [ ] Never infer GM authority from a client-provided role flag.
+- [x] Never infer GM authority from a client-provided role flag; verify the signed server-issued credential at the command boundary.
 
 ### 16.3 Server-side visibility projections
 
@@ -2116,17 +2188,17 @@ These initial budgets should be confirmed by technical spikes and real maps.
 
 ### 23.1 Repository foundation
 
-- [ ] README with product thesis, supported state, quick start, and current milestone.
-- [ ] This build plan linked prominently.
-- [ ] ADR template and numbered decision log.
-- [ ] Consistent formatter, linter, type checking, and test command.
-- [ ] Reproducible local development environment with one startup command.
-- [ ] Environment/config example containing no secrets.
-- [ ] Database migration framework and test database reset/seed.
-- [ ] Representative fixtures and optional sample encounter.
+- [x] README with product thesis, supported state, quick start, and current milestone.
+- [x] This build plan linked prominently.
+- [x] ADR template and numbered decision log.
+- [~] Consistent formatter, linter, type checking, and test command. Type checking and tests exist; formatter/linter remain.
+- [x] Reproducible local development environment with one startup command.
+- [x] Environment/config example containing no secrets.
+- [~] Database migration framework and test database reset/seed. Migrations and isolated temporary test databases exist; reusable seed/reset tooling remains.
+- [~] Representative fixtures and optional sample encounter. Actor fixtures exist; a sample encounter remains.
 - [ ] License/attribution files for application and third-party/SRD content.
-- [ ] Dependency lockfile and automated update policy.
-- [ ] CI on pull requests and protected main branch once the scaffold exists.
+- [~] Dependency lockfile and automated update policy. The lockfile exists; automated update policy remains.
+- [~] CI on pull requests and protected main branch once the scaffold exists. The workflow exists; protection and a recorded remote green run remain unverified.
 
 ### 23.2 Definition of done for an implementation item
 
@@ -2389,15 +2461,15 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 **Goal:** settle decisions that could invalidate the foundation.
 
-- [ ] Record ADR-001 through ADR-015, marking the already resolved local-host, character-claim, GM-password, mobile-parity, and 2D-dice decisions.
-- [ ] Choose application stack and repository/package boundaries.
+- [~] Record ADR-001 through ADR-015, marking the already resolved local-host, character-claim, GM-password, mobile-parity, and 2D-dice decisions. The decision index is populated; remaining proposed decisions and dedicated ADR files still need resolution/reconciliation.
+- [x] Choose application stack and repository/package boundaries.
 - [ ] Choose the first supported host OS/deployment form.
-- [ ] Prototype direct-IP startup, LAN URL display, firewall error handling, and phone connection.
-- [ ] Prototype responsive shell at phone portrait/landscape, tablet, and desktop.
-- [ ] Complete renderer/map/token input spike.
-- [ ] Complete realtime/reconnect/convergence spike.
-- [ ] Draft version 1 character and monster schemas with representative fixtures.
-- [ ] Prototype dice parser, server result, public/secret projection, and 2D presentation.
+- [~] Prototype direct-IP startup, LAN URL display, firewall error handling, and phone connection. Binding and LAN URL output exist; firewall recovery and physical-phone validation remain.
+- [~] Prototype responsive shell at phone portrait/landscape, tablet, and desktop. Responsive source exists; the device matrix remains unverified.
+- [~] Complete renderer/map/token input spike. The interaction proof exists; actual-device, large-map/100-token, targeting/drag, multi-cell, and performance validation remain.
+- [~] Complete realtime/reconnect/convergence spike. Revisions, snapshots, projections, and idempotency exist; multi-client convergence and disconnect testing remain.
+- [x] Draft version 1 character and monster schemas with representative fixtures.
+- [x] Prototype dice parser, server result, public/secret projection, and 2D presentation.
 - [x] Prototype persistence/event/snapshot model.
 - [ ] Produce low-fidelity end-to-end wireframes for setup, join, combat, dice, and recovery.
 - [ ] Define supported browser/device baseline and performance hardware.
@@ -2408,16 +2480,16 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 **Goal:** establish a secure, persistent shell that phones and laptops can join.
 
-- [ ] Repository scaffold, formatting/lint/type/test/CI.
-- [ ] Single local server startup and persistent data directory.
-- [ ] First-run GM password creation, hashing, login, session, logout, and rate limiting.
-- [ ] Direct-IP landing page and displayed/copyable/QR host URL.
-- [ ] Player character list, atomic claim, remembered browser session, release, and GM force-release.
-- [ ] Role/ownership authorization at server command boundary.
-- [ ] Realtime connection, presence, revisions, reconnect snapshot, and idempotency.
+- [~] Repository scaffold, formatting/lint/type/test/CI. Scaffold, type checking, tests, build, and CI exist; formatter/linter remain.
+- [x] Single local server startup and persistent data directory.
+- [~] First-run GM password creation, hashing, login, session, logout, and rate limiting. Bootstrap through session issuance exists; logout/revocation and rate limiting remain.
+- [~] Direct-IP landing page and displayed/copyable/QR host URL. Landing page and console LAN URLs exist; copy/QR UI remains.
+- [~] Player character list, atomic claim, remembered browser session, release, and GM force-release. Command/session primitives exist; visible roster, seeded characters, and GM force-release remain.
+- [~] Role/ownership authorization at server command boundary. Implemented for current claim and dice commands; comprehensive command matrix and revocation tests remain.
+- [~] Realtime connection, presence, revisions, reconnect snapshot, and idempotency. Connection, revision, snapshot, and idempotency primitives exist; presence and multi-client recovery tests remain.
 - [x] Database migration and transactional event/projection skeleton.
-- [ ] Responsive application shell and navigation with functional phone equivalents.
-- [ ] Error boundary, structured logs, health check, and basic diagnostics.
+- [~] Responsive application shell and navigation with functional phone equivalents. Initial shell exists; complete navigation and physical-device acceptance remain.
+- [~] Error boundary, structured logs, health check, and basic diagnostics. Health endpoint exists; error boundary, structured logs, and diagnostics remain.
 
 **Exit gate:** GM and two players can join from one phone and one laptop, claim distinct placeholder characters, reconnect, and remain correctly authorized after a server restart.
 
