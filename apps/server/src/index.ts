@@ -20,7 +20,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: clientOrigin ? { origin: clientOrigin } : undefined });
 const auth = new AuthService(join(dataDir, "auth.json"));
-const store = new GameStore(join(dataDir, "game-state.json"));
+const store = new GameStore(join(dataDir, "vtt.sqlite"));
 
 function lanUrls(portNumber: number) {
   const addresses = new Set<string>();
