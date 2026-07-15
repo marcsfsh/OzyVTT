@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@vtt/domain": "*",
+    "@vtt/rules-5e": "*",
     "bcryptjs": "^3.0.2",
     "express": "^5.1.0",
     "socket.io": "^4.8.1",
