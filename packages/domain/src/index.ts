@@ -14,8 +14,9 @@ export type PlayerView = Pick<GameState, "combat"> & { actors: Array<Omit<Actor,
 export type GmView = GameState;
 
 export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; }
+export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
 export interface ClientToServerEvents {
-  "session:join": (payload: { token?: string }, acknowledgement: (result: { ok: boolean; role?: ClientRole; sessionId?: string; message?: string }) => void) => void;
+  "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { actorId: string }, acknowledgement: (result: { ok: boolean; message?: string }) => void) => void;
   "character:release": (acknowledgement: (result: { ok: boolean; message?: string }) => void) => void;
 }
