@@ -1,5 +1,7 @@
 # Phase 0 command, persistence, and idempotency spike
 
+> Superseded by the accepted Phase 1 SQLite implementation in ADR-006. The command contract established here remains current.
+
 ## What this proof establishes
 
 - Every state-changing command carries a unique command ID.
@@ -8,10 +10,10 @@
 - A command carrying an outdated expected revision is explicitly rejected.
 - JSON files use write-then-rename to avoid a partially written individual file.
 
-## Current scope and limitations
+## Original scope and limitations
 
-This is a deliberately small, file-backed proof using character claim/release commands. It is **not** the final durable store: Phase 1 will replace the two JSON files with SQLite transactions, migrations, bounded event history, and snapshots. The contract—command ID, expected revision, event receipt, and authoritative state revision—remains the same.
+This was a deliberately small, file-backed proof using character claim/release commands. Phase 1 has now replaced the two JSON files with one SQLite database providing transactional receipts, events, projections, ordered migrations, and periodic snapshots. The contract—command ID, expected revision, event receipt, and authoritative state revision—remains the same.
 
 ## Automated evidence
 
-`apps/server/test/game-store.test.ts` verifies one accepted command, a duplicate retry, persisted event receipt, and a stale revision conflict.
+`apps/server/test/game-store.test.ts` now verifies initialization and migration, one accepted transactional command, a duplicate retry, a stale revision conflict, restart recovery, durable receipts/events, and periodic snapshots.
