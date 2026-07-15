@@ -6,6 +6,7 @@ import { GameStateSchema } from "@vtt/domain";
 import { describe, expect, it } from "vitest";
 import { GameStore, RevisionConflictError } from "../src/game-store.js";
 import { createInitialGameState } from "../src/initial-game-state.js";
+import { claimCharacter, forceReleaseCharacter } from "../src/character-claims.js";
 
 const actor = { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16b", name: "Test Character", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null };
 
@@ -59,6 +60,47 @@ describe("SQLite GameStore", () => {
       const persisted = new DatabaseSync(databasePath, { readOnly: true });
       expect((persisted.prepare("SELECT COUNT(*) AS count FROM application_seeds").get() as { count: number }).count).toBe(1);
       persisted.close();
+    } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("serializes simultaneous claims so exactly one player owns a character", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-claim-race-"));
+    const databasePath = join(directory, "vtt.sqlite");
+    const store = new GameStore(databasePath, GameStateSchema.parse({ schemaVersion: 1, actors: [actor] }));
+    try {
+      await store.initialize();
+      const sessions = ["e0bcfbbc-0211-462a-a8f9-b570545981f4", "f0bcfbbc-0211-462a-a8f9-b570545981f5"];
+      const results = await Promise.allSettled(sessions.map((sessionId, index) => store.execute(
+        { id: `simultaneous-claim-${index}`, type: "character.claim", actorId: actor.id },
+        (state) => claimCharacter(state, actor.id, sessionId)
+      )));
+      expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+      expect(results.filter(({ status }) => status === "rejected")).toHaveLength(1);
+      expect(sessions).toContain(store.snapshot.actors[0].ownerSessionId);
+      expect(store.snapshot.revision).toBe(1);
+    } finally { store.close(); await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("persists a claim through restart and allows a GM force-release", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-claim-recovery-"));
+    const databasePath = join(directory, "vtt.sqlite");
+    const sessionId = "e0bcfbbc-0211-462a-a8f9-b570545981f4";
+    let store: GameStore | undefined;
+    try {
+      store = new GameStore(databasePath, GameStateSchema.parse({ schemaVersion: 1, actors: [actor] }));
+      await store.initialize();
+      await store.execute({ id: "durable-claim", type: "character.claim", actorId: actor.id }, (state) => claimCharacter(state, actor.id, sessionId));
+      store.close(); store = undefined;
+
+      store = new GameStore(databasePath);
+      await store.initialize();
+      expect(store.snapshot.actors[0].ownerSessionId).toBe(sessionId);
+      const unauthorizedState = store.snapshot;
+      expect(() => forceReleaseCharacter(unauthorizedState, actor.id, "player")).toThrow("Only the GM");
+      expect(unauthorizedState.actors[0].ownerSessionId).toBe(sessionId);
+      await store.execute({ id: "gm-force-release", type: "character.force-release", actorId: actor.id }, (state) => forceReleaseCharacter(state, actor.id, "gm"));
+      expect(store.snapshot.actors[0].ownerSessionId).toBeNull();
+      expect(store.snapshot.revision).toBe(2);
     } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
   });
 });

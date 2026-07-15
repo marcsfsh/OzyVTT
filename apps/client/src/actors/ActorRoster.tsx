@@ -25,10 +25,17 @@ export function ActorRoster(props: Props) {
     });
   };
 
+  const forceRelease = (actorId: string) => {
+    setFeedback("Releasing player claim…");
+    socket.emit("character:force-release", { commandId: crypto.randomUUID(), actorId, expectedRevision: props.state.revision }, (result) => {
+      setFeedback(result.ok ? "Player claim released." : result.message ?? "The player claim could not be released.");
+    });
+  };
+
   return <section className="roster" aria-labelledby="roster-heading">
     <div className="roster-heading">
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
-      <p>{props.role === "player" ? "One character per player for this testing milestone." : "Player claims update here in real time. GM force-release is the next control."}</p>
+      <p>{props.role === "player" ? "One character per player for this testing milestone." : "Player claims update here in real time. You can release a stale claim when someone changes devices."}</p>
     </div>
     {actors.length === 0 ? <p className="roster-empty">No player characters are available yet.</p> : <div className="actor-grid">
       {actors.map((actor) => {
@@ -40,6 +47,7 @@ export function ActorRoster(props: Props) {
           <div className="actor-card-title"><div className="actor-monogram" aria-hidden="true">{actor.name.slice(0, 1)}</div><div><h3>{actor.name}</h3><span className={`claim-status${mine ? " claim-status-owned" : ""}`}>{status}</span></div></div>
           <dl><div><dt>HP</dt><dd>{actor.hp.current}/{actor.hp.maximum}</dd></div><div><dt>AC</dt><dd>{actor.armorClass ?? "—"}</dd></div><div><dt>Initiative</dt><dd>{actor.initiative === undefined ? "—" : actor.initiative >= 0 ? `+${actor.initiative}` : actor.initiative}</dd></div></dl>
           {props.role === "player" && (mine ? <button className="actor-action actor-release" onClick={release}>Release character</button> : <button className="actor-action" disabled={unavailable} onClick={() => claim(actor.id)}>{unavailable ? "Already claimed" : "Claim character"}</button>)}
+          {props.role === "gm" && "ownerSessionId" in actor && actor.ownerSessionId && <button className="actor-action actor-release" onClick={() => forceRelease(actor.id)}>Force release</button>}
         </article>;
       })}
     </div>}
