@@ -12,6 +12,8 @@ A private, LAN-hosted, combat-first D&D 5e virtual tabletop for one trusted GM a
 
 ## Run locally
 
+Prerequisite: Node.js 24 or newer.
+
 ```bash
 npm install
 cp .env.example .env
