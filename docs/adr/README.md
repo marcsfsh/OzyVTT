@@ -7,7 +7,7 @@
 | 003 | Proposed | Choose a mature Canvas/WebGL renderer after the interaction spike |
 | 004 | Accepted | TypeScript end to end with React, Express, Socket.IO, and SQLite target |
 | 005 | Accepted | Server-authoritative WebSocket command/event flow with reconnect snapshots |
-| 006 | Proposed | SQLite projections plus transactional event history for the first durable store |
+| 006 | Accepted | Embedded SQLite with migrations, transactional command/event/projection writes, and snapshots |
 | 007 | Accepted | Versioned validated JSON with adapters and extension data |
 | 008 | Accepted | Declarative rules operations plus inert text fallback |
 | 009 | Proposed | Square grid / five-foot cells for MVP; measurement conventions pending spike |
