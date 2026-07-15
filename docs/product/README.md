@@ -1,11 +1,14 @@
 # Product proof artifacts
 
-This directory holds low-fidelity wireframes, browser/device observations, and technical-spike evidence. These artifacts decide the foundation before feature work begins.
+This directory holds product contracts, checkpoint outcomes, wireframes, browser/device observations, and technical-spike evidence.
 
-Planned first artifacts:
+## Current artifacts
 
-1. Phone portrait and desktop landing/claim and GM-login wireframes.
-2. Direct-IP startup and LAN-connectivity observations.
-3. Canvas/WebGL map and touch-input spike evidence.
-4. Realtime reconnect/convergence and persistence/idempotency evidence.
-5. Dice visibility/projection proof.
+- [Actor definition version 1](actor-definition-v1.md)
+- [Continuous integration](continuous-integration.md)
+- [Phase 0 renderer and input spike](phase-0-renderer-spike.md)
+- [Phase 0 server-authoritative dice spike](phase-0-dice-spike.md)
+- [Phase 0 command/persistence spike](phase-0-command-persistence-spike.md)
+- [Phase 1 starter roster and character claims](phase-1-character-roster.md)
+
+Physical-device observations, end-to-end wireframes, and realtime multi-client convergence evidence remain to be added.
