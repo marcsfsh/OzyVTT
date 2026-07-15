@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,16 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { 
 const auth = new AuthService(join(dataDir, "auth.json"));
 const store = new GameStore(join(dataDir, "game-state.json"));
 const playerSessions = new Map<string, string>(); // socket.id -> stable browser session id (future cookie-backed)
+
+function lanUrls(portNumber: number) {
+  const addresses = new Set<string>();
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family === "IPv4" && !entry.internal) addresses.add(`http://${entry.address}:${portNumber}`);
+    }
+  }
+  return [...addresses];
+}
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 const playerView = (): PlayerView => {
@@ -75,4 +86,7 @@ io.on("connection", (socket) => {
 });
 
 await Promise.all([auth.initialize(), store.initialize()]);
-httpServer.listen(port, "0.0.0.0", () => console.log(`VTT server ready on http://localhost:${port}`));
+httpServer.listen(port, "0.0.0.0", () => {
+  console.log(`VTT server ready on http://localhost:${port}`);
+  for (const url of lanUrls(port)) console.log(`LAN join URL: ${url}`);
+});
