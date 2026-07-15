@@ -74,6 +74,7 @@ This table is the fast operational view. The detailed requirements and milestone
 | Dice | Phase 0 proof complete | Server-authoritative parser/evaluator, cryptographic live rolls, deterministic tests, recipient-specific visibility, and replaceable 2D results are implemented | Connect rolls to imported actions/combat consequences and complete browser/device accessibility validation | `docs/product/phase-0-dice-spike.md`, `packages/rules-5e/`, `apps/client/src/dice/` |
 | Persistence | Phase 1 foundation complete | SQLite migrations, WAL, atomic receipt/event/projection commits, idempotency, restart recovery, and periodic snapshots are verified | Backup/restore, rollback policy, bounded undo, migration backup, and production data lifecycle | ADR-006, `apps/server/src/game-store.ts`, `apps/server/test/game-store.test.ts` |
 | Battle/regional/world maps | Planned | Easy battlemap grid-calibration wizard and later atlas/marker/session-note requirements are recorded without changing current priority | Implement battlemap upload/normalization and calibration in Phase 2; atlas features remain post-Version-1 | Sections 18.6–18.8 and Phase 2 |
+| Shared-table viewer | Planned for Phase 2 | Requirement and authorization boundary are defined for a read-only TV/second-screen battlemap and Initiative display controlled from the GM view | Build viewer route/session, public projection, reconnect, fullscreen layout, and explicit GM presentation controls for focus, ping, measurement, and highlight | Sections 6.3.2, 16.3.1, and Phase 2 |
 
 **Current milestone assessment:** Phase 0 and Phase 1 overlap intentionally. The app opens and demonstrates foundational behavior, but neither exit gate is claimed until phone/laptop LAN testing and the complete placeholder-character claim/reconnect scenario pass.
 
@@ -85,7 +86,7 @@ This queue is derived from the milestone dependencies and is updated after each 
 2. Finish GM logout/session revocation and failed-login rate limiting.
 3. Add presence/reconnect/convergence coverage with multiple simulated clients.
 4. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
-5. Begin the Phase 2 battlemap upload and easy grid-calibration vertical slice after the Phase 1 join gate is satisfied.
+5. Begin the Phase 2 battlemap upload, easy grid-calibration, and shared-table viewer vertical slice after the Phase 1 join gate is satisfied.
 
 ### 1.6 Open blockers, risks, and validation gaps
 
@@ -100,6 +101,7 @@ There are no active hard blockers to the next queued implementation item.
 | GAP-003 | Open documentation gap | Phase 0 decision gate | ADR index marks several decisions accepted while only ADR-001, ADR-002, and ADR-006 currently have dedicated files | Expand accepted ADR-004/005/007/008/011/012/014 decisions into numbered records before claiming the Phase 0 exit gate |
 | GAP-004 | Open packaging gap | Production launch | Shared workspace packages currently export TypeScript source, so the supported launch uses Node's `tsx` loader even after the production client build | Add ordered shared-package compilation and runtime exports before packaging the host application |
 | RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
+| RISK-003 | Open visibility risk | Shared-table viewer | Mirroring a GM screen could expose hidden tokens, fogged areas, secret Initiative, notes, rolls, or private preparation gestures | Use a separate server-side viewer projection and explicit presentation commands; add negative payload/UI/cache tests before the Phase 2 gate |
 
 ### 1.7 Implementation outcome ledger
 
@@ -115,6 +117,7 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-15 | PLAN-001 | Complete | Added easy battlemap grid calibration plus deferred regional/world atlas, scale, marker, safe Markdown, and spatial session-note requirements | Sections 18.6–18.8; roadmap placement reviewed | Implement battlemap workflow in Phase 2; atlas remains post-Version-1 |
 | 2026-07-15 | FND-004 | Complete | Replaced the JSON proof with embedded SQLite migrations and atomic command receipt/event/projection persistence plus periodic snapshots | All 16 repository tests, TypeScript checks, production builds, ADR-006; GitHub checkpoint `523c8d8` | Backup/restore and undo are later Phase 1/Version 1 work |
 | 2026-07-15 | FND-005 | Complete (automated scope) | Added a one-time durable three-character starter roster, player-safe available/mine/claimed projections, responsive claim/release UI, one-character-per-session enforcement, and a reliable single-server start command | 18 tests, type-check, and production builds pass; seed persistence/non-duplication and private-identifier omission are tested; a fresh server reaches its ready state | Multi-client race/restart acceptance, GM force-release, physical-device UX, and compiled shared-package runtime exports remain |
+| 2026-07-15 | PLAN-002 | Complete | Added the required GM-orchestrated shared-table viewer for a TV/second screen, including battlemap, Initiative, public-state isolation, and remotely presented focus/pings/measurements/highlights | Product journey, role/permission model, realtime behavior, Phase 2 scope/exit gate, risk register, and release tests updated | Implement with the Phase 2 battlemap/Initiative vertical slice without displacing the current Phase 1 queue |
 
 ## 2. Product definition
 
@@ -155,8 +158,9 @@ These are product targets to validate through testing, not immutable promises:
 | --- | --- | --- |
 | GM | Prepare encounters quickly, control visibility, run monsters, make rulings, correct mistakes | Full control, quick-add workflows, sensible defaults, manual override, undo, private information controls |
 | Player | Join quickly, control one or more assigned characters, understand current turn and available actions | Direct-IP entry and character selection, focused action tray, clear turn state, owned-token controls, readable roll outcomes |
+| Shared table/display | Let players follow play from a TV or second screen without requiring personal devices | Read-only fullscreen player-safe battlemap, Initiative, and public presentation cues remotely orchestrated from the GM view |
 
-The product may eventually support observers or assistant GMs, but neither role is required for the first playable release.
+The shared-table viewer is required for the minimum playable vertical slice. It is a passive display surface, not a general observer account or public spectator link. Independent observers and assistant GMs remain later candidates.
 
 ### 2.5 Operating assumptions
 
@@ -171,6 +175,7 @@ The product may eventually support observers or assistant GMs, but neither role 
 - Monster content is imported or supplied in curated data bundles.
 - Phone and laptop clients have the same functional capabilities. Layout and interaction change responsively for the screen size and input type, but mobile is not a reduced companion experience.
 - Both player and GM roles must remain operable on a phone, including battle-map interaction, actions, dice, combat management, and GM tools when authenticated.
+- The GM may run a read-only viewer on a second monitor, television, projector, or separate LAN browser so players can follow the public battlemap and Initiative without individual devices.
 - Combat is the center of the application. Exploration on maps is supported only where it naturally follows from the combat canvas.
 - The GM's ruling always outranks the automation.
 
@@ -356,7 +361,7 @@ Version 1 is not defined by automating the entire SRD. It is defined by being de
 - Additional ruleset adapters
 - Import adapters for third-party character exporters
 - Optional 3D tabletop dice presentation, implemented behind the replaceable dice-presentation boundary
-- Public spectator links
+- Public remote spectator links with independent identities/access (distinct from the required local shared-table viewer)
 - Assistant GM role
 - Regional and world atlas maps with configurable real-world/fantasy scales
 - Clickable categorized map markers with safe Markdown notes
@@ -448,6 +453,27 @@ Acceptance criteria:
 - [ ] The GM can sign out and revoke other GM sessions.
 - [ ] A player cannot obtain GM state by changing client-side role values or calling GM endpoints directly.
 - [ ] Direct-IP HTTP is treated as a trusted-LAN mode; if the IP/port is exposed outside the trusted network, the deployment guide requires a secure tunnel/VPN or TLS reverse proxy because an HTTP password/session is not protected in transit.
+
+### 6.3.2 Present the table on a shared viewer
+
+**Goal:** let the GM put a player-safe battle display on a TV, projector, second monitor, or separate LAN device and direct attention there without exposing the GM workspace.
+
+1. From the GM view, the GM chooses **Open table viewer** for a local second window/display or creates a short-lived pairing/link path for a separate LAN browser.
+2. The viewer opens fullscreen or presentation-ready and shows the active player-visible battlemap, visible tokens/fog state, and readable Initiative order/current turn.
+3. The viewer cannot claim a character, move tokens, roll, advance turns, edit state, or request GM data.
+4. From ordinary GM controls, the GM explicitly sends a map focus/viewport, location ping, measurement line/path, token/area highlight, or clear-presentation command to one or all connected viewers.
+5. Viewer-only presentation overlays are ephemeral by default and do not clutter combat history; a consequential map measurement/drawing is persisted only through its normal GM command.
+6. If the viewer disconnects or reloads, it receives the latest authorized scene/Initiative snapshot and current presentation state without exposing prior private GM activity.
+
+Acceptance criteria:
+
+- [ ] Viewer mode is a separate server-authorized projection, never a CSS-hidden copy of the GM DOM/state.
+- [ ] The viewer receives only information a normal player is permitted to know, including player-safe fog, tokens, Initiative entries, and public rolls/cues.
+- [ ] The GM can target a connected viewer and explicitly present center/follow, ping, measurement, and highlight actions from the GM view.
+- [ ] Private GM cursor movement, measurements, selections, drafts, notes, rolls, hidden tokens, secret Initiative entries, and unrevealed fog never appear unless explicitly converted into a permitted public action.
+- [ ] The viewer is readable at normal television distance in fullscreen 16:9 layouts and remains usable at common 1080p and 4K display sizes.
+- [ ] The viewer reconnects without manual encounter reconfiguration and cannot send consequential game commands.
+- [ ] Players using phones/laptops and players watching only the shared viewer see a consistent public battle state.
 
 ### 6.4 Run a routine combat turn
 
@@ -1641,18 +1667,19 @@ Do not require confirmation for reversible, ordinary operations such as moving a
 
 ### 16.1 Roles
 
-| Capability | GM | Player |
-| --- | --- | --- |
-| Manage game/content/scenes | Yes | No |
-| View GM-only state | Yes | No |
-| Control assigned actor | Any | Claimed/assigned only |
-| Move assigned token | Any | Room policy/claimed |
-| Roll for assigned actor | Any | Claimed/assigned only |
-| Apply consequential results | Yes; optionally delegate | Own permitted actions/proposals |
-| Advance turn | Yes | Optional own-turn setting |
-| Join/read player-safe scene | Yes | Yes |
+| Capability | GM | Player | Shared viewer |
+| --- | --- | --- | --- |
+| Manage game/content/scenes | Yes | No | No |
+| View GM-only state | Yes | No | No |
+| Control assigned actor | Any | Claimed/assigned only | No |
+| Move assigned token | Any | Room policy/claimed | No |
+| Roll for assigned actor | Any | Claimed/assigned only | No |
+| Apply consequential results | Yes; optionally delegate | Own permitted actions/proposals | No |
+| Advance turn | Yes | Optional own-turn setting | No |
+| Join/read player-safe scene | Yes | Yes | Yes, display projection only |
+| Receive GM presentation commands | Author/send | Normal public cues | Yes: focus, ping, measure, highlight |
 
-Observer and assistant-GM roles remain post-Version-1 candidates. Do not add their entry/permission complexity until the actual table needs them.
+The shared viewer is a constrained display role required for the testing MVP. It has no identity, actor ownership, chat, independent hidden-state policy, or consequential command authority. General observers and assistant GMs remain post-Version-1 candidates.
 
 ### 16.2 Direct-IP entry, character claiming, and GM authentication
 
@@ -1692,6 +1719,18 @@ Define visibility at the entity/field/event level:
 
 Test that forbidden data is absent from player messages, initial HTML/state, logs, and cached API responses.
 
+### 16.3.1 Shared-table viewer authorization and presentation channel
+
+- Define a dedicated `ViewerView`/viewer snapshot derived from the player-safe scene projection, not from the GM state object.
+- Give the viewer an explicit read-only session/capability. A viewer connection must be unable to reuse presentation events as game commands.
+- Permit the GM to launch a local viewer window directly and optionally pair a separate LAN display with a short-lived code/link. Pairing grants viewer capability only, never GM authority.
+- Track viewer presence and a stable viewer ID so the GM can target one display or broadcast to all connected displays.
+- Keep viewer presentation commands in an ephemeral channel: set/follow viewport, center point/rectangle, ping point, display measurement line/path and label, highlight token/area, and clear overlays.
+- Require an explicit **Show on viewer** action or clearly enabled presentation mode. Do not mirror the GM cursor, ruler, selection, viewport, or draft overlays by default.
+- Sanitize Initiative for the viewer: hidden combatants use the settled player-safe placeholder/omission policy, and private tiebreakers or stats are absent.
+- Viewer reconnect receives the current authorized scene, Initiative, public log/cues, and current presentation state; expired transient pings need not replay.
+- Viewer payloads, DOM, accessibility tree, logs, and caches must pass the same negative secret-data tests as player clients.
+
 ### 16.4 Realtime synchronization
 
 - Server assigns monotonically ordered event sequence/revisions per active encounter.
@@ -1700,6 +1739,7 @@ Test that forbidden data is absent from player messages, initial HTML/state, log
 - HP, resources, rolls, turn transitions, and visibility changes should wait for or clearly reconcile with authoritative acknowledgement.
 - Client reconnect requests a current authorized snapshot plus later events.
 - Presence/cursor/ping updates may use ephemeral channels and need not enter permanent history.
+- Viewer focus, ping, measurement, and highlight directives use a separate GM-authorized ephemeral presentation channel and may target one viewer or all viewers.
 - Slow/disconnected clients must not block turn progression.
 - Backpressure and event-log catch-up must be bounded; use fresh snapshots when needed.
 
@@ -2329,6 +2369,7 @@ Exercise server, database, and domain together:
 - actor/content import and live instance creation;
 - encounter start through several turns;
 - public and secret roll authorization;
+- viewer pairing/read-only authorization, public projection, reconnect, and GM presentation directives;
 - attack/save/damage/effect compound commands;
 - autosave, restart, snapshot replay, and undo;
 - migration and restore;
@@ -2340,6 +2381,7 @@ Exercise server, database, and domain together:
 Use multiple simulated clients and injected latency/disconnects:
 
 - GM and two players join from fresh sessions;
+- GM pairs or opens a shared viewer, targets it with focus/ping/measurement directives, and the viewer cannot issue game commands;
 - public roll appears to all, GM-only roll appears only to GM, blind check result appears only to GM;
 - two devices attempt one character claim;
 - duplicate/reordered command delivery;
@@ -2367,6 +2409,7 @@ Automate the critical workflows at representative desktop and phone viewports:
 8. Resolve attack, save, damage, healing, condition, and End Turn.
 9. Refresh both clients and verify state.
 10. Undo a compound result and verify both clients.
+11. Open a shared viewer, confirm battlemap/Initiative parity, send GM focus/ping/measurement/highlight directives, reload it, and verify no private state appears.
 
 Do not rely exclusively on browser automation for gesture quality; manual device testing is required.
 
@@ -2389,6 +2432,7 @@ Manual device passes must cover:
 - host IP/port entry, bookmark, and optional QR path;
 - GM password manager/autofill behavior;
 - map and JSON upload from mobile file providers;
+- GM presentation controls for targeting the shared viewer and sending focus, ping, measurement, highlight, and clear actions;
 - safe areas, orientation, browser chrome, and on-screen keyboard.
 
 No milestone exits while a desktop feature lacks a usable mobile path.
@@ -2410,10 +2454,12 @@ No milestone exits while a desktop feature lacks a usable mobile path.
 - Canvas alternative controls and status announcements.
 - Color/shape/icon checks for token and target states.
 - Reduced-motion verification.
+- Shared-viewer Initiative and presentation cues readable at television distance, with non-color-only ping/highlight treatment and reduced-motion behavior.
 
 ### 24.11 Performance and load tests
 
 - Normal and stress maps at supported maximum dimensions.
+- Shared viewer at 1080p and 4K fullscreen while the GM and player clients continue normal map interaction.
 - 50 and 100 visible tokens with status badges/HP bars.
 - Long encounter with thousands of log events.
 - Large JSON content bundle.
@@ -2434,6 +2480,7 @@ No milestone exits while a desktop feature lacks a usable mobile path.
 - Cross-site request/origin protections.
 - Malicious JSON, Markdown, file names, images, and archive paths.
 - Secret-roll data absence from player snapshots, realtime frames, logs, DOM, accessibility tree, and browser persistence.
+- GM-only data absence from viewer snapshots, presentation events, realtime frames, logs, DOM, accessibility tree, and browser persistence; viewer attempts to send state-changing commands are rejected.
 - Hidden tokens/fog/NPC information absence from unauthorized payloads.
 - Dependency and container/file-permission scans.
 
@@ -2504,6 +2551,8 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Place, select, target, move, duplicate, label, and remove tokens.
 - [ ] Owned-token and GM control on phone and desktop.
 - [ ] Encounter roster, Initiative roll/manual entry, sort, current turn, next/previous, round counter.
+- [ ] Shared-table viewer route/session with fullscreen player-safe battlemap and readable Initiative/current-turn display.
+- [ ] GM viewer controls for selecting a display and explicitly sending viewport focus/follow, location ping, measurement line/path, highlight, and clear-overlay directives.
 - [ ] Generic and imported attack dice plus quick manual dice tray.
 - [ ] Public, GM-only, blind, and self-only roll projection; readable 2D result/log.
 - [ ] HP, maximum HP, temporary HP, raw damage/healing, and basic condition add/remove.
@@ -2512,7 +2561,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Player-safe versus GM state projection.
 - [ ] Phone portrait/landscape parity for every item above.
 
-**Exit gate:** using only the normal UI, a GM locally hosts a three-round PC-versus-monsters encounter while one player uses a phone and another uses a laptop; secret rolls stay secret; refresh/reconnect loses no accepted state.
+**Exit gate:** using only the normal UI, a GM locally hosts a three-round PC-versus-monsters encounter while one player uses a phone, another uses a laptop, and a read-only shared viewer shows the safe battlemap and Initiative on a second screen; the GM can present a ping and measurement to that viewer; secret state stays absent; refresh/reconnect loses no accepted state.
 
 ### Phase 3 — Playable alpha: fast normal combat
 
@@ -2668,11 +2717,13 @@ For each promoted mechanic, add:
 | Source extraction quality | Generated SRD content contains merged columns or incorrect actions | High warning count and nonsensical parsed fields | Curated pipeline, human review, coverage subset, source metadata, golden fixtures |
 | Realtime divergence/duplicate commands | Clients disagree or apply damage twice | Refresh “fixes” state; intermittent duplicate log entries | Server authority, idempotency IDs, ordered revisions, snapshots, concurrency tests |
 | Secret information leak | Players can inspect hidden roll/token data | Data present but hidden in UI | Server-side projections, negative authorization tests, no secret payload to unauthorized clients |
+| Shared viewer leaks GM workspace | A TV/projector exposes private state or preparation gestures to the table | Viewer is implemented as screen mirroring or receives the GM projection | Dedicated read-only viewer projection, explicit presentation channel, no default cursor/ruler mirroring, negative viewer payload/DOM/cache tests |
 | Direct-IP networking friction | Phones cannot reach host | Binding to localhost, firewall/guest Wi-Fi/client isolation, changing IP | Bind/display LAN URLs, startup reachability guidance, QR, firewall diagnostics, stable DHCP reservation guidance |
 | Plain HTTP exposed beyond LAN | GM password/session can be intercepted | Port forwarded to internet without TLS/VPN | Explicit trusted-LAN boundary; warn/detect exposure when possible; document VPN/tunnel/TLS proxy |
 | Local host sleeps/restarts | Session interrupts | Host power management or browser assumed to be server | Persistent standalone server, startup checks, autosave every command, restart recovery |
 | Data corruption or migration failure | Game/content lost | Unrestored backups or one-way migration | Transactional persistence, automatic pre-update backup, clean-host restore tests |
 | Map/mobile performance | Large images or many tokens crash phone browser | Memory spikes, blank canvas, tab reload | Image limits/tiling/downsampling, baseline-device budgets, fallback, stress fixtures |
+| Shared-display readability/performance | Initiative or overlays are unreadable at TV distance, or 4K rendering harms other clients | Tiny UI, stutter during GM interaction, oversized viewer snapshots | 16:9 presentation layout, distance-readable type, 1080p/4K fixtures, independent viewer performance budgets |
 | UI becomes dense | “Everything needed” turns into everything always visible | Several toolbars/panels; users hunt during turns | Context tray, sheets, progressive disclosure, usability timing tests |
 | Dependency lock-in | Renderer or dice/UI library blocks mobile/accessibility | Core domain imports library-specific types | Boundary interfaces, technical spikes, pinned dependencies, domain independent of renderer |
 | Ruleset/version ambiguity | 2014/2024/homebrew data behaves inconsistently | Same field means different mechanics | Pin SRD 5.2.1, content/ruleset versions, adapter metadata, explicit upgrades |
@@ -2790,6 +2841,17 @@ Run this suite against a release candidate on a clean host installation. Use at 
 - [ ] Reveal a secret result through an explicit auditable action if supported.
 - [ ] Reload/reconnect and verify visibility remains correct in history.
 
+### 28.4.1 Shared-table viewer
+
+- [ ] GM opens a local second-window viewer and pairs a separate LAN viewer without granting either GM authority.
+- [ ] Viewer shows the same player-safe battlemap, fog, visible tokens, Initiative order, and current turn as player clients.
+- [ ] GM targets one viewer and all viewers with focus/follow, ping, measurement, highlight, and clear-overlay actions.
+- [ ] Private GM cursor/ruler/selection/draft activity remains absent until the GM explicitly chooses **Show on viewer**.
+- [ ] Hidden actors, secret Initiative entries, notes, fogged content, private rolls, and private stats are absent from viewer payloads, DOM, accessibility tree, logs, caches, and reconnect snapshots.
+- [ ] Viewer attempts to claim, move, roll, advance, edit, or call GM commands are rejected without changing state.
+- [ ] Viewer reload/reconnect restores current public scene, Initiative, and presentation state.
+- [ ] Fullscreen layouts remain readable and performant at normal television distance at 1080p and 4K.
+
 ### 28.5 Mobile parity
 
 - [ ] Complete every routine combat action in phone portrait.
@@ -2850,9 +2912,9 @@ Keep this small dashboard current near the top or here:
 
 | Phase | Status | Exit gate evidence |
 | --- | --- | --- |
-| Phase 0 — Product lock and technical proof | Not started | — |
-| Phase 1 — Local-host foundation | Not started | — |
-| Phase 2 — Minimum playable vertical slice | Not started | — |
+| Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, and renderer proofs exist; physical-device/network, renderer stress/input, realtime convergence, wireframes, and remaining ADR records block the gate |
+| Phase 1 — Local-host foundation | In progress | Auth/session shell, durable roster/claims, recipient projections, CI, health endpoint, and transactional SQLite exist; full claim/restart scenario, auth hardening, presence, diagnostics, and device acceptance block the gate |
+| Phase 2 — Minimum playable vertical slice | Planned; requirements active | Battlemap calibration and shared-table viewer requirements are defined; implementation waits on the Phase 1 join/recovery gate |
 | Phase 3 — Playable alpha | Not started | — |
 | Phase 4 — Rules-assisted beta | Not started | — |
 | Phase 5 — Preparation speed/content | Not started | — |
@@ -2892,17 +2954,7 @@ Before promoting a material feature:
 
 ### 29.5 Immediate next actions
 
-Proceed in this order:
-
-1. Record the resolved ADRs for local hosting, direct-IP entry, GM-password/character-claim identity, phone parity, server-authoritative dice/secret visibility, and deferred 3D presentation.
-2. Choose the host packaging target and TypeScript/server/client stack.
-3. Create phone-portrait and desktop wireframes for landing/claim, GM login, encounter setup, and routine combat.
-4. Define minimal versioned character and monster JSON schemas using real sample player/monster data.
-5. Build the direct-IP/mobile connectivity spike.
-6. Build the map/token renderer and touch-input spike.
-7. Build the realtime/persistence/idempotency spike.
-8. Build the dice parser, secret projection, and 2D presentation spike.
-9. Review spike evidence, finalize foundational ADRs, and scaffold the repository.
+The canonical executable queue is maintained once, in Section 1.5. Do not duplicate it here; update that queue and the implementation outcome ledger together after every checkpoint.
 10. Implement Phase 1 without pulling Phase 3–5 features forward.
 
 The first implementation milestone is successful when the local host, phone browser, laptop browser, identity/claim model, realtime state, and persistence foundation work together. Deep rules automation before that point would optimize the wrong layer.
