@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vtt.local/schemas/actor-definition.v1.schema.json",
+  "title": "VTT actor definition v1",
+  "type": "object",
+  "required": ["schemaId", "schemaVersion", "source", "name", "size", "abilityScores", "proficiencyBonus", "armorClass", "hitPoints", "speedFeet"],
+  "properties": {
+    "schemaId": { "enum": ["vtt.actor-character", "vtt.actor-monster"] }, "schemaVersion": { "const": 1 },
+    "source": { "type": "object", "required": ["name", "version"], "properties": { "name": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 }, "externalId": { "type": "string" } }, "additionalProperties": false },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "summary": { "type": "string", "maxLength": 280 }, "size": { "enum": ["tiny", "small", "medium", "large", "huge", "gargantuan"] },
+    "abilityScores": { "type": "object", "required": ["str", "dex", "con", "int", "wis", "cha"], "additionalProperties": false, "properties": { "str": { "$ref": "#/$defs/ability" }, "dex": { "$ref": "#/$defs/ability" }, "con": { "$ref": "#/$defs/ability" }, "int": { "$ref": "#/$defs/ability" }, "wis": { "$ref": "#/$defs/ability" }, "cha": { "$ref": "#/$defs/ability" } } },
+    "proficiencyBonus": { "type": "integer", "minimum": 0, "maximum": 12 }, "armorClass": { "type": "integer", "minimum": 1, "maximum": 40 }, "hitPoints": { "type": "object", "required": ["maximum"], "properties": { "maximum": { "type": "integer", "minimum": 1 }, "formula": { "$ref": "#/$defs/dice" } }, "additionalProperties": false }, "initiativeBonus": { "type": "integer", "minimum": -20, "maximum": 30 }, "speedFeet": { "type": "integer", "minimum": 0 },
+    "actions": { "type": "array", "items": { "$ref": "#/$defs/action" }, "maxItems": 100 }, "token": { "type": "object" }, "extensions": { "type": "object", "additionalProperties": true }
+  }, "additionalProperties": false,
+  "$defs": { "ability": { "type": "integer", "minimum": 1, "maximum": 30 }, "dice": { "type": "string", "pattern": "^\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?$" }, "action": { "type": "object", "required": ["id", "name", "activation", "description"], "properties": { "id": { "type": "string", "pattern": "^[a-z0-9-]+$" }, "name": { "type": "string", "minLength": 1 }, "activation": { "enum": ["action", "bonus-action", "reaction", "other"] }, "description": { "type": "string", "minLength": 1 }, "attack": { "type": "object", "required": ["bonus"], "properties": { "bonus": { "type": "integer" }, "reachFeet": { "type": "integer", "minimum": 1 }, "rangeFeet": { "type": "integer", "minimum": 1 } }, "additionalProperties": false }, "damage": { "type": "array", "items": { "type": "object", "required": ["formula", "type"], "properties": { "formula": { "$ref": "#/$defs/dice" }, "type": { "type": "string" } }, "additionalProperties": false } } }, "additionalProperties": false } }
+}
