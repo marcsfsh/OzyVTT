@@ -8,6 +8,7 @@
 | Product stage | Phase 0 proof and Phase 1 foundation in progress |
 | Rules baseline | System Reference Document 5.2.1 (2024 fifth-edition rules) |
 | Primary use | One GM locally hosting a private home game for a small, known group |
+| Distribution direction | Open-source, self-hostable application with a documented public integration API |
 | Primary content path | Imported player-character and monster JSON |
 | Current checkpoint | Durable starter roster and player claim/release UI complete; multi-client claim/recovery controls next |
 | Last updated | 2026-07-15 |
@@ -75,6 +76,7 @@ This table is the fast operational view. The detailed requirements and milestone
 | Persistence | Phase 1 foundation complete | SQLite migrations, WAL, atomic receipt/event/projection commits, idempotency, restart recovery, and periodic snapshots are verified | Backup/restore, rollback policy, bounded undo, migration backup, and production data lifecycle | ADR-006, `apps/server/src/game-store.ts`, `apps/server/test/game-store.test.ts` |
 | Battle/regional/world maps | Planned | Easy battlemap grid-calibration wizard and later atlas/marker/session-note requirements are recorded without changing current priority | Implement battlemap upload/normalization and calibration in Phase 2; atlas features remain post-Version-1 | Sections 18.6–18.8 and Phase 2 |
 | Shared-table viewer | Planned for Phase 2 | Requirement and authorization boundary are defined for a read-only TV/second-screen battlemap and Initiative display controlled from the GM view | Build viewer route/session, public projection, reconnect, fullscreen layout, and explicit GM presentation controls for focus, ping, measurement, and highlight | Sections 6.3.2, 16.3.1, and Phase 2 |
+| Open integration API and open-source distribution | Foundational requirement; design active | Existing typed schemas, authoritative commands, revisions, idempotency, projections, and events provide the core seams | Settle ADR-016/017; add `/api/v1`, OpenAPI, scoped tokens, protocol/version negotiation, contract tests, integration docs, compatibility policy, and repository governance/license files | Sections 9.5, 16.6, Phase 1, and Phase 6 |
 
 **Current milestone assessment:** Phase 0 and Phase 1 overlap intentionally. The app opens and demonstrates foundational behavior, but neither exit gate is claimed until phone/laptop LAN testing and the complete placeholder-character claim/reconnect scenario pass.
 
@@ -84,9 +86,10 @@ This queue is derived from the milestone dependencies and is updated after each 
 
 1. Add claim-race, remembered-session, restart, and GM force-release integration coverage and controls.
 2. Finish GM logout/session revocation and failed-login rate limiting.
-3. Add presence/reconnect/convergence coverage with multiple simulated clients.
-4. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
-5. Begin the Phase 2 battlemap upload, easy grid-calibration, and shared-table viewer vertical slice after the Phase 1 join gate is satisfied.
+3. Establish the open API foundation: ADR-016, versioned `/api/v1` envelope/capabilities endpoint, OpenAPI source, scoped integration credentials, and contract-test harness.
+4. Add presence/reconnect/convergence coverage with multiple simulated clients.
+5. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
+6. Begin the Phase 2 battlemap upload, easy grid-calibration, shared-table viewer, and API-driven vertical slice after the Phase 1 join gate is satisfied.
 
 ### 1.6 Open blockers, risks, and validation gaps
 
@@ -102,6 +105,8 @@ There are no active hard blockers to the next queued implementation item.
 | GAP-004 | Open packaging gap | Production launch | Shared workspace packages currently export TypeScript source, so the supported launch uses Node's `tsx` loader even after the production client build | Add ordered shared-package compilation and runtime exports before packaging the host application |
 | RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
 | RISK-003 | Open visibility risk | Shared-table viewer | Mirroring a GM screen could expose hidden tokens, fogged areas, secret Initiative, notes, rolls, or private preparation gestures | Use a separate server-side viewer projection and explicit presentation commands; add negative payload/UI/cache tests before the Phase 2 gate |
+| DEC-002 | Open decision | Public release | Application code license, contributor policy, and treatment of separately licensed SRD/content/assets are not settled | Resolve ADR-017 and complete legal/license review before accepting public contributions or publishing a Version 1 release |
+| RISK-004 | Open security/compatibility risk | Public API | An integration could bypass UI safeguards, leak private state, or become coupled to unstable internals | Put API adapters over the same command/authorization/projection layer; use scoped tokens, contract tests, explicit versions, capability discovery, and deprecation policy |
 
 ### 1.7 Implementation outcome ledger
 
@@ -120,12 +125,13 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-15 | PLAN-002 | Complete | Added the required GM-orchestrated shared-table viewer for a TV/second screen, including battlemap, Initiative, public-state isolation, and remotely presented focus/pings/measurements/highlights | Product journey, role/permission model, realtime behavior, Phase 2 scope/exit gate, risk register, and release tests updated | Implement with the Phase 2 battlemap/Initiative vertical slice without displacing the current Phase 1 queue |
 | 2026-07-15 | FIX-001 | Complete (automated/runtime scope) | Fixed development host/LAN browser requests failing with Express `sendFile` `NotFoundError` when no built client existed: Vite now binds to the LAN on 5173, the API safely redirects browser traffic to that development client, and startup distinguishes development versus built-client URLs | 21 tests pass, including safe IPv4/IPv6/host-header redirects; type-check/build pass; development server branch reaches ready state | User to pull and confirm host plus physical LAN device on Windows; firewall guidance added to README |
 | 2026-07-15 | FIX-002 | Complete (code/build scope) | Fixed the development blank-screen crash caused by React Strict Mode cleaning up the asynchronous Pixi proof before initialization completed; renderer startup/cleanup is now race-safe and removes listeners, renderer failures stay local, and a top-level error boundary shows actionable failures | Type-check and production build pass after lifecycle fix; client bundle builds with error boundary | User to pull and confirm in the actual Windows browser; if hardware/browser initialization still fails, the page now remains usable and displays/records the exact error |
+| 2026-07-15 | PLAN-003 | Complete | Promoted open-source self-hosting and a documented open integration API to foundational product requirements rather than a post-release add-on | Product principles, architecture, authorization, API contract, milestones, tests, risks, documentation, release/governance requirements, and next queue reconciled | Settle ADR-016/017 and implement the Phase 1 API foundation before broadening the domain surface |
 
 ## 2. Product definition
 
 ### 2.1 Product thesis
 
-The VTT is a combat workspace that turns a battle map plus character and monster JSON into a playable encounter with almost no configuration. It should feel closer to placing miniatures on a physical table than administering a general-purpose game platform.
+The VTT is an open-source, self-hostable combat workspace that turns a battle map plus character and monster JSON into a playable encounter with almost no configuration. It should feel closer to placing miniatures on a physical table than administering a general-purpose game platform, while exposing stable documented interfaces so other tools can participate without forking or scraping the UI.
 
 The experience is governed by two promises:
 
@@ -153,6 +159,7 @@ These are product targets to validate through testing, not immutable promises:
 | Reconnect recovery | Return to current authoritative state within 5 seconds under normal conditions |
 | State durability | Refreshing or reopening the session loses no accepted combat action |
 | Required technical setup | None for players; a single documented launch/deploy path for the GM |
+| First API integration | An integrator can authenticate, discover capabilities, read a safe snapshot, submit one idempotent command, and observe its authorized event using only published documentation/examples |
 
 ### 2.4 Primary users
 
@@ -161,6 +168,8 @@ These are product targets to validate through testing, not immutable promises:
 | GM | Prepare encounters quickly, control visibility, run monsters, make rulings, correct mistakes | Full control, quick-add workflows, sensible defaults, manual override, undo, private information controls |
 | Player | Join quickly, control one or more assigned characters, understand current turn and available actions | Direct-IP entry and character selection, focused action tray, clear turn state, owned-token controls, readable roll outcomes |
 | Shared table/display | Let players follow play from a TV or second screen without requiring personal devices | Read-only fullscreen player-safe battlemap, Initiative, and public presentation cues remotely orchestrated from the GM view |
+| Self-host operator | Install, update, back up, secure, diagnose, and expose integrations without reading source code | Versioned releases, documented configuration, health/capability endpoints, migration/backup guidance, and secure defaults |
+| Integrator/contributor | Connect bots, campaign tools, hardware, stream overlays, automation, importers, or alternate clients without patching core | Versioned REST/realtime contracts, OpenAPI/event schemas, scoped credentials, examples, compatibility policy, and contribution governance |
 
 The shared-table viewer is required for the minimum playable vertical slice. It is a passive display surface, not a general observer account or public spectator link. Independent observers and assistant GMs remain later candidates.
 
@@ -170,6 +179,8 @@ The shared-table viewer is required for the minimum playable vertical slice. It 
 - One trusted GM is authoritative for rulings and visibility.
 - The initial target is approximately one GM and two to eight connected players.
 - The application is locally hosted and reached directly through the host machine's IP address and port.
+- The repository is intended to become publicly available for self-hosting; application code, content, examples, and assets must have explicit compatible licenses before public release.
+- The supported integration path is an external documented API. Integrations do not need to run inside the server process or receive filesystem/database access.
 - A player joins without an account by selecting an available character.
 - Entering GM mode requires the GM password.
 - The initial rules corpus is SRD 5.2.1, but imported content may include homebrew and older fifth-edition conventions.
@@ -192,6 +203,7 @@ The following are deliberately outside the core promise unless this plan is revi
 - Three-dimensional maps or miniatures
 - A general-purpose macro language or user-authored executable scripts
 - A module ecosystem comparable to highly extensible VTTs
+- Unrestricted in-process third-party plugins, arbitrary server-side code execution, direct database coupling, or compatibility promises for undocumented internal modules
 - Complete semantic automation of every spell, class feature, feat, magic item, environmental rule, and homebrew exception
 - Public SaaS billing, user accounts, organization management, or multi-tenant commercial hosting
 - Automated encounter balancing as a prerequisite for running combat
@@ -260,6 +272,18 @@ The initiative tracker, action controls, dice results, and actor state must have
 - Any imported field that does not affect play or reference should not become visible by default.
 - Any proposed plugin or macro system is presumed out of scope unless a concrete home-game need cannot be solved more simply.
 
+### 3.14 API-first, not UI-scraping
+
+The built-in client is one consumer of authoritative application contracts. New consequential capabilities must be expressible through typed commands/events and stable resource schemas before the UI is considered complete. Integrators must never need DOM scraping, browser automation, direct SQLite access, or imports from undocumented internal packages.
+
+### 3.15 Open does not mean unauthenticated
+
+“Open API” means documented, versioned, interoperable, and available to self-host operators. It does not mean every LAN or internet client receives GM authority. API credentials are scoped, expiring/revocable where appropriate, auditable, and subject to the same authorization and visibility projections as built-in clients.
+
+### 3.16 Extensibility stays outside the trusted process by default
+
+Prefer REST, realtime events, webhooks, import/export, and generated/client SDKs over an in-process plugin runtime. This preserves simple self-hosting and limits supply-chain/security risk. A future sandboxed plugin system requires its own threat model and explicit promotion; it is not implied by the open API.
+
 ## 4. Lessons to borrow—and boundaries to preserve
 
 The project should learn from established VTT patterns without inheriting their entire configuration surface.
@@ -300,6 +324,7 @@ This is the smallest end-to-end product that proves the concept:
 - Rolls and state changes appear to all authorized clients.
 - Accepted state survives refresh and reconnect.
 - The GM can override and undo common state changes.
+- A scoped integration can discover server/API versions, read an authorized encounter snapshot, submit at least one idempotent combat command through the same domain path as the UI, and receive the resulting authorized event.
 
 This slice does not need spell automation, dynamic lighting, advanced fog, walls, encounter libraries, or complete SRD content.
 
@@ -351,6 +376,8 @@ Version 1 is not defined by automating the entire SRD. It is defined by being de
 - The core flow meets accessibility and performance targets.
 - Failures produce actionable messages and diagnostics.
 - The SRD attribution and content provenance are present.
+- The public API, event protocol, OpenAPI/schema artifacts, authentication/scopes, error model, compatibility/deprecation policy, and integration examples match the shipped server.
+- The public repository includes an approved code license, separate content/license notices, contribution/security/support guidance, reproducible builds, and no private secrets or campaign data.
 
 ### 5.5 Later candidates, not implicit commitments
 
@@ -477,6 +504,27 @@ Acceptance criteria:
 - [ ] The viewer reconnects without manual encounter reconfiguration and cannot send consequential game commands.
 - [ ] Players using phones/laptops and players watching only the shared viewer see a consistent public battle state.
 
+### 6.3.3 Connect an external integration
+
+**Goal:** let a self-host operator connect a bot, stream overlay, campaign tool, hardware controller, importer, or alternate client without modifying core or sharing the GM password.
+
+1. An authenticated GM opens **Integrations**, creates a named credential, chooses the minimum scopes, and optionally sets an expiration.
+2. The secret is shown once. The UI records only a safe identifier/fingerprint, name, scopes, creator, created/last-used time, and revocation state.
+3. The integration calls `/api/v1/system/capabilities` and reads the advertised API, realtime protocol, schema, rules/content, and optional-feature versions.
+4. It reads an authorized resource/snapshot, submits a command with a unique idempotency key and expected revision, and receives a request ID plus accepted revision/event.
+5. It subscribes to authorized realtime events or a signed webhook and handles reconnect/replay according to the documented cursor/retention policy.
+6. The GM audits recent use and revokes or rotates the credential without changing the GM password or restarting the game.
+
+Acceptance criteria:
+
+- [ ] A quick-start integration works from a clean self-host install using only published docs and examples.
+- [ ] The credential cannot exceed its scopes, role/visibility policy, game/resource boundary, or expiration and cannot retrieve a GM password/session secret.
+- [ ] The same command submitted through UI and API reaches the same validator/domain handler and produces equivalent events/projections.
+- [ ] Retries with one idempotency key produce one mutation; stale revisions return a stable conflict error with current revision guidance.
+- [ ] Secret/hidden fields are absent from unauthorized HTTP responses, realtime events, webhooks, logs, examples, and generated SDK types.
+- [ ] Credential creation, use, failure, rotation, and revocation are auditable without logging the token secret.
+- [ ] API/protocol compatibility and deprecation behavior are documented and contract-tested.
+
 ### 6.4 Run a routine combat turn
 
 **Goal:** make the next useful action obvious and keep attention on the map.
@@ -596,6 +644,8 @@ Create one ADR per material decision. Status here must match `docs/adr/README.md
 | ADR-013 | State history | Proposed / partial foundation | Transactional command/event log and periodic snapshots exist; bounded undo remains undecided/unfinished | Before combat mutations |
 | ADR-014 | Device support | Accepted requirement / baseline pending | Functional phone/desktop parity with responsive/touch-specific UX; exact supported browser versions remain open | Before Phase 1 exit |
 | ADR-015 | SRD content packaging | Proposed | Curated, normalized, versioned content bundle separate from executable code; never parse source documents at runtime | Before bulk monster conversion |
+| ADR-016 | Public integration API | Proposed / foundational | Versioned REST resources plus documented realtime commands/events over the same authoritative domain boundary; OpenAPI, capability discovery, scoped tokens, and later signed webhooks | Before the next Phase 1 domain endpoints |
+| ADR-017 | Open-source distribution and governance | Proposed | Public self-hostable repository with explicit code/content licenses, contribution/security policy, reproducible releases, and no bundled private data | Before accepting public contributions or public release |
 
 ### 8.1 Technical spikes
 
@@ -611,8 +661,9 @@ Create one ADR per material decision. Status here must match `docs/adr/README.md
 - [ ] Prototype the core combat layout at desktop and tablet widths before committing to component structure.
 - [ ] Prototype every core combat workflow at narrow phone portrait, phone landscape, tablet, and desktop widths; reject any architecture that requires a reduced mobile feature set.
 - [ ] Verify direct-IP discovery/startup: bind to the LAN interface, display usable host URLs, and connect from iOS and Android devices on the same network.
+- [ ] Prototype an external integration that obtains a scoped token, discovers API/protocol capabilities, reads a recipient-safe snapshot, submits an idempotent command, and receives its authorized event without importing server internals.
 
-Exit gate: no unresolved renderer, networking, persistence, or schema risk can plausibly invalidate the first vertical slice.
+Exit gate: no unresolved renderer, networking, persistence, schema, API security, or compatibility risk can plausibly invalidate the first vertical slice.
 
 ## 9. Conceptual architecture
 
@@ -621,6 +672,7 @@ The system should be modular enough to test rules without a browser and to chang
 ```mermaid
 flowchart TD
     C["GM and player clients"] --> S["Session API and realtime gateway"]
+    I["External integrations"] --> S
     S --> D["Command and combat domain"]
     D --> P["Persistent state and event history"]
     D --> R["Rules and content registry"]
@@ -633,6 +685,7 @@ flowchart TD
 | --- | --- | --- |
 | Scene client | Render map state, collect intent, display projections, support accessible controls | Authoritative HP, dice, permissions, or rule outcomes |
 | Session/realtime layer | Authenticate participant, accept commands, broadcast authorized state, handle presence/reconnect | UI-specific state or content parsing |
+| Public API adapter | Validate/version external requests, authenticate scoped credentials, map resources to commands/queries/events, publish documentation | Separate business rules, privileged database access, or bypasses around domain authorization/projections |
 | Combat domain | Validate commands, resolve deterministic rules, create events, maintain invariants | Browser rendering, database-specific queries, arbitrary imported code |
 | Rules/content registry | Provide ruleset version, actor/action definitions, schema validation, source/provenance metadata | Live encounter state |
 | Persistence | Transactions, migrations, snapshots, event history, backups | Rule interpretation |
@@ -659,6 +712,9 @@ flowchart TD
 - Imported rich text is inert and sanitized.
 - Derived values identify their inputs and allow explicit override where the product permits it.
 - The player's projection excludes hidden information at the server boundary; hiding only with CSS is unacceptable.
+- Built-in clients and external integrations reach consequential behavior through the same command handlers, authorization policy, idempotency rules, and recipient projections.
+- Public contracts are versioned independently from internal file/package layout; an internal refactor must not silently change the integration API.
+- Capability discovery identifies API version, realtime protocol version, rules/content/schema versions, enabled optional features, and instance limits without revealing secrets.
 
 ### 9.4 Suggested repository shape
 
@@ -672,15 +728,31 @@ packages/
   domain/              Commands, events, entities, invariants
   rules-5e/            SRD 5.2.1 calculations and rule helpers
   schemas/             Versioned JSON Schema and generated types
+  api-contract/        OpenAPI, realtime command/event schemas, error/scopes/capability contracts
+  sdk-typescript/      Thin generated/handwritten client built only on public contracts
   content-srd-5.2.1/   Curated SRD-derived data and attribution
   ui/                  Shared accessible UI components
   test-fixtures/       Actors, maps, encounters, golden outcomes
 docs/
   adr/                 Architecture Decision Records
   product/             Wireframes, usability findings, glossary
+  api/                 Authentication, quick start, resource/event guides, examples, compatibility policy
 ```
 
 Avoid creating packages simply to match this diagram. Each package should have a real dependency boundary and independent test value.
+
+### 9.5 Public API architecture baseline
+
+- REST is the durable request/query surface; Socket.IO/WebSocket is the low-latency command/event surface. Both expose versioned public contracts and converge on the same domain services.
+- Begin with `/api/v1`. A version belongs in every OpenAPI document, realtime handshake, command envelope, event envelope, webhook payload, export manifest, and SDK release.
+- Publish an OpenAPI 3.1 document for HTTP. Maintain machine-readable schemas for realtime commands/events; evaluate AsyncAPI only if it remains simpler than the protocol it documents.
+- Public resource representations use stable opaque IDs, ISO timestamps, explicit schema versions, predictable pagination/filtering, and links/identifiers rather than database row shapes.
+- State-changing HTTP and realtime requests carry a client command/idempotency key and expected revision when conflicts matter. Accepted commands return the authoritative revision/event identity.
+- Queries and events are always projected for the authenticated principal. “Read game” does not imply “read GM secrets”; scope and role/visibility are separate checks.
+- The built-in UI may use optimized endpoints, but any endpoint designated internal must be namespaced/documented as unsupported. Core feature completion requires a supported external path or an explicit exception.
+- API errors use one stable envelope containing machine code, human message, request ID, optional field issues, current revision/conflict data, and documentation link. Stack traces and secrets never cross the boundary.
+- Long-running imports/asset transforms use job resources with progress, partial failures, cancellation policy, and resulting IDs rather than holding one request open indefinitely.
+- Uploaded binary assets use the same validation, normalization, size limits, ownership, and reference lifecycle as UI uploads; API access never exposes arbitrary filesystem paths.
 
 ## 10. Canonical domain model
 
@@ -1759,6 +1831,87 @@ Define and test:
 
 Prefer explicit latest-state reconciliation and specific notices over silent last-write-wins for consequential data.
 
+### 16.6 Open integration API
+
+The API is a supported product surface, not a debug endpoint. It must remain useful to self-hosted integrations without turning internal implementation details into permanent contracts.
+
+#### 16.6.1 Contract, discovery, and versioning
+
+- Use `/api/v1` for the first stable HTTP namespace and a versioned handshake for realtime connections.
+- Publish the exact OpenAPI document and JSON Schemas served by each release. The running server exposes them plus human-readable local documentation.
+- Provide `/api/v1/system/health`, `/api/v1/system/version`, and `/api/v1/system/capabilities`; keep shallow liveness separate from authenticated diagnostics.
+- Capabilities include supported API/protocol/schema/rules/content versions, optional features, limits, and deprecation notices, but no paths, secrets, session identities, or private game metadata.
+- Every response carries or returns a request/correlation ID; every accepted mutation identifies the command ID, event ID/sequence, and authoritative revision.
+- Use additive changes within a major API version where possible. Breaking representation/semantic changes require a new major namespace/protocol version and an explicit migration guide.
+- Publish support/deprecation windows before Version 1; never silently repurpose a field or event name.
+
+#### 16.6.2 Integration credentials and scopes
+
+- GM authentication creates/manages integration credentials; integrations never receive or exchange the GM password.
+- Store only a slow hash or secure verifier/fingerprint for bearer secrets. Show a new secret once, support named credentials, expiration, rotation, revocation, last-used metadata, and least-privilege defaults.
+- Separate credential scopes from state visibility. A write scope authorizes an operation category; role/resource policy still determines which game/entity/field is visible or mutable.
+- Support instance-wide operator tokens only where unavoidable. Prefer credentials bound to one game and explicit resource/action scopes.
+- Apply rate limits, request-size limits, origin/CORS policy where browser use is supported, audit logging, and immediate revocation checks.
+- Default to LAN/self-host access. Documentation for internet exposure requires TLS/reverse proxy or a secure tunnel/VPN, token protection, and trusted proxy configuration.
+
+Initial scope vocabulary:
+
+| Scope | Allows | Explicitly does not allow |
+| --- | --- | --- |
+| `system:read` | Version, capabilities, safe health | Diagnostics secrets, filesystem/config, game data |
+| `game:read` | Authorized game/scene/encounter snapshots | GM-hidden fields unless separately granted |
+| `actors:read` / `actors:write` | Authorized actor definitions/instances and supported mutations/import jobs | Direct DB edits or ownership bypass |
+| `scene:read` / `scene:write` | Authorized maps/tokens/drawings/fog commands | Arbitrary file paths or hidden-state reads |
+| `combat:read` / `combat:write` | Initiative, HP/effects, turn/action commands within policy | Rule/authorization bypass or event rewriting |
+| `rolls:read` / `rolls:write` | Authorized roll history and roll commands | Secret modes/results outside credential visibility |
+| `events:read` | Authorized realtime/event-log subscription | Events/fields excluded by projection |
+| `webhooks:manage` | Create/rotate/pause/delete webhook subscriptions within granted event scopes | Arbitrary internal URLs/files or unsigned delivery |
+| `admin:*` | Narrow operator functions explicitly documented per endpoint | Implicit wildcard access to future features |
+
+#### 16.6.3 Initial resource and command surface
+
+| Area | Read/query resources | Mutations use authoritative commands |
+| --- | --- | --- |
+| System | Health, version, capabilities, API/schema documents | Token/webhook administration through authenticated operator endpoints |
+| Games/sessions | Game metadata, active scene/encounter, participant-safe presence | Activate scene, configuration changes, supported claim/session controls |
+| Content/actors | Actor definitions, imports/jobs, actor instances, provenance | Import, create instance, safe update/archive, assign/claim/release |
+| Scenes/maps | Scene metadata, normalized asset metadata, tokens, drawings/templates, player-safe fog | Upload/transform jobs, place/move/hide token, drawing/fog commands |
+| Combat | Encounter, roster, Initiative, current turn/round, HP/resources/effects | Start/end encounter, roll/set/reorder Initiative, advance turn, apply/undo supported effects |
+| Dice/log | Authorized roll records and paginated event/combat log | Server-authoritative roll/reveal commands; historical results are immutable |
+| Viewer/presentation | Authorized viewers and current public presentation state | GM-scoped focus/ping/measurement/highlight/clear directives |
+| Portability | Versioned export/job/backup metadata where permitted | Export/import/backup jobs with explicit high-privilege scopes |
+
+Do not expose an endpoint merely because a table or internal object exists. Public resources require stable semantics, authorization, pagination/limits, errors, examples, and contract tests.
+
+#### 16.6.4 Realtime events and webhooks
+
+- External realtime clients negotiate protocol/API versions and authenticate before subscribing. Subscriptions declare game/resource/event filters and resume cursor when supported.
+- Use one versioned command envelope and one event envelope containing IDs, type, occurred-at time, game/encounter IDs, revision/sequence, schema version, correlation/causation IDs, and authorized payload.
+- Bound event retention and document when a stale cursor receives a fresh authorized snapshot instead of replay.
+- Backpressure, heartbeat, reconnect jitter, maximum subscriptions, and slow-consumer behavior are explicit.
+- Webhooks are a later Phase 3+ delivery adapter over the same projected event contracts. Sign deliveries, include timestamp/delivery ID, prevent replay, retry with bounded exponential backoff, expose delivery logs, and allow pause/replay according to retention.
+- Prevent server-side request forgery: validate destinations, block local/metadata/file schemes by default, resolve/recheck addresses safely, and document operator overrides if self-host use needs private endpoints.
+- Never let webhook failure block game commands or realtime clients.
+
+#### 16.6.5 Documentation, examples, and SDKs
+
+- Ship a local API reference and public repository docs covering setup, authentication, scopes, quick start, resources, commands/events, errors, pagination, revisions/idempotency, rate limits, webhooks, compatibility, and security.
+- Keep examples runnable and test them in CI against an ephemeral server. Include curl plus one small TypeScript example; add other SDKs only when maintained demand exists.
+- A TypeScript SDK may wrap transport/auth/reconnect and generated types, but must remain thin and must not contain alternate domain rules.
+- Publish a Postman/Bruno-style collection only if generated/tested from the same contract; never maintain a drifting hand-written second specification.
+- Provide an integration conformance fixture/server workflow so third-party clients can validate auth, retry, revision conflict, projection, reconnect, and secret-data behavior.
+
+### 16.7 Open-source project and self-host distribution
+
+- Resolve code license, content/SRD license and attribution, example/fixture licensing, asset provenance, and contribution terms separately; never imply one license covers all materials.
+- Add `LICENSE`, `NOTICE`/attribution as needed, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, support policy, governance/maintainer policy, issue/PR templates, and a release/compatibility policy before public launch.
+- Decide DCO versus CLA before accepting contributions. Keep contributor requirements proportional to a small community project.
+- Remove private campaign data, real credentials, local paths, and personal identifiers from history, fixtures, logs, screenshots, issues, release artifacts, and telemetry. No telemetry is enabled by default without an explicit future decision.
+- Publish reproducible tagged releases, checksums, migration notes, SBOM/dependency license inventory, container/package provenance where applicable, and a supported update/rollback path.
+- Keep a clear separation between application code, curated SRD-derived content, user-imported content, and optional third-party integrations.
+- Document secure self-host defaults, trusted-LAN mode, internet exposure, reverse proxy/TLS, backups, file permissions, token rotation, and vulnerability reporting.
+- Community integrations use their own names/versioning and declare compatible API ranges; listing or linking an integration is not a security endorsement.
+
 ## 17. Persistence, history, undo, and recovery
 
 ### 17.1 Save model
@@ -2203,6 +2356,8 @@ These initial budgets should be confirmed by technical spikes and real maps.
 | Concurrent room | One GM plus eight players with headroom |
 | Event history | Long encounter remains responsive; logs virtualized/paginated |
 | Import | Typical actor validates/previews perceptibly instantly; large bundle reports progress and never freezes the UI |
+| API reads | Normal local resource/capability reads complete within the same order of latency as built-in client queries; pagination prevents unbounded payloads |
+| API/event integrations | Representative subscribers/webhooks cannot add more than 10% to normal command acknowledgement latency; slow consumers are isolated and bounded |
 
 ### 22.1 Performance work items
 
@@ -2216,6 +2371,7 @@ These initial budgets should be confirmed by technical spikes and real maps.
 - [ ] Bound persistent template/drawing complexity.
 - [ ] Keep the initial dice presentation lightweight; benchmark any future 3D renderer independently before it can become a default.
 - [ ] Run load/reconnect tests with simulated latency and packet loss.
+- [ ] Benchmark API pagination, filtered event subscriptions, SDK overhead, rate limiting, and webhook retry queues independently from combat clients.
 
 ### 22.2 Reliability invariants
 
@@ -2226,6 +2382,8 @@ These initial budgets should be confirmed by technical spikes and real maps.
 - No accepted command acknowledged before durable storage.
 - No migration that destroys the only usable copy of data.
 - No scene/actor deletion that silently strands references.
+- No API transport path that bypasses the canonical validator/domain handler, durable acknowledgement, authorization, or recipient projection.
+- No slow/failing integration or webhook that blocks authoritative combat commands or connected player clients.
 
 ## 23. Engineering workflow and quality controls
 
@@ -2242,6 +2400,9 @@ These initial budgets should be confirmed by technical spikes and real maps.
 - [ ] License/attribution files for application and third-party/SRD content.
 - [~] Dependency lockfile and automated update policy. The lockfile exists; automated update policy remains.
 - [~] CI on pull requests and protected main branch once the scaffold exists. The workflow exists; protection and a recorded remote green run remain unverified.
+- [ ] Public API contract source, generated artifacts, breaking-change check, runnable examples, and ephemeral integration test server in CI.
+- [ ] Explicit application/content/example licenses and open-source community files (`CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`, support/governance/release policies).
+- [ ] Secret/private-data/history scan, dependency license inventory, SBOM, release checksums/provenance, and reproducible self-host artifacts.
 
 ### 23.2 Definition of done for an implementation item
 
@@ -2257,6 +2418,8 @@ An item is not complete until applicable requirements are met:
 - user-facing errors are actionable;
 - performance remains within the relevant budget;
 - documentation/schema/ADR/build plan is updated;
+- public API/resource/event/schema/SDK/docs are updated together when the item changes a supported integration contract;
+- API authorization, idempotency, revision/conflict, rate-limit, compatibility, and negative secret-projection tests exist when applicable;
 - SRD-derived rules include source reference and regression fixture;
 - no unrelated scope has been smuggled into the feature.
 
@@ -2266,6 +2429,7 @@ An item is not complete until applicable requirements are met:
 - Require tests and screenshots/video for material UI changes.
 - Require migration and rollback notes for persistence/schema changes.
 - Require security/visibility review for new event fields or endpoints.
+- Require public-contract and compatibility review for API/resource/command/event/error/scope changes; internal fields are private by default.
 - Require rules test vectors for automated mechanics.
 - Use feature flags only when they support safe incremental delivery; remove stale flags.
 - Update the current milestone checklist in the same change that completes an item.
@@ -2283,6 +2447,8 @@ Keep documentation purposeful:
 - supported automation/known limitations matrix;
 - release notes/changelog;
 - license and attribution.
+- OpenAPI/realtime/webhook references, integration quick starts/examples, scope/error/versioning/deprecation policy, and generated SDK documentation;
+- open-source contribution, security, support, governance, and release policy.
 
 Avoid creating lengthy internal documentation that merely repeats code structure.
 
@@ -2308,6 +2474,7 @@ Prioritize pure, fast tests for:
 - action operation validation;
 - coordinate/grid conversions, snapping, path distance, token footprint, and template-cell inclusion;
 - permission/visibility projection functions;
+- API scope/resource authorization, error-envelope mapping, version negotiation, pagination/cursor validation, and webhook signature/retry helpers;
 - state reducers/projections and inverse/undo operations;
 - schema validators and migrations.
 
@@ -2324,6 +2491,8 @@ Useful invariants include:
 - applying then safely undoing a compound event restores the prior state;
 - duplicate delivery of one command ID produces one mutation;
 - unauthorized projections never contain restricted fields/events;
+- equivalent valid UI/API commands produce the same domain event/state result, and retrying either transport with one command ID produces one mutation;
+- adding an internal field never adds it to a public API/event projection unless the public contract is explicitly changed;
 - snapshot plus later events equals the current state projection;
 - coordinate conversion round-trips within tolerance;
 - moving a token never mutates its actor definition;
@@ -2339,6 +2508,8 @@ Useful invariants include:
 - Snapshot normalized import results only where human review can detect meaningful drift.
 - Track content counts and unexpected duplicates/missing IDs.
 - Require every structured action to retain readable fallback text.
+- Validate OpenAPI and realtime/webhook schemas, examples, generated types, and compatibility fixtures against the running implementation in CI.
+- Diff public contracts in CI and require explicit review/version/deprecation notes for breaking or security-sensitive changes.
 
 ### 24.4 Rules coverage fixtures
 
@@ -2377,6 +2548,10 @@ Exercise server, database, and domain together:
 - migration and restore;
 - rate limiting/permission failures;
 - cleanup of archived/unreferenced entities.
+- integration-token create/use/expire/rotate/revoke/audit behavior and least-privilege scope matrix;
+- capability/version discovery, stable errors, pagination, rate limits, import jobs, and UI/API command equivalence;
+- API snapshot/event projections for GM, player-safe, viewer, and constrained integration principals;
+- signed webhook success/retry/replay/disable behavior and blocked unsafe destinations when webhooks are implemented.
 
 ### 24.6 Realtime and concurrency tests
 
@@ -2394,6 +2569,7 @@ Use multiple simulated clients and injected latency/disconnects:
 - host process restarts mid-encounter;
 - slow client falls behind event retention and receives a fresh snapshot;
 - role/claim revoked while client remains connected.
+- external realtime client negotiates versions, subscribes with scopes/filters, resumes by cursor, falls back to snapshot after retention, and is disconnected on credential revocation;
 
 Assert final convergence and absence of secret fields, not only HTTP status codes.
 
@@ -2412,6 +2588,7 @@ Automate the critical workflows at representative desktop and phone viewports:
 9. Refresh both clients and verify state.
 10. Undo a compound result and verify both clients.
 11. Open a shared viewer, confirm battlemap/Initiative parity, send GM focus/ping/measurement/highlight directives, reload it, and verify no private state appears.
+12. Run the published integration quick start against the same encounter: discover capabilities, read a safe snapshot, submit an idempotent command, observe the projected event, retry safely, and revoke the credential.
 
 Do not rely exclusively on browser automation for gesture quality; manual device testing is required.
 
@@ -2471,6 +2648,7 @@ No milestone exits while a desktop feature lacks a usable mobile path.
 - Slow mobile GPU/CPU and memory pressure.
 - Asset cache cold/warm behavior.
 - Backup and restore with realistic asset volume.
+- API pagination/large snapshots, one GM plus clients plus representative integrations, slow event subscribers, webhook retry backlog, and rate-limit behavior without degrading combat latency.
 
 ### 24.12 Security tests
 
@@ -2485,6 +2663,8 @@ No milestone exits while a desktop feature lacks a usable mobile path.
 - GM-only data absence from viewer snapshots, presentation events, realtime frames, logs, DOM, accessibility tree, and browser persistence; viewer attempts to send state-changing commands are rejected.
 - Hidden tokens/fog/NPC information absence from unauthorized payloads.
 - Dependency and container/file-permission scans.
+- Exhaustive integration scope/role/resource matrix; token guessing/leakage/rotation/revocation; CORS/origin and proxy handling; request smuggling/oversize inputs; idempotency abuse; event filter bypass; webhook signature/replay/SSRF/DNS-rebinding defenses.
+- Contract tests prove secret fields are absent rather than merely undocumented, including generated SDK models and examples.
 
 ### 24.13 Usability tests
 
@@ -2511,7 +2691,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 **Goal:** settle decisions that could invalidate the foundation.
 
-- [~] Record ADR-001 through ADR-015, marking the already resolved local-host, character-claim, GM-password, mobile-parity, and 2D-dice decisions. The decision index is populated; remaining proposed decisions and dedicated ADR files still need resolution/reconciliation.
+- [~] Record ADR-001 through ADR-017, including the open API and open-source distribution decisions. The decision index is populated; remaining proposed decisions and dedicated ADR files still need resolution/reconciliation.
 - [x] Choose application stack and repository/package boundaries.
 - [ ] Choose the first supported host OS/deployment form.
 - [~] Prototype direct-IP startup, LAN URL display, firewall error handling, and phone connection. Binding and LAN URL output exist; firewall recovery and physical-phone validation remain.
@@ -2523,8 +2703,9 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [x] Prototype persistence/event/snapshot model.
 - [ ] Produce low-fidelity end-to-end wireframes for setup, join, combat, dice, and recovery.
 - [ ] Define supported browser/device baseline and performance hardware.
+- [ ] Complete the API-first external-integration spike: scoped credential, capability discovery, safe snapshot, idempotent command, authorized event, and revocation.
 
-**Exit gate:** a phone and laptop can reach a local prototype by IP; the renderer, realtime model, schema, dice visibility, and persistence approaches have passed their spikes; no foundational decision remains implicit.
+**Exit gate:** a phone and laptop can reach a local prototype by IP; the renderer, realtime model, schema, dice visibility, persistence, and external API approaches have passed their spikes; no foundational decision remains implicit.
 
 ### Phase 1 — Local-host foundation
 
@@ -2540,8 +2721,11 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [x] Database migration and transactional event/projection skeleton.
 - [~] Responsive application shell and navigation with functional phone equivalents. Initial shell exists; complete navigation and physical-device acceptance remain.
 - [~] Error boundary, structured logs, health check, and basic diagnostics. Health endpoint exists; error boundary, structured logs, and diagnostics remain.
+- [ ] Versioned `/api/v1` foundation with stable error/request envelopes, version/capabilities endpoints, OpenAPI source, and schema validation at the boundary.
+- [ ] Named scoped integration credentials with one-time secret display, secure verification, expiry/rotation/revocation, last-used/audit metadata, and rate limits.
+- [ ] Versioned realtime handshake/command/event envelopes and contract-test harness shared by built-in and external clients.
 
-**Exit gate:** GM and two players can join from one phone and one laptop, claim distinct placeholder characters, reconnect, and remain correctly authorized after a server restart.
+**Exit gate:** GM and two players can join from one phone and one laptop, claim distinct placeholder characters, reconnect, and remain correctly authorized after a server restart; additionally, a scoped external integration can discover capabilities, read a safe snapshot, submit one idempotent command, observe its projected event, and be revoked.
 
 ### Phase 2 — Minimum playable vertical slice
 
@@ -2562,8 +2746,9 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Server-authoritative state, autosave, refresh/reconnect, and basic undo.
 - [ ] Player-safe versus GM state projection.
 - [ ] Phone portrait/landscape parity for every item above.
+- [ ] Supported API resources/commands/events cover the vertical-slice encounter without direct database access or UI automation.
 
-**Exit gate:** using only the normal UI, a GM locally hosts a three-round PC-versus-monsters encounter while one player uses a phone, another uses a laptop, and a read-only shared viewer shows the safe battlemap and Initiative on a second screen; the GM can present a ping and measurement to that viewer; secret state stays absent; refresh/reconnect loses no accepted state.
+**Exit gate:** using only the normal UI, a GM locally hosts a three-round PC-versus-monsters encounter while one player uses a phone, another uses a laptop, and a read-only shared viewer shows the safe battlemap and Initiative on a second screen; the GM can present a ping and measurement to that viewer; a scoped external integration can observe and perform representative supported encounter operations with the same authorization and semantics as the UI; secret state stays absent; refresh/reconnect loses no accepted state.
 
 ### Phase 3 — Playable alpha: fast normal combat
 
@@ -2582,6 +2767,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Compound action log and safe undo.
 - [ ] Import preview, warnings, duplicate strategy, and content provenance.
 - [ ] Usability pass and workflow-time measurement on phone and desktop.
+- [ ] Signed outbound webhook delivery for selected projected events, with retries, delivery logs, pause/rotate/delete, and SSRF/replay protections, if the Phase 1 realtime API proves insufficient for common integrations.
 
 **Exit gate:** the GM can run a representative combat without opening developer tools or editing JSON during play, and an untrained player can join and take a routine turn without coaching.
 
@@ -2637,6 +2823,9 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Automation coverage/known limitations guide.
 - [ ] License/About/SRD attribution surface.
 - [ ] Final usability tests with the actual table and no developer intervention.
+- [ ] OpenAPI/realtime schemas, local API reference, runnable curl/TypeScript quick starts, compatibility/deprecation policy, and integration conformance tests match the release.
+- [ ] Approved application/content/example licenses plus contribution, code of conduct, security, support, governance, and release policies are present.
+- [ ] Public-history/release audit finds no secrets, private campaign data, personal paths/identifiers, or unlicensed assets; SBOM/dependency-license inventory and reproducible checksums are published.
 
 **Exit gate:** all Version 1 quality criteria in Section 5.4 and the release acceptance suite in Section 28 pass.
 
@@ -2730,6 +2919,12 @@ For each promoted mechanic, add:
 | Dependency lock-in | Renderer or dice/UI library blocks mobile/accessibility | Core domain imports library-specific types | Boundary interfaces, technical spikes, pinned dependencies, domain independent of renderer |
 | Ruleset/version ambiguity | 2014/2024/homebrew data behaves inconsistently | Same field means different mechanics | Pin SRD 5.2.1, content/ruleset versions, adapter metadata, explicit upgrades |
 | One-person maintenance burden | Deployment and upgrades become chores | Multiple services, elaborate build, fragile tooling | Single deployable service, embedded/low-admin persistence, minimal configuration, strong diagnostics |
+| API freezes immature internals | Early external consumers make refactoring dangerous | Public payloads mirror database/domain objects; undocumented behavior becomes depended on | Small explicit `/api/v1`, capability discovery, API-specific DTOs, contract diffs, experimental namespace only when clearly unsupported |
+| Integration credential compromise | GM/private state or commands exposed | Long-lived broad tokens copied into scripts/logs | One-time display, hashed storage, narrow game-bound scopes, expiry/rotation/revocation, audit/last-used data, secret-scanning guidance |
+| API/UI behavior divergence | Integrations create states the UI cannot understand or bypass rules | Separate endpoint-specific mutations and duplicated business logic | All transports map to the same typed commands/domain handlers/events/projections; equivalence tests |
+| Malicious/slow integrations degrade play | Combat latency or host resources suffer | Unbounded queries/subscriptions/webhook retries | Pagination/limits, rate limits, backpressure, bounded queues/retention/retries, isolate delivery from command acknowledgement |
+| Open-source support burden | Maintainer time shifts from product to setup/integration support | Undocumented platforms, unstable releases, many ad hoc SDKs | Declare support matrix, issue templates, compatibility policy, thin official SDK only, community ownership boundaries |
+| License/content provenance error | Public distribution includes incompatible or private material | Code/content/assets treated as one license; missing attribution | ADR-017, legal/license review, separate manifests/notices, provenance inventory, automated scans, clean public fixtures |
 
 ### 27.2 Resolved requirements
 
@@ -2746,6 +2941,7 @@ For each promoted mechanic, add:
 - Battle, regional, and world maps accept standard image files through a common safe normalization pipeline.
 - Battlemap upload includes a short visual grid-calibration wizard; normal use never requires pixel/offset math.
 - Regional/world atlas maps, spatial Markdown notes, and session-recap markers are required long-term capabilities but remain post-Version-1 work unless this plan is explicitly reprioritized.
+- Open-source self-hosting and a documented, versioned integration API are foundational requirements. Open access never bypasses authentication, authorization, visibility, or safe defaults.
 
 ### 27.3 Open product decisions
 
@@ -2773,6 +2969,15 @@ Resolve these through ADRs or brief usability tests before their dependent miles
 | Map size/file limits | Derive from mobile-browser spike and downsample strategy | Phase 0–2 |
 | Fog default | Off for a new scene unless GM chooses Cover map; manual fog in alpha | Phase 3 |
 | Persistent PC state between encounters | Yes for HP/resources unless encounter created as simulation/copy | Phase 2–4 |
+| API transport baseline | REST `/api/v1` plus versioned Socket.IO/WebSocket commands/events over shared domain handlers | Phase 1 |
+| API credential model | Named bearer credentials shown once, securely verified, game-bound where possible, least-privilege scopes, expiry/rotation/revocation/audit | Phase 1 |
+| Browser API/CORS default | Same origin and explicit self-host allowlist; never wildcard credentialed CORS | Phase 1 |
+| API compatibility window | Additive within v1; publish breaking-change/deprecation policy before third-party stable release | Phase 1–6 |
+| Webhook timing | Defer until projected realtime subscriptions are proven; add in Phase 3 only for demonstrated server-to-server needs | Phase 3 |
+| Official SDKs | Thin TypeScript client first; additional SDKs community-maintained unless sustained demand justifies support | Phase 2–6 |
+| Application open-source license | Recommended starting candidate: a permissive OSI-approved license; settle code/content/asset/contribution terms in ADR-017 after review | Before public release |
+| Contribution attestation | Choose lightweight DCO or CLA in ADR-017 before accepting contributions | Before public contributions |
+| Telemetry | Off by default; any future opt-in telemetry requires a separate privacy/product decision | Before public release |
 | Legacy 2014-style import | Extension/adapter after canonical 5.2.1 schema works | Phase 5 or actual need |
 
 ### 27.4 Scope-admission questions
@@ -2883,6 +3088,18 @@ Run this suite against a release candidate on a clean host installation. Use at 
 - [ ] Password/session credentials are absent from normal logs/diagnostics.
 - [ ] Trusted-LAN versus external-exposure warning/documentation is visible and accurate.
 
+### 28.7.1 Public API and open-source release
+
+- [ ] A clean self-host install serves matching version/capability, OpenAPI, realtime/event schemas, and local human-readable API docs.
+- [ ] Published curl and TypeScript quick starts create/use/revoke a least-privilege credential and complete safe read, idempotent command, event subscription, retry, and revision-conflict flows.
+- [ ] UI and API submissions for representative claim, roll, movement, Initiative, HP/effect, viewer, and import commands produce equivalent domain events/projections.
+- [ ] Full scope/role/resource/visibility matrix passes; GM/player/viewer/secret data remains absent from unauthorized responses, events, webhooks, examples, generated types, logs, and caches.
+- [ ] Token secrets are shown once, securely verified at rest, never logged, and immediately invalid after expiry/revocation/rotation; audit metadata remains useful without revealing secrets.
+- [ ] Version negotiation, additive compatibility, breaking-contract detection, deprecation notices, cursor retention/snapshot fallback, pagination, rate limits, and stable error envelopes match documentation.
+- [ ] Slow/malicious clients and failing webhooks cannot block or materially degrade the active encounter; webhook SSRF/replay/signature/retry controls pass if webhooks ship.
+- [ ] Public repository/release contains approved licenses/notices, contribution/security/support/governance policies, dependency license inventory/SBOM, checksums/provenance, and no private data/secrets/unlicensed assets.
+- [ ] Upgrade and rollback documentation includes API/schema compatibility impact and integration migration notes.
+
 ### 28.8 Quality bar
 
 - [ ] No blocker/critical defects and no unresolved data-loss or authorization defect.
@@ -2915,8 +3132,8 @@ Keep this small dashboard current near the top or here:
 | Phase | Status | Exit gate evidence |
 | --- | --- | --- |
 | Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, and renderer proofs exist; physical-device/network, renderer stress/input, realtime convergence, wireframes, and remaining ADR records block the gate |
-| Phase 1 — Local-host foundation | In progress | Auth/session shell, durable roster/claims, recipient projections, CI, health endpoint, and transactional SQLite exist; full claim/restart scenario, auth hardening, presence, diagnostics, and device acceptance block the gate |
-| Phase 2 — Minimum playable vertical slice | Planned; requirements active | Battlemap calibration and shared-table viewer requirements are defined; implementation waits on the Phase 1 join/recovery gate |
+| Phase 1 — Local-host foundation | In progress | Auth/session shell, durable roster/claims, recipient projections, CI, health endpoint, and transactional SQLite exist; full claim/restart scenario, auth hardening, presence, API foundation/contracts/scoped credentials, diagnostics, and device acceptance block the gate |
+| Phase 2 — Minimum playable vertical slice | Planned; requirements active | Battlemap calibration, shared-table viewer, and API-driven vertical-slice requirements are defined; implementation waits on the Phase 1 join/recovery/API gate |
 | Phase 3 — Playable alpha | Not started | — |
 | Phase 4 — Rules-assisted beta | Not started | — |
 | Phase 5 — Preparation speed/content | Not started | — |
