@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "./styles.css";
 import { ActorRoster } from "./actors/ActorRoster";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { DicePanel } from "./dice/DicePanel";
 import { RendererProof } from "./scene/RendererProof";
 import { socket } from "./socket";
@@ -23,4 +24,4 @@ function App() {
   return <main><header><span className="eyebrow">PRIVATE LAN VTT</span><h1>Table ready.</h1><p>Combat-first D&D 5e, hosted by your group.</p></header>{message && <p className="notice">{message}</p>}{mode === "home" && <><section className="choices"><button onClick={joinPlayer}><strong>Join as Player</strong><span>Choose your character and enter the table.</span></button><button className="secondary" onClick={() => setMode("gm")}><strong>Enter as GM</strong><span>Manage the table, encounter, and hidden information.</span></button></section><RendererProof /></>}{mode === "gm" && <section className="card"><h2>{bootstrapped ? "GM sign-in" : "First-run GM setup"}</h2><p>{bootstrapped ? "Enter the GM password." : "This must be completed locally on the host before players join."}</p><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus /><button onClick={bootstrapped ? loginGm : bootstrap}>{bootstrapped ? "Enter table" : "Set GM password"}</button><button className="link" onClick={() => setMode("home")}>Back</button></section>}{mode !== "home" && state && <><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /><section className="table"><div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "PLAYER VIEW"}</span><h2>Combat canvas</h2><p>The real-time connection and role boundary are active. Encounter tools and the battle canvas are next.</p></div><div className="empty"><strong>No encounter loaded</strong><span>{state.actors.length ? `${state.actors.length} visible actor(s) are ready.` : "GM will import characters and build the first encounter."}</span></div></section><DicePanel role={mode} state={state} /></>}</main>;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><AppErrorBoundary><App /></AppErrorBoundary></StrictMode>);
