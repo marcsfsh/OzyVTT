@@ -34,7 +34,8 @@ export const GameStateSchema = z.object({
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
-export type PlayerView = Pick<GameState, "combat" | "revision"> & { actors: Array<Omit<Actor, "notes" | "ownerSessionId">>; rolls: PlayerRollRecord[] };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId"> & { claimStatus: "available" | "mine" | "claimed" };
+export type PlayerView = Pick<GameState, "combat" | "revision"> & { actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmView = GameState;
 
 export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; }
