@@ -485,7 +485,7 @@ Create one ADR per material decision. The recommendations below are starting pos
 | ADR-003 | Client renderer | Prototype a mature Canvas/WebGL scene library; do not build low-level rendering/input primitives unless testing proves necessary | End of technical spikes |
 | ADR-004 | Application language/stack | TypeScript end to end unless a spike demonstrates a concrete blocker | Before scaffold |
 | ADR-005 | Realtime protocol | Server-authoritative WebSocket command/event flow with reconnect snapshots | Before vertical slice |
-| ADR-006 | Persistence | Relational store for structured state plus file/object storage for assets; SQLite is a strong private-use starting point if deployment remains single-instance | Before first migration |
+| ADR-006 | Persistence | **Resolved direction:** embedded SQLite for structured state, command receipts, events, migrations, and snapshots; filesystem storage for uploaded assets | Accepted 2026-07-15 |
 | ADR-007 | Canonical content format | Versioned, documented JSON schemas with extension fields and adapters | Before importing production data |
 | ADR-008 | Rules representation | Typed declarative operations plus text fallback; never evaluate imported JavaScript | Before action automation |
 | ADR-009 | Grid baseline | Square grid with five-foot cells for MVP; record diagonal and occupied-cell conventions explicitly | Before movement/measurement tests |
@@ -2398,7 +2398,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Complete realtime/reconnect/convergence spike.
 - [ ] Draft version 1 character and monster schemas with representative fixtures.
 - [ ] Prototype dice parser, server result, public/secret projection, and 2D presentation.
-- [ ] Prototype persistence/event/snapshot model.
+- [x] Prototype persistence/event/snapshot model.
 - [ ] Produce low-fidelity end-to-end wireframes for setup, join, combat, dice, and recovery.
 - [ ] Define supported browser/device baseline and performance hardware.
 
@@ -2415,7 +2415,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Player character list, atomic claim, remembered browser session, release, and GM force-release.
 - [ ] Role/ownership authorization at server command boundary.
 - [ ] Realtime connection, presence, revisions, reconnect snapshot, and idempotency.
-- [ ] Database migration and transactional event/projection skeleton.
+- [x] Database migration and transactional event/projection skeleton.
 - [ ] Responsive application shell and navigation with functional phone equivalents.
 - [ ] Error boundary, structured logs, health check, and basic diagnostics.
 
