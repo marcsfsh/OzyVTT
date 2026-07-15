@@ -20,7 +20,9 @@ cp .env.example .env
 npm run dev
 ```
 
-For development, open `http://localhost:5173`. To run the single LAN service as a player would use it, build and launch it with `npm run start`, then open `http://localhost:3001` on the host. Players on the same LAN join through `http://HOST-IP:3001`.
+For development, open `http://localhost:5173`. Vite also prints a `Network` address such as `http://192.168.1.50:5173`; that is the address other devices use while `npm run dev` is running. Port 3001 is the development API and redirects browser requests to the correct port when the production client has not been built.
+
+To run the single LAN service as a player would use it, build and launch it with `npm run start`, then open `http://localhost:3001` on the host. Players on the same LAN join through the printed `http://HOST-IP:3001` address. If Windows asks about firewall access, allow Node.js on **Private networks** only.
 
 `data/` is intentionally local and ignored by Git; back it up separately once it contains real campaign data.
 
