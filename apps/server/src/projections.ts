@@ -13,7 +13,10 @@ export function projectPlayerView(state: GameState, playerSessionId?: string): P
   return {
     revision: state.revision,
     combat: state.combat,
-    actors: state.actors.filter((actor) => actor.visibility === "public").map(({ notes: _notes, ownerSessionId: _owner, ...actor }) => actor),
+    actors: state.actors.filter((actor) => actor.visibility === "public").map(({ notes: _notes, ownerSessionId, ...actor }) => ({
+      ...actor,
+      claimStatus: ownerSessionId === null ? "available" as const : ownerSessionId === playerSessionId ? "mine" as const : "claimed" as const
+    })),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)
   };
 }
