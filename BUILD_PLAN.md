@@ -9,7 +9,7 @@
 | Rules baseline | System Reference Document 5.2.1 (2024 fifth-edition rules) |
 | Primary use | One GM locally hosting a private home game for a small, known group |
 | Primary content path | Imported player-character and monster JSON |
-| Current checkpoint | Transactional SQLite foundation complete; character roster/claim workflow next |
+| Current checkpoint | Durable starter roster and player claim/release UI complete; multi-client claim/recovery controls next |
 | Last updated | 2026-07-15 |
 | Last implementation audit | 2026-07-15 |
 
@@ -67,7 +67,7 @@ This table is the fast operational view. The detailed requirements and milestone
 | Workstream | State | Verified outcome so far | Remaining before the next gate | Evidence |
 | --- | --- | --- | --- | --- |
 | Repository and application shell | Active | TypeScript npm workspaces, React/Vite client, Express/Socket.IO server, locked dependencies, type/test/build commands, and CI workflow exist | Add formatter/linter policy; verify protected `main`; complete error boundary and diagnostics | `package.json`, `.github/workflows/ci.yml`, `README.md` |
-| Identity and local hosting | Active | Host-only first-run GM bootstrap, bcrypt password hash, signed GM/player sessions, LAN binding/URL console output, and player-token memory exist | Logout/revocation, login rate limiting, password change, QR/copy UI, GM force-release, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/index.ts`, ADR-001/002 |
+| Identity and local hosting | Active | Host-only GM bootstrap, signed sessions, LAN binding/URLs, durable three-character starter roster, player-safe claim status, one-character claim/release UI, and player-token memory exist | Claim-race/restart integration, GM force-release, logout/revocation, login rate limiting, password change, QR/copy UI, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/index.ts`, `apps/client/src/actors/ActorRoster.tsx`, ADR-001/002 |
 | Renderer and responsive shell | Prototype implemented; validation active | Pixi renderer proof demonstrates grid/token rendering, pointer pan, wheel zoom, pinch zoom, high-DPI handling, and an accessible wrapper; responsive shell and touch-oriented CSS exist | Validate expected-size maps, 100 tokens, targeting/drag/multi-cell input, frame performance, and the physical-device matrix before accepting ADR-003 | `docs/product/phase-0-renderer-spike.md`, `apps/client/src/scene/` |
 | Actor content contract | Version 1 draft complete | Versioned character/monster schemas and representative fixtures validate | Build import preview/errors, adapters/migrations, live actor instances, and content library | `docs/product/actor-definition-v1.md`, `packages/schemas/`, `packages/test-fixtures/` |
 | Realtime command model | Active | Authoritative Socket.IO state projection, monotonic revisions, command IDs, duplicate suppression, and reconnect snapshot primitives exist | Presence, simultaneous-client convergence, role-revocation, retention fallback, and injected-disconnect tests | `apps/server/src/index.ts`, `apps/server/src/game-store.ts` |
@@ -81,12 +81,11 @@ This table is the fast operational view. The detailed requirements and milestone
 
 This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
 
-1. Seed placeholder player characters into the durable store and build the visible roster/claim/release workflow.
-2. Add claim-race, remembered-session, restart, and GM force-release integration coverage.
-3. Finish GM logout/session revocation and failed-login rate limiting.
-4. Add presence/reconnect/convergence coverage with multiple simulated clients.
-5. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
-6. Begin the Phase 2 battlemap upload and easy grid-calibration vertical slice after the Phase 1 join gate is satisfied.
+1. Add claim-race, remembered-session, restart, and GM force-release integration coverage and controls.
+2. Finish GM logout/session revocation and failed-login rate limiting.
+3. Add presence/reconnect/convergence coverage with multiple simulated clients.
+4. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
+5. Begin the Phase 2 battlemap upload and easy grid-calibration vertical slice after the Phase 1 join gate is satisfied.
 
 ### 1.6 Open blockers, risks, and validation gaps
 
@@ -99,6 +98,7 @@ There are no active hard blockers to the next queued implementation item.
 | DEC-001 | Open decision | Packaging and support baseline | First supported host OS/deployment form is not selected | Decide before packaging work; development can continue meanwhile |
 | GAP-002 | Open process gap | Delivery confidence | CI workflow exists, but branch protection and a recorded remote green run have not been verified in this plan | Verify GitHub settings and link a green run |
 | GAP-003 | Open documentation gap | Phase 0 decision gate | ADR index marks several decisions accepted while only ADR-001, ADR-002, and ADR-006 currently have dedicated files | Expand accepted ADR-004/005/007/008/011/012/014 decisions into numbered records before claiming the Phase 0 exit gate |
+| GAP-004 | Open packaging gap | Production launch | Shared workspace packages currently export TypeScript source, so the supported launch uses Node's `tsx` loader even after the production client build | Add ordered shared-package compilation and runtime exports before packaging the host application |
 | RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
 
 ### 1.7 Implementation outcome ledger
@@ -114,6 +114,7 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-15 | FND-003 | Partial | Added GitHub Actions validation for install, tests, type-check, and production build on pushes and pull requests | `.github/workflows/ci.yml`; local commands pass | Verify remote green run and branch protection |
 | 2026-07-15 | PLAN-001 | Complete | Added easy battlemap grid calibration plus deferred regional/world atlas, scale, marker, safe Markdown, and spatial session-note requirements | Sections 18.6–18.8; roadmap placement reviewed | Implement battlemap workflow in Phase 2; atlas remains post-Version-1 |
 | 2026-07-15 | FND-004 | Complete | Replaced the JSON proof with embedded SQLite migrations and atomic command receipt/event/projection persistence plus periodic snapshots | All 16 repository tests, TypeScript checks, production builds, ADR-006; GitHub checkpoint `523c8d8` | Backup/restore and undo are later Phase 1/Version 1 work |
+| 2026-07-15 | FND-005 | Complete (automated scope) | Added a one-time durable three-character starter roster, player-safe available/mine/claimed projections, responsive claim/release UI, one-character-per-session enforcement, and a reliable single-server start command | 18 tests, type-check, and production builds pass; seed persistence/non-duplication and private-identifier omission are tested; a fresh server reaches its ready state | Multi-client race/restart acceptance, GM force-release, physical-device UX, and compiled shared-package runtime exports remain |
 
 ## 2. Product definition
 
@@ -562,7 +563,7 @@ Create one ADR per material decision. Status here must match `docs/adr/README.md
 | ADR-008 | Rules representation | Accepted | Typed declarative operations plus inert text fallback; never evaluate imported JavaScript | Dedicated ADR file still required |
 | ADR-009 | Grid baseline | Proposed | Square grid with five-foot cells for MVP; diagonal and occupied-cell conventions await measurement tests | Before movement/measurement tests |
 | ADR-010 | Fog and vision | Proposed | Manual fog for alpha; dynamic walls/vision remain a separate later epic | Before map tool implementation |
-| ADR-011 | Identity | Accepted | Same direct-IP landing page; accountless player character claims; password-authenticated GM role | Dedicated ADR file still required |
+| ADR-011 | Identity | Accepted | Same direct-IP landing page; accountless player character claims; password-authenticated GM role; one claimed character per player session for the MVP | Dedicated ADR file still required |
 | ADR-012 | Dice authority and presentation | Accepted | Server-generated and recorded rolls; authorized 2D presentation; immutable formula/faces/modifiers/result/visibility/provenance | Dedicated ADR file still required |
 | ADR-013 | State history | Proposed / partial foundation | Transactional command/event log and periodic snapshots exist; bounded undo remains undecided/unfinished | Before combat mutations |
 | ADR-014 | Device support | Accepted requirement / baseline pending | Functional phone/desktop parity with responsive/touch-specific UX; exact supported browser versions remain open | Before Phase 1 exit |
@@ -1661,11 +1662,11 @@ There is no public account or invitation system. The host exposes one landing pa
 - [x] Startup console displays useful LAN URL(s), not merely `localhost`.
 - [ ] Optionally display a QR code for the current host URL so phone players do not have to type it.
 - [x] Landing page provides two unambiguous choices: **Join as Player** and **Enter as GM**.
-- [ ] Player path lists eligible player-character actor definitions/instances with portrait, name, and concise identifying details.
+- [~] Player path lists eligible player-character actors with name, claim status, HP, AC, and Initiative. Portrait/token art remains.
 - [x] Character claim is an atomic serialized server operation with revision and duplicate-command protection.
 - [~] Store a scoped participant/character-claim credential in the browser and allow the GM to invalidate it. Browser persistence exists; GM invalidation remains.
 - [~] Retain claims through brief disconnects/reloads; define a stale-claim timeout and GM force-release control. Signed player sessions and persisted ownership exist; timeout/force-release and browser acceptance remain.
-- [ ] Decide whether one player may claim multiple characters and expose it as a simple GM policy if needed.
+- [x] Use one claimed character per player session for the MVP; reconsider a simple multi-character policy only after the normal join flow is validated.
 - [ ] Handle duplicate tabs/devices deliberately: share the claim, reject the second controller, or require takeover confirmation.
 - [ ] Display presence, controlling character, and disconnected state without exposing unnecessary network details.
 - [x] Do not require external identity providers, email, invite links, or room codes.
