@@ -9,6 +9,7 @@ export class RevisionConflictError extends Error {}
 type Command = { id: string; type: string; actorId?: string; expectedRevision?: number };
 type ReceiptRow = { revision: number };
 type StateRow = { state_json: string };
+const PLACEHOLDER_ROSTER_SEED = "phase-1-placeholder-roster-v1";
 
 const MIGRATIONS = [{
   version: 1,
@@ -41,15 +42,25 @@ const MIGRATIONS = [{
       created_at TEXT NOT NULL
     ) STRICT;
   `
+}, {
+  version: 2,
+  sql: `
+    CREATE TABLE application_seeds (
+      seed_key TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    ) STRICT;
+  `
 }];
 
 export class GameStore {
   private state: GameState;
+  private readonly initialState: GameState;
   private database?: DatabaseSync;
   private commandQueue: Promise<void> = Promise.resolve();
 
   constructor(private readonly databasePath: string, initialState?: GameState) {
-    this.state = initialState ? structuredClone(initialState) : GameStateSchema.parse({ schemaVersion: 1 });
+    this.initialState = initialState ? structuredClone(initialState) : GameStateSchema.parse({ schemaVersion: 1 });
+    this.state = structuredClone(this.initialState);
   }
 
   async initialize() {
@@ -61,6 +72,7 @@ export class GameStore {
     const row = this.database.prepare("SELECT state_json FROM game_state WHERE id = 1").get() as StateRow | undefined;
     if (row) this.state = GameStateSchema.parse(JSON.parse(row.state_json));
     else this.insertInitialState();
+    this.applyPlaceholderRosterSeed();
   }
 
   get snapshot() { return structuredClone(this.state); }
@@ -120,6 +132,28 @@ export class GameStore {
     const now = new Date().toISOString();
     database.prepare("INSERT INTO game_state (id, schema_version, revision, state_json, updated_at) VALUES (1, ?, ?, ?, ?)").run(this.state.schemaVersion, this.state.revision, JSON.stringify(this.state), now);
     database.prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)").run(this.state.revision, JSON.stringify(this.state), "initial", now);
+  }
+
+  private applyPlaceholderRosterSeed() {
+    const database = this.requireDatabase();
+    const applied = database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(PLACEHOLDER_ROSTER_SEED);
+    if (applied) return;
+    const nextState = structuredClone(this.state);
+    if (nextState.actors.length === 0 && this.initialState.actors.length > 0) nextState.actors = structuredClone(this.initialState.actors);
+    const now = new Date().toISOString();
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      if (nextState.actors.length !== this.state.actors.length) {
+        database.prepare("UPDATE game_state SET state_json = ?, updated_at = ? WHERE id = 1").run(JSON.stringify(nextState), now);
+        database.prepare("UPDATE snapshots SET state_json = ? WHERE revision = ?").run(JSON.stringify(nextState), nextState.revision);
+      }
+      database.prepare("INSERT INTO application_seeds (seed_key, applied_at) VALUES (?, ?)").run(PLACEHOLDER_ROSTER_SEED, now);
+      database.exec("COMMIT");
+      this.state = nextState;
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   private requireDatabase() {
