@@ -36,12 +36,17 @@
 .encounter-map-zoom button:hover { border-color: #e8a743; }
 .encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: #090806; }
 .encounter-map-stage:fullscreen svg { max-height: 100vh; height: 100vh; }
-.encounter-map-interaction.enlarged .encounter-map-stage { min-height: 34rem; }
-.encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: min(88vh, 1100px); }
+/* "Enlarge map" is an in-tab overlay (not the OS Fullscreen API): the whole interaction area floats
+   over the page so the map physically grows, with the stage flex-filling the space so the SVG scales
+   up. Dismissed by "Shrink map". */
+.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid #514936; border-radius: .75rem; background: rgb(9 8 6 / 97%); box-shadow: 0 12px 40px rgb(0 0 0 / 60%); overflow: auto; }
+.encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
+.encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: none; height: 100%; }
 .encounter-map-saving { margin: .5rem 0 0; color: #f6c452; font-size: .85rem; }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: #e9b861; font-size: .78rem; }
 
-.encounter-map-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+/* Overlaid top-left inside the stage so the tools stay visible in normal, enlarged, and OS-fullscreen modes. */
+.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; max-width: calc(100% - 1.4rem); }
 .encounter-map-tools { display: flex; gap: .3rem; }
 .encounter-map-tools button { width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; cursor: pointer; }
 .encounter-map-tools button:hover { border-color: #e8a743; }
@@ -49,7 +54,7 @@
 .encounter-map-tools button:disabled { opacity: .4; cursor: not-allowed; }
 .encounter-map-gm-layer { padding: .4rem .7rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .encounter-map-gm-layer[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
-.encounter-map-live-measure { display: flex; align-items: center; gap: .4rem; color: #cfc5b4; font-size: .78rem; }
+.encounter-map-live-measure { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #eee4d2; font-size: .75rem; }
 
 .annotation-measurement line { stroke: #ffd463; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 .annotation-measurement circle { fill: #ffd463; }

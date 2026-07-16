@@ -110,6 +110,9 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, size]);
   const beginPan = (event: React.PointerEvent<HTMLElement>) => {
+    // The zoom / "Follow GM view" buttons are absolutely-positioned children of the stage; let their
+    // own onClick run instead of starting a pan (which captures the pointer and swallows the click).
+    if ((event.target as Element).closest("button")) return;
     const svg = svgRef.current; if (!svg) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const rect = svg.getBoundingClientRect();

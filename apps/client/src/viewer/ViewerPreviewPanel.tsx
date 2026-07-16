@@ -68,16 +68,21 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
   const { presentation, status } = useGmViewerPreview(gmToken);
 
   const beginDrag = (mode: "move" | "resize") => (event: React.PointerEvent<HTMLElement>) => {
+    // Don't start a title-bar move when the close button (a child of the title bar) is pressed.
+    if ((event.target as Element).closest("button")) return;
     event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
     setDrag({ mode, grabX: event.clientX, grabY: event.clientY, startRect: rect });
   };
+  // Pointer capture is on the title-bar/resize-handle child (the pointerdown target), so these
+  // panel-level handlers can't check `hasPointerCapture` on themselves — gate on the drag state.
+  // The captured child still bubbles pointermove/up to the panel, and capture auto-releases on up.
   const continueDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (!drag) return;
     const dx = event.clientX - drag.grabX, dy = event.clientY - drag.grabY;
     if (drag.mode === "move") setRect({ ...drag.startRect, x: Math.max(0, drag.startRect.x + dx), y: Math.max(0, drag.startRect.y + dy) });
     else setRect({ ...drag.startRect, width: Math.max(MIN_WIDTH, drag.startRect.width + dx), height: Math.max(MIN_HEIGHT, drag.startRect.height + dy) });
   };
-  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); setDrag(null); };
+  const endDrag = () => setDrag(null);
 
   return <div className="viewer-preview-panel" style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} onPointerMove={continueDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
     <div className="viewer-preview-titlebar" onPointerDown={beginDrag("move")}>
