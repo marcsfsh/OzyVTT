@@ -1,11 +1,12 @@
 import { useState } from "react";
-import type { GmView, PlayerActor, PlayerView } from "@vtt/domain";
+import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domain";
 import { socket } from "../socket";
 
 type Props = { role: "gm"; state: GmView } | { role: "player"; state: PlayerView };
 
 function statusForGm(ownerSessionId: string | null) { return ownerSessionId ? "Claimed" : "Available"; }
 function statusForPlayer(actor: PlayerActor) { return actor.claimStatus === "mine" ? "Your character" : actor.claimStatus === "claimed" ? "Claimed" : "Available"; }
+function presenceLabel(presence: PresenceStatus) { return presence === "online" ? "Online" : presence === "reconnecting" ? "Reconnecting" : "Offline"; }
 
 export function ActorRoster(props: Props) {
   const [feedback, setFeedback] = useState("");
@@ -44,7 +45,7 @@ export function ActorRoster(props: Props) {
         const unavailable = playerActor?.claimStatus === "claimed";
         const status = "ownerSessionId" in actor ? statusForGm(actor.ownerSessionId) : statusForPlayer(actor);
         return <article className={`actor-card${mine ? " actor-card-owned" : ""}`} key={actor.id}>
-          <div className="actor-card-title"><div className="actor-monogram" aria-hidden="true">{actor.name.slice(0, 1)}</div><div><h3>{actor.name}</h3><span className={`claim-status${mine ? " claim-status-owned" : ""}`}>{status}</span></div></div>
+          <div className="actor-card-title"><div className="actor-monogram" aria-hidden="true">{actor.name.slice(0, 1)}</div><div><h3>{actor.name}</h3><span className={`claim-status${mine ? " claim-status-owned" : ""}`}>{status}</span>{actor.presence && <span className={`presence presence-${actor.presence}`} role="status"><span className="presence-dot" aria-hidden="true"></span>{presenceLabel(actor.presence)}</span>}</div></div>
           <dl><div><dt>HP</dt><dd>{actor.hp.current}/{actor.hp.maximum}</dd></div><div><dt>AC</dt><dd>{actor.armorClass ?? "—"}</dd></div><div><dt>Initiative</dt><dd>{actor.initiative === undefined ? "—" : actor.initiative >= 0 ? `+${actor.initiative}` : actor.initiative}</dd></div></dl>
           {props.role === "player" && (mine ? <button className="actor-action actor-release" onClick={release}>Release character</button> : <button className="actor-action" disabled={unavailable} onClick={() => claim(actor.id)}>{unavailable ? "Already claimed" : "Claim character"}</button>)}
           {props.role === "gm" && "ownerSessionId" in actor && actor.ownerSessionId && <button className="actor-action actor-release" onClick={() => forceRelease(actor.id)}>Force release</button>}

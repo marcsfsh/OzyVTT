@@ -34,9 +34,15 @@ export const GameStateSchema = z.object({
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId"> & { claimStatus: "available" | "mine" | "claimed" };
+
+/** Server-authoritative connection presence for a claimed character's owning session. Never carries a session ID, token, socket ID, or address across the wire. */
+export const PresenceStatusSchema = z.enum(["online", "reconnecting", "offline"]);
+export type PresenceStatus = z.infer<typeof PresenceStatusSchema>;
+
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId"> & { claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null };
 export type PlayerView = Pick<GameState, "combat" | "revision"> & { actors: PlayerActor[]; rolls: PlayerRollRecord[] };
-export type GmView = GameState;
+export type GmActor = Actor & { presence: PresenceStatus | null };
+export type GmView = Omit<GameState, "actors"> & { actors: GmActor[] };
 
 export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
