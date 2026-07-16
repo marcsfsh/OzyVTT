@@ -27,7 +27,7 @@ const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "table", label: "Encounter" },
   { id: "maps", label: "Map Setup" },
   { id: "viewer", label: "Viewer" },
-  { id: "setup", label: "GM Setup" }
+  { id: "setup", label: "VTT Setup" }
 ];
 
 type Connection = "online" | "reconnecting" | "offline";

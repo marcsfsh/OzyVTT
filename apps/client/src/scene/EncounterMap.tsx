@@ -103,6 +103,8 @@ export function EncounterMap({
   const calibration = grid.calibration;
   const handleRadius = Math.max(9, calibration ? calibration.cellSizePx * 0.16 : 9);
   const arrowSize = calibration ? calibration.cellSizePx * 0.35 : 12;
+  // Labels are drawn in image-pixel units, so scale them to the grid cell (else they read tiny on large maps).
+  const labelSize = calibration ? Math.max(16, calibration.cellSizePx * 0.42) : 16;
 
   useEffect(() => { setGesture(null); setSelectedId(null); }, [assetId, token]);
   useEffect(() => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); }, [assetId, size?.width, size?.height]);
@@ -112,6 +114,21 @@ export function EncounterMap({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
   useEffect(() => { if (tool !== "select") setSelectedId(null); }, [tool]);
+  // Delete/Backspace removes the selected shape (unless typing in a field).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (!selectedId || tool !== "select") return;
+      if ((event.target as Element | null)?.closest("input, textarea, select")) return;
+      const annotation = annotationAt(selectedId);
+      if (annotation && annotation.kind === "shape" && canManageShape(annotation)) {
+        event.preventDefault(); setSelectedId(null); void removeAnnotation(selectedId);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, tool, annotations]);
 
   // Wheel-to-zoom needs preventDefault, which React's synthetic onWheel cannot reliably guarantee (passive by default).
   useEffect(() => {
@@ -139,7 +156,16 @@ export function EncounterMap({
     const width2 = size.width / nextZoom, height2 = size.height / nextZoom;
     setCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
   };
-  const resetView = () => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); };
+  const resetView = () => {
+    if (!size) return;
+    // The docked Initiative panel overlays the right of the stage; shift the center so the map
+    // lands in the visible (non-docked) area instead of hiding behind the panel.
+    const stage = stageRef.current;
+    const stageWidth = stage?.getBoundingClientRect().width ?? 0;
+    const dockWidth = stage?.querySelector<HTMLElement>(".encounter-map-dock")?.getBoundingClientRect().width ?? 0;
+    const centerX = size.width / 2 + (stageWidth > 0 ? (size.width * dockWidth) / (2 * stageWidth) : 0);
+    setCamera({ center: { x: centerX, y: size.height / 2 }, zoom: 1 });
+  };
   const zoomCenter = (factor: number) => { const svg = svgRef.current; if (!svg || !size) return; const rect = svg.getBoundingClientRect(); zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor); };
   const toggleFullscreen = () => { const el = stageRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else { setEnlarged(false); void el.requestFullscreen?.(); } };
   const toggleEnlarged = () => setEnlarged((current) => { if (!current && fullscreen) void document.exitFullscreen?.(); return !current; });
@@ -265,9 +291,9 @@ export function EncounterMap({
       setGesture(null);
       const originalToken = tokensById.get(actorId);
       const unchanged = Boolean(mapPoint && originalPosition && Math.hypot(mapPoint.x - originalPosition.x, mapPoint.y - originalPosition.y) < (originalToken?.gridSizePx ? originalToken.gridSizePx * .45 : .5));
-      if (unchanged) setMessage("Token stayed in the same space.");
+      if (overTray) void submitMove(actorId, null);
+      else if (unchanged) setMessage("Token stayed in the same space.");
       else if (mapPoint) void submitMove(actorId, mapPoint);
-      else if (overTray) void placeAtCenter(actorId);
       else setMessage("Move cancelled. Drop the token on the map or in the tray.");
       return;
     }
@@ -338,7 +364,7 @@ export function EncounterMap({
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           <div className="encounter-map-eye">
-            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={eyeOpen} title={`New drawings visible to: ${VISIBILITY_SHORT[defaultVisibility]}`} onClick={() => { setEyeOpen((v) => !v); setWrenchOpen(false); }}>◉</button>
+            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={eyeOpen} title={`New drawings visible to: ${VISIBILITY_SHORT[defaultVisibility]}`} onClick={() => { setEyeOpen((v) => !v); setWrenchOpen(false); }}>👁</button>
             {eyeOpen && <div className="encounter-map-menu" role="menu">
               <p className="encounter-map-menu-title">New drawings visible to</p>
               {visibilityOptions.map((option) => <button key={option.value} type="button" role="menuitemradio" aria-checked={defaultVisibility === option.value} className={defaultVisibility === option.value ? "selected" : ""} onClick={() => { setDefaultVisibility(option.value); if (option.value !== "gm-actor") setEyeOpen(false); }}>{option.label}</button>)}
@@ -363,11 +389,11 @@ export function EncounterMap({
           {annotations.map((annotation) => {
             const beingDragged = (gesture?.kind === "annotation-move" || gesture?.kind === "annotation-resize") && gesture.id === annotation.id;
             if (beingDragged) return null;
-            if (annotation.kind === "measurement") return <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} expiring />;
+            if (annotation.kind === "measurement") return <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} expiring />;
             const selectedShape = selectedId === annotation.id;
             const editable = tool === "select" && selectedShape && canMoveShape(annotation);
             return <g key={annotation.id} data-annotation-id={annotation.id} className={`annotation-shape visibility-${annotation.visibility}${selectedShape ? " selected" : ""}`}>
-              <AnnotationGlyph data={{ kind: "shape", shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} />
+              <AnnotationGlyph data={{ kind: "shape", shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} />
               {editable && <>
                 <circle data-annotation-handle="move" className="annotation-handle annotation-handle-move" cx={annotation.geometry.origin.x} cy={annotation.geometry.origin.y} r={handleRadius} />
                 <circle data-annotation-handle="resize" className="annotation-handle annotation-handle-resize" cx={annotation.geometry.target.x} cy={annotation.geometry.target.y} r={handleRadius} />
@@ -375,8 +401,8 @@ export function EncounterMap({
             </g>;
           })}
 
-          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
-          {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} /></g>}
+          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
+          {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} /></g>}
 
           {visibleTokens.map((encounterToken) => {
             const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
@@ -387,7 +413,10 @@ export function EncounterMap({
               <TokenGlyph sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
             </g>;
           })}
-          {liveTokenDistanceFeet !== null && dragging?.point && <text className="encounter-live-distance" x={dragging.point.x} y={dragging.point.y - 24}>{liveTokenDistanceFeet} ft</text>}
+          {liveTokenDistanceFeet !== null && dragging?.point && dragging.origin && <g className="encounter-move-guide">
+            <line className="encounter-move-line" x1={dragging.origin.x} y1={dragging.origin.y} x2={dragging.point.x} y2={dragging.point.y} />
+            <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragging.point.x} y={dragging.point.y - labelSize * 1.3}>{liveTokenDistanceFeet} ft</text>
+          </g>}
         </svg>
 
         {selected && selected.kind === "shape" && tool === "select" && (() => {

@@ -42,7 +42,8 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
     else setRect({ ...drag.startRect, width: Math.max(MIN_WIDTH, drag.startRect.width + dx), height: Math.max(MIN_HEIGHT, drag.startRect.height + dy) });
   };
   const endDrag = () => setDrag(null);
-  const popOut = () => window.open("/viewer.html", "vtt-viewer-preview", "width=1280,height=720");
+  // Popping out replaces the in-tab preview with a standalone window (no point keeping both live).
+  const popOut = () => { window.open("/viewer.html", "vtt-viewer-preview", "width=1280,height=720"); onClose(); };
 
   return <div className="viewer-preview-panel" style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} onPointerMove={continueDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
     <div className="viewer-preview-titlebar" onPointerDown={beginDrag("move")}>

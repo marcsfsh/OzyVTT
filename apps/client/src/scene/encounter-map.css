@@ -1,8 +1,8 @@
-.encounter-map-interaction { margin-top: 1.1rem; }
-.encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .55rem; padding: .65rem .8rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; }
+.encounter-map-interaction { margin-top: .5rem; }
+.encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; font-size: .82rem; }
 .encounter-map-help strong { color: #fff0d2; }
 .encounter-map-help span { color: #cfc5b4; font-size: .78rem; text-align: right; }
-.encounter-token-tray { min-height: 4.8rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; padding: .65rem .75rem; border: 1px dashed #675a45; border-radius: .55rem; background: #16130e; transition: border-color .15s, background .15s; }
+.encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; padding: .5rem .7rem; border: 1px dashed #675a45; border-radius: .55rem; background: #16130e; transition: border-color .15s, background .15s; }
 .encounter-token-tray.receiving { border-color: #e8a743; background: #282015; }
 .encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
 .encounter-token-tray > div:first-child span { margin-top: .15rem; color: #9f9789; font-size: .72rem; }
@@ -87,6 +87,8 @@
 .encounter-shape-editor-note { margin: 0; color: #9f9789; font-size: .75rem; }
 
 .encounter-live-distance { fill: #fff2c4; font: 800 15px sans-serif; text-anchor: middle; paint-order: stroke; stroke: #0a0805; stroke-width: 4; stroke-linejoin: round; pointer-events: none; }
+.encounter-move-guide { pointer-events: none; }
+.encounter-move-line { stroke: #ffd463; stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 
 @media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
 @media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } .encounter-shape-editor { width: 12rem; } }
