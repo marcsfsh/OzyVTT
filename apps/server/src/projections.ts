@@ -1,4 +1,4 @@
-import type { GameState, GmView, PlayerCombatView, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
@@ -19,7 +19,24 @@ export function projectPublicInitiative(state: GameState): readonly PlayerInitia
   });
 }
 
-export function projectPlayerCombat(state: GameState): PlayerCombatView {
+function visibleToPlayerAnnotation(annotation: Annotation, playerSessionId: string | undefined) {
+  if (annotation.visibility === "gm-only") return false;
+  if (annotation.visibility === "public") return true;
+  return annotation.ownerSessionId === playerSessionId;
+}
+
+function safeAnnotation(annotation: Annotation, playerSessionId: string | undefined): PlayerAnnotation {
+  const { ownerSessionId, ...visible } = annotation;
+  return { ...visible, mine: ownerSessionId === playerSessionId };
+}
+
+export function projectPlayerAnnotations(state: GameState, playerSessionId: string | undefined, now: number): readonly PlayerAnnotation[] {
+  return state.combat.annotations
+    .filter((annotation) => (annotation.expiresAt === null || annotation.expiresAt > now) && visibleToPlayerAnnotation(annotation, playerSessionId))
+    .map((annotation) => safeAnnotation(annotation, playerSessionId));
+}
+
+export function projectPlayerCombat(state: GameState, playerSessionId?: string, now = Date.now()): PlayerCombatView {
   const initiative = projectPublicInitiative(state);
   const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
   const currentIsPublic = initiative.some((entry) => entry.active);
@@ -30,14 +47,15 @@ export function projectPlayerCombat(state: GameState): PlayerCombatView {
     mapAssetId: state.combat.active ? state.combat.mapAssetId : null,
     hiddenTurn: state.combat.active && state.combat.turnActorId !== null && !currentIsPublic,
     initiative,
-    tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : []
+    tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : [],
+    annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : []
   };
 }
 
-export function projectPlayerView(state: GameState, playerSessionId: string | undefined, presenceFor: PresenceLookup): PlayerView {
+export function projectPlayerView(state: GameState, playerSessionId: string | undefined, presenceFor: PresenceLookup, now = Date.now()): PlayerView {
   return {
     revision: state.revision,
-    combat: projectPlayerCombat(state),
+    combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public").map(({ notes: _notes, ownerSessionId, ...actor }) => ({
       ...actor,
       claimStatus: ownerSessionId === null ? "available" as const : ownerSessionId === playerSessionId ? "mine" as const : "claimed" as const,

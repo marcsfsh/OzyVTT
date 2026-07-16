@@ -70,6 +70,23 @@ describe("map asset HTTP workflow", () => {
     expect(notModified.status).toBe(304);
   });
 
+  it("serves grid calibration to anyone who can already read the map's content, but not to strangers", async () => {
+    const test = await fixture();
+    const upload = await body(await fetch(`${test.base}/api/v1/map-assets?filename=grid.png&kind=battlemap`, { method: "POST", headers: gm("image/png"), body: test.input }));
+    const id = upload.data.asset.id;
+    const gridPath = `${test.base}/api/v1/map-assets/${id}/grid`;
+    expect((await fetch(gridPath)).status).toBe(403);
+    expect((await body(await fetch(gridPath, { headers: { authorization: "Bearer gm-token" } }))).data.calibration).toBeNull();
+    expect((await fetch(gridPath, { headers: { authorization: "Bearer player-token" } })).status).toBe(200);
+    expect((await fetch(gridPath, { headers: { cookie: "vtt_viewer_session=viewer-token" } })).status).toBe(200);
+
+    const started = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards`, { method: "POST", headers: gm(), body: JSON.stringify({ start: { x: 0, y: 0 }, end: { x: 150, y: 150 }, cellsAcross: 3, cellsDown: 3, distancePerCell: 5 }) }));
+    await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${started.data.wizardId}/complete`, { method: "POST", headers: gm(), body: "{}" });
+    const afterCalibration = await body(await fetch(gridPath, { headers: { authorization: "Bearer gm-token" } }));
+    expect(afterCalibration.data.calibration.cellSizePx).toBeCloseTo(50);
+    expect((await fetch(`${test.base}/api/v1/map-assets/does-not-exist/grid`, { headers: { authorization: "Bearer gm-token" } })).status).toBe(400);
+  });
+
   it("runs a server-owned calibration wizard through verification and durable completion", async () => {
     const test = await fixture();
     const upload = await body(await fetch(`${test.base}/api/v1/map-assets?filename=grid.png&kind=battlemap`, { method: "POST", headers: gm("image/png"), body: test.input }));

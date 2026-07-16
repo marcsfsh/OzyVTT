@@ -29,7 +29,7 @@ describe("recipient-safe encounter projections", () => {
   it("omits hidden combatants and reports a safe hidden-turn indicator", () => {
     const state = game(HIDDEN);
     const combat = projectPlayerCombat(state);
-    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null }] });
+    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null }], annotations: [] });
     const serialized = JSON.stringify(projectPlayerView(state, undefined, () => null));
     expect(serialized).not.toContain(HIDDEN);
     expect(serialized).not.toContain("Secret Lurker");
@@ -47,5 +47,56 @@ describe("recipient-safe encounter projections", () => {
     const state = game(PUBLIC); state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(projectViewerInitiative(state)).toEqual({ visible: false, round: 0, hiddenTurn: false, entries: [] });
     expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: null, tokens: [] });
+  });
+});
+
+const PLAYER_A = "45000000-0000-4000-8000-000000000001";
+const PLAYER_B = "45000000-0000-4000-8000-000000000002";
+
+function gameWithAnnotations() {
+  const geometry = { origin: { x: 0, y: 0 }, target: { x: 100, y: 0 }, sizeFeet: 20 };
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    combat: {
+      active: true, round: 1, mapAssetId: MAP, turnActorId: PUBLIC,
+      initiative: [{ actorId: PUBLIC, score: 10 }],
+      annotations: [
+        { id: "90000000-0000-4000-8000-000000000001", kind: "measurement", geometry, ownerSessionId: PLAYER_A, createdByRole: "player", visibility: "public", createdAt: 0, expiresAt: 5000 },
+        { id: "90000000-0000-4000-8000-000000000002", kind: "shape", shape: "circle", geometry, ownerSessionId: PLAYER_A, createdByRole: "player", visibility: "gm-only", createdAt: 0, expiresAt: null },
+        { id: "90000000-0000-4000-8000-000000000003", kind: "shape", shape: "square", geometry, ownerSessionId: PLAYER_A, createdByRole: "player", visibility: "owner-only", createdAt: 0, expiresAt: null },
+        { id: "90000000-0000-4000-8000-000000000004", kind: "shape", shape: "square", geometry, ownerSessionId: PLAYER_B, createdByRole: "player", visibility: "owner-only", createdAt: 0, expiresAt: null }
+      ]
+    }
+  });
+}
+
+describe("recipient-safe annotation projections", () => {
+  it("shows a player public annotations and their own private ones, marks ownership, and hides session IDs", () => {
+    const view = projectPlayerCombat(gameWithAnnotations(), PLAYER_A, 1000);
+    expect(view.annotations.map((annotation) => annotation.id)).toEqual([
+      "90000000-0000-4000-8000-000000000001",
+      "90000000-0000-4000-8000-000000000003"
+    ]);
+    expect(view.annotations.every((annotation) => !("ownerSessionId" in annotation))).toBe(true);
+    expect(view.annotations.map((annotation) => annotation.mine)).toEqual([true, true]);
+  });
+
+  it("hides another player's owner-only annotations and every player's gm-only annotations", () => {
+    const view = projectPlayerCombat(gameWithAnnotations(), PLAYER_B, 1000);
+    expect(view.annotations.map((annotation) => annotation.id)).toEqual([
+      "90000000-0000-4000-8000-000000000001",
+      "90000000-0000-4000-8000-000000000004"
+    ]);
+  });
+
+  it("drops an expired measurement once its time has passed", () => {
+    const view = projectPlayerCombat(gameWithAnnotations(), PLAYER_A, 6000);
+    expect(view.annotations.some((annotation) => annotation.id === "90000000-0000-4000-8000-000000000001")).toBe(false);
+  });
+
+  it("returns no annotations once combat is inactive", () => {
+    const state = gameWithAnnotations();
+    state.combat = { ...state.combat, active: false };
+    expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations).toEqual([]);
   });
 });

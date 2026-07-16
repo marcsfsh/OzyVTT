@@ -15,6 +15,13 @@ type ViewerSubscriber = {
   close: CloseListener;
 };
 
+type GmSubscriber = {
+  connectionId: string;
+  token: string;
+  listener: PresentationListener;
+  close: CloseListener;
+};
+
 export type ViewerConnectionMetadata = Readonly<{
   connectionId: string;
   viewerId: string;
@@ -24,6 +31,7 @@ export type ViewerConnectionMetadata = Readonly<{
 
 export class ViewerCoordinator {
   private readonly subscribers = new Map<string, ViewerSubscriber>();
+  private readonly gmSubscribers = new Map<string, GmSubscriber>();
   private readonly pingTimers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(
@@ -51,6 +59,15 @@ export class ViewerCoordinator {
       viewer: structuredClone(viewer),
       disconnect: () => this.subscribers.delete(connectionId)
     };
+  }
+
+  /** Lets the GM's own session subscribe to the exact live presentation the paired TV shows, for an in-tab preview — without a separate self-pairing step. */
+  connectGm(token: string, listener: PresentationListener, close: CloseListener = () => {}) {
+    if (!this.authorizeGm(token)) throw new ViewerAccessDeniedError("A valid GM session is required.");
+    const connectionId = randomUUID();
+    this.gmSubscribers.set(connectionId, { connectionId, token, listener, close });
+    listener(this.presentation.project(this.now()));
+    return { connectionId, disconnect: () => this.gmSubscribers.delete(connectionId) };
   }
 
   async executeGm(token: string | undefined, command: Omit<ViewerCommand, "role">) {
@@ -127,6 +144,10 @@ export class ViewerCoordinator {
         this.subscribers.delete(connectionId);
         subscriber.close();
       }
+    }
+    for (const [connectionId, subscriber] of this.gmSubscribers) {
+      if (!this.authorizeGm(subscriber.token)) { this.gmSubscribers.delete(connectionId); subscriber.close(); continue; }
+      subscriber.listener(projection);
     }
   }
 }

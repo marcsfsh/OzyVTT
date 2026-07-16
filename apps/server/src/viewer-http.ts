@@ -165,12 +165,15 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   router.get("/api/v1/viewer/events", (request, response) => {
     let disconnect = () => {};
     try {
-      const token = requireViewer(request);
+      const gmToken = bearer(request);
+      const isGm = options.authorizeGm(gmToken);
+      const token = isGm ? gmToken! : requireViewer(request);
       requestId(request, response);
       response.setHeader("content-type", "text/event-stream");
       response.setHeader("connection", "keep-alive");
       response.flushHeaders();
-      const connection = options.coordinator.connectViewer(token, (presentation) => response.write(`event: presentation\ndata: ${JSON.stringify(presentation)}\n\n`), () => response.end());
+      const write = (presentation: unknown) => response.write(`event: presentation\ndata: ${JSON.stringify(presentation)}\n\n`);
+      const connection = isGm ? options.coordinator.connectGm(token, write, () => response.end()) : options.coordinator.connectViewer(token, write, () => response.end());
       disconnect = connection.disconnect;
       const keepAlive = setInterval(() => response.write(": keepalive\n\n"), 15_000);
       request.on("close", () => { clearInterval(keepAlive); disconnect(); });

@@ -12,6 +12,7 @@ import { MapManager, type MapSelection } from "./maps/MapManager";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
 import { ViewerControls } from "./viewer/ViewerControls";
+import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
 async function api(path: string, init?: RequestInit) {
@@ -40,6 +41,7 @@ function App() {
   const [gmToken, setGmToken] = useState<string | null>(null);
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [gmTab, setGmTab] = useState<GmTab>("table");
+  const [showViewerPreview, setShowViewerPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   const { confirm, dialog } = useConfirm();
@@ -153,6 +155,7 @@ function App() {
       {(mode === "player" || gmTab === "table") && <div className="table-layout">
         <section className="table">
           <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "AT THE TABLE"}</span><h2>Battle map</h2><p>{state.combat.active ? `Encounter running · Round ${state.combat.round}` : mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p></div>
+          {mode === "gm" && gmToken && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
           {state.combat.active && state.combat.mapAssetId ? <EncounterMap
             assetId={state.combat.mapAssetId}
             token={mapToken}
@@ -160,6 +163,7 @@ function App() {
             role={mode}
             actors={state.actors}
             tokens={state.combat.tokens}
+            annotations={state.combat.annotations}
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
@@ -174,6 +178,8 @@ function App() {
       {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
+
+      {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
       {mode === "gm" && gmToken && gmTab === "setup" && <>
         <IntegrationsPanel gmToken={gmToken} />

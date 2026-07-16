@@ -27,6 +27,11 @@
 .calibration-instruction small { display: block; margin-top: .55rem; color: #f6c452; }
 .map-preview { position: relative; width: 100%; min-height: 4rem; display: grid; place-items: center; overflow: hidden; border: 2px solid #6b5e4b; border-radius: .6rem; background: #090806; cursor: crosshair; line-height: 0; }
 .map-preview.grid-area-mode { cursor: crosshair; touch-action: none; }
+.map-preview.movable { cursor: move; touch-action: none; }
+.map-preview.resizing { cursor: nwse-resize; touch-action: none; }
+.grid-crosshair line { stroke: #ffcf62; stroke-width: 1; stroke-dasharray: 6 5; opacity: .8; vector-effect: non-scaling-stroke; pointer-events: none; }
+.grid-area-handle { fill: #fff1d2; stroke: #181006; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.pending-area-actions { margin-top: .6rem; }
 .map-preview:hover { border-color: #e8a743; }
 .map-preview:focus-visible { outline: 3px solid #e8a743; outline-offset: 2px; }
 .map-preview p { line-height: 1.5; }

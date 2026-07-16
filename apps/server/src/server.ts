@@ -4,9 +4,10 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
+import { addAnnotation, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationVisibility } from "./annotations.js";
 import { createApiV1Router } from "./api-v1.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
@@ -56,6 +57,18 @@ const EncounterStartSchema = z.object({
 }).strict();
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
+const AnnotationAddSchema = z.object({
+  commandId: z.string().uuid(),
+  kind: z.enum(["measurement", "shape"]),
+  shape: AnnotationShapeKindSchema.optional(),
+  geometry: AnnotationGeometryInputSchema,
+  visibility: AnnotationVisibilitySchema.optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+const AnnotationMoveSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), geometry: AnnotationGeometryInputSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const AnnotationRemoveSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const AnnotationVisibilitySetSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), visibility: AnnotationVisibilitySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 
 export function createServer(options: CreateServerOptions) {
   const app: Express = express();
@@ -73,6 +86,15 @@ export function createServer(options: CreateServerOptions) {
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
+  const annotationExpiryTimers = new Set<ReturnType<typeof setTimeout>>();
+  /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry — same pattern as ViewerCoordinator's ping expiry. */
+  function scheduleAnnotationExpiry() {
+    const soonest = nextAnnotationExpiry(store.snapshot, Date.now());
+    if (soonest === null) return;
+    const timer = setTimeout(() => { annotationExpiryTimers.delete(timer); broadcast(); }, Math.max(0, soonest - Date.now()));
+    timer.unref?.();
+    annotationExpiryTimers.add(timer);
+  }
 
   function roleFor(socketId: string): ClientRole { return auth.verify(io.sockets.sockets.get(socketId)?.handshake.auth?.token) ? "gm" : "player"; }
   /** Also reauthorizes every connected socket against the latest revocation state, so a revoked GM client is downgraded or disconnected on its next check rather than only when it next sends a command. */
@@ -273,8 +295,9 @@ export function createServer(options: CreateServerOptions) {
             const currentGroup = group++;
             return term.dice.map((die) => ({ group: currentGroup, sides: term.sides, face: die.face, kept: die.kept, sign: term.sign }));
           });
+          const initiatorLabel = initiatorRole === "gm" ? "GM" : state.actors.find((candidate) => candidate.ownerSessionId === initiatorSessionId)?.name ?? "A player";
           const record: RollRecord = {
-            id: rollId, commandId, initiatorSessionId, initiatorRole, actorId: actorId ?? null, purpose, visibility, formula,
+            id: rollId, commandId, initiatorSessionId, initiatorRole, initiatorLabel, actorId: actorId ?? null, purpose, visibility, formula,
             normalizedFormula: resolution.expression.normalized,
             dice,
             modifiers: resolution.terms.filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier").map((term) => ({ value: term.value, sign: term.sign })),
@@ -366,6 +389,73 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be moved." }); }
     });
+    socket.on("annotation:add", async (payload, acknowledge) => {
+      const request = AnnotationAddSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The annotation is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before adding to the map." });
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before adding to the map." });
+      try {
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const { commandId, kind, shape, geometry: geometryInput, visibility, expectedRevision } = request.data;
+        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
+        const result = await store.execute({ id: commandId, type: "annotation.add", expectedRevision }, (state) => {
+          if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
+          addAnnotation(state, { id: commandId, kind, shape, origin: geometryInput.origin, target: geometryInput.target, visibility: visibility ?? "public", actor, now: Date.now() }, geometry);
+        });
+        if (!result.duplicate) { await publishGameState(result.state); scheduleAnnotationExpiry(); }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, annotationId: commandId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be added to the map." }); }
+    });
+    socket.on("annotation:move", async (payload, acknowledge) => {
+      const request = AnnotationMoveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The annotation update is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before editing the map." });
+      try {
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const { commandId, id, geometry: geometryInput, expectedRevision } = request.data;
+        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
+        const result = await store.execute({ id: commandId, type: "annotation.move", expectedRevision }, (state) => {
+          moveAnnotation(state, id, geometryInput.origin, geometryInput.target, actor, geometry);
+        });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be moved." }); }
+    });
+    socket.on("annotation:remove", async (payload, acknowledge) => {
+      const request = AnnotationRemoveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The annotation command is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
+      try {
+        const { commandId, id, expectedRevision } = request.data;
+        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
+        const result = await store.execute({ id: commandId, type: "annotation.remove", expectedRevision }, (state) => { removeAnnotation(state, id, actor); });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be removed." }); }
+    });
+    socket.on("annotation:set-visibility", async (payload, acknowledge) => {
+      const request = AnnotationVisibilitySetSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The visibility change is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
+      try {
+        const { commandId, id, visibility, expectedRevision } = request.data;
+        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
+        const result = await store.execute({ id: commandId, type: "annotation.set-visibility", expectedRevision }, (state) => { setAnnotationVisibility(state, id, visibility, actor); });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The visibility could not be changed." }); }
+    });
     socket.emit("state:updated", projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor));
   });
 
@@ -380,7 +470,7 @@ export function createServer(options: CreateServerOptions) {
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); viewerCoordinator.dispose(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }
