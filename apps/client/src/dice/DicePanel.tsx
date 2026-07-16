@@ -16,14 +16,14 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
   const roll = () => {
     setFeedback("Rolling…");
     socket.emit("dice:roll", { commandId: crypto.randomUUID(), formula, purpose, visibility }, (result) => {
-      if (!result.ok) return setFeedback(result.message ?? "The roll failed.");
-      setFeedback(result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "That roll was already accepted." : "Roll accepted by the server.");
+      if (!result.ok) return setFeedback(result.message ?? "That roll didn't work. Check the formula and try again.");
+      setFeedback(result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "Already rolled." : "Rolled.");
     });
   };
 
   return <section className="dice-proof" aria-labelledby="dice-proof-heading">
     <div className="dice-form">
-      <div><span className="eyebrow">SERVER-AUTHORITATIVE DICE PROOF</span><h2 id="dice-proof-heading">Dice</h2></div>
+      <div><span className="eyebrow">DICE</span><h2 id="dice-proof-heading">Roll dice</h2></div>
       <label>Formula<input value={formula} onChange={(event) => setFormula(event.target.value)} placeholder="2d20kh1 + 5" /></label>
       <label>Purpose<select value={purpose} onChange={(event) => setPurpose(event.target.value as RollPurpose)}>{PURPOSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       <label>Visibility<select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
