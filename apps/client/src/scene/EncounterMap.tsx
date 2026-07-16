@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapMeasurementPreview, snapShapePreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AnnotationGlyph, annotationCenter, type AnnotationGlyphData } from "./annotationGlyph";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -325,15 +325,17 @@ export function EncounterMap({
 
   const unplaced = tokens.filter((encounterToken) => encounterToken.position === null && canMove(encounterToken.actorId));
   const dragging = gesture?.kind === "token" ? gesture : null;
+  // Show the dragged token snapped to the grid live (mirrors the server snap on release).
+  const dragSnappedPoint = dragging?.point ? (calibration ? snapCellCenterPreview(calibration, dragging.point) : dragging.point) : null;
   const visibleTokens = tokens.flatMap((encounterToken) => {
-    const position = dragging?.actorId === encounterToken.actorId ? dragging.point : encounterToken.position;
+    const position = dragging?.actorId === encounterToken.actorId ? dragSnappedPoint : encounterToken.position;
     return position ? [{ ...encounterToken, position }] : [];
   });
   const viewBox = size ? (() => {
     const width = size.width / camera.zoom, height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   })() : "0 0 1 1";
-  const liveTokenDistanceFeet = rulerWhileMoving && calibration && dragging?.point && dragging.origin ? chebyshevFeetPreview(calibration, dragging.origin, dragging.point) : null;
+  const liveTokenDistanceFeet = rulerWhileMoving && calibration && dragSnappedPoint && dragging?.origin ? chebyshevFeetPreview(calibration, dragging.origin, dragSnappedPoint) : null;
 
   // Live, grid-snapped preview for the in-progress measure/shape/move/resize gesture (WYSIWYG with the saved result).
   const preview: { data: AnnotationGlyphData; snap: SnappedGeometry } | null = (() => {
@@ -386,10 +388,11 @@ export function EncounterMap({
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>
           <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
 
+          {/* Shapes render below tokens; measurements render above tokens (further down) so they read over the pieces. */}
           {annotations.map((annotation) => {
+            if (annotation.kind !== "shape") return null;
             const beingDragged = (gesture?.kind === "annotation-move" || gesture?.kind === "annotation-resize") && gesture.id === annotation.id;
             if (beingDragged) return null;
-            if (annotation.kind === "measurement") return <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} expiring />;
             const selectedShape = selectedId === annotation.id;
             const editable = tool === "select" && selectedShape && canMoveShape(annotation);
             return <g key={annotation.id} data-annotation-id={annotation.id} className={`annotation-shape visibility-${annotation.visibility}${selectedShape ? " selected" : ""}`}>
@@ -400,8 +403,6 @@ export function EncounterMap({
               </>}
             </g>;
           })}
-
-          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
           {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} /></g>}
 
           {visibleTokens.map((encounterToken) => {
@@ -413,9 +414,14 @@ export function EncounterMap({
               <TokenGlyph sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
             </g>;
           })}
-          {liveTokenDistanceFeet !== null && dragging?.point && dragging.origin && <g className="encounter-move-guide">
-            <line className="encounter-move-line" x1={dragging.origin.x} y1={dragging.origin.y} x2={dragging.point.x} y2={dragging.point.y} />
-            <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragging.point.x} y={dragging.point.y - labelSize * 1.3}>{liveTokenDistanceFeet} ft</text>
+          {/* Measurements render above the token layer so a measured line is never hidden behind a piece. */}
+          {annotations.map((annotation) => annotation.kind === "measurement"
+            ? <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} expiring />
+            : null)}
+          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
+          {liveTokenDistanceFeet !== null && dragSnappedPoint && dragging?.origin && <g className="encounter-move-guide">
+            <line className="encounter-move-line" x1={dragging.origin.x} y1={dragging.origin.y} x2={dragSnappedPoint.x} y2={dragSnappedPoint.y} />
+            <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragSnappedPoint.x} y={dragSnappedPoint.y - labelSize * 1.3}>{liveTokenDistanceFeet} ft</text>
           </g>}
         </svg>
 

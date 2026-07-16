@@ -101,7 +101,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [moveGrab, setMoveGrab] = useState<Point | null>(null);
   const [crosshairColor, setCrosshairColor] = useState("#ffcf62");
   const [crosshairOpacity, setCrosshairOpacity] = useState(0.8);
-  const [crosshairStyle, setCrosshairStyle] = useState<"dashed" | "dotted">("dashed");
+  const [crosshairStyle, setCrosshairStyle] = useState<"dashed" | "dotted" | "solid">("dashed");
   const [previewCamera, setPreviewCamera] = useState<{ center: Point; zoom: number } | null>(null);
   const [lastArea, setLastArea] = useState<{ start: Point; end: Point } | null>(null);
   const [battlemapMode, setBattlemapMode] = useState<"square" | "gridless">("square");
@@ -347,7 +347,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
             <div className="crosshair-swatches">{CROSSHAIR_PRESETS.map((preset) => <button key={preset.color} type="button" aria-label={preset.label} aria-pressed={crosshairColor.toLowerCase() === preset.color} style={{ background: preset.color }} onClick={() => setCrosshairColor(preset.color)} />)}</div>
             <label className="crosshair-color">Custom<input type="color" value={crosshairColor} onChange={(event) => setCrosshairColor(event.target.value)} /></label>
             <label className="crosshair-opacity">Opacity<input type="range" min="0.2" max="1" step="0.05" value={crosshairOpacity} onChange={(event) => setCrosshairOpacity(Number(event.target.value))} /></label>
-            <button type="button" className="crosshair-style" aria-pressed={crosshairStyle === "dotted"} onClick={() => setCrosshairStyle((current) => current === "dashed" ? "dotted" : "dashed")}>{crosshairStyle === "dashed" ? "Dashed" : "Dotted"}</button>
+            <button type="button" className="crosshair-style" onClick={() => setCrosshairStyle((current) => current === "dashed" ? "dotted" : current === "dotted" ? "solid" : "dashed")}>{crosshairStyle === "dashed" ? "Dashed" : crosshairStyle === "dotted" ? "Dotted" : "Solid"}</button>
             <span className="crosshair-hint">Scroll to zoom{previewCamera ? "" : " the map"}</span>
             {previewCamera && <button type="button" className="crosshair-style" onClick={() => setPreviewCamera(null)}>Reset zoom</button>}
           </div>}
@@ -358,7 +358,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
               <GridOverlay lines={overlay} />
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
               {pendingArea && <GridAreaPreview start={pendingArea.start} end={pendingArea.end} handle />}
-              {crosshairPoints.length > 0 && <CrosshairOverlay points={crosshairPoints} width={selected.width} height={selected.height} color={crosshairColor} opacity={crosshairOpacity} dash={crosshairStyle === "dashed" ? "6 5" : "1 6"} />}
+              {crosshairPoints.length > 0 && <CrosshairOverlay points={crosshairPoints} width={selected.width} height={selected.height} color={crosshairColor} opacity={crosshairOpacity} dash={crosshairStyle === "dashed" ? "6 5" : crosshairStyle === "dotted" ? "1 6" : "none"} />}
               {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
             </svg> : <p>Loading map preview…</p>}
           </div>

@@ -43,28 +43,38 @@ function squareGeometry(calibration: SquareGridCalibration, origin: AnnotationPo
  * Directional shapes (cone/line) also snap their angle to the nearest 45° relative to the grid, so
  * they can't be placed at arbitrary off-grid rotations.
  */
-function radialGeometry(calibration: SquareGridCalibration, origin: AnnotationPoint, target: AnnotationPoint, originSnap: "cell-center" | "intersection", snapAngle: boolean): AnnotationGeometry {
-  const snappedOrigin = snapImagePoint(calibration, origin, originSnap).image;
+function radialGeometry(calibration: SquareGridCalibration, origin: AnnotationPoint, target: AnnotationPoint): AnnotationGeometry {
+  const snappedOrigin = snapImagePoint(calibration, origin, "cell-center").image;
   const dx = target.x - snappedOrigin.x;
   const dy = target.y - snappedOrigin.y;
   const pixelDistance = Math.hypot(dx, dy);
   const cells = Math.max(1, Math.round(pixelDistance / calibration.cellSizePx));
   const sizeFeet = cells * calibration.distancePerCell;
   const sizePx = cells * calibration.cellSizePx;
-  let angle = pixelDistance === 0 ? 0 : Math.atan2(dy, dx);
-  if (snapAngle) {
-    const step = Math.PI / 4;
-    angle = calibration.rotationRadians + Math.round((angle - calibration.rotationRadians) / step) * step;
+  const angle = pixelDistance === 0 ? 0 : Math.atan2(dy, dx);
+  return { origin: snappedOrigin, target: { x: snappedOrigin.x + Math.cos(angle) * sizePx, y: snappedOrigin.y + Math.sin(angle) * sizePx }, sizeFeet };
+}
+
+/**
+ * Cone/line: the origin (apex) and the far end (a cone's base center) each snap to a grid cell
+ * center, so the shape points in any direction while both ends stay grid-aligned, instead of
+ * snapping the rotation to fixed increments.
+ */
+function pointableGeometry(calibration: SquareGridCalibration, origin: AnnotationPoint, target: AnnotationPoint): AnnotationGeometry {
+  const snappedOrigin = snapImagePoint(calibration, origin, "cell-center").image;
+  let snappedTarget = snapImagePoint(calibration, target, "cell-center").image;
+  if (snappedTarget.x === snappedOrigin.x && snappedTarget.y === snappedOrigin.y) {
+    const angle = Math.atan2(target.y - origin.y, target.x - origin.x) || 0;
+    snappedTarget = snapImagePoint(calibration, { x: snappedOrigin.x + Math.cos(angle) * calibration.cellSizePx, y: snappedOrigin.y + Math.sin(angle) * calibration.cellSizePx }, "cell-center").image;
   }
-  const snappedTarget = { x: snappedOrigin.x + Math.cos(angle) * sizePx, y: snappedOrigin.y + Math.sin(angle) * sizePx };
-  return { origin: snappedOrigin, target: snappedTarget, sizeFeet };
+  const cells = Math.max(1, Math.round(Math.hypot(snappedTarget.x - snappedOrigin.x, snappedTarget.y - snappedOrigin.y) / calibration.cellSizePx));
+  return { origin: snappedOrigin, target: snappedTarget, sizeFeet: cells * calibration.distancePerCell };
 }
 
 function shapeGeometry(calibration: SquareGridCalibration, shape: AnnotationShapeKind, origin: AnnotationPoint, target: AnnotationPoint): AnnotationGeometry {
   if (shape === "square") return squareGeometry(calibration, origin, target);
-  if (shape === "circle") return radialGeometry(calibration, origin, target, "cell-center", false);
-  if (shape === "cone") return radialGeometry(calibration, origin, target, "cell-center", true);
-  return radialGeometry(calibration, origin, target, "intersection", true);
+  if (shape === "circle") return radialGeometry(calibration, origin, target);
+  return pointableGeometry(calibration, origin, target);
 }
 
 function requireOwnedOrGm(annotation: Annotation, actor: AnnotationActor, action: string) {

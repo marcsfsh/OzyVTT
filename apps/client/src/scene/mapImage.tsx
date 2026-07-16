@@ -147,10 +147,6 @@ export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: numbe
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
 }
-function snapIntersectionPreview(calibration: GridCalibration, point: { x: number; y: number }) {
-  const grid = imageToGridPreview(calibration, point);
-  return gridToImagePreview(calibration, { column: Math.round(grid.column), row: Math.round(grid.row) });
-}
 
 export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; target: { x: number; y: number }; feet: number }>;
 
@@ -173,16 +169,23 @@ export function snapShapePreview(calibration: GridCalibration, shape: "circle" |
     const end = { column: startSnapped.column + (raw.column < start.column ? -1 : 1) * side, row: startSnapped.row + (raw.row < start.row ? -1 : 1) * side };
     return { origin: gridToImagePreview(calibration, startSnapped), target: gridToImagePreview(calibration, end), feet: side * calibration.distancePerCell };
   }
-  // Line anchors on a grid intersection; circle/cone anchor on a cell center (matches the server).
-  const snappedOrigin = shape === "line" ? snapIntersectionPreview(calibration, origin) : snapCellCenterPreview(calibration, origin);
+  // Cone/line: both ends snap to cell centers so the shape can point in any direction (free rotation).
+  if (shape === "cone" || shape === "line") {
+    const from = snapCellCenterPreview(calibration, origin);
+    let to = snapCellCenterPreview(calibration, target);
+    if (to.x === from.x && to.y === from.y) {
+      const angle = Math.atan2(target.y - origin.y, target.x - origin.x) || 0;
+      to = snapCellCenterPreview(calibration, { x: from.x + Math.cos(angle) * calibration.cellSizePx, y: from.y + Math.sin(angle) * calibration.cellSizePx });
+    }
+    const coneCells = Math.max(1, Math.round(Math.hypot(to.x - from.x, to.y - from.y) / calibration.cellSizePx));
+    return { origin: from, target: to, feet: coneCells * calibration.distancePerCell };
+  }
+  // Circle: origin snaps to a cell center, radius snaps to whole cells.
+  const snappedOrigin = snapCellCenterPreview(calibration, origin);
   const pixelDistance = Math.hypot(target.x - snappedOrigin.x, target.y - snappedOrigin.y);
   const cells = Math.max(1, Math.round(pixelDistance / calibration.cellSizePx));
   const sizePx = cells * calibration.cellSizePx;
-  let angle = pixelDistance === 0 ? 0 : Math.atan2(target.y - snappedOrigin.y, target.x - snappedOrigin.x);
-  if (shape === "cone" || shape === "line") {
-    const step = Math.PI / 4;
-    angle = calibration.rotationRadians + Math.round((angle - calibration.rotationRadians) / step) * step;
-  }
+  const angle = pixelDistance === 0 ? 0 : Math.atan2(target.y - snappedOrigin.y, target.x - snappedOrigin.x);
   return { origin: snappedOrigin, target: { x: snappedOrigin.x + Math.cos(angle) * sizePx, y: snappedOrigin.y + Math.sin(angle) * sizePx }, feet: cells * calibration.distancePerCell };
 }
 
