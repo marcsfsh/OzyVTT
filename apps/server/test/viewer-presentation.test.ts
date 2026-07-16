@@ -41,7 +41,7 @@ describe("viewer presentation state", () => {
     expect(projectViewerPresentation(state, 10_249).pings).toHaveLength(1);
     expect(projectViewerPresentation(state, 10_250).pings).toHaveLength(0);
     state = applyViewerCommand(state, command("disable", { type: "viewer.enabled.set", enabled: false })).state;
-    expect(projectViewerPresentation(state, 10_100)).toEqual({ schemaVersion: 1, revision: 4, enabled: false, activeMap: null, camera: null, measurement: null, pings: [], initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] }, encounter: { mapAssetId: null, tokens: [] } });
+    expect(projectViewerPresentation(state, 10_100)).toEqual({ schemaVersion: 1, revision: 4, enabled: false, activeMap: null, camera: null, measurement: null, pings: [], initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] }, encounter: { mapAssetId: null, tokens: [], annotations: [] } });
   });
 
   it("is idempotent, detects revision conflicts, and rejects non-GM control", () => {

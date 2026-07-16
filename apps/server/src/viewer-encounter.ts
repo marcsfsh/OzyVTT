@@ -14,8 +14,8 @@ export function projectViewerInitiative(state: GameState): ViewerInitiative {
   };
 }
 
-export function projectViewerEncounterScene(state: GameState): ViewerEncounterScene {
-  if (!state.combat.active || !state.combat.mapAssetId) return { mapAssetId: null, tokens: [] };
+export function projectViewerEncounterScene(state: GameState, now = Date.now()): ViewerEncounterScene {
+  if (!state.combat.active || !state.combat.mapAssetId) return { mapAssetId: null, tokens: [], annotations: [] };
   const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
   return {
     mapAssetId: state.combat.mapAssetId,
@@ -29,10 +29,16 @@ export function projectViewerEncounterScene(state: GameState): ViewerEncounterSc
         sizePx: token.sizePx,
         active: state.combat.turnActorId === actor.id
       }] : [];
-    })
+    }),
+    // The shared screen is a public display, so only `public` annotations reach it; expired
+    // measurements drop out here (the server re-syncs the viewer at each annotation expiry).
+    annotations: state.combat.annotations.flatMap((annotation) =>
+      annotation.visibility === "public" && (annotation.expiresAt === null || annotation.expiresAt > now)
+        ? [{ id: annotation.id, kind: annotation.kind, shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }]
+        : [])
   };
 }
 
-export function projectViewerEncounter(state: GameState) {
-  return { initiative: projectViewerInitiative(state), encounter: projectViewerEncounterScene(state) };
+export function projectViewerEncounter(state: GameState, now = Date.now()) {
+  return { initiative: projectViewerInitiative(state), encounter: projectViewerEncounterScene(state, now) };
 }

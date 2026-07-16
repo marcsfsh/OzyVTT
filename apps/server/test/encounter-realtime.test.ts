@@ -204,7 +204,7 @@ describe("live authoritative encounter workflow", () => {
       expect(moved).toMatchObject({ ok: true, revision: 3, duplicate: false });
       const ownerView = await ownerConvergence;
       expect(ownerView.combat.tokens).toEqual([{ actorId: HERO_ID, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0 }]);
-      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false }] });
+      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false }], annotations: [] });
 
       const hiddenMoveId = "61000000-0000-4000-8000-000000000005";
       expect(await emitCommand(gmSocket, "token:move", { commandId: hiddenMoveId, actorId: SECRET_ID, position: { x: 127, y: 127 }, expectedRevision: 3 })).toMatchObject({ ok: true, revision: 4, duplicate: false });

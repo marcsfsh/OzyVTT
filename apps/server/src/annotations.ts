@@ -62,9 +62,32 @@ function requireOwnedOrGm(annotation: Annotation, actor: AnnotationActor, action
   if (actor.role !== "gm" && annotation.ownerSessionId !== actor.sessionId) throw new CommandRejectedError(`You may only ${action} your own ${annotation.kind === "shape" ? "shapes" : "measurements"}.`);
 }
 
+/** GM and owner may always move/resize; a shape may also delegate move control to any player via `movableByOthers`. */
+function requireMoveAllowed(annotation: Annotation, actor: AnnotationActor) {
+  if (actor.role === "gm" || annotation.ownerSessionId === actor.sessionId || annotation.movableByOthers) return;
+  throw new CommandRejectedError("That shape's owner has not shared move control with other players.");
+}
+
+/**
+ * Players may only choose visibilities relative to themselves (public / owner-only / owner+gm);
+ * only the GM may hide from players (gm-only) or reveal to one specific character (gm-actor + target).
+ */
+function resolveVisibility(state: GameState, actor: AnnotationActor, visibility: AnnotationVisibility, visibleToActorId: string | null): { visibility: AnnotationVisibility; visibleToActorId: string | null } {
+  if (actor.role === "gm") {
+    if (!(["public", "gm-only", "gm-actor"] as const).includes(visibility as "public" | "gm-only" | "gm-actor")) throw new CommandRejectedError("Choose Everyone, Just the GM, or a specific character.");
+    if (visibility === "gm-actor") {
+      if (!visibleToActorId || !state.actors.some((candidate) => candidate.id === visibleToActorId)) throw new CommandRejectedError("Pick a character to reveal this to.");
+      return { visibility, visibleToActorId };
+    }
+    return { visibility, visibleToActorId: null };
+  }
+  if (!(["public", "owner-only", "owner-gm"] as const).includes(visibility as "public" | "owner-only" | "owner-gm")) throw new CommandRejectedError("Choose Everyone, Just me, or Just me and the GM.");
+  return { visibility, visibleToActorId: null };
+}
+
 export function addAnnotation(
   state: GameState,
-  input: Readonly<{ id: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint; visibility: AnnotationVisibility; actor: AnnotationActor; now: number }>,
+  input: Readonly<{ id: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint; visibility: AnnotationVisibility; visibleToActorId?: string | null; movableByOthers?: boolean; actor: AnnotationActor; now: number }>,
   geometryInput: AnnotationMapGeometry
 ): Annotation {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before measuring or placing shapes.");
@@ -75,6 +98,7 @@ export function addAnnotation(
   const geometry = input.kind === "measurement"
     ? measurementGeometry(calibration, input.origin, input.target)
     : shapeGeometry(calibration, input.shape!, input.origin, input.target);
+  const resolved = resolveVisibility(state, input.actor, input.visibility, input.visibleToActorId ?? null);
   const pruned = state.combat.annotations.filter((existing) => existing.expiresAt === null || existing.expiresAt > input.now);
   if (pruned.length >= 300) throw new CommandRejectedError("Too many annotations are on the map. Remove some before adding more.");
   const annotation: Annotation = {
@@ -84,7 +108,9 @@ export function addAnnotation(
     geometry,
     ownerSessionId: input.actor.sessionId,
     createdByRole: input.actor.role,
-    visibility: input.kind === "measurement" ? "public" : input.visibility,
+    visibility: resolved.visibility,
+    visibleToActorId: resolved.visibleToActorId,
+    movableByOthers: input.kind === "shape" ? (input.movableByOthers ?? false) : false,
     createdAt: input.now,
     expiresAt: input.kind === "measurement" ? input.now + 5000 : null
   };
@@ -96,7 +122,7 @@ export function moveAnnotation(state: GameState, id: string, origin: AnnotationP
   const existing = state.combat.annotations.find((annotation) => annotation.id === id);
   if (!existing) throw new CommandRejectedError("That annotation no longer exists.");
   if (existing.kind !== "shape") throw new CommandRejectedError("Only placed shapes can be moved or resized.");
-  requireOwnedOrGm(existing, actor, "move");
+  requireMoveAllowed(existing, actor);
   const calibration = requireCalibration(geometryInput);
   withinMap(origin, geometryInput, "The starting point");
   withinMap(target, geometryInput, "The endpoint");
@@ -111,12 +137,31 @@ export function removeAnnotation(state: GameState, id: string, actor: Annotation
   state.combat = { ...state.combat, annotations: state.combat.annotations.filter((annotation) => annotation.id !== id) };
 }
 
-export function setAnnotationVisibility(state: GameState, id: string, visibility: AnnotationVisibility, actor: AnnotationActor) {
+/** GM may clear all shapes, only the players' shapes, or their own; a player may only clear their own. */
+export function clearAnnotations(state: GameState, scope: "mine" | "players" | "all", actor: AnnotationActor) {
+  if (scope !== "mine" && actor.role !== "gm") throw new CommandRejectedError("Only the GM can remove other players' shapes.");
+  const keep = (annotation: Annotation) => {
+    if (scope === "all") return false;
+    if (scope === "players") return annotation.createdByRole !== "player";
+    return annotation.ownerSessionId !== actor.sessionId;
+  };
+  state.combat = { ...state.combat, annotations: state.combat.annotations.filter(keep) };
+}
+
+export function setAnnotationVisibility(state: GameState, id: string, visibility: AnnotationVisibility, visibleToActorId: string | null, actor: AnnotationActor) {
   const existing = state.combat.annotations.find((annotation) => annotation.id === id);
   if (!existing) throw new CommandRejectedError("That annotation no longer exists.");
-  if (existing.kind === "measurement") throw new CommandRejectedError("Measurements are always visible to everyone.");
   requireOwnedOrGm(existing, actor, "change visibility on");
-  state.combat = { ...state.combat, annotations: state.combat.annotations.map((annotation) => annotation.id === id ? { ...annotation, visibility } : annotation) };
+  const resolved = resolveVisibility(state, actor, visibility, visibleToActorId);
+  state.combat = { ...state.combat, annotations: state.combat.annotations.map((annotation) => annotation.id === id ? { ...annotation, visibility: resolved.visibility, visibleToActorId: resolved.visibleToActorId } : annotation) };
+}
+
+export function setAnnotationMovable(state: GameState, id: string, movableByOthers: boolean, actor: AnnotationActor) {
+  const existing = state.combat.annotations.find((annotation) => annotation.id === id);
+  if (!existing) throw new CommandRejectedError("That annotation no longer exists.");
+  if (existing.kind !== "shape") throw new CommandRejectedError("Only placed shapes can share move control.");
+  requireOwnedOrGm(existing, actor, "change move control on");
+  state.combat = { ...state.combat, annotations: state.combat.annotations.map((annotation) => annotation.id === id ? { ...annotation, movableByOthers } : annotation) };
 }
 
 /** Soonest future expiry among current annotations, or null if none are ephemeral — used to schedule the next expiry re-broadcast. */

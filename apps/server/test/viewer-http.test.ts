@@ -97,6 +97,19 @@ describe("viewer HTTP vertical slice", () => {
     expect(() => test.coordinator.connectGm("not-the-gm", () => {}, () => {})).toThrow();
   });
 
+  it("mints a GM preview cookie that authenticates as a read-only viewer, and rejects non-GM callers", async () => {
+    const test = await fixture();
+    expect((await fetch(`${test.base}/api/v1/viewer/preview-session`, { method: "POST" })).status).toBe(401);
+    const minted = await fetch(`${test.base}/api/v1/viewer/preview-session`, { method: "POST", headers: { authorization: "Bearer gm-secret" } });
+    expect(minted.status).toBe(201);
+    const cookie = minted.headers.get("set-cookie")!;
+    expect(cookie).toContain("vtt_viewer_session=");
+    expect(cookie).toContain("HttpOnly");
+    const session = cookie.split(";", 1)[0];
+    const usable = await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { cookie: session } });
+    expect(usable.status).toBe(200);
+  });
+
   it("accepts a GM bearer token on the SSE stream and rejects an unauthenticated request", async () => {
     const test = await fixture();
     const unauthenticated = await fetch(`${test.base}/api/v1/viewer/events`);

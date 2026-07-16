@@ -52,7 +52,7 @@ export const EncounterTokenSchema = z.object({
 export type EncounterTokenPosition = z.infer<typeof EncounterTokenPositionSchema>;
 export type EncounterToken = z.infer<typeof EncounterTokenSchema>;
 
-export const AnnotationVisibilitySchema = z.enum(["public", "gm-only", "owner-only", "owner-gm"]);
+export const AnnotationVisibilitySchema = z.enum(["public", "gm-only", "owner-only", "owner-gm", "gm-actor"]);
 export type AnnotationVisibility = z.infer<typeof AnnotationVisibilitySchema>;
 
 export const AnnotationShapeKindSchema = z.enum(["circle", "cone", "line", "square"]);
@@ -85,12 +85,17 @@ export const AnnotationSchema = z.object({
   ownerSessionId: z.string().uuid(),
   createdByRole: z.enum(["gm", "player"]),
   visibility: AnnotationVisibilitySchema.default("public"),
+  /** For `gm-actor` visibility: the actor whose owning player sees this alongside the GM. Null otherwise. */
+  visibleToActorId: z.string().uuid().nullable().default(null),
+  /** When true, any player (not just the owner) may move/resize this shape. The GM and owner always can. */
+  movableByOthers: z.boolean().default(false),
   createdAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().nonnegative().nullable().default(null)
 }).strict().superRefine((annotation, context) => {
   if (annotation.kind === "shape" && annotation.shape === null) context.addIssue({ code: z.ZodIssueCode.custom, path: ["shape"], message: "A shape annotation must specify a shape kind." });
   if (annotation.kind === "measurement" && annotation.shape !== null) context.addIssue({ code: z.ZodIssueCode.custom, path: ["shape"], message: "A measurement annotation must not specify a shape kind." });
-  if (annotation.kind === "measurement" && annotation.visibility !== "public") context.addIssue({ code: z.ZodIssueCode.custom, path: ["visibility"], message: "Measurements are always public." });
+  if (annotation.visibility === "gm-actor" && annotation.visibleToActorId === null) context.addIssue({ code: z.ZodIssueCode.custom, path: ["visibleToActorId"], message: "gm-actor visibility requires a target actor." });
+  if (annotation.visibility !== "gm-actor" && annotation.visibleToActorId !== null) context.addIssue({ code: z.ZodIssueCode.custom, path: ["visibleToActorId"], message: "Only gm-actor visibility carries a target actor." });
 });
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
@@ -161,8 +166,10 @@ export interface ClientToServerEvents {
   "initiative:next": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:previous": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "annotation:add": (payload: { commandId: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; geometry: AnnotationGeometryInput; visibility?: AnnotationVisibility; expectedRevision?: number }, acknowledgement: (result: AnnotationAddResult) => void) => void;
+  "annotation:add": (payload: { commandId: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; geometry: AnnotationGeometryInput; visibility?: AnnotationVisibility; visibleToActorId?: string | null; movableByOthers?: boolean; expectedRevision?: number }, acknowledgement: (result: AnnotationAddResult) => void) => void;
   "annotation:move": (payload: { commandId: string; id: string; geometry: AnnotationGeometryInput; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "annotation:remove": (payload: { commandId: string; id: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "annotation:set-visibility": (payload: { commandId: string; id: string; visibility: AnnotationVisibility; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "annotation:set-visibility": (payload: { commandId: string; id: string; visibility: AnnotationVisibility; visibleToActorId?: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "annotation:set-movable": (payload: { commandId: string; id: string; movableByOthers: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "annotation:clear": (payload: { commandId: string; scope: "mine" | "players" | "all"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
 }
