@@ -19,5 +19,6 @@
 | 015 | Proposed | Curated, versioned SRD bundle separate from executable code |
 | [016](0016-public-integration-api.md) | Proposed | Versioned public integration API over shared authoritative commands, events, authorization, and projections |
 | [017](0017-open-source-distribution.md) | Proposed | Open-source self-host distribution, licensing boundaries, contribution policy, and release governance |
+| [018](0018-character-sheet-pdf-ingestion.md) | Proposed | Isolated MarkItDown extraction followed by reviewed conversion into canonical character JSON |
 
-Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence. Every row marked Accepted or Proposed above has a dedicated linked record; ADR-003/009/010/013/015 remain index-only entries pending their spikes.
+Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence. Every row with a dedicated file is linked; ADR-003/009/010/013/015 remain index-only entries pending their spikes.
