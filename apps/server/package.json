@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@vtt/api-contract": "*",
     "@vtt/domain": "*",
     "@vtt/rules-5e": "*",
     "bcryptjs": "^3.0.2",
