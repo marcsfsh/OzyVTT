@@ -68,7 +68,7 @@ This table is the fast operational view. The detailed requirements and milestone
 | Workstream | State | Verified outcome so far | Remaining before the next gate | Evidence |
 | --- | --- | --- | --- | --- |
 | Repository and application shell | Active | TypeScript npm workspaces, React/Vite client, Express/Socket.IO server, locked dependencies, type/test/build commands, and CI workflow exist | Add formatter/linter policy; verify protected `main`; complete error boundary and diagnostics | `package.json`, `.github/workflows/ci.yml`, `README.md` |
-| Identity and local hosting | Active | Host-only GM bootstrap, signed sessions, LAN binding/URLs, durable starter roster, serialized claim races, remembered player-token recovery, restart-persistent ownership, player claim/release UI, and authorized GM force-release exist | Full multi-client socket/browser acceptance, logout/revocation, login rate limiting, password change, QR/copy UI, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/character-claims.ts`, `apps/server/src/index.ts`, `apps/client/src/actors/ActorRoster.tsx`, ADR-001/002 |
+| Identity and local hosting | Active | Host-only GM bootstrap, signed sessions, LAN binding/URLs, durable starter roster, serialized claim races, remembered player-token recovery, restart-persistent ownership, player claim/release UI, authorized GM force-release, individual GM logout, persistent restart-safe revoke-all-GM-sessions, bounded per-IP failed-login rate limiting with 429/Retry-After, and immediate socket reauthorization/disconnect of revoked GM clients exist | Full multi-client socket/browser acceptance, GM password change, "stay signed in" policy, QR/copy UI, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/login-rate-limit.ts`, `apps/server/src/character-claims.ts`, `apps/server/src/index.ts`, `apps/client/src/actors/ActorRoster.tsx`, `apps/client/src/main.tsx`, ADR-001/002 |
 | Renderer and responsive shell | Prototype implemented; validation active | Pixi renderer proof demonstrates grid/token rendering, pointer pan, wheel zoom, pinch zoom, high-DPI handling, and an accessible wrapper; responsive shell and touch-oriented CSS exist | Validate expected-size maps, 100 tokens, targeting/drag/multi-cell input, frame performance, and the physical-device matrix before accepting ADR-003 | `docs/product/phase-0-renderer-spike.md`, `apps/client/src/scene/` |
 | Actor content contract | Version 1 draft complete | Versioned character/monster schemas and representative fixtures validate | Build import preview/errors, adapters/migrations, live actor instances, and content library | `docs/product/actor-definition-v1.md`, `packages/schemas/`, `packages/test-fixtures/` |
 | Realtime command model | Active | Authoritative Socket.IO state projection, monotonic revisions, command IDs, duplicate suppression, and reconnect snapshot primitives exist | Presence, simultaneous-client convergence, role-revocation, retention fallback, and injected-disconnect tests | `apps/server/src/index.ts`, `apps/server/src/game-store.ts` |
@@ -84,10 +84,10 @@ This table is the fast operational view. The detailed requirements and milestone
 
 This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
 
-1. Finish GM logout/session revocation and failed-login rate limiting.
-2. Establish the open API foundation: ADR-016, versioned `/api/v1` envelope/capabilities endpoint, OpenAPI source, scoped integration credentials, and contract-test harness.
-3. Add presence/reconnect/convergence coverage with multiple simulated clients, including the full two-player claim/recovery scenario at the socket boundary.
-4. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
+1. Establish the open API foundation: ADR-016, versioned `/api/v1` envelope/capabilities endpoint, OpenAPI source, scoped integration credentials, and contract-test harness.
+2. Add presence/reconnect/convergence coverage with multiple simulated clients, including the full two-player claim/recovery scenario at the socket boundary.
+3. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings.
+4. Add GM password change and a documented "stay signed in" session-retention policy.
 5. Begin the Phase 2 battlemap upload, easy grid-calibration, shared-table viewer, and API-driven vertical slice after the Phase 1 join gate is satisfied.
 
 ### 1.6 Open blockers, risks, and validation gaps
@@ -112,7 +112,7 @@ There are no active hard blockers to the next queued implementation item.
 | Date | ID | Status | Outcome | Verification / evidence | Follow-up |
 | --- | --- | --- | --- | --- | --- |
 | 2026-07-15 | FND-001 | Complete | Created the TypeScript workspace, React/Vite client, Express/Socket.IO authoritative server, shared packages, lockfile, and development/build commands | Local type-check and production build; `README.md`, `ARCHITECTURE.md` | Formatter/linter and packaging remain |
-| 2026-07-15 | FND-002 | Partial | Implemented localhost-only GM bootstrap, bcrypt hashing, signed sessions, player session memory, LAN binding, and projected GM/player state | Auth/server source and working browser shell | Rate limiting, logout/revocation, and device acceptance remain |
+| 2026-07-15 | FND-002 | Partial | Implemented localhost-only GM bootstrap, bcrypt hashing, signed sessions, player session memory, LAN binding, and projected GM/player state | Auth/server source and working browser shell | Rate limiting and logout/revocation closed by FND-007; device acceptance remains |
 | 2026-07-15 | SPIKE-001 | Partial | Implemented a PixiJS map/grid/token interaction proof with pan/zoom/pinch/high-DPI and accessible status output | `docs/product/phase-0-renderer-spike.md`, renderer proof source, successful type-check/build | Complete actual-device, expected-map, 100-token, targeting/drag, and performance validation before accepting ADR-003 |
 | 2026-07-15 | SCHEMA-001 | Complete | Drafted and tested version 1 player-character and monster definition schemas with representative JSON fixtures | Four schema/fixture tests; schema reference and fixtures | Import UI and migrations remain |
 | 2026-07-15 | SPIKE-002 | Complete/superseded | Proved command IDs, expected revisions, idempotent receipts, events, and restart persistence with JSON files | Phase 0 persistence proof document | Superseded by FND-004 without changing the command contract |
@@ -126,6 +126,7 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-15 | FIX-002 | Complete (code/build scope) | Fixed the development blank-screen crash caused by React Strict Mode cleaning up the asynchronous Pixi proof before initialization completed; renderer startup/cleanup is now race-safe and removes listeners, renderer failures stay local, and a top-level error boundary shows actionable failures | Type-check and production build pass after lifecycle fix; client bundle builds with error boundary | User to pull and confirm in the actual Windows browser; if hardware/browser initialization still fails, the page now remains usable and displays/records the exact error |
 | 2026-07-15 | PLAN-003 | Complete | Promoted open-source self-hosting and a documented open integration API to foundational product requirements rather than a post-release add-on | Product principles, architecture, authorization, API contract, milestones, tests, risks, documentation, release/governance requirements, and next queue reconciled | Settle ADR-016/017 and implement the Phase 1 API foundation before broadening the domain surface |
 | 2026-07-15 | FND-006 | Complete (automated scope) | Centralized character-claim invariants, proved serialized simultaneous claims have exactly one winner, verified remembered player tokens and claimed ownership survive service/database restarts, and added an authorized GM force-release command and roster control | 24 tests pass; focused auth and SQLite race/recovery tests, type-check, and production build pass | Exercise two real browser clients plus restart/reconnect at the Socket.IO boundary and on the physical-device matrix |
+| 2026-07-16 | FND-007 | Complete (automated scope) | Added server-side GM logout that revokes the presented session immediately (not just a deleted browser token); persistent, restart-safe revoke-all-GM-sessions using an issuance-time cutoff plus a pruned individual-revocation list; bounded per-IP failed-login rate limiting returning 429 with `Retry-After` and no signal of how close a rejected attempt was; `broadcast()` now reauthorizes every connected socket on each call and disconnects one whose token no longer verifies as GM or player, so a revoked GM client is downgraded/disconnected proactively rather than only on its next command; minimal client Sign out and confirmation-gated Revoke all GM sessions controls; legacy auth.json files without the new revocation fields load and migrate in place | 41 repository tests pass (12 new: GM login success/failure, individual and revoke-all revocation, revocation persistence across an `AuthService` restart, legacy/malformed auth-data handling, player-session non-regression under GM revocation, and rate-limiter throttle/recovery/per-key isolation); manual end-to-end verification against a running server confirmed logout, revoke-all, 429/Retry-After lockout that also blocks a subsequently-correct password, and a live GM socket disconnecting immediately after revoke-all; type-check and production build pass | GM password change and a documented "stay signed in" retention policy remain; rate-limiter state is in-memory only (acceptable for a single-process self-hosted host, not restart-safe by design) |
 
 ## 2. Product definition
 
@@ -477,9 +478,9 @@ Acceptance criteria:
 
 - [ ] The GM password is created during first-run setup from the host machine/one-time local bootstrap path and can be changed by an authenticated GM.
 - [ ] The server stores only a modern salted password hash, never the plaintext password.
-- [ ] Failed attempts are rate-limited and do not reveal whether any other session detail is valid.
+- [x] Failed attempts are rate-limited and do not reveal whether any other session detail is valid.
 - [ ] The browser can retain the GM session according to a clear “stay signed in” policy without storing the password.
-- [ ] The GM can sign out and revoke other GM sessions.
+- [x] The GM can sign out and revoke other GM sessions.
 - [ ] A player cannot obtain GM state by changing client-side role values or calling GM endpoints directly.
 - [ ] Direct-IP HTTP is treated as a trusted-LAN mode; if the IP/port is exposed outside the trusted network, the deployment guide requires a secure tunnel/VPN or TLS reverse proxy because an HTTP password/session is not protected in transit.
 
@@ -1774,7 +1775,7 @@ There is no public account or invitation system. The host exposes one landing pa
 - [x] GM path verifies the password server-side and issues a role-bearing signed session credential.
 - [x] Initial GM-password bootstrap is restricted to localhost, preventing the first LAN visitor from claiming GM ownership.
 - [x] Hash the GM password with bcrypt and a per-password salt.
-- [ ] Rate-limit failed GM authentication and support session revocation/password change.
+- [~] Rate-limit failed GM authentication and support session revocation/password change. Rate limiting and individual/revoke-all session revocation are implemented; password change remains.
 - [x] Never infer GM authority from a client-provided role flag; verify the signed server-issued credential at the command boundary.
 
 ### 16.3 Server-side visibility projections
@@ -2713,7 +2714,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 - [~] Repository scaffold, formatting/lint/type/test/CI. Scaffold, type checking, tests, build, and CI exist; formatter/linter remain.
 - [x] Single local server startup and persistent data directory.
-- [~] First-run GM password creation, hashing, login, session, logout, and rate limiting. Bootstrap through session issuance exists; logout/revocation and rate limiting remain.
+- [x] First-run GM password creation, hashing, login, session, logout, and rate limiting. Bootstrap, session issuance, individual logout, revoke-all, and rate limiting are implemented and tested; password change remains a separate later item.
 - [~] Direct-IP landing page and displayed/copyable/QR host URL. Landing page and console LAN URLs exist; copy/QR UI remains.
 - [~] Player character list, atomic claim, remembered browser session, release, and GM force-release. Roster, player and GM controls, serialized race behavior, token recovery, and restart persistence are implemented and automated; full multi-client socket/browser/device acceptance remains.
 - [~] Role/ownership authorization at server command boundary. Implemented for current claim and dice commands; comprehensive command matrix and revocation tests remain.
