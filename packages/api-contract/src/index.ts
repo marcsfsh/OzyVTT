@@ -10,6 +10,17 @@ export const SYSTEM_PATHS = {
   capabilities: `${API_NAMESPACE}/system/capabilities`
 } as const;
 
+/** Served separately from SYSTEM_PATHS: it documents the whole contract rather than being one system operation among others. */
+export const OPENAPI_DOCUMENT_PATH = `${API_NAMESPACE}/openapi.json` as const;
+
+/** GM-authorized credential management, not integration-token authorized. `{id}` is OpenAPI-style; the Express router substitutes `:id`. */
+export const INTEGRATION_CREDENTIAL_PATHS = {
+  collection: `${API_NAMESPACE}/gm/integration-credentials`,
+  rotate: `${API_NAMESPACE}/gm/integration-credentials/{id}/rotate`,
+  revoke: `${API_NAMESPACE}/gm/integration-credentials/{id}/revoke`,
+  audit: `${API_NAMESPACE}/gm/integration-credentials/{id}/audit`
+} as const;
+
 export const ApiErrorCodeSchema = z.enum([
   "bad_request",
   "unauthenticated",
@@ -96,6 +107,40 @@ export const IntegrationCredentialMetadataSchema = z.object({
   revokedAt: TimestampSchema.nullable()
 }).strict();
 
+export const CreateIntegrationCredentialRequestSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  scopes: z.array(IntegrationScopeSchema).min(1),
+  gameId: z.string().uuid().nullable().optional(),
+  expiresAt: TimestampSchema.nullable().optional()
+}).strict();
+
+/** Present only in the single create/rotate response that issues it; never returned by list, audit, or any later read. */
+export const IntegrationCredentialIssuedSchema = z.object({
+  credential: IntegrationCredentialMetadataSchema,
+  token: z.string().min(1)
+}).strict();
+
+export const RotateIntegrationCredentialRequestSchema = z.object({
+  /** Omit to keep the current expiration; pass null to clear it; pass a timestamp to set a new one. */
+  expiresAt: TimestampSchema.nullable().optional()
+}).strict();
+
+export const CredentialAuditEventTypeSchema = z.enum(["created", "used", "verification_failed", "rotated", "revoked"]);
+export const CredentialAuditEventSchema = z.object({
+  id: z.number().int().positive(),
+  type: CredentialAuditEventTypeSchema,
+  occurredAt: TimestampSchema,
+  detail: z.record(z.unknown())
+}).strict();
+
+export const IntegrationCredentialListSchema = z.object({ credentials: z.array(IntegrationCredentialMetadataSchema) }).strict();
+export const IntegrationCredentialAuditSchema = z.object({ events: z.array(CredentialAuditEventSchema) }).strict();
+
+export const IntegrationCredentialResponseSchema = successEnvelopeSchema(IntegrationCredentialMetadataSchema);
+export const IntegrationCredentialIssuedResponseSchema = successEnvelopeSchema(IntegrationCredentialIssuedSchema);
+export const IntegrationCredentialListResponseSchema = successEnvelopeSchema(IntegrationCredentialListSchema);
+export const IntegrationCredentialAuditResponseSchema = successEnvelopeSchema(IntegrationCredentialAuditSchema);
+
 export const CommandEnvelopeSchema = z.object({
   protocolVersion: RealtimeProtocolVersionSchema,
   commandId: z.string().uuid(),
@@ -122,6 +167,11 @@ export type SystemHealth = z.infer<typeof SystemHealthSchema>;
 export type SystemVersion = z.infer<typeof SystemVersionSchema>;
 export type SystemCapabilities = z.infer<typeof SystemCapabilitiesSchema>;
 export type IntegrationCredentialMetadata = z.infer<typeof IntegrationCredentialMetadataSchema>;
+export type CreateIntegrationCredentialRequest = z.infer<typeof CreateIntegrationCredentialRequestSchema>;
+export type IntegrationCredentialIssued = z.infer<typeof IntegrationCredentialIssuedSchema>;
+export type RotateIntegrationCredentialRequest = z.infer<typeof RotateIntegrationCredentialRequestSchema>;
+export type CredentialAuditEventType = z.infer<typeof CredentialAuditEventTypeSchema>;
+export type CredentialAuditEvent = z.infer<typeof CredentialAuditEventSchema>;
 export type CommandEnvelope = z.infer<typeof CommandEnvelopeSchema>;
 export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>;
 
@@ -147,10 +197,21 @@ export const openApiDocument = {
   paths: {
     [SYSTEM_PATHS.health]: { get: { operationId: "getSystemHealth", security: [], responses: { "200": { description: "Server is live", content: { "application/json": { schema: { $ref: "#/components/schemas/SystemHealthResponse" } } } } } } },
     [SYSTEM_PATHS.version]: { get: { operationId: "getSystemVersion", security: [], responses: { "200": { description: "Public protocol versions", content: { "application/json": { schema: { $ref: "#/components/schemas/SystemVersionResponse" } } } } } } },
-    [SYSTEM_PATHS.capabilities]: { get: { operationId: "getSystemCapabilities", security: [{ bearerAuth: ["system:read"] }], responses: { "200": { description: "Authorized server capabilities", content: { "application/json": { schema: { $ref: "#/components/schemas/SystemCapabilitiesResponse" } } } }, "401": { $ref: "#/components/responses/ApiError" }, "403": { $ref: "#/components/responses/ApiError" } } } }
+    [SYSTEM_PATHS.capabilities]: { get: { operationId: "getSystemCapabilities", security: [{ bearerAuth: ["system:read"] }], responses: { "200": { description: "Authorized server capabilities", content: { "application/json": { schema: { $ref: "#/components/schemas/SystemCapabilitiesResponse" } } } }, "401": { $ref: "#/components/responses/ApiError" }, "403": { $ref: "#/components/responses/ApiError" } } } },
+    [OPENAPI_DOCUMENT_PATH]: { get: { operationId: "getOpenApiDocument", security: [], responses: { "200": { description: "This exact OpenAPI 3.1 document, served from the running instance", content: { "application/json": { schema: { type: "object" } } } } } } },
+    [INTEGRATION_CREDENTIAL_PATHS.collection]: {
+      post: { operationId: "createIntegrationCredential", security: [{ gmAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/CreateIntegrationCredentialRequest" } } } }, responses: { "201": { description: "Credential created; the token is shown exactly once", content: { "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialIssuedResponse" } } } }, "400": { $ref: "#/components/responses/ApiError" }, "401": { $ref: "#/components/responses/ApiError" } } },
+      get: { operationId: "listIntegrationCredentials", security: [{ gmAuth: [] }], responses: { "200": { description: "Safe metadata for every credential; never includes a secret", content: { "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialListResponse" } } } }, "401": { $ref: "#/components/responses/ApiError" } } }
+    },
+    [INTEGRATION_CREDENTIAL_PATHS.rotate]: { post: { operationId: "rotateIntegrationCredential", security: [{ gmAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], requestBody: { required: false, content: { "application/json": { schema: { $ref: "#/components/schemas/RotateIntegrationCredentialRequest" } } } }, responses: { "200": { description: "Credential rotated; the new token is shown exactly once", content: { "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialIssuedResponse" } } } }, "401": { $ref: "#/components/responses/ApiError" }, "404": { $ref: "#/components/responses/ApiError" }, "409": { $ref: "#/components/responses/ApiError" } } } },
+    [INTEGRATION_CREDENTIAL_PATHS.revoke]: { post: { operationId: "revokeIntegrationCredential", security: [{ gmAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], responses: { "200": { description: "Credential revoked; access denied immediately", content: { "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialResponse" } } } }, "401": { $ref: "#/components/responses/ApiError" }, "404": { $ref: "#/components/responses/ApiError" } } } },
+    [INTEGRATION_CREDENTIAL_PATHS.audit]: { get: { operationId: "getIntegrationCredentialAudit", security: [{ gmAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], responses: { "200": { description: "Safe audit history: no secrets, only usage/lifecycle metadata", content: { "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialAuditResponse" } } } }, "401": { $ref: "#/components/responses/ApiError" }, "404": { $ref: "#/components/responses/ApiError" } } } }
   },
   components: {
-    securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "VTT integration token" } },
+    securitySchemes: {
+      bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "VTT integration token" },
+      gmAuth: { type: "http", scheme: "bearer", bearerFormat: "VTT GM session token" }
+    },
     responses: { ApiError: { description: "Stable API error", content: { "application/json": { schema: { $ref: "#/components/schemas/ApiErrorEnvelope" } } } } },
     schemas: {
       SystemHealth: { type: "object", additionalProperties: false, required: ["status", "serverTime"], properties: { status: { const: "ok" }, serverTime: { type: "string", format: "date-time" } } },
@@ -159,6 +220,17 @@ export const openApiDocument = {
       SystemHealthResponse: envelopeSchema("#/components/schemas/SystemHealth"),
       SystemVersionResponse: envelopeSchema("#/components/schemas/SystemVersion"),
       SystemCapabilitiesResponse: envelopeSchema("#/components/schemas/SystemCapabilities"),
+      IntegrationCredentialMetadata: { type: "object", additionalProperties: false, required: ["id", "name", "scopes", "gameId", "createdAt", "expiresAt", "lastUsedAt", "revokedAt"], properties: { id: { type: "string", format: "uuid" }, name: { type: "string", minLength: 1, maxLength: 100 }, scopes: { type: "array", minItems: 1, items: { type: "string", enum: IntegrationScopeSchema.options } }, gameId: { type: ["string", "null"], format: "uuid" }, createdAt: { type: "string", format: "date-time" }, expiresAt: { type: ["string", "null"], format: "date-time" }, lastUsedAt: { type: ["string", "null"], format: "date-time" }, revokedAt: { type: ["string", "null"], format: "date-time" } } },
+      CreateIntegrationCredentialRequest: { type: "object", additionalProperties: false, required: ["name", "scopes"], properties: { name: { type: "string", minLength: 1, maxLength: 100 }, scopes: { type: "array", minItems: 1, items: { type: "string", enum: IntegrationScopeSchema.options } }, gameId: { type: ["string", "null"], format: "uuid" }, expiresAt: { type: ["string", "null"], format: "date-time" } } },
+      IntegrationCredentialIssued: { type: "object", additionalProperties: false, required: ["credential", "token"], properties: { credential: { $ref: "#/components/schemas/IntegrationCredentialMetadata" }, token: { type: "string", minLength: 1, description: "Shown exactly once; the server stores only a salted hash and cannot redisplay it." } } },
+      RotateIntegrationCredentialRequest: { type: "object", additionalProperties: false, properties: { expiresAt: { type: ["string", "null"], format: "date-time", description: "Omit to keep the current expiration; null clears it." } } },
+      CredentialAuditEvent: { type: "object", additionalProperties: false, required: ["id", "type", "occurredAt", "detail"], properties: { id: { type: "integer", minimum: 1 }, type: { type: "string", enum: ["created", "used", "verification_failed", "rotated", "revoked"] }, occurredAt: { type: "string", format: "date-time" }, detail: { type: "object", additionalProperties: true } } },
+      IntegrationCredentialList: { type: "object", additionalProperties: false, required: ["credentials"], properties: { credentials: { type: "array", items: { $ref: "#/components/schemas/IntegrationCredentialMetadata" } } } },
+      IntegrationCredentialAudit: { type: "object", additionalProperties: false, required: ["events"], properties: { events: { type: "array", items: { $ref: "#/components/schemas/CredentialAuditEvent" } } } },
+      IntegrationCredentialResponse: envelopeSchema("#/components/schemas/IntegrationCredentialMetadata"),
+      IntegrationCredentialIssuedResponse: envelopeSchema("#/components/schemas/IntegrationCredentialIssued"),
+      IntegrationCredentialListResponse: envelopeSchema("#/components/schemas/IntegrationCredentialList"),
+      IntegrationCredentialAuditResponse: envelopeSchema("#/components/schemas/IntegrationCredentialAudit"),
       ApiErrorEnvelope: { type: "object", additionalProperties: false, required: ["ok", "apiVersion", "error"], properties: { ok: { const: false }, apiVersion: { const: API_VERSION }, error: { type: "object", additionalProperties: false, required: ["code", "message", "requestId"], properties: { code: { type: "string", enum: ApiErrorCodeSchema.options }, message: { type: "string" }, requestId: { type: "string", format: "uuid" }, details: { type: "object", additionalProperties: true }, retryAfterSeconds: { type: "integer", minimum: 1 }, currentRevision: { type: "integer", minimum: 0 } } } } }
     }
   }
