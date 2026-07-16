@@ -25,6 +25,7 @@ function lanUrls(portNumber: number) {
 const { httpServer, initialize } = createServer({
   authPath: join(dataDir, "auth.json"),
   databasePath: join(dataDir, "vtt.sqlite"),
+  integrationCredentialsPath: join(dataDir, "integration-credentials.sqlite"),
   webDist,
   useDevelopmentClient,
   developmentClientPort,

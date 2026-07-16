@@ -6,11 +6,14 @@ import { Server } from "socket.io";
 import { z } from "zod";
 import { RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
+import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
+import { createApiV1Router } from "./api-v1.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
+import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
@@ -18,11 +21,14 @@ import { projectGmView, projectPlayerView } from "./projections.js";
 export type CreateServerOptions = {
   authPath: string;
   databasePath: string;
+  /** Separate SQLite file for integration credentials/audit, distinct from the game-state database. */
+  integrationCredentialsPath: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
   clientOrigin?: string;
   initialGameState?: GameState;
+  applicationVersion?: string;
   /** How long a session's presence stays "reconnecting" after its last connection drops before flipping to "offline". */
   presenceGraceMs?: number;
 };
@@ -35,6 +41,7 @@ export function createServer(options: CreateServerOptions) {
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: options.clientOrigin ? { origin: options.clientOrigin } : undefined });
   const auth = new AuthService(options.authPath);
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState());
+  const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -94,6 +101,13 @@ export function createServer(options: CreateServerOptions) {
     const state = store.snapshot;
     res.json(auth.verify(token) ? projectGmView(state, presenceFor) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId, presenceFor));
   });
+  app.use(createApiV1Router({
+    applicationVersion: options.applicationVersion ?? "0.1.0",
+    actorDefinitionVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
+    authorizeIntegration: (token, requiredScope) => credentials.verify(token, requiredScope) !== null,
+    authorizeGm: (token) => auth.verify(token) !== null,
+    credentialStore: credentials
+  }));
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
     app.use(express.static(options.webDist));
@@ -202,8 +216,8 @@ export function createServer(options: CreateServerOptions) {
     socket.emit("state:updated", projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor));
   });
 
-  async function initialize() { await Promise.all([auth.initialize(), store.initialize()]); }
-  function close() { presence.dispose(); io.close(); store.close(); }
+  async function initialize() { await Promise.all([auth.initialize(), store.initialize(), credentials.initialize()]); }
+  function close() { presence.dispose(); io.close(); store.close(); credentials.close(); }
 
-  return { app, httpServer, io, auth, store, presence, initialize, close };
+  return { app, httpServer, io, auth, store, credentials, presence, initialize, close };
 }

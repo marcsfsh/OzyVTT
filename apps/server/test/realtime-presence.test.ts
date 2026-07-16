@@ -14,6 +14,7 @@ async function startTestServer(overrides: Partial<CreateServerOptions> = {}) {
   const server = createServer({
     authPath: join(directory, "auth.json"),
     databasePath: join(directory, "vtt.sqlite"),
+    integrationCredentialsPath: join(directory, "integration-credentials.sqlite"),
     webDist: directory,
     useDevelopmentClient: true,
     developmentClientPort: 5173,
