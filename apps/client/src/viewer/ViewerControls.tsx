@@ -83,10 +83,11 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   };
   const command = async (payload: Record<string, unknown>) => {
     if (!presentation) throw new Error("Viewer presentation state is still loading.");
-    await api("/api/v1/viewer/presentation/commands", gmToken, { method: "POST", body: JSON.stringify({ id: crypto.randomUUID(), expectedRevision: presentation.revision, payload }) });
+    return api("/api/v1/viewer/presentation/commands", gmToken, { method: "POST", body: JSON.stringify({ id: crypto.randomUUID(), expectedRevision: presentation.revision, payload }) });
   };
   const connectedIds = new Set(connections.map((connection) => connection.viewerId));
   const mapIsPresented = Boolean(map && presentation?.enabled && presentation.activeMap?.assetId === map.assetId);
+  const presentationHasMap = Boolean(presentation?.enabled && presentation.activeMap);
   const requiredPointCount = tool === "measure" ? 2 : 1;
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -106,7 +107,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     return next;
   });
   const sendTool = () => void run(async () => {
-    if (!mapIsPresented) throw new Error("Begin presentation and show this map before using viewer tools.");
+    if (!mapIsPresented) throw new Error("Present this map before using viewer tools.");
     if (draftPoints.length < requiredPointCount) throw new Error(`Choose ${requiredPointCount === 1 ? "a point" : "two points"} on the map first.`);
     if (tool === "focus") await command({ type: "viewer.camera.set", camera: { center: draftPoints[0], zoom } });
     else if (tool === "ping") await command({ type: "viewer.ping", id: crypto.randomUUID(), point: draftPoints[0], durationMs: 3_500 });
@@ -125,13 +126,16 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     <div className="viewer-control-actions">
       <button disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</button>
       <button disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</button>
-      <button disabled={busy || !presentation} onClick={() => void run(() => command({ type: "viewer.enabled.set", enabled: !presentation?.enabled }))}>{presentation?.enabled ? "Pause presentation" : "Begin presentation"}</button>
-      <button disabled={busy || !presentation || !map} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }))}>Show current map</button>
+      <button disabled={busy || !presentation || (!presentationHasMap && !map)} onClick={() => void run(() => presentationHasMap
+        ? command({ type: "viewer.enabled.set", enabled: false }).then(() => undefined)
+        : command({ type: "viewer.presentation.begin", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined)
+      )}>{presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}</button>
+      <button disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined))}>{mapIsPresented ? "Current map is live" : "Switch viewer to current map"}</button>
     </div>
     {pairing && <div className="viewer-pairing-code" role="status"><span>PAIRING CODE</span><strong>{pairing.code}</strong><small>Expires {new Date(pairing.expiresAt).toLocaleTimeString()}</small><button onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</button></div>}
 
     {map && <section className="viewer-tools" aria-labelledby="viewer-tools-title">
-      <div><span className="viewer-tools-eyebrow">LIVE PRESENTATION TOOLS</span><h3 id="viewer-tools-title">Focus, ping, and measure</h3><p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Begin presentation and show the current map to enable these tools."}</p></div>
+      <div><span className="viewer-tools-eyebrow">LIVE PRESENTATION TOOLS</span><h3 id="viewer-tools-title">Focus, ping, and measure</h3><p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Present the current map to enable these tools."}</p></div>
       <div className="viewer-tool-tabs" role="group" aria-label="Presentation tool">
         {(["focus", "ping", "measure"] as const).map((candidate) => <button key={candidate} aria-pressed={tool === candidate} onClick={() => setTool(candidate)}>{candidate === "focus" ? "Focus view" : candidate === "ping" ? "Ping point" : "Measure line"}</button>)}
       </div>

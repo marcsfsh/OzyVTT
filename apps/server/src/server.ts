@@ -11,6 +11,7 @@ import { createApiV1Router } from "./api-v1.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
+import { endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
@@ -23,6 +24,7 @@ import { projectGmView, projectPlayerView } from "./projections.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
+import { projectViewerInitiative } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 export type CreateServerOptions = {
@@ -44,6 +46,14 @@ export type CreateServerOptions = {
 };
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+const CommandIdentitySchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const EncounterStartSchema = z.object({
+  commandId: z.string().uuid(),
+  mapAssetId: z.string().uuid(),
+  entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional() }).strict()).min(1).max(200),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 
 export function createServer(options: CreateServerOptions) {
   const app: Express = express();
@@ -73,6 +83,13 @@ export function createServer(options: CreateServerOptions) {
       if (token && !gm && !player) { socket.disconnect(true); continue; }
       socket.emit("state:updated", gm ? projectGmView(state, presenceFor) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
+  }
+  async function publishGameState(state: GameState) {
+    try { await viewerCoordinator.synchronizeInitiative(state.revision, projectViewerInitiative(state)); }
+    catch {
+      for (const socket of io.sockets.sockets.values()) if (auth.verify(socket.handshake.auth?.token)) socket.emit("system:error", "The game state was saved, but the shared viewer could not synchronize Initiative. Retry the last viewer action or restart the host.");
+    }
+    broadcast();
   }
 
   app.use(express.json());
@@ -128,11 +145,9 @@ export function createServer(options: CreateServerOptions) {
     assets: mapAssets,
     catalog: mapCatalog,
     authorizeGm,
-    // Until scenes have their own player-visible active-map projection, players
-    // may fetch only the map the GM has explicitly made public for presentation.
     authorizePlayer: (token, assetId) => {
-      const presentation = viewerPresentation.project();
-      return auth.verifyPlayer(token) !== null && presentation.enabled && presentation.activeMap?.assetId === assetId;
+      const combat = store.snapshot.combat;
+      return auth.verifyPlayer(token) !== null && combat.active && combat.mapAssetId === assetId;
     },
     authorizeViewer: (token, assetId) => {
       if (!token) return false;
@@ -206,21 +221,21 @@ export function createServer(options: CreateServerOptions) {
       const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
       try {
         const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision }, (state) => claimCharacter(state, actorId, sessionId));
-        if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+        if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character claim failed." }); }
     });
     socket.on("character:release", async ({ commandId, expectedRevision }, acknowledge) => {
       const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
       try {
         const result = await store.execute({ id: commandId, type: "character.release", expectedRevision }, (state) => releaseCharactersForSession(state, sessionId));
-        if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+        if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character release failed." }); }
     });
     socket.on("character:force-release", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can force-release a character." });
       try {
         const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision }, (state) => forceReleaseCharacter(state, actorId, "gm"));
-        if (!result.duplicate) broadcast(); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+        if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character force-release failed." }); }
     });
     socket.on("dice:roll", async ({ commandId, formula, purpose, visibility, actorId, expectedRevision }, acknowledge) => {
@@ -258,14 +273,71 @@ export function createServer(options: CreateServerOptions) {
           if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
         });
         const accepted = result.state.rolls.find((roll) => roll.commandId === commandId);
-        if (!result.duplicate) broadcast();
+        if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, rollId: accepted?.id, hiddenFromRoller: visibility === "blind" && !gm });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The roll failed." }); }
+    });
+    socket.on("encounter:start", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can start an encounter." });
+      const request = EncounterStartSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The encounter setup is malformed." });
+      const encounterMap = mapCatalog.get(request.data.mapAssetId);
+      if (!encounterMap || encounterMap.kind !== "battlemap") return acknowledge({ ok: false, message: "Select an uploaded battlemap before starting the encounter." });
+      try {
+        const { commandId, mapAssetId, entries, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "encounter.start", expectedRevision }, (state) => startEncounter(state, { mapAssetId, entries }, () => randomInt(1, 21)));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not start." }); }
+    });
+    socket.on("encounter:end", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can end an encounter." });
+      const request = CommandIdentitySchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The encounter command is malformed." });
+      try {
+        const result = await store.execute({ id: request.data.commandId, type: "encounter.end", expectedRevision: request.data.expectedRevision }, endEncounter);
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not end." }); }
+    });
+    socket.on("initiative:set", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change Initiative." });
+      const request = InitiativeScoreSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The Initiative update is malformed." });
+      try {
+        const { commandId, actorId, score, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "initiative.set", actorId, expectedRevision }, (state) => setInitiativeScore(state, actorId, score));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not be updated." }); }
+    });
+    socket.on("initiative:next", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can advance Initiative." });
+      const request = CommandIdentitySchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The Initiative command is malformed." });
+      try {
+        const result = await store.execute({ id: request.data.commandId, type: "initiative.next", expectedRevision: request.data.expectedRevision }, nextInitiativeTurn);
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not advance." }); }
+    });
+    socket.on("initiative:previous", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can move Initiative backward." });
+      const request = CommandIdentitySchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The Initiative command is malformed." });
+      try {
+        const result = await store.execute({ id: request.data.commandId, type: "initiative.previous", expectedRevision: request.data.expectedRevision }, previousInitiativeTurn);
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not move backward." }); }
     });
     socket.emit("state:updated", projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor));
   });
 
-  async function initialize() { await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]); }
+  async function initialize() {
+    await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
+    await viewerCoordinator.synchronizeInitiative(store.snapshot.revision, projectViewerInitiative(store.snapshot));
+  }
   function close() { presence.dispose(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };

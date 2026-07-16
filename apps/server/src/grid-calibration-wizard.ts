@@ -1,5 +1,6 @@
 import {
   calibrationErrorPx,
+  deriveSquareGridFromArea,
   deriveSquareGridFromSegment,
   nudgeSquareGrid,
   snapImagePoint,
@@ -91,6 +92,30 @@ export function measureKnownGridSpan(state: GridCalibrationWizardState, input: R
 }>): GridCalibrationWizardState {
   active(state);
   const calibration = deriveSquareGridFromSegment({
+    mapWidthPx: state.mapWidthPx,
+    mapHeightPx: state.mapHeightPx,
+    ...input
+  });
+  return {
+    ...state,
+    step: "refine",
+    calibration,
+    verification: null,
+    undoStack: state.calibration ? pushHistory(state.undoStack, state.calibration) : [],
+    redoStack: [],
+    revision: nextRevision(state)
+  };
+}
+
+export function measureKnownGridArea(state: GridCalibrationWizardState, input: Readonly<{
+  start: ImagePoint;
+  end: ImagePoint;
+  cellsAcross: number;
+  cellsDown: number;
+  distancePerCell?: number;
+}>): GridCalibrationWizardState {
+  active(state);
+  const calibration = deriveSquareGridFromArea({
     mapWidthPx: state.mapWidthPx,
     mapHeightPx: state.mapHeightPx,
     ...input

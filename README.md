@@ -9,6 +9,8 @@ A private, LAN-hosted, combat-first D&D 5e virtual tabletop for one trusted GM a
 - First-run GM password bootstrap is restricted to the host machine; only a salted password hash is persisted.
 - Server-owned session and character-claim model, separated GM/player views, and real-time state events.
 - Versioned JSON schemas for imported actors and persisted game state.
+- Authenticated map library with guided printed-grid/gridless setup and regional/world scales.
+- Persisted server-authoritative encounters with Initiative, turns/rounds, active GM/player battlemap, and a paired player-safe table viewer.
 
 ## Run locally
 
@@ -26,8 +28,18 @@ To run the single LAN service as a player would use it, build and launch it with
 
 `data/` is intentionally local and ignored by Git; back it up separately once it contains real campaign data.
 
+## Test the current encounter and second-screen milestone
+
+1. Enter GM mode and upload a battlemap under **Maps and grid setup**.
+2. Choose **Printed square grid** or **Gridless battlemap**. For a printed grid, press on one grid intersection, drag diagonally across exactly a 3×3 block of squares, and release on the opposite intersection. The overlay appears immediately; preview/adjust it, click a distant V intersection, verify, and save.
+3. Under **Table viewer**, open or copy the second-screen address. On a separate browser/display, pair it using a code created by the GM.
+4. Keep the intended map selected and click **Present _map name_**. This single action now starts presentation and sends the selected map/camera immediately.
+5. Under **Encounter and Initiative**, choose combatants, optionally enter Initiative scores (leave blanks for server rolls), and start the encounter. Advance turns from the GM controls; the player view and paired viewer update automatically. GM-only combatants appear only as a generic **GM turn** on public surfaces.
+
+The current combat canvas displays the active authenticated battlemap. Token placement/movement and fog are the next scene milestone.
+
 ## Scope boundaries
 
 This repository is intentionally not a character builder, campaign wiki, voice/video service, public SaaS, multi-tenant product, macro language, or 3D tabletop. Those boundaries prevent the core combat loop from becoming a general-purpose VTT project.
 
-The complete roadmap is [BUILD_PLAN.md](BUILD_PLAN.md). This repository is currently in Phase 0 technical proof / Phase 1 foundation work; no Phase 1 exit gate has been claimed yet. See [ARCHITECTURE.md](ARCHITECTURE.md), [docs/adr/](docs/adr/), and [docs/product/](docs/product/) for the decisions and proof artifacts that will guide implementation.
+The complete roadmap is [BUILD_PLAN.md](BUILD_PLAN.md). Phase 0/1 validation continues while the Phase 2 testing-MVP vertical slice is under active implementation; no phase exit gate has been claimed yet. See [ARCHITECTURE.md](ARCHITECTURE.md), [docs/adr/](docs/adr/), and [docs/product/](docs/product/) for the decisions and proof artifacts that guide implementation.

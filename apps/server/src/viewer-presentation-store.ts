@@ -17,7 +17,10 @@ function parseState(value: string): ViewerPresentationState {
   if (parsed.schemaVersion !== 1 || !Number.isInteger(parsed.revision) || (parsed.revision ?? -1) < 0 || typeof parsed.enabled !== "boolean" || !Array.isArray(parsed.pings) || !Array.isArray(parsed.acceptedCommandIds) || !parsed.initiative) {
     throw new Error("Persisted viewer presentation state is malformed or unsupported.");
   }
-  return parsed as ViewerPresentationState;
+  return {
+    ...parsed,
+    initiative: { ...parsed.initiative!, hiddenTurn: parsed.initiative!.hiddenTurn ?? false }
+  } as ViewerPresentationState;
 }
 
 export class ViewerPresentationStore {

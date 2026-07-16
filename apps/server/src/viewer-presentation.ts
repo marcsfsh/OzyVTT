@@ -29,6 +29,7 @@ export type ViewerInitiativeEntry = Readonly<{
 export type ViewerInitiative = Readonly<{
   visible: boolean;
   round: number;
+  hiddenTurn: boolean;
   entries: readonly ViewerInitiativeEntry[];
 }>;
 
@@ -57,6 +58,7 @@ export type ViewerPresentationProjection = Readonly<{
 
 type ViewerCommandPayload =
   | Readonly<{ type: "viewer.enabled.set"; enabled: boolean }>
+  | Readonly<{ type: "viewer.presentation.begin"; assetId: string; altText: string; camera: ViewerCamera }>
   | Readonly<{ type: "viewer.map.set"; assetId: string; altText: string; camera: ViewerCamera }>
   | Readonly<{ type: "viewer.camera.set"; camera: ViewerCamera }>
   | Readonly<{ type: "viewer.measurement.set"; measurement: ViewerMeasurement }>
@@ -117,7 +119,9 @@ function initiative(value: ViewerInitiative): ViewerInitiative {
     return { actorId, name: safeText(entry.name, "Initiative name", 100), initiative: entry.initiative, active: entry.active };
   });
   if (activeEntries > 1) throw new Error("Viewer initiative can have at most one active entry.");
-  return { visible: value.visible, round: value.round, entries };
+  const hiddenTurn = value.hiddenTurn ?? false;
+  if (hiddenTurn && activeEntries > 0) throw new Error("Viewer initiative cannot expose a public active entry during a hidden turn.");
+  return { visible: value.visible, round: value.round, hiddenTurn, entries };
 }
 
 export function createViewerPresentationState(): ViewerPresentationState {
@@ -129,7 +133,7 @@ export function createViewerPresentationState(): ViewerPresentationState {
     camera: null,
     measurement: null,
     pings: [],
-    initiative: { visible: false, round: 0, entries: [] },
+    initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] },
     acceptedCommandIds: []
   };
 }
@@ -144,6 +148,14 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
   let next: ViewerPresentationState = state;
   const payload = command.payload;
   if (payload.type === "viewer.enabled.set") next = { ...state, enabled: payload.enabled };
+  else if (payload.type === "viewer.presentation.begin") next = {
+    ...state,
+    enabled: true,
+    activeMap: { assetId: safeText(payload.assetId, "Map asset ID", 128), altText: safeText(payload.altText, "Map alternative text", 300, true) },
+    camera: camera(payload.camera),
+    measurement: null,
+    pings: []
+  };
   else if (payload.type === "viewer.map.set") next = {
     ...state,
     activeMap: { assetId: safeText(payload.assetId, "Map asset ID", 128), altText: safeText(payload.altText, "Map alternative text", 300, true) },
@@ -190,7 +202,7 @@ export function projectViewerPresentation(state: ViewerPresentationState, now = 
     camera: null,
     measurement: null,
     pings: [],
-    initiative: { visible: false, round: 0, entries: [] }
+    initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] }
   };
   return {
     schemaVersion: 1,
@@ -200,6 +212,6 @@ export function projectViewerPresentation(state: ViewerPresentationState, now = 
     camera: state.camera,
     measurement: state.measurement,
     pings: state.pings.filter((ping) => ping.expiresAt > now),
-    initiative: state.initiative.visible ? state.initiative : { visible: false, round: state.initiative.round, entries: [] }
+    initiative: state.initiative.visible ? state.initiative : { visible: false, round: state.initiative.round, hiddenTurn: false, entries: [] }
   };
 }

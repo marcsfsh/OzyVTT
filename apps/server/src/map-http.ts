@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
-import { adjustWizardGrid, completeGridCalibrationWizard, createGridCalibrationWizard, measureKnownGridSpan, redoWizardGrid, undoWizardGrid, verifyWizardIntersection, type GridCalibrationWizardState } from "./grid-calibration-wizard.js";
+import { adjustWizardGrid, completeGridCalibrationWizard, createGridCalibrationWizard, measureKnownGridArea, measureKnownGridSpan, redoWizardGrid, undoWizardGrid, verifyWizardIntersection, type GridCalibrationWizardState } from "./grid-calibration-wizard.js";
 import { gridOverlayLines } from "./grid-overlay.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
@@ -14,7 +14,10 @@ const WIZARD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a
 const WIZARD_TTL_MS = 30 * 60 * 1_000;
 
 const PointSchema = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
-const StartWizardSchema = z.object({ start: PointSchema, end: PointSchema, cellsBetween: z.number().int(), axis: z.enum(["horizontal", "vertical"]), distancePerCell: z.number().positive().optional() }).strict();
+const StartWizardSchema = z.union([
+  z.object({ start: PointSchema, end: PointSchema, cellsAcross: z.literal(3), cellsDown: z.literal(3), distancePerCell: z.number().positive().optional() }).strict(),
+  z.object({ start: PointSchema, end: PointSchema, cellsBetween: z.number().int(), axis: z.enum(["horizontal", "vertical"]), distancePerCell: z.number().positive().optional() }).strict()
+]);
 const WizardActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("adjust"), adjustment: z.object({ originDelta: PointSchema.optional(), cellSizeDeltaPx: z.number().finite().optional(), rotationDeltaRadians: z.number().finite().optional(), distancePerCell: z.number().positive().optional() }).strict() }).strict(),
   z.object({ action: z.literal("undo") }).strict(),
@@ -199,7 +202,8 @@ export function createMapRouter(options: MapRouterOptions) {
       const metadata = await options.assets.get(id);
       if (!metadata || !options.catalog.get(id)) return failure(request, response, 404, "not_found", "Map asset was not found.");
       const input = StartWizardSchema.parse(request.body);
-      const state = measureKnownGridSpan(createGridCalibrationWizard({ assetId: id, mapWidthPx: metadata.width, mapHeightPx: metadata.height }), input);
+      const initial = createGridCalibrationWizard({ assetId: id, mapWidthPx: metadata.width, mapHeightPx: metadata.height });
+      const state = "cellsAcross" in input ? measureKnownGridArea(initial, input) : measureKnownGridSpan(initial, input);
       const wizardId = randomUUID();
       wizards.set(wizardId, { ownerHash: createHash("sha256").update(token).digest("hex"), assetId: id, state, touchedAt: now() });
       return success(response, 201, wizardPayload(wizardId, state));

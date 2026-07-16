@@ -50,15 +50,10 @@ describe("viewer HTTP vertical slice", () => {
     expect(exchange.headers.get("set-cookie")).toContain("SameSite=Strict");
     const cookie = exchange.headers.get("set-cookie")!.split(";", 1)[0];
 
-    for (const body of [
-      { id: "enable", expectedRevision: 0, payload: { type: "viewer.enabled.set", enabled: true } },
-      { id: "map", expectedRevision: 1, payload: { type: "viewer.map.set", assetId: "map-1", altText: "Dungeon", camera: { center: { x: 500, y: 300 }, zoom: 1 } } }
-    ]) {
-      const response = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json" }, body: JSON.stringify(body) });
-      expect(response.status).toBe(200);
-    }
+    const begin = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json" }, body: JSON.stringify({ id: "begin", expectedRevision: 0, payload: { type: "viewer.presentation.begin", assetId: "map-1", altText: "Dungeon", camera: { center: { x: 500, y: 300 }, zoom: 1 } } }) });
+    expect(begin.status).toBe(200);
     const snapshot = await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { cookie } });
-    expect((await json(snapshot)).presentation).toMatchObject({ revision: 2, enabled: true, activeMap: { assetId: "map-1" } });
+    expect((await json(snapshot)).presentation).toMatchObject({ revision: 1, enabled: true, activeMap: { assetId: "map-1" } });
 
     const accessList = await fetch(`${test.base}/api/v1/viewer/access`, { headers: { authorization: "Bearer gm-secret" } });
     const viewerId = (await json(accessList)).viewers[0].id;
@@ -74,8 +69,9 @@ describe("viewer HTTP vertical slice", () => {
     const received: unknown[] = [];
     let closed = false;
     test.coordinator.connectViewer(created.token, (state) => received.push(state), () => { closed = true; });
-    await test.coordinator.executeGm("gm-secret", { id: "enable", expectedRevision: 0, payload: { type: "viewer.enabled.set", enabled: true } });
+    await test.coordinator.executeGm("gm-secret", { id: "begin", expectedRevision: 0, payload: { type: "viewer.presentation.begin", assetId: "map-live", altText: "Live map", camera: { center: { x: 50, y: 40 }, zoom: 1 } } });
     expect(received).toHaveLength(2);
+    expect(received[1]).toMatchObject({ enabled: true, activeMap: { assetId: "map-live" }, camera: { center: { x: 50, y: 40 } } });
     expect(received[1]).not.toHaveProperty("acceptedCommandIds");
     test.access.revoke(created.viewer.id);
     test.coordinator.broadcast();

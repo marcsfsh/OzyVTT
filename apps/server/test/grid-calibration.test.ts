@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calibrationErrorPx,
+  deriveSquareGridFromArea,
   deriveSquareGridFromSegment,
   distanceForGridPath,
   gridToImage,
@@ -11,6 +12,18 @@ import {
 } from "../src/grid-calibration.js";
 
 describe("square-grid calibration geometry", () => {
+  it("derives scale, origin, and rotation from one diagonal drag across a 3-by-3 area", () => {
+    const aligned = deriveSquareGridFromArea({ mapWidthPx: 1000, mapHeightPx: 800, start: { x: 100, y: 100 }, end: { x: 250, y: 250 }, cellsAcross: 3, cellsDown: 3 });
+    expect(aligned).toMatchObject({ kind: "square", origin: { x: 100, y: 100 }, rotationRadians: 0, distancePerCell: 5 });
+    expect(aligned.cellSizePx).toBeCloseTo(50);
+
+    const rotation = Math.PI / 6;
+    const endpoint = gridToImage({ ...aligned, rotationRadians: rotation }, { column: 3, row: 3 });
+    const rotated = deriveSquareGridFromArea({ mapWidthPx: 1000, mapHeightPx: 800, start: aligned.origin, end: endpoint, cellsAcross: 3, cellsDown: 3 });
+    expect(rotated.cellSizePx).toBeCloseTo(50);
+    expect(rotated.rotationRadians).toBeCloseTo(rotation);
+  });
+
   it("derives cell size and origin from an easy horizontal segment", () => {
     const calibration = deriveSquareGridFromSegment({ mapWidthPx: 2000, mapHeightPx: 1200, start: { x: 125, y: 80 }, end: { x: 375, y: 80 }, cellsBetween: 5, axis: "horizontal" });
     expect(calibration).toEqual({ kind: "square", origin: { x: 125, y: 80 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 });
@@ -59,6 +72,7 @@ describe("square-grid calibration geometry", () => {
     expect(() => deriveSquareGridFromSegment({ ...base, cellsBetween: 0 })).toThrow("integer");
     expect(() => deriveSquareGridFromSegment({ ...base, cellsBetween: 100 })).toThrow("supported");
     expect(() => deriveSquareGridFromSegment({ ...base, mapWidthPx: Number.NaN })).toThrow("finite");
+    expect(() => deriveSquareGridFromArea({ mapWidthPx: 500, mapHeightPx: 500, start: { x: 10, y: 10 }, end: { x: 10, y: 10 }, cellsAcross: 3, cellsDown: 3 })).toThrow("full calibration area");
     expect(() => nudgeSquareGrid(deriveSquareGridFromSegment(base), { cellSizeDeltaPx: -100 })).toThrow("between");
     expect(normalizeRotation(Math.PI * 3)).toBeCloseTo(-Math.PI);
   });

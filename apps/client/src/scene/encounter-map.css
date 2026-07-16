@@ -1,0 +1,4 @@
+.encounter-map-stage { position: relative; min-height: 20rem; margin-top: 1.25rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; }
+.encounter-map-stage img { display: block; width: 100%; max-height: min(72vh, 680px); object-fit: contain; user-select: none; }
+.encounter-map-stage p { padding: 2rem; text-align: center; }
+@media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } }
