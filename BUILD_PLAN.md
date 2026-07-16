@@ -5,14 +5,14 @@
 | Document field | Value |
 | --- | --- |
 | Status | Active living execution plan |
-| Product stage | Phase 0 proof and Phase 1 foundation in progress |
+| Product stage | Phase 0/1 validation and Phase 2 testing-MVP vertical slice in progress |
 | Rules baseline | System Reference Document 5.2.1 (2024 fifth-edition rules) |
 | Primary use | One GM locally hosting a private home game for a small, known group |
 | Distribution direction | Open-source, self-hostable application with a documented public integration API |
 | Primary content path | Canonical player-character and monster JSON, with reviewed player-sheet PDF conversion through MarkItDown planned for Version 1 |
-| Current checkpoint | Durable starter roster and player claim/release UI complete; multi-client claim/recovery controls next |
-| Last updated | 2026-07-15 |
-| Last implementation audit | 2026-07-15 |
+| Current checkpoint | Live scoped integrations plus the first map-upload, calibration, and paired second-screen presentation slice are implemented; physical multi-device acceptance and encounter-state integration are next |
+| Last updated | 2026-07-16 |
+| Last implementation audit | 2026-07-16 |
 
 ## 1. Purpose of this document
 
@@ -71,24 +71,25 @@ This table is the fast operational view. The detailed requirements and milestone
 | Identity and local hosting | Active | Host-only GM bootstrap, signed sessions, durable roster/claims, remembered recovery, authorized GM force-release, server-side individual logout, persistent revoke-all, bounded per-IP login throttling, and immediate revoked-socket disconnect exist | Full multi-client socket/browser acceptance, GM password change, stay-signed-in policy, QR/copy UI, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/login-rate-limit.ts`, `apps/server/src/index.ts`, `apps/client/src/main.tsx`, ADR-001/002 |
 | Renderer and responsive shell | Prototype implemented; validation active | Pixi renderer proof demonstrates grid/token rendering, pointer pan, wheel zoom, pinch zoom, high-DPI handling, and an accessible wrapper; responsive shell and touch-oriented CSS exist | Validate expected-size maps, 100 tokens, targeting/drag/multi-cell input, frame performance, and the physical-device matrix before accepting ADR-003 | `docs/product/phase-0-renderer-spike.md`, `apps/client/src/scene/` |
 | Actor content contract | Version 1 draft complete | Versioned character/monster schemas and representative fixtures validate; PDF-to-Markdown-to-draft-JSON ingestion requirements are defined without changing the canonical format | Build JSON import preview/errors and live instances in Phase 2; add isolated MarkItDown extraction, reviewed character-sheet conversion, and layout fixtures in Phase 5 | `docs/product/actor-definition-v1.md`, `packages/schemas/`, `packages/test-fixtures/`, Section 11.4.1 |
-| Realtime command model | Active | Authoritative Socket.IO state projection, monotonic revisions, command IDs, duplicate suppression, reconnect snapshots, a server-authoritative presence registry (multi-connection-per-session, grace-period reconnect, remembered-token recovery, immediate purge on GM revocation), and multi-socket claim/force-release/duplicate/stale-revision convergence are implemented and tested | Retention fallback for long-lived event history and injected-disconnect/packet-loss soak tests | `apps/server/src/server.ts`, `apps/server/src/presence.ts`, `apps/server/src/projections.ts`, `apps/server/src/game-store.ts`, `packages/domain/src/index.ts` |
+| Realtime command model | Active; automated foundation implemented | Authoritative Socket.IO projections, monotonic revisions, command IDs, duplicate suppression, reconnect snapshots, verified-session presence, multi-connection accounting, disconnect grace, and safe online/reconnecting/offline actor indicators exist | Complete the live two-player Socket.IO convergence/reconnect/revocation matrix, retention fallback, and injected-disconnect browser/device tests | `apps/server/src/server.ts`, `apps/server/src/game-store.ts`, `apps/server/src/presence.ts`, `apps/server/test/presence.test.ts`, `apps/server/test/projections.test.ts` |
 | Dice | Phase 0 proof complete | Server-authoritative parser/evaluator, cryptographic live rolls, deterministic tests, recipient-specific visibility, and replaceable 2D results are implemented | Connect rolls to imported actions/combat consequences and complete browser/device accessibility validation | `docs/product/phase-0-dice-spike.md`, `packages/rules-5e/`, `apps/client/src/dice/` |
 | Persistence | Phase 1 foundation complete | SQLite migrations, WAL, atomic receipt/event/projection commits, idempotency, restart recovery, and periodic snapshots are verified | Backup/restore, rollback policy, bounded undo, migration backup, and production data lifecycle | ADR-006, `apps/server/src/game-store.ts`, `apps/server/test/game-store.test.ts` |
-| Battle/regional/world maps | Planned | Easy battlemap grid-calibration wizard and later atlas/marker/session-note requirements are recorded without changing current priority | Implement battlemap upload/normalization and calibration in Phase 2; atlas features remain post-Version-1 | Sections 18.6–18.8 and Phase 2 |
-| Shared-table viewer | Planned for Phase 2 | Requirement and authorization boundary are defined for a read-only TV/second-screen battlemap and Initiative display controlled from the GM view | Build viewer route/session, public projection, reconnect, fullscreen layout, and explicit GM presentation controls for focus, ping, measurement, and highlight | Sections 6.3.2, 16.3.1, and Phase 2 |
-| Open integration API and open-source distribution | Foundational requirement; implementation active | `@vtt/api-contract` provides strict versions/envelopes/scopes/system DTOs and OpenAPI 3.1, now including GM-authorized credential-management DTOs; `createApiV1Router` is mounted in the live server ahead of the legacy `/api` fallback; `system:read` capabilities are authorized against the durable `IntegrationCredentialStore`; GM-authorized create/list/rotate/revoke/audit endpoints exist with one-time secret issuance; the exact shipped OpenAPI document is served from a stable path; a minimal GM Integrations UI is implemented | Per-credential rate limits, protocol negotiation for realtime command/event envelopes, game-data `/api/v1` endpoints (snapshot/command/event), integration docs, compatibility checks, and repository governance/license files | `packages/api-contract/`, `apps/server/src/api-v1.ts`, `apps/server/src/server.ts`, `apps/server/src/integration-credentials.ts`, `apps/client/src/integrations/IntegrationsPanel.tsx`, Sections 9.5/16.6, Phase 1/6 |
+| Battle/regional/world maps | Phase 2 vertical slice implemented; validation active | GM UI and live HTTP routes now upload/deduplicate content-validated raster maps, persist safe metadata, run a server-owned two-point/third-point square-grid wizard with overlay/nudge/undo/redo/verification, and save regional/world distance scales | Add safe display normalization/thumbnails, gridless battlemap choice, scene creation, rendition/texture-limit handling, deletion/reference lifecycle, mobile precision validation, and the later atlas/marker/note layers | `apps/client/src/maps/`, `apps/server/src/map-assets.ts`, `apps/server/src/map-catalog.ts`, `apps/server/src/map-http.ts`, focused map tests |
+| Shared-table viewer | Phase 2 vertical slice implemented; validation active | Dedicated fullscreen viewer entry, one-time pairing, hashed/revocable HttpOnly access, persisted convergent presentation, SSE reconnect, GM start/pause/map/focus/ping/measurement/clear controls, LAN URL selection, active-map-only byte authorization, and no-store caching now work end to end | Wire player-safe scene/tokens/fog and live Initiative, add per-display targeting/follow/highlight, run browser/TV/phone accessibility and 1080p/4K checks, and prove private-state omission against a complete encounter | `viewer.html`, `apps/client/src/viewer/`, `apps/server/src/viewer-*`, `apps/server/test/viewer-*.test.ts`, `apps/server/test/testing-mvp.test.ts` |
+| Open integration API and open-source distribution | Phase 1 live foundation implemented | The live server mounts `/api/v1`; shipped OpenAPI/system routes and durable named credentials support least-privilege scopes, optional binding/expiry, one-time secret display, safe list/audit, rotation, revocation, and GM UI management | Add safe game snapshot, shared authoritative command adapters, realtime negotiation/events, rate-limit/compatibility/quick-start conformance, and repository governance/license files | `packages/api-contract/`, `apps/server/src/api-v1.ts`, `apps/server/src/integration-credentials.ts`, `apps/client/src/integrations/`, Sections 9.5/16.6 |
 | AI-controlled character participants | Long-term post-Version-1 goal; contracts planned | Server authority, public API DTOs, recipient projections, idempotent commands, actor ownership, scopes, audit events, and revocation are the intended foundation | Define ADR-019, agent identity/actor binding, bounded autonomy/consent, observation/action contracts, GM controls, prompt-injection defenses, conformance simulations, and provider-neutral adapter boundary | Section 16.8 and Phase 7 |
 
-**Current milestone assessment:** Phase 0 and Phase 1 overlap intentionally. The app opens and demonstrates foundational behavior, but neither exit gate is claimed until phone/laptop LAN testing and the complete placeholder-character claim/reconnect scenario pass.
+**Current milestone assessment:** The repository now contains an automated testing-MVP path from authenticated GM map upload through persistent viewer pairing/presentation and restart recovery. This starts Phase 2 implementation without claiming the Phase 0/1/2 exit gates: physical phone/laptop/TV testing, the full two-player claim/reconnect scenario, API command/event conformance, and a real encounter/Initiative loop remain mandatory.
 
 ### 1.5 Ordered next queue
 
 This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
 
-1. Add game-data `/api/v1` endpoints (safe snapshot read, idempotent command submission, authorized event observation) so external integrations reach the same domain boundary as the built-in UI, plus per-credential API rate limits.
-2. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings, including the presence indicator and the GM Integrations UI across real disconnect/reconnect cycles.
-3. Add GM password change and document the stay-signed-in session-retention policy.
-4. Begin the Phase 2 battlemap upload, easy grid-calibration, shared-table viewer, and API-driven vertical slice after the Phase 1 join gate is satisfied. AI-controlled characters remain Phase 7 and do not displace this queue.
+1. Merge and physically exercise the testing-MVP map/viewer slice on the Windows host plus a separate LAN screen: upload, calibrate, pair, focus, ping, measure, reload, revoke, and restart; record browser/firewall/1080p findings.
+2. Complete the live two-player Socket.IO claim/presence/reconnect/revocation convergence matrix, then repeat the join path on one phone and one laptop.
+3. Finish the Phase 1 external-integration proof by adding one recipient-safe game snapshot, one shared idempotent authoritative command, one projected realtime event/resume path, and a tested quick start using the existing scoped credentials.
+4. Build the Phase 2 scene/encounter and Initiative state so uploaded maps, tokens, player views, and the shared viewer converge from the same authoritative projection rather than presentation-only state.
+5. Add GM password change/stay-signed-in policy, then continue the minimum combat loop with actor JSON import, token placement/movement, Initiative, HP, and turns. AI-controlled characters remain Phase 7 and do not displace this queue.
 
 ### 1.6 Open blockers, risks, and validation gaps
 
@@ -103,7 +104,8 @@ There are no active hard blockers to the next queued implementation item.
 | GAP-003 | Resolved 2026-07-15 | Phase 0 decision gate | Accepted ADR-004/005/007/008/011/012/014 previously lacked dedicated records | Dedicated linked records now exist; proposed ADR-018 has a dedicated record and remains blocked on its extraction/packaging spike |
 | GAP-004 | Open packaging gap | Production launch | Shared workspace packages currently export TypeScript source, so the supported launch uses Node's `tsx` loader even after the production client build | Add ordered shared-package compilation and runtime exports before packaging the host application |
 | RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
-| RISK-003 | Open visibility risk | Shared-table viewer | Mirroring a GM screen could expose hidden tokens, fogged areas, secret Initiative, notes, rolls, or private preparation gestures | Use a separate server-side viewer projection and explicit presentation commands; add negative payload/UI/cache tests before the Phase 2 gate |
+| RISK-003 | Mitigated in current slice; full validation open | Shared-table viewer | The viewer now uses separate persisted presentation state, explicit GM commands, active-map-only authorization, and no-store map responses, but tokens/fog/secret Initiative are not implemented deeply enough for complete negative-state proof | Preserve the separate projection; add hidden-token/fog/Initiative fixtures plus payload, DOM, accessibility-tree, log, and cache tests before the Phase 2 gate |
+| GAP-005 | Open validation gap | Testing-MVP map/viewer slice | Automated HTTP/domain/restart coverage passes, but no physical TV/second-monitor, Windows browser, touch calibration, 1080p/4K readability, or real LAN pairing result is recorded | Run queue item 1 after merge and log device, address, browser, reload, revocation, and visibility results here |
 | DEC-002 | Open decision | Public release | Application code license, contributor policy, and treatment of separately licensed SRD/content/assets are not settled | Resolve ADR-017 and complete legal/license review before accepting public contributions or publishing a Version 1 release |
 | RISK-004 | Open security/compatibility risk | Public API | An integration could bypass UI safeguards, leak private state, or become coupled to unstable internals | Put API adapters over the same command/authorization/projection layer; use scoped tokens, contract tests, explicit versions, capability discovery, and deprecation policy |
 
@@ -128,10 +130,11 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-15 | PLAN-004 | Complete | Added a player-facing character-sheet PDF ingestion path that runs untrusted PDFs through isolated MarkItDown extraction and a VTT-owned reviewed Markdown-to-canonical-JSON converter | Assumptions/non-goals, architecture boundary, import journey, security, tests, Phase 5, risks, decisions, and release acceptance reconciled | Spike representative sheet layouts and packaging before accepting ADR-018; do not displace Phase 1 or the Phase 2 canonical JSON importer |
 | 2026-07-15 | FND-006 | Complete (automated scope) | Centralized character-claim invariants, proved serialized simultaneous claims have exactly one winner, verified remembered player tokens and claimed ownership survive service/database restarts, and added an authorized GM force-release command and roster control | 24 tests pass; focused auth and SQLite race/recovery tests, type-check, and production build pass | Exercise two real browser clients plus restart/reconnect at the Socket.IO boundary and on the physical-device matrix |
 | 2026-07-16 | FND-007 | Complete (automated/runtime scope) | Added immediate server-side GM logout, restart-safe individual and revoke-all session invalidation, bounded per-IP failed-login throttling with `429`/`Retry-After`, proactive revoked-socket disconnect, client Sign out/Revoke all controls, and legacy auth-data migration | Claude checkpoint `0f51e23`: 41 repository tests plus manual running-server logout/revoke/rate-limit/socket checks, type-check, and production build passed | GM password change and stay-signed-in policy remain; rate-limiter memory intentionally resets with the single-process host |
-| 2026-07-16 | FND-008 | Complete (contract/router module scope) | Added strict runtime public API/realtime versions, scopes, success/error and command/event envelopes, explicit public DTOs, OpenAPI 3.1 system paths, and an Express `/api/v1` system router with public health/version, authorization-adapted capabilities, stable request IDs/errors, and no-store/privacy tests | Codex checkpoints `83f523a` and `3374311`: 31 tests at router completion, type-check, production build, and byte-for-byte remote verification passed | Mounting and the credential authorizer are closed by FND-010; contract compatibility/release docs remain |
+| 2026-07-16 | FND-008 | Complete (contract/router module scope) | Added strict runtime public API/realtime versions, scopes, success/error and command/event envelopes, explicit public DTOs, OpenAPI 3.1 system paths, and an Express `/api/v1` system router with public health/version, authorization-adapted capabilities, stable request IDs/errors, and no-store/privacy tests | Codex checkpoints `83f523a` and `3374311`: 31 tests at router completion, type-check, production build, and byte-for-byte remote verification passed | Mount router on the integrated server and implement the credential authorizer; contract compatibility/release docs remain |
 | 2026-07-16 | PLAN-005 | Complete | Promoted AI agents playing assigned characters to a defined long-term goal built on the public API and ordinary participant authority rather than privileged server access | Product scope, agent journey, architecture invariants, permissions, security, tests, risks, decisions, Phase 7, and ADR-019 reconciled | Keep post-Version-1; prove human multiplayer and external API conformance first |
-| 2026-07-16 | FND-009 | Complete (automated scope) | Added a server-authoritative presence registry (`apps/server/src/presence.ts`) keyed only by verified session IDs, supporting multiple concurrent connections per session, an 8-second reconnect grace period before flipping to "offline" so a reload does not flicker, and immediate purge on GM revocation. Extracted the Socket.IO/Express wiring from `apps/server/src/index.ts` into a testable `createServer()` factory (`apps/server/src/server.ts`) so the realtime layer can be started on an ephemeral port in tests; `index.ts` is now a thin bootstrap. `PlayerActor`/`GmActor` gained a `presence: "online" \| "reconnecting" \| "offline" \| null` field computed server-side from each actor's owning session and carried in the existing `state:updated` projection — no session ID, token, socket ID, or address is ever sent; unclaimed actors always report `null`. `ActorRoster.tsx` renders an accessible dot-plus-text badge (not color alone) beside each claimed character for both GM and player views | 71 repository tests pass at this checkpoint (16 new: presence-registry unit tests covering online/reconnecting/offline/immediate-purge/multi-connection transitions, and 8 real-socket integration tests against an ephemeral-port server covering two-player claim races, multiple connections per session, disconnect grace, remembered-token reconnect with claim-association recovery, force-release/duplicate-command/stale-revision convergence across three simultaneous clients, wire-level private-field omission, and revoked-GM-session presence removal); a Playwright-driven real Chromium session confirmed the Online → Reconnecting → Offline badge sequence rendering live in the GM roster against the actual dev server; type-check and production build pass | Presence has not yet been validated on a physical phone/laptop over real LAN Wi-Fi transitions (tracked under GAP-001); GM connection presence is tracked in the registry but intentionally not surfaced in any UI, since only player-owned characters have a badge to attach to |
-| 2026-07-16 | FND-010 | Complete (automated scope) | Mounted `createApiV1Router` in the live `createServer()` Express app ahead of the legacy `/api` fallback; initialized `IntegrationCredentialStore` against its own persistent SQLite file in the data directory (no startup race with `auth`/`store`: independent `Promise.all` initialization, independent file). Connected `/api/v1/system/capabilities` to the durable store (`system:read`, exact-scope, `admin`-bypass, game-binding, expiry, and revocation all enforced live, not simulated). Added GM-session-authorized (not integration-token-authorized) create/list/rotate/revoke/audit endpoints under `/api/v1/gm/integration-credentials`; extended `@vtt/api-contract` with their request/response DTOs, a `gmAuth` security scheme distinct from integration `bearerAuth`, and matching OpenAPI 3.1 paths/schemas; the exact shipped document is served unauthenticated from a stable `/api/v1/openapi.json`. Added the minimal GM Integrations panel (`apps/client/src/integrations/IntegrationsPanel.tsx`): create with name/scopes/optional game binding/expiration, a one-time secret display with copy confirmation and an explicit loss warning before dismissal, safe list metadata, rotate/revoke with confirmation, and audit history. The one-time secret exists only in transient React state between issuance and dismissal; it is never written to localStorage, and the server stores only a salted hash | 100 repository tests pass at this checkpoint (23 new: 15 in an expanded `api-v1.test.ts` covering live health/version/OpenAPI, capability authorization against real issued credentials — missing/invalid/expired/revoked/rotated/wrong-scope/wrong-game/admin-bypass, create/list/rotate/revoke/audit authorization and one-time-secret behavior, credential-store restart persistence, and stable request IDs/error envelopes; 8 new in `contract.test.ts` covering the new DTOs, OpenAPI path/security/schema alignment, and a structural scan proving no public schema exposes a secret-shaped field except the one intentional one-time-issue response); manual end-to-end verification against a running server confirmed the full create → verify → rotate (old token immediately invalid) → revoke (immediate 403) → audit lifecycle over real HTTP, and a Playwright-driven real Chromium session confirmed the GM UI create/copy/dismiss/rotate/revoke flow and proved the issued secret never appears in `localStorage` or in the rendered list; type-check and production build pass | Game-data `/api/v1` endpoints (snapshot/command/event) remain Phase 2+ scope; no per-credential API rate limiting yet (only GM login is rate-limited); realtime command/event envelope versioning and a contract-test harness shared by built-in and external clients remain open |
+| 2026-07-16 | FND-009 | Complete (foundation scope) | Mounted the versioned API in the live server and added durable hashed integration credentials plus GM create/list/rotate/revoke/audit UI with one-time secret handling, expiry, optional game binding, exact-scope verification, and restart persistence | Live source integration, API/store contract tests, TypeScript checks, and production builds | Safe game resources, shared commands, realtime events, quick-start conformance, and rate-limit policy remain before the Phase 1 API exit scenario |
+| 2026-07-16 | MVP-001 | Partial (automated testing-MVP scope) | Implemented the first normal-UI map-to-shared-screen vertical slice: safe raster upload/library, battlemap grid wizard, regional/world scale, LAN viewer URL, one-time pairing, fullscreen viewer, persistent/reconnecting presentation, and GM map/focus/ping/measurement controls | 19 server test files / 77 server tests and 100 tests across all workspaces, including live upload→pair→present→authorized bytes→restart recovery; full workspace type-check; two-entry Vite production build | Physical Windows/LAN/TV and mobile calibration validation; real scene/tokens/fog/Initiative; targeted displays; follow/highlight; safe rendition pipeline; OpenAPI integration |
+| 2026-07-16 | FIX-003 | Complete (routing/security scope) | Confined the versioned API router's 404 envelope to `/api/v1` so it cannot swallow `/viewer` or the SPA; restricted player/viewer map reads to the explicitly presented asset and disabled shared-screen caching | Live routing and authorization assertions in `testing-mvp.test.ts`; range/ETag/no-store coverage in `map-http.test.ts` | Revalidate through the Windows development and built-client launch paths after merge |
 
 ## 2. Product definition
 
@@ -511,12 +514,12 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- [ ] Viewer mode is a separate server-authorized projection, never a CSS-hidden copy of the GM DOM/state.
-- [ ] The viewer receives only information a normal player is permitted to know, including player-safe fog, tokens, Initiative entries, and public rolls/cues.
-- [ ] The GM can target a connected viewer and explicitly present center/follow, ping, measurement, and highlight actions from the GM view.
-- [ ] Private GM cursor movement, measurements, selections, drafts, notes, rolls, hidden tokens, secret Initiative entries, and unrevealed fog never appear unless explicitly converted into a permitted public action.
+- [x] Viewer mode is a separate server-authorized projection, never a CSS-hidden copy of the GM DOM/state. The current projection contains only explicit presentation state and is exercised through a dedicated `viewer.html` client.
+- [~] The viewer receives only information a normal player is permitted to know, including player-safe fog, tokens, Initiative entries, and public rolls/cues. Current map/presentation DTOs are allowlisted and active-map bytes are authorization-gated; scene/token/fog/log integration remains.
+- [~] The GM can target a connected viewer and explicitly present center/follow, ping, measurement, and highlight actions from the GM view. Broadcast focus, zoom, ping, measurement, and clear are live; per-display targeting, follow, and highlight remain.
+- [~] Private GM cursor movement, measurements, selections, drafts, notes, rolls, hidden tokens, secret Initiative entries, and unrevealed fog never appear unless explicitly converted into a permitted public action. The current viewer does not mirror the GM DOM/cursor and map responses are active-map-only/no-store; complete hidden-scene fixtures remain.
 - [ ] The viewer is readable at normal television distance in fullscreen 16:9 layouts and remains usable at common 1080p and 4K display sizes.
-- [ ] The viewer reconnects without manual encounter reconfiguration and cannot send consequential game commands.
+- [x] The viewer reconnects without manual presentation reconfiguration and cannot send consequential game commands. Pairing is read-only, SSE reconverges from a persisted snapshot, revocation closes live subscribers, and restart recovery is tested.
 - [ ] Players using phones/laptops and players watching only the shared viewer see a consistent public battle state.
 
 ### 6.3.3 Connect an external integration
@@ -1045,16 +1048,16 @@ Do not promise perfect automatic conversion from the extracted Markdown. Its tab
 
 ### 12.1 Map import and lifecycle
 
-- [ ] Accept standard image formats for battle, regional, and world maps through one shared upload path: PNG, JPEG/JPG, WebP, GIF, BMP, AVIF, HEIF/HEIC, TIFF, and SVG where the selected decoder can process them safely.
+- [~] Accept standard image formats for battle, regional, and world maps through one shared upload path. The live path supports content-validated PNG, JPEG/JPG, WebP, non-animated GIF, and BMP; safe AVIF, HEIF/HEIC, TIFF, and SVG decode/rasterization remain.
 - [ ] Normalize uploaded maps into safe internal display renditions; rasterize/sanitize SVG, flatten or explicitly select a frame for animated formats, and preserve the original file separately when feasible.
-- [ ] Validate type from file contents, not only extension.
-- [ ] Extract dimensions, calculate checksum, and create thumbnails/previews.
+- [x] Validate type from file contents, not only extension.
+- [~] Extract dimensions, calculate checksum, and create thumbnails/previews. Dimensions, content hash/ID, atomic originals, and browser previews exist; derived thumbnails/renditions remain.
 - [ ] Detect browser/GPU texture limits and downsample or tile oversized maps safely.
 - [ ] Keep the original asset when feasible and store derived display assets separately.
 - [ ] Create a scene from a newly imported map in the same workflow.
 - [ ] Allow blank scenes for sketching or theater-of-the-mind combat.
 - [ ] Lock map transforms during play by default.
-- [ ] Reuse one map asset across multiple scenes/encounters.
+- [~] Reuse one map asset across multiple scenes/encounters. Content-addressed upload deduplication and a durable map library exist; scene/encounter references are not implemented yet.
 - [ ] Prevent asset deletion while still referenced, or explain and repair references.
 
 ### 12.2 Grid calibration
@@ -1086,12 +1089,12 @@ Grid calibration is required product functionality, not an advanced configuratio
 
 Wizard requirements:
 
-- [ ] No pixel dimensions, coordinate math, or manual X/Y offset entry in the normal path.
+- [x] No pixel dimensions, coordinate math, or manual X/Y offset entry in the normal path. The normal wizard uses two clicked intersections, a cell count/direction, direct nudge controls, and a third clicked verification point; exact coordinates remain available as an accessibility/recovery alternative.
 - [ ] Optional assisted line/grid detection may prefill values but must never be required or difficult to override.
-- [ ] Touch controls must be fully usable on a phone, including zoomed precision placement and nudge controls.
+- [~] Touch controls must be fully usable on a phone, including zoomed precision placement and nudge controls. Responsive controls and numeric alternatives exist; physical touch/precision validation remains.
 - [ ] Gridless selection skips calibration cleanly while still allowing a configurable distance scale.
-- [ ] An Advanced section may expose exact cell size/offset/rotation values for recovery without competing with the wizard.
-- [ ] Calibration stores source-image and world transforms explicitly so replacing/downsampling a rendition does not alter scene coordinates.
+- [~] An Advanced section may expose exact cell size/offset/rotation values for recovery without competing with the wizard. The current readout and nudge/undo/redo controls expose recovery data; a collapsed exact-edit section remains.
+- [~] Calibration stores source-image and world transforms explicitly so replacing/downsampling a rendition does not alter scene coordinates. Source-image origin/cell size/rotation/distance are durable; scene-world and rendition transforms remain dependent on scene creation.
 
 Questions to resolve in ADR-009:
 
@@ -1881,15 +1884,15 @@ Test that forbidden data is absent from player messages, initial HTML/state, log
 
 ### 16.3.1 Shared-table viewer authorization and presentation channel
 
-- Define a dedicated `ViewerView`/viewer snapshot derived from the player-safe scene projection, not from the GM state object.
-- Give the viewer an explicit read-only session/capability. A viewer connection must be unable to reuse presentation events as game commands.
-- Permit the GM to launch a local viewer window directly and optionally pair a separate LAN display with a short-lived code/link. Pairing grants viewer capability only, never GM authority.
-- Track viewer presence and a stable viewer ID so the GM can target one display or broadcast to all connected displays.
-- Keep viewer presentation commands in an ephemeral channel: set/follow viewport, center point/rectangle, ping point, display measurement line/path and label, highlight token/area, and clear overlays.
-- Require an explicit **Show on viewer** action or clearly enabled presentation mode. Do not mirror the GM cursor, ruler, selection, viewport, or draft overlays by default.
-- Sanitize Initiative for the viewer: hidden combatants use the settled player-safe placeholder/omission policy, and private tiebreakers or stats are absent.
-- Viewer reconnect receives the current authorized scene, Initiative, public log/cues, and current presentation state; expired transient pings need not replay.
-- Viewer payloads, DOM, accessibility tree, logs, and caches must pass the same negative secret-data tests as player clients.
+- [~] Define a dedicated `ViewerView`/viewer snapshot derived from the player-safe scene projection, not from the GM state object. A dedicated allowlisted presentation projection is live; it must be composed with the future player-safe scene projection.
+- [x] Give the viewer an explicit read-only session/capability. A viewer connection cannot reuse presentation events as game commands.
+- [x] Permit the GM to launch a local viewer window directly and pair a separate LAN display with a short-lived code/link. Pairing grants viewer capability only, never GM authority.
+- [~] Track viewer presence and a stable viewer ID so the GM can target one display or broadcast to all connected displays. Stable safe metadata and live connections exist; commands currently broadcast to all displays.
+- [~] Keep viewer presentation commands in a separate channel: camera/focus, ping, measurement/path and clear are implemented with revision/idempotency semantics; follow and highlight remain.
+- [x] Require an explicit **Show current map** action and enabled presentation mode. The GM cursor, calibration draft, selection, and viewport are not mirrored.
+- [~] Sanitize Initiative for the viewer. The allowlisted Initiative DTO excludes arbitrary actor fields and private tiebreakers, but it is not yet fed from a hidden-combatant-aware encounter projection.
+- [~] Viewer reconnect receives the current authorized presentation state, persisted map/camera/measurement/Initiative, and unexpired pings. Future scene/log/cue composition remains.
+- [~] Viewer payloads and map caches have negative secret/identifier tests, active-map-only authorization, and `no-store`; DOM/accessibility/log coverage against complete hidden encounter state remains.
 
 ### 16.4 Realtime synchronization
 
@@ -2852,13 +2855,13 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [~] Prototype direct-IP startup, LAN URL display, firewall error handling, and phone connection. Binding and LAN URL output exist; firewall recovery and physical-phone validation remain.
 - [~] Prototype responsive shell at phone portrait/landscape, tablet, and desktop. Responsive source exists; the device matrix remains unverified.
 - [~] Complete renderer/map/token input spike. The interaction proof exists; actual-device, large-map/100-token, targeting/drag, multi-cell, and performance validation remain.
-- [x] Complete realtime/reconnect/convergence spike. Revisions, snapshots, projections, idempotency, presence, and multi-client convergence/disconnect testing are implemented and automated; physical-device LAN validation remains under the device-acceptance item below.
+- [~] Complete realtime/reconnect/convergence spike. Revisions, snapshots, projections, and idempotency exist; multi-client convergence and disconnect testing remain.
 - [x] Draft version 1 character and monster schemas with representative fixtures.
 - [x] Prototype dice parser, server result, public/secret projection, and 2D presentation.
 - [x] Prototype persistence/event/snapshot model.
 - [ ] Produce low-fidelity end-to-end wireframes for setup, join, combat, dice, and recovery.
 - [ ] Define supported browser/device baseline and performance hardware.
-- [~] Complete the API-first external-integration spike: scoped credential, capability discovery, safe snapshot, idempotent command, authorized event, and revocation. Scoped credential issuance, capability discovery, and revocation are implemented and tested live; safe snapshot/idempotent command/authorized event still require game-data `/api/v1` endpoints, which remain Phase 2+ scope.
+- [ ] Complete the API-first external-integration spike: scoped credential, capability discovery, safe snapshot, idempotent command, authorized event, and revocation.
 
 **Exit gate:** a phone and laptop can reach a local prototype by IP; the renderer, realtime model, schema, dice visibility, persistence, and external API approaches have passed their spikes; no foundational decision remains implicit.
 
@@ -2872,12 +2875,12 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [~] Direct-IP landing page and displayed/copyable/QR host URL. Landing page and console LAN URLs exist; copy/QR UI remains.
 - [~] Player character list, atomic claim, remembered browser session, release, and GM force-release. Roster, player and GM controls, serialized race behavior, token recovery, and restart persistence are implemented and automated; full multi-client socket/browser/device acceptance remains.
 - [~] Role/ownership authorization at server command boundary. Implemented for current claim and dice commands; comprehensive command matrix and revocation tests remain.
-- [x] Realtime connection, presence, revisions, reconnect snapshot, and idempotency. Connection, revision, snapshot, idempotency, a server-authoritative presence registry, and multi-client recovery/convergence tests are implemented and automated; physical-device recovery validation remains under the device-acceptance item.
+- [~] Realtime connection, presence, revisions, reconnect snapshot, and idempotency. Verified-session presence now handles multiple connections, reconnect grace, revoked-session removal, and recipient-safe actor indicators; full two-player live-socket/browser convergence and recovery tests remain.
 - [x] Database migration and transactional event/projection skeleton.
 - [~] Responsive application shell and navigation with functional phone equivalents. Initial shell exists; complete navigation and physical-device acceptance remain.
 - [~] Error boundary, structured logs, health check, and basic diagnostics. Health endpoint exists; error boundary, structured logs, and diagnostics remain.
-- [x] Versioned `/api/v1` foundation with stable error/request envelopes, version/capabilities endpoints, OpenAPI source, and schema validation at the boundary. `createApiV1Router` is mounted in the live server before the legacy `/api` fallback; `system:read` capability discovery is authorized against the durable credential store; the exact shipped OpenAPI 3.1 document is served from a stable, unauthenticated, cache-disabled `/api/v1/openapi.json`.
-- [~] Named scoped integration credentials with one-time secret display, secure verification, expiry/rotation/revocation, last-used/audit metadata, and rate limits. GM-authorized create/list/rotate/revoke/audit endpoints and a minimal GM Integrations UI are implemented and tested against the persistent credential store; per-credential API rate limits remain (only GM login has rate limiting today).
+- [x] Versioned `/api/v1` foundation with stable error/request envelopes, version/capabilities endpoints, exact shipped OpenAPI source, schema validation, live-server mounting, and durable credential authorization at the boundary.
+- [~] Named scoped integration credentials with one-time secret display, secure verification, expiry/rotation/revocation, last-used/audit metadata, and rate limits. Lifecycle, persistence, binding/scopes, audit, and GM UI are implemented; endpoint-specific rate-limit policy and physical one-time-display UX validation remain.
 - [ ] Versioned realtime handshake/command/event envelopes and contract-test harness shared by built-in and external clients.
 
 **Exit gate:** GM and two players can join from one phone and one laptop, claim distinct placeholder characters, reconnect, and remain correctly authorized after a server restart; additionally, a scoped external integration can discover capabilities, read a safe snapshot, submit one idempotent command, observe its projected event, and be revoked.
@@ -2886,20 +2889,20 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 **Goal:** play a simple multi-round encounter end to end.
 
-- [ ] Map upload, scene creation, basic square-grid calibration, pan/zoom.
+- [~] Map upload, scene creation, basic square-grid calibration, pan/zoom. Durable safe upload/library and the verified calibration wizard are live in the normal GM UI; scene creation and the real battle-canvas pan/zoom binding remain.
 - [ ] Versioned minimal character/monster JSON import with actionable errors.
 - [ ] Actor definition/instance/token separation.
 - [ ] Place, select, target, move, duplicate, label, and remove tokens.
 - [ ] Owned-token and GM control on phone and desktop.
 - [ ] Encounter roster, Initiative roll/manual entry, sort, current turn, next/previous, round counter.
-- [ ] Shared-table viewer route/session with fullscreen player-safe battlemap and readable Initiative/current-turn display.
-- [ ] GM viewer controls for selecting a display and explicitly sending viewport focus/follow, location ping, measurement line/path, highlight, and clear-overlay directives.
+- [~] Shared-table viewer route/session with fullscreen player-safe battlemap and readable Initiative/current-turn display. Pairing, fullscreen map, persistent presentation, SSE reconnect, and an allowlisted Initiative DTO are live; real encounter Initiative/tokens/fog remain.
+- [~] GM viewer controls for selecting a display and explicitly sending viewport focus/follow, location ping, measurement line/path, highlight, and clear-overlay directives. Broadcast focus/zoom, ping, measured line, and clear controls are live; per-display targeting, follow, and highlight remain.
 - [ ] Generic and imported attack dice plus quick manual dice tray.
 - [ ] Public, GM-only, blind, and self-only roll projection; readable 2D result/log.
 - [ ] HP, maximum HP, temporary HP, raw damage/healing, and basic condition add/remove.
 - [ ] Generic action controls and End Turn.
 - [ ] Server-authoritative state, autosave, refresh/reconnect, and basic undo.
-- [ ] Player-safe versus GM state projection.
+- [~] Player-safe versus GM state projection. Actor/roll/presence projections and a separate viewer projection exist with active-map/no-store enforcement; complete scene/token/fog/Initiative projection remains.
 - [ ] Phone portrait/landscape parity for every item above.
 - [ ] Supported API resources/commands/events cover the vertical-slice encounter without direct database access or UI automation.
 
@@ -3335,9 +3338,9 @@ Keep this small dashboard current near the top or here:
 
 | Phase | Status | Exit gate evidence |
 | --- | --- | --- |
-| Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, renderer, and accepted-decision records exist; physical-device/network, renderer stress/input, realtime convergence, wireframes, external-API proof, and unresolved proposed decisions block the gate; ADR-018/019 evidence is due only before their later implementation phases |
-| Phase 1 — Local-host foundation | In progress | Auth/session revocation/rate limiting, durable serialized roster/claims, remembered recovery, GM force-release, a mounted `/api/v1` with live scoped-credential authorization and a GM Integrations UI, a server-authoritative presence registry with multi-client convergence tests, recipient projections, CI, health, and transactional SQLite exist; full physical-device socket/browser acceptance, game-data API endpoints, per-credential rate limits, diagnostics, and GM password change block the gate |
-| Phase 2 — Minimum playable vertical slice | Planned; requirements active | Battlemap calibration, shared-table viewer, and API-driven vertical-slice requirements are defined; implementation waits on the Phase 1 join/recovery/API gate |
+| Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, renderer, scoped-credential/API foundation, map calibration, viewer presentation, and accepted-decision records exist; physical-device/network, renderer stress/input, realtime/API end-to-end conformance, wireframes, and unresolved proposed decisions block the gate; ADR-018/019 evidence is due only before their later implementation phases |
+| Phase 1 — Local-host foundation | In progress | Auth/session revocation/rate limiting, durable serialized roster/claims, remembered recovery, GM force-release, verified-session presence, mounted API, scoped credential lifecycle/UI, recipient projections, CI, health, and transactional SQLite exist; full socket/browser claim convergence, API snapshot/command/event proof, diagnostics, rate-limit completion, and physical-device acceptance block the gate |
+| Phase 2 — Minimum playable vertical slice | Implementation started; testing-MVP map/viewer slice active | Normal-UI map upload/library/calibration, regional/world scale, dedicated paired viewer, broadcast GM focus/ping/measurement, persisted reconnect, and active-map privacy are implemented; scene/tokens/fog, live Initiative/combat, actor import, phone parity, per-display follow/highlight, and complete API equivalence remain |
 | Phase 3 — Playable alpha | Not started | — |
 | Phase 4 — Rules-assisted beta | Not started | — |
 | Phase 5 — Preparation speed/content | Not started | — |

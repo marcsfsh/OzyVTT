@@ -22,13 +22,18 @@ function lanUrls(portNumber: number) {
   return [...addresses];
 }
 
+const clientPort = useDevelopmentClient ? developmentClientPort : port;
+const viewerBaseUrls = [`http://localhost:${clientPort}`, ...lanUrls(clientPort)];
+
 const { httpServer, initialize } = createServer({
   authPath: join(dataDir, "auth.json"),
   databasePath: join(dataDir, "vtt.sqlite"),
   integrationCredentialsPath: join(dataDir, "integration-credentials.sqlite"),
+  mapAssetsPath: join(dataDir, "map-assets"),
   webDist,
   useDevelopmentClient,
   developmentClientPort,
+  viewerBaseUrls,
   clientOrigin
 });
 
