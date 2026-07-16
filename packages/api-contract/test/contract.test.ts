@@ -11,13 +11,15 @@ import {
   IntegrationCredentialIssuedSchema,
   IntegrationCredentialMetadataSchema,
   IntegrationScopeSchema,
+  MAP_ASSET_PATHS,
   OPENAPI_DOCUMENT_PATH,
   openApiDocument,
   REALTIME_PROTOCOL_VERSION,
   RotateIntegrationCredentialRequestSchema,
   SYSTEM_PATHS,
   SystemCapabilitiesResponseSchema,
-  SystemVersionResponseSchema
+  SystemVersionResponseSchema,
+  VIEWER_PATHS
 } from "../src/index.js";
 
 const requestId = "f84d13cb-a7da-4ef2-9f2f-53d38e49d862";
@@ -76,7 +78,7 @@ describe("public API contracts", () => {
     expect(openApiDocument.info.version).toBe(API_VERSION);
     expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
 
-    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS)];
+    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS)];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(IntegrationScopeSchema.options);
     for (const path of Object.values(SYSTEM_PATHS)) expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(/^#\/components\/schemas\//);
@@ -90,6 +92,19 @@ describe("public API contracts", () => {
     expect(openApiDocument.paths[INTEGRATION_CREDENTIAL_PATHS.revoke].post.security).toEqual([{ gmAuth: [] }]);
     expect(openApiDocument.paths[INTEGRATION_CREDENTIAL_PATHS.audit].get.security).toEqual([{ gmAuth: [] }]);
     expect(openApiDocument.components.securitySchemes.gmAuth).toEqual({ type: "http", scheme: "bearer", bearerFormat: "VTT GM session token" });
+  });
+
+  it("documents the already-shipped map-asset and viewer routers with correctly scoped security", () => {
+    expect(openApiDocument.paths[MAP_ASSET_PATHS.collection].post.security).toEqual([{ gmAuth: [] }]);
+    expect(openApiDocument.paths[MAP_ASSET_PATHS.byId].get.security).toEqual([{ gmAuth: [] }]);
+    // Content is the one map-asset operation not GM-only: GM, an authorized player, or a paired viewer session may read it.
+    expect(openApiDocument.paths[MAP_ASSET_PATHS.content].get.security).toEqual([{ gmAuth: [] }, { viewerCookieAuth: [] }]);
+    expect(openApiDocument.paths[MAP_ASSET_PATHS.calibrationWizards].post.security).toEqual([{ gmAuth: [] }]);
+    expect(openApiDocument.paths[VIEWER_PATHS.pairings].post.security).toEqual([{ gmAuth: [] }]);
+    // Exchanging a pairing code is the credential itself; no separate auth is required to call it.
+    expect(openApiDocument.paths[VIEWER_PATHS.pairingsExchange].post.security).toEqual([]);
+    expect(openApiDocument.paths[VIEWER_PATHS.presentationCommands].post.security).toEqual([{ gmAuth: [] }]);
+    expect(openApiDocument.components.securitySchemes.viewerCookieAuth).toMatchObject({ type: "apiKey", in: "cookie", name: "vtt_viewer_session" });
   });
 
   it("never declares a secret-bearing property on any public component schema except the one-time-issue response", () => {
