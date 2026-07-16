@@ -147,6 +147,39 @@ export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: numbe
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
 }
+function snapIntersectionPreview(calibration: GridCalibration, point: { x: number; y: number }) {
+  const grid = imageToGridPreview(calibration, point);
+  return gridToImagePreview(calibration, { column: Math.round(grid.column), row: Math.round(grid.row) });
+}
+
+export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; target: { x: number; y: number }; feet: number }>;
+
+/**
+ * Client mirrors of the server's `measurementGeometry`/`squareGeometry`/`radialGeometry`
+ * (`apps/server/src/annotations.ts`) so the live drag preview snaps to the grid exactly as the saved
+ * result will — the server still re-derives and persists the authoritative geometry on release.
+ */
+export function snapMeasurementPreview(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }): SnappedGeometry {
+  const from = snapCellCenterPreview(calibration, origin);
+  const to = snapCellCenterPreview(calibration, target);
+  return { origin: from, target: to, feet: chebyshevFeetPreview(calibration, from, to) };
+}
+export function snapShapePreview(calibration: GridCalibration, shape: "circle" | "cone" | "line" | "square", origin: { x: number; y: number }, target: { x: number; y: number }): SnappedGeometry {
+  if (shape === "square") {
+    const start = imageToGridPreview(calibration, origin);
+    const raw = imageToGridPreview(calibration, target);
+    const startSnapped = { column: Math.round(start.column), row: Math.round(start.row) };
+    const side = Math.max(1, Math.round(Math.max(Math.abs(raw.column - start.column), Math.abs(raw.row - start.row))));
+    const end = { column: startSnapped.column + (raw.column < start.column ? -1 : 1) * side, row: startSnapped.row + (raw.row < start.row ? -1 : 1) * side };
+    return { origin: gridToImagePreview(calibration, startSnapped), target: gridToImagePreview(calibration, end), feet: side * calibration.distancePerCell };
+  }
+  const snappedOrigin = shape === "circle" ? snapCellCenterPreview(calibration, origin) : snapIntersectionPreview(calibration, origin);
+  const pixelDistance = Math.hypot(target.x - snappedOrigin.x, target.y - snappedOrigin.y);
+  const cells = Math.max(1, Math.round(pixelDistance / calibration.cellSizePx));
+  const sizePx = cells * calibration.cellSizePx;
+  const angle = pixelDistance === 0 ? 0 : Math.atan2(target.y - snappedOrigin.y, target.x - snappedOrigin.x);
+  return { origin: snappedOrigin, target: { x: snappedOrigin.x + Math.cos(angle) * sizePx, y: snappedOrigin.y + Math.sin(angle) * sizePx }, feet: cells * calibration.distancePerCell };
+}
 
 export type OverlayLine = Readonly<{ axis: "column" | "row"; index: number; start: { x: number; y: number }; end: { x: number; y: number }; major: boolean }>;
 

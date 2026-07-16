@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { probeImageDimensions, TokenGlyph } from "../scene/mapImage";
+import { AnnotationGlyph } from "../scene/annotationGlyph";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
+type ViewerAnnotation = Readonly<{ id: string; kind: "measurement" | "shape"; shape: "circle" | "cone" | "line" | "square" | null; origin: Point; target: Point; sizeFeet: number }>;
 export type Presentation = Readonly<{
   schemaVersion: 1;
   revision: number;
@@ -12,7 +14,7 @@ export type Presentation = Readonly<{
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
   initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean }>[] }>;
-  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean }>[] }>;
+  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean }>[]; annotations?: readonly ViewerAnnotation[] }>;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -129,7 +131,10 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
 
   if (!presentation.activeMap) return <section className="viewer-waiting"><span className="viewer-eyebrow">VIEWER CONNECTED</span><h1>Waiting for a map</h1><p>The GM controls what appears here.</p></section>;
   const measurementPoints = presentation.measurement?.points.map((point) => `${point.x},${point.y}`).join(" ");
-  const tokens = presentation.encounter.mapAssetId === presentation.activeMap.assetId ? presentation.encounter.tokens : [];
+  const onActiveMap = presentation.encounter.mapAssetId === presentation.activeMap.assetId;
+  const tokens = onActiveMap ? presentation.encounter.tokens : [];
+  const annotations = onActiveMap ? (presentation.encounter.annotations ?? []) : [];
+  const arrowSize = Math.max(8, Math.min(size.width, size.height) / 45);
   return <section className="viewer-stage" ref={stageRef} aria-label={presentation.activeMap.altText || "Shared battlemap"} onPointerDown={beginPan} onPointerMove={continuePan} onPointerUp={endPan} onPointerCancel={endPan}>
     <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
       <image href={href} width={size.width} height={size.height} onLoad={(event) => {
@@ -137,6 +142,9 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
         const source = image.href.baseVal;
         void probeImageDimensions(source).then(setSize).catch(() => {});
       }} />
+      {annotations.map((annotation) => annotation.kind === "shape"
+        ? <g className="annotation-shape visibility-public" key={annotation.id}><AnnotationGlyph data={annotation} arrowSize={arrowSize} /></g>
+        : <AnnotationGlyph key={annotation.id} data={annotation} arrowSize={arrowSize} />)}
       {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
         <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
       </g>)}

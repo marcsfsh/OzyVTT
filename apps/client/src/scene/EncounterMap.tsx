@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration } from "./mapImage";
+import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapMeasurementPreview, snapShapePreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { AnnotationGlyph, annotationCenter, type AnnotationGlyphData } from "./annotationGlyph";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./encounter-map.css";
@@ -20,15 +21,21 @@ type Gesture =
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
 const TOOLS: ReadonlyArray<{ id: Tool; glyph: string; label: string }> = [
-  { id: "select", glyph: "↖", label: "Select and move" },
-  { id: "measure", glyph: "⟷", label: "Measure distance" },
-  { id: "circle", glyph: "○", label: "Place a circle" },
-  { id: "cone", glyph: "△", label: "Place a cone" },
-  { id: "line", glyph: "─", label: "Place a line" },
-  { id: "square", glyph: "□", label: "Place a square" }
+  { id: "select", glyph: "▹", label: "Select and move" },
+  { id: "measure", glyph: "📏", label: "Measure distance" },
+  { id: "circle", glyph: "◯", label: "Place a circle" },
+  { id: "cone", glyph: "◭", label: "Place a cone" },
+  { id: "line", glyph: "╱", label: "Place a line" },
+  { id: "square", glyph: "▢", label: "Place a square" }
 ];
-const VISIBILITY_LABELS: Record<AnnotationVisibility, string> = { public: "Everyone", "gm-only": "Just the GM", "owner-only": "Just me", "owner-gm": "Just me and the GM" };
-const VISIBILITY_CYCLE: readonly AnnotationVisibility[] = ["public", "owner-only", "owner-gm"];
+
+type VisibilityOption = Readonly<{ value: AnnotationVisibility; label: string }>;
+function visibilityOptionsFor(role: "gm" | "player"): readonly VisibilityOption[] {
+  return role === "gm"
+    ? [{ value: "public", label: "Everyone" }, { value: "gm-only", label: "Just me" }, { value: "gm-actor", label: "Me + a character" }]
+    : [{ value: "public", label: "Everyone" }, { value: "owner-only", label: "Just me" }, { value: "owner-gm", label: "Just me and the GM" }];
+}
+const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = { public: "Everyone", "gm-only": "Just GM", "owner-only": "Just me", "owner-gm": "Me + GM", "gm-actor": "Me + character" };
 
 function emitMove(payload: Parameters<ClientToServerEvents["token:move"]>[0]) {
   return new Promise<MutationResult>((resolve) => socket.emit("token:move", payload, resolve));
@@ -45,26 +52,15 @@ function emitAnnotationRemove(payload: Parameters<ClientToServerEvents["annotati
 function emitAnnotationSetVisibility(payload: Parameters<ClientToServerEvents["annotation:set-visibility"]>[0]) {
   return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-visibility", payload, resolve));
 }
+function emitAnnotationSetMovable(payload: Parameters<ClientToServerEvents["annotation:set-movable"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-movable", payload, resolve));
+}
+function emitAnnotationClear(payload: Parameters<ClientToServerEvents["annotation:clear"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("annotation:clear", payload, resolve));
+}
 
 function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
   return role === "gm" || ("mine" in annotation && annotation.mine);
-}
-
-/** Circle/cone/line/square outline geometry shared by the live drag preview and confirmed annotations — both only ever need an origin/target pair. */
-function ShapeGlyph({ shape, origin, target, className }: Readonly<{ shape: AnnotationShapeKind; origin: Point; target: Point; className: string }>) {
-  if (shape === "circle") return <circle className={className} cx={origin.x} cy={origin.y} r={Math.max(1, Math.hypot(target.x - origin.x, target.y - origin.y))} />;
-  if (shape === "square") {
-    const size = Math.max(Math.abs(target.x - origin.x), Math.abs(target.y - origin.y));
-    return <rect className={className} x={Math.min(origin.x, target.x)} y={Math.min(origin.y, target.y)} width={size} height={size} />;
-  }
-  if (shape === "line") return <line className={className} x1={origin.x} y1={origin.y} x2={target.x} y2={target.y} />;
-  // Cone: apex at origin, opening toward target; 5e RAW cones have equal length and width, so the half-angle is atan(0.5).
-  const length = Math.max(1, Math.hypot(target.x - origin.x, target.y - origin.y));
-  const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
-  const halfAngle = Math.atan2(0.5, 1);
-  const left = { x: origin.x + Math.cos(angle - halfAngle) * length, y: origin.y + Math.sin(angle - halfAngle) * length };
-  const right = { x: origin.x + Math.cos(angle + halfAngle) * length, y: origin.y + Math.sin(angle + halfAngle) * length };
-  return <polygon className={className} points={`${origin.x},${origin.y} ${left.x},${left.y} ${right.x},${right.y}`} />;
 }
 
 export function EncounterMap({
@@ -87,27 +83,34 @@ export function EncounterMap({
   const [busyActorId, setBusyActorId] = useState<string | null>(null);
   const [camera, setCamera] = useState<Camera>({ center: { x: 0, y: 0 }, zoom: 1 });
   const [tool, setTool] = useState<Tool>("select");
-  const [gmLayer, setGmLayer] = useState(false);
-  const [showLiveMeasure, setShowLiveMeasure] = useState(false);
+  const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
+  const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
+  const [rulerWhileMoving, setRulerWhileMoving] = useState(false);
   const [enlarged, setEnlarged] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [eyeOpen, setEyeOpen] = useState(false);
+  const [wrenchOpen, setWrenchOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const actorsById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
   const tokensById = useMemo(() => new Map(tokens.map((encounterToken) => [encounterToken.actorId, encounterToken])), [tokens]);
+  const characters = useMemo(() => actors.filter((actor) => actor.kind === "player-character"), [actors]);
   const size = image.status === "ready" ? { width: image.width, height: image.height } : null;
   const calibration = grid.calibration;
-  const handleRadius = Math.max(10, calibration ? calibration.cellSizePx * 0.16 : 10);
+  const handleRadius = Math.max(9, calibration ? calibration.cellSizePx * 0.16 : 9);
+  const arrowSize = calibration ? calibration.cellSizePx * 0.35 : 12;
 
-  useEffect(() => { setGesture(null); }, [assetId, token]);
+  useEffect(() => { setGesture(null); setSelectedId(null); }, [assetId, token]);
   useEffect(() => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); }, [assetId, size?.width, size?.height]);
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === stageRef.current);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
+  useEffect(() => { if (tool !== "select") setSelectedId(null); }, [tool]);
 
   // Wheel-to-zoom needs preventDefault, which React's synthetic onWheel cannot reliably guarantee (passive by default).
   useEffect(() => {
@@ -145,6 +148,8 @@ export function EncounterMap({
     const actor = actorsById.get(actorId);
     return actor !== undefined && "claimStatus" in actor && actor.claimStatus === "mine";
   };
+  const canMoveShape = (annotation: AnyAnnotation) => role === "gm" || isMine(annotation, role) || annotation.movableByOthers;
+  const canManageShape = (annotation: AnyAnnotation) => role === "gm" || isMine(annotation, role);
   const pointFromScreen = (clientX: number, clientY: number) => {
     const svg = svgRef.current; if (!svg || !size) return null;
     const point = imagePointFromClient(svg, clientX, clientY);
@@ -163,56 +168,42 @@ export function EncounterMap({
   const placeAtCenter = (actorId: string) => { if (size) void submitMove(actorId, { x: size.width / 2, y: size.height / 2 }); };
 
   const annotationAt = (id: string) => annotations.find((annotation) => annotation.id === id) ?? null;
+  const runAnnotation = async (id: string, action: () => Promise<MutationResult>, fail: string) => {
+    setAnnotationBusy(id); setMessage("");
+    try { const result = await action(); if (!result.ok) throw new Error(result.message ?? fail); }
+    catch (error) { setMessage((error as Error).message); }
+    finally { setAnnotationBusy(null); }
+  };
   const submitAnnotationAdd = async (kind: "measurement" | "shape", shape: AnnotationShapeKind | undefined, origin: Point, target: Point) => {
-    setAnnotationBusy("new"); setMessage("");
-    try {
-      const result = await emitAnnotationAdd({ commandId: newId(), kind, shape, geometry: { origin, target }, visibility: gmLayer && role === "gm" ? "gm-only" : "public", expectedRevision: revision });
-      if (!result.ok) throw new Error(result.message ?? "That could not be added to the map.");
-    } catch (error) { setMessage((error as Error).message); }
-    finally { setAnnotationBusy(null); }
+    const commandId = newId();
+    await runAnnotation("new", async () => {
+      const result = await emitAnnotationAdd({ commandId, kind, shape, geometry: { origin, target }, visibility: defaultVisibility, visibleToActorId: defaultVisibility === "gm-actor" ? defaultActorId : null, movableByOthers: false, expectedRevision: revision });
+      if (result.ok && kind === "shape") { setTool("select"); setSelectedId(commandId); }
+      return result;
+    }, "That could not be added to the map.");
   };
-  const submitAnnotationMove = async (id: string, origin: Point, target: Point) => {
-    setAnnotationBusy(id); setMessage("");
-    try {
-      const result = await emitAnnotationMove({ commandId: newId(), id, geometry: { origin, target }, expectedRevision: revision });
-      if (!result.ok) throw new Error(result.message ?? "That could not be moved.");
-    } catch (error) { setMessage((error as Error).message); }
-    finally { setAnnotationBusy(null); }
-  };
-  const removeAnnotation = async (id: string) => {
-    setAnnotationBusy(id); setMessage("");
-    try {
-      const result = await emitAnnotationRemove({ commandId: newId(), id, expectedRevision: revision });
-      if (!result.ok) throw new Error(result.message ?? "That could not be removed.");
-    } catch (error) { setMessage((error as Error).message); }
-    finally { setAnnotationBusy(null); }
-  };
-  const cycleVisibility = async (annotation: AnyAnnotation) => {
-    const next = VISIBILITY_CYCLE[(VISIBILITY_CYCLE.indexOf(annotation.visibility as (typeof VISIBILITY_CYCLE)[number]) + 1) % VISIBILITY_CYCLE.length];
-    setAnnotationBusy(annotation.id); setMessage("");
-    try {
-      const result = await emitAnnotationSetVisibility({ commandId: newId(), id: annotation.id, visibility: next, expectedRevision: revision });
-      if (!result.ok) throw new Error(result.message ?? "The visibility could not be changed.");
-    } catch (error) { setMessage((error as Error).message); }
-    finally { setAnnotationBusy(null); }
-  };
+  const submitAnnotationMove = (id: string, origin: Point, target: Point) => runAnnotation(id, () => emitAnnotationMove({ commandId: newId(), id, geometry: { origin, target }, expectedRevision: revision }), "That could not be moved.");
+  const removeAnnotation = (id: string) => runAnnotation(id, () => emitAnnotationRemove({ commandId: newId(), id, expectedRevision: revision }), "That could not be removed.");
+  const setVisibility = (id: string, visibility: AnnotationVisibility, visibleToActorId: string | null) => runAnnotation(id, () => emitAnnotationSetVisibility({ commandId: newId(), id, visibility, visibleToActorId, expectedRevision: revision }), "The visibility could not be changed.");
+  const setMovable = (id: string, movableByOthers: boolean) => runAnnotation(id, () => emitAnnotationSetMovable({ commandId: newId(), id, movableByOthers, expectedRevision: revision }), "Move control could not be changed.");
+  const clearAnnotations = (scope: "mine" | "players" | "all") => { setWrenchOpen(false); void runAnnotation("clear", () => emitAnnotationClear({ commandId: newId(), scope, expectedRevision: revision }), "Shapes could not be removed."); };
 
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
-    // The visibility-cycle/delete shape controls and the overlaid tool/zoom clusters carry their own
-    // handlers; a pointerdown on any of them must not start a map gesture (which would preventDefault
-    // and swallow the click, and capture the pointer).
-    if (target.closest(".annotation-controls, .encounter-map-overlay, .encounter-map-zoom")) return;
+    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor")) return;
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
-    const handleAnnotationId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
-    if (tool === "select" && handleAnnotationId) {
-      const annotation = annotationAt(handleAnnotationId);
-      if (annotation && annotation.kind === "shape" && isMine(annotation, role)) {
-        const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
-        event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
-        if (handleId === "resize") { setGesture({ kind: "annotation-resize", id: annotation.id, anchor: annotation.geometry.origin, current: point }); return; }
-        setGesture({ kind: "annotation-move", id: annotation.id, grab: { x: point.x - annotation.geometry.origin.x, y: point.y - annotation.geometry.origin.y }, geometry: annotation.geometry });
+    const shapeId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
+    if (tool === "select" && shapeId) {
+      const annotation = annotationAt(shapeId);
+      if (annotation && annotation.kind === "shape") {
+        setSelectedId(shapeId);
+        if (canMoveShape(annotation) && handleId) {
+          const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
+          event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+          if (handleId === "resize") setGesture({ kind: "annotation-resize", id: annotation.id, anchor: annotation.geometry.origin, current: point });
+          else setGesture({ kind: "annotation-move", id: annotation.id, grab: { x: point.x - annotation.geometry.origin.x, y: point.y - annotation.geometry.origin.y }, geometry: annotation.geometry });
+        }
         return;
       }
     }
@@ -220,6 +211,7 @@ export function EncounterMap({
     if (tool === "select" && tokenId && tokensById.has(tokenId)) {
       if (!canMove(tokenId)) return;
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      setSelectedId(null);
       const origin = tokensById.get(tokenId)?.position ?? null;
       setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin });
       return;
@@ -227,13 +219,13 @@ export function EncounterMap({
     if (tool !== "select" && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
-      const origin = tool === "measure" ? snapCellCenterPreview(calibration, point) : point;
-      setMessage(""); setGesture({ kind: tool, origin, current: point });
+      setMessage(""); setGesture({ kind: tool, origin: point, current: point });
       return;
     }
-    // A press on empty map background (not a token, not the tray) pans the camera.
+    // Empty background in select mode: deselect + pan.
     const svg = svgRef.current;
     if (tool !== "select" || !svg || !size || !(event.target as Element).closest("svg")) return;
+    setSelectedId(null);
     event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
     const rect = svg.getBoundingClientRect();
     setGesture({ kind: "pan", startClient: { x: event.clientX, y: event.clientY }, startCenter: camera.center, scaleX: (size.width / camera.zoom) / rect.width, scaleY: (size.height / camera.zoom) / rect.height });
@@ -257,7 +249,6 @@ export function EncounterMap({
       setGesture({ ...gesture, geometry: { origin, target: { x: origin.x + width, y: origin.y + height } } });
       return;
     }
-    // measure / shape placement — the live preview follows the raw pointer; the server snaps the final geometry to the grid on release.
     setGesture({ ...gesture, current: point });
   };
   const finishGesture = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -315,12 +306,23 @@ export function EncounterMap({
     const width = size.width / camera.zoom, height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   })() : "0 0 1 1";
-  const liveTokenDistanceFeet = showLiveMeasure && calibration && dragging?.point && dragging.origin ? chebyshevFeetPreview(calibration, dragging.origin, dragging.point) : null;
-  const liveGestureFeet = calibration && gesture
-    ? gesture.kind === "annotation-resize" ? chebyshevFeetPreview(calibration, gesture.anchor, gesture.current)
-      : gesture.kind === "measure" || gesture.kind === "circle" || gesture.kind === "cone" || gesture.kind === "line" || gesture.kind === "square" ? chebyshevFeetPreview(calibration, gesture.origin, gesture.current)
-        : null
-    : null;
+  const liveTokenDistanceFeet = rulerWhileMoving && calibration && dragging?.point && dragging.origin ? chebyshevFeetPreview(calibration, dragging.origin, dragging.point) : null;
+
+  // Live, grid-snapped preview for the in-progress measure/shape/move/resize gesture (WYSIWYG with the saved result).
+  const preview: { data: AnnotationGlyphData; snap: SnappedGeometry } | null = (() => {
+    if (!calibration || !gesture) return null;
+    if (gesture.kind === "measure") { const snap = snapMeasurementPreview(calibration, gesture.origin, gesture.current); return { snap, data: { kind: "measurement", shape: null, origin: snap.origin, target: snap.target, sizeFeet: snap.feet } }; }
+    if (gesture.kind === "circle" || gesture.kind === "cone" || gesture.kind === "line" || gesture.kind === "square") { const shape = gesture.kind; const snap = snapShapePreview(calibration, shape, gesture.origin, gesture.current); return { snap, data: { kind: "shape", shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet } }; }
+    if (gesture.kind === "annotation-resize") { const live = annotationAt(gesture.id); if (live?.kind !== "shape" || !live.shape) return null; const snap = snapShapePreview(calibration, live.shape, gesture.anchor, gesture.current); return { snap, data: { kind: "shape", shape: live.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet } }; }
+    if (gesture.kind === "annotation-move") { const live = annotationAt(gesture.id); if (live?.kind !== "shape" || !live.shape) return null; const snap = snapShapePreview(calibration, live.shape, gesture.geometry.origin, gesture.geometry.target); return { snap, data: { kind: "shape", shape: live.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet } }; }
+    return null;
+  })();
+
+  const selected = selectedId ? annotationAt(selectedId) : null;
+  const visibilityOptions = visibilityOptionsFor(role);
+  const wrenchScopes: ReadonlyArray<{ scope: "mine" | "players" | "all"; label: string }> = role === "gm"
+    ? [{ scope: "mine", label: "Remove all my shapes" }, { scope: "players", label: "Remove all player shapes" }, { scope: "all", label: "Remove all shapes" }]
+    : [{ scope: "mine", label: "Remove all my shapes" }];
 
   return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture}>
     <div className="encounter-map-help"><strong>{role === "gm" ? "Drag any token to move it" : "Drag your highlighted character"}</strong><span>{role === "gm" ? "Calibrated maps snap automatically. Drop a token back in the tray to remove it from the map." : "Other tokens are view-only. Your moves snap automatically when the map has a grid."} Scroll or pinch to zoom; drag empty map space to pan.</span></div>
@@ -334,44 +336,46 @@ export function EncounterMap({
     <div className="encounter-map-stage" ref={stageRef} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
-          <div className="encounter-map-tools">
-            {TOOLS.map((entry) => <button key={entry.id} type="button" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+          <div className="encounter-map-eye">
+            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={eyeOpen} title={`New drawings visible to: ${VISIBILITY_SHORT[defaultVisibility]}`} onClick={() => { setEyeOpen((v) => !v); setWrenchOpen(false); }}>◉</button>
+            {eyeOpen && <div className="encounter-map-menu" role="menu">
+              <p className="encounter-map-menu-title">New drawings visible to</p>
+              {visibilityOptions.map((option) => <button key={option.value} type="button" role="menuitemradio" aria-checked={defaultVisibility === option.value} className={defaultVisibility === option.value ? "selected" : ""} onClick={() => { setDefaultVisibility(option.value); if (option.value !== "gm-actor") setEyeOpen(false); }}>{option.label}</button>)}
+              {defaultVisibility === "gm-actor" && <label className="encounter-map-menu-select">Character<select value={defaultActorId ?? ""} onChange={(event) => setDefaultActorId(event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
+            </div>}
           </div>
-          {role === "gm" && <button type="button" className="encounter-map-gm-layer" aria-pressed={gmLayer} title="New shapes you place default to GM-only" onClick={() => setGmLayer((current) => !current)}>GM layer{gmLayer ? " on" : ""}</button>}
-          <label className="encounter-map-live-measure"><input type="checkbox" checked={showLiveMeasure} onChange={(event) => setShowLiveMeasure(event.target.checked)} disabled={!calibration} /> Show distance while moving a token</label>
+          <div className="encounter-map-tools">
+            {TOOLS.map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+          </div>
+          <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
+          <div className="encounter-map-wrench">
+            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
+            {wrenchOpen && <div className="encounter-map-menu" role="menu">
+              {wrenchScopes.map((entry) => <button key={entry.scope} type="button" role="menuitem" onClick={() => clearAnnotations(entry.scope)}>{entry.label}</button>)}
+            </div>}
+          </div>
         </div>
+
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>
           <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
 
           {annotations.map((annotation) => {
-            const editable = tool === "select" && annotation.kind === "shape" && isMine(annotation, role);
             const beingDragged = (gesture?.kind === "annotation-move" || gesture?.kind === "annotation-resize") && gesture.id === annotation.id;
             if (beingDragged) return null;
-            const { origin, target } = annotation.geometry;
-            const busy = annotationBusy === annotation.id;
-            if (annotation.kind === "measurement") return <g key={annotation.id} className="annotation-measurement">
-              <line x1={origin.x} y1={origin.y} x2={target.x} y2={target.y} />
-              <circle cx={origin.x} cy={origin.y} r={4} /><circle cx={target.x} cy={target.y} r={4} />
-              <text x={(origin.x + target.x) / 2} y={(origin.y + target.y) / 2}>{annotation.geometry.sizeFeet} ft</text>
-            </g>;
-            return <g key={annotation.id} data-annotation-id={annotation.id} className={`annotation-shape visibility-${annotation.visibility}${editable ? " editable" : ""}`}>
-              <ShapeGlyph shape={annotation.shape!} origin={origin} target={target} className="annotation-shape-body" />
-              <text x={origin.x} y={origin.y - 8} className="annotation-shape-label">{annotation.geometry.sizeFeet} ft</text>
+            if (annotation.kind === "measurement") return <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} expiring />;
+            const selectedShape = selectedId === annotation.id;
+            const editable = tool === "select" && selectedShape && canMoveShape(annotation);
+            return <g key={annotation.id} data-annotation-id={annotation.id} className={`annotation-shape visibility-${annotation.visibility}${selectedShape ? " selected" : ""}`}>
+              <AnnotationGlyph data={{ kind: "shape", shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} />
               {editable && <>
-                <circle data-annotation-handle="move" className="annotation-handle annotation-handle-move" cx={origin.x} cy={origin.y} r={handleRadius} />
-                <circle data-annotation-handle="resize" className="annotation-handle annotation-handle-resize" cx={target.x} cy={target.y} r={handleRadius} />
-                <g className="annotation-controls" transform={`translate(${origin.x} ${origin.y - 26})`}>
-                  <g className="annotation-visibility-toggle" onClick={() => !busy && void cycleVisibility(annotation)}><rect rx={4} width={96} height={18} x={-48} /><text y={13}>{VISIBILITY_LABELS[annotation.visibility]}</text></g>
-                  <g className="annotation-delete" transform="translate(54 0)" onClick={() => !busy && void removeAnnotation(annotation.id)}><rect rx={4} width={18} height={18} x={0} /><text x={9} y={13}>×</text></g>
-                </g>
+                <circle data-annotation-handle="move" className="annotation-handle annotation-handle-move" cx={annotation.geometry.origin.x} cy={annotation.geometry.origin.y} r={handleRadius} />
+                <circle data-annotation-handle="resize" className="annotation-handle annotation-handle-resize" cx={annotation.geometry.target.x} cy={annotation.geometry.target.y} r={handleRadius} />
               </>}
             </g>;
           })}
 
-          {gesture?.kind === "measure" && <g className="annotation-measurement live"><line x1={gesture.origin.x} y1={gesture.origin.y} x2={gesture.current.x} y2={gesture.current.y} /><text x={(gesture.origin.x + gesture.current.x) / 2} y={(gesture.origin.y + gesture.current.y) / 2}>{liveGestureFeet ?? "…"} ft</text></g>}
-          {gesture && (gesture.kind === "circle" || gesture.kind === "cone" || gesture.kind === "line" || gesture.kind === "square") && <g className="annotation-shape live"><ShapeGlyph shape={gesture.kind} origin={gesture.origin} target={gesture.current} className="annotation-shape-body" /><text x={gesture.origin.x} y={gesture.origin.y - 8} className="annotation-shape-label">{liveGestureFeet ?? "…"} ft</text></g>}
-          {gesture?.kind === "annotation-resize" && (() => { const live = annotationAt(gesture.id); return live && live.kind === "shape" ? <g className="annotation-shape live"><ShapeGlyph shape={live.shape!} origin={gesture.anchor} target={gesture.current} className="annotation-shape-body" /><text x={gesture.anchor.x} y={gesture.anchor.y - 8} className="annotation-shape-label">{liveGestureFeet ?? "…"} ft</text></g> : null; })()}
-          {gesture?.kind === "annotation-move" && (() => { const live = annotationAt(gesture.id); return live && live.kind === "shape" ? <g className="annotation-shape live"><ShapeGlyph shape={live.shape!} origin={gesture.geometry.origin} target={gesture.geometry.target} className="annotation-shape-body" /></g> : null; })()}
+          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
+          {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} /></g>}
 
           {visibleTokens.map((encounterToken) => {
             const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
@@ -384,6 +388,22 @@ export function EncounterMap({
           })}
           {liveTokenDistanceFeet !== null && dragging?.point && <text className="encounter-live-distance" x={dragging.point.x} y={dragging.point.y - 24}>{liveTokenDistanceFeet} ft</text>}
         </svg>
+
+        {selected && selected.kind === "shape" && tool === "select" && (() => {
+          const center = annotationCenter({ kind: "shape", shape: selected.shape, origin: selected.geometry.origin, target: selected.geometry.target, sizeFeet: selected.geometry.sizeFeet });
+          const busy = annotationBusy === selected.id;
+          const manage = canManageShape(selected);
+          return <div className="encounter-shape-editor" role="group" aria-label="Selected shape">
+            <div className="encounter-shape-editor-head"><strong>{selected.geometry.sizeFeet}ft {selected.shape}</strong>{center && <span>at {Math.round(center.x)}, {Math.round(center.y)}</span>}</div>
+            {manage ? <>
+              <label>Visible to<select value={selected.visibility} disabled={busy} onChange={(event) => { const value = event.target.value as AnnotationVisibility; setVisibility(selected.id, value, value === "gm-actor" ? (selected.visibleToActorId ?? characters[0]?.id ?? null) : null); }}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              {selected.visibility === "gm-actor" && <label>Character<select value={selected.visibleToActorId ?? ""} disabled={busy} onChange={(event) => setVisibility(selected.id, "gm-actor", event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
+              <label className="encounter-shape-editor-check"><input type="checkbox" checked={selected.movableByOthers} disabled={busy} onChange={(event) => setMovable(selected.id, event.target.checked)} /> Others can move this</label>
+              <button type="button" className="danger" disabled={busy} onClick={() => { setSelectedId(null); void removeAnnotation(selected.id); }}>Delete shape</button>
+            </> : <p className="encounter-shape-editor-note">Visible to {VISIBILITY_SHORT[selected.visibility]}{selected.movableByOthers ? " · shared" : ""}</p>}
+          </div>;
+        })()}
+
         <div className="encounter-map-zoom" role="group" aria-label="Map controls">
           <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
           <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
