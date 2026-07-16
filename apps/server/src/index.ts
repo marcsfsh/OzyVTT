@@ -14,6 +14,7 @@ import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } fr
 import { developmentClientUrl } from "./client-hosting.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
+import { LoginRateLimiter } from "./login-rate-limit.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -28,6 +29,7 @@ const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: clientOrigin ? { origin: clientOrigin } : undefined });
 const auth = new AuthService(join(dataDir, "auth.json"));
 const store = new GameStore(join(dataDir, "vtt.sqlite"), createInitialGameState());
+const gmLoginRateLimiter = new LoginRateLimiter();
 
 function lanUrls(portNumber: number) {
   const addresses = new Set<string>();
@@ -41,11 +43,14 @@ function lanUrls(portNumber: number) {
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 function roleFor(socketId: string): ClientRole { return auth.verify(io.sockets.sockets.get(socketId)?.handshake.auth?.token) ? "gm" : "player"; }
+/** Also reauthorizes every connected socket against the latest revocation state, so a revoked GM client is downgraded or disconnected on its next check rather than only when it next sends a command. */
 function broadcast() {
   const state = store.snapshot;
   for (const socket of io.sockets.sockets.values()) {
-    const gm = auth.verify(socket.handshake.auth?.token);
-    const player = auth.verifyPlayer(socket.handshake.auth?.token);
+    const token = socket.handshake.auth?.token;
+    const gm = auth.verify(token);
+    const player = auth.verifyPlayer(token);
+    if (token && !gm && !player) { socket.disconnect(true); continue; }
     socket.emit("state:updated", gm ? projectGmView(state) : projectPlayerView(state, player?.sessionId));
   }
 }
@@ -60,10 +65,32 @@ app.post("/api/bootstrap", async (req, res) => {
   try { await auth.bootstrap(result.data.password); return res.status(201).json({ ok: true }); } catch (error) { return res.status(409).json({ message: (error as Error).message }); }
 });
 app.post("/api/gm/login", async (req, res) => {
+  const rateLimitKey = req.ip ?? "unknown";
+  const decision = gmLoginRateLimiter.check(rateLimitKey);
+  if (!decision.allowed) {
+    res.set("Retry-After", String(decision.retryAfterSeconds));
+    return res.status(429).json({ message: "Too many attempts. Try again later." });
+  }
   const result = z.object({ password: z.string() }).safeParse(req.body);
-  if (!result.success) return res.status(400).json({ message: "Password is required." });
+  if (!result.success) { gmLoginRateLimiter.recordFailure(rateLimitKey); return res.status(400).json({ message: "Password is required." }); }
   const token = await auth.login(result.data.password);
-  return token ? res.json({ token }) : res.status(401).json({ message: "Invalid GM password." });
+  if (!token) { gmLoginRateLimiter.recordFailure(rateLimitKey); return res.status(401).json({ message: "Invalid GM password." }); }
+  gmLoginRateLimiter.recordSuccess(rateLimitKey);
+  return res.json({ token });
+});
+app.post("/api/gm/logout", async (req, res) => {
+  const token = req.header("authorization")?.replace("Bearer ", "");
+  const revoked = await auth.logout(token);
+  if (!revoked) return res.status(401).json({ message: "A valid GM session is required to sign out." });
+  broadcast();
+  return res.json({ ok: true });
+});
+app.post("/api/gm/sessions/revoke-all", async (req, res) => {
+  const token = req.header("authorization")?.replace("Bearer ", "");
+  if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+  await auth.revokeAllGmSessions();
+  broadcast();
+  return res.json({ ok: true });
 });
 app.get("/api/state", (req, res) => {
   const token = req.header("authorization")?.replace("Bearer ", "");
