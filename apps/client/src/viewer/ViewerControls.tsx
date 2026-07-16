@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "../components/feedback";
+import { newId } from "../lib/ids";
+import { clampPoint, imagePointFromClient } from "../scene/mapImage";
 import "./viewer-controls.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -54,6 +57,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const [labelOverride, setLabelOverride] = useState("");
   const [viewerUrls, setViewerUrls] = useState<readonly string[]>([]);
   const [selectedViewerUrl, setSelectedViewerUrl] = useState("");
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const { confirm, dialog } = useConfirm();
   const suggestedLabel = useMemo(() => measurementLabel(map, draftPoints), [map, draftPoints]);
   const viewerUrl = selectedViewerUrl || viewerUrls[0] || `${window.location.origin}/viewer.html`;
 
@@ -83,7 +88,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   };
   const command = async (payload: Record<string, unknown>) => {
     if (!presentation) throw new Error("Viewer presentation state is still loading.");
-    return api("/api/v1/viewer/presentation/commands", gmToken, { method: "POST", body: JSON.stringify({ id: crypto.randomUUID(), expectedRevision: presentation.revision, payload }) });
+    return api("/api/v1/viewer/presentation/commands", gmToken, { method: "POST", body: JSON.stringify({ id: newId(), expectedRevision: presentation.revision, payload }) });
   };
   const connectedIds = new Set(connections.map((connection) => connection.viewerId));
   const mapIsPresented = Boolean(map && presentation?.enabled && presentation.activeMap?.assetId === map.assetId);
@@ -91,14 +96,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const requiredPointCount = tool === "measure" ? 2 : 1;
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!map || !map.previewUrl || busy) return;
-    const image = event.currentTarget.querySelector("img");
-    if (!image) return;
-    const rect = image.getBoundingClientRect();
-    const point = {
-      x: rounded(Math.max(0, Math.min(map.width, (event.clientX - rect.left) * map.width / rect.width))),
-      y: rounded(Math.max(0, Math.min(map.height, (event.clientY - rect.top) * map.height / rect.height)))
-    };
+    if (!map || !map.previewUrl || busy || !svgRef.current) return;
+    const raw = imagePointFromClient(svgRef.current, event.clientX, event.clientY);
+    if (!raw) return;
+    const point = clampPoint(raw, map.width, map.height);
     setDraftPoints((current) => tool === "measure" && current.length === 1 ? [current[0], point] : [point]);
   };
   const updatePoint = (index: number, coordinate: "x" | "y", value: number) => setDraftPoints((current) => {
@@ -110,8 +111,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     if (!mapIsPresented) throw new Error("Present this map before using viewer tools.");
     if (draftPoints.length < requiredPointCount) throw new Error(`Choose ${requiredPointCount === 1 ? "a point" : "two points"} on the map first.`);
     if (tool === "focus") await command({ type: "viewer.camera.set", camera: { center: draftPoints[0], zoom } });
-    else if (tool === "ping") await command({ type: "viewer.ping", id: crypto.randomUUID(), point: draftPoints[0], durationMs: 3_500 });
-    else await command({ type: "viewer.measurement.set", measurement: { id: crypto.randomUUID(), points: draftPoints.slice(0, 2), distanceLabel: labelOverride.trim() || suggestedLabel } });
+    else if (tool === "ping") await command({ type: "viewer.ping", id: newId(), point: draftPoints[0], durationMs: 5_000 });
+    else await command({ type: "viewer.measurement.set", measurement: { id: newId(), points: draftPoints.slice(0, 2), distanceLabel: labelOverride.trim() || suggestedLabel } });
     setMessage(tool === "focus" ? "Viewer focused." : tool === "ping" ? "Ping sent." : "Measurement shown.");
   });
   const copy = async (value: string, confirmation: string) => {
@@ -123,6 +124,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     <div className="viewer-controls-heading"><div><span>SHARED DISPLAY</span><h2 id="viewer-controls-title">Table viewer</h2></div><strong className={connections.length ? "online" : ""}>{connections.length} connected</strong></div>
     <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
     <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</select> : <code>{viewerUrl}</code>}<button onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</button></div>
+    {!map && <p className="viewer-no-map-notice" role="status">Choose a map on the <strong>Maps</strong> tab first to present it here and unlock the focus/ping/measure tools below.</p>}
     <div className="viewer-control-actions">
       <button disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</button>
       <button disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</button>
@@ -140,8 +142,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
         {(["focus", "ping", "measure"] as const).map((candidate) => <button key={candidate} aria-pressed={tool === candidate} onClick={() => setTool(candidate)}>{candidate === "focus" ? "Focus view" : candidate === "ping" ? "Ping point" : "Measure line"}</button>)}
       </div>
       {map.previewUrl && <div className="viewer-tool-preview"><div className="viewer-tool-image" onClick={choosePoint} aria-label="Viewer presentation map. Click to choose a point; coordinate fields below are the keyboard alternative.">
-        <img src={map.previewUrl} alt="" draggable={false} />
-        <svg viewBox={`0 0 ${map.width} ${map.height}`} aria-hidden="true">
+        <svg ref={svgRef} viewBox={`0 0 ${map.width} ${map.height}`} width={map.width} height={map.height} preserveAspectRatio="xMidYMid meet">
+          <image href={map.previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
           {tool === "measure" && draftPoints.length === 2 && <line x1={draftPoints[0].x} y1={draftPoints[0].y} x2={draftPoints[1].x} y2={draftPoints[1].y} />}
           {draftPoints.map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(5, Math.min(map.width, map.height) / 70)} /><text x={point.x} y={point.y}>{tool === "measure" ? (index ? "B" : "A") : "●"}</text></g>)}
         </svg>
@@ -157,7 +159,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     {message && <p className="viewer-control-feedback" role="status">{message}</p>}
     {viewers.length > 0 && <div className="viewer-access-list"><h3>Paired displays</h3><ul>{viewers.map((viewer) => <li key={viewer.id}>
       <div><strong>{viewer.name}</strong><span>{viewer.revokedAt ? "Revoked" : connectedIds.has(viewer.id) ? "Connected" : "Offline"}</span></div>
-      {!viewer.revokedAt && <button disabled={busy} onClick={() => { if (window.confirm(`Revoke ${viewer.name}?`)) void run(async () => { await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" }); }); }}>Revoke</button>}
+      {!viewer.revokedAt && <button disabled={busy} onClick={async () => { if (await confirm({ title: `Revoke ${viewer.name}?`, body: "This display immediately loses access and stops receiving updates.", confirmLabel: "Revoke", danger: true })) void run(async () => { await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" }); }); }}>Revoke</button>}
     </li>)}</ul></div>}
+    {dialog}
   </section>;
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
+import { API_VERSION } from "@vtt/api-contract";
 import { ViewerAccessDeniedError, ViewerPairingRateLimitError, type ViewerAccessStore } from "./viewer-access.js";
 import type { ViewerCoordinator } from "./viewer-coordinator.js";
 import { ViewerRevisionConflictError, type ViewerCommand } from "./viewer-presentation.js";
@@ -68,6 +69,11 @@ function requestId(request: Request, response: Response) {
   return id;
 }
 
+/** Adds the shared ok/apiVersion/data envelope alongside the existing top-level keys every caller already reads (e.g. `body.pairing`), so no existing client parsing breaks. */
+function success(response: Response, status: number, body: Record<string, unknown>) {
+  return response.status(status).json({ ok: true, apiVersion: API_VERSION, ...body });
+}
+
 function errorResponse(error: unknown, request: Request, response: Response) {
   const id = requestId(request, response);
   const status = error instanceof ViewerPairingRateLimitError ? 429
@@ -76,7 +82,11 @@ function errorResponse(error: unknown, request: Request, response: Response) {
         : error instanceof z.ZodError ? 400
           : error instanceof Error ? 400 : 500;
   const message = status === 500 ? "Viewer request failed." : error instanceof z.ZodError ? "Viewer request body is invalid." : (error as Error).message;
-  return response.status(status).json({ error: { code: status === 401 ? "unauthorized" : status === 409 ? "revision_conflict" : status === 429 ? "rate_limited" : status === 400 ? "invalid_request" : "internal_error", message, requestId: id } });
+  // Codes are aligned to the shared ApiErrorCodeSchema vocabulary (unauthorized -> unauthenticated,
+  // revision_conflict -> conflict, invalid_request -> validation_failed) for cross-router consistency.
+  // No client branches on these values today (only `.error.message` is read), so this is a safe realignment.
+  const code = status === 401 ? "unauthenticated" : status === 409 ? "conflict" : status === 429 ? "rate_limited" : status === 400 ? "validation_failed" : "internal_error";
+  return response.status(status).json({ ok: false, apiVersion: API_VERSION, error: { code, message, requestId: id } });
 }
 
 export function createViewerRouter(options: ViewerRouterOptions) {
@@ -100,7 +110,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const input = PairingSchema.parse(request.body);
       const pairing = options.access.createPairingCode(input.ttlMs);
       requestId(request, response);
-      return response.status(201).json({ pairing });
+      return success(response, 201, { pairing });
     } catch (error) { return errorResponse(error, request, response); }
   });
 
@@ -112,7 +122,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const maxAge = result.viewer.expiresAt === null ? 60 * 60 * 24 * 365 : Math.max(1, Math.floor((Date.parse(result.viewer.expiresAt) - now()) / 1_000));
       response.setHeader("set-cookie", `vtt_viewer_session=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`);
       requestId(request, response);
-      return response.status(201).json({ viewer: result.viewer });
+      return success(response, 201, { viewer: result.viewer });
     } catch (error) { return errorResponse(error, request, response); }
   });
 
@@ -120,7 +130,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     try {
       requireGm(request);
       requestId(request, response);
-      return response.json({ viewers: options.access.list(), connections: options.coordinator.activeViewers() });
+      return success(response, 200, { viewers: options.access.list(), connections: options.coordinator.activeViewers() });
     } catch (error) { return errorResponse(error, request, response); }
   });
 
@@ -130,7 +140,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const viewer = options.access.revoke(request.params.id);
       options.coordinator.disconnectViewerAccess(viewer.id);
       requestId(request, response);
-      return response.json({ viewer });
+      return success(response, 200, { viewer });
     } catch (error) { return errorResponse(error, request, response); }
   });
 
@@ -138,7 +148,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     try {
       if (!options.authorizeGm(bearer(request))) requireViewer(request);
       requestId(request, response);
-      return response.json({ presentation: options.presentation.project(now()) });
+      return success(response, 200, { presentation: options.presentation.project(now()) });
     } catch (error) { return errorResponse(error, request, response); }
   });
 
@@ -148,7 +158,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const command = CommandSchema.parse(request.body) as Omit<ViewerCommand, "role">;
       const result = await options.coordinator.executeGm(token, command);
       requestId(request, response);
-      return response.json({ revision: result.state.revision, duplicate: result.duplicate });
+      return success(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
     } catch (error) { return errorResponse(error, request, response); }
   });
 

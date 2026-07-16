@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { probeImageDimensions, TokenGlyph } from "../scene/mapImage";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -24,10 +25,6 @@ async function responseJson(response: Response) {
 
 function imageUrl(assetId: string) {
   return `/api/v1/map-assets/${encodeURIComponent(assetId)}/content`;
-}
-
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
 function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
@@ -83,13 +80,10 @@ function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
       <image href={href} width={size.width} height={size.height} onLoad={(event) => {
         const image = event.currentTarget as SVGImageElement;
         const source = image.href.baseVal;
-        const probe = new Image(); probe.onload = () => setSize({ width: probe.naturalWidth, height: probe.naturalHeight }); probe.src = source;
+        void probeImageDimensions(source).then(setSize).catch(() => {});
       }} />
       {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
-        {token.active && <circle className="viewer-token-turn" r={token.sizePx * .62} />}
-        <circle className="viewer-token-body" r={token.sizePx / 2} />
-        <text className="viewer-token-initials">{initials(token.name)}</text>
-        <text className="viewer-token-name" y={token.sizePx * .78}>{token.name}</text>
+        <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
       </g>)}
       {measurementPoints && <polyline className="viewer-measurement" points={measurementPoints} />}
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>

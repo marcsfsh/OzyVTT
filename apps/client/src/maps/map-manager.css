@@ -29,12 +29,11 @@
 .map-preview.grid-area-mode { cursor: crosshair; touch-action: none; }
 .map-preview:hover { border-color: #e8a743; }
 .map-preview:focus-visible { outline: 3px solid #e8a743; outline-offset: 2px; }
-.map-preview img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; }
 .map-preview p { line-height: 1.5; }
-.map-preview svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.map-preview svg { display: block; width: 100%; height: 100%; user-select: none; }
 .map-preview line { stroke: rgb(88 195 255 / 65%); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .map-preview line.major { stroke: rgb(255 209 89 / 80%); stroke-width: 1.5; }
-.map-preview .grid-area-preview polygon { fill: rgb(232 167 67 / 20%); stroke: #fff1d2; stroke-width: 2.5; stroke-dasharray: 8 5; vector-effect: non-scaling-stroke; }
+.map-preview .grid-area-preview rect { fill: rgb(232 167 67 / 20%); stroke: #fff1d2; stroke-width: 2.5; stroke-dasharray: 8 5; vector-effect: non-scaling-stroke; }
 .map-preview .grid-area-preview line { stroke: #ffae35; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .map-preview circle { fill: #ffae35; stroke: #181006; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .map-preview text { fill: #0b0804; font: 700 14px sans-serif; text-anchor: middle; dominant-baseline: central; }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
+import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
@@ -20,11 +21,17 @@ type PlayerProps = Readonly<{ role: "player"; state: PlayerView }>;
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
-    if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM has not started an encounter.</p></section>;
+    const myId = props.state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
+    if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
+    const myTurn = myId !== null && combat.turnActorId === myId;
     return <section className="encounter-panel" aria-labelledby="player-initiative-title">
-      <div className="encounter-heading"><div><span className="eyebrow">LIVE ENCOUNTER</span><h2 id="player-initiative-title">Initiative</h2></div><strong>Round {combat.round}</strong></div>
-      {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is resolving a hidden combatant's turn.</p>}
-      <ol className="initiative-list">{combat.initiative.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}><span>{entry.name}</span><strong>{entry.score}</strong></li>)}</ol>
+      <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><strong>Round {combat.round}</strong></div>
+      {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then let the GM know you're done.</p>}
+      {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
+      <ol className="initiative-list">{combat.initiative.map((entry) => {
+        const isMe = entry.actorId === myId;
+        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}><span>{entry.name}{isMe && <span className="you-badge">YOU</span>}</span><strong>{entry.score}</strong></li>;
+      })}</ol>
     </section>;
   }
 
@@ -66,21 +73,21 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
     if (entries.length === 0) throw new Error("Choose at least one combatant.");
-    return emitCommand("encounter:start", { commandId: crypto.randomUUID(), mapAssetId: selectedMap.id, entries, expectedRevision: state.revision });
+    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: selectedMap.id, entries, expectedRevision: state.revision });
   }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
-  const updateScore = (actorId: string) => void run(() => emitCommand("initiative:set", { commandId: crypto.randomUUID(), actorId, score: Number(scores[actorId]), expectedRevision: state.revision }), "Initiative updated.");
-  const next = () => void run(() => emitCommand("initiative:next", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Advanced to the next turn.");
-  const previous = () => void run(() => emitCommand("initiative:previous", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Moved to the previous turn.");
+  const updateScore = (actorId: string) => void run(() => emitCommand("initiative:set", { commandId: newId(), actorId, score: Number(scores[actorId]), expectedRevision: state.revision }), "Initiative updated.");
+  const next = () => void run(() => emitCommand("initiative:next", { commandId: newId(), expectedRevision: state.revision }), "Advanced to the next turn.");
+  const previous = () => void run(() => emitCommand("initiative:previous", { commandId: newId(), expectedRevision: state.revision }), "Moved to the previous turn.");
   const end = () => {
     if (!window.confirm("End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.")) return;
-    void run(() => emitCommand("encounter:end", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Encounter ended.");
+    void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
   };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
-    <div className="encounter-heading"><div><span className="eyebrow">SERVER-AUTHORITATIVE COMBAT</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div>{state.combat.active && <strong>Round {state.combat.round}</strong>}</div>
+    <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div>{state.combat.active && <strong>Round {state.combat.round}</strong>}</div>
     {!state.combat.active ? <>
-      <p>Choose combatants and enter any known scores. Starting the encounter creates their tokens automatically; drag them from the tray straight onto the map.</p>
-      <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Select a map above"}</strong></div>
+      <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
+      <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Pick a map on the Maps tab"}</strong></div>
       <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
         <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
         <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>

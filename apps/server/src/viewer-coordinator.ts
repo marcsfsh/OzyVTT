@@ -24,6 +24,7 @@ export type ViewerConnectionMetadata = Readonly<{
 
 export class ViewerCoordinator {
   private readonly subscribers = new Map<string, ViewerSubscriber>();
+  private readonly pingTimers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly access: ViewerAccessStore,
@@ -55,8 +56,28 @@ export class ViewerCoordinator {
   async executeGm(token: string | undefined, command: Omit<ViewerCommand, "role">) {
     if (!this.authorizeGm(token)) throw new ViewerAccessDeniedError("A valid GM session is required.");
     const result = await this.presentation.execute({ ...command, role: "gm" }, this.now());
-    if (!result.duplicate) this.broadcast();
+    if (!result.duplicate) {
+      this.broadcast();
+      // A ping only lasts for its duration, but nothing else may mutate state before it expires.
+      // Schedule a single re-broadcast at the soonest ping expiry so the projection (which already
+      // filters expired pings) actually reaches viewers and the ping disappears on its own.
+      if (command.payload.type === "viewer.ping") this.schedulePingExpiry();
+    }
     return result;
+  }
+
+  private schedulePingExpiry() {
+    const now = this.now();
+    const soonest = this.presentation.snapshot.pings.map((ping) => ping.expiresAt).filter((expiry) => expiry > now).sort((a, b) => a - b)[0];
+    if (soonest === undefined) return;
+    const timer = setTimeout(() => { this.pingTimers.delete(timer); this.broadcast(); }, Math.max(0, soonest - now));
+    timer.unref?.();
+    this.pingTimers.add(timer);
+  }
+
+  dispose() {
+    for (const timer of this.pingTimers) clearTimeout(timer);
+    this.pingTimers.clear();
   }
 
   async synchronizeInitiative(sourceRevision: number, initiative: ViewerInitiative) {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
 import "./map-manager.css";
 
 type Point = { x: number; y: number };
@@ -22,7 +23,6 @@ type WizardState = Readonly<{
   calibration: Readonly<{ origin: Point; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
   verification: Readonly<{ errorPx: number; tolerancePx: number; accepted: boolean }> | null;
 }>;
-type OverlayLine = Readonly<{ axis: "column" | "row"; index: number; start: Point; end: Point; major: boolean }>;
 export type MapSelection = Readonly<{
   id: string;
   name: string;
@@ -41,26 +41,33 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
   return body.data;
 }
 
-const rounded = (value: number) => Math.round(value * 100) / 100;
-
-const interpolate = (from: Point, to: Point, amount: number): Point => ({ x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount });
+/**
+ * Snaps a raw drag point to an axis-aligned square from the start corner: equal side length on
+ * both axes (side = the larger of the two deltas), sign preserved so it follows the drag
+ * direction, clamped so the square stays inside the map. This makes the calibration drag a true
+ * square (0°/90° aligned) — dragging a corner grows/shrinks both sides at the same rate — which is
+ * what the server's `deriveSquareGridFromArea` expects (it reads start/end as opposite corners of
+ * an axis-aligned box and locks rotation to 0).
+ */
+function squareCorner(start: Point, raw: Point, width: number, height: number): Point {
+  const signX = raw.x < start.x ? -1 : 1;
+  const signY = raw.y < start.y ? -1 : 1;
+  const maxX = signX > 0 ? width - start.x : start.x;
+  const maxY = signY > 0 ? height - start.y : start.y;
+  const side = Math.min(Math.max(Math.abs(raw.x - start.x), Math.abs(raw.y - start.y)), maxX, maxY);
+  return { x: start.x + signX * side, y: start.y + signY * side };
+}
 
 function GridAreaPreview({ start, end }: Readonly<{ start: Point; end: Point }>) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const center = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-  const topRight = { x: center.x + dy / 2, y: center.y - dx / 2 };
-  const bottomLeft = { x: center.x - dy / 2, y: center.y + dx / 2 };
-  const corners = [start, topRight, end, bottomLeft] as const;
+  const x0 = Math.min(start.x, end.x);
+  const y0 = Math.min(start.y, end.y);
+  const size = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y));
   return <g className="grid-area-preview">
-    <polygon points={corners.map((point) => `${point.x},${point.y}`).join(" ")} />
-    {[1 / 3, 2 / 3].flatMap((amount) => {
-      const top = interpolate(start, topRight, amount);
-      const bottom = interpolate(bottomLeft, end, amount);
-      const left = interpolate(start, bottomLeft, amount);
-      const right = interpolate(topRight, end, amount);
-      return [<line key={`column-${amount}`} x1={top.x} y1={top.y} x2={bottom.x} y2={bottom.y} />, <line key={`row-${amount}`} x1={left.x} y1={left.y} x2={right.x} y2={right.y} />];
-    })}
+    <rect x={x0} y={y0} width={size} height={size} />
+    {[1, 2].flatMap((third) => [
+      <line key={`v${third}`} x1={x0 + (size * third) / 3} y1={y0} x2={x0 + (size * third) / 3} y2={y0 + size} />,
+      <line key={`h${third}`} x1={x0} y1={y0 + (size * third) / 3} x2={x0 + size} y2={y0 + (size * third) / 3} />
+    ])}
   </g>;
 }
 
@@ -84,7 +91,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [unit, setUnit] = useState("miles");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const selected = maps.find((map) => map.id === selectedId) ?? null;
 
   const refresh = async (preferId?: string) => {
@@ -134,12 +141,9 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     });
   };
   const pointAt = (clientX: number, clientY: number) => {
-    if (!selected || !imageRef.current) return;
-    const rect = imageRef.current.getBoundingClientRect();
-    return {
-      x: rounded(Math.max(0, Math.min(selected.width, (clientX - rect.left) * selected.width / rect.width))),
-      y: rounded(Math.max(0, Math.min(selected.height, (clientY - rect.top) * selected.height / rect.height)))
-    };
+    if (!selected || !svgRef.current) return null;
+    const point = imagePointFromClient(svgRef.current, clientX, clientY);
+    return point ? clampPoint(point, selected.width, selected.height) : null;
   };
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     const point = pointAt(event.clientX, event.clientY);
@@ -159,17 +163,18 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     setPoints([]); setDragStart(point); setDragCurrent(point); setMessage("Keep dragging to the opposite corner of a 3 × 3 block.");
   };
   const moveGridArea = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (!dragStart || !selected || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const point = pointAt(event.clientX, event.clientY); if (!point) return;
-    event.preventDefault(); setDragCurrent(point);
+    event.preventDefault(); setDragCurrent(squareCorner(dragStart, point, selected.width, selected.height));
   };
   const finishGridArea = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (!dragStart || !selected || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const point = pointAt(event.clientX, event.clientY); if (!point) return;
     event.preventDefault(); event.currentTarget.releasePointerCapture(event.pointerId);
     const start = dragStart;
-    setDragStart(null); setDragCurrent(null); setPoints([start, point]);
-    void startAreaWizard(start, point);
+    const end = squareCorner(start, point, selected.width, selected.height);
+    setDragStart(null); setDragCurrent(null); setPoints([start, end]);
+    void startAreaWizard(start, end);
   };
   const cancelGridArea = () => { setDragStart(null); setDragCurrent(null); };
   const updatePoint = (index: number, coordinate: "x" | "y", value: number) => setPoints((current) => {
@@ -227,12 +232,12 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
           </div>
 
           <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
-            {previewUrl ? <img ref={imageRef} src={previewUrl} alt={selected.name} draggable={false} /> : <p>Loading map preview…</p>}
-            <svg viewBox={`0 0 ${selected.width} ${selected.height}`} aria-hidden="true">
-              {overlay.map((line) => <line key={`${line.axis}-${line.index}`} className={line.major ? "major" : ""} x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} />)}
+            {previewUrl ? <svg ref={svgRef} viewBox={`0 0 ${selected.width} ${selected.height}`} preserveAspectRatio="xMidYMid meet">
+              <image href={previewUrl} width={selected.width} height={selected.height} role="img" aria-label={selected.name} />
+              <GridOverlay lines={overlay} />
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
               {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
-            </svg>
+            </svg> : <p>Loading map preview…</p>}
           </div>
 
           {showPoints && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
