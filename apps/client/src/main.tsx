@@ -21,6 +21,14 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
+type GmTab = "table" | "maps" | "viewer" | "setup";
+const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
+  { id: "table", label: "Table" },
+  { id: "maps", label: "Maps" },
+  { id: "viewer", label: "Viewer" },
+  { id: "setup", label: "Setup" }
+];
+
 function App() {
   const [mode, setMode] = useState<"home" | "player" | "gm">("home");
   const [state, setState] = useState<PlayerView | GmView | null>(null);
@@ -29,6 +37,7 @@ function App() {
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
   const [gmToken, setGmToken] = useState<string | null>(null);
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
+  const [gmTab, setGmTab] = useState<GmTab>("table");
 
   useEffect(() => {
     api("/api/bootstrap/status").then(({ bootstrapped }) => setBootstrapped(bootstrapped)).catch((error) => setMessage(error.message));
@@ -61,7 +70,7 @@ function App() {
     } catch (error) { setMessage((error as Error).message); }
   };
   const leaveGmSession = (notice: string) => {
-    socket.disconnect(); setGmToken(null); setSelectedMap(null); setPassword(""); setMode("home"); setState(null); setMessage(notice);
+    socket.disconnect(); setGmToken(null); setSelectedMap(null); setGmTab("table"); setPassword(""); setMode("home"); setState(null); setMessage(notice);
   };
   const signOutGm = async () => {
     const token = gmToken;
@@ -94,25 +103,37 @@ function App() {
     </section>}
     {mode !== "home" && state && <>
       <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />
-      <section className="table">
-        <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "PLAYER VIEW"}</span><h2>Combat canvas</h2><p>{state.combat.active ? `Encounter active · Round ${state.combat.round}` : "The real-time connection and role boundary are active. Start an encounter below."}</p></div>
-        {state.combat.active && state.combat.mapAssetId ? <EncounterMap
-          assetId={state.combat.mapAssetId}
-          token={mapToken}
-          altText={selectedMap?.id === state.combat.mapAssetId ? selectedMap.name : "Active encounter battlemap"}
-          role={mode}
-          actors={state.actors}
-          tokens={state.combat.tokens}
-          revision={state.revision}
-          activeActorId={state.combat.turnActorId}
-        /> : <div className="empty"><strong>No encounter loaded</strong><span>{state.actors.length ? `${state.actors.length} visible actor(s) are ready.` : "GM will import characters and build the first encounter."}</span></div>}
-      </section>
-      {mode === "gm" && gmToken && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
-      <EncounterPanel {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, selectedMap } : { role: "player" as const, state: state as PlayerView })} />
-      {mode === "gm" && gmToken && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
-      {mode === "gm" && <section className="gm-session-controls"><button className="secondary" onClick={signOutGm}>Sign out</button><button className="danger" onClick={revokeAllGmSessions}>Revoke all GM sessions</button></section>}
-      {mode === "gm" && gmToken && <IntegrationsPanel gmToken={gmToken} />}
-      <DicePanel role={mode} state={state} />
+
+      {mode === "gm" && <nav className="gm-tabs" aria-label="GM sections">
+        {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}
+      </nav>}
+
+      {(mode === "player" || gmTab === "table") && <>
+        <section className="table">
+          <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "PLAYER VIEW"}</span><h2>Combat canvas</h2><p>{state.combat.active ? `Encounter active · Round ${state.combat.round}` : "The real-time connection and role boundary are active. Start an encounter below."}</p></div>
+          {state.combat.active && state.combat.mapAssetId ? <EncounterMap
+            assetId={state.combat.mapAssetId}
+            token={mapToken}
+            altText={selectedMap?.id === state.combat.mapAssetId ? selectedMap.name : "Active encounter battlemap"}
+            role={mode}
+            actors={state.actors}
+            tokens={state.combat.tokens}
+            revision={state.revision}
+            activeActorId={state.combat.turnActorId}
+          /> : <div className="empty"><strong>No encounter loaded</strong><span>{state.actors.length ? `${state.actors.length} visible actor(s) are ready.` : "GM will import characters and build the first encounter."}</span></div>}
+        </section>
+        <EncounterPanel {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, selectedMap } : { role: "player" as const, state: state as PlayerView })} />
+        <DicePanel role={mode} state={state} />
+      </>}
+
+      {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
+
+      {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
+
+      {mode === "gm" && gmToken && gmTab === "setup" && <>
+        <IntegrationsPanel gmToken={gmToken} />
+        <section className="gm-session-controls"><button className="secondary" onClick={signOutGm}>Sign out</button><button className="danger" onClick={revokeAllGmSessions}>Revoke all GM sessions</button></section>
+      </>}
     </>}
   </main>;
 }

@@ -12,16 +12,20 @@ import {
 } from "../src/grid-calibration.js";
 
 describe("square-grid calibration geometry", () => {
-  it("derives scale, origin, and rotation from one diagonal drag across a 3-by-3 area", () => {
+  it("derives scale and origin from one diagonal drag across a 3-by-3 area, always locked to a right angle", () => {
     const aligned = deriveSquareGridFromArea({ mapWidthPx: 1000, mapHeightPx: 800, start: { x: 100, y: 100 }, end: { x: 250, y: 250 }, cellsAcross: 3, cellsDown: 3 });
     expect(aligned).toMatchObject({ kind: "square", origin: { x: 100, y: 100 }, rotationRadians: 0, distancePerCell: 5 });
     expect(aligned.cellSizePx).toBeCloseTo(50);
 
-    const rotation = Math.PI / 6;
-    const endpoint = gridToImage({ ...aligned, rotationRadians: rotation }, { column: 3, row: 3 });
-    const rotated = deriveSquareGridFromArea({ mapWidthPx: 1000, mapHeightPx: 800, start: aligned.origin, end: endpoint, cellsAcross: 3, cellsDown: 3 });
-    expect(rotated.cellSizePx).toBeCloseTo(50);
-    expect(rotated.rotationRadians).toBeCloseTo(rotation);
+    // A real drag is never a perfect diagonal. Imprecision must not be read as map rotation.
+    const imprecise = deriveSquareGridFromArea({ mapWidthPx: 1000, mapHeightPx: 800, start: { x: 100, y: 100 }, end: { x: 262, y: 238 }, cellsAcross: 3, cellsDown: 3 });
+    expect(imprecise.rotationRadians).toBe(0);
+    expect(imprecise.origin).toEqual({ x: 100, y: 100 });
+
+    // The area can be dragged from any corner; the resulting origin is always the top-left.
+    const reversed = deriveSquareGridFromArea({ mapWidthPx: 1000, mapHeightPx: 800, start: { x: 250, y: 250 }, end: { x: 100, y: 100 }, cellsAcross: 3, cellsDown: 3 });
+    expect(reversed).toMatchObject({ origin: { x: 100, y: 100 }, rotationRadians: 0 });
+    expect(reversed.cellSizePx).toBeCloseTo(50);
   });
 
   it("derives cell size and origin from an easy horizontal segment", () => {

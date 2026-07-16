@@ -95,6 +95,19 @@ describe("map asset HTTP workflow", () => {
     expect((await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/complete`, { method: "POST", headers: gm(), body: "{}" })).status).toBe(404);
   });
 
+  it("completes calibration from the 3-by-3 drag alone, with no verification step required", async () => {
+    const test = await fixture();
+    const upload = await body(await fetch(`${test.base}/api/v1/map-assets?filename=grid.png&kind=battlemap`, { method: "POST", headers: gm("image/png"), body: test.input }));
+    const id = upload.data.asset.id;
+    const started = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards`, { method: "POST", headers: gm(), body: JSON.stringify({ start: { x: 20, y: 20 }, end: { x: 275, y: 170 }, cellsAcross: 3, cellsDown: 3, distancePerCell: 5 }) }));
+    expect(started.data.state.calibration.rotationRadians).toBe(0);
+    const wizardId = started.data.wizardId;
+    const completed = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/complete`, { method: "POST", headers: gm(), body: "{}" }));
+    expect(completed.data.map.calibration.calibration.rotationRadians).toBe(0);
+    expect(completed.data.map.calibration.verificationErrorPx).toBeNull();
+    expect(completed.data.map.calibration.verifiedAt).toBeNull();
+  });
+
   it("calibrates gridless regional scale and rejects spoofed or unsafe inputs", async () => {
     const test = await fixture();
     const rejected = await fetch(`${test.base}/api/v1/map-assets?filename=malware.png`, { method: "POST", headers: gm("image/png"), body: Buffer.from("not an image") });
