@@ -228,8 +228,13 @@ export function createMapRouter(options: MapRouterOptions) {
       const id = mapId(request); if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
       const found = wizardFor(request, id); if (!found) return failure(request, response, 404, "not_found", "Calibration wizard was not found or expired.");
       const state = completeGridCalibrationWizard(found.session.state);
-      const verification = state.verification!;
-      const entry = options.catalog.saveCalibration(id, { calibration: state.calibration!, verifiedAt: new Date(now()).toISOString(), verificationPoint: verification.imagePoint, verificationErrorPx: verification.errorPx });
+      const verification = state.verification?.accepted ? state.verification : null;
+      const entry = options.catalog.saveCalibration(id, {
+        calibration: state.calibration!,
+        verifiedAt: verification ? new Date(now()).toISOString() : null,
+        verificationPoint: verification?.imagePoint ?? null,
+        verificationErrorPx: verification?.errorPx ?? null
+      });
       wizards.delete(found.id);
       return success(response, 200, { map: entry });
     } catch (error) { return failure(request, response, 400, "validation_failed", (error as Error).message); }

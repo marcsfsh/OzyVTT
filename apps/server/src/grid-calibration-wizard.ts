@@ -207,10 +207,13 @@ export function verifyWizardIntersection(state: GridCalibrationWizardState, imag
   };
 }
 
+/**
+ * A verified intersection is reassurance, not a requirement: the 3-by-3 area drag
+ * already is the calibration, so completion only needs a calibration to exist.
+ */
 export function completeGridCalibrationWizard(state: GridCalibrationWizardState): GridCalibrationWizardState {
   active(state);
   calibrationFrom(state);
-  if (!state.verification?.accepted) throw new Error("Verify a known grid intersection within tolerance before completing calibration.");
   return { ...state, step: "complete", revision: nextRevision(state) };
 }
 

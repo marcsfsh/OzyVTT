@@ -16,6 +16,8 @@ describe("MapCatalogStore", () => {
       await store.initialize();
       expect(store.register(id, "Ruined Keep", "battlemap")).toMatchObject({ assetId: id, name: "Ruined Keep", kind: "battlemap", calibration: null });
       const grid = deriveSquareGridFromSegment({ mapWidthPx: 1000, mapHeightPx: 800, start: { x: 10, y: 20 }, end: { x: 210, y: 20 }, cellsBetween: 4, axis: "horizontal" });
+      store.saveCalibration(id, { calibration: grid, verifiedAt: null, verificationPoint: null, verificationErrorPx: null });
+      expect(store.get(id)).toMatchObject({ calibration: { verifiedAt: null, verificationPoint: null, verificationErrorPx: null } });
       store.saveCalibration(id, { calibration: grid, verifiedAt: "2026-07-16T02:01:00.000Z", verificationPoint: { x: 110, y: 120 }, verificationErrorPx: 0 });
       store.saveScale(id, { kind: "image-scale", distancePerPixel: 0.25, unit: "miles" });
       store.close();
@@ -37,6 +39,8 @@ describe("MapCatalogStore", () => {
       expect(() => store.register("../../auth", "Unsafe", "world")).toThrow("malformed");
       expect(() => store.updateDetails(id, { name: " " })).toThrow("Map name");
       expect(() => store.saveScale(id, { kind: "image-scale", distancePerPixel: 0, unit: "mi" })).toThrow("positive finite");
+      const grid = deriveSquareGridFromSegment({ mapWidthPx: 1000, mapHeightPx: 800, start: { x: 10, y: 20 }, end: { x: 210, y: 20 }, cellsBetween: 4, axis: "horizontal" });
+      expect(() => store.saveCalibration(id, { calibration: grid, verifiedAt: null, verificationPoint: { x: 1, y: 1 }, verificationErrorPx: null })).toThrow("verification");
     } finally { store.close(); await rm(directory, { recursive: true, force: true }); }
   });
 });

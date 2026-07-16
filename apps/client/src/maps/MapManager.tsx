@@ -75,7 +75,8 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [dragCurrent, setDragCurrent] = useState<Point | null>(null);
   const [battlemapMode, setBattlemapMode] = useState<"square" | "gridless">("square");
-  const [distancePerCell, setDistancePerCell] = useState(5);
+  const [distancePerCell] = useState(5);
+  const [verifying, setVerifying] = useState(false);
   const [wizardId, setWizardId] = useState<string | null>(null);
   const [wizard, setWizard] = useState<WizardState | null>(null);
   const [overlay, setOverlay] = useState<readonly OverlayLine[]>([]);
@@ -94,7 +95,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   useEffect(() => { void refresh().catch((error) => setMessage(error.message)); }, [gmToken]);
   useEffect(() => { if (preferredMapId && maps.some((map) => map.id === preferredMapId)) setSelectedId(preferredMapId); }, [preferredMapId, maps]);
   useEffect(() => {
-    setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]);
+    setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setVerifying(false);
     if (!selected) { setPreviewUrl(null); return; }
     setBattlemapMode(selected.scale && !selected.calibration ? "gridless" : "square");
     setUnit(selected.scale?.unit ?? (selected.kind === "battlemap" ? "feet" : "miles"));
@@ -182,7 +183,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     if (!selected) throw new Error("Select a battlemap first.");
     const data = await api(`/api/v1/map-assets/${selected.id}/calibration/wizards`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ start, end, cellsAcross: 3, cellsDown: 3, distancePerCell }) });
     acceptWizardData(data);
-    if (!data.overlayWarning) setMessage("3 × 3 area measured. Adjust only if the blue overlay does not match the printed grid.");
+    if (!data.overlayWarning) setMessage("3 × 3 area measured. Confirm below if the blue overlay matches the printed grid.");
   });
   const wizardAction = (action: Record<string, unknown>) => run(async () => {
     if (!selected || !wizardId) throw new Error("Start grid calibration first.");
@@ -191,24 +192,19 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const completeWizard = () => run(async () => {
     if (!selected || !wizardId) throw new Error("Start grid calibration first.");
     await api(`/api/v1/map-assets/${selected.id}/calibration/wizards/${wizardId}/complete`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-    await refresh(selected.id); setWizard(null); setWizardId(null); setOverlay([]); setPoints([]); setDragStart(null); setDragCurrent(null); setMessage("Grid calibration saved.");
+    await refresh(selected.id); setWizard(null); setWizardId(null); setOverlay([]); setPoints([]); setDragStart(null); setDragCurrent(null); setVerifying(false); setMessage("Grid calibration saved.");
   });
   const saveScale = () => run(async () => {
     if (!selected || points.length < 2) throw new Error("Choose two points with a known real-world distance.");
     await api(`/api/v1/map-assets/${selected.id}/scale`, gmToken, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ start: points[0], end: points[1], knownDistance, unit }) });
     await refresh(selected.id); setPoints([]); setMessage("Map scale saved.");
   });
-  const restartCalibration = (notice: string) => { setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setMessage(notice); };
-  const gridStep = !wizard ? 1 : wizard.verification?.accepted ? 4 : points.length >= 3 ? 3 : 2;
-  const gridInstruction = !wizard
-    ? "Press on a grid intersection, drag diagonally across exactly three squares by three squares, and release on the opposite intersection."
-    : wizard.verification?.accepted
-      ? "The distant check point lands on the aligned grid. Save this calibration."
-      : points.length < 3
-        ? "The blue overlay came from your 3 × 3 drag. If it matches, click a distant grid intersection to place check point V; otherwise use the adjustment controls first."
-        : wizard.verification
-          ? "That check point missed the overlay. Adjust the grid, click a new distant intersection, and verify again."
-          : "Point V is selected. Verify it to confirm that the alignment holds across the whole map.";
+  const restartCalibration = (notice: string) => { setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setVerifying(false); setMessage(notice); };
+  const squareMode = selected?.kind === "battlemap" && battlemapMode === "square";
+  const showPoints = !wizard || verifying;
+  const instruction = squareMode
+    ? (!wizard ? "Press on a grid intersection, drag diagonally across a 3 × 3 block of squares, and release on the opposite intersection." : "Grid detected. Confirm it below, or fine-tune it first if it looks off.")
+    : `${points.length < 2 ? `Choose ${points.length ? "the ending" : "a starting"} point` : "Enter the real-world distance"}. Click two locations on the map whose real-world distance you know.`;
 
   return <>
     <section className="map-manager" aria-labelledby="map-manager-heading">
@@ -223,55 +219,45 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
       {maps.length > 0 && <div className="map-workspace">
         <nav className="map-list" aria-label="Uploaded maps">{maps.map((map) => <button key={map.id} className={map.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(map.id)}><strong>{map.name}</strong><span>{map.kind} · {map.width}×{map.height}</span><small>{map.calibration ? "Grid calibrated" : map.scale ? `Scale ${map.scale.distancePerPixel.toPrecision(3)} ${map.scale.unit}/px` : "Needs scale setup"}</small></button>)}</nav>
         {selected && <div className="map-calibration">
-          {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale, position, and rotation.</span></button><button aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
-          {selected.kind === "battlemap" && battlemapMode === "square" ? <>
-            <ol className="calibration-steps" aria-label="Grid calibration progress">
-              {["Drag 3 × 3 area", "Inspect overlay", "Verify alignment", "Save"].map((label, index) => {
-                const step = index + 1;
-                return <li key={label} className={gridStep === step ? "current" : gridStep > step ? "complete" : ""} aria-current={gridStep === step ? "step" : undefined}><span>{gridStep > step ? "✓" : step}</span><strong>{label}</strong></li>;
-              })}
-            </ol>
-            <div className="calibration-instruction" id="calibration-instruction" role="status">
-              <span>STEP {gridStep} OF 4</span>
-              <strong>{gridStep === 1 ? "Drag over nine squares" : gridStep === 2 ? "Inspect the aligned grid" : gridStep === 3 ? "Check it across the map" : "Save the result"}</strong>
-              <p>{gridInstruction}</p>
-              {selected.calibration && points.length === 0 && <small>This map already has a saved grid. Continuing will replace it only after you verify and save.</small>}
-            </div>
-          </> : <div className="calibration-instruction" id="calibration-instruction" role="status"><span>{selected.kind === "battlemap" ? "GRIDLESS SCALE" : "MAP SCALE"}</span><strong>{points.length < 2 ? `Choose ${points.length ? "the ending" : "a starting"} point` : "Enter the real-world distance"}</strong><p>{points.length < 2 ? "Click two locations on the map whose real-world distance you know." : "The two selected points are locked. Enter their distance and unit below, or reset them."}</p></div>}
+          {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
+          <div className="calibration-instruction" id="calibration-instruction" role="status">
+            <span>{squareMode ? "SQUARE GRID" : selected.kind === "battlemap" ? "GRIDLESS SCALE" : "MAP SCALE"}</span>
+            <p>{instruction}</p>
+            {squareMode && !wizard && <small>Squares are 5 ft each, the D&amp;D 5e default.</small>}
+          </div>
 
-          <div className={`map-preview ${selected.kind === "battlemap" && battlemapMode === "square" && !wizard ? "grid-area-mode" : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={selected.kind === "battlemap" && battlemapMode === "square" && !wizard ? undefined : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${selected.kind === "battlemap" && battlemapMode === "square" && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
+          <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
             {previewUrl ? <img ref={imageRef} src={previewUrl} alt={selected.name} draggable={false} /> : <p>Loading map preview…</p>}
             <svg viewBox={`0 0 ${selected.width} ${selected.height}`} aria-hidden="true">
               {overlay.map((line) => <line key={`${line.axis}-${line.index}`} className={line.major ? "major" : ""} x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} />)}
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
-              {points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
+              {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
             </svg>
           </div>
 
-          {points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(selected.kind === "battlemap" && battlemapMode === "square" ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
-          <details className="advanced-points"><summary>Enter or fine-tune point coordinates (keyboard alternative)</summary><div className="point-editor">{[0, 1, ...(wizard ? [2] : [])].map((index) => <fieldset key={index}><legend>{index === 0 ? "Drag start A" : index === 1 ? "Drag end C" : "Check V"}</legend><label>X<input type="number" value={points[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<input type="number" value={points[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}</div></details>
+          {showPoints && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
+          {!wizard && <details className="advanced-points"><summary>Enter or fine-tune point coordinates (keyboard alternative)</summary><div className="point-editor">{[0, 1].map((index) => <fieldset key={index}><legend>{index === 0 ? "Drag start A" : "Drag end C"}</legend><label>X<input type="number" value={points[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<input type="number" value={points[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}</div>{squareMode && points.length >= 2 && <button disabled={busy} onClick={() => void startAreaWizard(points[0], points[1])}>Measure 3 × 3 area from these points</button>}</details>}
 
-          {selected.kind === "battlemap" && battlemapMode === "square" ? <div className="grid-wizard">
-            {!wizard && <>
-              <h3>One gesture: 3 squares × 3 squares</h3>
-              <p className="wizard-example">Start exactly on one printed-grid intersection. Hold and drag diagonally across a block containing <strong>nine squares</strong>, then release exactly on the opposite intersection.</p>
-              <label className="distance-per-square">Game distance per square<input type="number" min="0.01" step="0.5" value={distancePerCell} onChange={(event) => setDistancePerCell(Number(event.target.value))} /></label>
-              {points.length >= 2 && <button className="wizard-primary" disabled={busy} onClick={() => void startAreaWizard(points[0], points[1])}>Retry 3 × 3 measurement</button>}
-            </>}
+          {squareMode ? <div className="grid-wizard">
+            {!wizard && <p className="wizard-example">Start exactly on one printed-grid intersection. Hold and drag diagonally across a block containing <strong>nine squares</strong>, then release exactly on the opposite intersection.</p>}
             {wizard && <>
-              <dl className="calibration-readout"><div><dt>Square size</dt><dd>{wizard.calibration.cellSizePx.toFixed(2)} px</dd></div><div><dt>Grid origin</dt><dd>{wizard.calibration.origin.x.toFixed(1)}, {wizard.calibration.origin.y.toFixed(1)}</dd></div><div><dt>Rotation</dt><dd>{(wizard.calibration.rotationRadians * 180 / Math.PI).toFixed(2)}°</dd></div><div><dt>Game distance</dt><dd>{wizard.calibration.distancePerCell} / square</dd></div></dl>
-              <div className="adjustment-groups">
-                <fieldset><legend>Move overlay</legend><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: -1, y: 0 } } })}>← Left</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: 1, y: 0 } } })}>Right →</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: 0, y: -1 } } })}>↑ Up</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: 0, y: 1 } } })}>Down ↓</button></fieldset>
-                <fieldset><legend>Square size</legend><button onClick={() => wizardAction({ action: "adjust", adjustment: { cellSizeDeltaPx: -.5 } })}>− Smaller</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { cellSizeDeltaPx: .5 } })}>+ Larger</button></fieldset>
-                <fieldset><legend>Rotation</legend><button onClick={() => wizardAction({ action: "adjust", adjustment: { rotationDeltaRadians: -Math.PI / 1800 } })}>↶ Left</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { rotationDeltaRadians: Math.PI / 1800 } })}>Right ↷</button></fieldset>
-                <fieldset><legend>History</legend><button onClick={() => wizardAction({ action: "undo" })}>Undo</button><button onClick={() => wizardAction({ action: "redo" })}>Redo</button></fieldset>
+              <p className="grid-detected">{wizard.calibration.cellSizePx.toFixed(0)} px squares · {wizard.calibration.distancePerCell} ft each</p>
+              <div className="grid-wizard-actions">
+                <button className="save-map" disabled={busy} onClick={completeWizard}>Confirm grid</button>
+                <button className="secondary" disabled={busy} onClick={() => restartCalibration("Drag diagonally across a 3 × 3 block of printed squares.")}>Redo drag</button>
               </div>
-              <div className="verification-card">
-                <div><strong>{points.length < 3 ? "Click a distant grid intersection" : "Check point V"}</strong><p>{points.length < 3 ? "Choose one far from the 3 × 3 sample. A distant check catches tiny spacing or rotation errors." : "Verify whether V lands close enough to an intersection on the blue overlay."}</p></div>
-                <button className="wizard-primary" disabled={busy || points.length < 3} onClick={() => wizardAction({ action: "verify", imagePoint: points[2] })}>Verify selected point</button>
-              </div>
-              {wizard.verification && <p className={wizard.verification.accepted ? "verification accepted" : "verification rejected"}>{wizard.verification.accepted ? `Passed — V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid.` : `Not aligned yet — V misses by ${wizard.verification.errorPx.toFixed(2)} px.`}</p>}
-              <button className="save-map" disabled={busy || !wizard.verification?.accepted} onClick={completeWizard}>Save calibrated grid</button>
+              <details className="grid-fine-tune">
+                <summary>Fine-tune (optional)</summary>
+                <div className="adjustment-groups">
+                  <fieldset><legend>Move overlay</legend><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: -1, y: 0 } } })}>← Left</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: 1, y: 0 } } })}>Right →</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: 0, y: -1 } } })}>↑ Up</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { originDelta: { x: 0, y: 1 } } })}>Down ↓</button></fieldset>
+                  <fieldset><legend>Square size</legend><button onClick={() => wizardAction({ action: "adjust", adjustment: { cellSizeDeltaPx: -.5 } })}>− Smaller</button><button onClick={() => wizardAction({ action: "adjust", adjustment: { cellSizeDeltaPx: .5 } })}>+ Larger</button></fieldset>
+                  <fieldset><legend>History</legend><button onClick={() => wizardAction({ action: "undo" })}>Undo</button><button onClick={() => wizardAction({ action: "redo" })}>Redo</button></fieldset>
+                </div>
+                <div className="verification-card">
+                  {!verifying ? <button onClick={() => setVerifying(true)}>Check alignment at a distant point</button> : <div><strong>{points.length < 3 ? "Click a distant grid intersection" : "Check point V"}</strong><p>{points.length < 3 ? "Choose one far from the 3 × 3 sample to catch spacing errors." : "Verify whether V lands close enough to an intersection on the blue overlay."}</p><button className="wizard-primary" disabled={busy || points.length < 3} onClick={() => wizardAction({ action: "verify", imagePoint: points[2] })}>Verify selected point</button></div>}
+                </div>
+                {wizard.verification && <p className={wizard.verification.accepted ? "verification accepted" : "verification rejected"}>{wizard.verification.accepted ? `Aligned — V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid.` : `Not aligned — V misses by ${wizard.verification.errorPx.toFixed(2)} px. This does not block Confirm.`}</p>}
+              </details>
             </>}
           </div> : <div className="grid-wizard"><h3>{selected.kind === "battlemap" ? "Gridless movement scale" : "Real-world scale"}</h3><p>{selected.kind === "battlemap" ? "Measure a known span so rulers can display feet without drawing a grid." : "Measure a known span so markers and rulers can use real-world distance."}</p><div className="wizard-fields"><label>Distance between the points<input type="number" min="0.01" value={knownDistance} onChange={(event) => setKnownDistance(Number(event.target.value))} /></label><label>Unit<input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={32} placeholder={selected.kind === "battlemap" ? "feet" : "miles"} /></label></div><button className="wizard-primary" disabled={busy || points.length < 2} onClick={saveScale}>Save map scale</button></div>}
         </div>}

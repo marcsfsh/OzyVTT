@@ -8,9 +8,9 @@ export type MapKind = "battlemap" | "regional" | "world";
 
 export type StoredGridCalibration = Readonly<{
   calibration: SquareGridCalibration;
-  verifiedAt: string;
-  verificationPoint: ImagePoint;
-  verificationErrorPx: number;
+  verifiedAt: string | null;
+  verificationPoint: ImagePoint | null;
+  verificationErrorPx: number | null;
 }>;
 
 export type MapCatalogEntry = Readonly<{
@@ -58,9 +58,13 @@ function finitePoint(value: ImagePoint) {
 
 function calibration(value: StoredGridCalibration) {
   validateSquareGridCalibration(value.calibration);
-  finitePoint(value.verificationPoint);
-  if (!Number.isFinite(value.verificationErrorPx) || value.verificationErrorPx < 0) throw new Error("Grid verification error must be a non-negative finite number.");
-  if (!Number.isFinite(Date.parse(value.verifiedAt))) throw new Error("Grid verification timestamp is invalid.");
+  const verified = value.verifiedAt !== null || value.verificationPoint !== null || value.verificationErrorPx !== null;
+  if (verified) {
+    if (value.verificationPoint === null) throw new Error("Grid verification point is missing.");
+    finitePoint(value.verificationPoint);
+    if (value.verificationErrorPx === null || !Number.isFinite(value.verificationErrorPx) || value.verificationErrorPx < 0) throw new Error("Grid verification error must be a non-negative finite number.");
+    if (value.verifiedAt === null || !Number.isFinite(Date.parse(value.verifiedAt))) throw new Error("Grid verification timestamp is invalid.");
+  }
   return value;
 }
 

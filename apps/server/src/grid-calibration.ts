@@ -91,7 +91,10 @@ export function deriveSquareGridFromSegment(input: SegmentCalibrationInput): Squ
 /**
  * Derives a square grid from opposite corners of a known rectangular grid area.
  * The normal UI uses a fixed 3-by-3 area: one press-drag-release gesture yields
- * origin, cell size, and rotation without asking the GM for pixel math or axis.
+ * origin and cell size without asking the GM for pixel math or axis. The area is
+ * always treated as axis-aligned (rotation locked to 0): a hand-drawn drag is
+ * never a perfect diagonal, and inferring rotation from small drag imprecision
+ * would rotate the grid when the GM never intended a rotated map.
  */
 export function deriveSquareGridFromArea(input: AreaCalibrationInput): SquareGridCalibration {
   const mapWidthPx = positive(input.mapWidthPx, "Map width");
@@ -100,21 +103,13 @@ export function deriveSquareGridFromArea(input: AreaCalibrationInput): SquareGri
   pointWithinMap(input.end, mapWidthPx, mapHeightPx, "Area end");
   if (!Number.isInteger(input.cellsAcross) || input.cellsAcross < 1 || input.cellsAcross > MAX_CELLS_BETWEEN) throw new Error(`Cells across must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
   if (!Number.isInteger(input.cellsDown) || input.cellsDown < 1 || input.cellsDown > MAX_CELLS_BETWEEN) throw new Error(`Cells down must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
-  const dx = input.end.x - input.start.x;
-  const dy = input.end.y - input.start.y;
-  const length = Math.hypot(dx, dy);
-  if (length === 0) throw new Error("Drag across the full calibration area before releasing.");
-  const cellSizePx = length / Math.hypot(input.cellsAcross, input.cellsDown);
+  const width = Math.abs(input.end.x - input.start.x);
+  const height = Math.abs(input.end.y - input.start.y);
+  if (width === 0 || height === 0) throw new Error("Drag across the full calibration area before releasing.");
+  const cellSizePx = (width / input.cellsAcross + height / input.cellsDown) / 2;
   if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX) throw new Error(`The selected area produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`);
-  const imageDiagonalAngle = Math.atan2(dy, dx);
-  const gridDiagonalAngle = Math.atan2(input.cellsDown, input.cellsAcross);
-  return validateSquareGridCalibration({
-    kind: "square",
-    origin: { ...input.start },
-    cellSizePx,
-    rotationRadians: normalizeRotation(imageDiagonalAngle - gridDiagonalAngle),
-    distancePerCell: input.distancePerCell ?? 5
-  });
+  const origin = { x: Math.min(input.start.x, input.end.x), y: Math.min(input.start.y, input.end.y) };
+  return validateSquareGridCalibration({ kind: "square", origin, cellSizePx, rotationRadians: 0, distancePerCell: input.distancePerCell ?? 5 });
 }
 
 export function imageToGrid(calibration: SquareGridCalibration, point: ImagePoint): GridPoint {

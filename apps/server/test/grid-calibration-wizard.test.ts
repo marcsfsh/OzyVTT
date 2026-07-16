@@ -28,11 +28,20 @@ describe("grid calibration wizard", () => {
     expect(measured.calibration?.cellSizePx).toBeCloseTo(50);
   });
 
-  it("walks through measure, refine, verify, and completion", () => {
+  it("completes from a drag alone, with no verification required", () => {
     const measured = measuredWizard();
     expect(measured.step).toBe("refine");
     expect(measured.calibration).toMatchObject({ origin: { x: 100, y: 100 }, cellSizePx: 50, distancePerCell: 5 });
 
+    const complete = completeGridCalibrationWizard(measured);
+    expect(complete.step).toBe("complete");
+    expect(complete.verification).toBeNull();
+    expect(() => adjustWizardGrid(complete, { cellSizeDeltaPx: 1 })).toThrow("reopened");
+    expect(reopenGridCalibrationWizard(complete)).toMatchObject({ step: "refine", verification: null });
+  });
+
+  it("walks through measure, refine, an optional verify, and completion", () => {
+    const measured = measuredWizard();
     const refined = adjustWizardGrid(measured, { originDelta: { x: 2, y: -1 }, distancePerCell: 10 });
     expect(refined.calibration).toMatchObject({ origin: { x: 102, y: 99 }, distancePerCell: 10 });
     expect(refined.revision).toBe(2);
@@ -48,12 +57,12 @@ describe("grid calibration wizard", () => {
     expect(reopenGridCalibrationWizard(complete)).toMatchObject({ step: "refine", verification: null });
   });
 
-  it("requires a trustworthy third-point verification", () => {
+  it("reports an optional verification as rejected without blocking completion", () => {
     const measured = measuredWizard();
     const rejected = verifyWizardIntersection(measured, { x: 124, y: 124 }, 3);
     expect(rejected.verification).toMatchObject({ accepted: false, tolerancePx: 3 });
     expect(rejected.verification?.errorPx).toBeCloseTo(Math.hypot(24, 24));
-    expect(() => completeGridCalibrationWizard(rejected)).toThrow("within tolerance");
+    expect(completeGridCalibrationWizard(rejected).step).toBe("complete");
   });
 
   it("supports bounded undo and redo while invalidating stale verification", () => {
