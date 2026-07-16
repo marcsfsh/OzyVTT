@@ -38,8 +38,12 @@ function squareGeometry(calibration: SquareGridCalibration, origin: AnnotationPo
   return { origin: gridToImage(calibration, startSnapped), target: gridToImage(calibration, endSnapped), sizeFeet: side * calibration.distancePerCell };
 }
 
-/** Circle/cone/line: origin snaps to the grid, size snaps to whole cells along the drag direction. */
-function radialGeometry(calibration: SquareGridCalibration, origin: AnnotationPoint, target: AnnotationPoint, originSnap: "cell-center" | "intersection"): AnnotationGeometry {
+/**
+ * Circle/cone/line: origin snaps to the grid, size snaps to whole cells along the drag direction.
+ * Directional shapes (cone/line) also snap their angle to the nearest 45° relative to the grid, so
+ * they can't be placed at arbitrary off-grid rotations.
+ */
+function radialGeometry(calibration: SquareGridCalibration, origin: AnnotationPoint, target: AnnotationPoint, originSnap: "cell-center" | "intersection", snapAngle: boolean): AnnotationGeometry {
   const snappedOrigin = snapImagePoint(calibration, origin, originSnap).image;
   const dx = target.x - snappedOrigin.x;
   const dy = target.y - snappedOrigin.y;
@@ -47,15 +51,20 @@ function radialGeometry(calibration: SquareGridCalibration, origin: AnnotationPo
   const cells = Math.max(1, Math.round(pixelDistance / calibration.cellSizePx));
   const sizeFeet = cells * calibration.distancePerCell;
   const sizePx = cells * calibration.cellSizePx;
-  const angle = pixelDistance === 0 ? 0 : Math.atan2(dy, dx);
+  let angle = pixelDistance === 0 ? 0 : Math.atan2(dy, dx);
+  if (snapAngle) {
+    const step = Math.PI / 4;
+    angle = calibration.rotationRadians + Math.round((angle - calibration.rotationRadians) / step) * step;
+  }
   const snappedTarget = { x: snappedOrigin.x + Math.cos(angle) * sizePx, y: snappedOrigin.y + Math.sin(angle) * sizePx };
   return { origin: snappedOrigin, target: snappedTarget, sizeFeet };
 }
 
 function shapeGeometry(calibration: SquareGridCalibration, shape: AnnotationShapeKind, origin: AnnotationPoint, target: AnnotationPoint): AnnotationGeometry {
   if (shape === "square") return squareGeometry(calibration, origin, target);
-  if (shape === "circle") return radialGeometry(calibration, origin, target, "cell-center");
-  return radialGeometry(calibration, origin, target, "intersection");
+  if (shape === "circle") return radialGeometry(calibration, origin, target, "cell-center", false);
+  if (shape === "cone") return radialGeometry(calibration, origin, target, "cell-center", true);
+  return radialGeometry(calibration, origin, target, "intersection", true);
 }
 
 function requireOwnedOrGm(annotation: Annotation, actor: AnnotationActor, action: string) {

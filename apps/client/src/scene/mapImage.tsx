@@ -173,11 +173,16 @@ export function snapShapePreview(calibration: GridCalibration, shape: "circle" |
     const end = { column: startSnapped.column + (raw.column < start.column ? -1 : 1) * side, row: startSnapped.row + (raw.row < start.row ? -1 : 1) * side };
     return { origin: gridToImagePreview(calibration, startSnapped), target: gridToImagePreview(calibration, end), feet: side * calibration.distancePerCell };
   }
-  const snappedOrigin = shape === "circle" ? snapCellCenterPreview(calibration, origin) : snapIntersectionPreview(calibration, origin);
+  // Line anchors on a grid intersection; circle/cone anchor on a cell center (matches the server).
+  const snappedOrigin = shape === "line" ? snapIntersectionPreview(calibration, origin) : snapCellCenterPreview(calibration, origin);
   const pixelDistance = Math.hypot(target.x - snappedOrigin.x, target.y - snappedOrigin.y);
   const cells = Math.max(1, Math.round(pixelDistance / calibration.cellSizePx));
   const sizePx = cells * calibration.cellSizePx;
-  const angle = pixelDistance === 0 ? 0 : Math.atan2(target.y - snappedOrigin.y, target.x - snappedOrigin.x);
+  let angle = pixelDistance === 0 ? 0 : Math.atan2(target.y - snappedOrigin.y, target.x - snappedOrigin.x);
+  if (shape === "cone" || shape === "line") {
+    const step = Math.PI / 4;
+    angle = calibration.rotationRadians + Math.round((angle - calibration.rotationRadians) / step) * step;
+  }
   return { origin: snappedOrigin, target: { x: snappedOrigin.x + Math.cos(angle) * sizePx, y: snappedOrigin.y + Math.sin(angle) * sizePx }, feet: cells * calibration.distancePerCell };
 }
 

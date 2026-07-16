@@ -51,18 +51,19 @@ function arrowPoints(origin: Point, target: Point, size: number) {
  * "{feet}ft {Shape}"). Shared by the encounter map and the shared-screen viewer so both look
  * identical. `arrowSize` scales the arrowhead to the map's grid so it reads at any zoom.
  */
-export function AnnotationGlyph({ data, arrowSize = 14, expiring = false, labelPoint }: Readonly<{ data: AnnotationGlyphData; arrowSize?: number; expiring?: boolean; labelPoint?: Point }>) {
+export function AnnotationGlyph({ data, arrowSize = 14, labelSize = 16, expiring = false, labelPoint }: Readonly<{ data: AnnotationGlyphData; arrowSize?: number; labelSize?: number; expiring?: boolean; labelPoint?: Point }>) {
   const center = labelPoint ?? annotationCenter(data);
+  const labelStyle = { fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) };
   if (data.kind === "measurement") {
     return <g className={`annotation-measurement${expiring ? " expiring" : ""}`}>
       <line x1={data.origin.x} y1={data.origin.y} x2={data.target.x} y2={data.target.y} />
       <circle cx={data.origin.x} cy={data.origin.y} r={4} />
       <polygon className="annotation-arrow" points={arrowPoints(data.origin, data.target, arrowSize)} />
-      <text x={center.x} y={center.y - 12}>{data.sizeFeet} ft</text>
+      <text style={labelStyle} x={center.x} y={center.y - labelSize}>{data.sizeFeet} ft</text>
     </g>;
   }
   return <>
     {data.shape && <ShapeOutline shape={data.shape} origin={data.origin} target={data.target} className="annotation-shape-body" />}
-    <text className="annotation-shape-label" x={center.x} y={center.y}>{data.sizeFeet}ft {data.shape ? SHAPE_NAMES[data.shape] : ""}</text>
+    <text className="annotation-shape-label" style={labelStyle} x={center.x} y={center.y}>{data.sizeFeet}ft {data.shape ? SHAPE_NAMES[data.shape] : ""}</text>
   </>;
 }

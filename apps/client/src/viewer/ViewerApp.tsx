@@ -158,6 +158,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
     <div className="viewer-zoom" role="group" aria-label="This screen's zoom">
       <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
       <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
+      <button type="button" onClick={() => setLocalCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 })}>Reset view</button>
       {localCamera && <button type="button" onClick={() => setLocalCamera(null)}>Follow GM view</button>}
     </div>
   </section>;

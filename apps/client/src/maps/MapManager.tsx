@@ -76,10 +76,12 @@ function GridAreaPreview({ start, end, handle }: Readonly<{ start: Point; end: P
 const CROSSHAIR_PRESETS: ReadonlyArray<{ color: string; label: string }> = [
   { color: "#ffcf62", label: "Amber" }, { color: "#58c3ff", label: "Cyan" }, { color: "#ff6b6b", label: "Red" }, { color: "#8fff9a", label: "Green" }, { color: "#ffffff", label: "White" }
 ];
-function CrosshairOverlay({ point, width, height, color, opacity }: Readonly<{ point: Point; width: number; height: number; color: string; opacity: number }>) {
-  return <g className="grid-crosshair" aria-hidden="true" style={{ stroke: color, opacity }}>
-    <line x1={0} y1={point.y} x2={width} y2={point.y} />
-    <line x1={point.x} y1={0} x2={point.x} y2={height} />
+function CrosshairOverlay({ points, width, height, color, opacity, dash }: Readonly<{ points: readonly Point[]; width: number; height: number; color: string; opacity: number; dash: string }>) {
+  return <g className="grid-crosshair" aria-hidden="true" style={{ stroke: color, opacity, strokeDasharray: dash }}>
+    {points.map((point, index) => <g key={index}>
+      <line x1={0} y1={point.y} x2={width} y2={point.y} />
+      <line x1={point.x} y1={0} x2={point.x} y2={height} />
+    </g>)}
   </g>;
 }
 
@@ -99,6 +101,9 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [moveGrab, setMoveGrab] = useState<Point | null>(null);
   const [crosshairColor, setCrosshairColor] = useState("#ffcf62");
   const [crosshairOpacity, setCrosshairOpacity] = useState(0.8);
+  const [crosshairStyle, setCrosshairStyle] = useState<"dashed" | "dotted">("dashed");
+  const [previewCamera, setPreviewCamera] = useState<{ center: Point; zoom: number } | null>(null);
+  const [lastArea, setLastArea] = useState<{ start: Point; end: Point } | null>(null);
   const [battlemapMode, setBattlemapMode] = useState<"square" | "gridless">("square");
   const [distancePerCell] = useState(5);
   const [verifying, setVerifying] = useState(false);
@@ -110,6 +115,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const selected = maps.find((map) => map.id === selectedId) ?? null;
 
   const refresh = async (preferId?: string) => {
@@ -120,7 +126,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   useEffect(() => { void refresh().catch((error) => setMessage(error.message)); }, [gmToken]);
   useEffect(() => { if (preferredMapId && maps.some((map) => map.id === preferredMapId)) setSelectedId(preferredMapId); }, [preferredMapId, maps]);
   useEffect(() => {
-    setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setVerifying(false);
+    setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setVerifying(false); setPreviewCamera(null); setLastArea(null);
     if (!selected) { setPreviewUrl(null); return; }
     setBattlemapMode(selected.scale && !selected.calibration ? "gridless" : "square");
     setUnit(selected.scale?.unit ?? (selected.kind === "battlemap" ? "feet" : "miles"));
@@ -162,6 +168,37 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     if (!selected || !svgRef.current) return null;
     const point = imagePointFromClient(svgRef.current, clientX, clientY);
     return point ? clampPoint(point, selected.width, selected.height) : null;
+  };
+  // Wheel-zoom on the calibration preview so the GM can zoom in to place the 3×3 box precisely
+  // against the printed art. Zooms at the cursor and never zooms out past the full map.
+  const zoomPreviewAt = (clientX: number, clientY: number, factor: number) => {
+    const svg = svgRef.current; if (!svg || !selected) return;
+    const rect = svg.getBoundingClientRect();
+    const fx = (clientX - rect.left) / rect.width, fy = (clientY - rect.top) / rect.height;
+    const cam = previewCamera ?? { center: { x: selected.width / 2, y: selected.height / 2 }, zoom: 1 };
+    const w = selected.width / cam.zoom, h = selected.height / cam.zoom;
+    const imageX = cam.center.x - w / 2 + fx * w, imageY = cam.center.y - h / 2 + fy * h;
+    const nextZoom = Math.max(1, Math.min(8, cam.zoom * factor));
+    if (nextZoom <= 1) { setPreviewCamera(null); return; }
+    const w2 = selected.width / nextZoom, h2 = selected.height / nextZoom;
+    const cx = Math.min(Math.max(imageX + w2 * (0.5 - fx), w2 / 2), selected.width - w2 / 2);
+    const cy = Math.min(Math.max(imageY + h2 * (0.5 - fy), h2 / 2), selected.height - h2 / 2);
+    setPreviewCamera({ center: { x: cx, y: cy }, zoom: nextZoom });
+  };
+  useEffect(() => {
+    const el = previewRef.current; if (!el) return;
+    const onWheel = (event: WheelEvent) => { if (!svgRef.current || !selected) return; event.preventDefault(); zoomPreviewAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15); };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, previewCamera]);
+  // "Redo drag" brings the just-placed 3×3 box back so the GM can nudge it and re-measure, instead of starting from scratch.
+  const reopenArea = () => {
+    const area = lastArea ?? (points.length >= 2 ? { start: points[0], end: points[1] } : null);
+    if (!area) { restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); return; }
+    setPendingArea(area); setPoints([area.start, area.end]);
+    setWizard(null); setWizardId(null); setOverlay([]); setVerifying(false);
+    setMessage("Adjust the square, then measure the grid again.");
   };
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     const point = pointAt(event.clientX, event.clientY);
@@ -246,6 +283,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const acceptWizardData = (data: any) => { setWizardId(data.wizardId); setWizard(data.state); setOverlay(data.overlay ?? []); setPendingArea(null); if (data.overlayWarning) setMessage(data.overlayWarning); };
   const startAreaWizard = (start: Point, end: Point) => run(async () => {
     if (!selected) throw new Error("Select a battlemap first.");
+    setLastArea({ start, end });
     const data = await api(`/api/v1/map-assets/${selected.id}/calibration/wizards`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ start, end, cellsAcross: 3, cellsDown: 3, distancePerCell }) });
     acceptWizardData(data);
     if (!data.overlayWarning) setMessage("3 × 3 area measured. Confirm below if the blue overlay matches the printed grid.");
@@ -272,11 +310,18 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
       : !wizard ? "Press on a grid intersection, drag diagonally across a 3 × 3 block of squares, and release on the opposite intersection."
       : "Grid detected. Confirm it below, or fine-tune it first if it looks off.")
     : `${points.length < 2 ? `Choose ${points.length ? "the ending" : "a starting"} point` : "Enter the real-world distance"}. Click two locations on the map whose real-world distance you know.`;
-  // While dragging out or resizing the area the crosshair tracks the moving corner; once released it
-  // sits on the *opposite* (fixed) corner so you can line that edge up against the printed grid too.
-  const crosshairPoint = squareMode && !wizard
-    ? (dragCurrent ?? (pendingArea ? (areaAction ? pendingArea.end : pendingArea.start) : hoverPoint))
-    : null;
+  // While dragging out or resizing, the crosshair tracks the moving corner; once the box is placed and
+  // idle, both corners get a crosshair so either edge can be lined up against the printed grid.
+  const crosshairPoints: readonly Point[] = squareMode && !wizard
+    ? (dragStart && dragCurrent ? [dragCurrent]
+      : pendingArea ? (areaAction === "resize" ? [pendingArea.end] : areaAction === "move" ? [] : [pendingArea.start, pendingArea.end])
+      : hoverPoint ? [hoverPoint] : [])
+    : [];
+  const previewViewBox = selected
+    ? (previewCamera
+      ? `${previewCamera.center.x - selected.width / previewCamera.zoom / 2} ${previewCamera.center.y - selected.height / previewCamera.zoom / 2} ${selected.width / previewCamera.zoom} ${selected.height / previewCamera.zoom}`
+      : `0 0 ${selected.width} ${selected.height}`)
+    : "0 0 1 1";
 
   return <>
     <section className="map-manager" aria-labelledby="map-manager-heading">
@@ -302,15 +347,18 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
             <div className="crosshair-swatches">{CROSSHAIR_PRESETS.map((preset) => <button key={preset.color} type="button" aria-label={preset.label} aria-pressed={crosshairColor.toLowerCase() === preset.color} style={{ background: preset.color }} onClick={() => setCrosshairColor(preset.color)} />)}</div>
             <label className="crosshair-color">Custom<input type="color" value={crosshairColor} onChange={(event) => setCrosshairColor(event.target.value)} /></label>
             <label className="crosshair-opacity">Opacity<input type="range" min="0.2" max="1" step="0.05" value={crosshairOpacity} onChange={(event) => setCrosshairOpacity(Number(event.target.value))} /></label>
+            <button type="button" className="crosshair-style" aria-pressed={crosshairStyle === "dotted"} onClick={() => setCrosshairStyle((current) => current === "dashed" ? "dotted" : "dashed")}>{crosshairStyle === "dashed" ? "Dashed" : "Dotted"}</button>
+            <span className="crosshair-hint">Scroll to zoom{previewCamera ? "" : " the map"}</span>
+            {previewCamera && <button type="button" className="crosshair-style" onClick={() => setPreviewCamera(null)}>Reset zoom</button>}
           </div>}
 
-          <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (areaAction === "resize" ? "resizing" : "movable") : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} onPointerLeave={() => { if (!dragStart && !areaAction) setHoverPoint(null); }} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${pendingArea ? "Drag to move or resize the placed grid area." : squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
-            {previewUrl ? <svg ref={svgRef} viewBox={`0 0 ${selected.width} ${selected.height}`} preserveAspectRatio="xMidYMid meet">
+          <div ref={previewRef} className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (areaAction === "resize" ? "resizing" : "movable") : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} onPointerLeave={() => { if (!dragStart && !areaAction) setHoverPoint(null); }} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${pendingArea ? "Drag to move or resize the placed grid area." : squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
+            {previewUrl ? <svg ref={svgRef} viewBox={previewViewBox} preserveAspectRatio="xMidYMid meet">
               <image href={previewUrl} width={selected.width} height={selected.height} role="img" aria-label={selected.name} />
               <GridOverlay lines={overlay} />
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
               {pendingArea && <GridAreaPreview start={pendingArea.start} end={pendingArea.end} handle />}
-              {crosshairPoint && <CrosshairOverlay point={crosshairPoint} width={selected.width} height={selected.height} color={crosshairColor} opacity={crosshairOpacity} />}
+              {crosshairPoints.length > 0 && <CrosshairOverlay points={crosshairPoints} width={selected.width} height={selected.height} color={crosshairColor} opacity={crosshairOpacity} dash={crosshairStyle === "dashed" ? "6 5" : "1 6"} />}
               {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
             </svg> : <p>Loading map preview…</p>}
           </div>
@@ -325,7 +373,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
               <p className="grid-detected">{wizard.calibration.cellSizePx.toFixed(0)} px squares · {wizard.calibration.distancePerCell} ft each</p>
               <div className="grid-wizard-actions">
                 <button className="save-map" disabled={busy} onClick={completeWizard}>Confirm grid</button>
-                <button className="secondary" disabled={busy} onClick={() => restartCalibration("Drag diagonally across a 3 × 3 block of printed squares.")}>Redo drag</button>
+                <button className="secondary" disabled={busy} onClick={reopenArea}>Redo drag</button>
               </div>
               <details className="grid-fine-tune">
                 <summary>Fine-tune (optional)</summary>
