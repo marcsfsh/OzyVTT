@@ -30,6 +30,11 @@
 .encounter-token-initials, .encounter-token-name { pointer-events: none; fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: Inter, sans-serif; font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
 .encounter-token-name { dominant-baseline: hanging; }
 .encounter-token.movable:focus-visible .encounter-token-body { stroke: #ffcf62; stroke-width: 6; }
+.encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
+.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; display: flex; gap: .35rem; }
+.encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
+.encounter-map-zoom button:hover { border-color: #e8a743; }
+.encounter-map-saving { margin: .5rem 0 0; color: #f6c452; font-size: .85rem; }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: #e9b861; font-size: .78rem; }
 @media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
 @media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } }

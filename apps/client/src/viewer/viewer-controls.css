@@ -30,8 +30,7 @@
 .viewer-tool-tabs button:focus-visible, .viewer-tool-actions button:focus-visible, .viewer-address button:focus-visible { outline: 3px solid #e8a743; outline-offset: 2px; }
 .viewer-tool-preview { display: grid; place-items: center; overflow: auto; min-height: 12rem; max-height: 54vh; padding: .5rem; border: 1px solid #4e422f; border-radius: .55rem; background: #080706; }
 .viewer-tool-image { position: relative; display: inline-block; max-width: 100%; cursor: crosshair; line-height: 0; }
-.viewer-tool-image img { display: block; max-width: 100%; max-height: 50vh; user-select: none; }
-.viewer-tool-image svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.viewer-tool-image svg { display: block; max-width: 100%; max-height: 50vh; width: auto; height: auto; user-select: none; }
 .viewer-tool-image line { stroke: #ffe17b; stroke-width: 3; vector-effect: non-scaling-stroke; }
 .viewer-tool-image circle { fill: rgb(232 79 57 / 55%); stroke: #fff3ca; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .viewer-tool-image text { fill: #fff; font: 800 14px sans-serif; text-anchor: middle; dominant-baseline: central; }
