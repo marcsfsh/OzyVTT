@@ -1,5 +1,6 @@
 import type { EncounterStartEntry, GameState, InitiativeEntry } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -16,7 +17,7 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
     || left.actorId.localeCompare(right.actorId));
 }
 
-export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number) {
+export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry) {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200) throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   const actorIds = new Set<string>();
@@ -36,7 +37,8 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     round: 1,
     turnActorId: sorted[0].actorId,
     mapAssetId: input.mapAssetId,
-    initiative: sorted
+    initiative: sorted,
+    tokens: createEncounterTokens(sorted.map((entry) => entry.actorId), tokenGeometry)
   };
 }
 

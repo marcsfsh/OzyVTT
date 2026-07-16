@@ -67,7 +67,7 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
     });
     if (entries.length === 0) throw new Error("Choose at least one combatant.");
     return emitCommand("encounter:start", { commandId: crypto.randomUUID(), mapAssetId: selectedMap.id, entries, expectedRevision: state.revision });
-  }, "Encounter started. Blank Initiative scores were rolled by the server.");
+  }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
   const updateScore = (actorId: string) => void run(() => emitCommand("initiative:set", { commandId: crypto.randomUUID(), actorId, score: Number(scores[actorId]), expectedRevision: state.revision }), "Initiative updated.");
   const next = () => void run(() => emitCommand("initiative:next", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Advanced to the next turn.");
   const previous = () => void run(() => emitCommand("initiative:previous", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Moved to the previous turn.");
@@ -79,7 +79,7 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
     <div className="encounter-heading"><div><span className="eyebrow">SERVER-AUTHORITATIVE COMBAT</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div>{state.combat.active && <strong>Round {state.combat.round}</strong>}</div>
     {!state.combat.active ? <>
-      <p>Choose combatants, enter any known scores, and leave the rest blank for a server roll of 1d20 plus the actor's Initiative modifier.</p>
+      <p>Choose combatants and enter any known scores. Starting the encounter creates their tokens automatically; drag them from the tray straight onto the map.</p>
       <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Select a map above"}</strong></div>
       <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
         <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
@@ -87,7 +87,7 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
       </li>)}</ul>
       <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter</button>
     </> : <>
-      <div className="encounter-status"><span>Active map</span><strong>{selectedMap?.id === state.combat.mapAssetId ? selectedMap.name : "Saved encounter map"}</strong><span>{state.combat.initiative.length} combatants</span></div>
+      <div className="encounter-status"><span>Active map</span><strong>{selectedMap?.id === state.combat.mapAssetId ? selectedMap.name : "Saved encounter map"}</strong><span>{state.combat.tokens.filter((token) => token.position !== null).length} of {state.combat.initiative.length} tokens placed</span></div>
       <ol className="initiative-list gm">{state.combat.initiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;

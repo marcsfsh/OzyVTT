@@ -21,6 +21,7 @@ export function projectPublicInitiative(state: GameState): readonly PlayerInitia
 
 export function projectPlayerCombat(state: GameState): PlayerCombatView {
   const initiative = projectPublicInitiative(state);
+  const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
   const currentIsPublic = initiative.some((entry) => entry.active);
   return {
     active: state.combat.active,
@@ -28,7 +29,8 @@ export function projectPlayerCombat(state: GameState): PlayerCombatView {
     turnActorId: currentIsPublic ? state.combat.turnActorId : null,
     mapAssetId: state.combat.active ? state.combat.mapAssetId : null,
     hiddenTurn: state.combat.active && state.combat.turnActorId !== null && !currentIsPublic,
-    initiative
+    initiative,
+    tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : []
   };
 }
 

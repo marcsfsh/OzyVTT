@@ -150,4 +150,84 @@ describe("live authoritative encounter workflow", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it("authorizes owned-token movement, snaps on the server, hides secret tokens, converges the viewer, and recovers after restart", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-token-live-"));
+    const options = {
+      authPath: join(directory, "auth.json"),
+      databasePath: join(directory, "vtt.sqlite"),
+      integrationCredentialsPath: join(directory, "integrations.sqlite"),
+      mapAssetsPath: join(directory, "map-assets"),
+      webDist: join(directory, "dist"),
+      useDevelopmentClient: true,
+      developmentClientPort: 5173,
+      initialGameState: initialState()
+    };
+    let running = createServer(options);
+    let gmSocket: ClientSocket | undefined;
+    let ownerSocket: ClientSocket | undefined;
+    let otherSocket: ClientSocket | undefined;
+    try {
+      await running.initialize();
+      await running.auth.bootstrap("a sufficiently long GM password");
+      const gmToken = (await running.auth.login("a sufficiently long GM password"))!;
+      const ownerToken = running.auth.issuePlayerSession();
+      const otherToken = running.auth.issuePlayerSession();
+      const imported = await running.mapAssets.import(png(500, 400), "grid-arena.png");
+      running.mapCatalog.register(imported.metadata.id, "Grid Arena", "battlemap");
+      running.mapCatalog.saveCalibration(imported.metadata.id, {
+        calibration: { kind: "square", origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 },
+        verifiedAt: "2026-07-16T04:00:00.000Z", verificationPoint: { x: 250, y: 250 }, verificationErrorPx: 0
+      });
+      await new Promise<void>((resolve) => running.httpServer.listen(0, "127.0.0.1", resolve));
+      const address = running.httpServer.address(); if (!address || typeof address === "string") throw new Error("Token test server did not bind.");
+      const base = `http://127.0.0.1:${address.port}`;
+      gmSocket = await joinSocket(base, gmToken);
+      ownerSocket = await joinSocket(base, ownerToken);
+      otherSocket = await joinSocket(base, otherToken);
+
+      expect(await emitCommand(ownerSocket, "character:claim", { commandId: "61000000-0000-4000-8000-000000000001", actorId: HERO_ID, expectedRevision: 0 })).toMatchObject({ ok: true, revision: 1 });
+      expect(await emitCommand(gmSocket, "encounter:start", {
+        commandId: "61000000-0000-4000-8000-000000000002", mapAssetId: imported.metadata.id, expectedRevision: 1,
+        entries: [{ actorId: SECRET_ID, score: 20 }, { actorId: HERO_ID, score: 15 }]
+      })).toMatchObject({ ok: true, revision: 2 });
+      expect(running.store.snapshot.combat.tokens).toEqual([
+        expect.objectContaining({ actorId: SECRET_ID, position: null, sizePx: 41, gridSizePx: 50 }),
+        expect.objectContaining({ actorId: HERO_ID, position: null, sizePx: 41, gridSizePx: 50 })
+      ]);
+
+      const denied = await emitCommand(otherSocket, "token:move", { commandId: "61000000-0000-4000-8000-000000000003", actorId: HERO_ID, position: { x: 75, y: 75 }, expectedRevision: 2 });
+      expect(denied).toMatchObject({ ok: false }); expect(denied.message).toContain("claimed character");
+
+      const ownerConvergence = waitForState(ownerSocket, (state) => state.revision === 3 && state.combat.tokens[0]?.position?.x === 75);
+      const moved = await emitCommand(ownerSocket, "token:move", { commandId: "61000000-0000-4000-8000-000000000004", actorId: HERO_ID, position: { x: 78, y: 74 }, expectedRevision: 2 });
+      expect(moved).toMatchObject({ ok: true, revision: 3, duplicate: false });
+      const ownerView = await ownerConvergence;
+      expect(ownerView.combat.tokens).toEqual([{ actorId: HERO_ID, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0 }]);
+      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false }] });
+
+      const hiddenMoveId = "61000000-0000-4000-8000-000000000005";
+      expect(await emitCommand(gmSocket, "token:move", { commandId: hiddenMoveId, actorId: SECRET_ID, position: { x: 127, y: 127 }, expectedRevision: 3 })).toMatchObject({ ok: true, revision: 4, duplicate: false });
+      expect(running.store.snapshot.combat.tokens[0].position).toEqual({ x: 125, y: 125 });
+      expect(await emitCommand(gmSocket, "token:move", { commandId: hiddenMoveId, actorId: SECRET_ID, position: { x: 400, y: 300 }, expectedRevision: 3 })).toMatchObject({ ok: true, revision: 4, duplicate: true });
+      const safeState = await (await fetch(`${base}/api/state`, { headers: { authorization: `Bearer ${ownerToken}` } })).json();
+      expect(JSON.stringify(safeState)).not.toContain(SECRET_ID);
+      expect(running.viewerPresentation.snapshot.encounter.tokens).toHaveLength(1);
+
+      const stale = await emitCommand(ownerSocket, "token:move", { commandId: "61000000-0000-4000-8000-000000000006", actorId: HERO_ID, position: { x: 175, y: 175 }, expectedRevision: 2 });
+      expect(stale).toMatchObject({ ok: false }); expect(stale.message).toContain("outdated");
+      expect(await emitCommand(ownerSocket, "token:move", { commandId: "61000000-0000-4000-8000-000000000007", actorId: HERO_ID, position: null, expectedRevision: 4 })).toMatchObject({ ok: true, revision: 5 });
+      expect(running.viewerPresentation.snapshot.encounter.tokens).toEqual([]);
+      expect(await emitCommand(ownerSocket, "token:move", { commandId: "61000000-0000-4000-8000-000000000008", actorId: HERO_ID, position: { x: 224, y: 176 }, expectedRevision: 5 })).toMatchObject({ ok: true, revision: 6 });
+      expect(running.store.snapshot.combat.tokens.find((token) => token.actorId === HERO_ID)?.position).toEqual({ x: 225, y: 175 });
+
+      gmSocket.disconnect(); ownerSocket.disconnect(); otherSocket.disconnect(); gmSocket = undefined; ownerSocket = undefined; otherSocket = undefined;
+      running.close(); running = createServer(options); await running.initialize();
+      expect(running.store.snapshot.combat.tokens.find((token) => token.actorId === HERO_ID)?.position).toEqual({ x: 225, y: 175 });
+      expect(running.viewerPresentation.snapshot.encounter.tokens).toEqual([expect.objectContaining({ actorId: HERO_ID, position: { x: 225, y: 175 } })]);
+    } finally {
+      gmSocket?.disconnect(); ownerSocket?.disconnect(); otherSocket?.disconnect(); running.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });

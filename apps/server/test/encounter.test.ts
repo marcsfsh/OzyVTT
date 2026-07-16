@@ -8,6 +8,7 @@ const IDS = {
   gamma: "10000000-0000-4000-8000-000000000003",
   map: "20000000-0000-5000-8000-000000000001"
 } as const;
+const TOKEN_GEOMETRY = { width: 900, height: 600, calibration: null } as const;
 
 function state() {
   return GameStateSchema.parse({ schemaVersion: 1, actors: [
@@ -20,18 +21,23 @@ function state() {
 describe("authoritative encounter and Initiative", () => {
   it("starts from manual/server-rolled scores with deterministic tie-breaking", () => {
     const game = state();
-    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha, score: 10 }, { actorId: IDS.beta }, { actorId: IDS.gamma, score: 10 }] }, () => 8);
+    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha, score: 10 }, { actorId: IDS.beta }, { actorId: IDS.gamma, score: 10 }] }, () => 8, TOKEN_GEOMETRY);
     expect(game.combat).toMatchObject({ active: true, round: 1, turnActorId: IDS.gamma, mapAssetId: IDS.map });
     expect(game.combat.initiative).toEqual([
       { actorId: IDS.gamma, score: 10, tieBreaker: 5 },
       { actorId: IDS.alpha, score: 10, tieBreaker: 2 },
       { actorId: IDS.beta, score: 8, tieBreaker: 0 }
     ]);
+    expect(game.combat.tokens).toEqual([
+      expect.objectContaining({ actorId: IDS.gamma, position: null, gridSizePx: null }),
+      expect.objectContaining({ actorId: IDS.alpha, position: null, gridSizePx: null }),
+      expect.objectContaining({ actorId: IDS.beta, position: null, gridSizePx: null })
+    ]);
   });
 
   it("advances, wraps rounds, moves backward, edits scores, and ends without discarding history", () => {
     const game = state();
-    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha, score: 15 }, { actorId: IDS.beta, score: 10 }] }, () => 1);
+    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha, score: 15 }, { actorId: IDS.beta, score: 10 }] }, () => 1, TOKEN_GEOMETRY);
     nextInitiativeTurn(game);
     expect(game.combat).toMatchObject({ round: 1, turnActorId: IDS.beta });
     nextInitiativeTurn(game);
@@ -48,14 +54,14 @@ describe("authoritative encounter and Initiative", () => {
 
   it("rejects duplicate, missing, malformed, and out-of-sequence mutations", () => {
     const game = state();
-    expect(() => startEncounter(game, { mapAssetId: IDS.map, entries: [] }, () => 10)).toThrow("Choose 1 to 200");
-    expect(() => startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha }, { actorId: IDS.alpha }] }, () => 10)).toThrow("only once");
-    expect(() => startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: "30000000-0000-4000-8000-000000000001" }] }, () => 10)).toThrow("no longer exists");
+    expect(() => startEncounter(game, { mapAssetId: IDS.map, entries: [] }, () => 10, TOKEN_GEOMETRY)).toThrow("Choose 1 to 200");
+    expect(() => startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha }, { actorId: IDS.alpha }] }, () => 10, TOKEN_GEOMETRY)).toThrow("only once");
+    expect(() => startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: "30000000-0000-4000-8000-000000000001" }] }, () => 10, TOKEN_GEOMETRY)).toThrow("no longer exists");
     expect(() => nextInitiativeTurn(game)).toThrow("Start an encounter");
     expect(() => endEncounter(game)).toThrow("no active encounter");
     const active = state();
-    startEncounter(active, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha, score: 10 }] }, () => 10);
-    expect(() => startEncounter(active, { mapAssetId: IDS.map, entries: [{ actorId: IDS.beta, score: 9 }] }, () => 10)).toThrow("End the active encounter");
+    startEncounter(active, { mapAssetId: IDS.map, entries: [{ actorId: IDS.alpha, score: 10 }] }, () => 10, TOKEN_GEOMETRY);
+    expect(() => startEncounter(active, { mapAssetId: IDS.map, entries: [{ actorId: IDS.beta, score: 9 }] }, () => 10, TOKEN_GEOMETRY)).toThrow("End the active encounter");
     expect(() => setInitiativeScore(active, IDS.alpha, 1001)).toThrow("-1000 to 1000");
   });
 });

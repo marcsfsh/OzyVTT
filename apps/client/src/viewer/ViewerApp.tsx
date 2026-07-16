@@ -11,6 +11,7 @@ type Presentation = Readonly<{
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
   initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean }>[] }>;
+  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean }>[] }>;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -23,6 +24,10 @@ async function responseJson(response: Response) {
 
 function imageUrl(assetId: string) {
   return `/api/v1/map-assets/${encodeURIComponent(assetId)}/content`;
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
 function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
@@ -72,6 +77,7 @@ function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
   }, [presentation.camera, size]);
   if (!presentation.activeMap) return <section className="viewer-waiting"><span className="viewer-eyebrow">VIEWER CONNECTED</span><h1>Waiting for a map</h1><p>The GM controls what appears here.</p></section>;
   const measurementPoints = presentation.measurement?.points.map((point) => `${point.x},${point.y}`).join(" ");
+  const tokens = presentation.encounter.mapAssetId === presentation.activeMap.assetId ? presentation.encounter.tokens : [];
   return <section className="viewer-stage" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
     <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
       <image href={href} width={size.width} height={size.height} onLoad={(event) => {
@@ -79,6 +85,12 @@ function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
         const source = image.href.baseVal;
         const probe = new Image(); probe.onload = () => setSize({ width: probe.naturalWidth, height: probe.naturalHeight }); probe.src = source;
       }} />
+      {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
+        {token.active && <circle className="viewer-token-turn" r={token.sizePx * .62} />}
+        <circle className="viewer-token-body" r={token.sizePx / 2} />
+        <text className="viewer-token-initials">{initials(token.name)}</text>
+        <text className="viewer-token-name" y={token.sizePx * .78}>{token.name}</text>
+      </g>)}
       {measurementPoints && <polyline className="viewer-measurement" points={measurementPoints} />}
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>
         <circle r={Math.max(8, Math.min(size.width, size.height) / 40)} /><circle r={Math.max(3, Math.min(size.width, size.height) / 100)} />

@@ -14,6 +14,12 @@ const InitiativeSchema = z.object({
   hiddenTurn: z.boolean().default(false),
   entries: z.array(z.object({ actorId: z.string(), name: z.string(), initiative: z.number().finite(), active: z.boolean() }).strict()).max(200)
 }).strict();
+const EncounterSceneSchema = z.object({
+  mapAssetId: z.string().nullable(),
+  tokens: z.array(z.object({
+    actorId: z.string(), name: z.string(), kind: z.enum(["player-character", "monster", "npc"]), position: PointSchema, sizePx: z.number().positive(), active: z.boolean()
+  }).strict()).max(200)
+}).strict();
 const PayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("viewer.enabled.set"), enabled: z.boolean() }).strict(),
   z.object({ type: z.literal("viewer.presentation.begin"), assetId: z.string(), altText: z.string(), camera: CameraSchema }).strict(),
@@ -22,7 +28,8 @@ const PayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("viewer.measurement.set"), measurement: z.object({ id: z.string(), points: z.array(PointSchema), distanceLabel: z.string() }).strict() }).strict(),
   z.object({ type: z.literal("viewer.measurement.clear") }).strict(),
   z.object({ type: z.literal("viewer.ping"), id: z.string(), point: PointSchema, label: z.string().optional(), durationMs: z.number().int().optional() }).strict(),
-  z.object({ type: z.literal("viewer.initiative.set"), initiative: InitiativeSchema }).strict()
+  z.object({ type: z.literal("viewer.initiative.set"), initiative: InitiativeSchema }).strict(),
+  z.object({ type: z.literal("viewer.encounter.set"), initiative: InitiativeSchema, encounter: EncounterSceneSchema }).strict()
 ]);
 const CommandSchema = z.object({ id: z.string(), expectedRevision: z.number().int().nonnegative().optional(), payload: PayloadSchema }).strict();
 const PairingSchema = z.object({ ttlMs: z.number().int().optional() }).strict();

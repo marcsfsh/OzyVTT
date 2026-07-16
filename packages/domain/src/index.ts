@@ -32,12 +32,27 @@ export const InitiativeEntrySchema = z.object({
 });
 export type InitiativeEntry = z.infer<typeof InitiativeEntrySchema>;
 
+export const EncounterTokenPositionSchema = z.object({
+  x: z.number().finite().nonnegative().max(1_000_000),
+  y: z.number().finite().nonnegative().max(1_000_000)
+}).strict();
+export const EncounterTokenSchema = z.object({
+  actorId: z.string().uuid(),
+  position: EncounterTokenPositionSchema.nullable().default(null),
+  sizePx: z.number().finite().positive().max(4096),
+  gridSizePx: z.number().finite().positive().max(4096).nullable().default(null),
+  gridRotationRadians: z.number().finite().min(-Math.PI).max(Math.PI).nullable().default(null)
+}).strict();
+export type EncounterTokenPosition = z.infer<typeof EncounterTokenPositionSchema>;
+export type EncounterToken = z.infer<typeof EncounterTokenSchema>;
+
 export const CombatStateSchema = z.object({
   active: z.boolean().default(false),
   round: z.number().int().positive().default(1),
   turnActorId: z.string().uuid().nullable().default(null),
   mapAssetId: z.string().uuid().nullable().default(null),
-  initiative: z.array(InitiativeEntrySchema).max(200).default([])
+  initiative: z.array(InitiativeEntrySchema).max(200).default([]),
+  tokens: z.array(EncounterTokenSchema).max(200).default([])
 }).superRefine((combat, context) => {
   const actorIds = new Set<string>();
   for (const [index, entry] of combat.initiative.entries()) {
@@ -47,6 +62,12 @@ export const CombatStateSchema = z.object({
   if (combat.active && combat.initiative.length === 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ["initiative"], message: "An active encounter requires at least one combatant." });
   if (combat.active && combat.turnActorId === null) context.addIssue({ code: z.ZodIssueCode.custom, path: ["turnActorId"], message: "An active encounter requires a current turn." });
   if (combat.turnActorId !== null && !actorIds.has(combat.turnActorId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["turnActorId"], message: "The current turn actor must be in Initiative." });
+  const tokenActorIds = new Set<string>();
+  for (const [index, token] of combat.tokens.entries()) {
+    if (tokenActorIds.has(token.actorId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["tokens", index, "actorId"], message: "Encounter token actor IDs must be unique." });
+    tokenActorIds.add(token.actorId);
+    if (!actorIds.has(token.actorId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["tokens", index, "actorId"], message: "Encounter tokens must belong to actors in Initiative." });
+  }
 });
 export type CombatState = z.infer<typeof CombatStateSchema>;
 
@@ -55,7 +76,7 @@ export const GameStateSchema = z.object({
   revision: z.number().int().nonnegative().default(0),
   actors: z.array(ActorSchema).default([]),
   rolls: z.array(RollRecordSchema).default([]),
-  combat: CombatStateSchema.default({ active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [] })
+  combat: CombatStateSchema.default({ active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [], tokens: [] })
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
@@ -66,7 +87,7 @@ export type PresenceStatus = z.infer<typeof PresenceStatusSchema>;
 
 export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId"> & { claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean }>;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[] }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[] }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[] };
@@ -87,4 +108,5 @@ export interface ClientToServerEvents {
   "initiative:set": (payload: { commandId: string; actorId: string; score: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:next": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:previous": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
 }

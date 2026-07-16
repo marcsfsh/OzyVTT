@@ -34,9 +34,11 @@ To run the single LAN service as a player would use it, build and launch it with
 2. Choose **Printed square grid** or **Gridless battlemap**. For a printed grid, press on one grid intersection, drag diagonally across exactly a 3×3 block of squares, and release on the opposite intersection. The overlay appears immediately; preview/adjust it, click a distant V intersection, verify, and save.
 3. Under **Table viewer**, open or copy the second-screen address. On a separate browser/display, pair it using a code created by the GM.
 4. Keep the intended map selected and click **Present _map name_**. This single action now starts presentation and sends the selected map/camera immediately.
-5. Under **Encounter and Initiative**, choose combatants, optionally enter Initiative scores (leave blanks for server rolls), and start the encounter. Advance turns from the GM controls; the player view and paired viewer update automatically. GM-only combatants appear only as a generic **GM turn** on public surfaces.
+5. Under **Encounter and Initiative**, choose combatants, optionally enter Initiative scores (leave blanks for server rolls), and start the encounter. Their tokens appear automatically in the tray above the map—there is no separate token setup form.
+6. Drag tokens from the tray onto the map and drag them again to move them. Printed-grid maps snap to cell centers on the server; gridless maps place freely within the image. Drag a token back to the tray to remove it from the map. A player can move only their claimed character; the GM can move any token. Arrow keys move a focused placed token, and Delete returns it to the tray.
+7. Advance turns from the GM controls. The active-turn ring, player map, and paired viewer update automatically. GM-only combatants and their token identity/position are absent from public surfaces, which show only the generic **GM turn** cue.
 
-The current combat canvas displays the active authenticated battlemap. Token placement/movement and fog are the next scene milestone.
+The current combat canvas supports authoritative token placement/movement and viewer synchronization. Manual fog, targeting, HP/actions, and physical phone/TV acceptance are the next scene/combat milestones.
 
 ## Scope boundaries
 

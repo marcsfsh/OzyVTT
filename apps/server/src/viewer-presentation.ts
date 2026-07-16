@@ -33,6 +33,20 @@ export type ViewerInitiative = Readonly<{
   entries: readonly ViewerInitiativeEntry[];
 }>;
 
+export type ViewerEncounterToken = Readonly<{
+  actorId: string;
+  name: string;
+  kind: "player-character" | "monster" | "npc";
+  position: ImagePoint;
+  sizePx: number;
+  active: boolean;
+}>;
+
+export type ViewerEncounterScene = Readonly<{
+  mapAssetId: string | null;
+  tokens: readonly ViewerEncounterToken[];
+}>;
+
 export type ViewerPresentationState = Readonly<{
   schemaVersion: 1;
   revision: number;
@@ -42,6 +56,7 @@ export type ViewerPresentationState = Readonly<{
   measurement: ViewerMeasurement | null;
   pings: readonly ViewerPing[];
   initiative: ViewerInitiative;
+  encounter: ViewerEncounterScene;
   acceptedCommandIds: readonly string[];
 }>;
 
@@ -54,6 +69,7 @@ export type ViewerPresentationProjection = Readonly<{
   measurement: ViewerMeasurement | null;
   pings: readonly ViewerPing[];
   initiative: ViewerInitiative;
+  encounter: ViewerEncounterScene;
 }>;
 
 type ViewerCommandPayload =
@@ -64,7 +80,8 @@ type ViewerCommandPayload =
   | Readonly<{ type: "viewer.measurement.set"; measurement: ViewerMeasurement }>
   | Readonly<{ type: "viewer.measurement.clear" }>
   | Readonly<{ type: "viewer.ping"; id: string; point: ImagePoint; label?: string; durationMs?: number }>
-  | Readonly<{ type: "viewer.initiative.set"; initiative: ViewerInitiative }>;
+  | Readonly<{ type: "viewer.initiative.set"; initiative: ViewerInitiative }>
+  | Readonly<{ type: "viewer.encounter.set"; initiative: ViewerInitiative; encounter: ViewerEncounterScene }>;
 
 export type ViewerCommand = Readonly<{
   id: string;
@@ -124,6 +141,25 @@ function initiative(value: ViewerInitiative): ViewerInitiative {
   return { visible: value.visible, round: value.round, hiddenTurn, entries };
 }
 
+function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
+  const mapAssetId = value.mapAssetId === null ? null : safeText(value.mapAssetId, "Encounter map asset ID", 128);
+  if (value.tokens.length > 200) throw new Error("Viewer encounter cannot exceed 200 tokens.");
+  const actorIds = new Set<string>();
+  let activeTokens = 0;
+  const tokens = value.tokens.map((token) => {
+    const actorId = safeText(token.actorId, "Viewer token actor ID", 128);
+    if (actorIds.has(actorId)) throw new Error("Viewer token actor IDs must be unique.");
+    actorIds.add(actorId);
+    if (token.active) activeTokens++;
+    if (token.kind !== "player-character" && token.kind !== "monster" && token.kind !== "npc") throw new Error("Viewer token kind is invalid.");
+    if (!Number.isFinite(token.sizePx) || token.sizePx <= 0 || token.sizePx > 4096) throw new Error("Viewer token size is invalid.");
+    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active };
+  });
+  if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
+  if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");
+  return { mapAssetId, tokens };
+}
+
 export function createViewerPresentationState(): ViewerPresentationState {
   return {
     schemaVersion: 1,
@@ -134,6 +170,7 @@ export function createViewerPresentationState(): ViewerPresentationState {
     measurement: null,
     pings: [],
     initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] },
+    encounter: { mapAssetId: null, tokens: [] },
     acceptedCommandIds: []
   };
 }
@@ -183,6 +220,7 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
     };
     next = { ...state, pings: [...state.pings.filter((item) => item.id !== ping.id && item.expiresAt > now), ping].slice(-20) };
   } else if (payload.type === "viewer.initiative.set") next = { ...state, initiative: initiative(payload.initiative) };
+  else if (payload.type === "viewer.encounter.set") next = { ...state, initiative: initiative(payload.initiative), encounter: encounter(payload.encounter) };
 
   next = {
     ...next,
@@ -202,7 +240,8 @@ export function projectViewerPresentation(state: ViewerPresentationState, now = 
     camera: null,
     measurement: null,
     pings: [],
-    initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] }
+    initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] },
+    encounter: { mapAssetId: null, tokens: [] }
   };
   return {
     schemaVersion: 1,
@@ -212,6 +251,7 @@ export function projectViewerPresentation(state: ViewerPresentationState, now = 
     camera: state.camera,
     measurement: state.measurement,
     pings: state.pings.filter((ping) => ping.expiresAt > now),
-    initiative: state.initiative.visible ? state.initiative : { visible: false, round: state.initiative.round, hiddenTurn: false, entries: [] }
+    initiative: state.initiative.visible ? state.initiative : { visible: false, round: state.initiative.round, hiddenTurn: false, entries: [] },
+    encounter: state.encounter
   };
 }
