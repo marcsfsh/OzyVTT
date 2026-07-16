@@ -73,8 +73,11 @@ function GridAreaPreview({ start, end, handle }: Readonly<{ start: Point; end: P
 }
 
 /** Two full-map guide lines that follow the point being placed/adjusted, to help line up a corner against printed grid art before or during a drag. */
-function CrosshairOverlay({ point, width, height }: Readonly<{ point: Point; width: number; height: number }>) {
-  return <g className="grid-crosshair" aria-hidden="true">
+const CROSSHAIR_PRESETS: ReadonlyArray<{ color: string; label: string }> = [
+  { color: "#ffcf62", label: "Amber" }, { color: "#58c3ff", label: "Cyan" }, { color: "#ff6b6b", label: "Red" }, { color: "#8fff9a", label: "Green" }, { color: "#ffffff", label: "White" }
+];
+function CrosshairOverlay({ point, width, height, color, opacity }: Readonly<{ point: Point; width: number; height: number; color: string; opacity: number }>) {
+  return <g className="grid-crosshair" aria-hidden="true" style={{ stroke: color, opacity }}>
     <line x1={0} y1={point.y} x2={width} y2={point.y} />
     <line x1={point.x} y1={0} x2={point.x} y2={height} />
   </g>;
@@ -94,6 +97,8 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [pendingArea, setPendingArea] = useState<{ start: Point; end: Point } | null>(null);
   const [areaAction, setAreaAction] = useState<"move" | "resize" | null>(null);
   const [moveGrab, setMoveGrab] = useState<Point | null>(null);
+  const [crosshairColor, setCrosshairColor] = useState("#ffcf62");
+  const [crosshairOpacity, setCrosshairOpacity] = useState(0.8);
   const [battlemapMode, setBattlemapMode] = useState<"square" | "gridless">("square");
   const [distancePerCell] = useState(5);
   const [verifying, setVerifying] = useState(false);
@@ -267,7 +272,11 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
       : !wizard ? "Press on a grid intersection, drag diagonally across a 3 × 3 block of squares, and release on the opposite intersection."
       : "Grid detected. Confirm it below, or fine-tune it first if it looks off.")
     : `${points.length < 2 ? `Choose ${points.length ? "the ending" : "a starting"} point` : "Enter the real-world distance"}. Click two locations on the map whose real-world distance you know.`;
-  const crosshairPoint = squareMode && !wizard ? (dragCurrent ?? pendingArea?.end ?? hoverPoint) : null;
+  // While dragging out or resizing the area the crosshair tracks the moving corner; once released it
+  // sits on the *opposite* (fixed) corner so you can line that edge up against the printed grid too.
+  const crosshairPoint = squareMode && !wizard
+    ? (dragCurrent ?? (pendingArea ? (areaAction ? pendingArea.end : pendingArea.start) : hoverPoint))
+    : null;
 
   return <>
     <section className="map-manager" aria-labelledby="map-manager-heading">
@@ -288,6 +297,12 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
             <p>{instruction}</p>
             {squareMode && !wizard && <small>Squares are 5 ft each, the D&amp;D 5e default.</small>}
           </div>
+          {squareMode && !wizard && <div className="crosshair-controls" role="group" aria-label="Alignment crosshair">
+            <span>Crosshair</span>
+            <div className="crosshair-swatches">{CROSSHAIR_PRESETS.map((preset) => <button key={preset.color} type="button" aria-label={preset.label} aria-pressed={crosshairColor.toLowerCase() === preset.color} style={{ background: preset.color }} onClick={() => setCrosshairColor(preset.color)} />)}</div>
+            <label className="crosshair-color">Custom<input type="color" value={crosshairColor} onChange={(event) => setCrosshairColor(event.target.value)} /></label>
+            <label className="crosshair-opacity">Opacity<input type="range" min="0.2" max="1" step="0.05" value={crosshairOpacity} onChange={(event) => setCrosshairOpacity(Number(event.target.value))} /></label>
+          </div>}
 
           <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (areaAction === "resize" ? "resizing" : "movable") : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} onPointerLeave={() => { if (!dragStart && !areaAction) setHoverPoint(null); }} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${pendingArea ? "Drag to move or resize the placed grid area." : squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
             {previewUrl ? <svg ref={svgRef} viewBox={`0 0 ${selected.width} ${selected.height}`} preserveAspectRatio="xMidYMid meet">
@@ -295,7 +310,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
               <GridOverlay lines={overlay} />
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
               {pendingArea && <GridAreaPreview start={pendingArea.start} end={pendingArea.end} handle />}
-              {crosshairPoint && <CrosshairOverlay point={crosshairPoint} width={selected.width} height={selected.height} />}
+              {crosshairPoint && <CrosshairOverlay point={crosshairPoint} width={selected.width} height={selected.height} color={crosshairColor} opacity={crosshairOpacity} />}
               {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
             </svg> : <p>Loading map preview…</p>}
           </div>

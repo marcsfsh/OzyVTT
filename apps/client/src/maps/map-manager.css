@@ -29,9 +29,18 @@
 .map-preview.grid-area-mode { cursor: crosshair; touch-action: none; }
 .map-preview.movable { cursor: move; touch-action: none; }
 .map-preview.resizing { cursor: nwse-resize; touch-action: none; }
-.grid-crosshair line { stroke: #ffcf62; stroke-width: 1; stroke-dasharray: 6 5; opacity: .8; vector-effect: non-scaling-stroke; pointer-events: none; }
+.grid-crosshair { pointer-events: none; }
+.grid-crosshair line { stroke-width: 1; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
 .grid-area-handle { fill: #fff1d2; stroke: #181006; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .pending-area-actions { margin-top: .6rem; }
+.crosshair-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .75rem; padding: .5rem .7rem; border: 1px solid #403a2c; border-radius: .5rem; background: #17140f; font-size: .78rem; color: #c8c0b1; }
+.crosshair-controls > span { color: #e8a743; font-weight: 700; }
+.crosshair-swatches { display: flex; gap: .3rem; }
+.crosshair-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }
+.crosshair-swatches button[aria-pressed="true"] { outline: 2px solid #fff; outline-offset: 1px; }
+.crosshair-color, .crosshair-opacity { display: flex; align-items: center; gap: .35rem; }
+.crosshair-color input { width: 2rem; height: 1.6rem; margin: 0; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; background: none; }
+.crosshair-opacity input { width: 6rem; margin: 0; }
 .map-preview:hover { border-color: #e8a743; }
 .map-preview:focus-visible { outline: 3px solid #e8a743; outline-offset: 2px; }
 .map-preview p { line-height: 1.5; }

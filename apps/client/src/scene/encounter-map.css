@@ -32,6 +32,9 @@
 .encounter-token.movable:focus-visible .encounter-token-body { stroke: #ffcf62; stroke-width: 6; }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
 .encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; display: flex; gap: .35rem; }
+.encounter-map-zoom.docked-left { right: auto; left: .7rem; }
+.encounter-map-dock { position: absolute; right: 0; top: 0; bottom: 0; z-index: 2; width: min(24rem, 42%); overflow: auto; padding: .6rem; background: rgb(20 17 12 / 94%); border-left: 1px solid #514936; }
+.encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
 .encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-map-zoom button:hover { border-color: #e8a743; }
 .encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: #090806; }
@@ -70,6 +73,8 @@
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
 .encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
+/* When the initiative panel is docked on the right, slide the shape editor clear of it. */
+.encounter-map-stage.has-right-dock .encounter-shape-editor { right: calc(min(24rem, 42%) + .7rem); }
 .encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .encounter-shape-editor-head strong { text-transform: capitalize; }
 .encounter-shape-editor-head span { color: #9f9789; font-size: .7rem; }

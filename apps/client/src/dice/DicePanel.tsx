@@ -60,6 +60,8 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     </div>
     <div className="dice-quick" role="group" aria-label="Quick rolls">
       {QUICK_DICE.map((sides) => <button key={sides} onClick={() => quickRoll(sides)}>d{sides}</button>)}
+    </div>
+    <div className="dice-adv-row" role="group" aria-label="Advantage and modifier">
       <button type="button" className="secondary" aria-pressed={advantage} onClick={toggleAdvantage}>Advantage</button>
       <button type="button" className="secondary" aria-pressed={disadvantage} onClick={toggleDisadvantage}>Disadvantage</button>
       <div className="dice-modifier"><span>Modifier</span><button type="button" aria-label="Decrease modifier" onClick={() => setModifier((value) => value - 1)}>−</button><strong>{modifierLabel(modifier)}</strong><button type="button" aria-label="Increase modifier" onClick={() => setModifier((value) => value + 1)}>+</button></div>
@@ -75,9 +77,9 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
       <p className="dice-hint">Try 1d20, 2d20kh1 + 5, or 2d6 + 1d4 - 2.</p>
     </details>
     <p className="dice-feedback" aria-live="polite">{feedback}</p>
-    <div className="roll-list">
+    <div className="roll-list" aria-label="Recent rolls">
       {state.rolls.length === 0 && <p>No rolls yet.</p>}
-      {state.rolls.slice(-8).reverse().map((roll) => <article className="roll-card" key={roll.id}>
+      {state.rolls.slice(-30).reverse().map((roll) => <article className="roll-card" key={roll.id}>
         <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{roll.initiatorLabel ?? "Unknown roller"} · {PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
         <div className="roll-result"><div className="dice-faces">{roll.dice.map((die, index) => <span key={`${roll.id}-${index}`} className={die.kept ? "die" : "die discarded"} title={`d${die.sides}${die.kept ? "" : " (discarded)"}`}>{die.face}</span>)}</div><strong className="roll-total">{roll.total}</strong></div>
       </article>)}

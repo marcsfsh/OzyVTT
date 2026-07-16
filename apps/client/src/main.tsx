@@ -24,10 +24,10 @@ async function api(path: string, init?: RequestInit) {
 
 type GmTab = "table" | "maps" | "viewer" | "setup";
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
-  { id: "table", label: "Table" },
-  { id: "maps", label: "Maps" },
+  { id: "table", label: "Encounter" },
+  { id: "maps", label: "Map Setup" },
   { id: "viewer", label: "Viewer" },
-  { id: "setup", label: "Setup" }
+  { id: "setup", label: "GM Setup" }
 ];
 
 type Connection = "online" | "reconnecting" | "offline";
@@ -42,6 +42,7 @@ function App() {
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [showViewerPreview, setShowViewerPreview] = useState(false);
+  const [dockInitiative, setDockInitiative] = useState(false);
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   const { confirm, dialog } = useConfirm();
@@ -130,6 +131,14 @@ function App() {
   };
 
   const mapToken = mode === "gm" ? gmToken : localStorage.getItem(PLAYER_TOKEN_KEY);
+  const combatMapActive = !!state && state.combat.active && !!state.combat.mapAssetId;
+  const showDocked = dockInitiative && combatMapActive;
+  const encounterDock = combatMapActive ? { docked: dockInitiative, onToggle: () => setDockInitiative((current) => !current) } : undefined;
+  const encounterPanel = state
+    ? (mode === "gm"
+      ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} dock={encounterDock} />
+      : <EncounterPanel role="player" state={state as PlayerView} dock={encounterDock} />)
+    : null;
   return <main>
     <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
@@ -166,10 +175,11 @@ function App() {
             annotations={state.combat.annotations}
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
+            rightDock={showDocked ? encounterPanel : undefined}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
         </section>
         <div className="table-sidebar">
-          <EncounterPanel {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, selectedMap } : { role: "player" as const, state: state as PlayerView })} />
+          {!showDocked && encounterPanel}
           <DicePanel role={mode} state={state} />
           {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
         </div>

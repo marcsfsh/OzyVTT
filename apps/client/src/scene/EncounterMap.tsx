@@ -64,7 +64,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, rightDock
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -75,6 +75,7 @@ export function EncounterMap({
   annotations: readonly AnyAnnotation[];
   revision: number;
   activeActorId: string | null;
+  rightDock?: React.ReactNode;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -191,7 +192,7 @@ export function EncounterMap({
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
-    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor")) return;
+    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock")) return;
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
     const shapeId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && shapeId) {
@@ -333,7 +334,7 @@ export function EncounterMap({
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
     </div>
-    <div className="encounter-map-stage" ref={stageRef} aria-busy={image.status !== "ready"}>
+    <div className={`encounter-map-stage${rightDock ? " has-right-dock" : ""}`} ref={stageRef} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           <div className="encounter-map-eye">
@@ -404,7 +405,9 @@ export function EncounterMap({
           </div>;
         })()}
 
-        <div className="encounter-map-zoom" role="group" aria-label="Map controls">
+        {rightDock && <div className="encounter-map-dock">{rightDock}</div>}
+
+        <div className={`encounter-map-zoom${rightDock ? " docked-left" : ""}`} role="group" aria-label="Map controls">
           <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
           <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
           <button type="button" onClick={resetView}>Reset view</button>
