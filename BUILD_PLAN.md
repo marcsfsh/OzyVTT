@@ -9,7 +9,7 @@
 | Rules baseline | System Reference Document 5.2.1 (2024 fifth-edition rules) |
 | Primary use | One GM locally hosting a private home game for a small, known group |
 | Distribution direction | Open-source, self-hostable application with a documented public integration API |
-| Primary content path | Imported player-character and monster JSON |
+| Primary content path | Canonical player-character and monster JSON, with reviewed player-sheet PDF conversion through MarkItDown planned for Version 1 |
 | Current checkpoint | Durable starter roster and player claim/release UI complete; multi-client claim/recovery controls next |
 | Last updated | 2026-07-15 |
 | Last implementation audit | 2026-07-15 |
@@ -68,15 +68,16 @@ This table is the fast operational view. The detailed requirements and milestone
 | Workstream | State | Verified outcome so far | Remaining before the next gate | Evidence |
 | --- | --- | --- | --- | --- |
 | Repository and application shell | Active | TypeScript npm workspaces, React/Vite client, Express/Socket.IO server, locked dependencies, type/test/build commands, and CI workflow exist | Add formatter/linter policy; verify protected `main`; complete error boundary and diagnostics | `package.json`, `.github/workflows/ci.yml`, `README.md` |
-| Identity and local hosting | Active | Host-only GM bootstrap, signed sessions, LAN binding/URLs, durable starter roster, serialized claim races, remembered player-token recovery, restart-persistent ownership, player claim/release UI, authorized GM force-release, individual GM logout, persistent restart-safe revoke-all-GM-sessions, bounded per-IP failed-login rate limiting with 429/Retry-After, and immediate socket reauthorization/disconnect of revoked GM clients exist | Full multi-client socket/browser acceptance, GM password change, "stay signed in" policy, QR/copy UI, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/login-rate-limit.ts`, `apps/server/src/character-claims.ts`, `apps/server/src/index.ts`, `apps/client/src/actors/ActorRoster.tsx`, `apps/client/src/main.tsx`, ADR-001/002 |
+| Identity and local hosting | Active | Host-only GM bootstrap, signed sessions, durable roster/claims, remembered recovery, authorized GM force-release, server-side individual logout, persistent revoke-all, bounded per-IP login throttling, and immediate revoked-socket disconnect exist | Full multi-client socket/browser acceptance, GM password change, stay-signed-in policy, QR/copy UI, firewall guidance, and real-phone LAN validation | `apps/server/src/auth.ts`, `apps/server/src/login-rate-limit.ts`, `apps/server/src/index.ts`, `apps/client/src/main.tsx`, ADR-001/002 |
 | Renderer and responsive shell | Prototype implemented; validation active | Pixi renderer proof demonstrates grid/token rendering, pointer pan, wheel zoom, pinch zoom, high-DPI handling, and an accessible wrapper; responsive shell and touch-oriented CSS exist | Validate expected-size maps, 100 tokens, targeting/drag/multi-cell input, frame performance, and the physical-device matrix before accepting ADR-003 | `docs/product/phase-0-renderer-spike.md`, `apps/client/src/scene/` |
-| Actor content contract | Version 1 draft complete | Versioned character/monster schemas and representative fixtures validate | Build import preview/errors, adapters/migrations, live actor instances, and content library | `docs/product/actor-definition-v1.md`, `packages/schemas/`, `packages/test-fixtures/` |
+| Actor content contract | Version 1 draft complete | Versioned character/monster schemas and representative fixtures validate; PDF-to-Markdown-to-draft-JSON ingestion requirements are defined without changing the canonical format | Build JSON import preview/errors and live instances in Phase 2; add isolated MarkItDown extraction, reviewed character-sheet conversion, and layout fixtures in Phase 5 | `docs/product/actor-definition-v1.md`, `packages/schemas/`, `packages/test-fixtures/`, Section 11.4.1 |
 | Realtime command model | Active | Authoritative Socket.IO state projection, monotonic revisions, command IDs, duplicate suppression, reconnect snapshots, a server-authoritative presence registry (multi-connection-per-session, grace-period reconnect, remembered-token recovery, immediate purge on GM revocation), and multi-socket claim/force-release/duplicate/stale-revision convergence are implemented and tested | Retention fallback for long-lived event history and injected-disconnect/packet-loss soak tests | `apps/server/src/server.ts`, `apps/server/src/presence.ts`, `apps/server/src/projections.ts`, `apps/server/src/game-store.ts`, `packages/domain/src/index.ts` |
 | Dice | Phase 0 proof complete | Server-authoritative parser/evaluator, cryptographic live rolls, deterministic tests, recipient-specific visibility, and replaceable 2D results are implemented | Connect rolls to imported actions/combat consequences and complete browser/device accessibility validation | `docs/product/phase-0-dice-spike.md`, `packages/rules-5e/`, `apps/client/src/dice/` |
 | Persistence | Phase 1 foundation complete | SQLite migrations, WAL, atomic receipt/event/projection commits, idempotency, restart recovery, and periodic snapshots are verified | Backup/restore, rollback policy, bounded undo, migration backup, and production data lifecycle | ADR-006, `apps/server/src/game-store.ts`, `apps/server/test/game-store.test.ts` |
 | Battle/regional/world maps | Planned | Easy battlemap grid-calibration wizard and later atlas/marker/session-note requirements are recorded without changing current priority | Implement battlemap upload/normalization and calibration in Phase 2; atlas features remain post-Version-1 | Sections 18.6–18.8 and Phase 2 |
 | Shared-table viewer | Planned for Phase 2 | Requirement and authorization boundary are defined for a read-only TV/second-screen battlemap and Initiative display controlled from the GM view | Build viewer route/session, public projection, reconnect, fullscreen layout, and explicit GM presentation controls for focus, ping, measurement, and highlight | Sections 6.3.2, 16.3.1, and Phase 2 |
-| Open integration API and open-source distribution | Foundational requirement; design active | Existing typed schemas, authoritative commands, revisions, idempotency, projections, and events provide the core seams | Settle ADR-016/017; add `/api/v1`, OpenAPI, scoped tokens, protocol/version negotiation, contract tests, integration docs, compatibility policy, and repository governance/license files | Sections 9.5, 16.6, Phase 1, and Phase 6 |
+| Open integration API and open-source distribution | Foundational requirement; implementation active | `@vtt/api-contract` provides strict versions/envelopes/scopes/system DTOs and OpenAPI 3.1; an independently tested `/api/v1` system router provides health/version plus authorization-adapted capabilities | Mount the router after auth integration; implement durable scoped credentials, protocol negotiation, integration docs, compatibility checks, and repository governance/license files | `packages/api-contract/`, `apps/server/src/api-v1.ts`, Sections 9.5/16.6, Phase 1/6 |
+| AI-controlled character participants | Long-term post-Version-1 goal; contracts planned | Server authority, public API DTOs, recipient projections, idempotent commands, actor ownership, scopes, audit events, and revocation are the intended foundation | Define ADR-019, agent identity/actor binding, bounded autonomy/consent, observation/action contracts, GM controls, prompt-injection defenses, conformance simulations, and provider-neutral adapter boundary | Section 16.8 and Phase 7 |
 
 **Current milestone assessment:** Phase 0 and Phase 1 overlap intentionally. The app opens and demonstrates foundational behavior, but neither exit gate is claimed until phone/laptop LAN testing and the complete placeholder-character claim/reconnect scenario pass.
 
@@ -84,10 +85,10 @@ This table is the fast operational view. The detailed requirements and milestone
 
 This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
 
-1. Establish the open API foundation: ADR-016, versioned `/api/v1` envelope/capabilities endpoint, OpenAPI source, scoped integration credentials, and contract-test harness.
+1. Complete the open API foundation: mount the tested `/api/v1` router and add durable named scoped integration credentials with secure verification, expiry/rotation/revocation/audit.
 2. Validate direct-IP use on a physical phone and laptop, then record firewall/browser/device findings, including the presence indicator across real disconnect/reconnect cycles.
-3. Add GM password change and a documented "stay signed in" session-retention policy.
-4. Begin the Phase 2 battlemap upload, easy grid-calibration, shared-table viewer, and API-driven vertical slice after the Phase 1 join gate is satisfied.
+3. Add GM password change and document the stay-signed-in session-retention policy.
+4. Begin the Phase 2 battlemap upload, easy grid-calibration, shared-table viewer, and API-driven vertical slice after the Phase 1 join gate is satisfied. AI-controlled characters remain Phase 7 and do not displace this queue.
 
 ### 1.6 Open blockers, risks, and validation gaps
 
@@ -99,7 +100,7 @@ There are no active hard blockers to the next queued implementation item.
 | GAP-001 | Open validation gap | Phase 0 and Phase 1 exit gates | No recorded physical iOS/Android and laptop LAN acceptance pass yet | Run the documented device matrix after roster/claim UI is visible |
 | DEC-001 | Open decision | Packaging and support baseline | First supported host OS/deployment form is not selected | Decide before packaging work; development can continue meanwhile |
 | GAP-002 | Open process gap | Delivery confidence | CI workflow exists, but branch protection and a recorded remote green run have not been verified in this plan | Verify GitHub settings and link a green run |
-| GAP-003 | Open documentation gap | Phase 0 decision gate | ADR index marks several decisions accepted while only ADR-001, ADR-002, and ADR-006 currently have dedicated files | Expand accepted ADR-004/005/007/008/011/012/014 decisions into numbered records before claiming the Phase 0 exit gate |
+| GAP-003 | Resolved 2026-07-15 | Phase 0 decision gate | Accepted ADR-004/005/007/008/011/012/014 previously lacked dedicated records | Dedicated linked records now exist; proposed ADR-018 has a dedicated record and remains blocked on its extraction/packaging spike |
 | GAP-004 | Open packaging gap | Production launch | Shared workspace packages currently export TypeScript source, so the supported launch uses Node's `tsx` loader even after the production client build | Add ordered shared-package compilation and runtime exports before packaging the host application |
 | RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
 | RISK-003 | Open visibility risk | Shared-table viewer | Mirroring a GM screen could expose hidden tokens, fogged areas, secret Initiative, notes, rolls, or private preparation gestures | Use a separate server-side viewer projection and explicit presentation commands; add negative payload/UI/cache tests before the Phase 2 gate |
@@ -124,9 +125,12 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-15 | FIX-001 | Complete (automated/runtime scope) | Fixed development host/LAN browser requests failing with Express `sendFile` `NotFoundError` when no built client existed: Vite now binds to the LAN on 5173, the API safely redirects browser traffic to that development client, and startup distinguishes development versus built-client URLs | 21 tests pass, including safe IPv4/IPv6/host-header redirects; type-check/build pass; development server branch reaches ready state | User to pull and confirm host plus physical LAN device on Windows; firewall guidance added to README |
 | 2026-07-15 | FIX-002 | Complete (code/build scope) | Fixed the development blank-screen crash caused by React Strict Mode cleaning up the asynchronous Pixi proof before initialization completed; renderer startup/cleanup is now race-safe and removes listeners, renderer failures stay local, and a top-level error boundary shows actionable failures | Type-check and production build pass after lifecycle fix; client bundle builds with error boundary | User to pull and confirm in the actual Windows browser; if hardware/browser initialization still fails, the page now remains usable and displays/records the exact error |
 | 2026-07-15 | PLAN-003 | Complete | Promoted open-source self-hosting and a documented open integration API to foundational product requirements rather than a post-release add-on | Product principles, architecture, authorization, API contract, milestones, tests, risks, documentation, release/governance requirements, and next queue reconciled | Settle ADR-016/017 and implement the Phase 1 API foundation before broadening the domain surface |
+| 2026-07-15 | PLAN-004 | Complete | Added a player-facing character-sheet PDF ingestion path that runs untrusted PDFs through isolated MarkItDown extraction and a VTT-owned reviewed Markdown-to-canonical-JSON converter | Assumptions/non-goals, architecture boundary, import journey, security, tests, Phase 5, risks, decisions, and release acceptance reconciled | Spike representative sheet layouts and packaging before accepting ADR-018; do not displace Phase 1 or the Phase 2 canonical JSON importer |
 | 2026-07-15 | FND-006 | Complete (automated scope) | Centralized character-claim invariants, proved serialized simultaneous claims have exactly one winner, verified remembered player tokens and claimed ownership survive service/database restarts, and added an authorized GM force-release command and roster control | 24 tests pass; focused auth and SQLite race/recovery tests, type-check, and production build pass | Exercise two real browser clients plus restart/reconnect at the Socket.IO boundary and on the physical-device matrix |
-| 2026-07-16 | FND-007 | Complete (automated scope) | Added server-side GM logout that revokes the presented session immediately (not just a deleted browser token); persistent, restart-safe revoke-all-GM-sessions using an issuance-time cutoff plus a pruned individual-revocation list; bounded per-IP failed-login rate limiting returning 429 with `Retry-After` and no signal of how close a rejected attempt was; `broadcast()` now reauthorizes every connected socket on each call and disconnects one whose token no longer verifies as GM or player, so a revoked GM client is downgraded/disconnected proactively rather than only on its next command; minimal client Sign out and confirmation-gated Revoke all GM sessions controls; legacy auth.json files without the new revocation fields load and migrate in place | 41 repository tests pass (12 new: GM login success/failure, individual and revoke-all revocation, revocation persistence across an `AuthService` restart, legacy/malformed auth-data handling, player-session non-regression under GM revocation, and rate-limiter throttle/recovery/per-key isolation); manual end-to-end verification against a running server confirmed logout, revoke-all, 429/Retry-After lockout that also blocks a subsequently-correct password, and a live GM socket disconnecting immediately after revoke-all; type-check and production build pass | GM password change and a documented "stay signed in" retention policy remain; rate-limiter state is in-memory only (acceptable for a single-process self-hosted host, not restart-safe by design) |
-| 2026-07-16 | FND-008 | Complete (automated scope) | Added a server-authoritative presence registry (`apps/server/src/presence.ts`) keyed only by verified session IDs, supporting multiple concurrent connections per session, an 8-second reconnect grace period before flipping to "offline" so a reload does not flicker, and immediate purge on GM revocation. Extracted the Socket.IO/Express wiring from `apps/server/src/index.ts` into a testable `createServer()` factory (`apps/server/src/server.ts`) so the realtime layer can be started on an ephemeral port in tests; `index.ts` is now a thin bootstrap. `PlayerActor`/`GmActor` gained a `presence: "online" \| "reconnecting" \| "offline" \| null` field computed server-side from each actor's owning session and carried in the existing `state:updated` projection — no session ID, token, socket ID, or address is ever sent; unclaimed actors always report `null`. `ActorRoster.tsx` renders an accessible dot-plus-text badge (not color alone) beside each claimed character for both GM and player views | 71 repository tests pass (16 new: presence-registry unit tests covering online/reconnecting/offline/immediate-purge/multi-connection transitions, and 8 real-socket integration tests against an ephemeral-port server covering two-player claim races, multiple connections per session, disconnect grace, remembered-token reconnect with claim-association recovery, force-release/duplicate-command/stale-revision convergence across three simultaneous clients, wire-level private-field omission, and revoked-GM-session presence removal); a Playwright-driven real Chromium session confirmed the Online → Reconnecting → Offline badge sequence rendering live in the GM roster against the actual dev server; type-check and production build pass | Presence has not yet been validated on a physical phone/laptop over real LAN Wi-Fi transitions (tracked under GAP-001); GM connection presence is tracked in the registry but intentionally not surfaced in any UI, since only player-owned characters have a badge to attach to |
+| 2026-07-16 | FND-007 | Complete (automated/runtime scope) | Added immediate server-side GM logout, restart-safe individual and revoke-all session invalidation, bounded per-IP failed-login throttling with `429`/`Retry-After`, proactive revoked-socket disconnect, client Sign out/Revoke all controls, and legacy auth-data migration | Claude checkpoint `0f51e23`: 41 repository tests plus manual running-server logout/revoke/rate-limit/socket checks, type-check, and production build passed | GM password change and stay-signed-in policy remain; rate-limiter memory intentionally resets with the single-process host |
+| 2026-07-16 | FND-008 | Complete (contract/router module scope) | Added strict runtime public API/realtime versions, scopes, success/error and command/event envelopes, explicit public DTOs, OpenAPI 3.1 system paths, and an Express `/api/v1` system router with public health/version, authorization-adapted capabilities, stable request IDs/errors, and no-store/privacy tests | Codex checkpoints `83f523a` and `3374311`: 31 tests at router completion, type-check, production build, and byte-for-byte remote verification passed | Mount router on the integrated server and implement the credential authorizer; contract compatibility/release docs remain |
+| 2026-07-16 | PLAN-005 | Complete | Promoted AI agents playing assigned characters to a defined long-term goal built on the public API and ordinary participant authority rather than privileged server access | Product scope, agent journey, architecture invariants, permissions, security, tests, risks, decisions, Phase 7, and ADR-019 reconciled | Keep post-Version-1; prove human multiplayer and external API conformance first |
+| 2026-07-16 | FND-009 | Complete (automated scope) | Added a server-authoritative presence registry (`apps/server/src/presence.ts`) keyed only by verified session IDs, supporting multiple concurrent connections per session, an 8-second reconnect grace period before flipping to "offline" so a reload does not flicker, and immediate purge on GM revocation. Extracted the Socket.IO/Express wiring from `apps/server/src/index.ts` into a testable `createServer()` factory (`apps/server/src/server.ts`) so the realtime layer can be started on an ephemeral port in tests; `index.ts` is now a thin bootstrap. `PlayerActor`/`GmActor` gained a `presence: "online" \| "reconnecting" \| "offline" \| null` field computed server-side from each actor's owning session and carried in the existing `state:updated` projection — no session ID, token, socket ID, or address is ever sent; unclaimed actors always report `null`. `ActorRoster.tsx` renders an accessible dot-plus-text badge (not color alone) beside each claimed character for both GM and player views | 71 repository tests pass at this checkpoint (16 new: presence-registry unit tests covering online/reconnecting/offline/immediate-purge/multi-connection transitions, and 8 real-socket integration tests against an ephemeral-port server covering two-player claim races, multiple connections per session, disconnect grace, remembered-token reconnect with claim-association recovery, force-release/duplicate-command/stale-revision convergence across three simultaneous clients, wire-level private-field omission, and revoked-GM-session presence removal); a Playwright-driven real Chromium session confirmed the Online → Reconnecting → Offline badge sequence rendering live in the GM roster against the actual dev server; type-check and production build pass | Presence has not yet been validated on a physical phone/laptop over real LAN Wi-Fi transitions (tracked under GAP-001); GM connection presence is tracked in the registry but intentionally not surfaced in any UI, since only player-owned characters have a badge to attach to |
 
 ## 2. Product definition
 
@@ -161,16 +165,18 @@ These are product targets to validate through testing, not immutable promises:
 | State durability | Refreshing or reopening the session loses no accepted combat action |
 | Required technical setup | None for players; a single documented launch/deploy path for the GM |
 | First API integration | An integrator can authenticate, discover capabilities, read a safe snapshot, submit one idempotent command, and observe its authorized event using only published documentation/examples |
+| Supported PDF character import | A player unfamiliar with JSON can upload a completed supported sheet, resolve every flagged ambiguity, and obtain a canonical actor without re-entering clearly extracted fields |
 
 ### 2.4 Primary users
 
 | User | Needs | Product response |
 | --- | --- | --- |
 | GM | Prepare encounters quickly, control visibility, run monsters, make rulings, correct mistakes | Full control, quick-add workflows, sensible defaults, manual override, undo, private information controls |
-| Player | Join quickly, control one or more assigned characters, understand current turn and available actions | Direct-IP entry and character selection, focused action tray, clear turn state, owned-token controls, readable roll outcomes |
+| Player | Join quickly, bring an existing completed character sheet, control assigned characters, and understand the current turn/actions | Direct-IP entry, character selection, reviewed PDF-to-canonical import in Phase 5, focused action tray, clear turn state, owned-token controls, readable roll outcomes |
 | Shared table/display | Let players follow play from a TV or second screen without requiring personal devices | Read-only fullscreen player-safe battlemap, Initiative, and public presentation cues remotely orchestrated from the GM view |
 | Self-host operator | Install, update, back up, secure, diagnose, and expose integrations without reading source code | Versioned releases, documented configuration, health/capability endpoints, migration/backup guidance, and secure defaults |
 | Integrator/contributor | Connect bots, campaign tools, hardware, stream overlays, automation, importers, or alternate clients without patching core | Versioned REST/realtime contracts, OpenAPI/event schemas, scoped credentials, examples, compatibility policy, and contribution governance |
+| AI-player operator (post-Version-1) | Configure an agent to portray a specific character consistently, participate socially, and take bounded game actions without receiving privileged knowledge | Structured persona/goals/relationships/tactical style, actor-bound credentials, authorized observation/action APIs, memory controls, GM pause/approve/revoke, and complete audit/replay |
 
 The shared-table viewer is required for the minimum playable vertical slice. It is a passive display surface, not a general observer account or public spectator link. Independent observers and assistant GMs remain later candidates.
 
@@ -185,19 +191,21 @@ The shared-table viewer is required for the minimum playable vertical slice. It 
 - A player joins without an account by selecting an available character.
 - Entering GM mode requires the GM password.
 - The initial rules corpus is SRD 5.2.1, but imported content may include homebrew and older fifth-edition conventions.
-- Character creation happens elsewhere. The VTT consumes prepared character JSON.
+- Character creation and level-up decisions happen elsewhere. The VTT consumes canonical character JSON and may transcribe an already-completed character-sheet PDF into a reviewed canonical JSON draft.
 - Monster content is imported or supplied in curated data bundles.
 - Phone and laptop clients have the same functional capabilities. Layout and interaction change responsively for the screen size and input type, but mobile is not a reduced companion experience.
 - Both player and GM roles must remain operable on a phone, including battle-map interaction, actions, dice, combat management, and GM tools when authenticated.
 - The GM may run a read-only viewer on a second monitor, television, projector, or separate LAN browser so players can follow the public battlemap and Initiative without individual devices.
 - Combat is the center of the application. Exploration on maps is supported only where it naturally follows from the combat canvas.
 - The GM's ruling always outranks the automation.
+- AI-controlled characters are optional, explicitly enabled by the GM, clearly identified to the table, bound to assigned actors, and never receive authority or hidden context merely because a model can reason about it.
+- An AI player's objective is to portray its configured character and collaborate with the table—not simply maximize expected combat output. Personality affects preferences and expression but never expands permissions.
 
 ### 2.6 Explicit non-goals for the initial product
 
 The following are deliberately outside the core promise unless this plan is revised:
 
-- A full character builder or level-up workflow
+- A full character builder or level-up workflow; PDF ingestion transcribes an existing sheet and does not choose abilities, equipment, spells, advancements, or legal build options
 - A general campaign wiki, journal, quest manager, or worldbuilding suite
 - A public marketplace or commercial content storefront
 - Built-in video conferencing, voice chat, or music streaming
@@ -209,6 +217,7 @@ The following are deliberately outside the core promise unless this plan is revi
 - Public SaaS billing, user accounts, organization management, or multi-tenant commercial hosting
 - Automated encounter balancing as a prerequisite for running combat
 - Replacing the GM's judgment about line of sight, cover, unusual movement, or ambiguous rules
+- A covert autonomous agent, an AI GM, unrestricted model access to campaign files/private prompts, or an agent that can bypass consent/turn/command confirmation because it is “intelligent”
 
 The later regional/world-map atlas and spatial session-note system described in Sections 18.6–18.8 is a bounded post-Version-1 extension, not a reversal of the initial “no general campaign wiki” constraint. Its purpose is visual, map-anchored recall rather than a general-purpose knowledge-management suite.
 
@@ -284,6 +293,10 @@ The built-in client is one consumer of authoritative application contracts. New 
 ### 3.16 Extensibility stays outside the trusted process by default
 
 Prefer REST, realtime events, webhooks, import/export, and generated/client SDKs over an in-process plugin runtime. This preserves simple self-hosting and limits supply-chain/security risk. A future sandboxed plugin system requires its own threat model and explicit promotion; it is not implied by the open API.
+
+### 3.17 AI personality is authored character direction, not permission
+
+An AI player should make recognizable, sometimes imperfect choices consistent with its configured character rather than reduce play to tactical optimization. Persona, goals, bonds, flaws, relationships, voice, risk tolerance, tactical habits, and table etiquette shape which authorized option it prefers and how it communicates. They never grant hidden knowledge, extra actions, GM tools, or permission to ignore confirmations. The UI must make the effective persona and autonomy policy inspectable and editable without exposing provider secrets or requiring prompt engineering.
 
 ## 4. Lessons to borrow—and boundaries to preserve
 
@@ -526,6 +539,29 @@ Acceptance criteria:
 - [ ] Credential creation, use, failure, rotation, and revocation are auditable without logging the token secret.
 - [ ] API/protocol compatibility and deprecation behavior are documented and contract-tested.
 
+### 6.3.4 Configure an AI player character — post-Version-1
+
+**Goal:** let the GM/table configure an AI participant that portrays an assigned character socially and tactically while remaining bounded, observable, and interruptible.
+
+1. The GM creates an AI-player profile, assigns exactly the permitted actor(s), selects a provider/local-model adapter, and grants a narrow agent credential that cannot read GM-only state.
+2. The table configures a structured persona: identity/background, values, temperament, goals, bonds/flaws, relationships/opinions, speaking style, humor/formality, risk tolerance, moral boundaries, tactical preferences, signature habits, knowledge limits, and topics/actions requiring human confirmation.
+3. The GM chooses autonomy separately for conversation, exploration proposals, resource spending, movement, targeting, rolls, and consequential combat actions: suggest only, confirm each, confirm risky actions, or act within explicit limits.
+4. On its turn or when invited to speak, the agent receives only an authorized, purpose-built observation containing visible game state, its own sheet/resources/memory, recent public events, permitted table conversation, and the current persona/autonomy policy.
+5. The agent returns a typed intent plus optional in-character speech and a concise rationale tagged as persona preference, tactical assessment, goal, relationship, or uncertainty. The server validates/authorizes the intent exactly like a human/API command.
+6. The GM or designated human can approve, edit, reject, pause, take over, mute speech, change persona/autonomy, or revoke the agent immediately. Every observation request, proposed intent, approval, command, and model/provider error is auditable with private reasoning excluded unless intentionally retained.
+7. Between sessions, bounded character memory records only approved facts/summaries at permitted visibility; it does not ingest arbitrary campaign files, GM notes, other players' secrets, or raw provider conversations by default.
+
+Acceptance criteria:
+
+- [ ] The same combat state yields meaningfully different but valid choices for contrasting personas (for example cautious protector versus reckless glory-seeker), without hard-coding “optimal move” as the objective.
+- [ ] Personality configuration is structured, inspectable, portable, versioned, and editable through normal UI; an advanced prompt field, if ever offered, cannot replace required permission/autonomy controls.
+- [ ] Persona influences preference, dialogue, and willingness—not dice results, rules, turn order, scopes, visibility, or command authorization.
+- [ ] Untrusted map notes, chat, imported text, rules text, and API/event content cannot rewrite system policy, reveal secrets, expand memory, change persona, or cause tool calls through prompt injection.
+- [ ] The agent can express uncertainty, ask the table a question, defer, or take a simple safe fallback instead of fabricating game facts or stalling play.
+- [ ] The table can identify that a participant is AI-controlled and see whether it is suggesting, awaiting approval, acting, paused, disconnected, or rate-limited.
+- [ ] GM pause/takeover/revoke prevents further accepted commands immediately; a provider outage never blocks human turns or authoritative server progress.
+- [ ] A human can replace the agent for the same actor without losing canonical character state; provider/persona changes do not mutate the actor definition unless explicitly saved as separate metadata.
+
 ### 6.4 Run a routine combat turn
 
 **Goal:** make the next useful action obvious and keep attention on the map.
@@ -633,20 +669,22 @@ Create one ADR per material decision. Status here must match `docs/adr/README.md
 | ADR-001 | Product platform | Accepted | Browser-based application with full phone/desktop functional parity and responsive role-specific layouts | Recorded |
 | ADR-002 | Hosting topology | Accepted | Locally hosted, single authoritative server reached by host IP and port; package as one simple service with persistent local data | Recorded |
 | ADR-003 | Client renderer | Proposed / spike active | Evaluate PixiJS through actual-device, representative-map, 100-token, input, and performance tests | End of technical spikes |
-| ADR-004 | Application language/stack | Accepted | TypeScript end to end with React/Vite, Express, Socket.IO, and embedded SQLite | Dedicated ADR file still required |
-| ADR-005 | Realtime protocol | Accepted | Server-authoritative Socket.IO command/event flow with reconnect snapshots and recipient-specific projections | Dedicated ADR file still required |
+| ADR-004 | Application language/stack | Accepted | TypeScript end to end with React/Vite, Express, Socket.IO, and embedded SQLite | Recorded |
+| ADR-005 | Realtime protocol | Accepted | Server-authoritative Socket.IO command/event flow with reconnect snapshots and recipient-specific projections | Recorded |
 | ADR-006 | Persistence | Accepted 2026-07-15 | Embedded SQLite for structured state, command receipts, events, migrations, and snapshots; filesystem storage for uploaded assets | Recorded |
-| ADR-007 | Canonical content format | Accepted | Versioned, documented JSON schemas with extension fields, fixtures, and adapters | Dedicated ADR file still required |
-| ADR-008 | Rules representation | Accepted | Typed declarative operations plus inert text fallback; never evaluate imported JavaScript | Dedicated ADR file still required |
+| ADR-007 | Canonical content format | Accepted | Versioned, documented JSON schemas with extension fields, fixtures, and adapters | Recorded |
+| ADR-008 | Rules representation | Accepted | Typed declarative operations plus inert text fallback; never evaluate imported JavaScript | Recorded |
 | ADR-009 | Grid baseline | Proposed | Square grid with five-foot cells for MVP; diagonal and occupied-cell conventions await measurement tests | Before movement/measurement tests |
 | ADR-010 | Fog and vision | Proposed | Manual fog for alpha; dynamic walls/vision remain a separate later epic | Before map tool implementation |
-| ADR-011 | Identity | Accepted | Same direct-IP landing page; accountless player character claims; password-authenticated GM role; one claimed character per player session for the MVP | Dedicated ADR file still required |
-| ADR-012 | Dice authority and presentation | Accepted | Server-generated and recorded rolls; authorized 2D presentation; immutable formula/faces/modifiers/result/visibility/provenance | Dedicated ADR file still required |
+| ADR-011 | Identity | Accepted | Same direct-IP landing page; accountless player character claims; password-authenticated GM role; one claimed character per player session for the MVP | Recorded |
+| ADR-012 | Dice authority and presentation | Accepted | Server-generated and recorded rolls; authorized 2D presentation; immutable formula/faces/modifiers/result/visibility/provenance | Recorded |
 | ADR-013 | State history | Proposed / partial foundation | Transactional command/event log and periodic snapshots exist; bounded undo remains undecided/unfinished | Before combat mutations |
-| ADR-014 | Device support | Accepted requirement / baseline pending | Functional phone/desktop parity with responsive/touch-specific UX; exact supported browser versions remain open | Before Phase 1 exit |
+| ADR-014 | Device support | Accepted requirement / baseline pending | Functional phone/desktop parity with responsive/touch-specific UX; exact supported browser versions remain open | Dedicated record exists; browser baseline due before Phase 1 exit |
 | ADR-015 | SRD content packaging | Proposed | Curated, normalized, versioned content bundle separate from executable code; never parse source documents at runtime | Before bulk monster conversion |
 | ADR-016 | Public integration API | Proposed / foundational | Versioned REST resources plus documented realtime commands/events over the same authoritative domain boundary; OpenAPI, capability discovery, scoped tokens, and later signed webhooks | Before the next Phase 1 domain endpoints |
 | ADR-017 | Open-source distribution and governance | Proposed | Public self-hostable repository with explicit code/content licenses, contribution/security policy, reproducible releases, and no bundled private data | Before accepting public contributions or public release |
+| ADR-018 | Character-sheet PDF ingestion | Proposed | Treat MarkItDown as an isolated, version-pinned extraction adapter; convert its Markdown with a VTT-owned deterministic parser into a reviewable canonical JSON draft, never directly into live actor state | Before Phase 5 PDF importer implementation |
+| ADR-019 | AI-controlled character participants and persona policy | Proposed / long-term | Provider-neutral external agent clients use actor-bound scoped credentials, structured persona/memory/autonomy, recipient-safe observations, typed intents, ordinary commands, and immediate human control | Before Phase 7 implementation; foundational DTO/permission seams reviewed during API work |
 
 ### 8.1 Technical spikes
 
@@ -663,6 +701,8 @@ Create one ADR per material decision. Status here must match `docs/adr/README.md
 - [ ] Prototype every core combat workflow at narrow phone portrait, phone landscape, tablet, and desktop widths; reject any architecture that requires a reduced mobile feature set.
 - [ ] Verify direct-IP discovery/startup: bind to the LAN interface, display usable host URLs, and connect from iOS and Android devices on the same network.
 - [ ] Prototype an external integration that obtains a scoped token, discovers API/protocol capabilities, reads a recipient-safe snapshot, submits an idempotent command, and receives its authorized event without importing server internals.
+- [ ] Run pinned MarkItDown against representative digitally generated, table-heavy, multi-page, malformed, encrypted, and scanned character-sheet PDFs; record extraction quality, runtime/memory, packaging size, offline behavior, and fields requiring OCR or manual review.
+- [ ] After Version 1, prototype two deterministic fake agents with contrasting structured personas against the same encounter; verify different valid preferences, actor-bound visibility/authority, prompt-injection resistance, bounded timing, pause/takeover/revoke, and provider-neutral observation/intent contracts before selecting any model provider.
 
 Exit gate: no unresolved renderer, networking, persistence, schema, API security, or compatibility risk can plausibly invalidate the first vertical slice.
 
@@ -711,6 +751,7 @@ flowchart TD
 - Every connected client can reconstruct its authorized view from a snapshot plus later events.
 - Ruleset and schema versions are pinned to saved content/encounters and migrated deliberately.
 - Imported rich text is inert and sanitized.
+- Extracted PDF/Markdown content is untrusted evidence, not canonical state; only schema-valid fields explicitly accepted through the import review may enter an actor definition.
 - Derived values identify their inputs and allow explicit override where the product permits it.
 - The player's projection excludes hidden information at the server boundary; hiding only with CSS is unacceptable.
 - Built-in clients and external integrations reach consequential behavior through the same command handlers, authorization policy, idempotency rules, and recipient projections.
@@ -729,6 +770,7 @@ packages/
   domain/              Commands, events, entities, invariants
   rules-5e/            SRD 5.2.1 calculations and rule helpers
   schemas/             Versioned JSON Schema and generated types
+  character-import/    Deterministic Markdown-to-canonical-character conversion, confidence/provenance, and golden fixtures
   api-contract/        OpenAPI, realtime command/event schemas, error/scopes/capability contracts
   sdk-typescript/      Thin generated/handwritten client built only on public contracts
   content-srd-5.2.1/   Curated SRD-derived data and attribution
@@ -789,7 +831,7 @@ The exact schema remains an implementation task, but the following concepts must
 | Command | Requested intent | ID, actor, participant, expected revision, parameters, timestamp |
 | Domain event | Accepted fact | Sequence, command link, before/after summary, visibility, undo relation |
 | Snapshot | Restorable state checkpoint | Encounter revision, event cursor, schema versions, creation reason |
-| Import job | Traceable content ingestion | Source file, schema/adapter, per-item results, warnings, failures |
+| Import job | Traceable content ingestion | Uploader/authority, source checksum/type, extractor/parser/schema versions, bounded job status, extracted Markdown retention, field provenance/confidence, draft JSON, review decisions, warnings, failures, resulting actor ID |
 
 ### 10.2 Actor definition, actor instance, and token separation
 
@@ -908,6 +950,48 @@ The normal import flow should be:
 7. Offer direct, human-readable corrections or a downloadable error report for structural failures.
 
 Error messages should look like “Goblin Warrior → Actions → Scimitar → damage formula is missing a die size,” not a parser stack trace or raw schema pointer alone.
+
+### 11.4.1 Player character-sheet PDF ingestion
+
+This is an alternate input adapter for completed character sheets, not a character builder and not a second canonical format. The durable output remains the same versioned `actor-character` JSON accepted by the normal importer.
+
+The intended flow is:
+
+1. A player or GM selects a PDF character sheet from phone or desktop and sees file-size/page/encryption guidance before upload.
+2. The server validates the file signature, records a checksum, and creates a bounded import job; a filename or `.pdf` extension alone is never trusted.
+3. A version-pinned MarkItDown adapter extracts the PDF into inert Markdown inside an isolated temporary workspace with network access disabled, execution timeout, memory/page/output limits, and guaranteed cleanup.
+4. The VTT-owned character converter parses labels, tables, checkboxes, repeated sections, and text from the extracted Markdown into field candidates. It records source spans, parser rule/version, confidence, warnings, and unresolved alternatives for each candidate.
+5. Candidates are normalized into a draft canonical character JSON document and validated with the same schema used for direct JSON imports. Extraction/parser output never bypasses canonical validation.
+6. The player reviews the draft in a side-by-side or field-focused correction wizard. Required, contradictory, low-confidence, and ruleset-ambiguous values must be confirmed; the UI never silently invents missing character choices.
+7. The GM approves creation or update according to the settled table policy. Approval creates a new actor definition or shows an explicit field-level update diff; it never silently overwrites a live actor instance.
+8. The import job retains sufficient provenance for diagnosis/re-import while following a documented local retention/deletion policy for the original PDF and extracted Markdown.
+
+Initial conversion scope should cover identity, level/classes, ancestry/species text, ability scores, proficiency bonus, saves, skills, AC, HP, Hit Dice, initiative, Speed, senses, proficiencies/languages, attacks, spellcasting values/slots, resources, equipment/reference text, features/traits, and spells when the sheet exposes them. Unsupported layout fragments remain visible text or warnings rather than fabricated structured mechanics.
+
+Requirements and guardrails:
+
+- [ ] Accept PDF only for the first document adapter; direct canonical JSON remains available and authoritative.
+- [ ] Provide clear states for queued, extracting, converting, awaiting review, approved, partially imported, failed, canceled, and expired jobs.
+- [ ] Pin and report MarkItDown plus converter versions; golden fixtures must reveal extraction drift during upgrades.
+- [ ] Treat scanned/image-only sheets as an explicit unsupported/warning case until an offline, bounded OCR decision is recorded. Never imply that an empty extraction is a valid empty character.
+- [ ] Do not call a hosted AI service, fetch remote resources, execute embedded PDF content, or send private sheets off the self-hosted machine by default.
+- [ ] Keep raw Markdown inert. Strip/neutralize HTML, links, embedded files, scripts, forms, actions, and unsafe URI schemes before preview.
+- [ ] Enforce compressed/input size, page count, decompressed/output size, nesting, CPU, memory, and wall-clock limits; malformed/encrypted/password-protected files fail safely and do not block the game server.
+- [ ] Run extraction/conversion outside the authoritative combat command path. Slow or failed imports cannot delay rolls, movement, autosave, realtime broadcasts, or shutdown recovery.
+- [ ] Show every normalized/defaulted value and preserve field-level provenance so users can distinguish extracted, inferred, manually corrected, and unavailable data.
+- [ ] A player can create/update only the character allowed by the final authorization policy; they cannot use an import to claim another actor, gain GM authority, or inject hidden content.
+- [ ] Original PDF and extracted Markdown retention is configurable and clearly disclosed; deletion removes temporary copies and does not break the approved canonical actor.
+- [ ] Phone users can upload, review required corrections, save progress, and resume the import without losing the draft.
+- [ ] The public API eventually exposes the same bounded import-job lifecycle and safe result DTOs without filesystem paths or raw private documents unless explicitly authorized.
+
+Acceptance criteria:
+
+- [ ] Representative supported sheets produce schema-valid drafts with all required low-confidence/ambiguous fields visibly flagged.
+- [ ] A user unfamiliar with JSON can upload, correct, approve, and claim a supported completed sheet without developer tools.
+- [ ] Re-running the same PDF with the same extractor/converter versions is deterministic and does not create a duplicate without an explicit choice.
+- [ ] Updating an existing character shows a field diff and cannot mutate current HP/resources or a live encounter silently.
+- [ ] Corrupt, encrypted, oversized, image-only, adversarial, or unsupported-layout PDFs produce actionable errors and leave no partial actor or orphaned temporary file.
+- [ ] Fixture, logs, diagnostics, API responses, and player projections contain no raw PDF/Markdown or personal filesystem path unless that principal explicitly requests an authorized import detail.
 
 ### 11.5 Validation severity
 
@@ -1775,7 +1859,7 @@ There is no public account or invitation system. The host exposes one landing pa
 - [x] GM path verifies the password server-side and issues a role-bearing signed session credential.
 - [x] Initial GM-password bootstrap is restricted to localhost, preventing the first LAN visitor from claiming GM ownership.
 - [x] Hash the GM password with bcrypt and a per-password salt.
-- [~] Rate-limit failed GM authentication and support session revocation/password change. Rate limiting and individual/revoke-all session revocation are implemented; password change remains.
+- [~] Rate-limit failed GM authentication and support session revocation/password change. Rate limiting and individual/revoke-all revocation are implemented; password change remains.
 - [x] Never infer GM authority from a client-provided role flag; verify the signed server-issued credential at the command boundary.
 
 ### 16.3 Server-side visibility projections
@@ -1912,6 +1996,61 @@ Do not expose an endpoint merely because a table or internal object exists. Publ
 - Keep a clear separation between application code, curated SRD-derived content, user-imported content, and optional third-party integrations.
 - Document secure self-host defaults, trusted-LAN mode, internet exposure, reverse proxy/TLS, backups, file permissions, token rotation, and vulnerability reporting.
 - Community integrations use their own names/versioning and declare compatible API ranges; listing or linking an integration is not a security endorsement.
+
+### 16.8 AI-controlled character participant architecture — post-Version-1
+
+AI players are external or replaceable agent clients over the documented API. They never import private server packages, query SQLite, receive a browser's full state, or run model code inside the authoritative command process by default.
+
+#### 16.8.1 Identity, actor binding, and authority
+
+- Use an explicit `agent-player` principal/credential type bound to one game and one or more GM-approved actors. Authority is the intersection of credential scopes, actor binding, current turn/control policy, recipient visibility, and the active autonomy policy.
+- Agent commands use the same IDs, revisions, idempotency, validators, domain handlers, events, projections, rate limits, and revocation path as human/external clients. “AI” is never a superuser role.
+- Clearly label AI participants and current control state. Human takeover atomically suspends agent command authority for that actor; reconnect cannot silently restore it.
+- Separate model/provider credentials from VTT integration credentials. Provider secrets remain server/operator configuration and are never placed in persona exports, game state, prompts returned to clients, or public logs.
+
+#### 16.8.2 Structured personality and behavior policy
+
+Store a versioned `AgentPersona` separate from the canonical actor definition and separate from permission/autonomy policy. It should support:
+
+- character identity/background and self-description;
+- values, ideals, bonds, flaws, goals, fears, motivations, moral/behavioral boundaries, and current priorities;
+- relationships/opinions/trust toward known characters/factions, including visibility and who may edit them;
+- temperament, emotional tendencies, sociability, humor, formality, verbosity, vocabulary, speech patterns, and optional voice/presentation metadata;
+- tactical preferences such as aggression, caution, protection, positioning, teamwork, resource conservation, spell/ability preferences, retreat thresholds, risk tolerance, and willingness to follow plans;
+- exploration/social preferences, curiosity, deception comfort, conflict style, leadership/follower tendency, and table etiquette;
+- explicit knowledge boundaries, misconceptions/beliefs, secrets the character knows, and facts the model must not assume;
+- hard limits, soft preferences, confirmation-required topics/actions, fallback behavior, and a small set of weighted decision priorities.
+
+Configuration uses normal forms, presets, examples, previews, and export/import—not mandatory prompt engineering. Free-form flavor may supplement structured fields, but system rules, scopes, visibility, and autonomy remain separately enforced. Persona version/history changes are auditable and can be rolled back without changing character statistics.
+
+#### 16.8.3 Observation, decision, and action contract
+
+- Build a minimal recipient-safe `AgentObservation` DTO rather than dumping snapshots or logs. Include current public scene/combat facts, agent-owned actor state, permitted perceived actors, legal/likely actions where available, recent authorized events/conversation, persona, bounded memory, autonomy, deadlines, and correlation ID.
+- Require a typed `AgentIntent` response: action kind, actor/targets/parameters, optional in-character speech, confidence/uncertainty, and concise decision tags. Do not require or persist hidden chain-of-thought.
+- Validate the typed intent structurally, then authorize and resolve it through ordinary domain commands. Invalid/late/stale intents receive stable errors and a chance to choose a safe fallback within the turn timer.
+- Keep “what the character would prefer” distinct from “what commands are legal.” A personality engine/ranker may score authorized options, including suboptimal options consistent with goals/relationships, but cannot fabricate capabilities or force outcomes.
+- Conversation and combat action channels are distinct so muting speech does not change turn authority and narrative text cannot be interpreted as a tool command.
+
+#### 16.8.4 Autonomy, consent, timing, and human control
+
+- Configure autonomy per category: speak, propose, move, target, roll, spend resources, reveal information, initiate combat, and apply consequential results. Defaults are suggest-only/confirmation for consequential actions.
+- Support GM/table consent, quiet hours/speaking cadence, interruption rules, response deadline, maximum retries/tokens/cost, per-turn action budget, and safe timeout behavior.
+- GM controls include pause all agents, pause one, approve/edit/reject intent, take over actor, clear pending work, mute speech, inspect effective persona/policy, rotate/revoke credentials, and disable provider access.
+- Provider/model failure, latency, quota, or invalid output falls back to human control or a no-op/defend prompt chosen by policy; it never blocks initiative advancement or server shutdown.
+
+#### 16.8.5 Memory and prompt-injection boundary
+
+- Separate immutable system policy, GM-authored persona/policy, approved character memory, authorized game observations, and untrusted content into labeled channels with strict precedence. Text from chat, notes, PDFs, maps, imported rules, webhooks, API errors, or other characters is data—not instructions.
+- Memory writes are explicit typed proposals with source/visibility/retention and approval policy. Summaries cannot grant knowledge the character did not observe; private facts keep their visibility classification.
+- Bound memory size and retention; allow inspect/edit/delete/export; never silently train a provider or upload the full campaign. Provider data-retention/privacy settings are displayed and documented.
+- Test indirect prompt injection, tool-call smuggling, persona override, encoded instructions, malicious character names/notes, memory poisoning, cross-agent secret transfer, and attempts to exfiltrate GM/API/provider credentials.
+
+#### 16.8.6 Provider-neutral adapters and observability
+
+- Define a provider-neutral request/response interface with capability discovery for structured output, streaming, local/remote execution, context limits, cancellation, usage/cost, and data-retention posture.
+- Support at least one local/self-host-friendly path before claiming the feature fully open; remote providers remain optional operator-configured adapters.
+- Log correlation IDs, provider/model/version, latency, usage/cost where available, observation/intent schema versions, decision tags, approval/command outcome, errors, and revocation—without credentials, hidden reasoning, or unauthorized content.
+- Provide deterministic scripted/fake agents for CI and conformance; model quality evaluations supplement but never replace authorization, privacy, timing, and command-invariant tests.
 
 ## 17. Persistence, history, undo, and recovery
 
@@ -2203,6 +2342,10 @@ Private home use reduces threat exposure but does not remove the need for safe d
 - Image content validation and decompression-bomb/resource limits.
 - Archive/bundle path traversal protection.
 - Remote image fetching disabled initially or isolated behind explicit, validated import.
+- PDF magic/type verification, encrypted/embedded-file/action rejection, page/input/output limits, and decompression/resource-exhaustion defenses.
+- MarkItDown runs version-pinned in an isolated temporary workspace with no network, bounded CPU/memory/time/output, least filesystem privilege, cleanup, and no access to the database/auth secrets or game asset tree.
+- Extracted Markdown and converter candidates remain untrusted until sanitized, schema-validated, reviewed, and authorized; previews never render trusted HTML or active PDF content.
+- Import diagnostics redact original document contents and host paths by default; retention/deletion of PDFs, Markdown, and failed drafts is explicit and testable.
 
 ### 20.3 Application security
 
@@ -2443,6 +2586,7 @@ Keep documentation purposeful:
 - build plan;
 - ADRs;
 - canonical JSON schema reference and examples;
+- supported character-sheet PDF layouts, privacy/retention behavior, correction workflow, known extraction limits, and MarkItDown/converter version diagnostics;
 - deployment/backup/restore guide;
 - user-facing GM quick guide;
 - supported automation/known limitations matrix;
@@ -2473,6 +2617,8 @@ Prioritize pure, fast tests for:
 - resource use and Recharge;
 - death-save/stabilization transitions;
 - action operation validation;
+- character-sheet Markdown field extraction, normalization, confidence/provenance, duplicate matching, and canonical draft conversion;
+- agent persona/autonomy validation, preference ranking over legal options, observation projection, typed-intent parsing, memory visibility/retention, provider timeout/cancellation, and safe fallback selection;
 - coordinate/grid conversions, snapping, path distance, token footprint, and template-cell inclusion;
 - permission/visibility projection functions;
 - API scope/resource authorization, error-envelope mapping, version negotiation, pagination/cursor validation, and webhook signature/retry helpers;
@@ -2494,6 +2640,8 @@ Useful invariants include:
 - unauthorized projections never contain restricted fields/events;
 - equivalent valid UI/API commands produce the same domain event/state result, and retrying either transport with one command ID produces one mutation;
 - adding an internal field never adds it to a public API/event projection unless the public contract is explicitly changed;
+- changing an AI persona or model/provider never changes its scopes, actor binding, recipient visibility, dice authority, or legal command set;
+- identical authorized observations and deterministic fake-agent/persona versions produce replayable typed intents, while contrasting personas may rank the same legal options differently;
 - snapshot plus later events equals the current state projection;
 - coordinate conversion round-trips within tolerance;
 - moving a token never mutates its actor definition;
@@ -2511,6 +2659,7 @@ Useful invariants include:
 - Require every structured action to retain readable fallback text.
 - Validate OpenAPI and realtime/webhook schemas, examples, generated types, and compatibility fixtures against the running implementation in CI.
 - Diff public contracts in CI and require explicit review/version/deprecation notes for breaking or security-sensitive changes.
+- Run pinned PDF → MarkItDown → converter golden fixtures across supported layouts; fail review on unexplained extraction drift, schema-invalid drafts, lost provenance, or newly unflagged ambiguity.
 
 ### 24.4 Rules coverage fixtures
 
@@ -2541,6 +2690,7 @@ Exercise server, database, and domain together:
 - simultaneous claim race for one character;
 - map upload/transform/reference lifecycle;
 - actor/content import and live instance creation;
+- player PDF upload through bounded extraction/conversion, save/resume review, GM approval, duplicate/update choice, cleanup, and canonical actor creation;
 - encounter start through several turns;
 - public and secret roll authorization;
 - viewer pairing/read-only authorization, public projection, reconnect, and GM presentation directives;
@@ -2552,6 +2702,7 @@ Exercise server, database, and domain together:
 - integration-token create/use/expire/rotate/revoke/audit behavior and least-privilege scope matrix;
 - capability/version discovery, stable errors, pagination, rate limits, import jobs, and UI/API command equivalence;
 - API snapshot/event projections for GM, player-safe, viewer, and constrained integration principals;
+- agent-player observation/intent/approval/command flow, actor binding, human takeover, pause/revoke, provider timeout, memory write approval, and human replacement without character-state loss;
 - signed webhook success/retry/replay/disable behavior and blocked unsafe destinations when webhooks are implemented.
 
 ### 24.6 Realtime and concurrency tests
@@ -2660,12 +2811,14 @@ No milestone exits while a desktop feature lacks a usable mobile path.
 - Brute-force/rate-limit behavior.
 - Cross-site request/origin protections.
 - Malicious JSON, Markdown, file names, images, and archive paths.
+- Malicious, encrypted, truncated, oversized, deeply nested, decompression-heavy, image-only, form/action-bearing, embedded-file, and external-reference PDFs; MarkItDown timeout/crash/output overflow; temporary-file cleanup and network/filesystem isolation.
 - Secret-roll data absence from player snapshots, realtime frames, logs, DOM, accessibility tree, and browser persistence.
 - GM-only data absence from viewer snapshots, presentation events, realtime frames, logs, DOM, accessibility tree, and browser persistence; viewer attempts to send state-changing commands are rejected.
 - Hidden tokens/fog/NPC information absence from unauthorized payloads.
 - Dependency and container/file-permission scans.
 - Exhaustive integration scope/role/resource matrix; token guessing/leakage/rotation/revocation; CORS/origin and proxy handling; request smuggling/oversize inputs; idempotency abuse; event filter bypass; webhook signature/replay/SSRF/DNS-rebinding defenses.
 - Contract tests prove secret fields are absent rather than merely undocumented, including generated SDK models and examples.
+- AI-agent tests treat every chat/note/imported field/name/event/error as adversarial data: persona/policy override, indirect prompt injection, encoded tool instructions, memory poisoning, scope escalation, hidden-state inference/exfiltration, cross-agent leakage, provider-secret leakage, runaway retries/cost, and post-revocation commands must fail safely.
 
 ### 24.13 Usability tests
 
@@ -2692,7 +2845,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 **Goal:** settle decisions that could invalidate the foundation.
 
-- [~] Record ADR-001 through ADR-017, including the open API and open-source distribution decisions. The decision index is populated; remaining proposed decisions and dedicated ADR files still need resolution/reconciliation.
+- [~] Record ADR-001 through ADR-019, including open API, open-source distribution, character-sheet PDF ingestion, and long-term AI character participants. Accepted decisions have dedicated records; proposed/index-only decisions plus ADR-018/019 spike evidence still need resolution at their dependent phases.
 - [x] Choose application stack and repository/package boundaries.
 - [ ] Choose the first supported host OS/deployment form.
 - [~] Prototype direct-IP startup, LAN URL display, firewall error handling, and phone connection. Binding and LAN URL output exist; firewall recovery and physical-phone validation remain.
@@ -2714,7 +2867,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 - [~] Repository scaffold, formatting/lint/type/test/CI. Scaffold, type checking, tests, build, and CI exist; formatter/linter remain.
 - [x] Single local server startup and persistent data directory.
-- [x] First-run GM password creation, hashing, login, session, logout, and rate limiting. Bootstrap, session issuance, individual logout, revoke-all, and rate limiting are implemented and tested; password change remains a separate later item.
+- [x] First-run GM password creation, hashing, login, session, logout, and rate limiting. Bootstrap, session issuance, individual logout, persistent revoke-all, throttling, and proactive revoked-socket disconnect are implemented/tested; password change remains a separate item.
 - [~] Direct-IP landing page and displayed/copyable/QR host URL. Landing page and console LAN URLs exist; copy/QR UI remains.
 - [~] Player character list, atomic claim, remembered browser session, release, and GM force-release. Roster, player and GM controls, serialized race behavior, token recovery, and restart persistence are implemented and automated; full multi-client socket/browser/device acceptance remains.
 - [~] Role/ownership authorization at server command boundary. Implemented for current claim and dice commands; comprehensive command matrix and revocation tests remain.
@@ -2722,7 +2875,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [x] Database migration and transactional event/projection skeleton.
 - [~] Responsive application shell and navigation with functional phone equivalents. Initial shell exists; complete navigation and physical-device acceptance remain.
 - [~] Error boundary, structured logs, health check, and basic diagnostics. Health endpoint exists; error boundary, structured logs, and diagnostics remain.
-- [ ] Versioned `/api/v1` foundation with stable error/request envelopes, version/capabilities endpoints, OpenAPI source, and schema validation at the boundary.
+- [~] Versioned `/api/v1` foundation with stable error/request envelopes, version/capabilities endpoints, OpenAPI source, and schema validation at the boundary. Contracts and independently tested router exist; mounting and live credential authorization remain.
 - [ ] Named scoped integration credentials with one-time secret display, secure verification, expiry/rotation/revocation, last-used/audit metadata, and rate limits.
 - [ ] Versioned realtime handshake/command/event envelopes and contract-test harness shared by built-in and external clients.
 
@@ -2800,6 +2953,8 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Map/token-art library, thumbnails, reuse, reference-safe cleanup.
 - [ ] Encounter templates and baseline reset/duplicate.
 - [ ] Bulk JSON bundle import with partial success and report.
+- [ ] Player/GM character-sheet PDF upload with isolated pinned MarkItDown extraction, deterministic VTT-owned Markdown conversion, resumable correction/review, GM approval policy, canonical JSON output, and duplicate/update diff.
+- [ ] Representative digital-sheet golden fixtures plus explicit encrypted, malformed, scanned/image-only, adversarial, timeout, cleanup, and extraction-version-drift coverage.
 - [ ] Curated SRD 5.2.1 content conversion pipeline and initial reviewed monster subset.
 - [ ] Token defaults/art crop/fallback and auto-labeling.
 - [ ] Quick add by monster, quantity, and initiative mode.
@@ -2807,7 +2962,7 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Sample encounter and concise first-run onboarding.
 - [ ] Validate repeat-encounter setup time target.
 
-**Exit gate:** a repeat encounter using existing content can be prepared in under the validated target without data-entry work.
+**Exit gate:** a repeat encounter using existing content can be prepared in under the validated target without data-entry work, and a nontechnical player can turn a supported completed PDF sheet into a reviewed canonical character without editing JSON or silently accepting ambiguous values.
 
 ### Phase 6 — Version 1 hardening
 
@@ -2829,6 +2984,27 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 - [ ] Public-history/release audit finds no secrets, private campaign data, personal paths/identifiers, or unlicensed assets; SBOM/dependency-license inventory and reproducible checksums are published.
 
 **Exit gate:** all Version 1 quality criteria in Section 5.4 and the release acceptance suite in Section 28 pass.
+
+### Phase 7 — AI-controlled character participants — post-Version-1
+
+**Goal:** let explicitly authorized AI agents portray configurable characters and participate safely in social play and combat without privileged knowledge or “always optimize” behavior.
+
+Prerequisites: a stable documented API/realtime protocol, complete actor/action/combat commands, recipient-safe projections, presence/reconnect, integration credentials, audit history, actual-table Version 1 validation, and accepted ADR-019.
+
+- [ ] Versioned structured persona schema/editor with values, goals, bonds/flaws, relationships, speech style, tactical/exploration preferences, risk tolerance, knowledge boundaries, weighted priorities, and portable history.
+- [ ] Separate versioned autonomy/consent policy per speech and action category; suggest/confirm/bounded-act modes with conservative defaults.
+- [ ] Agent-player identity and actor-bound scoped credential lifecycle with presence, clear AI labeling, rotation/revocation, and atomic human takeover.
+- [ ] Recipient-safe `AgentObservation`, typed `AgentIntent`, legal-action/fallback hints, stale/late response handling, and ordinary domain-command adapter.
+- [ ] Provider-neutral adapter with structured output, cancellation/timeouts, local/remote capability disclosure, cost/context limits, and at least one self-host-friendly path.
+- [ ] Bounded inspectable character memory with typed proposals, source/visibility, approval, edit/delete/export, and cross-session retention policy.
+- [ ] GM control center: inspect effective persona/policy, pause all/one, approve/edit/reject, mute, take over, clear pending, cap usage, and disable provider.
+- [ ] In-character public conversation channel separate from tool/action commands, with cadence/interrupt/table-etiquette controls.
+- [ ] Scripted deterministic fake-agent conformance suite plus contrasting-persona behavior fixtures; model/provider evaluation matrix for roleplay consistency, rules uncertainty, latency, and failure recovery.
+- [ ] Prompt-injection, memory-poisoning, secret-exfiltration, cross-agent leakage, provider-retention, runaway action/cost, revocation, and untrusted-content security suite.
+- [ ] Human-table usability/consent playtests covering cooperative roleplay, non-optimal persona-consistent choices, social interruptions, combat turns, provider outage, GM correction, and human replacement.
+- [ ] Public API/SDK docs and sample agent that require no private imports, database access, browser automation, GM password, or hidden chain-of-thought logging.
+
+**Exit gate:** at a consenting test table, two differently configured AI characters demonstrate recognizably different persona-consistent social and tactical behavior through only authorized observations and ordinary commands; humans can understand, interrupt, edit, take over, and revoke them immediately; injected content cannot alter policy or reveal hidden data; provider failure never blocks play.
 
 ### Post-Version-1 parking lot
 
@@ -2907,6 +3083,9 @@ For each promoted mechanic, add:
 | Canvas-heavy UI excludes keyboard/screen-reader users | Core combat cannot be operated accessibly | State/actions exist only in canvas | Accessible DOM mirrors and alternative controls from initial architecture |
 | JSON schema becomes too rigid | Homebrew/legacy imports fail or require constant schema changes | Many unknown fields discarded; users edit canonical JSON to satisfy UI | Versioned schema, adapters, extensions, warnings/text fallback, round-trip tests |
 | Source extraction quality | Generated SRD content contains merged columns or incorrect actions | High warning count and nonsensical parsed fields | Curated pipeline, human review, coverage subset, source metadata, golden fixtures |
+| Character-sheet PDF extraction is wrong | A player imports incorrect combat statistics or loses sheet information | MarkItDown changes table order; layout/OCR ambiguity is treated as certainty; users skip review | Version-pin extraction/converter, representative golden fixtures, field provenance/confidence, required review, schema validation, text fallback, explicit unsupported-layout errors |
+| Untrusted PDF exhausts or compromises the host | Import blocks combat, reads local data, writes outside temporary storage, or triggers parser vulnerabilities | Extraction shares server privileges/process/resources; embedded actions/resources are followed | Isolated no-network worker, least privilege, strict size/page/time/memory/output limits, patched pinned dependency, magic/type checks, cleanup tests, never run in authoritative command path |
+| Character-sheet privacy/retention surprise | Private player data persists in diagnostics/backups or leaves the host | Raw PDF/Markdown logged, remotely processed, or retained indefinitely | Local-only default, redacted logs/API, explicit retention/deletion policy, temporary cleanup, backup disclosure, no hosted AI/OCR without a separate opt-in decision |
 | Realtime divergence/duplicate commands | Clients disagree or apply damage twice | Refresh “fixes” state; intermittent duplicate log entries | Server authority, idempotency IDs, ordered revisions, snapshots, concurrency tests |
 | Secret information leak | Players can inspect hidden roll/token data | Data present but hidden in UI | Server-side projections, negative authorization tests, no secret payload to unauthorized clients |
 | Shared viewer leaks GM workspace | A TV/projector exposes private state or preparation gestures to the table | Viewer is implemented as screen mirroring or receives the GM projection | Dedicated read-only viewer projection, explicit presentation channel, no default cursor/ruler mirroring, negative viewer payload/DOM/cache tests |
@@ -2924,6 +3103,12 @@ For each promoted mechanic, add:
 | Integration credential compromise | GM/private state or commands exposed | Long-lived broad tokens copied into scripts/logs | One-time display, hashed storage, narrow game-bound scopes, expiry/rotation/revocation, audit/last-used data, secret-scanning guidance |
 | API/UI behavior divergence | Integrations create states the UI cannot understand or bypass rules | Separate endpoint-specific mutations and duplicated business logic | All transports map to the same typed commands/domain handlers/events/projections; equivalence tests |
 | Malicious/slow integrations degrade play | Combat latency or host resources suffer | Unbounded queries/subscriptions/webhook retries | Pagination/limits, rate limits, backpressure, bounded queues/retention/retries, isolate delivery from command acknowledgement |
+| AI agent becomes a tactical optimizer instead of a character | Roleplay feels generic; every agent chooses the same mathematically strongest action | Persona is free text only; evaluator rewards wins/damage; no relationship/goal/risk inputs | Structured persona and weighted priorities, contrasting-persona fixtures, table feedback, allow valid suboptimal choices, separate rules legality from preference ranking |
+| Agent prompt injection or memory poisoning | Untrusted chat/notes/imports change policy, leak secrets, or trigger tools | Raw text shares the instruction channel; agent writes memory without provenance/approval | Labeled trust channels, typed observations/intents/memory proposals, strict precedence, minimized projections, adversarial suite, no text-to-command interpretation |
+| Agent authority/knowledge exceeds its character | Agent sees GM/private state or controls other actors | Full snapshots/GM token supplied for convenience; model output trusted directly | Actor-bound agent principal, least scopes, recipient-safe observation DTO, ordinary authorization/domain commands, negative projections, immediate pause/takeover/revoke |
+| Agent latency/outage/runaway cost disrupts play | Initiative stalls or self-host expenses surprise operator | Synchronous model call blocks server/turn; unbounded retries/context | Async cancellable adapter, deadlines/budgets, usage caps, safe fallback/human takeover, provider circuit breaker, never block authoritative process |
+| Persona stereotypes or unwanted behavior harm the table | Offensive, disruptive, or consent-breaking roleplay | Unreviewed presets, hidden persona/memory, no boundaries/mute | Inspectable editable persona, hard boundaries, table consent, clear AI labeling, mute/pause/report/reset, provider/content policy disclosure |
+| Provider privacy/retention leaks campaign data | Private conversation/character memory leaves expected boundary | Whole campaign/prompt sent remotely; provider retention unknown | Minimal authorized context, local option, provider disclosure/opt-in, redact secrets, configurable retention, inspect/export/delete, no training assumption |
 | Open-source support burden | Maintainer time shifts from product to setup/integration support | Undocumented platforms, unstable releases, many ad hoc SDKs | Declare support matrix, issue templates, compatibility policy, thin official SDK only, community ownership boundaries |
 | License/content provenance error | Public distribution includes incompatible or private material | Code/content/assets treated as one license; missing attribution | ADR-017, legal/license review, separate manifests/notices, provenance inventory, automated scans, clean public fixtures |
 
@@ -2938,11 +3123,12 @@ For each promoted mechanic, add:
 - Dice rolling and secret rolls are core.
 - Initial dice presentation is 2D; 3D tabletop dice are deferred behind a replaceable presentation boundary.
 - Automation assists and proposes; GM override is always available.
-- Character building is external; canonical JSON import is primary.
+- Character building/level-up decision-making is external; canonical JSON remains authoritative, while completed character-sheet PDFs may be converted locally through MarkItDown and a reviewed VTT-owned canonicalization adapter.
 - Battle, regional, and world maps accept standard image files through a common safe normalization pipeline.
 - Battlemap upload includes a short visual grid-calibration wizard; normal use never requires pixel/offset math.
 - Regional/world atlas maps, spatial Markdown notes, and session-recap markers are required long-term capabilities but remain post-Version-1 work unless this plan is explicitly reprioritized.
 - Open-source self-hosting and a documented, versioned integration API are foundational requirements. Open access never bypasses authentication, authorization, visibility, or safe defaults.
+- AI-controlled player characters are a post-Version-1 goal. They are configurable roleplaying participants with structured personalities and bounded autonomy, not privileged optimizers; human play, ordinary API authority, and immediate GM control remain primary.
 
 ### 27.3 Open product decisions
 
@@ -2980,6 +3166,19 @@ Resolve these through ADRs or brief usability tests before their dependent miles
 | Contribution attestation | Choose lightweight DCO or CLA in ADR-017 before accepting contributions | Before public contributions |
 | Telemetry | Off by default; any future opt-in telemetry requires a separate privacy/product decision | Before public release |
 | Legacy 2014-style import | Extension/adapter after canonical 5.2.1 schema works | Phase 5 or actual need |
+| PDF importer approval authority | Player may upload/review a draft; GM approval is the conservative default before creating/updating a shared actor | Before Phase 5 importer UI |
+| PDF/original Markdown retention | Delete temporary extraction after approval/failure by default; optionally retain the original locally when the GM explicitly enables it for provenance/re-import | Before Phase 5 persistence schema |
+| Scanned-sheet OCR | Not supported initially; evaluate a bounded offline OCR adapter only after digital-PDF extraction quality and packaging are proven | Phase 5 or demonstrated need |
+| MarkItDown packaging | Prefer an isolated, pinned local worker/CLI bundled or installed through the supported host package; decide process/container boundary and upgrade policy in ADR-018 | Before Phase 5 implementation |
+| Character conversion intelligence | Deterministic layout/rule parser with explicit confidence and manual correction; no hosted AI by default | Before Phase 5 converter spike |
+| AI persona ownership/editing | GM controls effective policy; table/character owner may propose persona/relationship edits according to an explicit consent model | Before Phase 7 persona UI |
+| AI disclosure and table consent | Clearly label AI participants and require GM plus table opt-in; no covert substitution | Before Phase 7 playtest |
+| AI autonomy defaults | Suggest-only for consequential actions; configure speech/movement/roll/resource/reveal authority separately | Before Phase 7 command adapter |
+| AI provider baseline | Provider-neutral interface and at least one self-host-friendly option; remote providers are explicit operator choices | Before Phase 7 provider implementation |
+| AI memory policy | Typed, bounded, inspectable character memory with source/visibility and conservative approval; no automatic full-campaign ingestion | Before Phase 7 persistence |
+| AI reasoning retention | Store concise decision tags/rationale and command audit, not hidden chain-of-thought; provider raw reasoning is neither required nor treated as authoritative | Before Phase 7 diagnostics |
+| AI speech/table behavior | Separate public speech from commands; define cadence, interruption, muting, private-message, and content-boundary policy through table testing | Before Phase 7 social playtest |
+| AI turn timeout/fallback | Bounded deadline/retries and then human takeover or configured safe fallback; never block initiative | Before Phase 7 realtime implementation |
 
 ### 27.4 Scope-admission questions
 
@@ -3017,6 +3216,9 @@ Run this suite against a release candidate on a clean host installation. Use at 
 - [ ] GM imports a normal map from the supported device/file source.
 - [ ] GM calibrates the square grid without documentation.
 - [ ] GM imports valid character and monster JSON.
+- [ ] Player uploads a supported completed PDF sheet; bounded MarkItDown extraction and the VTT converter produce a reviewable schema-valid draft with provenance and ambiguity warnings.
+- [ ] Player corrects/accepts the draft and the GM approves it; the resulting actor behaves like a direct canonical JSON import and the original document follows the configured retention policy.
+- [ ] One encrypted/image-only or intentionally malformed sheet fails safely with an actionable explanation, no partial actor, no leaked content/path, and no orphaned temporary files.
 - [ ] GM understands and resolves one intentionally malformed actor error.
 - [ ] GM adds multiple copies of a monster with unique labels.
 - [ ] GM places tokens and prepares manual fog.
@@ -3132,13 +3334,14 @@ Keep this small dashboard current near the top or here:
 
 | Phase | Status | Exit gate evidence |
 | --- | --- | --- |
-| Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, and renderer proofs exist; physical-device/network, renderer stress/input, realtime convergence, wireframes, and remaining ADR records block the gate |
-| Phase 1 — Local-host foundation | In progress | Auth/session shell with hardened GM logout/revoke-all/rate limiting, durable serialized roster/claims, remembered-token/restart recovery, GM force-release, a server-authoritative presence registry with multi-client convergence tests, recipient projections, CI, health endpoint, and transactional SQLite exist; full physical-device socket/browser acceptance, API foundation/contracts/scoped credentials, diagnostics, and GM password change block the gate |
+| Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, renderer, and accepted-decision records exist; physical-device/network, renderer stress/input, realtime convergence, wireframes, external-API proof, and unresolved proposed decisions block the gate; ADR-018/019 evidence is due only before their later implementation phases |
+| Phase 1 — Local-host foundation | In progress | Auth/session revocation/rate limiting, durable serialized roster/claims, remembered recovery, GM force-release, API contracts/system router module, a server-authoritative presence registry with multi-client convergence tests, recipient projections, CI, health, and transactional SQLite exist; full socket/browser claim acceptance, mounted API/scoped credentials, diagnostics, GM password change, and device acceptance block the gate |
 | Phase 2 — Minimum playable vertical slice | Planned; requirements active | Battlemap calibration, shared-table viewer, and API-driven vertical-slice requirements are defined; implementation waits on the Phase 1 join/recovery/API gate |
 | Phase 3 — Playable alpha | Not started | — |
 | Phase 4 — Rules-assisted beta | Not started | — |
 | Phase 5 — Preparation speed/content | Not started | — |
 | Phase 6 — Version 1 hardening | Not started | — |
+| Phase 7 — AI character participants | Post-Version-1 | Structured persona/autonomy/memory and actor-bound safe agent contracts are defined; implementation waits on stable human combat/API/presence plus accepted ADR-019 |
 
 ### 29.3 Decision record template
 
