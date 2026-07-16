@@ -12,7 +12,7 @@
 .combatant-choice { display: flex; gap: .7rem; align-items: center; cursor: pointer; }
 .combatant-choice input { width: 1.2rem; height: 1.2rem; accent-color: #d58a35; }
 .combatant-choice span, .combatant-choice strong, .combatant-choice small { display: block; }
-.combatant-choice small, .initiative-list small { margin-top: .2rem; color: #a69e91; }
+.combatant-choice small, .initiative-list small { display: block; margin-top: .2rem; color: #a69e91; }
 .initiative-score { color: #c8c0b1; font-size: .75rem; }
 .initiative-score input, .initiative-list.gm input { width: 100%; margin-top: .3rem; padding: .55rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #0c0a07; color: #f5efe3; }
 .encounter-primary, .turn-controls button, .initiative-list.gm button { padding: .7rem 1rem; border: 1px solid #7c633e; border-radius: .5rem; background: #282117; color: #fff; cursor: pointer; }

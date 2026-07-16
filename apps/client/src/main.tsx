@@ -150,9 +150,9 @@ function App() {
         {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}
       </nav>}
 
-      {(mode === "player" || gmTab === "table") && <>
+      {(mode === "player" || gmTab === "table") && <div className="table-layout">
         <section className="table">
-          <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "AT THE TABLE"}</span><h2>Battle map</h2><p>{state.combat.active ? `Encounter running · Round ${state.combat.round}` : mode === "gm" ? "No encounter running yet. Start one from the Encounter panel below." : "No encounter running yet. The GM will start combat when everyone's ready."}</p></div>
+          <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "AT THE TABLE"}</span><h2>Battle map</h2><p>{state.combat.active ? `Encounter running · Round ${state.combat.round}` : mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p></div>
           {state.combat.active && state.combat.mapAssetId ? <EncounterMap
             assetId={state.combat.mapAssetId}
             token={mapToken}
@@ -164,10 +164,12 @@ function App() {
             activeActorId={state.combat.turnActorId}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
         </section>
-        <EncounterPanel {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, selectedMap } : { role: "player" as const, state: state as PlayerView })} />
-        <DicePanel role={mode} state={state} />
-        {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
-      </>}
+        <div className="table-sidebar">
+          <EncounterPanel {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, selectedMap } : { role: "player" as const, state: state as PlayerView })} />
+          <DicePanel role={mode} state={state} />
+          {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
+        </div>
+      </div>}
 
       {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
 import "./map-manager.css";
 
 type Point = { x: number; y: number };
@@ -22,7 +23,6 @@ type WizardState = Readonly<{
   calibration: Readonly<{ origin: Point; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
   verification: Readonly<{ errorPx: number; tolerancePx: number; accepted: boolean }> | null;
 }>;
-type OverlayLine = Readonly<{ axis: "column" | "row"; index: number; start: Point; end: Point; major: boolean }>;
 export type MapSelection = Readonly<{
   id: string;
   name: string;
@@ -40,8 +40,6 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
   if (!response.ok) throw new Error(body.error?.message ?? body.message ?? "Map request failed.");
   return body.data;
 }
-
-const rounded = (value: number) => Math.round(value * 100) / 100;
 
 const interpolate = (from: Point, to: Point, amount: number): Point => ({ x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount });
 
@@ -84,7 +82,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [unit, setUnit] = useState("miles");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const selected = maps.find((map) => map.id === selectedId) ?? null;
 
   const refresh = async (preferId?: string) => {
@@ -134,12 +132,9 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     });
   };
   const pointAt = (clientX: number, clientY: number) => {
-    if (!selected || !imageRef.current) return;
-    const rect = imageRef.current.getBoundingClientRect();
-    return {
-      x: rounded(Math.max(0, Math.min(selected.width, (clientX - rect.left) * selected.width / rect.width))),
-      y: rounded(Math.max(0, Math.min(selected.height, (clientY - rect.top) * selected.height / rect.height)))
-    };
+    if (!selected || !svgRef.current) return null;
+    const point = imagePointFromClient(svgRef.current, clientX, clientY);
+    return point ? clampPoint(point, selected.width, selected.height) : null;
   };
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     const point = pointAt(event.clientX, event.clientY);
@@ -227,12 +222,12 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
           </div>
 
           <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
-            {previewUrl ? <img ref={imageRef} src={previewUrl} alt={selected.name} draggable={false} /> : <p>Loading map preview…</p>}
-            <svg viewBox={`0 0 ${selected.width} ${selected.height}`} aria-hidden="true">
-              {overlay.map((line) => <line key={`${line.axis}-${line.index}`} className={line.major ? "major" : ""} x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} />)}
+            {previewUrl ? <svg ref={svgRef} viewBox={`0 0 ${selected.width} ${selected.height}`} preserveAspectRatio="xMidYMid meet">
+              <image href={previewUrl} width={selected.width} height={selected.height} role="img" aria-label={selected.name} />
+              <GridOverlay lines={overlay} />
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
               {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
-            </svg>
+            </svg> : <p>Loading map preview…</p>}
           </div>
 
           {showPoints && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
