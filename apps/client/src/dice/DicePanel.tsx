@@ -78,7 +78,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     <div className="roll-list">
       {state.rolls.length === 0 && <p>No rolls yet.</p>}
       {state.rolls.slice(-8).reverse().map((roll) => <article className="roll-card" key={roll.id}>
-        <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{roll.initiatorLabel} · {PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
+        <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{roll.initiatorLabel ?? "Unknown roller"} · {PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
         <div className="roll-result"><div className="dice-faces">{roll.dice.map((die, index) => <span key={`${roll.id}-${index}`} className={die.kept ? "die" : "die discarded"} title={`d${die.sides}${die.kept ? "" : " (discarded)"}`}>{die.face}</span>)}</div><strong className="roll-total">{roll.total}</strong></div>
       </article>)}
     </div>

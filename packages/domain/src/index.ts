@@ -10,8 +10,12 @@ export const RollRecordSchema = z.object({
   commandId: z.string().uuid(),
   initiatorSessionId: z.string().uuid(),
   initiatorRole: z.enum(["gm", "player"]),
-  /** Human-readable "who rolled this" — the GM, or the player's claimed character's name at roll time. */
-  initiatorLabel: z.string().min(1).max(120),
+  /**
+   * Human-readable "who rolled this" — the GM, or the player's claimed character's name at roll
+   * time. Optional so rolls persisted before this field existed still parse; the server always
+   * supplies a real value for every new roll.
+   */
+  initiatorLabel: z.string().min(1).max(120).optional(),
   actorId: z.string().uuid().nullable(),
   purpose: RollPurposeSchema,
   visibility: RollVisibilitySchema,

@@ -99,6 +99,7 @@ export function EncounterMap({
   const tokensById = useMemo(() => new Map(tokens.map((encounterToken) => [encounterToken.actorId, encounterToken])), [tokens]);
   const size = image.status === "ready" ? { width: image.width, height: image.height } : null;
   const calibration = grid.calibration;
+  const handleRadius = Math.max(10, calibration ? calibration.cellSizePx * 0.16 : 10);
 
   useEffect(() => { setGesture(null); }, [assetId, token]);
   useEffect(() => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); }, [assetId, size?.width, size?.height]);
@@ -199,6 +200,9 @@ export function EncounterMap({
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
+    // The visibility-cycle and delete controls are nested inside the same draggable annotation
+    // group; let their own onClick handlers run natively instead of starting a move/resize drag.
+    if (target.closest(".annotation-controls")) return;
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
     const handleAnnotationId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && handleAnnotationId) {
@@ -353,8 +357,8 @@ export function EncounterMap({
               <ShapeGlyph shape={annotation.shape!} origin={origin} target={target} className="annotation-shape-body" />
               <text x={origin.x} y={origin.y - 8} className="annotation-shape-label">{annotation.geometry.sizeFeet} ft</text>
               {editable && <>
-                <circle data-annotation-handle="move" className="annotation-handle annotation-handle-move" cx={origin.x} cy={origin.y} r={7} />
-                <circle data-annotation-handle="resize" className="annotation-handle annotation-handle-resize" cx={target.x} cy={target.y} r={7} />
+                <circle data-annotation-handle="move" className="annotation-handle annotation-handle-move" cx={origin.x} cy={origin.y} r={handleRadius} />
+                <circle data-annotation-handle="resize" className="annotation-handle annotation-handle-resize" cx={target.x} cy={target.y} r={handleRadius} />
                 <g className="annotation-controls" transform={`translate(${origin.x} ${origin.y - 26})`}>
                   <g className="annotation-visibility-toggle" onClick={() => !busy && void cycleVisibility(annotation)}><rect rx={4} width={96} height={18} x={-48} /><text y={13}>{VISIBILITY_LABELS[annotation.visibility]}</text></g>
                   <g className="annotation-delete" transform="translate(54 0)" onClick={() => !busy && void removeAnnotation(annotation.id)}><rect rx={4} width={18} height={18} x={0} /><text x={9} y={13}>×</text></g>
