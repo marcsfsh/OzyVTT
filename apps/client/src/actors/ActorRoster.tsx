@@ -36,9 +36,9 @@ export function ActorRoster(props: Props) {
   return <section className="roster" aria-labelledby="roster-heading">
     <div className="roster-heading">
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
-      <p>{props.role === "player" ? "One character per player for this testing milestone." : "Player claims update here in real time. You can release a stale claim when someone changes devices."}</p>
+      <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
     </div>
-    {actors.length === 0 ? <p className="roster-empty">No player characters are available yet.</p> : <div className="actor-grid">
+    {actors.length === 0 ? <p className="roster-empty">No characters have been added yet.</p> : <div className="actor-grid">
       {actors.map((actor) => {
         const playerActor = "claimStatus" in actor ? actor : null;
         const mine = playerActor?.claimStatus === "mine";

@@ -26,7 +26,7 @@ export function EncounterMap({
 }>) {
   const [source, setSource] = useState<string | null>(null);
   const [size, setSize] = useState<Readonly<{ width: number; height: number }> | null>(null);
-  const [message, setMessage] = useState("Loading active battlemap…");
+  const [message, setMessage] = useState("Loading the battle map…");
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [busyActorId, setBusyActorId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -36,17 +36,17 @@ export function EncounterMap({
 
   useEffect(() => {
     setSource(null); setSize(null); setDragging(null);
-    if (!token) { setMessage("A table session is required to load the active battlemap."); return; }
+    if (!token) { setMessage("Rejoin the table to load the battle map."); return; }
     const controller = new AbortController();
     let objectUrl: string | null = null;
-    setMessage("Loading active battlemap…");
+    setMessage("Loading the battle map…");
     fetch(`/api/v1/map-assets/${encodeURIComponent(assetId)}/content`, {
       headers: { authorization: `Bearer ${token}` }, signal: controller.signal
     }).then(async (response) => {
-      if (!response.ok) throw new Error(response.status === 403 ? "The active battlemap is not available to this session." : "The active battlemap could not be loaded.");
+      if (!response.ok) throw new Error(response.status === 403 ? "You don't have access to this map." : "The battle map couldn't be loaded.");
       objectUrl = URL.createObjectURL(await response.blob());
       const probe = new Image();
-      await new Promise<void>((resolve, reject) => { probe.onload = () => resolve(); probe.onerror = () => reject(new Error("The active battlemap image could not be decoded.")); probe.src = objectUrl!; });
+      await new Promise<void>((resolve, reject) => { probe.onload = () => resolve(); probe.onerror = () => reject(new Error("The battle map image couldn't be displayed.")); probe.src = objectUrl!; });
       setSize({ width: probe.naturalWidth, height: probe.naturalHeight }); setSource(objectUrl); setMessage("");
     }).catch((error) => { if (error.name !== "AbortError") setMessage(error.message); });
     return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };

@@ -77,10 +77,10 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
   };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
-    <div className="encounter-heading"><div><span className="eyebrow">SERVER-AUTHORITATIVE COMBAT</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div>{state.combat.active && <strong>Round {state.combat.round}</strong>}</div>
+    <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div>{state.combat.active && <strong>Round {state.combat.round}</strong>}</div>
     {!state.combat.active ? <>
-      <p>Choose combatants and enter any known scores. Starting the encounter creates their tokens automatically; drag them from the tray straight onto the map.</p>
-      <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Select a map above"}</strong></div>
+      <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
+      <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Pick a map on the Maps tab"}</strong></div>
       <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
         <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
         <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
