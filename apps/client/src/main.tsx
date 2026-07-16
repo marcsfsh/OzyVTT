@@ -160,6 +160,7 @@ function App() {
             role={mode}
             actors={state.actors}
             tokens={state.combat.tokens}
+            annotations={state.combat.annotations}
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}

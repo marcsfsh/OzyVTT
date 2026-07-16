@@ -58,7 +58,7 @@ function squareCorner(start: Point, raw: Point, width: number, height: number): 
   return { x: start.x + signX * side, y: start.y + signY * side };
 }
 
-function GridAreaPreview({ start, end }: Readonly<{ start: Point; end: Point }>) {
+function GridAreaPreview({ start, end, handle }: Readonly<{ start: Point; end: Point; handle?: boolean }>) {
   const x0 = Math.min(start.x, end.x);
   const y0 = Math.min(start.y, end.y);
   const size = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y));
@@ -68,6 +68,15 @@ function GridAreaPreview({ start, end }: Readonly<{ start: Point; end: Point }>)
       <line key={`v${third}`} x1={x0 + (size * third) / 3} y1={y0} x2={x0 + (size * third) / 3} y2={y0 + size} />,
       <line key={`h${third}`} x1={x0} y1={y0 + (size * third) / 3} x2={x0 + size} y2={y0 + (size * third) / 3} />
     ])}
+    {handle && <circle className="grid-area-handle" cx={end.x} cy={end.y} r={Math.max(6, size / 24)} />}
+  </g>;
+}
+
+/** Two full-map guide lines that follow the point being placed/adjusted, to help line up a corner against printed grid art before or during a drag. */
+function CrosshairOverlay({ point, width, height }: Readonly<{ point: Point; width: number; height: number }>) {
+  return <g className="grid-crosshair" aria-hidden="true">
+    <line x1={0} y1={point.y} x2={width} y2={point.y} />
+    <line x1={point.x} y1={0} x2={point.x} y2={height} />
   </g>;
 }
 
@@ -81,6 +90,10 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [points, setPoints] = useState<Point[]>([]);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [dragCurrent, setDragCurrent] = useState<Point | null>(null);
+  const [hoverPoint, setHoverPoint] = useState<Point | null>(null);
+  const [pendingArea, setPendingArea] = useState<{ start: Point; end: Point } | null>(null);
+  const [areaAction, setAreaAction] = useState<"move" | "resize" | null>(null);
+  const [moveGrab, setMoveGrab] = useState<Point | null>(null);
   const [battlemapMode, setBattlemapMode] = useState<"square" | "gridless">("square");
   const [distancePerCell] = useState(5);
   const [verifying, setVerifying] = useState(false);
@@ -160,30 +173,72 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     if (!selected || selected.kind !== "battlemap" || battlemapMode !== "square" || wizard || busy) return;
     const point = pointAt(event.clientX, event.clientY); if (!point) return;
     event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+    if (pendingArea) {
+      const handleRadius = Math.max(10, Math.min(selected.width, selected.height) / 30);
+      const nearCorner = Math.hypot(point.x - pendingArea.end.x, point.y - pendingArea.end.y) <= handleRadius;
+      if (nearCorner) { setAreaAction("resize"); return; }
+      setAreaAction("move"); setMoveGrab({ x: point.x - pendingArea.start.x, y: point.y - pendingArea.start.y });
+      return;
+    }
     setPoints([]); setDragStart(point); setDragCurrent(point); setMessage("Keep dragging to the opposite corner of a 3 × 3 block.");
   };
   const moveGridArea = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart || !selected || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (!selected) return;
     const point = pointAt(event.clientX, event.clientY); if (!point) return;
-    event.preventDefault(); setDragCurrent(squareCorner(dragStart, point, selected.width, selected.height));
+    if (dragStart && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.preventDefault(); setDragCurrent(squareCorner(dragStart, point, selected.width, selected.height));
+      return;
+    }
+    if (pendingArea && areaAction === "resize" && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.preventDefault();
+      setPendingArea((current) => current && { start: current.start, end: squareCorner(current.start, point, selected.width, selected.height) });
+      return;
+    }
+    if (pendingArea && areaAction === "move" && moveGrab && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.preventDefault();
+      setPendingArea((current) => {
+        if (!current) return current;
+        const sideX = current.end.x - current.start.x;
+        const sideY = current.end.y - current.start.y;
+        const size = Math.abs(sideX);
+        const minX = sideX >= 0 ? 0 : size;
+        const maxX = sideX >= 0 ? selected.width - size : selected.width;
+        const minY = sideY >= 0 ? 0 : size;
+        const maxY = sideY >= 0 ? selected.height - size : selected.height;
+        const startX = Math.min(Math.max(point.x - moveGrab.x, minX), maxX);
+        const startY = Math.min(Math.max(point.y - moveGrab.y, minY), maxY);
+        return { start: { x: startX, y: startY }, end: { x: startX + sideX, y: startY + sideY } };
+      });
+      return;
+    }
+    if (!dragStart && !pendingArea && squareMode && !wizard) setHoverPoint(point);
   };
   const finishGridArea = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart || !selected || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const point = pointAt(event.clientX, event.clientY); if (!point) return;
-    event.preventDefault(); event.currentTarget.releasePointerCapture(event.pointerId);
-    const start = dragStart;
-    const end = squareCorner(start, point, selected.width, selected.height);
-    setDragStart(null); setDragCurrent(null); setPoints([start, end]);
-    void startAreaWizard(start, end);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (dragStart && selected) {
+      const point = pointAt(event.clientX, event.clientY);
+      const start = dragStart;
+      const end = point ? squareCorner(start, point, selected.width, selected.height) : (dragCurrent ?? start);
+      setDragStart(null); setDragCurrent(null);
+      setPendingArea({ start, end }); setPoints([start, end]);
+      setMessage("Drag the square to move it, its corner to resize it, then measure the grid.");
+      return;
+    }
+    if (areaAction) {
+      if (pendingArea) setPoints([pendingArea.start, pendingArea.end]);
+      setAreaAction(null); setMoveGrab(null);
+    }
   };
-  const cancelGridArea = () => { setDragStart(null); setDragCurrent(null); };
+  const cancelGridArea = () => { setDragStart(null); setDragCurrent(null); setAreaAction(null); setMoveGrab(null); };
+  const confirmPendingArea = () => { if (pendingArea) void startAreaWizard(pendingArea.start, pendingArea.end); };
+  const discardPendingArea = () => restartCalibration("Drag diagonally across a 3 × 3 block of printed squares.");
   const updatePoint = (index: number, coordinate: "x" | "y", value: number) => setPoints((current) => {
     const next = [...current];
     while (next.length <= index) next.push({ x: 0, y: 0 });
     next[index] = { ...next[index], [coordinate]: Number.isFinite(value) ? value : 0 };
     return next;
   });
-  const acceptWizardData = (data: any) => { setWizardId(data.wizardId); setWizard(data.state); setOverlay(data.overlay ?? []); if (data.overlayWarning) setMessage(data.overlayWarning); };
+  const acceptWizardData = (data: any) => { setWizardId(data.wizardId); setWizard(data.state); setOverlay(data.overlay ?? []); setPendingArea(null); if (data.overlayWarning) setMessage(data.overlayWarning); };
   const startAreaWizard = (start: Point, end: Point) => run(async () => {
     if (!selected) throw new Error("Select a battlemap first.");
     const data = await api(`/api/v1/map-assets/${selected.id}/calibration/wizards`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ start, end, cellsAcross: 3, cellsDown: 3, distancePerCell }) });
@@ -197,19 +252,22 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const completeWizard = () => run(async () => {
     if (!selected || !wizardId) throw new Error("Start grid calibration first.");
     await api(`/api/v1/map-assets/${selected.id}/calibration/wizards/${wizardId}/complete`, gmToken, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-    await refresh(selected.id); setWizard(null); setWizardId(null); setOverlay([]); setPoints([]); setDragStart(null); setDragCurrent(null); setVerifying(false); setMessage("Grid calibration saved.");
+    await refresh(selected.id); setWizard(null); setWizardId(null); setOverlay([]); setPoints([]); setDragStart(null); setDragCurrent(null); setPendingArea(null); setVerifying(false); setMessage("Grid calibration saved.");
   });
   const saveScale = () => run(async () => {
     if (!selected || points.length < 2) throw new Error("Choose two points with a known real-world distance.");
     await api(`/api/v1/map-assets/${selected.id}/scale`, gmToken, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ start: points[0], end: points[1], knownDistance, unit }) });
     await refresh(selected.id); setPoints([]); setMessage("Map scale saved.");
   });
-  const restartCalibration = (notice: string) => { setPoints([]); setDragStart(null); setDragCurrent(null); setWizardId(null); setWizard(null); setOverlay([]); setVerifying(false); setMessage(notice); };
+  const restartCalibration = (notice: string) => { setPoints([]); setDragStart(null); setDragCurrent(null); setHoverPoint(null); setPendingArea(null); setAreaAction(null); setMoveGrab(null); setWizardId(null); setWizard(null); setOverlay([]); setVerifying(false); setMessage(notice); };
   const squareMode = selected?.kind === "battlemap" && battlemapMode === "square";
   const showPoints = !wizard || verifying;
   const instruction = squareMode
-    ? (!wizard ? "Press on a grid intersection, drag diagonally across a 3 × 3 block of squares, and release on the opposite intersection." : "Grid detected. Confirm it below, or fine-tune it first if it looks off.")
+    ? (pendingArea ? "Drag inside the square to move it, or its corner to resize it. Confirm when it lines up with the printed grid."
+      : !wizard ? "Press on a grid intersection, drag diagonally across a 3 × 3 block of squares, and release on the opposite intersection."
+      : "Grid detected. Confirm it below, or fine-tune it first if it looks off.")
     : `${points.length < 2 ? `Choose ${points.length ? "the ending" : "a starting"} point` : "Enter the real-world distance"}. Click two locations on the map whose real-world distance you know.`;
+  const crosshairPoint = squareMode && !wizard ? (dragCurrent ?? pendingArea?.end ?? hoverPoint) : null;
 
   return <>
     <section className="map-manager" aria-labelledby="map-manager-heading">
@@ -231,16 +289,19 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
             {squareMode && !wizard && <small>Squares are 5 ft each, the D&amp;D 5e default.</small>}
           </div>
 
-          <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
+          <div className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (areaAction === "resize" ? "resizing" : "movable") : ""}`} style={{ aspectRatio: `${selected.width} / ${selected.height}` }} onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint} onPointerDown={beginGridArea} onPointerMove={moveGridArea} onPointerUp={finishGridArea} onPointerCancel={cancelGridArea} onPointerLeave={() => { if (!dragStart && !areaAction) setHoverPoint(null); }} aria-describedby="calibration-instruction" aria-label={`Map preview for ${selected.name}. ${pendingArea ? "Drag to move or resize the placed grid area." : squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}>
             {previewUrl ? <svg ref={svgRef} viewBox={`0 0 ${selected.width} ${selected.height}`} preserveAspectRatio="xMidYMid meet">
               <image href={previewUrl} width={selected.width} height={selected.height} role="img" aria-label={selected.name} />
               <GridOverlay lines={overlay} />
               {dragStart && dragCurrent && <GridAreaPreview start={dragStart} end={dragCurrent} />}
+              {pendingArea && <GridAreaPreview start={pendingArea.start} end={pendingArea.end} handle />}
+              {crosshairPoint && <CrosshairOverlay point={crosshairPoint} width={selected.width} height={selected.height} />}
               {showPoints && points.slice(0, wizard ? 3 : 2).map((point, index) => <g key={index}><circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(selected.width, selected.height) / 80)} /><text x={point.x} y={point.y}>{index === 0 ? "A" : index === 1 ? "C" : "V"}</text></g>)}
             </svg> : <p>Loading map preview…</p>}
           </div>
 
-          {showPoints && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
+          {pendingArea && !wizard && <div className="grid-wizard-actions pending-area-actions"><button className="save-map" disabled={busy} onClick={confirmPendingArea}>Measure this area</button><button className="secondary" disabled={busy} onClick={discardPendingArea}>Start over</button></div>}
+          {showPoints && !pendingArea && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
           {!wizard && <details className="advanced-points"><summary>Enter or fine-tune point coordinates (keyboard alternative)</summary><div className="point-editor">{[0, 1].map((index) => <fieldset key={index}><legend>{index === 0 ? "Drag start A" : "Drag end C"}</legend><label>X<input type="number" value={points[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<input type="number" value={points[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}</div>{squareMode && points.length >= 2 && <button disabled={busy} onClick={() => void startAreaWizard(points[0], points[1])}>Measure 3 × 3 area from these points</button>}</details>}
 
           {squareMode ? <div className="grid-wizard">

@@ -36,7 +36,44 @@
 .encounter-map-zoom button:hover { border-color: #e8a743; }
 .encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: #090806; }
 .encounter-map-stage:fullscreen svg { max-height: 100vh; height: 100vh; }
+.encounter-map-interaction.enlarged .encounter-map-stage { min-height: 34rem; }
+.encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: min(88vh, 1100px); }
 .encounter-map-saving { margin: .5rem 0 0; color: #f6c452; font-size: .85rem; }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: #e9b861; font-size: .78rem; }
-@media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
+
+.encounter-map-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+.encounter-map-tools { display: flex; gap: .3rem; }
+.encounter-map-tools button { width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; cursor: pointer; }
+.encounter-map-tools button:hover { border-color: #e8a743; }
+.encounter-map-tools button[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+.encounter-map-tools button:disabled { opacity: .4; cursor: not-allowed; }
+.encounter-map-gm-layer { padding: .4rem .7rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.encounter-map-gm-layer[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+.encounter-map-live-measure { display: flex; align-items: center; gap: .4rem; color: #cfc5b4; font-size: .78rem; }
+
+.annotation-measurement line { stroke: #ffd463; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.annotation-measurement circle { fill: #ffd463; }
+.annotation-measurement text, .annotation-shape-label { fill: #fff2c4; font: 700 13px sans-serif; text-anchor: middle; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
+.annotation-measurement.live line { stroke-dasharray: 6 5; }
+.annotation-measurement:not(.live) { animation: annotation-fade-out 5s ease-in forwards; }
+
+.annotation-shape-body { fill: rgb(88 195 255 / 18%); stroke: #58c3ff; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.annotation-shape.visibility-gm-only .annotation-shape-body { stroke: #ffb52e; stroke-dasharray: 7 5; fill: rgb(255 181 46 / 14%); }
+.annotation-shape.visibility-owner-only .annotation-shape-body { stroke: #b58cff; stroke-dasharray: 7 5; fill: rgb(181 140 255 / 14%); }
+.annotation-shape.visibility-owner-gm .annotation-shape-body { stroke: #ff8cc6; stroke-dasharray: 7 5; fill: rgb(255 140 198 / 14%); }
+.annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
+.annotation-handle { fill: #fff1d2; stroke: #181006; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; }
+.annotation-handle-move { cursor: move; }
+.annotation-handle-resize { cursor: nwse-resize; }
+.annotation-controls { cursor: pointer; }
+.annotation-controls rect { fill: rgb(9 8 6 / 88%); stroke: #6b5e4b; stroke-width: 1; }
+.annotation-controls text { fill: #f5efe3; font: 700 10px sans-serif; text-anchor: middle; }
+.annotation-visibility-toggle:hover rect, .annotation-delete:hover rect { stroke: #e8a743; }
+.annotation-delete text { fill: #ffb3a8; font-size: 13px; }
+
+.encounter-live-distance { fill: #fff2c4; font: 800 15px sans-serif; text-anchor: middle; paint-order: stroke; stroke: #0a0805; stroke-width: 4; stroke-linejoin: round; }
+
+@keyframes annotation-fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .annotation-measurement:not(.live) { animation: none; } }
+@media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } .encounter-map-toolbar-row { flex-direction: column; align-items: flex-start; } }
 @media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } }

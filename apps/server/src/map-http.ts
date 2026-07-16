@@ -195,6 +195,19 @@ export function createMapRouter(options: MapRouterOptions) {
     return response.send(part);
   });
 
+  // Calibration numbers are not secret — the client already receives grid-derived token sizing —
+  // and exposing them (read-only) to anyone who can already read the map's image lets the battle
+  // map show a live preview while measuring or resizing a shape. The server still computes and
+  // snaps the authoritative geometry on every annotation:add/move command; this is presentation only.
+  router.get(`${MAP_COLLECTION}/:id/grid`, (request, response) => {
+    const id = mapId(request);
+    if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+    if (!canReadContent(request, id)) return failure(request, response, 403, "forbidden", "That map is not available to this table session.");
+    const entry = options.catalog.get(id);
+    if (!entry) return failure(request, response, 404, "not_found", "Map asset was not found.");
+    return success(response, 200, { calibration: entry.calibration?.calibration ?? null });
+  });
+
   router.post(`${MAP_COLLECTION}/:id/calibration/wizards`, requireGm, async (request, response) => {
     try {
       const id = mapId(request); const token = bearer(request);

@@ -9,11 +9,15 @@ const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 function modifierSuffix(modifier: number) { return modifier === 0 ? "" : modifier > 0 ? `+${modifier}` : `${modifier}`; }
 function modifierLabel(modifier: number) { return modifier === 0 ? "±0" : modifier > 0 ? `+${modifier}` : `−${Math.abs(modifier)}`; }
 
+function isBareD20(formula: string) { return /^\s*1?d20\s*$/i.test(formula); }
+
 export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmView | PlayerView }) {
   const [formula, setFormula] = useState("1d20");
   const [purpose, setPurpose] = useState<RollPurpose>("manual");
   const [visibility, setVisibility] = useState<RollVisibility>("public");
   const [modifier, setModifier] = useState(0);
+  const [advantage, setAdvantage] = useState(false);
+  const [disadvantage, setDisadvantage] = useState(false);
   const [feedback, setFeedback] = useState("");
   const visibilityOptions: Array<{ value: RollVisibility; label: string }> = role === "gm"
     ? [{ value: "public", label: "Everyone" }, { value: "gm-only", label: "Just me (GM)" }, { value: "self-only", label: "Just me" }]
@@ -27,9 +31,27 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
       setFeedback(result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "Already rolled." : "Rolled.");
     });
   };
-  const quickRoll = (sides: number) => submit(`1d${sides}${modifierSuffix(modifier)}`, "manual");
-  const advantageRoll = (kind: "kh1" | "kl1") => submit(`2d20${kind}${modifierSuffix(modifier)}`, "manual");
-  const customRoll = () => submit(formula, purpose);
+  // Advantage/disadvantage are toggles that arm the *next* d20 roll only; rolling a d20 consumes
+  // and clears them. Core 5e rules never allow both at once, so turning one on while the other is
+  // already armed cancels both rather than silently overriding — the player has to choose again.
+  const toggleAdvantage = () => { if (advantage) return setAdvantage(false); if (disadvantage) { setAdvantage(false); setDisadvantage(false); return; } setAdvantage(true); };
+  const toggleDisadvantage = () => { if (disadvantage) return setDisadvantage(false); if (advantage) { setAdvantage(false); setDisadvantage(false); return; } setDisadvantage(true); };
+  const quickRoll = (sides: number) => {
+    if (sides === 20 && (advantage || disadvantage)) {
+      const kind = advantage ? "kh1" : "kl1";
+      setAdvantage(false); setDisadvantage(false);
+      return submit(`2d20${kind}${modifierSuffix(modifier)}`, "manual");
+    }
+    submit(`1d${sides}${modifierSuffix(modifier)}`, "manual");
+  };
+  const customRoll = () => {
+    if (isBareD20(formula) && (advantage || disadvantage)) {
+      const kind = advantage ? "kh1" : "kl1";
+      setAdvantage(false); setDisadvantage(false);
+      return submit(`2d20${kind}`, purpose);
+    }
+    submit(formula, purpose);
+  };
 
   return <section className="dice-proof" aria-labelledby="dice-proof-heading">
     <div className="dice-heading">
@@ -38,10 +60,11 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     </div>
     <div className="dice-quick" role="group" aria-label="Quick rolls">
       {QUICK_DICE.map((sides) => <button key={sides} onClick={() => quickRoll(sides)}>d{sides}</button>)}
-      <button className="secondary" onClick={() => advantageRoll("kh1")}>Advantage</button>
-      <button className="secondary" onClick={() => advantageRoll("kl1")}>Disadvantage</button>
+      <button type="button" className="secondary" aria-pressed={advantage} onClick={toggleAdvantage}>Advantage</button>
+      <button type="button" className="secondary" aria-pressed={disadvantage} onClick={toggleDisadvantage}>Disadvantage</button>
       <div className="dice-modifier"><span>Modifier</span><button type="button" aria-label="Decrease modifier" onClick={() => setModifier((value) => value - 1)}>−</button><strong>{modifierLabel(modifier)}</strong><button type="button" aria-label="Increase modifier" onClick={() => setModifier((value) => value + 1)}>+</button></div>
     </div>
+    {(advantage || disadvantage) && <p className="dice-armed">{advantage ? "Advantage" : "Disadvantage"} is armed for the next d20 roll.</p>}
     <details className="dice-custom">
       <summary>Custom formula (advantage keeps, drop lowest, and more)</summary>
       <div className="dice-form">
@@ -55,7 +78,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     <div className="roll-list">
       {state.rolls.length === 0 && <p>No rolls yet.</p>}
       {state.rolls.slice(-8).reverse().map((roll) => <article className="roll-card" key={roll.id}>
-        <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
+        <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{roll.initiatorLabel} · {PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
         <div className="roll-result"><div className="dice-faces">{roll.dice.map((die, index) => <span key={`${roll.id}-${index}`} className={die.kept ? "die" : "die discarded"} title={`d${die.sides}${die.kept ? "" : " (discarded)"}`}>{die.face}</span>)}</div><strong className="roll-total">{roll.total}</strong></div>
       </article>)}
     </div>

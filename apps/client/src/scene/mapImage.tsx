@@ -96,6 +96,58 @@ export function TokenGlyph({ sizePx, name, active, turnClassName, bodyClassName,
   </>;
 }
 
+export type GridCalibration = Readonly<{ origin: { x: number; y: number }; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
+
+/** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret — the client already receives grid-derived token sizing. */
+export function useMapCalibration(assetId: string | null, token: string | null | undefined): Readonly<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }> {
+  const [state, setState] = useState<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }>({ status: "loading", calibration: null });
+  useEffect(() => {
+    if (!assetId || !token) { setState({ status: "loading", calibration: null }); return; }
+    setState({ status: "loading", calibration: null });
+    const controller = new AbortController();
+    fetch(`/api/v1/map-assets/${encodeURIComponent(assetId)}/grid`, { headers: { authorization: `Bearer ${token}` }, signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The grid could not be loaded.");
+        const body = await response.json();
+        setState({ status: "ready", calibration: body.data.calibration });
+      })
+      .catch((error) => { if (error.name !== "AbortError") setState({ status: "error", calibration: null }); });
+    return () => controller.abort();
+  }, [assetId, token]);
+  return state;
+}
+
+/**
+ * Preview-only grid math mirroring the server's authoritative snapping (`grid-calibration.ts`,
+ * `map-measurement.ts`). Used only to show a live number/snap while the pointer is still moving —
+ * the server always re-derives and persists the real geometry when a drag ends (`annotation:add`/
+ * `annotation:move`), so any drift here affects only what's shown for a moment, never what's saved.
+ */
+export function imageToGridPreview(calibration: GridCalibration, point: { x: number; y: number }) {
+  const dx = point.x - calibration.origin.x;
+  const dy = point.y - calibration.origin.y;
+  const cosine = Math.cos(calibration.rotationRadians);
+  const sine = Math.sin(calibration.rotationRadians);
+  return { column: (cosine * dx + sine * dy) / calibration.cellSizePx, row: (-sine * dx + cosine * dy) / calibration.cellSizePx };
+}
+export function gridToImagePreview(calibration: GridCalibration, point: { column: number; row: number }) {
+  const localX = point.column * calibration.cellSizePx;
+  const localY = point.row * calibration.cellSizePx;
+  const cosine = Math.cos(calibration.rotationRadians);
+  const sine = Math.sin(calibration.rotationRadians);
+  return { x: calibration.origin.x + cosine * localX - sine * localY, y: calibration.origin.y + sine * localX + cosine * localY };
+}
+export function snapCellCenterPreview(calibration: GridCalibration, point: { x: number; y: number }) {
+  const grid = imageToGridPreview(calibration, point);
+  return gridToImagePreview(calibration, { column: Math.floor(grid.column) + 0.5, row: Math.floor(grid.row) + 0.5 });
+}
+/** Whole-cell Chebyshev distance in feet between two image points — every cell (including diagonals) costs one step, matching the server's default measurement rule. */
+export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: number; y: number }, b: { x: number; y: number }) {
+  const gridA = imageToGridPreview(calibration, a);
+  const gridB = imageToGridPreview(calibration, b);
+  return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
+}
+
 export type OverlayLine = Readonly<{ axis: "column" | "row"; index: number; start: { x: number; y: number }; end: { x: number; y: number }; major: boolean }>;
 
 /** Renders a set of calibration/grid overlay line segments. Shared so overlay styling stays one implementation. */
