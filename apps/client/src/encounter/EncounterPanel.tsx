@@ -20,11 +20,17 @@ type PlayerProps = Readonly<{ role: "player"; state: PlayerView }>;
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
-    if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM has not started an encounter.</p></section>;
+    const myId = props.state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
+    if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
+    const myTurn = myId !== null && combat.turnActorId === myId;
     return <section className="encounter-panel" aria-labelledby="player-initiative-title">
-      <div className="encounter-heading"><div><span className="eyebrow">LIVE ENCOUNTER</span><h2 id="player-initiative-title">Initiative</h2></div><strong>Round {combat.round}</strong></div>
-      {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is resolving a hidden combatant's turn.</p>}
-      <ol className="initiative-list">{combat.initiative.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}><span>{entry.name}</span><strong>{entry.score}</strong></li>)}</ol>
+      <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><strong>Round {combat.round}</strong></div>
+      {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then let the GM know you're done.</p>}
+      {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
+      <ol className="initiative-list">{combat.initiative.map((entry) => {
+        const isMe = entry.actorId === myId;
+        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}><span>{entry.name}{isMe && <span className="you-badge">YOU</span>}</span><strong>{entry.score}</strong></li>;
+      })}</ol>
     </section>;
   }
 
