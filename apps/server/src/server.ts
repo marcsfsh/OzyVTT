@@ -1,6 +1,6 @@
 import { createServer as createHttpServer } from "node:http";
 import { randomInt, randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
@@ -15,20 +15,30 @@ import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-s
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
+import { MapAssetStore } from "./map-assets.js";
+import { MapCatalogStore } from "./map-catalog.js";
+import { createMapRouter } from "./map-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
+import { ViewerAccessStore } from "./viewer-access.js";
+import { ViewerCoordinator } from "./viewer-coordinator.js";
+import { createViewerRouter } from "./viewer-http.js";
+import { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 export type CreateServerOptions = {
   authPath: string;
   databasePath: string;
   /** Separate SQLite file for integration credentials/audit, distinct from the game-state database. */
   integrationCredentialsPath: string;
+  mapAssetsPath?: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
   clientOrigin?: string;
   initialGameState?: GameState;
   applicationVersion?: string;
+  /** Browser origins that a GM can copy to a separate LAN display. */
+  viewerBaseUrls?: readonly string[];
   /** How long a session's presence stays "reconnecting" after its last connection drops before flipping to "offline". */
   presenceGraceMs?: number;
 };
@@ -42,6 +52,12 @@ export function createServer(options: CreateServerOptions) {
   const auth = new AuthService(options.authPath);
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState());
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
+  const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
+  const mapCatalog = new MapCatalogStore(options.databasePath);
+  const viewerAccess = new ViewerAccessStore(options.databasePath);
+  const viewerPresentation = new ViewerPresentationStore(options.databasePath);
+  const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
+  const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -101,18 +117,51 @@ export function createServer(options: CreateServerOptions) {
     const state = store.snapshot;
     res.json(auth.verify(token) ? projectGmView(state, presenceFor) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId, presenceFor));
   });
-  app.use(createApiV1Router({
+  app.get("/api/gm/viewer-urls", (req, res) => {
+    const token = req.header("authorization")?.replace("Bearer ", "");
+    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+    const viewerUrls = [...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))];
+    return res.json({ viewerUrls });
+  });
+  app.use(createViewerRouter({ access: viewerAccess, presentation: viewerPresentation, coordinator: viewerCoordinator, authorizeGm }));
+  app.use(createMapRouter({
+    assets: mapAssets,
+    catalog: mapCatalog,
+    authorizeGm,
+    // Until scenes have their own player-visible active-map projection, players
+    // may fetch only the map the GM has explicitly made public for presentation.
+    authorizePlayer: (token, assetId) => {
+      const presentation = viewerPresentation.project();
+      return auth.verifyPlayer(token) !== null && presentation.enabled && presentation.activeMap?.assetId === assetId;
+    },
+    authorizeViewer: (token, assetId) => {
+      if (!token) return false;
+      try {
+        viewerAccess.verify(token);
+        const presentation = viewerPresentation.project();
+        return presentation.enabled && presentation.activeMap?.assetId === assetId;
+      } catch { return false; }
+    }
+  }));
+  const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
     actorDefinitionVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
     authorizeIntegration: (token, requiredScope) => credentials.verify(token, requiredScope) !== null,
-    authorizeGm: (token) => auth.verify(token) !== null,
+    authorizeGm,
     credentialStore: credentials
-  }));
+  });
+  // The versioned router owns its own API-only 404 envelope. Keep that catch-all
+  // scoped to /api/v1 so it cannot swallow the SPA or the dedicated TV viewer.
+  app.use((req, res, next) => req.path === "/api/v1" || req.path.startsWith("/api/v1/")
+    ? apiV1Router(req, res, next)
+    : next());
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
+    app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
     app.use(express.static(options.webDist));
     app.get("/{*path}", (_req, res) => res.sendFile(join(options.webDist, "index.html")));
   } else {
+    app.get("/viewer", (req, res) => res.redirect(307, developmentClientUrl(req.hostname, "/viewer.html", options.developmentClientPort)));
     app.get("/{*path}", (req, res) => res.redirect(307, developmentClientUrl(req.hostname, req.originalUrl, options.developmentClientPort)));
   }
 
@@ -216,8 +265,8 @@ export function createServer(options: CreateServerOptions) {
     socket.emit("state:updated", projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor));
   });
 
-  async function initialize() { await Promise.all([auth.initialize(), store.initialize(), credentials.initialize()]); }
-  function close() { presence.dispose(); io.close(); store.close(); credentials.close(); }
+  async function initialize() { await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]); }
+  function close() { presence.dispose(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
-  return { app, httpServer, io, auth, store, credentials, presence, initialize, close };
+  return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }
