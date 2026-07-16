@@ -41,24 +41,33 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
   return body.data;
 }
 
-const interpolate = (from: Point, to: Point, amount: number): Point => ({ x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount });
+/**
+ * Snaps a raw drag point to an axis-aligned square from the start corner: equal side length on
+ * both axes (side = the larger of the two deltas), sign preserved so it follows the drag
+ * direction, clamped so the square stays inside the map. This makes the calibration drag a true
+ * square (0°/90° aligned) — dragging a corner grows/shrinks both sides at the same rate — which is
+ * what the server's `deriveSquareGridFromArea` expects (it reads start/end as opposite corners of
+ * an axis-aligned box and locks rotation to 0).
+ */
+function squareCorner(start: Point, raw: Point, width: number, height: number): Point {
+  const signX = raw.x < start.x ? -1 : 1;
+  const signY = raw.y < start.y ? -1 : 1;
+  const maxX = signX > 0 ? width - start.x : start.x;
+  const maxY = signY > 0 ? height - start.y : start.y;
+  const side = Math.min(Math.max(Math.abs(raw.x - start.x), Math.abs(raw.y - start.y)), maxX, maxY);
+  return { x: start.x + signX * side, y: start.y + signY * side };
+}
 
 function GridAreaPreview({ start, end }: Readonly<{ start: Point; end: Point }>) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const center = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-  const topRight = { x: center.x + dy / 2, y: center.y - dx / 2 };
-  const bottomLeft = { x: center.x - dy / 2, y: center.y + dx / 2 };
-  const corners = [start, topRight, end, bottomLeft] as const;
+  const x0 = Math.min(start.x, end.x);
+  const y0 = Math.min(start.y, end.y);
+  const size = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y));
   return <g className="grid-area-preview">
-    <polygon points={corners.map((point) => `${point.x},${point.y}`).join(" ")} />
-    {[1 / 3, 2 / 3].flatMap((amount) => {
-      const top = interpolate(start, topRight, amount);
-      const bottom = interpolate(bottomLeft, end, amount);
-      const left = interpolate(start, bottomLeft, amount);
-      const right = interpolate(topRight, end, amount);
-      return [<line key={`column-${amount}`} x1={top.x} y1={top.y} x2={bottom.x} y2={bottom.y} />, <line key={`row-${amount}`} x1={left.x} y1={left.y} x2={right.x} y2={right.y} />];
-    })}
+    <rect x={x0} y={y0} width={size} height={size} />
+    {[1, 2].flatMap((third) => [
+      <line key={`v${third}`} x1={x0 + (size * third) / 3} y1={y0} x2={x0 + (size * third) / 3} y2={y0 + size} />,
+      <line key={`h${third}`} x1={x0} y1={y0 + (size * third) / 3} x2={x0 + size} y2={y0 + (size * third) / 3} />
+    ])}
   </g>;
 }
 
@@ -154,17 +163,18 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     setPoints([]); setDragStart(point); setDragCurrent(point); setMessage("Keep dragging to the opposite corner of a 3 × 3 block.");
   };
   const moveGridArea = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (!dragStart || !selected || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const point = pointAt(event.clientX, event.clientY); if (!point) return;
-    event.preventDefault(); setDragCurrent(point);
+    event.preventDefault(); setDragCurrent(squareCorner(dragStart, point, selected.width, selected.height));
   };
   const finishGridArea = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    if (!dragStart || !selected || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const point = pointAt(event.clientX, event.clientY); if (!point) return;
     event.preventDefault(); event.currentTarget.releasePointerCapture(event.pointerId);
     const start = dragStart;
-    setDragStart(null); setDragCurrent(null); setPoints([start, point]);
-    void startAreaWizard(start, point);
+    const end = squareCorner(start, point, selected.width, selected.height);
+    setDragStart(null); setDragCurrent(null); setPoints([start, end]);
+    void startAreaWizard(start, end);
   };
   const cancelGridArea = () => { setDragStart(null); setDragCurrent(null); };
   const updatePoint = (index: number, coordinate: "x" | "y", value: number) => setPoints((current) => {

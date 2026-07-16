@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor } from "@vtt/domain";
 import { imagePointFromClient, initialsOf, TokenGlyph, useAuthorizedMapImage } from "./mapImage";
+import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./encounter-map.css";
 
@@ -71,6 +72,8 @@ export function EncounterMap({
     setCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
   };
   const resetView = () => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); };
+  const zoomCenter = (factor: number) => { const svg = svgRef.current; if (!svg || !size) return; const rect = svg.getBoundingClientRect(); zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor); };
+  const toggleFullscreen = () => { const el = stageRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else void el.requestFullscreen?.(); };
 
   const canMove = (actorId: string) => {
     if (role === "gm") return true;
@@ -86,7 +89,7 @@ export function EncounterMap({
     if (busyActorId || !canMove(actorId)) return;
     setBusyActorId(actorId); setMessage("");
     try {
-      const result = await emitMove({ commandId: crypto.randomUUID(), actorId, position, expectedRevision: revision });
+      const result = await emitMove({ commandId: newId(), actorId, position, expectedRevision: revision });
       if (!result.ok) throw new Error(result.message ?? "The token move was rejected.");
       setMessage(position ? "Token moved." : "Token returned to the tray.");
     } catch (error) { setMessage((error as Error).message); }
@@ -190,10 +193,11 @@ export function EncounterMap({
             </g>;
           })}
         </svg>
-        <div className="encounter-map-zoom" role="group" aria-label="Zoom controls">
-          <button type="button" onClick={() => svgRef.current && size && zoomAt(svgRef.current.getBoundingClientRect().left + svgRef.current.getBoundingClientRect().width / 2, svgRef.current.getBoundingClientRect().top + svgRef.current.getBoundingClientRect().height / 2, 1.3)}>+</button>
-          <button type="button" onClick={() => svgRef.current && size && zoomAt(svgRef.current.getBoundingClientRect().left + svgRef.current.getBoundingClientRect().width / 2, svgRef.current.getBoundingClientRect().top + svgRef.current.getBoundingClientRect().height / 2, 1 / 1.3)}>−</button>
+        <div className="encounter-map-zoom" role="group" aria-label="Map controls">
+          <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
+          <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
           <button type="button" onClick={resetView}>Reset view</button>
+          <button type="button" onClick={toggleFullscreen}>Fullscreen</button>
         </div>
       </> : <p role="status">{image.status === "error" ? image.message : "Loading the battle map…"}</p>}
     </div>

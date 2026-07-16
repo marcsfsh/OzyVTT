@@ -34,6 +34,8 @@
 .encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; display: flex; gap: .35rem; }
 .encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-map-zoom button:hover { border-color: #e8a743; }
+.encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: #090806; }
+.encounter-map-stage:fullscreen svg { max-height: 100vh; height: 100vh; }
 .encounter-map-saving { margin: .5rem 0 0; color: #f6c452; font-size: .85rem; }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: #e9b861; font-size: .78rem; }
 @media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }

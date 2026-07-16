@@ -180,8 +180,12 @@ export function createServer(options: CreateServerOptions) {
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
-    app.use(express.static(options.webDist));
-    app.get("/{*path}", (_req, res) => res.sendFile(join(options.webDist, "index.html")));
+    // `dotfiles: "allow"` and serving index.html root-relative both matter on hosts whose install
+    // path contains a dot-segment (e.g. OneDrive's `.DesktopOneDrive`): `send` defaults to
+    // `dotfiles: "ignore"`, which 404s any *absolute* path containing a dot-segment — so the SPA
+    // fallback below must pass a root and a clean relative filename, not the full absolute path.
+    app.use(express.static(options.webDist, { dotfiles: "allow" }));
+    app.get("/{*path}", (_req, res) => res.sendFile("index.html", { root: options.webDist, dotfiles: "allow" }));
   } else {
     app.get("/viewer", (req, res) => res.redirect(307, developmentClientUrl(req.hostname, "/viewer.html", options.developmentClientPort)));
     app.get("/{*path}", (req, res) => res.redirect(307, developmentClientUrl(req.hostname, req.originalUrl, options.developmentClientPort)));
@@ -376,7 +380,7 @@ export function createServer(options: CreateServerOptions) {
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }

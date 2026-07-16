@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
+import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = { manual: "Roll", attack: "Attack", damage: "Damage", save: "Save", check: "Check" };
-const QUICK_DICE = [4, 6, 8, 10, 12, 20, 100] as const;
+const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 
 function modifierSuffix(modifier: number) { return modifier === 0 ? "" : modifier > 0 ? `+${modifier}` : `${modifier}`; }
 function modifierLabel(modifier: number) { return modifier === 0 ? "±0" : modifier > 0 ? `+${modifier}` : `−${Math.abs(modifier)}`; }
@@ -21,7 +22,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
 
   const submit = (rollFormula: string, rollPurpose: RollPurpose) => {
     setFeedback("Rolling…");
-    socket.emit("dice:roll", { commandId: crypto.randomUUID(), formula: rollFormula, purpose: rollPurpose, visibility }, (result) => {
+    socket.emit("dice:roll", { commandId: newId(), formula: rollFormula, purpose: rollPurpose, visibility }, (result) => {
       if (!result.ok) return setFeedback(result.message ?? "That roll didn't work. Check the formula and try again.");
       setFeedback(result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "Already rolled." : "Rolled.");
     });

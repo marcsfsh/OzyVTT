@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domain";
 import { useConfirm } from "../components/feedback";
+import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
 type Props = { role: "gm"; state: GmView } | { role: "player"; state: PlayerView };
@@ -21,7 +22,7 @@ export function ActorRoster(props: Props) {
   const claim = (actorId: string, name: string) => {
     setClaiming(actorId);
     setFeedback(`Claiming ${name}…`);
-    socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId, expectedRevision: props.state.revision }, (result) => {
+    socket.emit("character:claim", { commandId: newId(), actorId, expectedRevision: props.state.revision }, (result) => {
       setClaiming(null);
       setFeedback(result.ok ? `You're playing ${name}.` : result.message ?? `Couldn't claim ${name} — someone may have taken it first.`);
     });
@@ -33,9 +34,9 @@ export function ActorRoster(props: Props) {
     if (!(await confirm({ title: `Switch to ${name}?`, body: `You'll leave ${fromName} and play ${name} instead.`, confirmLabel: `Play ${name}` }))) return;
     setClaiming(actorId);
     setFeedback(`Switching to ${name}…`);
-    socket.emit("character:release", { commandId: crypto.randomUUID() }, (released) => {
+    socket.emit("character:release", { commandId: newId() }, (released) => {
       if (!released.ok) { setClaiming(null); setFeedback(released.message ?? "Couldn't switch characters."); return; }
-      socket.emit("character:claim", { commandId: crypto.randomUUID(), actorId }, (result) => {
+      socket.emit("character:claim", { commandId: newId(), actorId }, (result) => {
         setClaiming(null);
         setFeedback(result.ok ? `You're playing ${name}.` : result.message ?? `Left ${fromName}, but ${name} was just taken. Pick another.`);
       });
@@ -46,7 +47,7 @@ export function ActorRoster(props: Props) {
     if (!(await confirm({ title: `Leave ${name}?`, body: "You'll release this character so someone else can play it.", confirmLabel: "Leave character" }))) return;
     setReleasing(true);
     setFeedback(`Leaving ${name}…`);
-    socket.emit("character:release", { commandId: crypto.randomUUID(), expectedRevision: props.state.revision }, (result) => {
+    socket.emit("character:release", { commandId: newId(), expectedRevision: props.state.revision }, (result) => {
       setReleasing(false);
       setFeedback(result.ok ? `You left ${name}. Pick another when you're ready.` : result.message ?? "Couldn't release the character.");
     });
@@ -54,7 +55,7 @@ export function ActorRoster(props: Props) {
 
   const forceRelease = (actorId: string) => {
     setFeedback("Releasing player claim…");
-    socket.emit("character:force-release", { commandId: crypto.randomUUID(), actorId, expectedRevision: props.state.revision }, (result) => {
+    socket.emit("character:force-release", { commandId: newId(), actorId, expectedRevision: props.state.revision }, (result) => {
       setFeedback(result.ok ? "Player claim released." : result.message ?? "The player claim could not be released.");
     });
   };

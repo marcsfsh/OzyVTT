@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "../components/feedback";
+import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient } from "../scene/mapImage";
 import "./viewer-controls.css";
 
@@ -87,7 +88,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   };
   const command = async (payload: Record<string, unknown>) => {
     if (!presentation) throw new Error("Viewer presentation state is still loading.");
-    return api("/api/v1/viewer/presentation/commands", gmToken, { method: "POST", body: JSON.stringify({ id: crypto.randomUUID(), expectedRevision: presentation.revision, payload }) });
+    return api("/api/v1/viewer/presentation/commands", gmToken, { method: "POST", body: JSON.stringify({ id: newId(), expectedRevision: presentation.revision, payload }) });
   };
   const connectedIds = new Set(connections.map((connection) => connection.viewerId));
   const mapIsPresented = Boolean(map && presentation?.enabled && presentation.activeMap?.assetId === map.assetId);
@@ -110,8 +111,8 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     if (!mapIsPresented) throw new Error("Present this map before using viewer tools.");
     if (draftPoints.length < requiredPointCount) throw new Error(`Choose ${requiredPointCount === 1 ? "a point" : "two points"} on the map first.`);
     if (tool === "focus") await command({ type: "viewer.camera.set", camera: { center: draftPoints[0], zoom } });
-    else if (tool === "ping") await command({ type: "viewer.ping", id: crypto.randomUUID(), point: draftPoints[0], durationMs: 3_500 });
-    else await command({ type: "viewer.measurement.set", measurement: { id: crypto.randomUUID(), points: draftPoints.slice(0, 2), distanceLabel: labelOverride.trim() || suggestedLabel } });
+    else if (tool === "ping") await command({ type: "viewer.ping", id: newId(), point: draftPoints[0], durationMs: 5_000 });
+    else await command({ type: "viewer.measurement.set", measurement: { id: newId(), points: draftPoints.slice(0, 2), distanceLabel: labelOverride.trim() || suggestedLabel } });
     setMessage(tool === "focus" ? "Viewer focused." : tool === "ping" ? "Ping sent." : "Measurement shown.");
   });
   const copy = async (value: string, confirmation: string) => {

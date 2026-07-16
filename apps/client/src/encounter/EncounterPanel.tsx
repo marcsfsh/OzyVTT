@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
+import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
@@ -72,14 +73,14 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
     if (entries.length === 0) throw new Error("Choose at least one combatant.");
-    return emitCommand("encounter:start", { commandId: crypto.randomUUID(), mapAssetId: selectedMap.id, entries, expectedRevision: state.revision });
+    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: selectedMap.id, entries, expectedRevision: state.revision });
   }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
-  const updateScore = (actorId: string) => void run(() => emitCommand("initiative:set", { commandId: crypto.randomUUID(), actorId, score: Number(scores[actorId]), expectedRevision: state.revision }), "Initiative updated.");
-  const next = () => void run(() => emitCommand("initiative:next", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Advanced to the next turn.");
-  const previous = () => void run(() => emitCommand("initiative:previous", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Moved to the previous turn.");
+  const updateScore = (actorId: string) => void run(() => emitCommand("initiative:set", { commandId: newId(), actorId, score: Number(scores[actorId]), expectedRevision: state.revision }), "Initiative updated.");
+  const next = () => void run(() => emitCommand("initiative:next", { commandId: newId(), expectedRevision: state.revision }), "Advanced to the next turn.");
+  const previous = () => void run(() => emitCommand("initiative:previous", { commandId: newId(), expectedRevision: state.revision }), "Moved to the previous turn.");
   const end = () => {
     if (!window.confirm("End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.")) return;
-    void run(() => emitCommand("encounter:end", { commandId: crypto.randomUUID(), expectedRevision: state.revision }), "Encounter ended.");
+    void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
   };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
