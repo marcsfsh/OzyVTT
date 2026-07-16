@@ -6,7 +6,7 @@ const playerA = "b539ef5e-16e6-46ce-bf33-3ed4b02997c1";
 const playerB = "65cc7d6b-1150-41c4-aa9f-390439313f53";
 const noPresence = () => null;
 function roll(visibility: RollVisibility, index: number): RollRecord {
-  return { id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`, commandId: `10000000-0000-4000-8000-${String(index).padStart(12, "0")}`, initiatorSessionId: playerA, initiatorRole: "player", actorId: null, purpose: "manual", visibility, formula: "1d20", normalizedFormula: "1d20", dice: [{ group: 0, sides: 20, face: 12, kept: true, sign: 1 }], modifiers: [], total: 12, createdAt: "2026-07-15T12:00:00.000Z" };
+  return { id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`, commandId: `10000000-0000-4000-8000-${String(index).padStart(12, "0")}`, initiatorSessionId: playerA, initiatorRole: "player", initiatorLabel: "A player", actorId: null, purpose: "manual", visibility, formula: "1d20", normalizedFormula: "1d20", dice: [{ group: 0, sides: 20, face: 12, kept: true, sign: 1 }], modifiers: [], total: 12, createdAt: "2026-07-15T12:00:00.000Z" };
 }
 
 describe("recipient-specific roll projections", () => {
