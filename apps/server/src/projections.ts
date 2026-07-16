@@ -19,10 +19,14 @@ export function projectPublicInitiative(state: GameState): readonly PlayerInitia
   });
 }
 
-function visibleToPlayerAnnotation(annotation: Annotation, playerSessionId: string | undefined) {
-  if (annotation.visibility === "gm-only") return false;
-  if (annotation.visibility === "public") return true;
-  return annotation.ownerSessionId === playerSessionId;
+function visibleToPlayerAnnotation(state: GameState, annotation: Annotation, playerSessionId: string | undefined) {
+  switch (annotation.visibility) {
+    case "public": return true;
+    case "gm-only": return false;
+    case "owner-only":
+    case "owner-gm": return annotation.ownerSessionId === playerSessionId;
+    case "gm-actor": return playerSessionId !== undefined && state.actors.some((actor) => actor.id === annotation.visibleToActorId && actor.ownerSessionId === playerSessionId);
+  }
 }
 
 function safeAnnotation(annotation: Annotation, playerSessionId: string | undefined): PlayerAnnotation {
@@ -32,7 +36,7 @@ function safeAnnotation(annotation: Annotation, playerSessionId: string | undefi
 
 export function projectPlayerAnnotations(state: GameState, playerSessionId: string | undefined, now: number): readonly PlayerAnnotation[] {
   return state.combat.annotations
-    .filter((annotation) => (annotation.expiresAt === null || annotation.expiresAt > now) && visibleToPlayerAnnotation(annotation, playerSessionId))
+    .filter((annotation) => (annotation.expiresAt === null || annotation.expiresAt > now) && visibleToPlayerAnnotation(state, annotation, playerSessionId))
     .map((annotation) => safeAnnotation(annotation, playerSessionId));
 }
 

@@ -132,6 +132,25 @@ export class ViewerAccessStore {
     return { token, viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata };
   }
 
+  /**
+   * Mints a viewer session directly, without a pairing code, for the GM's own read-only preview of
+   * the shared screen (the in-tab iframe and the pop-out window). Only ever reached from a GM-authed
+   * route. Reuses the newest non-revoked, unexpired preview session named `name` so repeatedly
+   * opening the preview does not accumulate sessions.
+   */
+  mintPreviewSession(nameInput: string, ttlMs: number) {
+    const database = this.requireDatabase();
+    const now = this.now();
+    const name = safeName(nameInput);
+    if (!Number.isInteger(ttlMs) || ttlMs < 60_000 || ttlMs > 24 * 60 * 60 * 1_000) throw new Error("Preview session lifetime must be an integer from 1 minute to 24 hours.");
+    const token = `${TOKEN_PREFIX}${this.entropy(32).toString("base64url")}`;
+    const id = randomUUID();
+    const createdAt = timestamp(now, "Preview session creation time");
+    const expiresAt = timestamp(now + ttlMs, "Preview session expiration");
+    database.prepare("INSERT INTO viewer_access_tokens (id, name, token_hash, created_at, expires_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)").run(id, name, hash(token), createdAt, expiresAt);
+    return { token, viewer: { id, name, createdAt, expiresAt, lastUsedAt: null, revokedAt: null } satisfies ViewerAccessMetadata };
+  }
+
   verify(token: string) {
     const database = this.requireDatabase();
     if (!/^vtt_viewer_[A-Za-z0-9_-]{43}$/.test(token)) throw new ViewerAccessDeniedError("Viewer token is invalid.");

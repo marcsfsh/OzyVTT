@@ -42,9 +42,20 @@ export type ViewerEncounterToken = Readonly<{
   active: boolean;
 }>;
 
+/** Player-safe drawing shown on the shared screen — only `public` annotations are ever projected here. */
+export type ViewerAnnotation = Readonly<{
+  id: string;
+  kind: "measurement" | "shape";
+  shape: "circle" | "cone" | "line" | "square" | null;
+  origin: ImagePoint;
+  target: ImagePoint;
+  sizeFeet: number;
+}>;
+
 export type ViewerEncounterScene = Readonly<{
   mapAssetId: string | null;
   tokens: readonly ViewerEncounterToken[];
+  annotations: readonly ViewerAnnotation[];
 }>;
 
 export type ViewerPresentationState = Readonly<{
@@ -157,7 +168,20 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   });
   if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
   if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");
-  return { mapAssetId, tokens };
+  const rawAnnotations = value.annotations ?? [];
+  if (rawAnnotations.length > 300) throw new Error("Viewer encounter cannot exceed 300 annotations.");
+  const annotationIds = new Set<string>();
+  const annotations = rawAnnotations.map((annotation) => {
+    const id = safeText(annotation.id, "Viewer annotation ID", 128);
+    if (annotationIds.has(id)) throw new Error("Viewer annotation IDs must be unique.");
+    annotationIds.add(id);
+    if (annotation.kind !== "measurement" && annotation.kind !== "shape") throw new Error("Viewer annotation kind is invalid.");
+    if (annotation.shape !== null && !(["circle", "cone", "line", "square"] as const).includes(annotation.shape)) throw new Error("Viewer annotation shape is invalid.");
+    if (!Number.isFinite(annotation.sizeFeet) || annotation.sizeFeet < 0 || annotation.sizeFeet > 100_000) throw new Error("Viewer annotation size is invalid.");
+    return { id, kind: annotation.kind, shape: annotation.shape, origin: point(annotation.origin, "Viewer annotation origin"), target: point(annotation.target, "Viewer annotation target"), sizeFeet: annotation.sizeFeet };
+  });
+  if (mapAssetId === null && annotations.length) throw new Error("Viewer annotations require an active encounter map.");
+  return { mapAssetId, tokens, annotations };
 }
 
 export function createViewerPresentationState(): ViewerPresentationState {
@@ -170,7 +194,7 @@ export function createViewerPresentationState(): ViewerPresentationState {
     measurement: null,
     pings: [],
     initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] },
-    encounter: { mapAssetId: null, tokens: [] },
+    encounter: { mapAssetId: null, tokens: [], annotations: [] },
     acceptedCommandIds: []
   };
 }
@@ -241,7 +265,7 @@ export function projectViewerPresentation(state: ViewerPresentationState, now = 
     measurement: null,
     pings: [],
     initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] },
-    encounter: { mapAssetId: null, tokens: [] }
+    encounter: { mapAssetId: null, tokens: [], annotations: [] }
   };
   return {
     schemaVersion: 1,

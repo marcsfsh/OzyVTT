@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { addAnnotation, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationVisibility } from "../src/annotations.js";
+import { addAnnotation, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationMovable, setAnnotationVisibility } from "../src/annotations.js";
 import { createEncounterTokens } from "../src/token-placement.js";
 
 const ACTOR = "60000000-0000-4000-8000-000000000001";
@@ -72,38 +72,63 @@ describe("authoritative annotation geometry", () => {
     expect(dragged.visibility).toBe("gm-only");
   });
 
-  it("forces measurement visibility to public regardless of the requested value", () => {
+  it("keeps the requested measurement visibility (GM may hide a measurement)", () => {
     const state = activeState();
     const annotation = addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "measurement", origin: { x: 0, y: 0 }, target: { x: 100, y: 0 }, visibility: "gm-only", actor: gmActor, now: 0 }, geometry);
-    expect(annotation.visibility).toBe("public");
+    expect(annotation.visibility).toBe("gm-only");
   });
 
-  it("lets the owner move/resize and delete their own shape, but not another player's", () => {
+  it("rejects a player choosing a GM-only or gm-actor visibility", () => {
+    const state = activeState();
+    expect(() => addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000009", kind: "shape", shape: "square", origin: { x: 0, y: 0 }, target: { x: 50, y: 50 }, visibility: "gm-only", actor: playerActor, now: 0 }, geometry))
+      .toThrow("Everyone, Just me");
+  });
+
+  it("lets the owner move/resize and delete their own shape, but not another player's unless shared", () => {
     const state = activeState();
     addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "shape", shape: "square", origin: { x: 0, y: 0 }, target: { x: 50, y: 50 }, visibility: "public", actor: playerActor, now: 0 }, geometry);
     expect(() => moveAnnotation(state, "a0000000-0000-4000-8000-000000000001", { x: 100, y: 100 }, { x: 150, y: 150 }, { sessionId: OTHER_PLAYER, role: "player" }, geometry))
-      .toThrow("your own");
+      .toThrow("not shared move control");
     moveAnnotation(state, "a0000000-0000-4000-8000-000000000001", { x: 100, y: 100 }, { x: 150, y: 150 }, playerActor, geometry);
     expect(state.combat.annotations[0].geometry.origin).toEqual({ x: 100, y: 100 });
+    // Owner shares move control → another player may now move it.
+    setAnnotationMovable(state, "a0000000-0000-4000-8000-000000000001", true, playerActor);
+    moveAnnotation(state, "a0000000-0000-4000-8000-000000000001", { x: 200, y: 200 }, { x: 250, y: 250 }, { sessionId: OTHER_PLAYER, role: "player" }, geometry);
+    expect(state.combat.annotations[0].geometry.origin).toEqual({ x: 200, y: 200 });
     expect(() => removeAnnotation(state, "a0000000-0000-4000-8000-000000000001", { sessionId: OTHER_PLAYER, role: "player" })).toThrow("your own");
     removeAnnotation(state, "a0000000-0000-4000-8000-000000000001", playerActor);
     expect(state.combat.annotations).toHaveLength(0);
   });
 
-  it("lets the GM move, delete, or change the visibility of anyone's shape", () => {
+  it("lets the GM move, delete, or change the visibility of anyone's shape (incl. gm-actor)", () => {
     const state = activeState();
     addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "shape", shape: "square", origin: { x: 0, y: 0 }, target: { x: 50, y: 50 }, visibility: "public", actor: playerActor, now: 0 }, geometry);
-    setAnnotationVisibility(state, "a0000000-0000-4000-8000-000000000001", "owner-gm", gmActor);
-    expect(state.combat.annotations[0].visibility).toBe("owner-gm");
+    setAnnotationVisibility(state, "a0000000-0000-4000-8000-000000000001", "gm-actor", ACTOR, gmActor);
+    expect(state.combat.annotations[0].visibility).toBe("gm-actor");
+    expect(state.combat.annotations[0].visibleToActorId).toBe(ACTOR);
+    setAnnotationVisibility(state, "a0000000-0000-4000-8000-000000000001", "gm-only", null, gmActor);
+    expect(state.combat.annotations[0].visibleToActorId).toBeNull();
     removeAnnotation(state, "a0000000-0000-4000-8000-000000000001", gmActor);
     expect(state.combat.annotations).toHaveLength(0);
   });
 
-  it("rejects moving or changing visibility on a measurement, and rejects an unknown ID", () => {
+  it("clears shapes by scope, and a player may only clear their own", () => {
+    const state = activeState();
+    addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "shape", shape: "square", origin: { x: 0, y: 0 }, target: { x: 50, y: 50 }, visibility: "public", actor: playerActor, now: 0 }, geometry);
+    addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000002", kind: "shape", shape: "square", origin: { x: 0, y: 0 }, target: { x: 50, y: 50 }, visibility: "public", actor: gmActor, now: 0 }, geometry);
+    expect(() => clearAnnotations(state, "all", playerActor)).toThrow("Only the GM");
+    clearAnnotations(state, "mine", playerActor);
+    expect(state.combat.annotations.map((a) => a.id)).toEqual(["a0000000-0000-4000-8000-000000000002"]);
+    clearAnnotations(state, "all", gmActor);
+    expect(state.combat.annotations).toHaveLength(0);
+  });
+
+  it("rejects moving a measurement but allows changing its visibility; rejects an unknown ID", () => {
     const state = activeState();
     addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "measurement", origin: { x: 0, y: 0 }, target: { x: 100, y: 0 }, visibility: "public", actor: playerActor, now: 0 }, geometry);
     expect(() => moveAnnotation(state, "a0000000-0000-4000-8000-000000000001", { x: 0, y: 0 }, { x: 100, y: 100 }, playerActor, geometry)).toThrow("Only placed shapes");
-    expect(() => setAnnotationVisibility(state, "a0000000-0000-4000-8000-000000000001", "gm-only", playerActor)).toThrow("always visible");
+    setAnnotationVisibility(state, "a0000000-0000-4000-8000-000000000001", "owner-only", null, playerActor);
+    expect(state.combat.annotations[0].visibility).toBe("owner-only");
     expect(() => removeAnnotation(state, "does-not-exist", gmActor)).toThrow("no longer exists");
   });
 });

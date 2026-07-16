@@ -3,7 +3,11 @@
 .encounter-panel h2 { margin: .2rem 0 0; }
 .encounter-panel > p { color: #c8c0b1; }
 .encounter-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
-.encounter-heading > strong { padding: .55rem .8rem; border-radius: 999px; background: #6e431c; color: #ffd58d; }
+.encounter-heading-right { display: flex; align-items: center; gap: .55rem; }
+.encounter-heading-right > strong { padding: .55rem .8rem; border-radius: 999px; background: #6e431c; color: #ffd58d; }
+.encounter-dock-toggle { padding: .4rem .7rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: #17140f; color: #f5efe3; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.encounter-dock-toggle:hover { border-color: #e8a743; }
+.encounter-dock-toggle[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .encounter-map, .encounter-status { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; margin: 1rem 0; padding: .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; }
 .encounter-map span, .encounter-status span { color: #a69e91; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .encounter-status span:last-child { margin-left: auto; }
@@ -34,4 +38,4 @@
 .turn-controls .danger { margin-left: auto; border-color: #9b443b; background: #6e211e; }
 .hidden-turn { padding: .7rem; border-left: 4px solid #d69442; background: #2b2115; color: #f3c77d !important; }
 .encounter-feedback { min-height: 1.3rem; color: #e9b861 !important; }
-@media (max-width: 560px) { .encounter-heading { display: block; } .encounter-heading > strong { display: inline-block; margin-top: .6rem; } .combatant-setup li, .initiative-list.gm li { grid-template-columns: 1fr; } .initiative-score { width: 100%; } .turn-controls { display: grid; grid-template-columns: 1fr 1fr; } .turn-controls .danger { grid-column: 1 / -1; margin-left: 0; } .encounter-status span:last-child { margin-left: 0; width: 100%; } }
+@media (max-width: 560px) { .encounter-heading { display: block; } .encounter-heading-right { margin-top: .6rem; justify-content: flex-start; } .combatant-setup li, .initiative-list.gm li { grid-template-columns: 1fr; } .initiative-score { width: 100%; } .turn-controls { display: grid; grid-template-columns: 1fr 1fr; } .turn-controls .danger { grid-column: 1 / -1; margin-left: 0; } .encounter-status span:last-child { margin-left: 0; width: 100%; } }

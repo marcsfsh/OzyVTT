@@ -40,13 +40,13 @@ describe("recipient-safe encounter projections", () => {
     const state = game(PUBLIC);
     expect(projectPlayerCombat(state)).toMatchObject({ turnActorId: PUBLIC, hiddenTurn: false, initiative: [{ actorId: PUBLIC, active: true }] });
     expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true }] });
-    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true }] });
+    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true }], annotations: [] });
   });
 
   it("hides the Initiative list after combat ends", () => {
     const state = game(PUBLIC); state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(projectViewerInitiative(state)).toEqual({ visible: false, round: 0, hiddenTurn: false, entries: [] });
-    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: null, tokens: [] });
+    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: null, tokens: [], annotations: [] });
   });
 });
 
@@ -98,5 +98,26 @@ describe("recipient-safe annotation projections", () => {
     const state = gameWithAnnotations();
     state.combat = { ...state.combat, active: false };
     expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations).toEqual([]);
+  });
+
+  it("reveals a gm-actor annotation only to the player who owns the target actor", () => {
+    const geometry = { origin: { x: 0, y: 0 }, target: { x: 50, y: 0 }, sizeFeet: 10 };
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 }, ownerSessionId: PLAYER_A }],
+      combat: {
+        active: true, round: 1, mapAssetId: MAP, turnActorId: PUBLIC, initiative: [{ actorId: PUBLIC, score: 10 }],
+        annotations: [{ id: "91000000-0000-4000-8000-000000000001", kind: "shape", shape: "circle", geometry, ownerSessionId: "45000000-0000-4000-8000-0000000000ff", createdByRole: "gm", visibility: "gm-actor", visibleToActorId: PUBLIC, createdAt: 0, expiresAt: null }]
+      }
+    });
+    expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations.map((a) => a.id)).toEqual(["91000000-0000-4000-8000-000000000001"]);
+    expect(projectPlayerCombat(state, PLAYER_B, 1000).annotations).toEqual([]);
+  });
+
+  it("projects only public, non-expired annotations onto the shared screen", () => {
+    const scene = projectViewerEncounterScene(gameWithAnnotations(), 1000);
+    expect(scene.annotations.map((a) => a.id)).toEqual(["90000000-0000-4000-8000-000000000001"]);
+    expect(scene.annotations[0]).toMatchObject({ kind: "measurement", sizeFeet: 20 });
+    expect(projectViewerEncounterScene(gameWithAnnotations(), 6000).annotations).toEqual([]);
   });
 });

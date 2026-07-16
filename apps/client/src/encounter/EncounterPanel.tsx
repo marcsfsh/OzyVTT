@@ -15,8 +15,14 @@ function emitCommand(event: CommandEvent, payload: CommandPayload) {
 
 const validInitiativeScore = (value: string | undefined) => value !== undefined && value.trim() !== "" && Number.isInteger(Number(value)) && Number(value) >= -1000 && Number(value) <= 1000;
 
-type GmProps = Readonly<{ role: "gm"; state: GmView; selectedMap: MapSelection | null }>;
-type PlayerProps = Readonly<{ role: "player"; state: PlayerView }>;
+type DockControl = Readonly<{ docked: boolean; onToggle: () => void }>;
+type GmProps = Readonly<{ role: "gm"; state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>;
+type PlayerProps = Readonly<{ role: "player"; state: PlayerView; dock?: DockControl }>;
+
+function DockToggle({ dock }: Readonly<{ dock?: DockControl }>) {
+  if (!dock) return null;
+  return <button type="button" className="encounter-dock-toggle" aria-pressed={dock.docked} title={dock.docked ? "Return to the sidebar" : "Dock to the right of the map"} onClick={dock.onToggle}>{dock.docked ? "⇥ Undock" : "⇤ Dock"}</button>;
+}
 
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
@@ -25,7 +31,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
     return <section className="encounter-panel" aria-labelledby="player-initiative-title">
-      <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><strong>Round {combat.round}</strong></div>
+      <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><div className="encounter-heading-right"><DockToggle dock={props.dock} /><strong>Round {combat.round}</strong></div></div>
       {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then let the GM know you're done.</p>}
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
@@ -35,10 +41,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     </section>;
   }
 
-  return <GmEncounterPanel state={props.state} selectedMap={props.selectedMap} />;
+  return <GmEncounterPanel state={props.state} selectedMap={props.selectedMap} dock={props.dock} />;
 }
 
-function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; selectedMap: MapSelection | null }>) {
+function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>) {
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => new Set(state.actors.map((actor) => actor.id)));
   const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -84,7 +90,7 @@ function GmEncounterPanel({ state, selectedMap }: Readonly<{ state: GmView; sele
   };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
-    <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div>{state.combat.active && <strong>Round {state.combat.round}</strong>}</div>
+    <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter and Initiative</h2></div><div className="encounter-heading-right"><DockToggle dock={dock} />{state.combat.active && <strong>Round {state.combat.round}</strong>}</div></div>
     {!state.combat.active ? <>
       <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
       <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Pick a map on the Maps tab"}</strong></div>

@@ -144,6 +144,19 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     } catch (error) { return errorResponse(error, request, response); }
   });
 
+  // Mints a short-lived read-only viewer cookie for the GM's own preview of the shared screen (the
+  // in-tab iframe and the pop-out window both load /viewer.html and authenticate with this cookie).
+  router.post("/api/v1/viewer/preview-session", (request, response) => {
+    try {
+      requireGm(request);
+      const result = options.access.mintPreviewSession("GM preview", 12 * 60 * 60 * 1_000);
+      const maxAge = Math.max(1, Math.floor((Date.parse(result.viewer.expiresAt!) - now()) / 1_000));
+      response.setHeader("set-cookie", `vtt_viewer_session=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`);
+      requestId(request, response);
+      return success(response, 201, { viewer: result.viewer });
+    } catch (error) { return errorResponse(error, request, response); }
+  });
+
   router.get("/api/v1/viewer/presentation", (request, response) => {
     try {
       if (!options.authorizeGm(bearer(request))) requireViewer(request);
