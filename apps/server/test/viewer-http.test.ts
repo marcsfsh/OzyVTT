@@ -81,6 +81,37 @@ describe("viewer HTTP vertical slice", () => {
     expect(test.coordinator.activeViewers()).toEqual([]);
   });
 
+  it("lets the GM's own session subscribe to the live presentation for an in-tab preview, and stops on revocation", async () => {
+    const test = await fixture();
+    const received: unknown[] = [];
+    let closed = false;
+    const connection = test.coordinator.connectGm("gm-secret", (state) => received.push(state), () => { closed = true; });
+    expect(received).toHaveLength(1);
+    await test.coordinator.executeGm("gm-secret", { id: "begin", expectedRevision: 0, payload: { type: "viewer.presentation.begin", assetId: "map-preview", altText: "Preview map", camera: { center: { x: 10, y: 10 }, zoom: 1 } } });
+    expect(received).toHaveLength(2);
+    expect(received[1]).toMatchObject({ enabled: true, activeMap: { assetId: "map-preview" } });
+    connection.disconnect();
+    test.coordinator.broadcast();
+    expect(received).toHaveLength(2);
+    expect(closed).toBe(false); // an explicit disconnect() does not itself call the close callback — that's for server-initiated drops.
+    expect(() => test.coordinator.connectGm("not-the-gm", () => {}, () => {})).toThrow();
+  });
+
+  it("accepts a GM bearer token on the SSE stream and rejects an unauthenticated request", async () => {
+    const test = await fixture();
+    const unauthenticated = await fetch(`${test.base}/api/v1/viewer/events`);
+    expect(unauthenticated.status).toBe(401);
+
+    const controller = new AbortController();
+    const live = await fetch(`${test.base}/api/v1/viewer/events`, { headers: { authorization: "Bearer gm-secret" }, signal: controller.signal });
+    expect(live.status).toBe(200);
+    expect(live.headers.get("content-type")).toContain("text/event-stream");
+    const reader = live.body!.getReader();
+    const { value } = await reader.read();
+    expect(Buffer.from(value!).toString()).toContain("event: presentation");
+    controller.abort();
+  });
+
   it("returns stable validation and revision-conflict envelopes without secrets", async () => {
     const test = await fixture();
     const malformed = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": "bad-1" }, body: JSON.stringify({ id: "bad", payload: { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: "huge" } } }) });

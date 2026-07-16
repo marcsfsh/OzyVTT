@@ -3,7 +3,7 @@ import { probeImageDimensions, TokenGlyph } from "../scene/mapImage";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
-type Presentation = Readonly<{
+export type Presentation = Readonly<{
   schemaVersion: 1;
   revision: number;
   enabled: boolean;
@@ -51,7 +51,7 @@ function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
   </form></main>;
 }
 
-function Initiative({ presentation }: Readonly<{ presentation: Presentation }>) {
+export function Initiative({ presentation }: Readonly<{ presentation: Presentation }>) {
   if (!presentation.initiative.visible) return null;
   return <aside className="viewer-initiative" aria-label={`Initiative, round ${presentation.initiative.round}`}>
     <div><span>INITIATIVE</span><strong>Round {presentation.initiative.round}</strong></div>
@@ -62,21 +62,73 @@ function Initiative({ presentation }: Readonly<{ presentation: Presentation }>) 
   </aside>;
 }
 
-function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
+type LocalCamera = Readonly<{ center: Point; zoom: number }>;
+type PanGesture = Readonly<{ startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>;
+const LOCAL_MIN_ZOOM = 0.5;
+const LOCAL_MAX_ZOOM = 8;
+
+/**
+ * This screen's own zoom/pan, layered on top of whatever the GM presents. It is purely local —
+ * nothing here is sent back to the server — so each paired display (or the GM's in-tab preview of
+ * it) can be framed independently without affecting what anyone else sees. Resets to follow the
+ * GM's camera again whenever the presented map changes, or when "Follow GM view" is pressed.
+ */
+export function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
   const [size, setSize] = useState({ width: 16, height: 9 });
+  const [localCamera, setLocalCamera] = useState<LocalCamera | null>(null);
+  const [pan, setPan] = useState<PanGesture | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
   const href = presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "";
+  useEffect(() => { setLocalCamera(null); }, [presentation.activeMap?.assetId]);
+  const camera: LocalCamera = localCamera ?? presentation.camera ?? { center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 };
   const viewBox = useMemo(() => {
-    const camera = presentation.camera;
-    if (!camera) return `0 0 ${size.width} ${size.height}`;
     const width = size.width / camera.zoom;
     const height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
-  }, [presentation.camera, size]);
+  }, [camera, size]);
+
+  const zoomAt = (clientX: number, clientY: number, factor: number) => {
+    const svg = svgRef.current; if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const fx = (clientX - rect.left) / rect.width;
+    const fy = (clientY - rect.top) / rect.height;
+    const width = size.width / camera.zoom, height = size.height / camera.zoom;
+    const imageX = camera.center.x - width / 2 + fx * width;
+    const imageY = camera.center.y - height / 2 + fy * height;
+    const nextZoom = Math.max(LOCAL_MIN_ZOOM, Math.min(LOCAL_MAX_ZOOM, camera.zoom * factor));
+    const width2 = size.width / nextZoom, height2 = size.height / nextZoom;
+    setLocalCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
+  };
+  // Wheel-to-zoom needs preventDefault, which React's synthetic onWheel cannot reliably guarantee (passive by default).
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const onWheel = (event: WheelEvent) => { if (!svgRef.current) return; event.preventDefault(); zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15); };
+    stage.addEventListener("wheel", onWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera, size]);
+  const beginPan = (event: React.PointerEvent<HTMLElement>) => {
+    const svg = svgRef.current; if (!svg) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const rect = svg.getBoundingClientRect();
+    setPan({ startClient: { x: event.clientX, y: event.clientY }, startCenter: camera.center, scaleX: (size.width / camera.zoom) / rect.width, scaleY: (size.height / camera.zoom) / rect.height });
+  };
+  const continuePan = (event: React.PointerEvent<HTMLElement>) => {
+    if (!pan || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const dx = (event.clientX - pan.startClient.x) * pan.scaleX;
+    const dy = (event.clientY - pan.startClient.y) * pan.scaleY;
+    setLocalCamera({ zoom: camera.zoom, center: { x: pan.startCenter.x - dx, y: pan.startCenter.y - dy } });
+  };
+  const endPan = (event: React.PointerEvent<HTMLElement>) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); setPan(null); };
+  const zoomCenter = (factor: number) => { const svg = svgRef.current; if (!svg) return; const rect = svg.getBoundingClientRect(); zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor); };
+
   if (!presentation.activeMap) return <section className="viewer-waiting"><span className="viewer-eyebrow">VIEWER CONNECTED</span><h1>Waiting for a map</h1><p>The GM controls what appears here.</p></section>;
   const measurementPoints = presentation.measurement?.points.map((point) => `${point.x},${point.y}`).join(" ");
   const tokens = presentation.encounter.mapAssetId === presentation.activeMap.assetId ? presentation.encounter.tokens : [];
-  return <section className="viewer-stage" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
-    <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
+  return <section className="viewer-stage" ref={stageRef} aria-label={presentation.activeMap.altText || "Shared battlemap"} onPointerDown={beginPan} onPointerMove={continuePan} onPointerUp={endPan} onPointerCancel={endPan}>
+    <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
       <image href={href} width={size.width} height={size.height} onLoad={(event) => {
         const image = event.currentTarget as SVGImageElement;
         const source = image.href.baseVal;
@@ -92,6 +144,11 @@ function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
     </svg>
     {presentation.measurement && <output className="viewer-distance">{presentation.measurement.distanceLabel}</output>}
     {presentation.pings.filter((ping) => ping.label).map((ping) => <div className="viewer-ping-label" key={ping.id}>{ping.label}</div>)}
+    <div className="viewer-zoom" role="group" aria-label="This screen's zoom">
+      <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
+      <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
+      {localCamera && <button type="button" onClick={() => setLocalCamera(null)}>Follow GM view</button>}
+    </div>
   </section>;
 }
 
