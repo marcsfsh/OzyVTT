@@ -200,9 +200,10 @@ export function EncounterMap({
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
-    // The visibility-cycle and delete controls are nested inside the same draggable annotation
-    // group; let their own onClick handlers run natively instead of starting a move/resize drag.
-    if (target.closest(".annotation-controls")) return;
+    // The visibility-cycle/delete shape controls and the overlaid tool/zoom clusters carry their own
+    // handlers; a pointerdown on any of them must not start a map gesture (which would preventDefault
+    // and swallow the click, and capture the pointer).
+    if (target.closest(".annotation-controls, .encounter-map-overlay, .encounter-map-zoom")) return;
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
     const handleAnnotationId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && handleAnnotationId) {
@@ -330,15 +331,15 @@ export function EncounterMap({
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
     </div>
-    <div className="encounter-map-toolbar-row">
-      <div className="encounter-map-tools" role="group" aria-label="Map tools">
-        {TOOLS.map((entry) => <button key={entry.id} type="button" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-      </div>
-      {role === "gm" && <button type="button" className="encounter-map-gm-layer" aria-pressed={gmLayer} title="New shapes you place default to GM-only" onClick={() => setGmLayer((current) => !current)}>GM layer{gmLayer ? " on" : ""}</button>}
-      <label className="encounter-map-live-measure"><input type="checkbox" checked={showLiveMeasure} onChange={(event) => setShowLiveMeasure(event.target.checked)} disabled={!calibration} /> Show distance while moving a token</label>
-    </div>
     <div className="encounter-map-stage" ref={stageRef} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
+        <div className="encounter-map-overlay" role="group" aria-label="Map tools">
+          <div className="encounter-map-tools">
+            {TOOLS.map((entry) => <button key={entry.id} type="button" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+          </div>
+          {role === "gm" && <button type="button" className="encounter-map-gm-layer" aria-pressed={gmLayer} title="New shapes you place default to GM-only" onClick={() => setGmLayer((current) => !current)}>GM layer{gmLayer ? " on" : ""}</button>}
+          <label className="encounter-map-live-measure"><input type="checkbox" checked={showLiveMeasure} onChange={(event) => setShowLiveMeasure(event.target.checked)} disabled={!calibration} /> Show distance while moving a token</label>
+        </div>
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>
           <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
 
