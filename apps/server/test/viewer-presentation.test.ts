@@ -17,15 +17,19 @@ describe("viewer presentation state", () => {
     state = applyViewerCommand(state, command("camera", { type: "viewer.camera.set", camera: { center: { x: 550, y: 325 }, zoom: 1.5 } })).state;
     state = applyViewerCommand(state, command("measure", { type: "viewer.measurement.set", measurement: { id: "ruler-1", points: [{ x: 10, y: 20 }, { x: 110, y: 20 }], distanceLabel: "30 ft" } })).state;
     state = applyViewerCommand(state, command("ping", { type: "viewer.ping", id: "ping-1", point: { x: 80, y: 90 }, label: "Look here", durationMs: 1_000 }), 1_000).state;
-    state = applyViewerCommand(state, command("initiative", { type: "viewer.initiative.set", initiative: { visible: true, round: 2, hiddenTurn: false, entries: [
+    state = applyViewerCommand(state, command("encounter", { type: "viewer.encounter.set", initiative: { visible: true, round: 2, hiddenTurn: false, entries: [
       { actorId: "fighter", name: "Fighter", initiative: 18, active: true },
       { actorId: "goblin", name: "Goblin", initiative: 12, active: false }
+    ] }, encounter: { mapAssetId: "map-1", tokens: [
+      { actorId: "fighter", name: "Fighter", kind: "player-character", position: { x: 120, y: 140 }, sizePx: 40, active: true },
+      { actorId: "goblin", name: "Goblin", kind: "monster", position: { x: 220, y: 140 }, sizePx: 40, active: false }
     ] } })).state;
 
     const projection = projectViewerPresentation(state, 1_500);
     expect(projection).toMatchObject({ enabled: true, activeMap: { assetId: "map-1" }, camera: { zoom: 1.5 }, measurement: { distanceLabel: "30 ft" } });
     expect(projection.pings).toHaveLength(1);
     expect(projection.initiative.entries).toHaveLength(2);
+    expect(projection.encounter.tokens).toHaveLength(2);
     expect(projection).not.toHaveProperty("acceptedCommandIds");
   });
 
@@ -37,7 +41,7 @@ describe("viewer presentation state", () => {
     expect(projectViewerPresentation(state, 10_249).pings).toHaveLength(1);
     expect(projectViewerPresentation(state, 10_250).pings).toHaveLength(0);
     state = applyViewerCommand(state, command("disable", { type: "viewer.enabled.set", enabled: false })).state;
-    expect(projectViewerPresentation(state, 10_100)).toEqual({ schemaVersion: 1, revision: 4, enabled: false, activeMap: null, camera: null, measurement: null, pings: [], initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] } });
+    expect(projectViewerPresentation(state, 10_100)).toEqual({ schemaVersion: 1, revision: 4, enabled: false, activeMap: null, camera: null, measurement: null, pings: [], initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] }, encounter: { mapAssetId: null, tokens: [] } });
   });
 
   it("is idempotent, detects revision conflicts, and rejects non-GM control", () => {
@@ -62,5 +66,9 @@ describe("viewer presentation state", () => {
       { actorId: "same", name: "One", initiative: 10, active: true },
       { actorId: "same", name: "Two", initiative: 9, active: true }
     ] } }))).toThrow();
+    expect(() => applyViewerCommand(state, command("bad-tokens", { type: "viewer.encounter.set", initiative: { visible: true, round: 1, hiddenTurn: false, entries: [] }, encounter: { mapAssetId: "two", tokens: [
+      { actorId: "same", name: "One", kind: "monster", position: { x: 1, y: 2 }, sizePx: 40, active: false },
+      { actorId: "same", name: "Two", kind: "monster", position: { x: 3, y: 4 }, sizePx: 40, active: false }
+    ] } }))).toThrow("unique");
   });
 });

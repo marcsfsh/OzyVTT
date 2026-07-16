@@ -1,4 +1,35 @@
-.encounter-map-stage { position: relative; min-height: 20rem; margin-top: 1.25rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; }
-.encounter-map-stage img { display: block; width: 100%; max-height: min(72vh, 680px); object-fit: contain; user-select: none; }
-.encounter-map-stage p { padding: 2rem; text-align: center; }
-@media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } }
+.encounter-map-interaction { margin-top: 1.1rem; }
+.encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .55rem; padding: .65rem .8rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; }
+.encounter-map-help strong { color: #fff0d2; }
+.encounter-map-help span { color: #cfc5b4; font-size: .78rem; text-align: right; }
+.encounter-token-tray { min-height: 4.8rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; padding: .65rem .75rem; border: 1px dashed #675a45; border-radius: .55rem; background: #16130e; transition: border-color .15s, background .15s; }
+.encounter-token-tray.receiving { border-color: #e8a743; background: #282015; }
+.encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
+.encounter-token-tray > div:first-child span { margin-top: .15rem; color: #9f9789; font-size: .72rem; }
+.encounter-token-tray-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
+.tray-token { display: flex; align-items: center; gap: .45rem; padding: .42rem .6rem; border-radius: 999px; background: #243e5c; text-align: left; cursor: grab; touch-action: none; }
+.tray-token:active { cursor: grabbing; }
+.tray-token > span { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin: 0; border-radius: 50%; background: #315a8a; color: #fff; font-weight: 900; }
+.tray-token > strong { font-size: .75rem; }
+.tray-token.monster { background: #55241f; }
+.tray-token.monster > span { background: #7e302a; }
+.tray-token.npc { background: #35432a; }
+.tray-token.npc > span { background: #52623d; }
+.tray-token.hidden { border-style: dashed; opacity: .76; }
+.encounter-map-stage { position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; touch-action: none; }
+.encounter-map-stage svg { display: block; width: 100%; max-height: min(72vh, 680px); background: #090806; user-select: none; }
+.encounter-map-stage > p { padding: 2rem; text-align: center; }
+.encounter-token { outline: none; }
+.encounter-token.movable { cursor: grab; }
+.encounter-token.dragging { cursor: grabbing; opacity: .82; }
+.encounter-token-body { fill: #315a8a; stroke: #e8f2ff; stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
+.encounter-token.monster .encounter-token-body { fill: #7e302a; stroke: #ffd7cf; }
+.encounter-token.npc .encounter-token-body { fill: #52623d; stroke: #e5f2c8; }
+.encounter-token.hidden .encounter-token-body { stroke-dasharray: 6 4; opacity: .72; }
+.encounter-token-turn { fill: rgb(255 190 58 / 25%); stroke: #ffc33d; stroke-width: 5; vector-effect: non-scaling-stroke; }
+.encounter-token-initials, .encounter-token-name { pointer-events: none; fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: Inter, sans-serif; font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
+.encounter-token-name { dominant-baseline: hanging; }
+.encounter-token.movable:focus-visible .encounter-token-body { stroke: #ffcf62; stroke-width: 6; }
+.encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: #e9b861; font-size: .78rem; }
+@media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
+@media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } }

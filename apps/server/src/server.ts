@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
+import { EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { createApiV1Router } from "./api-v1.js";
@@ -21,10 +21,11 @@ import { MapCatalogStore } from "./map-catalog.js";
 import { createMapRouter } from "./map-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
+import { ensureEncounterTokens, moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
-import { projectViewerInitiative } from "./viewer-encounter.js";
+import { projectViewerEncounter } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 export type CreateServerOptions = {
@@ -54,6 +55,7 @@ const EncounterStartSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 
 export function createServer(options: CreateServerOptions) {
   const app: Express = express();
@@ -84,10 +86,15 @@ export function createServer(options: CreateServerOptions) {
       socket.emit("state:updated", gm ? projectGmView(state, presenceFor) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
+  async function tokenGeometryFor(mapAssetId: string): Promise<TokenMapGeometry> {
+    const [asset, entry] = await Promise.all([mapAssets.get(mapAssetId), Promise.resolve(mapCatalog.get(mapAssetId))]);
+    if (!asset || !entry || entry.kind !== "battlemap") throw new CommandRejectedError("The active encounter battlemap is unavailable.");
+    return { width: asset.width, height: asset.height, calibration: entry.calibration?.calibration ?? null };
+  }
   async function publishGameState(state: GameState) {
-    try { await viewerCoordinator.synchronizeInitiative(state.revision, projectViewerInitiative(state)); }
+    try { await viewerCoordinator.synchronizeEncounter(state.revision, projectViewerEncounter(state)); }
     catch {
-      for (const socket of io.sockets.sockets.values()) if (auth.verify(socket.handshake.auth?.token)) socket.emit("system:error", "The game state was saved, but the shared viewer could not synchronize Initiative. Retry the last viewer action or restart the host.");
+      for (const socket of io.sockets.sockets.values()) if (auth.verify(socket.handshake.auth?.token)) socket.emit("system:error", "The game state was saved, but the shared viewer could not synchronize the encounter. Retry the last viewer action or restart the host.");
     }
     broadcast();
   }
@@ -285,7 +292,8 @@ export function createServer(options: CreateServerOptions) {
       if (!encounterMap || encounterMap.kind !== "battlemap") return acknowledge({ ok: false, message: "Select an uploaded battlemap before starting the encounter." });
       try {
         const { commandId, mapAssetId, entries, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "encounter.start", expectedRevision }, (state) => startEncounter(state, { mapAssetId, entries }, () => randomInt(1, 21)));
+        const tokenGeometry = await tokenGeometryFor(mapAssetId);
+        const result = await store.execute({ id: commandId, type: "encounter.start", expectedRevision }, (state) => startEncounter(state, { mapAssetId, entries }, () => randomInt(1, 21), tokenGeometry));
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not start." }); }
@@ -331,12 +339,42 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not move backward." }); }
     });
+    socket.on("token:move", async (payload, acknowledge) => {
+      const request = TokenMoveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The token move is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before moving tokens." });
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before moving tokens." });
+      try {
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const { commandId, actorId, position, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "token.move", actorId, expectedRevision }, (state) => {
+          if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
+          if (!gm) {
+            const actor = state.actors.find((candidate) => candidate.id === actorId);
+            if (!actor || actor.ownerSessionId !== player!.sessionId) throw new CommandRejectedError("You may only move your claimed character token.");
+          }
+          moveEncounterToken(state, actorId, position, geometry);
+        });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be moved." }); }
+    });
     socket.emit("state:updated", projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor));
   });
 
   async function initialize() {
     await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
-    await viewerCoordinator.synchronizeInitiative(store.snapshot.revision, projectViewerInitiative(store.snapshot));
+    const persisted = store.snapshot;
+    if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
+      try {
+        const geometry = await tokenGeometryFor(persisted.combat.mapAssetId);
+        await store.execute({ id: `encounter.tokens.prepare:${persisted.revision}`, type: "encounter.tokens.prepare" }, (state) => { ensureEncounterTokens(state, geometry); });
+      } catch { /* Preserve startup for an old encounter whose map asset was removed; the GM can end it and start a new encounter. */ }
+    }
+    await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
   function close() { presence.dispose(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 

@@ -15,6 +15,14 @@ button, input { font: inherit; }
 .viewer-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) clamp(16rem, 22vw, 30rem); background: #050504; }
 .viewer-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; }
 .viewer-stage svg { width: 100%; height: 100%; background: #0d0b08; }
+.viewer-token { pointer-events: none; }
+.viewer-token-body { fill: #315a8a; stroke: #e8f2ff; stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
+.viewer-token.monster .viewer-token-body { fill: #7e302a; stroke: #ffd7cf; }
+.viewer-token.npc .viewer-token-body { fill: #52623d; stroke: #e5f2c8; }
+.viewer-token-turn { fill: rgb(255 190 58 / 25%); stroke: #ffc33d; stroke-width: 5; vector-effect: non-scaling-stroke; }
+.viewer-token-initials, .viewer-token-name { fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: Inter, sans-serif; font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
+.viewer-token-initials { font-size: 18px; }
+.viewer-token-name { font-size: 13px; dominant-baseline: hanging; }
 .viewer-measurement { fill: none; stroke: #ffd463; stroke-width: 4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 2px #000); }
 .viewer-ping circle { fill: none; stroke: #ffb52e; stroke-width: 4; vector-effect: non-scaling-stroke; animation: viewer-pulse 1s ease-out infinite; }
 .viewer-ping circle + circle { fill: #ffb52e; animation: none; }

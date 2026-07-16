@@ -19,7 +19,8 @@ function parseState(value: string): ViewerPresentationState {
   }
   return {
     ...parsed,
-    initiative: { ...parsed.initiative!, hiddenTurn: parsed.initiative!.hiddenTurn ?? false }
+    initiative: { ...parsed.initiative!, hiddenTurn: parsed.initiative!.hiddenTurn ?? false },
+    encounter: parsed.encounter ?? { mapAssetId: null, tokens: [] }
   } as ViewerPresentationState;
 }
 
