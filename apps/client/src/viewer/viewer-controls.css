@@ -4,6 +4,8 @@
 .viewer-controls-heading h2 { margin: .25rem 0 0; }
 .viewer-controls-heading > strong { color: #a69e91; font-size: .85rem; }
 .viewer-controls-heading > strong.online { color: #78d690; }
+.viewer-no-map-notice { margin-top: 1rem; padding: .8rem 1rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; color: #f3d9a5; }
+.viewer-no-map-notice strong { color: #f6c452; }
 .viewer-address { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; margin-top: 1rem; padding: .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; }
 .viewer-address span { grid-column: 1 / -1; color: #a69e91; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-address code { min-width: 0; overflow-wrap: anywhere; color: #f2d39b; }

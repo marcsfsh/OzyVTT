@@ -35,7 +35,9 @@ describe("viewer HTTP vertical slice", () => {
     const test = await fixture();
     const unauthorized = await fetch(`${test.base}/api/v1/viewer/pairings`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     expect(unauthorized.status).toBe(401);
-    expect((await json(unauthorized)).error).toMatchObject({ code: "unauthorized" });
+    const unauthorizedBody = await json(unauthorized);
+    expect(unauthorizedBody.ok).toBe(false);
+    expect(unauthorizedBody.error).toMatchObject({ code: "unauthenticated" });
 
     const pairingResponse = await fetch(`${test.base}/api/v1/viewer/pairings`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": "pair-1" }, body: "{}" });
     expect(pairingResponse.status).toBe(201);
@@ -83,13 +85,13 @@ describe("viewer HTTP vertical slice", () => {
     const test = await fixture();
     const malformed = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json", "x-request-id": "bad-1" }, body: JSON.stringify({ id: "bad", payload: { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: "huge" } } }) });
     expect(malformed.status).toBe(400);
-    expect(await json(malformed)).toEqual({ error: { code: "invalid_request", message: "Viewer request body is invalid.", requestId: "bad-1" } });
+    expect(await json(malformed)).toEqual({ ok: false, apiVersion: "1", error: { code: "validation_failed", message: "Viewer request body is invalid.", requestId: "bad-1" } });
 
     await test.coordinator.executeGm("gm-secret", { id: "first", payload: { type: "viewer.enabled.set", enabled: true } });
     const conflict = await fetch(`${test.base}/api/v1/viewer/presentation/commands`, { method: "POST", headers: { authorization: "Bearer gm-secret", "content-type": "application/json" }, body: JSON.stringify({ id: "stale", expectedRevision: 0, payload: { type: "viewer.enabled.set", enabled: false } }) });
     const text = await conflict.text();
     expect(conflict.status).toBe(409);
     expect(text).not.toContain("gm-secret");
-    expect(JSON.parse(text).error.code).toBe("revision_conflict");
+    expect(JSON.parse(text).error.code).toBe("conflict");
   });
 });

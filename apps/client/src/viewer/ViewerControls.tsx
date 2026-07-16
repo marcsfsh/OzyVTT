@@ -123,6 +123,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     <div className="viewer-controls-heading"><div><span>SHARED DISPLAY</span><h2 id="viewer-controls-title">Table viewer</h2></div><strong className={connections.length ? "online" : ""}>{connections.length} connected</strong></div>
     <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
     <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</select> : <code>{viewerUrl}</code>}<button onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</button></div>
+    {!map && <p className="viewer-no-map-notice" role="status">Choose a map on the <strong>Maps</strong> tab first to present it here and unlock the focus/ping/measure tools below.</p>}
     <div className="viewer-control-actions">
       <button disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</button>
       <button disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</button>
