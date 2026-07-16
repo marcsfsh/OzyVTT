@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ViewerAccessDeniedError, type ViewerAccessMetadata, type ViewerAccessStore } from "./viewer-access.js";
-import type { ViewerCommand, ViewerPresentationProjection } from "./viewer-presentation.js";
+import type { ViewerCommand, ViewerInitiative, ViewerPresentationProjection } from "./viewer-presentation.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 type PresentationListener = (projection: ViewerPresentationProjection) => void;
@@ -57,6 +57,18 @@ export class ViewerCoordinator {
     const result = await this.presentation.execute({ ...command, role: "gm" }, this.now());
     if (!result.duplicate) this.broadcast();
     return result;
+  }
+
+  async synchronizeInitiative(sourceRevision: number, initiative: ViewerInitiative) {
+    const current = this.presentation.snapshot;
+    if (JSON.stringify(current.initiative) === JSON.stringify(initiative)) return false;
+    const result = await this.presentation.execute({
+      id: `encounter-initiative:${sourceRevision}:${current.revision}`,
+      role: "gm",
+      payload: { type: "viewer.initiative.set", initiative }
+    }, this.now());
+    if (!result.duplicate) this.broadcast();
+    return !result.duplicate;
   }
 
   disconnectViewerAccess(viewerId: string) {

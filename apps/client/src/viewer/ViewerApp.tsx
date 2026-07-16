@@ -10,7 +10,7 @@ type Presentation = Readonly<{
   camera: Readonly<{ center: Point; zoom: number }> | null;
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
-  initiative: Readonly<{ visible: boolean; round: number; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean }>[] }>;
+  initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean }>[] }>;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -53,6 +53,7 @@ function Initiative({ presentation }: Readonly<{ presentation: Presentation }>) 
   if (!presentation.initiative.visible) return null;
   return <aside className="viewer-initiative" aria-label={`Initiative, round ${presentation.initiative.round}`}>
     <div><span>INITIATIVE</span><strong>Round {presentation.initiative.round}</strong></div>
+    {presentation.initiative.hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
     <ol>{presentation.initiative.entries.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
       <span>{entry.name}</span><strong>{entry.initiative}</strong>
     </li>)}</ol>

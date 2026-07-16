@@ -3,6 +3,7 @@ import {
   adjustWizardGrid,
   completeGridCalibrationWizard,
   createGridCalibrationWizard,
+  measureKnownGridArea,
   measureKnownGridSpan,
   redoWizardGrid,
   reopenGridCalibrationWizard,
@@ -18,6 +19,15 @@ function measuredWizard() {
 }
 
 describe("grid calibration wizard", () => {
+  it("starts from the normal 3-by-3 drag gesture", () => {
+    const measured = measureKnownGridArea(
+      createGridCalibrationWizard({ assetId: "map-1", mapWidthPx: 1200, mapHeightPx: 800 }),
+      { start: { x: 100, y: 100 }, end: { x: 250, y: 250 }, cellsAcross: 3, cellsDown: 3 }
+    );
+    expect(measured).toMatchObject({ step: "refine", calibration: { origin: { x: 100, y: 100 }, rotationRadians: 0 } });
+    expect(measured.calibration?.cellSizePx).toBeCloseTo(50);
+  });
+
   it("walks through measure, refine, verify, and completion", () => {
     const measured = measuredWizard();
     expect(measured.step).toBe("refine");

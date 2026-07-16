@@ -74,10 +74,12 @@ describe("map asset HTTP workflow", () => {
     const test = await fixture();
     const upload = await body(await fetch(`${test.base}/api/v1/map-assets?filename=grid.png&kind=battlemap`, { method: "POST", headers: gm("image/png"), body: test.input }));
     const id = upload.data.asset.id;
-    const started = await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards`, { method: "POST", headers: gm(), body: JSON.stringify({ start: { x: 0, y: 0 }, end: { x: 200, y: 0 }, cellsBetween: 4, axis: "horizontal", distancePerCell: 5 }) });
+    const wrongSize = await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards`, { method: "POST", headers: gm(), body: JSON.stringify({ start: { x: 0, y: 0 }, end: { x: 100, y: 100 }, cellsAcross: 2, cellsDown: 2, distancePerCell: 5 }) });
+    expect(wrongSize.status).toBe(400);
+    const started = await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards`, { method: "POST", headers: gm(), body: JSON.stringify({ start: { x: 0, y: 0 }, end: { x: 150, y: 150 }, cellsAcross: 3, cellsDown: 3, distancePerCell: 5 }) });
     expect(started.status).toBe(201);
     const startedBody = await body(started);
-    expect(startedBody.data.state.calibration.cellSizePx).toBe(50);
+    expect(startedBody.data.state.calibration.cellSizePx).toBeCloseTo(50);
     const wizardId = startedBody.data.wizardId;
 
     const adjusted = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/actions`, { method: "POST", headers: gm(), body: JSON.stringify({ action: "adjust", adjustment: { originDelta: { x: 1, y: 1 } } }) }));
@@ -85,9 +87,11 @@ describe("map asset HTTP workflow", () => {
     const undone = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/actions`, { method: "POST", headers: gm(), body: JSON.stringify({ action: "undo" }) }));
     expect(undone.data.state.calibration.origin).toEqual({ x: 0, y: 0 });
     const verified = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/actions`, { method: "POST", headers: gm(), body: JSON.stringify({ action: "verify", imagePoint: { x: 100, y: 100 } }) }));
-    expect(verified.data.state.verification).toMatchObject({ accepted: true, errorPx: 0 });
+    expect(verified.data.state.verification).toMatchObject({ accepted: true });
+    expect(verified.data.state.verification.errorPx).toBeCloseTo(0);
     const completed = await body(await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/complete`, { method: "POST", headers: gm(), body: "{}" }));
-    expect(completed.data.map.calibration).toMatchObject({ calibration: { cellSizePx: 50 }, verificationErrorPx: 0 });
+    expect(completed.data.map.calibration.calibration.cellSizePx).toBeCloseTo(50);
+    expect(completed.data.map.calibration.verificationErrorPx).toBeCloseTo(0);
     expect((await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards/${wizardId}/complete`, { method: "POST", headers: gm(), body: "{}" })).status).toBe(404);
   });
 

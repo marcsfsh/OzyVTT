@@ -17,7 +17,7 @@ describe("viewer presentation state", () => {
     state = applyViewerCommand(state, command("camera", { type: "viewer.camera.set", camera: { center: { x: 550, y: 325 }, zoom: 1.5 } })).state;
     state = applyViewerCommand(state, command("measure", { type: "viewer.measurement.set", measurement: { id: "ruler-1", points: [{ x: 10, y: 20 }, { x: 110, y: 20 }], distanceLabel: "30 ft" } })).state;
     state = applyViewerCommand(state, command("ping", { type: "viewer.ping", id: "ping-1", point: { x: 80, y: 90 }, label: "Look here", durationMs: 1_000 }), 1_000).state;
-    state = applyViewerCommand(state, command("initiative", { type: "viewer.initiative.set", initiative: { visible: true, round: 2, entries: [
+    state = applyViewerCommand(state, command("initiative", { type: "viewer.initiative.set", initiative: { visible: true, round: 2, hiddenTurn: false, entries: [
       { actorId: "fighter", name: "Fighter", initiative: 18, active: true },
       { actorId: "goblin", name: "Goblin", initiative: 12, active: false }
     ] } })).state;
@@ -37,7 +37,7 @@ describe("viewer presentation state", () => {
     expect(projectViewerPresentation(state, 10_249).pings).toHaveLength(1);
     expect(projectViewerPresentation(state, 10_250).pings).toHaveLength(0);
     state = applyViewerCommand(state, command("disable", { type: "viewer.enabled.set", enabled: false })).state;
-    expect(projectViewerPresentation(state, 10_100)).toEqual({ schemaVersion: 1, revision: 4, enabled: false, activeMap: null, camera: null, measurement: null, pings: [], initiative: { visible: false, round: 0, entries: [] } });
+    expect(projectViewerPresentation(state, 10_100)).toEqual({ schemaVersion: 1, revision: 4, enabled: false, activeMap: null, camera: null, measurement: null, pings: [], initiative: { visible: false, round: 0, hiddenTurn: false, entries: [] } });
   });
 
   it("is idempotent, detects revision conflicts, and rejects non-GM control", () => {
@@ -58,7 +58,7 @@ describe("viewer presentation state", () => {
     expect(state.measurement).toBeNull();
     expect(state.pings).toEqual([]);
     expect(() => applyViewerCommand(state, command("bad-zoom", { type: "viewer.camera.set", camera: { center: { x: 0, y: 0 }, zoom: 0 } }))).toThrow("zoom");
-    expect(() => applyViewerCommand(state, command("bad-initiative", { type: "viewer.initiative.set", initiative: { visible: true, round: 1, entries: [
+    expect(() => applyViewerCommand(state, command("bad-initiative", { type: "viewer.initiative.set", initiative: { visible: true, round: 1, hiddenTurn: false, entries: [
       { actorId: "same", name: "One", initiative: 10, active: true },
       { actorId: "same", name: "Two", initiative: 9, active: true }
     ] } }))).toThrow();

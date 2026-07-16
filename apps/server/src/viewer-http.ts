@@ -11,10 +11,12 @@ const CameraSchema = z.object({ center: PointSchema, zoom: z.number().finite() }
 const InitiativeSchema = z.object({
   visible: z.boolean(),
   round: z.number().int().nonnegative(),
+  hiddenTurn: z.boolean().default(false),
   entries: z.array(z.object({ actorId: z.string(), name: z.string(), initiative: z.number().finite(), active: z.boolean() }).strict()).max(200)
 }).strict();
 const PayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("viewer.enabled.set"), enabled: z.boolean() }).strict(),
+  z.object({ type: z.literal("viewer.presentation.begin"), assetId: z.string(), altText: z.string(), camera: CameraSchema }).strict(),
   z.object({ type: z.literal("viewer.map.set"), assetId: z.string(), altText: z.string(), camera: CameraSchema }).strict(),
   z.object({ type: z.literal("viewer.camera.set"), camera: CameraSchema }).strict(),
   z.object({ type: z.literal("viewer.measurement.set"), measurement: z.object({ id: z.string(), points: z.array(PointSchema), distanceLabel: z.string() }).strict() }).strict(),

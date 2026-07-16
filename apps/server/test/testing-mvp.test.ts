@@ -70,7 +70,9 @@ describe("testing MVP live server", () => {
     expect(viewerImage.headers.get("cache-control")).toBe("private, no-store");
     const hiddenViewerImage = await fetch(`${base}/api/v1/map-assets/${hiddenAssetId}/content`, { headers: { cookie: viewerCookie } });
     expect(hiddenViewerImage.status).toBe(403);
-    expect((await fetch(`${base}/api/v1/map-assets/${assetId}/content`, { headers: { authorization: `Bearer ${playerToken}` } })).status).toBe(200);
+    // Uploaded GM maps are not exposed to players until the server-authoritative
+    // encounter selects one as the active battlemap.
+    expect((await fetch(`${base}/api/v1/map-assets/${assetId}/content`, { headers: { authorization: `Bearer ${playerToken}` } })).status).toBe(403);
     expect((await fetch(`${base}/api/v1/map-assets/${hiddenAssetId}/content`, { headers: { authorization: `Bearer ${playerToken}` } })).status).toBe(403);
     const viewerRedirect = await fetch(`${base}/viewer`, { redirect: "manual" });
     expect(viewerRedirect.status).toBe(307);

@@ -10,7 +10,7 @@
 | Primary use | One GM locally hosting a private home game for a small, known group |
 | Distribution direction | Open-source, self-hostable application with a documented public integration API |
 | Primary content path | Canonical player-character and monster JSON, with reviewed player-sheet PDF conversion through MarkItDown planned for Version 1 |
-| Current checkpoint | Live scoped integrations plus the first map-upload, calibration, and paired second-screen presentation slice are implemented; physical multi-device acceptance and encounter-state integration are next |
+| Current checkpoint | A server-authoritative encounter/Initiative vertical slice now connects uploaded battlemaps, GM/player combat views, persistence, and the paired viewer; the calibration UX and presentation-start path were redesigned after hands-on failure feedback, and physical multi-device revalidation is next |
 | Last updated | 2026-07-16 |
 | Last implementation audit | 2026-07-16 |
 
@@ -74,22 +74,23 @@ This table is the fast operational view. The detailed requirements and milestone
 | Realtime command model | Active; automated foundation implemented | Authoritative Socket.IO projections, monotonic revisions, command IDs, duplicate suppression, reconnect snapshots, verified-session presence, multi-connection accounting, disconnect grace, and safe online/reconnecting/offline actor indicators exist | Complete the live two-player Socket.IO convergence/reconnect/revocation matrix, retention fallback, and injected-disconnect browser/device tests | `apps/server/src/server.ts`, `apps/server/src/game-store.ts`, `apps/server/src/presence.ts`, `apps/server/test/presence.test.ts`, `apps/server/test/projections.test.ts` |
 | Dice | Phase 0 proof complete | Server-authoritative parser/evaluator, cryptographic live rolls, deterministic tests, recipient-specific visibility, and replaceable 2D results are implemented | Connect rolls to imported actions/combat consequences and complete browser/device accessibility validation | `docs/product/phase-0-dice-spike.md`, `packages/rules-5e/`, `apps/client/src/dice/` |
 | Persistence | Phase 1 foundation complete | SQLite migrations, WAL, atomic receipt/event/projection commits, idempotency, restart recovery, and periodic snapshots are verified | Backup/restore, rollback policy, bounded undo, migration backup, and production data lifecycle | ADR-006, `apps/server/src/game-store.ts`, `apps/server/test/game-store.test.ts` |
-| Battle/regional/world maps | Phase 2 vertical slice implemented; validation active | GM UI and live HTTP routes now upload/deduplicate content-validated raster maps, persist safe metadata, run a server-owned two-point/third-point square-grid wizard with overlay/nudge/undo/redo/verification, and save regional/world distance scales | Add safe display normalization/thumbnails, gridless battlemap choice, scene creation, rendition/texture-limit handling, deletion/reference lifecycle, mobile precision validation, and the later atlas/marker/note layers | `apps/client/src/maps/`, `apps/server/src/map-assets.ts`, `apps/server/src/map-catalog.ts`, `apps/server/src/map-http.ts`, focused map tests |
-| Shared-table viewer | Phase 2 vertical slice implemented; validation active | Dedicated fullscreen viewer entry, one-time pairing, hashed/revocable HttpOnly access, persisted convergent presentation, SSE reconnect, GM start/pause/map/focus/ping/measurement/clear controls, LAN URL selection, active-map-only byte authorization, and no-store caching now work end to end | Wire player-safe scene/tokens/fog and live Initiative, add per-display targeting/follow/highlight, run browser/TV/phone accessibility and 1080p/4K checks, and prove private-state omission against a complete encounter | `viewer.html`, `apps/client/src/viewer/`, `apps/server/src/viewer-*`, `apps/server/test/viewer-*.test.ts`, `apps/server/test/testing-mvp.test.ts` |
+| Encounter and Initiative | Phase 2 authoritative vertical slice implemented; validation active | GM UI starts/ends a persisted battlemap encounter, accepts manual scores or server rolls, deterministically sorts ties, edits scores, advances/rewinds turns and rounds, displays the active map to GM/player clients, and converges hidden-safe projections after duplicate/conflicting commands and restart | Add actor instances/tokens, group/reorder/skip/jump controls, HP/effects/actions, player End Turn policy, undo, and full phone/laptop three-round acceptance | `apps/server/src/encounter.ts`, `apps/server/src/viewer-encounter.ts`, `apps/client/src/encounter/`, `apps/client/src/scene/EncounterMap.tsx`, encounter tests |
+| Battle/regional/world maps | Phase 2 vertical slice implemented; validation active | GM UI and live HTTP routes upload/deduplicate validated raster maps, persist safe metadata, provide an explicit printed-grid/gridless choice, calibrate a printed square grid from one fixed 3×3 click-drag gesture with immediate aligned preview, support direct adjustments/undo/redo/third-point verification, and save gridless/regional/world distance scales | Re-run hands-on calibration after the UX redesign; add safe display normalization/thumbnails, scene-world transforms, rendition/texture-limit handling, deletion/reference lifecycle, mobile precision validation, and later atlas/marker/note layers | `apps/client/src/maps/`, `apps/server/src/map-assets.ts`, `apps/server/src/map-catalog.ts`, `apps/server/src/map-http.ts`, focused map tests |
+| Shared-table viewer | Phase 2 vertical slice implemented; validation active | Dedicated fullscreen viewer entry, one-time pairing, hashed/revocable HttpOnly access, persisted/SSE-convergent presentation, atomic present-current-map/pause, GM focus/ping/measurement/clear controls, LAN URL selection, active-map-only bytes, and hidden-safe live Initiative/current-turn synchronization now work end to end | Wire player-safe tokens/fog, add per-display targeting/follow/highlight, run browser/TV/phone accessibility and 1080p/4K checks, and extend negative proof to DOM/accessibility/log/cache surfaces | `viewer.html`, `apps/client/src/viewer/`, `apps/server/src/viewer-*`, `apps/server/test/viewer-*.test.ts`, `apps/server/test/testing-mvp.test.ts`, `apps/server/test/encounter-realtime.test.ts` |
 | Open integration API and open-source distribution | Phase 1 live foundation implemented | The live server mounts `/api/v1`; shipped OpenAPI/system routes and durable named credentials support least-privilege scopes, optional binding/expiry, one-time secret display, safe list/audit, rotation, revocation, and GM UI management | Add safe game snapshot, shared authoritative command adapters, realtime negotiation/events, rate-limit/compatibility/quick-start conformance, and repository governance/license files | `packages/api-contract/`, `apps/server/src/api-v1.ts`, `apps/server/src/integration-credentials.ts`, `apps/client/src/integrations/`, Sections 9.5/16.6 |
 | AI-controlled character participants | Long-term post-Version-1 goal; contracts planned | Server authority, public API DTOs, recipient projections, idempotent commands, actor ownership, scopes, audit events, and revocation are the intended foundation | Define ADR-019, agent identity/actor binding, bounded autonomy/consent, observation/action contracts, GM controls, prompt-injection defenses, conformance simulations, and provider-neutral adapter boundary | Section 16.8 and Phase 7 |
 
-**Current milestone assessment:** The repository now contains an automated testing-MVP path from authenticated GM map upload through persistent viewer pairing/presentation and restart recovery. This starts Phase 2 implementation without claiming the Phase 0/1/2 exit gates: physical phone/laptop/TV testing, the full two-player claim/reconnect scenario, API command/event conformance, and a real encounter/Initiative loop remain mandatory.
+**Current milestone assessment:** The automated testing-MVP path now continues from authenticated map upload through authoritative encounter start, Initiative/turn/round commands, safe GM/player/viewer convergence, active player battlemap authorization, and restart recovery. Hidden combatants are omitted and represented only by a generic hidden-turn cue. This does not claim the Phase 2 exit gate: hands-on calibration and presentation feedback exposed defects that are corrected in code but require revalidation, while tokens/fog, actor import, HP/actions, full phone/laptop/TV play, and API encounter equivalence remain mandatory.
 
 ### 1.5 Ordered next queue
 
 This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
 
-1. Merge and physically exercise the testing-MVP map/viewer slice on the Windows host plus a separate LAN screen: upload, calibrate, pair, focus, ping, measure, reload, revoke, and restart; record browser/firewall/1080p findings.
-2. Complete the live two-player Socket.IO claim/presence/reconnect/revocation convergence matrix, then repeat the join path on one phone and one laptop.
-3. Finish the Phase 1 external-integration proof by adding one recipient-safe game snapshot, one shared idempotent authoritative command, one projected realtime event/resume path, and a tested quick start using the existing scoped credentials.
-4. Build the Phase 2 scene/encounter and Initiative state so uploaded maps, tokens, player views, and the shared viewer converge from the same authoritative projection rather than presentation-only state.
-5. Add GM password change/stay-signed-in policy, then continue the minimum combat loop with actor JSON import, token placement/movement, Initiative, HP, and turns. AI-controlled characters remain Phase 7 and do not displace this queue.
+1. Merge and physically re-run the redesigned Windows/LAN flow: upload a printed-grid and gridless map, complete calibration, pair a separate viewer, present the map with one action, start an encounter, advance through public/hidden turns, focus/ping/measure, reload, revoke, and restart; record usability, firewall, touch, and 1080p findings.
+2. Extend the encounter slice with actor instances and visible/hidden tokens placed and moved on the authoritative battlemap, preserving the current recipient-safe projection boundary.
+3. Complete the live two-player Socket.IO claim/presence/reconnect/revocation convergence matrix, then repeat the encounter/join path on one phone and one laptop.
+4. Finish the Phase 1 external-integration proof by adding one recipient-safe game snapshot, one shared idempotent authoritative encounter command, one projected realtime event/resume path, and a tested quick start using existing scoped credentials.
+5. Continue the minimum combat loop with canonical actor JSON import, HP/temp HP/damage/healing, conditions, generic actions, End Turn, and basic undo. AI-controlled characters remain Phase 7 and do not displace this queue.
 
 ### 1.6 Open blockers, risks, and validation gaps
 
@@ -104,8 +105,9 @@ There are no active hard blockers to the next queued implementation item.
 | GAP-003 | Resolved 2026-07-15 | Phase 0 decision gate | Accepted ADR-004/005/007/008/011/012/014 previously lacked dedicated records | Dedicated linked records now exist; proposed ADR-018 has a dedicated record and remains blocked on its extraction/packaging spike |
 | GAP-004 | Open packaging gap | Production launch | Shared workspace packages currently export TypeScript source, so the supported launch uses Node's `tsx` loader even after the production client build | Add ordered shared-package compilation and runtime exports before packaging the host application |
 | RISK-002 | Open performance risk | Client startup | Vite reports a JavaScript chunk above 500 kB during the current proof build | Measure on baseline phones and split scene/UI code before the performance gate if needed |
-| RISK-003 | Mitigated in current slice; full validation open | Shared-table viewer | The viewer now uses separate persisted presentation state, explicit GM commands, active-map-only authorization, and no-store map responses, but tokens/fog/secret Initiative are not implemented deeply enough for complete negative-state proof | Preserve the separate projection; add hidden-token/fog/Initiative fixtures plus payload, DOM, accessibility-tree, log, and cache tests before the Phase 2 gate |
-| GAP-005 | Open validation gap | Testing-MVP map/viewer slice | Automated HTTP/domain/restart coverage passes, but no physical TV/second-monitor, Windows browser, touch calibration, 1080p/4K readability, or real LAN pairing result is recorded | Run queue item 1 after merge and log device, address, browser, reload, revocation, and visibility results here |
+| RISK-003 | Mitigated in current slice; full validation open | Shared-table viewer | The viewer uses separate persisted presentation state, explicit GM commands, active-map-only authorization, no-store responses, and hidden-aware Initiative projection; tokens/fog and non-payload surfaces are not implemented deeply enough for complete negative-state proof | Preserve the projection boundary; add hidden-token/fog fixtures plus DOM, accessibility-tree, log, and cache tests before the Phase 2 gate |
+| GAP-005 | Open validation gap | Testing-MVP map/viewer/encounter slice | Automated HTTP/domain/socket/restart coverage passes, but no post-redesign physical TV/second-monitor, Windows browser, touch calibration, 1080p/4K readability, real LAN pairing, or three-round play result is recorded | Run queue item 1 after merge and log device, address, browser, calibration result, presentation response, encounter convergence, reload, revocation, and visibility findings here |
+| GAP-006 | Open usability validation gap; prior design rejected 2026-07-16 | Grid calibration | Hands-on use found the original point/form workflow unintuitive and its overlay container could diverge from image geometry; the replacement begins with one fixed 3×3 diagonal click-drag, derives scale/position/rotation without a direction or cell-count form, previews within the exact image geometry, then offers grouped adjustments and distant-point verification, but has not yet been accepted by the user on a real map | Re-test one clean printed grid, one rotated/cropped grid, one gridless battlemap, and touch placement; iterate until the user can finish without explanation |
 | DEC-002 | Open decision | Public release | Application code license, contributor policy, and treatment of separately licensed SRD/content/assets are not settled | Resolve ADR-017 and complete legal/license review before accepting public contributions or publishing a Version 1 release |
 | RISK-004 | Open security/compatibility risk | Public API | An integration could bypass UI safeguards, leak private state, or become coupled to unstable internals | Put API adapters over the same command/authorization/projection layer; use scoped tokens, contract tests, explicit versions, capability discovery, and deprecation policy |
 
@@ -135,6 +137,8 @@ There are no active hard blockers to the next queued implementation item.
 | 2026-07-16 | FND-009 | Complete (foundation scope) | Mounted the versioned API in the live server and added durable hashed integration credentials plus GM create/list/rotate/revoke/audit UI with one-time secret handling, expiry, optional game binding, exact-scope verification, and restart persistence | Live source integration, API/store contract tests, TypeScript checks, and production builds | Safe game resources, shared commands, realtime events, quick-start conformance, and rate-limit policy remain before the Phase 1 API exit scenario |
 | 2026-07-16 | MVP-001 | Partial (automated testing-MVP scope) | Implemented the first normal-UI map-to-shared-screen vertical slice: safe raster upload/library, battlemap grid wizard, regional/world scale, LAN viewer URL, one-time pairing, fullscreen viewer, persistent/reconnecting presentation, and GM map/focus/ping/measurement controls | 19 server test files / 77 server tests and 100 tests across all workspaces, including live upload→pair→present→authorized bytes→restart recovery; full workspace type-check; two-entry Vite production build | Physical Windows/LAN/TV and mobile calibration validation; real scene/tokens/fog/Initiative; targeted displays; follow/highlight; safe rendition pipeline; OpenAPI integration |
 | 2026-07-16 | FIX-003 | Complete (routing/security scope) | Confined the versioned API router's 404 envelope to `/api/v1` so it cannot swallow `/viewer` or the SPA; restricted player/viewer map reads to the explicitly presented asset and disabled shared-screen caching | Live routing and authorization assertions in `testing-mvp.test.ts`; range/ETag/no-store coverage in `map-http.test.ts` | Revalidate through the Windows development and built-client launch paths after merge |
+| 2026-07-16 | MVP-002 | Partial (authoritative encounter scope) | Added persisted server-authoritative encounters and Initiative: battlemap selection, manual/server-rolled scores, stable tie sorting, editable scores, current turn, next/previous, round wrap, end, active GM/player battlemap display, hidden-safe player/viewer projections, and automatic second-screen Initiative convergence | 22 server test files / 86 server tests and 109 tests across all workspaces; live GM/player socket test covers authorization, hidden omission, map access, idempotency, revision conflict, viewer sync, and restart; full type-check and production build pass | Actor instances/tokens/fog, grouped/reordered Initiative, HP/actions/undo, full API equivalence, and physical three-round multi-device acceptance remain |
+| 2026-07-16 | FIX-004 | Complete (code/automated scope); acceptance open | Replaced the failed calibration UX with one fixed 3×3 click-drag that derives square size, origin, and rotation without exposing cell counts/directions, plus immediate aligned preview, grouped direct adjustments, distant-point verification, and collapsed keyboard recovery; replaced the viewer's misleading enable-only action with an atomic present-current-map command that immediately pushes map/camera state | 22 server test files / 86 server tests and 109 tests across all workspaces; area geometry covers aligned/rotated/invalid gestures, HTTP enforces 3×3, coordinator tests cover atomic presentation, and full type-check/two-entry production build pass | User must pull and re-evaluate calibration and one-click presentation on the Windows host and separate viewer; keep GAP-006 open until accepted |
 
 ## 2. Product definition
 
@@ -515,12 +519,12 @@ Acceptance criteria:
 Acceptance criteria:
 
 - [x] Viewer mode is a separate server-authorized projection, never a CSS-hidden copy of the GM DOM/state. The current projection contains only explicit presentation state and is exercised through a dedicated `viewer.html` client.
-- [~] The viewer receives only information a normal player is permitted to know, including player-safe fog, tokens, Initiative entries, and public rolls/cues. Current map/presentation DTOs are allowlisted and active-map bytes are authorization-gated; scene/token/fog/log integration remains.
+- [~] The viewer receives only information a normal player is permitted to know, including player-safe fog, tokens, Initiative entries, and public rolls/cues. Current map/presentation DTOs and live Initiative are allowlisted, hidden combatants are omitted with only a generic GM-turn cue, and active-map bytes are authorization-gated; scene/token/fog/log integration remains.
 - [~] The GM can target a connected viewer and explicitly present center/follow, ping, measurement, and highlight actions from the GM view. Broadcast focus, zoom, ping, measurement, and clear are live; per-display targeting, follow, and highlight remain.
-- [~] Private GM cursor movement, measurements, selections, drafts, notes, rolls, hidden tokens, secret Initiative entries, and unrevealed fog never appear unless explicitly converted into a permitted public action. The current viewer does not mirror the GM DOM/cursor and map responses are active-map-only/no-store; complete hidden-scene fixtures remain.
+- [~] Private GM cursor movement, measurements, selections, drafts, notes, rolls, hidden tokens, secret Initiative entries, and unrevealed fog never appear unless explicitly converted into a permitted public action. The current viewer does not mirror the GM DOM/cursor; map responses are active-map-only/no-store; secret Initiative identity/ID/notes are absent in automated projections; complete hidden-token/fog and non-payload fixtures remain.
 - [ ] The viewer is readable at normal television distance in fullscreen 16:9 layouts and remains usable at common 1080p and 4K display sizes.
 - [x] The viewer reconnects without manual presentation reconfiguration and cannot send consequential game commands. Pairing is read-only, SSE reconverges from a persisted snapshot, revocation closes live subscribers, and restart recovery is tested.
-- [ ] Players using phones/laptops and players watching only the shared viewer see a consistent public battle state.
+- [~] Players using phones/laptops and players watching only the shared viewer see a consistent public battle state. Automated GM/player/viewer encounter convergence now proves the same safe Initiative/current turn and active map; physical phone/laptop/TV parity remains.
 
 ### 6.3.3 Connect an external integration
 
@@ -1081,19 +1085,19 @@ Initial recommendation: support square grids only in the first vertical slice; m
 
 Grid calibration is required product functionality, not an advanced configuration screen. The normal map-upload flow should immediately offer a short visual wizard:
 
-1. **Choose map type:** printed square grid, gridless, or unsure.
-2. **Show one known span:** drag across one square or between two grid intersections; for a longer sample, enter how many cells the span represents.
-3. **Align:** drag one visible grid intersection onto the overlay and use large, direct nudge controls only if necessary.
-4. **Preview:** inspect several areas/zoom levels with the overlay, token footprint, snap, and five-foot scale visible.
-5. **Confirm:** create the scene with safe defaults; retain a clear **Recalibrate grid** action that preserves world/token placement.
+1. **Choose map type:** select printed square grid or gridless battlemap with a plain-language explanation of the consequence.
+2. **Show one fixed area:** press on intersection A, drag diagonally across exactly three squares by three squares, and release on opposite intersection C. The fixed 3×3 gesture gives the server enough information to derive square size and rotation without asking for a cell count or direction.
+3. **Align:** preview the overlay in the exact same image coordinate box and use grouped position, square-size, and rotation controls only if necessary.
+4. **Verify:** click a distant third intersection V so the server can detect small spacing/rotation error across the map.
+5. **Confirm:** save only after verification passes; retain a clear restart/recalibrate path and keep raw coordinates in a collapsed keyboard/recovery section.
 
 Wizard requirements:
 
-- [x] No pixel dimensions, coordinate math, or manual X/Y offset entry in the normal path. The normal wizard uses two clicked intersections, a cell count/direction, direct nudge controls, and a third clicked verification point; exact coordinates remain available as an accessibility/recovery alternative.
+- [x] No pixel dimensions, coordinate math, cell-count form, direction selector, or manual X/Y offset entry in the normal path. The normal wizard uses one diagonal click-drag across a fixed 3×3 area, direct nudge controls, and a third clicked verification point; exact coordinates remain available as an accessibility/recovery alternative.
 - [ ] Optional assisted line/grid detection may prefill values but must never be required or difficult to override.
 - [~] Touch controls must be fully usable on a phone, including zoomed precision placement and nudge controls. Responsive controls and numeric alternatives exist; physical touch/precision validation remains.
-- [ ] Gridless selection skips calibration cleanly while still allowing a configurable distance scale.
-- [~] An Advanced section may expose exact cell size/offset/rotation values for recovery without competing with the wizard. The current readout and nudge/undo/redo controls expose recovery data; a collapsed exact-edit section remains.
+- [x] Gridless selection skips grid calibration cleanly and uses the same two-known-points interaction to save a configurable distance scale.
+- [x] An Advanced section exposes exact point coordinates for keyboard/recovery use without competing with the normal wizard; live cell size/origin/rotation remain readable while direct grouped controls are primary.
 - [~] Calibration stores source-image and world transforms explicitly so replacing/downsampling a rendition does not alter scene coordinates. Source-image origin/cell size/rotation/distance are durable; scene-world and rendition transforms remain dependent on scene creation.
 
 Questions to resolve in ADR-009:
@@ -1890,8 +1894,8 @@ Test that forbidden data is absent from player messages, initial HTML/state, log
 - [~] Track viewer presence and a stable viewer ID so the GM can target one display or broadcast to all connected displays. Stable safe metadata and live connections exist; commands currently broadcast to all displays.
 - [~] Keep viewer presentation commands in a separate channel: camera/focus, ping, measurement/path and clear are implemented with revision/idempotency semantics; follow and highlight remain.
 - [x] Require an explicit **Show current map** action and enabled presentation mode. The GM cursor, calibration draft, selection, and viewport are not mirrored.
-- [~] Sanitize Initiative for the viewer. The allowlisted Initiative DTO excludes arbitrary actor fields and private tiebreakers, but it is not yet fed from a hidden-combatant-aware encounter projection.
-- [~] Viewer reconnect receives the current authorized presentation state, persisted map/camera/measurement/Initiative, and unexpired pings. Future scene/log/cue composition remains.
+- [x] Sanitize Initiative for the viewer. The allowlisted DTO is now fed automatically from the authoritative encounter projection, excludes arbitrary actor fields/private tiebreakers/GM-only actors, and uses a generic hidden-turn flag without leaking identity.
+- [~] Viewer reconnect receives the current authorized presentation state, persisted map/camera/measurement/hidden-safe Initiative, and unexpired pings. Future token/fog/log/cue composition remains.
 - [~] Viewer payloads and map caches have negative secret/identifier tests, active-map-only authorization, and `no-store`; DOM/accessibility/log coverage against complete hidden encounter state remains.
 
 ### 16.4 Realtime synchronization
@@ -2889,20 +2893,20 @@ Milestones are ordered by dependency and table value. They deliberately postpone
 
 **Goal:** play a simple multi-round encounter end to end.
 
-- [~] Map upload, scene creation, basic square-grid calibration, pan/zoom. Durable safe upload/library and the verified calibration wizard are live in the normal GM UI; scene creation and the real battle-canvas pan/zoom binding remain.
+- [~] Map upload, scene creation, basic square-grid calibration, pan/zoom. Durable safe upload/library, guided printed-grid/gridless setup, server verification, and an authenticated active-encounter map canvas are live; scene-world/token binding and real battle-canvas pan/zoom remain.
 - [ ] Versioned minimal character/monster JSON import with actionable errors.
 - [ ] Actor definition/instance/token separation.
 - [ ] Place, select, target, move, duplicate, label, and remove tokens.
 - [ ] Owned-token and GM control on phone and desktop.
-- [ ] Encounter roster, Initiative roll/manual entry, sort, current turn, next/previous, round counter.
-- [~] Shared-table viewer route/session with fullscreen player-safe battlemap and readable Initiative/current-turn display. Pairing, fullscreen map, persistent presentation, SSE reconnect, and an allowlisted Initiative DTO are live; real encounter Initiative/tokens/fog remain.
+- [~] Encounter roster, Initiative roll/manual entry, sort, current turn, next/previous, round counter. The server-authoritative UI supports selected actors, manual or server `1d20 + modifier`, deterministic ties, edits, current turn, round wrap, previous/next, and end; actor-instance roster, groups, reorder/skip/jump, and full tie-choice policy remain.
+- [~] Shared-table viewer route/session with fullscreen player-safe battlemap and readable Initiative/current-turn display. Pairing, atomic map presentation, persistent/SSE reconnect, and live hidden-safe encounter Initiative/current turn are implemented; tokens/fog remain.
 - [~] GM viewer controls for selecting a display and explicitly sending viewport focus/follow, location ping, measurement line/path, highlight, and clear-overlay directives. Broadcast focus/zoom, ping, measured line, and clear controls are live; per-display targeting, follow, and highlight remain.
 - [ ] Generic and imported attack dice plus quick manual dice tray.
 - [ ] Public, GM-only, blind, and self-only roll projection; readable 2D result/log.
 - [ ] HP, maximum HP, temporary HP, raw damage/healing, and basic condition add/remove.
 - [ ] Generic action controls and End Turn.
-- [ ] Server-authoritative state, autosave, refresh/reconnect, and basic undo.
-- [~] Player-safe versus GM state projection. Actor/roll/presence projections and a separate viewer projection exist with active-map/no-store enforcement; complete scene/token/fog/Initiative projection remains.
+- [~] Server-authoritative state, autosave, refresh/reconnect, and basic undo. Encounter/Initiative commands use durable revisions, receipts/events, duplicate suppression, restart recovery, and realtime snapshots; basic undo remains.
+- [~] Player-safe versus GM state projection. Actor/roll/presence plus encounter/Initiative projections omit hidden actor IDs/names/notes/tiebreakers, authorize only the active battlemap, and feed a separate viewer projection; complete token/fog projection remains.
 - [ ] Phone portrait/landscape parity for every item above.
 - [ ] Supported API resources/commands/events cover the vertical-slice encounter without direct database access or UI automation.
 
@@ -3231,7 +3235,7 @@ Run this suite against a release candidate on a clean host installation. Use at 
 
 ### 28.3 Routine combat
 
-- [ ] Roll/manual-enter Initiative, resolve ties, and start combat.
+- [~] Roll/manual-enter Initiative, resolve ties, and start combat. Automated authoritative start/manual/server-roll/stable-tie coverage passes; rules-choice tie prompts and physical normal-UI acceptance remain.
 - [ ] Phone player identifies active turn and selected character.
 - [ ] Move and target from phone; measure path/range.
 - [ ] Execute a normal attack and apply typed damage.
@@ -3257,13 +3261,13 @@ Run this suite against a release candidate on a clean host installation. Use at 
 
 ### 28.4.1 Shared-table viewer
 
-- [ ] GM opens a local second-window viewer and pairs a separate LAN viewer without granting either GM authority.
-- [ ] Viewer shows the same player-safe battlemap, fog, visible tokens, Initiative order, and current turn as player clients.
+- [~] GM opens a local second-window viewer and pairs a separate LAN viewer without granting either GM authority. Authorization and local/LAN URL/pairing paths are automated; physical separate-screen acceptance remains.
+- [~] Viewer shows the same player-safe battlemap, fog, visible tokens, Initiative order, and current turn as player clients. Battlemap plus hidden-safe Initiative/current turn converge automatically; fog/tokens and physical parity remain.
 - [ ] GM targets one viewer and all viewers with focus/follow, ping, measurement, highlight, and clear-overlay actions.
 - [ ] Private GM cursor/ruler/selection/draft activity remains absent until the GM explicitly chooses **Show on viewer**.
-- [ ] Hidden actors, secret Initiative entries, notes, fogged content, private rolls, and private stats are absent from viewer payloads, DOM, accessibility tree, logs, caches, and reconnect snapshots.
+- [~] Hidden actors, secret Initiative entries, notes, fogged content, private rolls, and private stats are absent from viewer payloads, DOM, accessibility tree, logs, caches, and reconnect snapshots. Hidden Initiative actor ID/name/notes are absent in automated player/viewer payload and restart tests; token/fog and DOM/accessibility/log/cache negative tests remain.
 - [ ] Viewer attempts to claim, move, roll, advance, edit, or call GM commands are rejected without changing state.
-- [ ] Viewer reload/reconnect restores current public scene, Initiative, and presentation state.
+- [~] Viewer reload/reconnect restores current public scene, Initiative, and presentation state. Persisted map/presentation and live authoritative Initiative recover in automated restart/SSE tests; physical browser reconnect remains.
 - [ ] Fullscreen layouts remain readable and performant at normal television distance at 1080p and 4K.
 
 ### 28.5 Mobile parity
@@ -3340,7 +3344,7 @@ Keep this small dashboard current near the top or here:
 | --- | --- | --- |
 | Phase 0 — Product lock and technical proof | In progress | Stack, schema, dice, persistence, LAN URL, renderer, scoped-credential/API foundation, map calibration, viewer presentation, and accepted-decision records exist; physical-device/network, renderer stress/input, realtime/API end-to-end conformance, wireframes, and unresolved proposed decisions block the gate; ADR-018/019 evidence is due only before their later implementation phases |
 | Phase 1 — Local-host foundation | In progress | Auth/session revocation/rate limiting, durable serialized roster/claims, remembered recovery, GM force-release, verified-session presence, mounted API, scoped credential lifecycle/UI, recipient projections, CI, health, and transactional SQLite exist; full socket/browser claim convergence, API snapshot/command/event proof, diagnostics, rate-limit completion, and physical-device acceptance block the gate |
-| Phase 2 — Minimum playable vertical slice | Implementation started; testing-MVP map/viewer slice active | Normal-UI map upload/library/calibration, regional/world scale, dedicated paired viewer, broadcast GM focus/ping/measurement, persisted reconnect, and active-map privacy are implemented; scene/tokens/fog, live Initiative/combat, actor import, phone parity, per-display follow/highlight, and complete API equivalence remain |
+| Phase 2 — Minimum playable vertical slice | Implementation active; authoritative encounter slice implemented | Normal-UI map upload/library/guided grid or gridless setup, regional/world scale, authenticated active combat map, persisted encounter/Initiative commands, hidden-safe player/viewer current-turn convergence, paired viewer, atomic map presentation, focus/ping/measurement, reconnect, and active-map privacy are implemented; actor instances/tokens/fog, HP/actions/undo, actor import, phone/TV acceptance, per-display follow/highlight, and complete API equivalence remain |
 | Phase 3 — Playable alpha | Not started | — |
 | Phase 4 — Rules-assisted beta | Not started | — |
 | Phase 5 — Preparation speed/content | Not started | — |
