@@ -190,6 +190,8 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const total = state.combat.initiative.length;
         return placed < total ? <p className="encounter-place-nudge">{placed} of {total} tokens placed — drag the rest from the tray above.</p> : null;
       })()}
+      {/* Turn navigation sits above the order so Previous/Next are reachable without scrolling past the list. */}
+      <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
       <ol className="initiative-list gm">{state.combat.initiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;
@@ -227,7 +229,6 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         </div>
         <ActionRunner state={state} actor={current} onFeedback={setMessage} /></>;
       })()}
-      <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
       <button type="button" className="encounter-end" disabled={busy} onClick={end}>End encounter</button>
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}

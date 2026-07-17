@@ -114,9 +114,19 @@ export function createServer(options: CreateServerOptions) {
   const annotationExpiryTimers = new Set<ReturnType<typeof setTimeout>>();
   /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry — same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
   function scheduleAnnotationExpiry() {
+    // Keep exactly one pending timer: clear any prior one, arm the soonest expiry, then re-arm from
+    // inside the callback so every staggered annotation drops at its own expiry — not just the first.
+    // Without the re-arm, a second ping placed after the first would linger until unrelated activity
+    // re-broadcast the state (the reported "extra pings don't disappear" bug).
+    for (const timer of annotationExpiryTimers) clearTimeout(timer);
+    annotationExpiryTimers.clear();
     const soonest = nextAnnotationExpiry(store.snapshot, Date.now());
     if (soonest === null) return;
-    const timer = setTimeout(() => { annotationExpiryTimers.delete(timer); void publishGameState(store.snapshot); }, Math.max(0, soonest - Date.now()));
+    const timer = setTimeout(() => {
+      annotationExpiryTimers.delete(timer);
+      void publishGameState(store.snapshot);
+      scheduleAnnotationExpiry();
+    }, Math.max(0, soonest - Date.now()));
     timer.unref?.();
     annotationExpiryTimers.add(timer);
   }

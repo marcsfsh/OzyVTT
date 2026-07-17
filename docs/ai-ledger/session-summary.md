@@ -8,6 +8,40 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — UX bug sweep (owner test pass, batch 1 of the UX/UI PR)
+
+Six fixes from the owner's testing pass, on `claude/srd-content-pipeline` (kept on the same
+branch per the owner):
+
+- **#3 wheel scroll** — the map's `wheel` listener zoomed even when the pointer was over a
+  docked panel; added the same `.closest()` guard the pointer-down handler already uses
+  (`.encounter-map-dock/-overlay/-menu/-shape-editor`), so a docked initiative tracker scrolls
+  on wheel instead of zooming the map.
+- **#9 ping expiry** — `scheduleAnnotationExpiry` (and the viewer's `schedulePingExpiry`) armed
+  only the *soonest* expiry and never re-armed, so a second staggered ping lingered until
+  unrelated activity re-broadcast. Now it keeps one timer, clears stale ones, and re-arms from
+  the callback → every ping/measurement drops at its own expiry.
+- **#19 statblock z-index** — a docked panel's `.encounter-map-dock` (z-index 2) is a stacking
+  context that trapped the sheet's fixed `.confirm-overlay` (z-50) beneath the map controls
+  (z 3–6); `CharacterSheet` now `createPortal`s to `<body>` so it covers everything.
+- **#10 turn nav** — Previous/Next moved above the initiative order (reachable without
+  scrolling past the list).
+- **#6 reference actions** — dashed reference-only action rows (no structured attack/save/
+  damage) were dead on click; they're now buttons that expand the SRD reference text (touch-
+  friendly, no hover-only tooltip) — reference level per ADR-0008.
+- **#12 dice column** — on desktop the dice section now fills the sidebar beneath the panel and
+  bottom-aligns with the map column (roll history grows instead of a fixed 19rem). *Needs an
+  eyeball for exact top-of-map alignment.*
+
+Verified: check / test (222) / build green. Browser pass is the owner's (their test loop).
+
+**Queued (same 20-item list, later batches):** B — tracker docking (dock from enlarged map;
+left/right-only + drag-resize). C — combat interaction (clickable targeting, AOE auto-apply,
+right-click token menu, per-target saving-throw prompts, event toasts, off-turn reactions,
+occupied-cell move cost). D — scenes/GM prep (#7). E — assets (token upload #13, map
+save/organize #14). Parked: #17 (manual economy already ships), #11 (reference repos to
+evaluate). Full triage in the session scratchpad backlog.
+
 ## 2026-07-17 — Post-A–G polish: token footprints, condition/health badges, PC sheet import
 
 Three deferred slices, on `claude/srd-content-pipeline` atop phases A–G:

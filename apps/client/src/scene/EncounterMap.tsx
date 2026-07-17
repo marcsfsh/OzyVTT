@@ -152,6 +152,9 @@ export function EncounterMap({
     if (!stage) return;
     const onWheel = (event: WheelEvent) => {
       if (!svgRef.current || !size) return;
+      // Wheeling over an overlaid panel (a docked initiative tracker, an open menu, the shape editor)
+      // must scroll that panel, not zoom the map behind it — mirror the pointer-down guard below.
+      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor")) return;
       event.preventDefault();
       zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
     };

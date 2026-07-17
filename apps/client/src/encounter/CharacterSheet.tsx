@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
 import { ConditionEditor } from "./conditions";
 import { newId } from "../lib/ids";
@@ -74,7 +75,10 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
     ? (["walk", "swim", "fly", "climb", "burrow"] as const).flatMap((mode) => { const feet = extension.speeds?.[mode]; return feet ? [`${mode === "walk" ? "" : `${mode} `}${feet} ft.${mode === "fly" && extension.speeds?.hover ? " (hover)" : ""}`] : []; }).join(", ")
     : definition ? `${definition.speedFeet} ft.` : null;
 
-  return <div className="confirm-overlay" role="presentation" onClick={onClose}>
+  // Portal to <body> so the sheet escapes any stacking context it's rendered inside — notably a
+  // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
+  // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
+  return createPortal(<div className="confirm-overlay" role="presentation" onClick={onClose}>
     <div className="character-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(event) => event.stopPropagation()}>
       <div className="sheet-head">
         <div>
@@ -129,5 +133,5 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet — the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
     </div>
-  </div>;
+  </div>, document.body);
 }

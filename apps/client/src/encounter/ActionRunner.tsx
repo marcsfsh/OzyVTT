@@ -26,11 +26,12 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const [targets, setTargets] = useState<ReadonlySet<string>>(new Set());
   const [result, setResult] = useState<ActionResolution | null>(null);
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
+  const [openReference, setOpenReference] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const definitionId = actor.definitionId;
   useEffect(() => {
-    setPicking(null); setResult(null); setTargets(new Set()); setApplied(new Set());
+    setPicking(null); setResult(null); setTargets(new Set()); setApplied(new Set()); setOpenReference(null);
     if (!definitionId) return;
     const cached = actionCache.get(definitionId);
     if (cached) { setActions(cached); return; }
@@ -74,7 +75,12 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => { setPicking(action); setTargets(new Set()); }}>
               <strong>{action.name}</strong><small>{summaryOf(action)}</small>
             </button>
-          : <div className="action-row action-row-static" title={action.description}><strong>{action.name}</strong><small>{action.activation === "other" ? "see description" : action.activation}</small></div>}
+          : <>
+              <button type="button" className="action-row action-row-static" aria-expanded={openReference === action.id} onClick={() => setOpenReference((current) => current === action.id ? null : action.id)}>
+                <strong>{action.name}</strong><small>{action.activation === "other" ? "Reference — tap to read" : `${action.activation} · tap to read`}</small>
+              </button>
+              {openReference === action.id && <p className="action-reference-text">{action.description}</p>}
+            </>}
       </li>)}
     </ul>}
     {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.name}`}>
