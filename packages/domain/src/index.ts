@@ -79,7 +79,10 @@ export type AnnotationPoint = z.infer<typeof AnnotationPointSchema>;
 export const AnnotationGeometrySchema = z.object({
   origin: AnnotationPointSchema,
   target: AnnotationPointSchema,
-  sizeFeet: z.number().finite().positive().max(2000)
+  // Nonnegative, not strictly positive: a ping is a single point stored with sizeFeet 0. Rulers and
+  // shapes always compute a positive span, but a persisted live ping must re-parse on startup (the
+  // store validates the whole GameState on load), so 0 has to be legal here.
+  sizeFeet: z.number().finite().nonnegative().max(2000)
 }).strict();
 export type AnnotationGeometry = z.infer<typeof AnnotationGeometrySchema>;
 
@@ -134,21 +137,13 @@ export const PendingSaveSchema = z.object({
 }).strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
 
-export const CombatStateSchema = z.object({
-  active: z.boolean().default(false),
-  round: z.number().int().positive().default(1),
-  turnActorId: z.string().uuid().nullable().default(null),
-  mapAssetId: z.string().uuid().nullable().default(null),
-  initiative: z.array(InitiativeEntrySchema).max(200).default([]),
-  tokens: z.array(EncounterTokenSchema).max(200).default([]),
-  annotations: z.array(AnnotationSchema).max(300).default([]),
-  /** Action economy of the current turn's actor; reset whenever the turn changes. Tracked, never enforced. */
-  turn: z.object({ actionUsed: z.boolean().default(false), bonusActionUsed: z.boolean().default(false) }).default({ actionUsed: false, bonusActionUsed: false }),
-  /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
-  reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
-  /** Saving throws still owed by targets (see PendingSaveSchema). */
-  pendingSaves: z.array(PendingSaveSchema).max(100).default([])
-}).superRefine((combat, context) => {
+/**
+ * Shared invariants for a combat context — the live top-level combat AND each parked scene's frozen
+ * copy. Extracted so a scene's stored combat is validated with exactly the same rules as the active
+ * one. Paths are relative to whichever combat object owns the refine, so Zod nests them correctly
+ * under `scenes[i].combat.*` for parked scenes.
+ */
+function refineCombatContext(combat: { active: boolean; turnActorId: string | null; initiative: ReadonlyArray<{ actorId: string }>; tokens: ReadonlyArray<{ actorId: string }> }, context: z.RefinementCtx) {
   const actorIds = new Set<string>();
   for (const [index, entry] of combat.initiative.entries()) {
     if (actorIds.has(entry.actorId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["initiative", index, "actorId"], message: "Initiative actor IDs must be unique." });
@@ -162,6 +157,55 @@ export const CombatStateSchema = z.object({
     if (tokenActorIds.has(token.actorId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["tokens", index, "actorId"], message: "Encounter token actor IDs must be unique." });
     tokenActorIds.add(token.actorId);
     if (!actorIds.has(token.actorId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["tokens", index, "actorId"], message: "Encounter tokens must belong to actors in Initiative." });
+  }
+}
+
+/** Combat fields shared by the live top-level combat and each parked scene — everything except the map (a Scene carries its own) and the scene bookkeeping (only the top level carries that). */
+const sceneCombatShape = {
+  active: z.boolean().default(false),
+  round: z.number().int().positive().default(1),
+  turnActorId: z.string().uuid().nullable().default(null),
+  initiative: z.array(InitiativeEntrySchema).max(200).default([]),
+  tokens: z.array(EncounterTokenSchema).max(200).default([]),
+  annotations: z.array(AnnotationSchema).max(300).default([]),
+  /** Action economy of the current turn's actor; reset whenever the turn changes. Tracked, never enforced. */
+  turn: z.object({ actionUsed: z.boolean().default(false), bonusActionUsed: z.boolean().default(false) }).default({ actionUsed: false, bonusActionUsed: false }),
+  /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
+  reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
+  /** Saving throws still owed by targets (see PendingSaveSchema). */
+  pendingSaves: z.array(PendingSaveSchema).max(100).default([])
+};
+
+/** A parked scene's frozen combat — same fields and invariants as the live combat, minus the map (the Scene owns that). */
+export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCombatContext);
+export type SceneCombat = z.infer<typeof SceneCombatSchema>;
+
+/** A prepared encounter the GM can switch to: its map plus a frozen combat context that resumes exactly when activated. */
+export const SceneSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(120),
+  mapAssetId: z.string().uuid(),
+  combat: SceneCombatSchema.default({})
+}).strict();
+export type Scene = z.infer<typeof SceneSchema>;
+
+export const CombatStateSchema = z.object({
+  ...sceneCombatShape,
+  mapAssetId: z.string().uuid().nullable().default(null),
+  /** Prepared scenes the GM parks-and-resumes between. The active scene's own `combat` slot stays empty — its live copy is these top-level fields (single source of truth). */
+  scenes: z.array(SceneSchema).max(20).default([]),
+  activeSceneId: z.string().uuid().nullable().default(null)
+}).superRefine((combat, context) => {
+  refineCombatContext(combat, context);
+  const sceneIds = new Set<string>();
+  for (const [index, scene] of combat.scenes.entries()) {
+    if (sceneIds.has(scene.id)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes", index, "id"], message: "Scene IDs must be unique." });
+    sceneIds.add(scene.id);
+  }
+  if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["activeSceneId"], message: "The active scene must be one of the prepared scenes." });
+  const active = combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
+  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || active.combat.pendingSaves.length > 0)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty — its live copy is the top-level combat." });
   }
 });
 export type CombatState = z.infer<typeof CombatStateSchema>;
@@ -206,6 +250,7 @@ export type EncounterStartEntry = Readonly<{ actorId: string; score?: number }>;
 export type AnnotationGeometryInput = Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>;
 export type AnnotationAddResult = MutationResult & { annotationId?: string };
 export type ActorAddResult = MutationResult & { actorId?: string };
+export type SceneCreateResult = MutationResult & { sceneId?: string };
 /** Compact browse row for bundled monster content; the server maps content definitions into this wire shape. */
 export type ContentMonsterSummary = Readonly<{ id: string; name: string; challengeRating: number; type: string; size: string; armorClass: number; hitPoints: number }>;
 export type ContentMonstersResult = { ok: boolean; message?: string; monsters?: readonly ContentMonsterSummary[]; attribution?: string };
@@ -263,7 +308,12 @@ export interface ClientToServerEvents {
   "initiative:set": (payload: { commandId: string; actorId: string; score: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:next": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:previous": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "scene:create": (payload: { commandId: string; name: string; mapAssetId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: SceneCreateResult) => void) => void;
+  "scene:rename": (payload: { commandId: string; sceneId: string; name: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "scene:remove": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "scene:activate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "scene:set-combatants": (payload: { commandId: string; sceneId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "annotation:add": (payload: { commandId: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; geometry: AnnotationGeometryInput; visibility?: AnnotationVisibility; visibleToActorId?: string | null; movableByOthers?: boolean; color?: string; expectedRevision?: number }, acknowledgement: (result: AnnotationAddResult) => void) => void;
   "annotation:ping": (payload: { commandId: string; point: AnnotationPoint; color?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "annotation:set-color": (payload: { commandId: string; id: string; color: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
