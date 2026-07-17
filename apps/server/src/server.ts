@@ -8,7 +8,9 @@ import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilityS
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
+import { addActorFromDefinition, removeActor } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
+import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
@@ -56,6 +58,8 @@ const EncounterStartSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -89,6 +93,7 @@ export function createServer(options: CreateServerOptions) {
   const mapCatalog = new MapCatalogStore(options.databasePath);
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
+  const contentLibrary = new ContentLibrary();
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   const gmLoginRateLimiter = new LoginRateLimiter();
@@ -278,6 +283,36 @@ export function createServer(options: CreateServerOptions) {
         const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision }, (state) => forceReleaseCharacter(state, actorId, "gm"));
         if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character force-release failed." }); }
+    });
+    socket.on("content:monsters", (_payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse bundled content." });
+      acknowledge({ ok: true, monsters: contentLibrary.monsterSummaries(), attribution: contentLibrary.attribution });
+    });
+    socket.on("actor:add-from-definition", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can add combatants." });
+      const request = ActorAddFromDefinitionSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The add-combatant command is malformed." });
+      const definition = contentLibrary.monster(request.data.definitionId);
+      if (!definition) return acknowledge({ ok: false, message: "That monster is not in the bundled content." });
+      try {
+        // Like annotation:add, the commandId doubles as the new entity id so a duplicate
+        // delivery acks the same actorId instead of minting a fresh unused one.
+        const actorId = request.data.commandId;
+        const result = await store.execute({ id: request.data.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.data.expectedRevision }, (state) => addActorFromDefinition(state, definition, actorId, request.data.visibility));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
+    });
+    socket.on("actor:remove", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove combatants." });
+      const request = ActorRemoveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The remove-combatant command is malformed." });
+      try {
+        const { commandId, actorId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.remove", actorId, expectedRevision }, (state) => removeActor(state, actorId));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be removed." }); }
     });
     socket.on("dice:roll", async ({ commandId, formula, purpose, visibility, actorId, expectedRevision }, acknowledge) => {
       const request = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).safeParse({ commandId, formula, purpose, visibility, actorId, expectedRevision });

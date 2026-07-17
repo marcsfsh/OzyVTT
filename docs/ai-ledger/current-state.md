@@ -27,12 +27,15 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 - **Phase 2 testing-MVP vertical slice** is under active implementation; no phase exit gate
   claimed yet (see `README.md`, `BUILD_PLAN.md`).
-- **SRD combat-content integration (phases A–G).** Phase A (content pipeline) is done:
-  `packages/content-srd-5.2.1` now carries vendored open5e `srd-2024` fixtures (CC BY 4.0)
-  and committed canonical bundles — 331 `ActorDefinition` monsters, 15 conditions,
-  attribution (ADR-0015). Next phases: B actor-instantiation from definitions → C HP/damage
-  tracking → D conditions → E action economy/End Turn → F targeting + action resolution →
-  G character-sheet panel. Full plan reviewed with the owner 2026-07-17.
+- **SRD combat-content integration (phases A–G).** Phase A (content pipeline) done and
+  audited: `packages/content-srd-5.2.1` carries vendored open5e `srd-2024` fixtures
+  (CC BY 4.0) and cross-validated canonical bundles — 330 `ActorDefinition` monsters (423
+  structured attacks), spells/weapons/armor/skills/damage-types/rules references,
+  attribution (ADR-0015). Phase B done: GM browses the bestiary in encounter setup
+  (`MonsterBrowser`), `actor:add-from-definition`/`actor:remove`/`content:monsters`
+  commands instantiate/remove monsters with live HP and provenance (`Actor.definitionId`).
+  Next: C HP/damage tracking → D conditions → E action economy/End Turn → F targeting +
+  action resolution → G character-sheet panel. Plan reviewed with the owner 2026-07-17.
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.

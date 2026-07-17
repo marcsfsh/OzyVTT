@@ -8,6 +8,28 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Phase B: SRD monsters instantiate into encounters
+
+First consumer of the content bundle. Server: `ContentLibrary` (loads the monster bundle +
+attribution once), reducers in `actor-roster.ts` (`addActorFromDefinition` — live HP=max,
+AC, initiative bonus, name dedup "Goblin Warrior 2", `definitionId` provenance;
+`removeActor` — refuses player-characters and active combatants, cleans stale inactive
+initiative/token refs), three socket commands (`content:monsters` read, GM-gated;
+`actor:add-from-definition` — commandId doubles as actorId for duplicate-safe acks, like
+annotations; `actor:remove`). `Actor` schema gains optional `definitionId` (additive).
+Client: `MonsterBrowser` overlay (search 330 monsters, CR/type/AC/HP rows, GM-only toggle,
+CC-BY attribution footer) opened from encounter setup; per-row ✕ remove for non-PCs;
+newly added actors auto-check into the combatant selection (found via live smoke — they
+previously arrived unchecked and got left out of the fight).
+
+Verified: check/test (196: +5 actor-roster incl. gm-only projection safety)/build green;
+live Playwright end-to-end — browse→search→add×2 (dedup)→add hidden→remove→start
+encounter→goblins in initiative; player context sees the public goblin, never the GM-only
+boss; narrow-viewport pass; zero page errors.
+
+**Follow-up:** Phase C (HP/damage/heal commands + sheet surface). Token footprints still
+1×1 (definition retains the data). Content reads ride sockets; PR F owns API parity.
+
 ## 2026-07-17 — SRD 5.2.1 content pipeline (integration phase A, audited)
 
 Reviewed 7 candidate content/tool repos with the owner; decision (ADR-0015): source SRD

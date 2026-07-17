@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@vtt/api-contract": "*",
+    "@vtt/content-srd-5.2.1": "*",
     "@vtt/domain": "*",
     "@vtt/rules-5e": "*",
     "@vtt/schemas": "*",

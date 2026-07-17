@@ -11,7 +11,9 @@ export const ActorSchema = z.object({
   armorClass: z.number().int().positive().optional(),
   initiative: z.number().int().optional(),
   ownerSessionId: z.string().uuid().nullable().default(null),
-  notes: z.string().max(10000).optional()
+  notes: z.string().max(10000).optional(),
+  /** Provenance: slug of the content-bundle definition this actor was instantiated from (additive; absent for seeded/imported actors). */
+  definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional()
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
