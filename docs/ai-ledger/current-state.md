@@ -52,6 +52,9 @@ the map inside the full-viewport "Enlarge map" overlay). See `docs/ai-context/te
 ## Claude Code tooling
 
 This repo now carries a Claude Code tooling layer (this upgrade): `CLAUDE.md` index,
-`docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, and `.claude/skills/`
-(`vtt-task-packet`, `vtt-branch-safety`, `vtt-schedule` live; more planned in
-`docs/claude-code-tooling-outline.md`).
+`docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, and the full
+`.claude/skills/` roster — `vtt-task-packet`, `vtt-context-router`, `vtt-implement`,
+`vtt-qa-check`, `vtt-ledger-update`, `vtt-ux-review`, `vtt-test-pass`, `vtt-branch-safety`,
+`vtt-schedule`. Still planned (see `docs/claude-code-tooling-outline.md`): the three
+lifecycle hooks (Stop / UserPromptSubmit / PreToolUse) and an optional GitHub Actions
+scheduled ledger-drift workflow.
