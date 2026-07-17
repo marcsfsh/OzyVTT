@@ -110,6 +110,30 @@ export const AnnotationSchema = z.object({
 });
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
+export const AbilityIdSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
+export type AbilityId = z.infer<typeof AbilityIdSchema>;
+/**
+ * A saving throw a target still owes: created when a save action resolves, answered by rolling or
+ * typing a total (GM anyone; a player their own character). On answer the outcome AUTO-APPLIES —
+ * fail: full proposed damage + condition; success: half (or none). This is the owner-approved
+ * documented exception to the propose→apply ladder for structured saves (ADR-0008 carve-out).
+ */
+export const PendingSaveSchema = z.object({
+  id: z.string().uuid(),
+  targetActorId: z.string().uuid(),
+  ability: AbilityIdSchema,
+  dc: z.number().int().min(1).max(40),
+  /** Source actor for GM bookkeeping; stripped from player projections. */
+  sourceActorId: z.string().uuid().nullable().default(null),
+  sourceName: z.string().min(1).max(120),
+  actionName: z.string().min(1).max(120),
+  proposedDamage: z.number().int().nonnegative().max(10000).default(0),
+  halfOnSuccess: z.boolean().default(true),
+  conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).nullable().default(null),
+  createdAt: z.number().int().nonnegative()
+}).strict();
+export type PendingSave = z.infer<typeof PendingSaveSchema>;
+
 export const CombatStateSchema = z.object({
   active: z.boolean().default(false),
   round: z.number().int().positive().default(1),
@@ -121,7 +145,9 @@ export const CombatStateSchema = z.object({
   /** Action economy of the current turn's actor; reset whenever the turn changes. Tracked, never enforced. */
   turn: z.object({ actionUsed: z.boolean().default(false), bonusActionUsed: z.boolean().default(false) }).default({ actionUsed: false, bonusActionUsed: false }),
   /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
-  reactionsUsed: z.array(z.string().uuid()).max(200).default([])
+  reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
+  /** Saving throws still owed by targets (see PendingSaveSchema). */
+  pendingSaves: z.array(PendingSaveSchema).max(100).default([])
 }).superRefine((combat, context) => {
   const actorIds = new Set<string>();
   for (const [index, entry] of combat.initiative.entries()) {
@@ -163,7 +189,9 @@ export type PlayerHp = { kind: "exact"; current: number; maximum: number; tempor
 export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp"> & { hp: PlayerHp; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[] }>;
+/** A player's own pending saves only; the source actor id never crosses the wire, and a hidden source's name is masked server-side. */
+export type PlayerPendingSave = Omit<PendingSave, "sourceActorId">;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[] }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[] };
@@ -199,6 +227,8 @@ export type ActionResolution = Readonly<{
   crit: boolean;
 }>;
 export type ActionResolveResult = MutationResult & { resolution?: ActionResolution };
+/** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
+export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean } };
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -216,7 +246,9 @@ export interface ClientToServerEvents {
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
-  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
+  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds: readonly string[]; conditionId?: string; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
+  "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
+  "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

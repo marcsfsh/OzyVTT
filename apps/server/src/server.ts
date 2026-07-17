@@ -27,6 +27,7 @@ import { MapCatalogStore } from "./map-catalog.js";
 import { createMapRouter } from "./map-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
+import { answerSave, dismissSave } from "./saving-throws.js";
 import { ensureEncounterTokens, moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import { ViewerAccessStore } from "./viewer-access.js";
@@ -69,7 +70,10 @@ const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string(
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const ActionResolveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), actionId: z.string().regex(/^[a-z0-9-]+$/).max(120), targetIds: z.array(z.string().uuid()).min(1).max(20), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActionResolveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), actionId: z.string().regex(/^[a-z0-9-]+$/).max(120), targetIds: z.array(z.string().uuid()).min(1).max(20), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict()
+  .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
+const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -440,18 +444,54 @@ export function createServer(options: CreateServerOptions) {
       const request = ActionResolveSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The action command is malformed." });
       try {
-        const { commandId, actorId, actionId, targetIds, expectedRevision } = request.data;
+        const { commandId, actorId, actionId, targetIds, conditionId, expectedRevision } = request.data;
+        if (conditionId !== undefined && !contentLibrary.hasCondition(conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled reference." });
         let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
         const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision }, (state) => {
           const attacker = state.actors.find((item) => item.id === actorId);
           if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
           const action = (storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId))?.actions.find((candidate) => candidate.id === actionId);
           if (!action) throw new CommandRejectedError("That action is not on the stat block.");
-          resolution = resolveDefinitionAction(state, action, { actorId, targetIds, commandId }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
+          resolution = resolveDefinitionAction(state, action, { actorId, targetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
         });
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The action could not be resolved." }); }
+    });
+    socket.on("save:answer", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before answering saving throws." });
+      const request = SaveAnswerSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The saving-throw answer is malformed." });
+      const sessionId = scope.role === "gm" ? auth.verify(socket.handshake.auth.token)!.sessionId : scope.sessionId;
+      try {
+        const { commandId, saveId, method, total, expectedRevision } = request.data;
+        let outcome: ReturnType<typeof answerSave> | undefined;
+        const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision }, (state) => {
+          outcome = answerSave(state, commandId, saveId, method, total, scope, {
+            random: (sides) => randomInt(1, sides + 1),
+            newRollId: randomUUID,
+            sessionId,
+            role: scope.role,
+            now: () => new Date().toISOString(),
+            resolveDefinition
+          });
+        });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be answered." }); }
+    });
+    socket.on("save:dismiss", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before managing saving throws." });
+      const request = SaveDismissSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The dismissal is malformed." });
+      try {
+        const { commandId, saveId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "save.dismiss", expectedRevision }, (state) => dismissSave(state, saveId, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be dismissed." }); }
     });
     socket.on("turn:use", async (payload, acknowledge) => {
       const scope = actorScope();

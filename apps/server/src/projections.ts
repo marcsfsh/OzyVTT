@@ -63,7 +63,12 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
     // A hidden combatant's turn stays opaque: economy flags reset to idle rather than narrating its activity.
     turn: currentIsPublic ? { ...state.combat.turn } : { actionUsed: false, bonusActionUsed: false },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId))
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
+    // A player sees only the saves their own claimed character owes. The source actor id never
+    // crosses the wire, and a hidden source's name is masked so gm-only attackers stay unnarrated.
+    pendingSaves: state.combat.pendingSaves
+      .filter((entry) => { const target = state.actors.find((actor) => actor.id === entry.targetActorId); return target !== undefined && target.ownerSessionId !== null && target.ownerSessionId === playerSessionId; })
+      .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName }))
   };
 }
 

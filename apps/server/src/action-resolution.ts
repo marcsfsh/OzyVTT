@@ -2,9 +2,10 @@ import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
 import { parseDiceFormula, resolveDice, type DiceExpression, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
+import { createPendingSaves, halfOnSuccessFrom } from "./saving-throws.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
-export type ResolveInput = Readonly<{ actorId: string; targetIds: readonly string[]; commandId: string }>;
+export type ResolveInput = Readonly<{ actorId: string; targetIds: readonly string[]; commandId: string; conditionId?: string | null }>;
 export type ResolveDependencies = Readonly<{ random: RandomSource; newRollId: () => string; gmSessionId: string; now: () => string }>;
 
 /** Double every dice term (2024 crit rule: extra dice, modifiers once) and rebuild a matching formula string. */
@@ -88,6 +89,24 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       recordRoll(state, rolled, { ...rollBase, id: deps.newRollId(), purpose: "damage" });
       damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
     }
+  }
+
+  // A save action leaves one pending save per target: prompts appear in the tracker rows, each
+  // answered by rolling or typing a total, and the outcome auto-applies (see saving-throws.ts).
+  if (action.save) {
+    createPendingSaves(state, {
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      actionName: action.name,
+      ability: action.save.ability,
+      dc: action.save.dc,
+      targetIds: targets.map((target) => target.id),
+      proposedDamage: damage.reduce((sum, part) => sum + part.total, 0),
+      halfOnSuccess: halfOnSuccessFrom(action.description),
+      conditionId: input.conditionId ?? null,
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
+    });
   }
 
   // Bookkeeping, never a gate: resolving marks the matching economy slot.

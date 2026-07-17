@@ -111,16 +111,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <p className="action-applied">Applied to {result.attack.targetName}.</p>
           : <button type="button" className="action-apply" disabled={busy} onClick={() => applyDamage(result.attack!.targetId, result.attack!.targetName, result.damageTotal, result.attack!.targetId)}>Apply {result.damageTotal} to {result.attack.targetName}</button>
       )}
-      {result.save && result.damageTotal > 0 && <ul className="action-save-targets">{result.save.targets.map((target) => <li key={target.targetId}>
-        <span>{target.targetName}</span>
-        {applied.has(target.targetId)
-          ? <span className="action-applied">applied</span>
-          : <span className="action-save-buttons">
-              <button type="button" disabled={busy} title="Failed the save" onClick={() => applyDamage(target.targetId, target.targetName, result.damageTotal, target.targetId)}>Full {result.damageTotal}</button>
-              <button type="button" disabled={busy} title="Succeeded on the save" onClick={() => applyDamage(target.targetId, target.targetName, Math.floor(result.damageTotal / 2), target.targetId)}>Half {Math.floor(result.damageTotal / 2)}</button>
-              <button type="button" disabled={busy} title="No damage" onClick={() => setApplied((current) => new Set([...current, target.targetId]))}>None</button>
-            </span>}
-      </li>)}</ul>}
+      {result.save && <p className="action-save-note">Saving-throw {result.save.targets.length === 1 ? "prompt is" : "prompts are"} waiting on {result.save.targets.length} {result.save.targets.length === 1 ? "target" : "targets"} in the turn order — roll or enter each result there and damage/conditions apply automatically.</p>}
     </div>}
   </div>;
 }

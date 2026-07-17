@@ -32,7 +32,10 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     return { actorId: actor.id, score: rolled, tieBreaker };
   });
   const sorted = ordered(state, initiative);
+  // Spread, never a fresh literal: CombatState grows fields over time (pendingSaves today; scenes
+  // next) and a wholesale replacement here would silently drop them.
   state.combat = {
+    ...state.combat,
     active: true,
     round: 1,
     turnActorId: sorted[0].actorId,
@@ -41,13 +44,14 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     tokens: createEncounterTokens(sorted.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), tokenGeometry),
     annotations: [],
     turn: { actionUsed: false, bonusActionUsed: false },
-    reactionsUsed: []
+    reactionsUsed: [],
+    pendingSaves: []
   };
 }
 
 export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [] };
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [] };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {

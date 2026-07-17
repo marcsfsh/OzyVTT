@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@vtt/domain";
+import type { ClientToServerEvents, GmView, MutationResult, PendingSave, PlayerPendingSave, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
@@ -43,6 +43,55 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
   </div>;
 }
 
+/**
+ * A saving throw a combatant still owes, rendered inside its initiative row. Roll = the server rolls
+ * d20 + its best-known modifier; the typed total covers proficient/situational saves. The outcome
+ * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
+ */
+function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
+  const [manualTotal, setManualTotal] = useState("");
+  const [busy, setBusy] = useState(false);
+  // Outcome feedback goes to the parent: answering removes this prompt from state, so the component
+  // unmounts before it could show its own result.
+  const answer = (method: "roll" | "manual") => {
+    const total = Number(manualTotal.trim());
+    if (method === "manual" && (!Number.isInteger(total) || total < -20 || total > 60)) { onFeedback("Enter the rolled total (-20 to 60)."); return; }
+    setBusy(true);
+    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, ...(method === "manual" ? { total } : {}) }, (result: SaveAnswerResult) => {
+      setBusy(false);
+      if (!result.ok) { onFeedback(result.message ?? "The saving throw could not be answered."); return; }
+      const outcome = result.outcome;
+      if (outcome) onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " — condition applied" : ""}.`);
+    });
+  };
+  const dismiss = () => {
+    setBusy(true);
+    socket.emit("save:dismiss", { commandId: newId(), saveId: save.id }, (result: MutationResult) => {
+      setBusy(false);
+      onFeedback(result.ok ? "Saving throw dismissed." : result.message ?? "The saving throw could not be dismissed.");
+    });
+  };
+  return <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
+    <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName}){save.proposedDamage > 0 ? ` · ${save.proposedDamage} dmg` : ""}</span>
+    <span className="save-prompt-actions">
+      <button type="button" disabled={busy} onClick={() => answer("roll")}>Roll</button>
+      <input type="number" min="-20" max="60" placeholder="Total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} />
+      <button type="button" disabled={busy || manualTotal.trim() === ""} onClick={() => answer("manual")}>Submit</button>
+      {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
+    </span>
+  </div>;
+}
+
+/** A player's own pending saves with a local feedback line (the GM panel uses its shared message instead). */
+function OwnSavePrompts({ saves, targetName }: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string }>) {
+  const [feedback, setFeedback] = useState("");
+  if (saves.length === 0 && !feedback) return null;
+  return <div className="own-save-prompts">
+    {saves.map((save) => <SavePrompt key={save.id} save={save} targetName={targetName} canDismiss={false} onFeedback={setFeedback} />)}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
+  </div>;
+}
+
 /** A player's own economy: Action/Bonus live only on their turn; the reaction is an off-turn resource, markable any time. Pressed = spent. */
 function PlayerTurnEconomy({ combat, myId, myTurn }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean }>) {
   const [busy, setBusy] = useState(false);
@@ -78,9 +127,13 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const actorConditions = props.state.actors.find((actor) => actor.id === entry.actorId)?.conditions ?? [];
+        const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
         return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
-          <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}<ConditionChips conditions={actorConditions} /></span>
-          <strong>{entry.score}</strong>
+          <div className="initiative-row-main">
+            <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}<ConditionChips conditions={actorConditions} /></span>
+            <strong>{entry.score}</strong>
+          </div>
+          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} />}
         </li>;
       })}</ol>
     </section>;
@@ -215,6 +268,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
           </div>}
           {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
+          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} />)}
           {/* The active combatant's economy + action runner live on its own initiative row, not in a
               detached block at the bottom, so actions read against the creature they belong to. */}
           {active && actor && <>

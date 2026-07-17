@@ -140,6 +140,22 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .action-save-buttons { display: inline-flex; gap: .3rem; }
 .action-save-buttons button { padding: .35rem .55rem; border: 1px solid #6b5e4b; border-radius: .4rem; background: #241f17; color: #f5efe3; font-size: .72rem; font-weight: 700; cursor: pointer; }
 .action-save-buttons button:hover:not(:disabled) { border-color: #e8a743; }
+/* Saving-throw prompts inside the target's initiative row (auto-apply on answer). */
+.save-prompt { display: flex; flex-direction: column; gap: .35rem; margin-top: .4rem; padding: .5rem .6rem; border: 1px solid #7c633e; border-radius: .5rem; background: #241a10; }
+.save-prompt-label { font-size: .78rem; color: #f3c77d; }
+.save-prompt-label strong { color: #ffd58d; }
+.save-prompt-actions { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.save-prompt-actions input { width: 4rem; margin: 0; padding: .4rem; text-align: center; }
+.save-prompt-actions button { padding: .4rem .7rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #282117; color: #fff; font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
+.save-prompt-actions button:hover:not(:disabled) { border-color: #e8a743; }
+.save-prompt-dismiss { margin-left: auto; padding: .4rem .55rem !important; background: transparent !important; color: #c8988f !important; }
+.save-prompt-outcome, .action-save-note { margin: .3rem 0 0; color: #e9b861; font-size: .78rem; }
+.own-save-prompts { margin-top: .4rem; }
+/* Player initiative rows stack the name/score row above any owed-save prompts. */
+.initiative-list:not(.gm) li { flex-direction: column; align-items: stretch; }
+.initiative-list:not(.gm) .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.initiative-list:not(.gm) .initiative-row-main > span { display: flex; align-items: center; }
+.initiative-list:not(.gm) .initiative-row-main > strong { color: #f6c452; }
 /* Character sheet: live state over the immutable stat block. Track, never build. */
 .initiative-sheet-link { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted transparent; }
 .initiative-sheet-link:hover { color: #ffd58d; text-decoration-color: #e8a743; }
