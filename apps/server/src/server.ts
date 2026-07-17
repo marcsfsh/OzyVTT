@@ -85,7 +85,7 @@ const ActionResolveSchema = z.object({
   conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().refine((payload) => (payload.targetIds === undefined) !== (payload.template === undefined), { message: "Provide either explicit targets or an area template, not both." });
-const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict()
+const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
@@ -561,11 +561,11 @@ export function createServer(options: CreateServerOptions) {
       if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The saving-throw answer is malformed." });
       const sessionId = scope.role === "gm" ? auth.verify(socket.handshake.auth.token)!.sessionId : scope.sessionId;
       try {
-        const { commandId, saveId, method, total, expectedRevision } = request.data;
+        const { commandId, saveId, method, total, commit, expectedRevision } = request.data;
         const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
         let outcome: ReturnType<typeof answerSave> | undefined;
         const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision }, (state) => {
-          outcome = answerSave(state, commandId, saveId, method, total, scope, {
+          outcome = answerSave(state, commandId, saveId, method, total, commit, scope, {
             random: (sides) => randomInt(1, sides + 1),
             newRollId: randomUUID,
             sessionId,
@@ -576,7 +576,7 @@ export function createServer(options: CreateServerOptions) {
         });
         if (!result.duplicate) {
           await publishGameState(result.state);
-          if (outcome && pending) broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+          if (outcome && outcome.committed && pending) broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
         }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be answered." }); }

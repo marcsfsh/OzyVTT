@@ -144,11 +144,18 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .save-prompt { display: flex; flex-direction: column; gap: .35rem; margin-top: .4rem; padding: .5rem .6rem; border: 1px solid #7c633e; border-radius: .5rem; background: #241a10; }
 .save-prompt-label { font-size: .78rem; color: #f3c77d; }
 .save-prompt-label strong { color: #ffd58d; }
-.save-prompt-actions { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
-.save-prompt-actions input { width: 4rem; margin: 0; padding: .4rem; text-align: center; }
-.save-prompt-actions button { padding: .4rem .7rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #282117; color: #fff; font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
-.save-prompt-actions button:hover:not(:disabled) { border-color: #e8a743; }
+.save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.save-prompt-roll { flex: 0 0 auto; }
+.save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; }
+.save-prompt-actions input { width: 6.5rem; margin: 0; padding: .4rem .5rem; text-align: left; }
+.save-prompt-actions button, .save-prompt-confirm button { padding: .4rem .8rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #282117; color: #fff; font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
+.save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: #e8a743; }
 .save-prompt-dismiss { margin-left: auto; padding: .4rem .55rem !important; background: transparent !important; color: #c8988f !important; }
+.save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.save-prompt-confirm .save-pass { color: #a7e8b0; }
+.save-prompt-confirm .save-fail { color: #ffb4ab; }
+.save-prompt-effect { color: #c8c0b1; font-size: .76rem; }
+.save-prompt-confirm .encounter-primary { background: #6e431c; border-color: #ffc34d; margin-left: auto; }
 .save-prompt-outcome, .action-save-note { margin: .3rem 0 0; color: #e9b861; font-size: .78rem; }
 .own-save-prompts { margin-top: .4rem; }
 /* Player initiative rows stack the name/score row above any owed-save prompts. */

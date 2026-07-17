@@ -69,7 +69,7 @@ describe("saving-throw prompts", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
     const saveId = game.combat.pendingSaves[0].id;
-    const outcome = answerSave(game, cmd(2), saveId, "roll", undefined, { role: "gm" }, deps([5])); // 5 + 7 = 12 < 15
+    const outcome = answerSave(game, cmd(2), saveId, "roll", undefined, true, { role: "gm" }, deps([5])); // 5 + 7 = 12 < 15
     expect(outcome).toMatchObject({ success: false, total: 12, appliedDamage: 12, conditionApplied: true });
     const goblin = game.actors.find((actor) => actor.id === IDS.monster)!;
     expect(goblin.hp.current).toBe(0);
@@ -78,22 +78,39 @@ describe("saving-throw prompts", () => {
     expect(game.rolls.find((roll) => roll.purpose === "save")).toMatchObject({ actorId: IDS.monster, initiatorLabel: "Goblin", visibility: "public" });
   });
 
+  it("previews a roll without applying it (commit=false): records the die, keeps the save, applies nothing", () => {
+    const game = state();
+    createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
+    const saveId = game.combat.pendingSaves[0].id;
+    const preview = answerSave(game, cmd(20), saveId, "roll", undefined, false, { role: "gm" }, deps([5])); // 12 < 15 → would fail
+    expect(preview).toMatchObject({ success: false, total: 12, appliedDamage: 12, conditionApplied: true, committed: false });
+    const goblin = game.actors.find((actor) => actor.id === IDS.monster)!;
+    expect(goblin.hp.current).toBe(12); // untouched
+    expect(goblin.conditions).toHaveLength(0); // not applied yet
+    expect(game.combat.pendingSaves).toHaveLength(1); // still owed
+    expect(game.rolls.find((roll) => roll.purpose === "save")).toBeTruthy(); // the die is shown to the table
+    // Committing with the shown total then applies it and clears the save.
+    const committed = answerSave(game, cmd(21), saveId, "manual", 12, true, { role: "gm" }, deps([]));
+    expect(committed).toMatchObject({ committed: true, appliedDamage: 12, conditionApplied: true });
+    expect(game.combat.pendingSaves).toHaveLength(0);
+  });
+
   it("applies half on success, or nothing when the action says no damage on success", () => {
     const half = state();
     createPendingSaves(half, pendingInput([IDS.monster]));
-    expect(answerSave(half, cmd(3), half.combat.pendingSaves[0].id, "roll", undefined, { role: "gm" }, deps([10])).appliedDamage).toBe(6); // 10+7 = 17 >= 15
+    expect(answerSave(half, cmd(3), half.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).appliedDamage).toBe(6); // 10+7 = 17 >= 15
     expect(half.actors.find((actor) => actor.id === IDS.monster)!.hp.current).toBe(6);
 
     const none = state();
     createPendingSaves(none, pendingInput([IDS.monster], { halfOnSuccess: false }));
-    expect(answerSave(none, cmd(4), none.combat.pendingSaves[0].id, "roll", undefined, { role: "gm" }, deps([10])).appliedDamage).toBe(0);
+    expect(answerSave(none, cmd(4), none.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).appliedDamage).toBe(0);
     expect(none.actors.find((actor) => actor.id === IDS.monster)!.hp.current).toBe(12);
   });
 
   it("routes failed-save damage through temporary hit points first (manual total)", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.pc]));
-    answerSave(game, cmd(5), game.combat.pendingSaves[0].id, "manual", 5, { role: "gm" }, deps([]));
+    answerSave(game, cmd(5), game.combat.pendingSaves[0].id, "manual", 5, true, { role: "gm" }, deps([]));
     const borin = game.actors.find((actor) => actor.id === IDS.pc)!;
     expect(borin.hp.temporary).toBe(0);
     expect(borin.hp.current).toBe(22); // 30 - (12 - 4 temp)
@@ -103,16 +120,16 @@ describe("saving-throw prompts", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId = game.combat.pendingSaves[0].id;
-    expect(() => answerSave(game, cmd(6), saveId, "manual", undefined, { role: "gm" }, deps([]))).toThrow(/whole number/);
-    expect(() => answerSave(game, cmd(6), saveId, "manual", 999, { role: "gm" }, deps([]))).toThrow(/whole number/);
+    expect(() => answerSave(game, cmd(6), saveId, "manual", undefined, true, { role: "gm" }, deps([]))).toThrow(/whole number/);
+    expect(() => answerSave(game, cmd(6), saveId, "manual", 999, true, { role: "gm" }, deps([]))).toThrow(/whole number/);
   });
 
   it("lets the owning player answer their own save but not another's, and only the GM dismiss", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId = game.combat.pendingSaves[0].id;
-    expect(() => answerSave(game, cmd(7), saveId, "manual", 20, { role: "player", sessionId: IDS.otherSession }, deps([]))).toThrow(/own character/);
-    expect(answerSave(game, cmd(8), saveId, "manual", 20, { role: "player", sessionId: IDS.pcSession }, deps([])).success).toBe(true);
+    expect(() => answerSave(game, cmd(7), saveId, "manual", 20, true, { role: "player", sessionId: IDS.otherSession }, deps([]))).toThrow(/own character/);
+    expect(answerSave(game, cmd(8), saveId, "manual", 20, true, { role: "player", sessionId: IDS.pcSession }, deps([])).success).toBe(true);
 
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId2 = game.combat.pendingSaves[0].id;
@@ -125,7 +142,7 @@ describe("saving-throw prompts", () => {
     const game = state();
     game.actors.find((actor) => actor.id === IDS.monster)!.visibility = "gm-only";
     createPendingSaves(game, pendingInput([IDS.monster]));
-    answerSave(game, cmd(9), game.combat.pendingSaves[0].id, "roll", undefined, { role: "gm" }, deps([10]));
+    answerSave(game, cmd(9), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10]));
     expect(game.rolls.find((roll) => roll.purpose === "save")).toMatchObject({ actorId: IDS.monster, visibility: "gm-only" });
   });
 

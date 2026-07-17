@@ -51,18 +51,26 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
 function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
   const [manualTotal, setManualTotal] = useState("");
   const [busy, setBusy] = useState(false);
-  // Outcome feedback goes to the parent: answering removes this prompt from state, so the component
+  // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
+  // so we can show it and let the answerer confirm rather than auto-resolving on the Roll click.
+  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean } | null>(null);
+  // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
   // unmounts before it could show its own result.
-  const answer = (method: "roll" | "manual") => {
-    const total = Number(manualTotal.trim());
-    if (method === "manual" && (!Number.isInteger(total) || total < -20 || total > 60)) { onFeedback("Enter the rolled total (-20 to 60)."); return; }
+  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean) => {
     setBusy(true);
-    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, ...(method === "manual" ? { total } : {}) }, (result: SaveAnswerResult) => {
+    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(total !== undefined ? { total } : {}) }, (result: SaveAnswerResult) => {
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The saving throw could not be answered."); return; }
       const outcome = result.outcome;
-      if (outcome) onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " — condition applied" : ""}.`);
+      if (!outcome) return;
+      if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied }); return; }
+      onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " — condition applied" : ""}.`);
     });
+  };
+  const submitManual = () => {
+    const total = Number(manualTotal.trim());
+    if (!Number.isInteger(total) || total < -20 || total > 60) { onFeedback("Enter the rolled total (-20 to 60)."); return; }
+    send("manual", total, true);
   };
   const dismiss = () => {
     setBusy(true);
@@ -73,12 +81,19 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ sav
   };
   return <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
     <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName}){save.proposedDamage > 0 ? ` · ${save.proposedDamage} dmg` : ""}</span>
-    <span className="save-prompt-actions">
-      <button type="button" disabled={busy} onClick={() => answer("roll")}>Roll</button>
-      <input type="number" min="-20" max="60" placeholder="Total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} />
-      <button type="button" disabled={busy || manualTotal.trim() === ""} onClick={() => answer("manual")}>Submit</button>
-      {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
-    </span>
+    {rolled
+      // Reveal the rolled total and what it will do, and require an explicit Confirm before applying.
+      ? <span className="save-prompt-confirm">
+          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total} — {rolled.success ? "Success" : "Failure"}</strong>
+          <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => send("manual", rolled.total, true)}>Confirm</button>
+          <button type="button" className="secondary" disabled={busy} onClick={() => setRolled(null)}>Re-roll</button>
+        </span>
+      : <span className="save-prompt-actions">
+          <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => send("roll", undefined, false)}>Roll</button>
+          <span className="save-prompt-manual"><input type="number" min="-20" max="60" placeholder="or type total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
+          {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
+        </span>}
   </div>;
 }
 

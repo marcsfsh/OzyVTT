@@ -203,23 +203,45 @@ export function footprintCells(calibration: GridCalibration, position: { x: numb
   return cells;
 }
 /**
- * 5e movement-through-occupied-cells cost, display-only. Walks the whole-cell Chebyshev line from
- * origin to target; each intermediate cell (not the destination) that another token occupies adds one
- * cell of movement (+distancePerCell). Preview-only — the client only ever has the tokens it may see,
- * so nothing hidden leaks into the count.
+ * Every grid cell the straight segment (grid-space) from `a` to `b` passes through, via an
+ * Amanatides–Woo voxel/DDA traversal. Unlike a Chebyshev "diagonal-first" walk, this visits exactly
+ * the cells the drawn line crosses, so the occupied-cell count matches what the ruler visibly passes
+ * over. At an exact lattice corner it steps diagonally (skips the two side cells) — the standard choice.
+ */
+function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): string[] {
+  let column = Math.floor(ax), row = Math.floor(ay);
+  const endColumn = Math.floor(bx), endRow = Math.floor(by);
+  const deltaX = bx - ax, deltaY = by - ay;
+  const stepX = Math.sign(deltaX), stepY = Math.sign(deltaY);
+  const tDeltaX = deltaX !== 0 ? Math.abs(1 / deltaX) : Infinity;
+  const tDeltaY = deltaY !== 0 ? Math.abs(1 / deltaY) : Infinity;
+  let tMaxX = deltaX !== 0 ? (stepX > 0 ? Math.floor(ax) + 1 - ax : ax - Math.floor(ax)) * tDeltaX : Infinity;
+  let tMaxY = deltaY !== 0 ? (stepY > 0 ? Math.floor(ay) + 1 - ay : ay - Math.floor(ay)) * tDeltaY : Infinity;
+  const cells = [`${column},${row}`];
+  for (let guard = 0; (column !== endColumn || row !== endRow) && guard < 1000; guard++) {
+    if (Math.abs(tMaxX - tMaxY) < 1e-9) { tMaxX += tDeltaX; tMaxY += tDeltaY; column += stepX; row += stepY; }
+    else if (tMaxX < tMaxY) { tMaxX += tDeltaX; column += stepX; }
+    else { tMaxY += tDeltaY; row += stepY; }
+    cells.push(`${column},${row}`);
+  }
+  return cells;
+}
+
+/**
+ * 5e movement-through-occupied-cells cost, display-only. Base distance is the whole-cell Chebyshev
+ * count (diagonals cost one). The penalty is every cell the straight path crosses — excluding the
+ * start and destination cells — that another token occupies, each adding one cell (+distancePerCell).
+ * Preview-only — the client only ever has the tokens it may see, so nothing hidden leaks into the count.
  */
 export function occupiedPathCost(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }, occupied: ReadonlySet<string>): { baseFeet: number; penaltyFeet: number } {
   const from = imageToGridPreview(calibration, origin);
   const to = imageToGridPreview(calibration, target);
-  let column = Math.floor(from.column), row = Math.floor(from.row);
-  const destColumn = Math.floor(to.column), destRow = Math.floor(to.row);
-  const steps = Math.max(Math.abs(destColumn - column), Math.abs(destRow - row));
+  const originCell = `${Math.floor(from.column)},${Math.floor(from.row)}`;
+  const destCell = `${Math.floor(to.column)},${Math.floor(to.row)}`;
+  const steps = Math.max(Math.abs(Math.floor(to.column) - Math.floor(from.column)), Math.abs(Math.floor(to.row) - Math.floor(from.row)));
   let penaltyCells = 0;
-  for (let step = 0; step < steps; step++) {
-    if (column !== destColumn) column += Math.sign(destColumn - column);
-    if (row !== destRow) row += Math.sign(destRow - row);
-    const atDestination = column === destColumn && row === destRow;
-    if (!atDestination && occupied.has(`${column},${row}`)) penaltyCells++;
+  for (const cell of cellsOnGridSegment(from.column, from.row, to.column, to.row)) {
+    if (cell !== originCell && cell !== destCell && occupied.has(cell)) penaltyCells++;
   }
   return { baseFeet: steps * calibration.distancePerCell, penaltyFeet: penaltyCells * calibration.distancePerCell };
 }

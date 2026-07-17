@@ -13,7 +13,7 @@ export type SaveAnswerDependencies = Readonly<{
   now: () => string;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
 }>;
-export type SaveOutcome = Readonly<{ success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean }>;
+export type SaveOutcome = Readonly<{ success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean }>;
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
@@ -98,7 +98,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
  */
-export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, scope: ActorScope, deps: SaveAnswerDependencies): SaveOutcome {
+export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies): SaveOutcome {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
@@ -122,17 +122,20 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   }
 
   const success = total >= pending.dc;
+  const outcomeDamage = !success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0);
+  const outcomeCondition = !success && pending.conditionId !== null;
+
+  // Preview (commit=false): the die roll is still recorded for the table so everyone sees it, but the
+  // outcome is NOT applied and the save stays open until the answerer confirms. This makes "Roll" a
+  // reveal, not an auto-resolve — the answerer then commits (manual with the rolled total).
+  if (!commit) return { success, total, dc: pending.dc, appliedDamage: outcomeDamage, conditionApplied: outcomeCondition, committed: false };
+
   let appliedDamage = 0;
   let conditionApplied = false;
-  if (!success) {
-    if (pending.proposedDamage > 0) { applyDamage(state, target.id, pending.proposedDamage, { role: "gm" }); appliedDamage = pending.proposedDamage; }
-    if (pending.conditionId) { setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }); conditionApplied = true; }
-  } else if (pending.halfOnSuccess && pending.proposedDamage > 0) {
-    const half = Math.floor(pending.proposedDamage / 2);
-    if (half > 0) { applyDamage(state, target.id, half, { role: "gm" }); appliedDamage = half; }
-  }
+  if (outcomeDamage > 0) { applyDamage(state, target.id, outcomeDamage, { role: "gm" }); appliedDamage = outcomeDamage; }
+  if (outcomeCondition && pending.conditionId) { setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }); conditionApplied = true; }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
-  return { success, total, dc: pending.dc, appliedDamage, conditionApplied };
+  return { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true };
 }
 
 /** Drop a pending save without resolving it (GM housekeeping — e.g. the effect ended). */
