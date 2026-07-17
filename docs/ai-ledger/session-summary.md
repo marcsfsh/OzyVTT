@@ -8,6 +8,29 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — UX bug sweep, batch 2 (owner retest)
+
+Second round from the owner's retest, same branch:
+
+- **Ping expiry — real root cause.** Batch 1's re-arm was necessary but insufficient: `projectGmView`
+  spread state verbatim and **never filtered expired annotations**, so a ping only vanished from the
+  GM's own screen on the next add, not on the scheduled expiry re-broadcast (only the player/viewer
+  projections filtered). `projectGmView` now takes `now` and filters expired annotations like the
+  others. Regression test added.
+- **#12 regression fix.** The batch-1 "dice fills the sidebar" change let the roll history grow
+  unbounded and `align-items: stretch` stretched the whole row → huge dead space under the map.
+  Reverted the fill; desktop grid is now `align-items: start` so a short column no longer forces
+  dead space.
+- **Markdown in reference text.** SRD descriptions carry `**bold**`, newlines, and `- ` bullets that
+  showed raw in the CharacterSheet traits/actions and the tap-to-read reference rows. New inline-safe
+  `RichText` (bold/br/bullets only) renders them.
+- **Actions on the creature's row.** The current combatant's economy + `ActionRunner` moved from a
+  detached block at the panel bottom to inline under that combatant's initiative row; dropped the
+  redundant economy-strip name (which was being truncated by the Action/Bonus/Reaction buttons).
+- **Above-map clutter.** "Preview what players see" moved below the map.
+
+Verified: check / test (224, +2 GM-expiry regression) / build green. Browser pass is the owner's.
+
 ## 2026-07-17 — UX bug sweep (owner test pass, batch 1 of the UX/UI PR)
 
 Six fixes from the owner's testing pass, on `claude/srd-content-pipeline` (kept on the same

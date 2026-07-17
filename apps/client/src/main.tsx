@@ -168,7 +168,6 @@ function App() {
       {(mode === "player" || gmTab === "table") && <div className="table-layout">
         <section className="table">
           <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "AT THE TABLE"}</span><h2>Battle map</h2><p>{state.combat.active ? `Encounter running · Round ${state.combat.round}` : mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p></div>
-          {mode === "gm" && gmToken && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
           {state.combat.active && state.combat.mapAssetId ? <EncounterMap
             assetId={state.combat.mapAssetId}
             token={mapToken}
@@ -181,6 +180,7 @@ function App() {
             activeActorId={state.combat.turnActorId}
             dock={showDocked ? { node: encounterPanel, position: dockPosition } : undefined}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
+          {mode === "gm" && gmToken && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>
         <div className="table-sidebar">
           {!showDocked && encounterPanel}

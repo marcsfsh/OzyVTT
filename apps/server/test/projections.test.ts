@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type RollRecord, type RollVisibility } from "@vtt/domain";
 import { projectGmView, projectPlayerView } from "../src/projections.js";
+import { addPing } from "../src/annotations.js";
 
 const playerA = "b539ef5e-16e6-46ce-bf33-3ed4b02997c1";
 const playerB = "65cc7d6b-1150-41c4-aa9f-390439313f53";
@@ -67,5 +68,32 @@ describe("presence projection", () => {
     const alwaysOnline = () => "online" as const;
     const projected = projectPlayerView(state, undefined, alwaysOnline);
     expect(projected.actors[0].presence).toBeNull();
+  });
+});
+
+describe("GM view drops expired ephemeral annotations", () => {
+  const calibration = { kind: "square" as const, origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 };
+  const geometry = { width: 1000, height: 1000, calibration };
+  const gmActor = { sessionId: playerA, role: "gm" as const };
+  const combatant = "60000000-0000-4000-8000-000000000001";
+  function twoPings() {
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [{ id: combatant, name: "Hero", kind: "player-character", hp: { current: 10, maximum: 10 } }],
+      combat: { active: true, round: 1, turnActorId: combatant, mapAssetId: "70000000-0000-5000-8000-000000000001", initiative: [{ actorId: combatant, score: 20 }] }
+    });
+    addPing(state, { id: "20000000-0000-4000-8000-000000000001", point: { x: 100, y: 100 }, label: "GM", actor: gmActor, now: 1000 }, geometry); // expires 5000
+    addPing(state, { id: "20000000-0000-4000-8000-000000000002", point: { x: 150, y: 150 }, label: "GM", actor: gmActor, now: 2000 }, geometry); // expires 6000
+    return state;
+  }
+
+  // Regression: the GM projection used to spread state verbatim, so an expired ping only vanished on
+  // the next add (not on the scheduled expiry re-broadcast) — pings lingered on the GM's own screen.
+  it("hides a ping past its expiry while keeping a still-live one", () => {
+    const view = projectGmView(twoPings(), noPresence, 5500);
+    expect(view.combat.annotations.map((annotation) => annotation.id)).toEqual(["20000000-0000-4000-8000-000000000002"]);
+  });
+  it("keeps both pings before either expires", () => {
+    expect(projectGmView(twoPings(), noPresence, 4000).combat.annotations).toHaveLength(2);
   });
 });

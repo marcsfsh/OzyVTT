@@ -215,20 +215,18 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
           </div>}
           {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
+          {/* The active combatant's economy + action runner live on its own initiative row, not in a
+              detached block at the bottom, so actions read against the creature they belong to. */}
+          {active && actor && <>
+            <div className="turn-economy" role="group" aria-label={`Turn resources for ${actor.name}`}>
+              <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
+              <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
+              <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+            </div>
+            <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
+          </>}
         </li>;
       })}</ol>
-      {(() => {
-        const current = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
-        if (!current) return null;
-        const reactionUsed = state.combat.reactionsUsed.includes(current.id);
-        return <><div className="turn-economy" role="group" aria-label={`Turn resources for ${current.name}`}>
-          <span className="turn-economy-name">{current.name}</span>
-          <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
-          <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
-          <button type="button" className="economy-slot" aria-pressed={reactionUsed} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: current.id, used: !reactionUsed, expectedRevision: state.revision }), reactionUsed ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
-        </div>
-        <ActionRunner state={state} actor={current} onFeedback={setMessage} /></>;
-      })()}
       <button type="button" className="encounter-end" disabled={busy} onClick={end}>End encounter</button>
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
+import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -79,7 +80,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
               <button type="button" className="action-row action-row-static" aria-expanded={openReference === action.id} onClick={() => setOpenReference((current) => current === action.id ? null : action.id)}>
                 <strong>{action.name}</strong><small>{action.activation === "other" ? "Reference — tap to read" : `${action.activation} · tap to read`}</small>
               </button>
-              {openReference === action.id && <p className="action-reference-text">{action.description}</p>}
+              {openReference === action.id && <p className="action-reference-text"><RichText text={action.description} /></p>}
             </>}
       </li>)}
     </ul>}

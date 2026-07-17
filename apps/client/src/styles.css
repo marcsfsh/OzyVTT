@@ -3,10 +3,5 @@
 .own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
 .own-hp-tracker button { padding: .5rem .7rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #17140f; color: #f5efe3; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
-.own-hp-tracker button:hover:not(:disabled) { border-color: #e8a743; } .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; } .table-sidebar > .dice-proof { margin-top: auto; } .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; } .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; } @media (min-width: 980px) { .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); }
-/* Desktop side-by-side: the dice section fills the sidebar beneath the initiative panel and
-   bottom-aligns with the map column, its roll history growing to use the height rather than a
-   fixed cap, so dice and map read as two aligned columns. */
-.table-sidebar > .dice-proof { flex: 1 1 auto; display: flex; flex-direction: column; }
-.table-sidebar > .dice-proof .roll-list { flex: 1 1 auto; max-height: none; }
+.own-hp-tracker button:hover:not(:disabled) { border-color: #e8a743; } .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; } .table-sidebar > .dice-proof { margin-top: auto; } .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; } .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; } @media (min-width: 980px) { .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); align-items: start; }
 .viewer-preview-toggle { margin-top: .6rem; } }

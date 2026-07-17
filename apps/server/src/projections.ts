@@ -88,9 +88,13 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
   };
 }
 
-export function projectGmView(state: GameState, presenceFor: PresenceLookup): GmView {
+export function projectGmView(state: GameState, presenceFor: PresenceLookup, now = Date.now()): GmView {
   return {
     ...state,
+    // Ephemeral annotations (measurements ~5s, pings ~4s) must drop off the GM's own screen when
+    // they expire, not only when the next add prunes state — the scheduled expiry re-broadcast
+    // relies on this filter (the player/viewer projections already do the same).
+    combat: { ...state.combat, annotations: state.combat.annotations.filter((annotation) => annotation.expiresAt === null || annotation.expiresAt > now) },
     actors: state.actors.map((actor) => ({ ...actor, presence: actor.ownerSessionId === null ? null : presenceFor(actor.ownerSessionId) }))
   };
 }

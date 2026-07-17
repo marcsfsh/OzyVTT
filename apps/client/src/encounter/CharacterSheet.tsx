@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
 import { ConditionEditor } from "./conditions";
+import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -122,10 +123,10 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           <div><dt>Proficiency</dt><dd>{signed(definition.proficiencyBonus)}</dd></div>
         </dl>
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
-          {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> {trait.description}</p>)}
+          {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
         {definition.actions.length > 0 && <section className="sheet-section"><h3>Actions</h3>
-          {definition.actions.map((action) => <p key={action.id} className="sheet-entry"><strong>{action.name}.</strong> {action.description}</p>)}
+          {definition.actions.map((action) => <p key={action.id} className="sheet-entry"><strong>{action.name}.</strong> <RichText text={action.description} /></p>)}
         </section>}
         <p className="sheet-attribution">Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.</p>
       </>}
