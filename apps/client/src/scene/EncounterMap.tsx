@@ -80,7 +80,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], dock, moveSceneId
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], dock, moveSceneId, onScenePrep, staging
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -95,6 +95,10 @@ export function EncounterMap({
   dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
   /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene, not the live encounter. */
   moveSceneId?: string;
+  /** GM scene-prep entry (map button) — opens the scene picker. */
+  onScenePrep?: () => void;
+  /** Present while staging a prepared scene privately — adds "back to live" / "make live" controls to the map. */
+  staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -630,6 +634,12 @@ export function EncounterMap({
         <MapToastStack />
 
         <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
+          {staging
+            ? <span className="encounter-map-scene-live" role="group" aria-label="Staged scene controls">
+                <button type="button" className="scene-back" onClick={staging.onBackToLive} title="Return to the scene players see">◀ Live</button>
+                <button type="button" className="scene-golive" onClick={staging.onMakeLive} title="Make this the scene players see">Make live ⬆</button>
+              </span>
+            : onScenePrep && <button type="button" aria-label="Scene prep" title="Scene prep — stage and switch scenes (GM only)" onClick={onScenePrep}>🎬 Scenes</button>}
           {dock && <span className="encounter-map-dock-control" role="group" aria-label="Dock the tracker">
             <button type="button" aria-label="Dock tracker left" aria-pressed={dock.position === "left"} title="Dock tracker left" onClick={() => dock.onChange("left")}>◧</button>
             <button type="button" aria-label="Dock tracker right" aria-pressed={dock.position === "right"} title="Dock tracker right" onClick={() => dock.onChange("right")}>◨</button>

@@ -157,3 +157,6 @@
 .token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
 .token-context-conditions { margin-top: .1rem; }
 .token-context-feedback { margin: .1rem 0 0; color: #e9b861; font-size: .75rem; }
+
+.encounter-map-scene-live { display: inline-flex; gap: .35rem; }
+.encounter-map-scene-live .scene-golive { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
