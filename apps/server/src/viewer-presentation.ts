@@ -45,11 +45,13 @@ export type ViewerEncounterToken = Readonly<{
 /** Player-safe drawing shown on the shared screen — only `public` annotations are ever projected here. */
 export type ViewerAnnotation = Readonly<{
   id: string;
-  kind: "measurement" | "shape";
+  kind: "measurement" | "shape" | "ping";
   shape: "circle" | "cone" | "line" | "square" | null;
   origin: ImagePoint;
   target: ImagePoint;
   sizeFeet: number;
+  color: string;
+  label: string | null;
 }>;
 
 export type ViewerEncounterScene = Readonly<{
@@ -175,10 +177,12 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     const id = safeText(annotation.id, "Viewer annotation ID", 128);
     if (annotationIds.has(id)) throw new Error("Viewer annotation IDs must be unique.");
     annotationIds.add(id);
-    if (annotation.kind !== "measurement" && annotation.kind !== "shape") throw new Error("Viewer annotation kind is invalid.");
+    if (annotation.kind !== "measurement" && annotation.kind !== "shape" && annotation.kind !== "ping") throw new Error("Viewer annotation kind is invalid.");
     if (annotation.shape !== null && !(["circle", "cone", "line", "square"] as const).includes(annotation.shape)) throw new Error("Viewer annotation shape is invalid.");
     if (!Number.isFinite(annotation.sizeFeet) || annotation.sizeFeet < 0 || annotation.sizeFeet > 100_000) throw new Error("Viewer annotation size is invalid.");
-    return { id, kind: annotation.kind, shape: annotation.shape, origin: point(annotation.origin, "Viewer annotation origin"), target: point(annotation.target, "Viewer annotation target"), sizeFeet: annotation.sizeFeet };
+    if (typeof annotation.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(annotation.color)) throw new Error("Viewer annotation color is invalid.");
+    const label = annotation.label === null || annotation.label === undefined ? null : safeText(annotation.label, "Viewer annotation label", 60);
+    return { id, kind: annotation.kind, shape: annotation.shape, origin: point(annotation.origin, "Viewer annotation origin"), target: point(annotation.target, "Viewer annotation target"), sizeFeet: annotation.sizeFeet, color: annotation.color, label };
   });
   if (mapAssetId === null && annotations.length) throw new Error("Viewer annotations require an active encounter map.");
   return { mapAssetId, tokens, annotations };

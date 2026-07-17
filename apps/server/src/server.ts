@@ -7,7 +7,7 @@ import { z } from "zod";
 import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
-import { addAnnotation, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
+import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
 import { createApiV1Router } from "./api-v1.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
@@ -58,6 +58,7 @@ const EncounterStartSchema = z.object({
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
+const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const AnnotationAddSchema = z.object({
   commandId: z.string().uuid(),
   kind: z.enum(["measurement", "shape"]),
@@ -66,8 +67,11 @@ const AnnotationAddSchema = z.object({
   visibility: AnnotationVisibilitySchema.optional(),
   visibleToActorId: z.string().uuid().nullable().optional(),
   movableByOthers: z.boolean().optional(),
+  color: HexColorSchema.optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
+const AnnotationPingSchema = z.object({ commandId: z.string().uuid(), point: AnnotationPointSchema, color: HexColorSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const AnnotationColorSetSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), color: HexColorSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationMoveSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), geometry: AnnotationGeometryInputSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationRemoveSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationVisibilitySetSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), visibility: AnnotationVisibilitySchema, visibleToActorId: z.string().uuid().nullable().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -403,15 +407,51 @@ export function createServer(options: CreateServerOptions) {
       if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before adding to the map." });
       try {
         const geometry = await tokenGeometryFor(mapAssetId);
-        const { commandId, kind, shape, geometry: geometryInput, visibility, visibleToActorId, movableByOthers, expectedRevision } = request.data;
+        const { commandId, kind, shape, geometry: geometryInput, visibility, visibleToActorId, movableByOthers, color, expectedRevision } = request.data;
         const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
         const result = await store.execute({ id: commandId, type: "annotation.add", expectedRevision }, (state) => {
           if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
-          addAnnotation(state, { id: commandId, kind, shape, origin: geometryInput.origin, target: geometryInput.target, visibility: visibility ?? "public", visibleToActorId: visibleToActorId ?? null, movableByOthers, actor, now: Date.now() }, geometry);
+          addAnnotation(state, { id: commandId, kind, shape, origin: geometryInput.origin, target: geometryInput.target, visibility: visibility ?? "public", visibleToActorId: visibleToActorId ?? null, movableByOthers, color, actor, now: Date.now() }, geometry);
         });
         if (!result.duplicate) { await publishGameState(result.state); scheduleAnnotationExpiry(); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, annotationId: commandId });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be added to the map." }); }
+    });
+    socket.on("annotation:ping", async (payload, acknowledge) => {
+      const request = AnnotationPingSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The ping is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before pinging the map." });
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before pinging the map." });
+      try {
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const { commandId, point, color, expectedRevision } = request.data;
+        const sessionId = gm?.sessionId ?? player!.sessionId;
+        const actor = { sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
+        const result = await store.execute({ id: commandId, type: "annotation.ping", expectedRevision }, (state) => {
+          if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
+          const label = gm ? "GM" : state.actors.find((candidate) => candidate.ownerSessionId === sessionId)?.name ?? "A player";
+          addPing(state, { id: commandId, point, label, color, actor, now: Date.now() }, geometry);
+        });
+        if (!result.duplicate) { await publishGameState(result.state); scheduleAnnotationExpiry(); }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The ping could not be sent." }); }
+    });
+    socket.on("annotation:set-color", async (payload, acknowledge) => {
+      const request = AnnotationColorSetSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The color change is malformed." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
+      try {
+        const { commandId, id, color, expectedRevision } = request.data;
+        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
+        const result = await store.execute({ id: commandId, type: "annotation.set-color", expectedRevision }, (state) => { setAnnotationColor(state, id, color, actor); });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The color could not be changed." }); }
     });
     socket.on("annotation:move", async (payload, acknowledge) => {
       const request = AnnotationMoveSchema.safeParse(payload);

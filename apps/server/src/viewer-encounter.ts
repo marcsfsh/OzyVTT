@@ -34,7 +34,7 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
     // measurements drop out here (the server re-syncs the viewer at each annotation expiry).
     annotations: state.combat.annotations.flatMap((annotation) =>
       annotation.visibility === "public" && (annotation.expiresAt === null || annotation.expiresAt > now)
-        ? [{ id: annotation.id, kind: annotation.kind, shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }]
+        ? [{ id: annotation.id, kind: annotation.kind, shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet, color: annotation.color, label: annotation.label }]
         : [])
   };
 }

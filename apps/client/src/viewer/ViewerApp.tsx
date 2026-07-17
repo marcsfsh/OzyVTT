@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { probeImageDimensions, TokenGlyph } from "../scene/mapImage";
-import { AnnotationGlyph } from "../scene/annotationGlyph";
+import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
-type ViewerAnnotation = Readonly<{ id: string; kind: "measurement" | "shape"; shape: "circle" | "cone" | "line" | "square" | null; origin: Point; target: Point; sizeFeet: number }>;
+type ViewerAnnotation = Readonly<{ id: string; kind: "measurement" | "shape" | "ping"; shape: "circle" | "cone" | "line" | "square" | null; origin: Point; target: Point; sizeFeet: number; color: string; label: string | null }>;
 export type Presentation = Readonly<{
   schemaVersion: 1;
   revision: number;
@@ -135,6 +135,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   const tokens = onActiveMap ? presentation.encounter.tokens : [];
   const annotations = onActiveMap ? (presentation.encounter.annotations ?? []) : [];
   const arrowSize = Math.max(8, Math.min(size.width, size.height) / 45);
+  const pingSize = Math.max(10, Math.min(size.width, size.height) / 30);
   return <section className="viewer-stage" ref={stageRef} aria-label={presentation.activeMap.altText || "Shared battlemap"} onPointerDown={beginPan} onPointerMove={continuePan} onPointerUp={endPan} onPointerCancel={endPan}>
     <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img" aria-label={presentation.activeMap.altText || "Shared battlemap"}>
       <image href={href} width={size.width} height={size.height} onLoad={(event) => {
@@ -142,9 +143,12 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
         const source = image.href.baseVal;
         void probeImageDimensions(source).then(setSize).catch(() => {});
       }} />
-      {annotations.map((annotation) => annotation.kind === "shape"
-        ? <g className="annotation-shape visibility-public" key={annotation.id}><AnnotationGlyph data={annotation} arrowSize={arrowSize} /></g>
-        : <AnnotationGlyph key={annotation.id} data={annotation} arrowSize={arrowSize} />)}
+      {annotations.map((annotation) => {
+        if (annotation.kind === "ping") return <PingGlyph key={annotation.id} point={annotation.origin} color={annotation.color} label={annotation.label} size={pingSize} />;
+        const data = { kind: annotation.kind, shape: annotation.shape, origin: annotation.origin, target: annotation.target, sizeFeet: annotation.sizeFeet };
+        if (annotation.kind === "shape") return <g className="annotation-shape visibility-public" key={annotation.id}><AnnotationGlyph data={data} arrowSize={arrowSize} color={annotation.color} /></g>;
+        return <AnnotationGlyph key={annotation.id} data={data} arrowSize={arrowSize} color={annotation.color} />;
+      })}
       {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
         <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
       </g>)}

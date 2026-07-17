@@ -15,4 +15,11 @@
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
 @keyframes annotation-fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .annotation-measurement.expiring { animation: none; } }
+
+/* Pings: an expanding, pulsing ring + core dot + the sender's name. `color` is set inline per sender. */
+.annotation-ping { color: #ffd43f; pointer-events: none; }
+.annotation-ping-ring { fill: none; stroke: currentcolor; stroke-width: 3; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: annotation-ping-pulse 1.3s ease-out infinite; }
+.annotation-ping-core { fill: currentcolor; }
+.annotation-ping-label { fill: #fff2c4; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #0a0805; stroke-linejoin: round; font-weight: 800; }
+@keyframes annotation-ping-pulse { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .annotation-measurement.expiring, .annotation-ping-ring { animation: none; } }
