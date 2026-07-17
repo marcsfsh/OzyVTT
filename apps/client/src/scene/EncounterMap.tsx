@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
 import { CharacterSheet } from "../encounter/CharacterSheet";
@@ -565,7 +566,7 @@ export function EncounterMap({
             const targeted = targetable && activeTargeting.selected.includes(actor.id);
             return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
-              <TokenGlyph sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
+              <AuthorizedTokenGlyph assetId={actor.tokenAssetId ?? null} token={token} sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
               <TokenStatusBadges sizePx={encounterToken.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map(conditionBadgeLabel)} />
             </g>;
           })}
@@ -641,7 +642,7 @@ export function EncounterMap({
     {contextMenu && (() => {
       const actor = actorsById.get(contextMenu.actorId);
       return actor
-        ? <TokenContextMenu actor={actor} role={role} x={contextMenu.x} y={contextMenu.y} reactionUsed={reactionsUsed.includes(actor.id)} placed={tokensById.get(actor.id)?.position != null} onOpenSheet={() => setSheetActorId(actor.id)} onReturnToTray={() => void submitMove(actor.id, null)} onClose={() => setContextMenu(null)} />
+        ? <TokenContextMenu actor={actor} role={role} gmToken={role === "gm" ? token : null} x={contextMenu.x} y={contextMenu.y} reactionUsed={reactionsUsed.includes(actor.id)} placed={tokensById.get(actor.id)?.position != null} onOpenSheet={() => setSheetActorId(actor.id)} onReturnToTray={() => void submitMove(actor.id, null)} onClose={() => setContextMenu(null)} />
         : null;
     })()}
     {sheetActorId && (() => {

@@ -4,6 +4,7 @@ import type { GmActor, PlayerActor } from "@vtt/domain";
 import { ConditionEditor } from "../encounter/conditions";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { TokenLibrary } from "../tokens/TokenLibrary";
 
 type Actor = GmActor | PlayerActor;
 
@@ -12,9 +13,10 @@ type Actor = GmActor | PlayerActor;
  * their own claimed token (the caller gates that). Portaled to <body> so it clears the docked panel
  * and enlarged-map stacking contexts. Uses only existing commands — the server stays authoritative.
  */
-export function TokenContextMenu({ actor, role, x, y, reactionUsed, placed, onOpenSheet, onReturnToTray, onClose }: Readonly<{
+export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, placed, onOpenSheet, onReturnToTray, onClose }: Readonly<{
   actor: Actor;
   role: "gm" | "player";
+  gmToken: string | null;
   x: number;
   y: number;
   reactionUsed: boolean;
@@ -27,6 +29,7 @@ export function TokenContextMenu({ actor, role, x, y, reactionUsed, placed, onOp
   const [amount, setAmount] = useState("");
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
+  const [library, setLibrary] = useState(false);
 
   useEffect(() => {
     const onPointer = (event: PointerEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) onClose(); };
@@ -55,6 +58,9 @@ export function TokenContextMenu({ actor, role, x, y, reactionUsed, placed, onOp
     });
   };
 
+  // The image picker replaces the menu while open; closing it dismisses the whole flow.
+  if (library && gmToken) return <TokenLibrary actorId={actor.id} actorName={actor.name} definitionId={actor.definitionId ?? null} currentAssetId={actor.tokenAssetId ?? null} gmToken={gmToken} onClose={onClose} />;
+
   // Clamp so the menu stays on-screen near the pointer.
   const style: React.CSSProperties = { left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.max(8, Math.min(y, window.innerHeight - 340)) };
 
@@ -67,6 +73,7 @@ export function TokenContextMenu({ actor, role, x, y, reactionUsed, placed, onOp
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", "Healed")}>Heal</button>
       </div>}
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
+      {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}
       <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent — restore" : "Use reaction"}</button>
       {role === "gm" && placed && <button type="button" className="token-context-item" onClick={() => { onReturnToTray(); onClose(); }}>Return to tray</button>}
       <div className="token-context-conditions"><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>

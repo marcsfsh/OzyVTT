@@ -25,7 +25,8 @@ const WizardActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("verify"), imagePoint: PointSchema, tolerancePx: z.number().positive().optional() }).strict()
 ]);
 const ScaleSchema = z.object({ start: PointSchema, end: PointSchema, knownDistance: z.number().positive(), unit: z.string() }).strict();
-const DetailsSchema = z.object({ name: z.string().optional(), kind: z.enum(["battlemap", "regional", "world"]).optional() }).strict();
+const DetailsSchema = z.object({ name: z.string().optional(), kind: z.enum(["battlemap", "regional", "world"]).optional(), folder: z.string().nullable().optional() }).strict();
+const FolderRenameSchema = z.object({ from: z.string(), to: z.string().nullable() }).strict();
 
 type WizardSession = { ownerHash: string; assetId: string; state: GridCalibrationWizardState; touchedAt: number };
 
@@ -78,6 +79,7 @@ function publicAsset(metadata: MapAssetMetadata, entry: MapCatalogEntry) {
     id: metadata.id,
     name: entry.name,
     kind: entry.kind,
+    folder: entry.folder,
     originalName: metadata.originalName,
     format: metadata.format,
     mediaType: metadata.mediaType,
@@ -162,6 +164,11 @@ export function createMapRouter(options: MapRouterOptions) {
       const input = DetailsSchema.parse(request.body);
       return success(response, 200, { map: options.catalog.updateDetails(id, input) });
     } catch (error) { return failure(request, response, 400, "validation_failed", error instanceof z.ZodError ? "Map details are malformed." : (error as Error).message); }
+  });
+
+  router.post(`${MAP_COLLECTION}/folders/rename`, requireGm, (request, response) => {
+    try { const input = FolderRenameSchema.parse(request.body); options.catalog.renameFolder(input.from, input.to); return success(response, 200, { renamed: true }); }
+    catch (error) { return failure(request, response, 400, "validation_failed", error instanceof z.ZodError ? "Folder rename is malformed." : (error as Error).message); }
   });
 
   router.get(`${MAP_COLLECTION}/:id/content`, async (request, response) => {

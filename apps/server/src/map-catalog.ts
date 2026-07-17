@@ -17,6 +17,7 @@ export type MapCatalogEntry = Readonly<{
   assetId: string;
   name: string;
   kind: MapKind;
+  folder: string | null;
   calibration: StoredGridCalibration | null;
   scale: MapDistanceScale | null;
   createdAt: string;
@@ -27,6 +28,7 @@ type CatalogRow = Readonly<{
   asset_id: string;
   name: string;
   kind: MapKind;
+  folder: string | null;
   calibration_json: string | null;
   scale_json: string | null;
   created_at: string;
@@ -51,6 +53,15 @@ function mapKind(value: string): MapKind {
   return value;
 }
 
+/** One flat level of folders: a printable label with no slashes. Empty/undefined means "unfiled". */
+export function mapFolder(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const folder = value.trim();
+  if (folder === "") return null;
+  if (folder.length > 60 || folder.includes("/") || /[\u0000-\u001f\u007f]/.test(folder)) throw new Error("Folder must be one level: up to 60 printable characters, no slashes.");
+  return folder;
+}
+
 function finitePoint(value: ImagePoint) {
   if (!Number.isFinite(value.x) || !Number.isFinite(value.y)) throw new Error("Grid verification point must contain finite coordinates.");
   return { x: value.x, y: value.y };
@@ -73,6 +84,7 @@ function rowToEntry(row: CatalogRow): MapCatalogEntry {
     assetId: assetId(row.asset_id),
     name: mapName(row.name),
     kind: mapKind(row.kind),
+    folder: row.folder,
     calibration: row.calibration_json ? calibration(JSON.parse(row.calibration_json) as StoredGridCalibration) : null,
     scale: row.scale_json ? validateMapDistanceScale(JSON.parse(row.scale_json) as MapDistanceScale) : null,
     createdAt: row.created_at,
@@ -102,6 +114,9 @@ export class MapCatalogStore {
           updated_at TEXT NOT NULL
         ) STRICT;
       `);
+      // Additive upgrade for catalogs created before folders existed (no migration table by design).
+      const columns = database.prepare("PRAGMA table_info(map_catalog)").all() as ReadonlyArray<Record<string, unknown>>;
+      if (!columns.some((column) => column.name === "folder")) database.exec("ALTER TABLE map_catalog ADD COLUMN folder TEXT");
       this.database = database;
     } catch (error) {
       database.close();
@@ -119,14 +134,21 @@ export class MapCatalogStore {
     return this.get(id)!;
   }
 
-  updateDetails(assetIdInput: string, input: Readonly<{ name?: string; kind?: MapKind }>) {
+  updateDetails(assetIdInput: string, input: Readonly<{ name?: string; kind?: MapKind; folder?: string | null }>) {
     const database = this.requireDatabase();
     const existing = this.get(assetIdInput);
     if (!existing) throw new Error("Map asset is not registered.");
     const name = input.name === undefined ? existing.name : mapName(input.name);
     const kind = input.kind === undefined ? existing.kind : mapKind(input.kind);
-    database.prepare("UPDATE map_catalog SET name = ?, kind = ?, updated_at = ? WHERE asset_id = ?").run(name, kind, new Date(this.now()).toISOString(), existing.assetId);
+    const folder = input.folder === undefined ? existing.folder : mapFolder(input.folder);
+    database.prepare("UPDATE map_catalog SET name = ?, kind = ?, folder = ?, updated_at = ? WHERE asset_id = ?").run(name, kind, folder, new Date(this.now()).toISOString(), existing.assetId);
     return this.get(existing.assetId)!;
+  }
+
+  renameFolder(from: string, to: string | null) {
+    const source = mapFolder(from);
+    if (source === null) throw new Error("Choose a folder to rename.");
+    this.requireDatabase().prepare("UPDATE map_catalog SET folder = ?, updated_at = ? WHERE folder = ?").run(mapFolder(to), new Date(this.now()).toISOString(), source);
   }
 
   saveCalibration(assetIdInput: string, value: StoredGridCalibration) {
@@ -149,12 +171,12 @@ export class MapCatalogStore {
 
   get(assetIdInput: string) {
     if (!ASSET_ID.test(assetIdInput)) return null;
-    const row = this.requireDatabase().prepare("SELECT asset_id, name, kind, calibration_json, scale_json, created_at, updated_at FROM map_catalog WHERE asset_id = ?").get(assetIdInput) as CatalogRow | undefined;
+    const row = this.requireDatabase().prepare("SELECT asset_id, name, kind, folder, calibration_json, scale_json, created_at, updated_at FROM map_catalog WHERE asset_id = ?").get(assetIdInput) as CatalogRow | undefined;
     return row ? rowToEntry(row) : null;
   }
 
   list() {
-    return (this.requireDatabase().prepare("SELECT asset_id, name, kind, calibration_json, scale_json, created_at, updated_at FROM map_catalog ORDER BY updated_at DESC, asset_id").all() as CatalogRow[]).map(rowToEntry);
+    return (this.requireDatabase().prepare("SELECT asset_id, name, kind, folder, calibration_json, scale_json, created_at, updated_at FROM map_catalog ORDER BY updated_at DESC, asset_id").all() as CatalogRow[]).map(rowToEntry);
   }
 
   close() { this.database?.close(); this.database = undefined; }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 
 export type MapImageState =
   | { status: "loading" }
@@ -72,6 +72,8 @@ export type TokenGlyphProps = Readonly<{
   sizePx: number;
   name: string;
   active?: boolean;
+  /** Optional portrait; drawn clipped to the token circle. Missing or failed loads fall back to initials. */
+  imageUrl?: string | null;
   turnClassName: string;
   bodyClassName: string;
   initialsClassName: string;
@@ -82,16 +84,29 @@ export type TokenGlyphProps = Readonly<{
 }>;
 
 /**
- * The visual content of a map token (turn ring, body, initials, name) shared by the interactive
- * encounter canvas and the read-only shared-screen viewer. Each caller supplies its own class
- * names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs —
+ * The visual content of a map token (turn ring, body, portrait-or-initials, name) shared by the
+ * interactive encounter canvas and the read-only shared-screen viewer. Each caller supplies its own
+ * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs —
  * this component owns only the repeated drawing, not the per-app interaction semantics.
  */
-export function TokenGlyph({ sizePx, name, active, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
+export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
+  const clipId = useId();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [imageUrl]);
+  const radius = sizePx / 2;
+  const showImage = imageUrl != null && imageUrl !== "" && !failed;
   return <>
     {active && <circle className={turnClassName} r={sizePx * 0.64} />}
-    <circle className={bodyClassName} r={sizePx / 2} />
-    <text className={initialsClassName} style={initialsStyle}>{initialsOf(name)}</text>
+    <circle className={bodyClassName} r={radius} />
+    {showImage
+      // The portrait fills the body circle (cover-cropped) with the body ring redrawn on top so the
+      // border stays crisp; a broken/forbidden image falls back to the initials via onError.
+      ? <>
+          <clipPath id={clipId}><circle r={radius} /></clipPath>
+          <image href={imageUrl ?? undefined} x={-radius} y={-radius} width={sizePx} height={sizePx} clipPath={`url(#${clipId})`} preserveAspectRatio="xMidYMid slice" onError={() => setFailed(true)} />
+          <circle className={bodyClassName} r={radius} style={{ fill: "none" }} />
+        </>
+      : <text className={initialsClassName} style={initialsStyle}>{initialsOf(name)}</text>}
     <text className={nameClassName} y={nameY} style={nameStyle}>{name}</text>
   </>;
 }

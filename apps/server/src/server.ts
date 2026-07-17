@@ -26,6 +26,8 @@ import { LoginRateLimiter } from "./login-rate-limit.js";
 import { MapAssetStore } from "./map-assets.js";
 import { MapCatalogStore } from "./map-catalog.js";
 import { createMapRouter } from "./map-http.js";
+import { TokenCatalogStore } from "./token-catalog.js";
+import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
@@ -43,6 +45,7 @@ export type CreateServerOptions = {
   /** Separate SQLite file for integration credentials/audit, distinct from the game-state database. */
   integrationCredentialsPath: string;
   mapAssetsPath?: string;
+  tokenAssetsPath?: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
@@ -66,6 +69,7 @@ const EncounterStartSchema = z.object({
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -116,6 +120,8 @@ export function createServer(options: CreateServerOptions) {
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
   const mapCatalog = new MapCatalogStore(options.databasePath);
+  const tokenAssets = new MapAssetStore(options.tokenAssetsPath ?? join(dirname(options.databasePath), "token-assets"), { maxBytes: 5 * 1024 * 1024, maxDimensionPx: 2048, maxPixels: 2048 * 2048 });
+  const tokenCatalog = new TokenCatalogStore(options.databasePath);
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
   const contentLibrary = new ContentLibrary();
@@ -253,6 +259,17 @@ export function createServer(options: CreateServerOptions) {
       } catch { return false; }
     }
   }));
+  app.use(createTokenRouter({
+    assets: tokenAssets,
+    catalog: tokenCatalog,
+    authorizeGm,
+    authorizePlayer: (token, assetId) => auth.verifyPlayer(token) !== null && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
+    authorizeViewer: (token, assetId) => {
+      if (!token) return false;
+      try { viewerAccess.verify(token); return viewerPresentation.project().enabled && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId); }
+      catch { return false; }
+    }
+  }));
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
     actorDefinitionVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
@@ -383,6 +400,29 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be removed." }); }
+    });
+    socket.on("actor:set-token-image", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set token images." });
+      const request = SetTokenImageSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The token image command is malformed." });
+      try {
+        const { commandId, actorId, tokenAssetId, expectedRevision } = request.data;
+        if (tokenAssetId !== null && !tokenCatalog.get(tokenAssetId)) return acknowledge({ ok: false, message: "That token image is not in your library." });
+        const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision }, (state) => {
+          const actor = state.actors.find((item) => item.id === actorId);
+          if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+          if (tokenAssetId === null) delete actor.tokenAssetId; else actor.tokenAssetId = tokenAssetId;
+        });
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          if (tokenAssetId !== null) {
+            tokenCatalog.touchLastUsed(tokenAssetId);
+            const definitionId = result.state.actors.find((item) => item.id === actorId)?.definitionId;
+            if (definitionId) tokenCatalog.rememberForDefinition(definitionId, tokenAssetId);
+          }
+        }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token image could not be set." }); }
     });
     // GM adjusts anyone's hit points; a player only their own claimed character (checked in the reducer).
     const actorScope = (): ActorScope | null => {
@@ -846,7 +886,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
@@ -856,7 +896,7 @@ export function createServer(options: CreateServerOptions) {
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }

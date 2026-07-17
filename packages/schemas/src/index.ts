@@ -16,6 +16,8 @@ export const ActorSchema = z.object({
   definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional(),
   /** Token footprint in grid cells per side (large 2, huge 3, gargantuan 4); absent means 1. */
   sizeCells: z.number().int().min(1).max(4).optional(),
+  /** Custom uploaded token image (a token-asset id); absent means the initials glyph. Additive. */
+  tokenAssetId: z.string().uuid().optional(),
   /** Active conditions by content-bundle id; `level` is only meaningful for exhaustion (1-6). Tracked and displayed, never auto-applied (ADR-0008 reference level). */
   conditions: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), level: z.number().int().min(1).max(6).optional() }).strict()).max(20).default([])
 });

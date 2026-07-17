@@ -39,7 +39,8 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
         sizePx: token.sizePx,
         active: state.combat.turnActorId === actor.id,
         health: healthBandOf(actor.hp),
-        conditions: conditionLabels(actor)
+        conditions: conditionLabels(actor),
+        ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {})
       }] : [];
     }),
     // The shared screen is a public display, so only `public` annotations reach it; expired

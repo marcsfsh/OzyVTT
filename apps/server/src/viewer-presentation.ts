@@ -46,6 +46,7 @@ export type ViewerEncounterToken = Readonly<{
   active: boolean;
   health: "healthy" | "bloodied" | "down";
   conditions: readonly string[];
+  tokenAssetId?: string;
 }>;
 
 /** Player-safe drawing shown on the shared screen — only `public` annotations are ever projected here. */

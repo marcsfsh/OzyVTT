@@ -216,6 +216,19 @@ export class MapAssetStore {
     return buffer;
   }
 
+  /** Delete an asset's bytes + metadata (queue-serialized with imports). Returns false if it was already gone. */
+  async remove(id: string) {
+    const operation = async () => {
+      const metadata = await this.get(id);
+      if (!metadata) return false;
+      await Promise.all([rm(join(this.originalDirectory, `${id}.${metadata.extension}`), { force: true }), rm(join(this.metadataDirectory, `${id}.json`), { force: true })]);
+      return true;
+    };
+    const result = this.operationQueue.then(operation);
+    this.operationQueue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   private get originalDirectory() { return join(this.rootDirectory, "originals"); }
   private get metadataDirectory() { return join(this.rootDirectory, "metadata"); }
   private get temporaryDirectory() { return join(this.rootDirectory, "temporary"); }
