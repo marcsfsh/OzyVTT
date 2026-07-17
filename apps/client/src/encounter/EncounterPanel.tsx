@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientToServerEvents, GmView, MutationResult, PendingSave, PlayerPendingSave, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
+import { ScenePanel } from "../scenes/ScenePanel";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { CharacterSheet } from "./CharacterSheet";
@@ -165,6 +166,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
+  const [showScenes, setShowScenes] = useState(false);
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [hpActorId, setHpActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
@@ -237,19 +239,17 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
-    <div className="encounter-heading"><div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>{state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}</div>
-    {state.combat.scenes.length >= 1 && <label className="scene-switch">Scene
-      <select value={state.combat.activeSceneId ?? ""} disabled={busy} onChange={(event) => {
-        const sceneId = event.target.value;
-        if (!sceneId || sceneId === state.combat.activeSceneId) return;
-        const target = state.combat.scenes.find((scene) => scene.id === sceneId);
-        if (state.combat.active && !window.confirm(`Switch to “${target?.name ?? "this scene"}”? The current fight is parked and resumes exactly when you switch back.`)) return;
-        void run(() => emitCommand("scene:activate", { commandId: newId(), sceneId }), "Scene switched.");
-      }}>
-        {state.combat.activeSceneId === null && <option value="">Unassigned</option>}
-        {state.combat.scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}{scene.id === state.combat.activeSceneId ? " (live)" : ""}</option>)}
-      </select>
-    </label>}
+    <div className="encounter-heading">
+      <div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>
+      <div className="encounter-heading-tools">
+        {state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}
+        {/* GM scene prep + switch — GM-only; opening it changes nothing for players until a scene is switched live. */}
+        <button type="button" className="encounter-scenes-toggle" aria-pressed={showScenes} title="Prepare and switch scenes (GM only)" onClick={() => setShowScenes((current) => !current)}>🎬 Scenes{state.combat.scenes.length ? ` (${state.combat.scenes.length})` : ""}</button>
+      </div>
+    </div>
+    {showScenes && <div className="encounter-scenes-panel">
+      <ScenePanel scenes={state.combat.scenes} activeSceneId={state.combat.activeSceneId} combatActive={state.combat.active} combatRound={state.combat.round} actors={state.actors} selectedMap={selectedMap} />
+    </div>}
     <DockPicker dock={dock} />
     {!state.combat.active ? <>
       <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>

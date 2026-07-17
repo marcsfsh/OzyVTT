@@ -115,7 +115,14 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <p className="action-applied">Applied to {result.attack.targetName}.</p>
           : <button type="button" className="action-apply" disabled={busy} onClick={() => applyDamage(result.attack!.targetId, result.attack!.targetName, result.damageTotal, result.attack!.targetId)}>Apply {result.damageTotal} to {result.attack.targetName}</button>
       )}
-      {result.save && <p className="action-save-note">Saving-throw {result.save.targets.length === 1 ? "prompt is" : "prompts are"} waiting on {result.save.targets.length} {result.save.targets.length === 1 ? "target" : "targets"} in the turn order — roll or enter each result there and damage/conditions apply automatically.</p>}
+      {result.save && (() => {
+        // Reflect the LIVE count of unanswered saves for this action (matched by attacker + action),
+        // not the frozen resolve-time count — so the note clears as each save is answered in the tracker.
+        const waiting = state.combat.pendingSaves.filter((save) => save.sourceActorId === actor.id && save.actionName === result.actionName).length;
+        return waiting > 0
+          ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order — roll or enter each result there, then confirm to apply.</p>
+          : <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>;
+      })()}
     </div>}
   </div>;
 }
