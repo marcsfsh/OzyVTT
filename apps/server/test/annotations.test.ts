@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { addAnnotation, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationMovable, setAnnotationVisibility } from "../src/annotations.js";
+import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "../src/annotations.js";
 import { createEncounterTokens } from "../src/token-placement.js";
 
 const ACTOR = "60000000-0000-4000-8000-000000000001";
@@ -130,5 +130,35 @@ describe("authoritative annotation geometry", () => {
     setAnnotationVisibility(state, "a0000000-0000-4000-8000-000000000001", "owner-only", null, playerActor);
     expect(state.combat.annotations[0].visibility).toBe("owner-only");
     expect(() => removeAnnotation(state, "does-not-exist", gmActor)).toThrow("no longer exists");
+  });
+
+  it("stores and validates a per-drawing color; a bad hex is rejected", () => {
+    const state = activeState();
+    const shape = addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "shape", shape: "circle", origin: { x: 100, y: 100 }, target: { x: 100, y: 150 }, visibility: "public", color: "#FF6B6B", actor: playerActor, now: 0 }, geometry);
+    expect(shape.color).toBe("#ff6b6b");
+    setAnnotationColor(state, shape.id, "#8fff9a", playerActor);
+    expect(state.combat.annotations[0].color).toBe("#8fff9a");
+    expect(() => setAnnotationColor(state, shape.id, "red", playerActor)).toThrow("#RRGGBB");
+    expect(() => addAnnotation(activeState(), { id: "a0000000-0000-4000-8000-000000000002", kind: "shape", shape: "circle", origin: { x: 0, y: 0 }, target: { x: 0, y: 50 }, visibility: "public", color: "nope", actor: gmActor, now: 0 }, geometry)).toThrow("#RRGGBB");
+  });
+
+  it("points a cone in any direction: both ends snap to cell centers, not to fixed angles", () => {
+    const state = activeState();
+    // Drag ~3 cells right and 1 cell down — a ~18° angle that must survive (not snap to 0/45°).
+    const cone = addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "shape", shape: "cone", origin: { x: 25, y: 25 }, target: { x: 175, y: 75 }, visibility: "public", actor: gmActor, now: 0 }, geometry);
+    expect(cone.geometry.origin).toEqual({ x: 25, y: 25 }); // apex snapped to its cell center
+    expect(cone.geometry.target).toEqual({ x: 175, y: 75 }); // base center snapped to a cell center (3 right, 1 down)
+    const angle = Math.round(Math.atan2(cone.geometry.target.y - cone.geometry.origin.y, cone.geometry.target.x - cone.geometry.origin.x) * 180 / Math.PI);
+    expect(angle % 45).not.toBe(0);
+  });
+
+  it("pings are public, labeled with who sent them, and expire after 4s", () => {
+    const state = activeState();
+    const ping = addPing(state, { id: "a0000000-0000-4000-8000-000000000009", point: { x: 120, y: 130 }, label: "Aria Quickstep", color: "#ffd43f", actor: playerActor, now: 1000 }, geometry);
+    expect(ping.kind).toBe("ping");
+    expect(ping.visibility).toBe("public");
+    expect(ping.label).toBe("Aria Quickstep");
+    expect(ping.expiresAt).toBe(5000);
+    expect(() => addPing(activeState(), { id: "a0000000-0000-4000-8000-00000000000a", point: { x: 5000, y: 5000 }, label: "GM", actor: gmActor, now: 0 }, geometry)).toThrow("inside the map");
   });
 });

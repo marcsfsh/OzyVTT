@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
 import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
-import { AnnotationGlyph, annotationCenter, type AnnotationGlyphData } from "./annotationGlyph";
+import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./encounter-map.css";
@@ -10,7 +10,7 @@ type Actor = GmActor | PlayerActor;
 type Point = EncounterTokenPosition;
 type AnyAnnotation = Annotation | PlayerAnnotation;
 type Camera = Readonly<{ center: Point; zoom: number }>;
-type Tool = "select" | "measure" | AnnotationShapeKind;
+type Tool = "select" | "measure" | "ping" | AnnotationShapeKind;
 type Gesture =
   | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null }>
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
@@ -22,6 +22,7 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
 const TOOLS: ReadonlyArray<{ id: Tool; glyph: string; label: string }> = [
   { id: "select", glyph: "▹", label: "Select and move" },
+  { id: "ping", glyph: "📍", label: "Ping a spot" },
   { id: "measure", glyph: "📏", label: "Measure distance" },
   { id: "circle", glyph: "◯", label: "Place a circle" },
   { id: "cone", glyph: "◭", label: "Place a cone" },
@@ -58,6 +59,14 @@ function emitAnnotationSetMovable(payload: Parameters<ClientToServerEvents["anno
 function emitAnnotationClear(payload: Parameters<ClientToServerEvents["annotation:clear"]>[0]) {
   return new Promise<MutationResult>((resolve) => socket.emit("annotation:clear", payload, resolve));
 }
+function emitAnnotationPing(payload: Parameters<ClientToServerEvents["annotation:ping"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("annotation:ping", payload, resolve));
+}
+function emitAnnotationSetColor(payload: Parameters<ClientToServerEvents["annotation:set-color"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-color", payload, resolve));
+}
+
+const PLAYER_COLORS = ["#58c3ff", "#ff6b6b", "#8fff9a", "#ffd43f", "#c58cff", "#ff9d5c", "#5cf2e0", "#ff8cc6"];
 
 function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
   return role === "gm" || ("mine" in annotation && annotation.mine);
@@ -93,6 +102,10 @@ export function EncounterMap({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [eyeOpen, setEyeOpen] = useState(false);
   const [wrenchOpen, setWrenchOpen] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
+  const [gmLayer, setGmLayer] = useState(false);
+  const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ffb52e" : PLAYER_COLORS[0]));
+  useEffect(() => { localStorage.setItem("vtt.annotation-color", sessionColor); }, [sessionColor]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const trayRef = useRef<HTMLDivElement | null>(null);
@@ -105,6 +118,7 @@ export function EncounterMap({
   const arrowSize = calibration ? calibration.cellSizePx * 0.35 : 12;
   // Labels are drawn in image-pixel units, so scale them to the grid cell (else they read tiny on large maps).
   const labelSize = calibration ? Math.max(16, calibration.cellSizePx * 0.42) : 16;
+  const pingSize = calibration ? calibration.cellSizePx * 0.6 : 26;
 
   useEffect(() => { setGesture(null); setSelectedId(null); }, [assetId, token]);
   useEffect(() => { if (size) setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 }); }, [assetId, size?.width, size?.height]);
@@ -201,14 +215,18 @@ export function EncounterMap({
     catch (error) { setMessage((error as Error).message); }
     finally { setAnnotationBusy(null); }
   };
+  // When the GM layer is active, new drawings go onto it (gm-only) regardless of the eye default.
+  const effectiveVisibility: AnnotationVisibility = role === "gm" && gmLayer ? "gm-only" : defaultVisibility;
   const submitAnnotationAdd = async (kind: "measurement" | "shape", shape: AnnotationShapeKind | undefined, origin: Point, target: Point) => {
     const commandId = newId();
     await runAnnotation("new", async () => {
-      const result = await emitAnnotationAdd({ commandId, kind, shape, geometry: { origin, target }, visibility: defaultVisibility, visibleToActorId: defaultVisibility === "gm-actor" ? defaultActorId : null, movableByOthers: false, expectedRevision: revision });
+      const result = await emitAnnotationAdd({ commandId, kind, shape, geometry: { origin, target }, visibility: effectiveVisibility, visibleToActorId: effectiveVisibility === "gm-actor" ? defaultActorId : null, movableByOthers: false, color: sessionColor, expectedRevision: revision });
       if (result.ok && kind === "shape") { setTool("select"); setSelectedId(commandId); }
       return result;
     }, "That could not be added to the map.");
   };
+  const submitPing = (point: Point) => runAnnotation("ping", () => emitAnnotationPing({ commandId: newId(), point, color: sessionColor, expectedRevision: revision }), "The ping could not be sent.");
+  const setColor = (id: string, color: string) => runAnnotation(id, () => emitAnnotationSetColor({ commandId: newId(), id, color, expectedRevision: revision }), "The color could not be changed.");
   const submitAnnotationMove = (id: string, origin: Point, target: Point) => runAnnotation(id, () => emitAnnotationMove({ commandId: newId(), id, geometry: { origin, target }, expectedRevision: revision }), "That could not be moved.");
   const removeAnnotation = (id: string) => runAnnotation(id, () => emitAnnotationRemove({ commandId: newId(), id, expectedRevision: revision }), "That could not be removed.");
   const setVisibility = (id: string, visibility: AnnotationVisibility, visibleToActorId: string | null) => runAnnotation(id, () => emitAnnotationSetVisibility({ commandId: newId(), id, visibility, visibleToActorId, expectedRevision: revision }), "The visibility could not be changed.");
@@ -219,11 +237,17 @@ export function EncounterMap({
     if (busyActorId) return;
     const target = event.target as Element;
     if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock")) return;
+    if (tool === "ping") {
+      const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
+      event.preventDefault(); void submitPing(point);
+      return;
+    }
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
     const shapeId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && shapeId) {
       const annotation = annotationAt(shapeId);
-      if (annotation && annotation.kind === "shape") {
+      // When the GM works on the GM layer, only GM-layer (gm-only) shapes are interactive.
+      if (annotation && annotation.kind === "shape" && !(role === "gm" && gmLayer && annotation.visibility !== "gm-only")) {
         setSelectedId(shapeId);
         if (canMoveShape(annotation) && handleId) {
           const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
@@ -373,10 +397,19 @@ export function EncounterMap({
               {defaultVisibility === "gm-actor" && <label className="encounter-map-menu-select">Character<select value={defaultActorId ?? ""} onChange={(event) => setDefaultActorId(event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
             </div>}
           </div>
+          <div className="encounter-map-color">
+            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={colorOpen} title={`Your drawing color: ${sessionColor}`} style={{ color: sessionColor }} onClick={() => { setColorOpen((v) => !v); setEyeOpen(false); setWrenchOpen(false); }}>🎨</button>
+            {colorOpen && <div className="encounter-map-menu" role="menu">
+              <p className="encounter-map-menu-title">Your color</p>
+              <div className="encounter-map-swatches">{PLAYER_COLORS.map((swatch) => <button key={swatch} type="button" aria-label={swatch} className={sessionColor.toLowerCase() === swatch ? "selected" : ""} style={{ background: swatch }} onClick={() => { setSessionColor(swatch); setColorOpen(false); }} />)}</div>
+              <label className="encounter-map-menu-select">Custom<input type="color" value={sessionColor} onChange={(event) => setSessionColor(event.target.value)} /></label>
+            </div>}
+          </div>
           <div className="encounter-map-tools">
-            {TOOLS.map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+            {TOOLS.map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && entry.id !== "ping" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
           </div>
           <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active — new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
           <div className="encounter-map-wrench">
             <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
             {wrenchOpen && <div className="encounter-map-menu" role="menu">
@@ -396,14 +429,14 @@ export function EncounterMap({
             const selectedShape = selectedId === annotation.id;
             const editable = tool === "select" && selectedShape && canMoveShape(annotation);
             return <g key={annotation.id} data-annotation-id={annotation.id} className={`annotation-shape visibility-${annotation.visibility}${selectedShape ? " selected" : ""}`}>
-              <AnnotationGlyph data={{ kind: "shape", shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} />
+              <AnnotationGlyph data={{ kind: "shape", shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} color={annotation.color} />
               {editable && <>
                 <circle data-annotation-handle="move" className="annotation-handle annotation-handle-move" cx={annotation.geometry.origin.x} cy={annotation.geometry.origin.y} r={handleRadius} />
                 <circle data-annotation-handle="resize" className="annotation-handle annotation-handle-resize" cx={annotation.geometry.target.x} cy={annotation.geometry.target.y} r={handleRadius} />
               </>}
             </g>;
           })}
-          {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} /></g>}
+          {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} color={sessionColor} /></g>}
 
           {visibleTokens.map((encounterToken) => {
             const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
@@ -414,11 +447,14 @@ export function EncounterMap({
               <TokenGlyph sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
             </g>;
           })}
-          {/* Measurements render above the token layer so a measured line is never hidden behind a piece. */}
+          {/* Measurements and pings render above the token layer so they're never hidden behind a piece. */}
           {annotations.map((annotation) => annotation.kind === "measurement"
-            ? <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} expiring />
+            ? <AnnotationGlyph key={annotation.id} data={{ kind: "measurement", shape: null, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet }} arrowSize={arrowSize} labelSize={labelSize} color={annotation.color} expiring />
             : null)}
-          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
+          {preview && preview.data.kind === "measurement" && <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} color={sessionColor} labelPoint={{ x: preview.snap.target.x, y: preview.snap.target.y }} />}
+          {annotations.map((annotation) => annotation.kind === "ping"
+            ? <PingGlyph key={annotation.id} point={annotation.geometry.origin} color={annotation.color} label={annotation.label} size={pingSize} />
+            : null)}
           {liveTokenDistanceFeet !== null && dragSnappedPoint && dragging?.origin && <g className="encounter-move-guide">
             <line className="encounter-move-line" x1={dragging.origin.x} y1={dragging.origin.y} x2={dragSnappedPoint.x} y2={dragSnappedPoint.y} />
             <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragSnappedPoint.x} y={dragSnappedPoint.y - labelSize * 1.3}>{liveTokenDistanceFeet} ft</text>
@@ -432,6 +468,7 @@ export function EncounterMap({
           return <div className="encounter-shape-editor" role="group" aria-label="Selected shape">
             <div className="encounter-shape-editor-head"><strong>{selected.geometry.sizeFeet}ft {selected.shape}</strong>{center && <span>at {Math.round(center.x)}, {Math.round(center.y)}</span>}</div>
             {manage ? <>
+              <label className="encounter-shape-editor-color">Color<input type="color" value={selected.color} disabled={busy} onChange={(event) => setColor(selected.id, event.target.value)} /></label>
               <label>Visible to<select value={selected.visibility} disabled={busy} onChange={(event) => { const value = event.target.value as AnnotationVisibility; setVisibility(selected.id, value, value === "gm-actor" ? (selected.visibleToActorId ?? characters[0]?.id ?? null) : null); }}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
               {selected.visibility === "gm-actor" && <label>Character<select value={selected.visibleToActorId ?? ""} disabled={busy} onChange={(event) => setVisibility(selected.id, "gm-actor", event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
               <label className="encounter-shape-editor-check"><input type="checkbox" checked={selected.movableByOthers} disabled={busy} onChange={(event) => setMovable(selected.id, event.target.checked)} /> Others can move this</label>

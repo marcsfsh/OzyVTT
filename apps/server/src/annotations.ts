@@ -106,7 +106,7 @@ function resolveVisibility(state: GameState, actor: AnnotationActor, visibility:
 
 export function addAnnotation(
   state: GameState,
-  input: Readonly<{ id: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint; visibility: AnnotationVisibility; visibleToActorId?: string | null; movableByOthers?: boolean; actor: AnnotationActor; now: number }>,
+  input: Readonly<{ id: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint; visibility: AnnotationVisibility; visibleToActorId?: string | null; movableByOthers?: boolean; color?: string; actor: AnnotationActor; now: number }>,
   geometryInput: AnnotationMapGeometry
 ): Annotation {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before measuring or placing shapes.");
@@ -130,11 +130,52 @@ export function addAnnotation(
     visibility: resolved.visibility,
     visibleToActorId: resolved.visibleToActorId,
     movableByOthers: input.kind === "shape" ? (input.movableByOthers ?? false) : false,
+    color: normalizeColor(input.color),
+    label: null,
     createdAt: input.now,
     expiresAt: input.kind === "measurement" ? input.now + 5000 : null
   };
   state.combat = { ...state.combat, annotations: [...pruned, annotation] };
   return annotation;
+}
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+function normalizeColor(color: string | undefined): string {
+  if (color === undefined) return "#58c3ff";
+  if (!HEX_COLOR.test(color)) throw new CommandRejectedError("Color must be a #RRGGBB hex value.");
+  return color.toLowerCase();
+}
+
+/** A transient marker anyone may drop to draw the table's attention; always public, labeled with who sent it, and it fades after 4s. */
+export function addPing(state: GameState, input: Readonly<{ id: string; point: AnnotationPoint; label: string; color?: string; actor: AnnotationActor; now: number }>, geometryInput: AnnotationMapGeometry): Annotation {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before pinging the map.");
+  withinMap(input.point, geometryInput, "The ping");
+  const pruned = state.combat.annotations.filter((existing) => existing.expiresAt === null || existing.expiresAt > input.now);
+  const annotation: Annotation = {
+    id: input.id,
+    kind: "ping",
+    shape: null,
+    geometry: { origin: input.point, target: input.point, sizeFeet: 0 },
+    ownerSessionId: input.actor.sessionId,
+    createdByRole: input.actor.role,
+    visibility: "public",
+    visibleToActorId: null,
+    movableByOthers: false,
+    color: normalizeColor(input.color),
+    label: input.label.slice(0, 60),
+    createdAt: input.now,
+    expiresAt: input.now + 4000
+  };
+  state.combat = { ...state.combat, annotations: [...pruned, annotation] };
+  return annotation;
+}
+
+export function setAnnotationColor(state: GameState, id: string, color: string, actor: AnnotationActor) {
+  const existing = state.combat.annotations.find((annotation) => annotation.id === id);
+  if (!existing) throw new CommandRejectedError("That annotation no longer exists.");
+  requireOwnedOrGm(existing, actor, "recolor");
+  const next = normalizeColor(color);
+  state.combat = { ...state.combat, annotations: state.combat.annotations.map((annotation) => annotation.id === id ? { ...annotation, color: next } : annotation) };
 }
 
 export function moveAnnotation(state: GameState, id: string, origin: AnnotationPoint, target: AnnotationPoint, actor: AnnotationActor, geometryInput: AnnotationMapGeometry) {

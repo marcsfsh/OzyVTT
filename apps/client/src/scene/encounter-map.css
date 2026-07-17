@@ -52,7 +52,12 @@
    enlarged, and OS-fullscreen modes since it lives inside the stage. */
 .encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; max-width: calc(100% - 1.4rem); }
 .encounter-map-tools { display: flex; gap: .3rem; }
-.encounter-map-eye, .encounter-map-wrench { position: relative; }
+.encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
+.encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
+.encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }
+.encounter-map-swatches button.selected { outline: 2px solid #fff; outline-offset: 1px; }
+.encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
+.encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
 .encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; }
 .encounter-map-icon:hover { border-color: #e8a743; }
 .encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
