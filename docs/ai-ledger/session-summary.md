@@ -18,15 +18,21 @@ validation of every bundle), committed bundles, server-side loaders, 11 tests in
 dice-grammar validation of every formula. `check`/`test` (189)/`build` green. Also merged
 PR #32 (dock + declutter) after live verification.
 
-A full audit pass then **cross-validated every statblock against an independent CC-BY copy
-of the SRD text**: exact 330/330 coverage both ways, 0 AC/HP/CR mismatches. Curation that
-came out of it (documented in the package README + ETL tables): excluded `giant-fly` (no
-SRD statblock), restored 25 Tiny sizes open5e flattens to small, fixed octopus CON/CHA
-(modifiers-as-scores) and greater-invisibility's empty description. Bundles now also carry
-**spells (339, structured save/damage/upcast), weapons (38) + property/mastery texts (17),
-armor (13, AC-derivation fields), skills (18), damage types (13), rules glossary (56)**.
+Two audit passes then **cross-validated every statblock against an independent CC-BY copy
+of the SRD text** — round 1: names/size/AC/HP/CR; round 2: all six ability scores, saving
+throws, initiative, attack bonuses (both directions), all 339 spell headers, all 38 weapon
+damage rows. Final result: **zero mismatches on every checked dimension**. Curation that
+came out (documented in the package README + ETL tables): excluded `giant-fly` (no SRD
+statblock), restored 25 Tiny sizes open5e flattens to small, fixed octopus CON/CHA +
+mastiff/swarm-of-rats/octopus save values, restored greater-invisibility's empty
+description, and added a **deterministic prose-attack parser** recovering 33 structured
+attacks (mostly animals) that have no upstream attack rows. Bundles also carry **spells
+(339, structured save/damage/upcast), weapons (38) + property/mastery texts (17), armor
+(13, AC-derivation fields), skills (18), damage types (13), rules glossary (56)**.
 Deliberately not bundled: classes/species/feats/backgrounds/magic items (char-builder/loot
-scope). Attribution wording verified against the SRD's own Legal Information page.
+scope). Attribution wording verified against the SRD's own Legal Information page. Runtime
+proofs: package imports cleanly from the server source tree; live Playwright GM smoke green
+with zero page errors; `npm ls` consistent; ETL hash-deterministic.
 
 **Follow-up:** phase B — GM browses bundle + `actor:add-from-definition` command
 instantiates monsters into encounters (then C HP/damage → D conditions → E action economy →

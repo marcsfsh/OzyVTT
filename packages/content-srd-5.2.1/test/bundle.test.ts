@@ -49,6 +49,32 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(consume?.save).toEqual({ ability: "int", dc: 16 });
   });
 
+  it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    // rat: flat "1 Piercing damage" — attack is structured, damage stays prose-only.
+    const ratBite = byId("rat").actions.find((action) => action.id === "bite");
+    expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
+    expect(ratBite?.damage).toEqual([]);
+    // ankheg: dice primary plus acid rider, parenthetical advantage clause skipped.
+    const ankhegBite = byId("ankheg").actions.find((action) => action.id === "bite");
+    expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5 });
+    expect(ankhegBite?.damage).toEqual([
+      { formula: "2d6 + 3", type: "slashing" },
+      { formula: "1d6", type: "acid" }
+    ]);
+    // djinni storm bolt: ranged, "feet" wording.
+    const stormBolt = byId("djinni").actions.find((action) => action.id === "storm-bolt");
+    expect(stormBolt?.attack).toEqual({ bonus: 9, rangeFeet: 120 });
+    expect(stormBolt?.damage).toEqual([{ formula: "3d8", type: "thunder" }]);
+  });
+
+  it("carries the SRD-printed saving throws where upstream stores modifiers", () => {
+    const savesOf = (id: string) => (monsters.find((monster) => monster.source.externalId === id)!.extensions["open5e.srd-2024"] as { savingThrows: Record<string, number | null> }).savingThrows;
+    expect(savesOf("mastiff").wis).toBe(3);
+    expect(savesOf("swarm-of-rats").dex).toBe(2);
+    expect(savesOf("octopus").con).toBeNull();
+  });
+
   it("carries the SRD-printed tiny sizes that upstream flattens to small", () => {
     const sizeOf = (id: string) => monsters.find((monster) => monster.source.externalId === id)?.size;
     expect(sizeOf("rat")).toBe("tiny");

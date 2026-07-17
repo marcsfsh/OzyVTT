@@ -14,14 +14,19 @@ anything consumes it.
   CreatureActionAttack + CreatureTrait and adapts each stat block into a canonical
   `ActorDefinition` (structured attacks/saves/damage; everything unmodeled stays inert in
   `extensions`/description text per ADR-0008), and maps the spell/equipment/rules fixtures
-  into typed reference records. Deterministic output; **refuses to write if any bundle fails
+  into typed reference records. Attack actions with no structured row upstream (33, mostly
+  animals) are recovered from the standardized 2024 statblock prose by a deterministic
+  parser — a flat-damage primary keeps its damage prose-only so structure never
+  misrepresents the text. Deterministic output; **refuses to write if any bundle fails
   validation**. Upstream data bugs are fixed via reviewed `CORRECTIONS` tables (never by
   editing sources); fixtures open5e mislabels as SRD are dropped via `EXCLUSIONS`.
   Re-run with `npm run build-bundle -w @vtt/content-srd-5.2.1`.
 - `bundles/` — the committed, reviewed bundles:
   - `monsters.v1.json` — all **330** SRD 5.2.1 statblocks (monsters + animals) as
-    `ActorDefinition` v1. Cross-validated statblock-by-statblock against an independent
-    CC-BY copy of the SRD text: exact name coverage both ways, 0 AC/HP/CR mismatches.
+    `ActorDefinition` v1 (423 structured attacks: 390 from upstream rows + 33 prose-
+    recovered). Cross-validated statblock-by-statblock against an independent CC-BY copy of
+    the SRD text: exact name coverage both ways; 0 mismatches on size, AC, HP, CR, all six
+    ability scores, saving throws, initiative, and attack bonuses.
   - `conditions.v1.json` — the 15 SRD conditions as reference text.
   - `spells.v1.json` — all 339 SRD spells with structured casting/save/damage/upcast fields
     plus full text.
@@ -48,7 +53,8 @@ anything consumes it.
   (rat, imp, sprite, will-o'-wisp, ...). The SRD's "Medium or Small" NPC statblocks stay at
   open5e's `small`, which is within the SRD's own dual-size statement.
 - **`octopus`** — upstream stores the CON/CHA *modifiers* (0 / −3) where the scores (11 / 4)
-  belong.
+  belong, plus a garbage CON-save value; **`mastiff`** and **`swarm-of-rats`** store save
+  *modifiers* where the SRD-printed save bonuses belong.
 - **`greater-invisibility`** — upstream ships an empty description; restored from the SRD.
 - Deferred (not bundled): classes, species, feats, backgrounds, magic items — character-build
   and loot content outside this VTT's "not a character builder" scope.

@@ -3800,7 +3800,20 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the ankheg), reach 5 ft. 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13).",
-    "damage": []
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "2d6 + 3",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d6",
+      "type": "acid"
+     }
+    ]
    },
    {
     "id": "acid-spray",
@@ -4449,6 +4462,10 @@
     "name": "Rake",
     "activation": "action",
     "description": "Melee Attack Roll: +1, reach 5 ft. 1 Slashing damage.",
+    "attack": {
+     "bonus": 1,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -4894,6 +4911,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +2, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 2,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -5577,6 +5598,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +4 to hit, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -7232,7 +7257,16 @@
     "name": "Morningstar",
     "activation": "action",
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the bugbear), reach 10 ft. 12 (2d8 + 3) Piercing damage.",
-    "damage": []
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 10
+    },
+    "damage": [
+     {
+      "formula": "2d8 + 3",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -7334,7 +7368,17 @@
     "name": "Light Hammer",
     "activation": "action",
     "description": "Melee or Ranged Attack Roll: +4 (with Advantage if the target is Grappled by the bugbear), reach 10 ft. or range 20/60 ft. 9 (3d4 + 2) Bludgeoning damage.",
-    "damage": []
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 10,
+     "rangeFeet": 20
+    },
+    "damage": [
+     {
+      "formula": "3d4 + 2",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -7626,6 +7670,10 @@
     "name": "Scratch",
     "activation": "action",
     "description": "Melee Attack Roll: +4, reach 5 ft. 1 Slashing damage.",
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -9118,6 +9166,10 @@
     "name": "Claw",
     "activation": "action",
     "description": "Melee Attack Roll: +2, reach 5 ft. 1 Bludgeoning damage.",
+    "attack": {
+     "bonus": 2,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -10002,14 +10054,36 @@
     "name": "Storm Blade",
     "activation": "action",
     "description": "Melee Attack Roll: +9, reach 5 feet. 12 (2d6 + 5) Slashing damage plus 7 (2d6) Lightning damage.",
-    "damage": []
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "2d6 + 5",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "lightning"
+     }
+    ]
    },
    {
     "id": "storm-bolt",
     "name": "Storm Bolt",
     "activation": "action",
     "description": "Ranged Attack Roll: +9, range 120 feet. 13 (3d8) Thunder damage. If the target is a Large or smaller creature, it has the Prone condition.",
-    "damage": []
+    "attack": {
+     "bonus": 9,
+     "rangeFeet": 120
+    },
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "thunder"
+     }
+    ]
    },
    {
     "id": "create-whirlwind",
@@ -10135,7 +10209,16 @@
     "name": "Slam",
     "activation": "action",
     "description": "Melee Attack Roll: +6 (with Advantage during the first round of each combat), reach 5 ft. 11 (2d6 + 4) Bludgeoning damage.",
-    "damage": []
+    "attack": {
+     "bonus": 6,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "2d6 + 4",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "unsettling-visage",
@@ -11052,7 +11135,16 @@
     "name": "Talons",
     "activation": "action",
     "description": "Melee Attack Roll: +4, reach 5 feet. 4 (1d4 + 2) Slashing damage.",
-    "damage": []
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "1d4 + 2",
+      "type": "slashing"
+     }
+    ]
    }
   ],
   "token": {
@@ -12307,6 +12399,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +4, reach 5 ft. 1 Piercing damage plus 5 (2d4) Poison damage.",
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -12393,6 +12489,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +3, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 3,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -14160,6 +14260,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +1, reach 5 ft. 1 Fire damage.",
+    "attack": {
+     "bonus": 1,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -14838,7 +14942,16 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 feet. 5 (1d4 + 3) Piercing damage.",
-    "damage": []
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "1d4 + 3",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -15144,7 +15257,16 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +9 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 22 (3d10 + 6) Piercing damage.",
-    "damage": []
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "3d10 + 6",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -16371,6 +16493,10 @@
     "name": "Ram",
     "activation": "action",
     "description": "Melee Attack Roll: +2, reach 5 ft. 1 Bludgeoning damage, or 2 (1d4) Bludgeoning damage if the goat moved 20+ feet straight toward the target immediately before the hit.",
+    "attack": {
+     "bonus": 2,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -18198,6 +18324,10 @@
     "name": "Talons",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 1 Slashing damage.",
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -19047,6 +19177,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +4, reach 5 ft. 1 Piercing damage, and the target is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target has the Poisoned condition until the end of the homunculus's next turn. Failure by 5 or More: The target has the Poisoned condition for 1 minute. While Poisoned, the target has the Unconscious condition, which ends early if the target takes any damage.",
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
     "save": {
      "ability": "con",
      "dc": 12
@@ -19270,7 +19404,16 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +6 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 14 (3d6 + 4) Piercing damage.",
-    "damage": []
+    "attack": {
+     "bonus": 6,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "3d6 + 4",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -21347,6 +21490,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +2, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 2,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -22156,7 +22303,7 @@
      "dex": 2,
      "con": 1,
      "int": -4,
-     "wis": 1,
+     "wis": 3,
      "cha": -2
     },
     "damageVulnerabilities": null,
@@ -22571,7 +22718,20 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. 7 (1d8 + 3) Piercing damage—or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic—plus 4 (1d8) Acid damage.",
-    "damage": []
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "1d8 + 3",
+      "type": "piercing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -23872,7 +24032,7 @@
     "savingThrows": {
      "str": -3,
      "dex": 2,
-     "con": 30,
+     "con": null,
      "int": -4,
      "wis": 0,
      "cha": -3
@@ -24398,6 +24558,10 @@
     "name": "Talons",
     "activation": "action",
     "description": "Melee Attack Roll: +3, reach 5 ft. 1 Slashing damage.",
+    "attack": {
+     "bonus": 3,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -24883,6 +25047,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -26599,6 +26767,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +2, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 2,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -26685,6 +26857,10 @@
     "name": "Beak",
     "activation": "action",
     "description": "Melee Attack Roll: +4, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -27405,6 +27581,10 @@
     "name": "Tentacle",
     "activation": "action",
     "description": "Melee Attack Roll: +7, reach 60 ft. The target has the Grappled condition (escape DC 14) from one of six tentacles, and the target has the Poisoned condition until the grapple ends. The tentacle can be damaged, freeing a creature it has Grappled when destroyed (AC 20, HP 10, Immunity to Poison and Psychic damage). Damaging the tentacle deals no damage to the roper, and a destroyed tentacle regrows at the start of the roper's next turn.",
+    "attack": {
+     "bonus": 7,
+     "reachFeet": 60
+    },
     "damage": []
    },
    {
@@ -28069,6 +28249,10 @@
     "name": "Sting",
     "activation": "action",
     "description": "Melee Attack Roll: +2, reach 5 ft. 1 Piercing damage plus 3 (1d6) Poison damage.",
+    "attack": {
+     "bonus": 2,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -29753,6 +29937,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +4, reach 5 ft. 1 Piercing damage plus 2 (1d4) Poison damage.",
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],
@@ -29984,6 +30172,10 @@
     "name": "Enchanting Bow",
     "activation": "action",
     "description": "Ranged Attack Roll: +6, range 40/160 ft. 1 Piercing damage, and the target has the Charmed condition until the start of the sprite's next turn.",
+    "attack": {
+     "bonus": 6,
+     "rangeFeet": 40
+    },
     "damage": []
    },
    {
@@ -31194,7 +31386,16 @@
     "name": "Bites",
     "activation": "action",
     "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 8 (2d4 + 3) Piercing damage, or 5 (1d4 + 3) Piercing damage if the swarm is Bloodied.",
-    "damage": []
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
+    "damage": [
+     {
+      "formula": "2d4 + 3",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -31325,7 +31526,7 @@
     "languages": null,
     "savingThrows": {
      "str": -1,
-     "dex": 0,
+     "dex": 2,
      "con": -1,
      "int": -4,
      "wis": 0,
@@ -34075,6 +34276,10 @@
     "name": "Bite",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 1 Piercing damage.",
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
+    },
     "damage": []
    }
   ],

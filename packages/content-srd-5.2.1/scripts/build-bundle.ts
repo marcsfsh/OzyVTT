@@ -140,6 +140,35 @@ const usesSuffix = (action: ActionFields): string => {
 };
 
 /**
+ * Fallback for the 27 attack actions that have no CreatureActionAttack row upstream (mostly
+ * animals): parse the standardized 2024 statblock prose — "Melee Attack Roll: +2, reach
+ * 5 ft. 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage." A flat primary ("1 Piercing
+ * damage") keeps an empty damage list so the structured part never misrepresents the text;
+ * "or ... Bloodied"-style variants deliberately stay prose-only (ADR-0008).
+ */
+type ProseAttack = { bonus: number; reachFeet: number | null; rangeFeet: number | null; damage: { formula: string; type: string }[] };
+const parseProseAttack = (desc: string): ProseAttack | null => {
+  const roll = desc.match(/(?:Melee or Ranged|Melee|Ranged) Attack Roll:\s*([+-]\d+)(?:\s*\([^)]*\))?/);
+  if (!roll) return null;
+  const head = desc.slice(0, 200);
+  const reach = head.match(/reach (\d+) (?:ft|feet)/);
+  const range = head.match(/range (\d+)(?:\/\d+)? (?:ft|feet)/);
+  const damage: { formula: string; type: string }[] = [];
+  const primary = desc.match(/(?:(\d+)\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)|(\d+))\s+([A-Za-z]+) damage/);
+  if (primary && primary[2]) {
+    const type = primary[4].toLowerCase();
+    if ((DAMAGE_TYPES as readonly string[]).includes(type)) {
+      damage.push({ formula: primary[2].replace(/\s*([+-])\s*/, " $1 "), type });
+      for (const extra of desc.matchAll(/plus\s+\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)\s+([A-Za-z]+) damage/g)) {
+        const extraType = extra[2].toLowerCase();
+        if ((DAMAGE_TYPES as readonly string[]).includes(extraType)) damage.push({ formula: extra[1].replace(/\s*([+-])\s*/, " $1 "), type: extraType });
+      }
+    }
+  }
+  return { bonus: Number.parseInt(roll[1], 10), reachFeet: reach ? Number.parseInt(reach[1], 10) : null, rangeFeet: range ? Number.parseInt(range[1], 10) : null, damage };
+};
+
+/**
  * Reviewed exclusions: fixtures open5e labels `srd-2024` that are not actually SRD 5.2.1
  * content. Verified against the SRD 5.2.1 text (repo root `5.2.1 SRD.md`).
  * - giant-fly: the SRD mentions a giant fly only inside the Figurine of Wondrous Power item;
@@ -167,7 +196,12 @@ const TINY_PER_SRD = [
  *   "small" — that value is within the SRD's own dual-size statement.)
  */
 const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
-  "srd-2024_octopus": { ability_score_constitution: 11, ability_score_charisma: 4 },
+  // octopus: CON/CHA modifiers stored as scores; a garbage 30 in the CON save column
+  // (the SRD table prints +0 there, i.e. no proficiency — open5e's convention is null).
+  "srd-2024_octopus": { ability_score_constitution: 11, ability_score_charisma: 4, saving_throw_constitution: null },
+  // mastiff / swarm-of-rats: the save *modifier* stored where the SRD-printed save bonus belongs.
+  "srd-2024_mastiff": { saving_throw_wisdom: 3 },
+  "srd-2024_swarm-of-rats": { saving_throw_dexterity: 2 },
   ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }]))
 };
 
@@ -186,7 +220,7 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk)) throw new Error(`Spell correction targets unknown spell ${pk} — check for a typo or an upstream rename.`);
 }
 
-const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, structuredSaves: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
+const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
 
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
@@ -202,24 +236,31 @@ const monsters: ActorDefinition[] = creatures
     const creatureActions = (actionsByCreature.get(creature.pk) ?? [])
       .sort((left, right) => (left.fields.order_in_statblock ?? 0) - (right.fields.order_in_statblock ?? 0) || left.pk.localeCompare(right.pk))
       .map((action) => {
-        const attack = attackByAction.get(action.pk)?.fields;
+        const row = attackByAction.get(action.pk)?.fields;
+        const prose = row ? null : parseProseAttack(action.fields.desc);
         const save = action.fields.desc.match(SAVE_PATTERN);
         const legendary = action.fields.action_type === "LEGENDARY_ACTION";
         const legendaryPrefix = legendary ? `Legendary Action${(action.fields.legendary_action_cost ?? 1) > 1 ? ` (costs ${action.fields.legendary_action_cost} actions)` : ""}. ` : "";
         // Flat damage (e.g. the octopus's "1 Bludgeoning") has no dice; it stays in the
         // description text per ADR-0008 rather than forcing a fake formula.
-        const damage = attack
+        const damage = row
           ? [
-              ...(attack.damage_die_count && attack.damage_die_type
-                ? [{ formula: formulaOf(attack.damage_die_count, attack.damage_die_type, attack.damage_bonus), type: primaryDamageType(attack, action.fields.desc) }]
+              ...(row.damage_die_count && row.damage_die_type
+                ? [{ formula: formulaOf(row.damage_die_count, row.damage_die_type, row.damage_bonus), type: primaryDamageType(row, action.fields.desc) }]
                 : []),
-              ...(attack.extra_damage_die_count && attack.extra_damage_die_type
-                ? [{ formula: formulaOf(attack.extra_damage_die_count, attack.extra_damage_die_type, attack.extra_damage_bonus), type: attack.extra_damage_type ?? "untyped" }]
+              ...(row.extra_damage_die_count && row.extra_damage_die_type
+                ? [{ formula: formulaOf(row.extra_damage_die_count, row.extra_damage_die_type, row.extra_damage_bonus), type: row.extra_damage_type ?? "untyped" }]
                 : [])
             ]
-          : [];
+          : prose?.damage ?? [];
+        const attack = row
+          ? { bonus: row.to_hit_mod, ...(row.reach !== null ? { reachFeet: row.reach } : {}), ...(row.range !== null ? { rangeFeet: row.range } : {}) }
+          : prose
+            ? { bonus: prose.bonus, ...(prose.reachFeet !== null ? { reachFeet: prose.reachFeet } : {}), ...(prose.rangeFeet !== null ? { rangeFeet: prose.rangeFeet } : {}) }
+            : null;
         report.actionsTotal += 1;
-        if (attack) report.structuredAttacks += 1;
+        if (row) report.structuredAttacks += 1;
+        if (prose) report.proseAttacks += 1;
         if (save) report.structuredSaves += 1;
         for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
         return {
@@ -227,7 +268,7 @@ const monsters: ActorDefinition[] = creatures
           name: `${action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
           activation: action.fields.action_type === "ACTION" ? "action" as const : action.fields.action_type === "BONUS_ACTION" ? "bonus-action" as const : action.fields.action_type === "REACTION" ? "reaction" as const : "other" as const,
           description: `${legendaryPrefix}${action.fields.desc}`.slice(0, 12000),
-          ...(attack ? { attack: { bonus: attack.to_hit_mod, ...(attack.reach !== null ? { reachFeet: attack.reach } : {}), ...(attack.range !== null ? { rangeFeet: attack.range } : {}) } } : {}),
+          ...(attack ? { attack } : {}),
           ...(save ? { save: { ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME], dc: Number.parseInt(save[2], 10) } } : {}),
           damage
         };
@@ -442,7 +483,7 @@ writeFileSync(join(outDir, "rules.v1.json"), `${JSON.stringify(ruleRecords, null
 writeFileSync(join(outDir, "attribution.json"), `${JSON.stringify(attribution, null, 2)}\n`);
 
 console.log(`monsters: ${report.monsters} (all valid; excluded: ${[...EXCLUSIONS].map(slugOf).join(", ") || "none"})`);
-console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks}, structured saves ${report.structuredSaves}`);
+console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks} (+${report.proseAttacks} prose-parsed), structured saves ${report.structuredSaves}`);
 console.log(`conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`);
 console.log(`skills: ${skillRecords.length} | damage types: ${damageTypeRecords.length} | rules: ${ruleRecords.length}`);
 if (report.corrections.length > 0) console.log(`upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`);

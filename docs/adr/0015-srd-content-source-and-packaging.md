@@ -85,18 +85,24 @@ directories.
 
 ## Validation evidence
 
-`packages/content-srd-5.2.1/test/bundle.test.ts` (11 tests): all 330 definitions pass
+`packages/content-srd-5.2.1/test/bundle.test.ts` (13 tests): all 330 definitions pass
 `ActorDefinitionSchema`; every hit-point, damage, and spell formula parses with the
 authoritative `@vtt/rules-5e` grammar; the aboleth stat block spot-checks faithfully (AC 17,
 HP 150 `20d10 + 40`, tentacle +9 reach 15 `2d6 + 5` bludgeoning, Consume Memories save INT
-DC 16); fireball, battleaxe, and breastplate spot-check across the reference bundles;
-monsters are uniformly hostile with bounded footprints; the 15 SRD conditions and the exact
-CC BY 4.0 attribution statement (verified against the SRD's own Legal Information page) are
-present. The full bundle was cross-validated statblock-by-statblock against an independent
-CC-BY copy of the SRD text: exact 330/330 name coverage in both directions and zero
-AC/HP/CR mismatches. Documented curation: `giant-fly` excluded (no SRD statblock — verified
+DC 16); prose-recovered attacks spot-check (rat, ankheg, djinni); fireball, battleaxe, and
+breastplate spot-check across the reference bundles; monsters are uniformly hostile with
+bounded footprints; the 15 SRD conditions and the exact CC BY 4.0 attribution statement
+(verified against the SRD's own Legal Information page) are present. The full bundle was
+cross-validated statblock-by-statblock against an independent CC-BY copy of the SRD text:
+exact 330/330 name coverage in both directions and zero mismatches on size, AC, HP, CR, all
+six ability scores, saving throws, initiative bonuses, and attack bonuses; all 339 spell
+headers (level/school/classes/concentration/ritual) and all 38 weapon damage entries also
+match exactly. Documented curation: `giant-fly` excluded (no SRD statblock — verified
 against the SRD text), 25 Tiny sizes restored (upstream flattens Tiny to small), octopus
-CON/CHA and greater-invisibility description corrected. ETL report: 989 actions adapted —
-390 structured attacks, 184 structured saves. Every bundle (monsters, spells, weapons,
-weapon properties, armor, skills, damage types, rules, conditions, attribution) is validated
-fail-closed before writing. Full workspace `check`/`test`/`build` green (189 tests).
+CON/CHA + three saving-throw values and greater-invisibility's description corrected. ETL
+report: 989 actions adapted — 390 structured attacks from upstream rows plus 33 recovered
+by a deterministic parser over the standardized statblock prose, 184 structured saves.
+Every bundle is validated fail-closed before writing. Full workspace `check`/`test`/`build`
+green (191 tests), `npm ls` dependency tree consistent, ETL output hash-identical across
+consecutive runs, package import proven from the server source tree, and a live Playwright
+GM smoke (sign-in, map + initiative render, turn advance) passes with zero page errors.
