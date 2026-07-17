@@ -9,6 +9,7 @@ import { DicePanel } from "./dice/DicePanel";
 import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/EncounterPanel";
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
+import { ScenePanel } from "./scenes/ScenePanel";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
 import { ViewerControls } from "./viewer/ViewerControls";
@@ -202,6 +203,7 @@ function App() {
       </div>}
 
       {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
+      {mode === "gm" && gmToken && gmTab === "maps" && <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} />}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
 

@@ -9,7 +9,7 @@ import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end";
+type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end" | "scene:activate";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -223,6 +223,18 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
     <div className="encounter-heading"><div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>{state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}</div>
+    {state.combat.scenes.length > 1 && <label className="scene-switch">Scene
+      <select value={state.combat.activeSceneId ?? ""} disabled={busy} onChange={(event) => {
+        const sceneId = event.target.value;
+        if (!sceneId || sceneId === state.combat.activeSceneId) return;
+        const target = state.combat.scenes.find((scene) => scene.id === sceneId);
+        if (state.combat.active && !window.confirm(`Switch to “${target?.name ?? "this scene"}”? The current fight is parked and resumes exactly when you switch back.`)) return;
+        void run(() => emitCommand("scene:activate", { commandId: newId(), sceneId }), "Scene switched.");
+      }}>
+        {state.combat.activeSceneId === null && <option value="">Unassigned</option>}
+        {state.combat.scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}{scene.id === state.combat.activeSceneId ? " (live)" : ""}</option>)}
+      </select>
+    </label>}
     <DockPicker dock={dock} />
     {!state.combat.active ? <>
       <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
