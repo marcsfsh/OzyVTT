@@ -16,7 +16,7 @@
 .tray-token.npc { background: #35432a; }
 .tray-token.npc > span { background: #52623d; }
 .tray-token.hidden { border-style: dashed; opacity: .76; }
-.encounter-map-stage { position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; touch-action: none; }
+.encounter-map-stage { --dock-side-width: 22rem; --dock-strip-height: 16rem; position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; touch-action: none; }
 .encounter-map-stage svg { display: block; width: 100%; max-height: min(72vh, 680px); background: #090806; user-select: none; }
 .encounter-map-stage > p { padding: 2rem; text-align: center; }
 .encounter-token { outline: none; }
@@ -31,9 +31,16 @@
 .encounter-token-name { dominant-baseline: hanging; }
 .encounter-token.movable:focus-visible .encounter-token-body { stroke: #ffcf62; stroke-width: 6; }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
-.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; display: flex; gap: .35rem; }
-.encounter-map-zoom.docked-left { right: auto; left: .7rem; }
-.encounter-map-dock { position: absolute; right: 0; top: 0; bottom: 0; z-index: 2; width: min(24rem, 42%); overflow: auto; padding: .6rem; background: rgb(20 17 12 / 94%); border-left: 1px solid #514936; }
+.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; gap: .35rem; }
+/* Keep the zoom cluster clear of the docked panel: opposite side for a left/right dock, lifted above a bottom strip. */
+.encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; }
+.encounter-map-zoom.zoom-dock-bottom { bottom: calc(var(--dock-strip-height) + .7rem); }
+/* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize. */
+.encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: rgb(20 17 12 / 94%); }
+.encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid #514936; }
+.encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid #514936; }
+.encounter-map-dock.dock-top { top: 0; left: 0; right: 0; height: var(--dock-strip-height); border-bottom: 1px solid #514936; }
+.encounter-map-dock.dock-bottom { bottom: 0; left: 0; right: 0; height: var(--dock-strip-height); border-top: 1px solid #514936; }
 .encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
 .encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-map-zoom button:hover { border-color: #e8a743; }
@@ -78,8 +85,12 @@
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
 .encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
-/* When the initiative panel is docked on the right, slide the shape editor clear of it. */
-.encounter-map-stage.has-right-dock .encounter-shape-editor { right: calc(min(24rem, 42%) + .7rem); }
+/* Slide the overlaid tool cluster (top-left) and shape editor (top-right) clear of a docked panel
+   sharing their edge, so a left/top dock never hides the tools and a right/top dock never hides the editor. */
+.encounter-map-stage.has-dock-left .encounter-map-overlay { left: calc(var(--dock-side-width) + .7rem); }
+.encounter-map-stage.has-dock-top .encounter-map-overlay { top: calc(var(--dock-strip-height) + .7rem); }
+.encounter-map-stage.has-dock-right .encounter-shape-editor { right: calc(var(--dock-side-width) + .7rem); }
+.encounter-map-stage.has-dock-top .encounter-shape-editor { top: calc(var(--dock-strip-height) + .7rem); }
 .encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .encounter-shape-editor-head strong { text-transform: capitalize; }
 .encounter-shape-editor-head span { color: #9f9789; font-size: .7rem; }

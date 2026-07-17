@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
 import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
+import type { DockPosition } from "../encounter/EncounterPanel";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./encounter-map.css";
@@ -73,7 +74,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, rightDock
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, dock
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -84,7 +85,7 @@ export function EncounterMap({
   annotations: readonly AnyAnnotation[];
   revision: number;
   activeActorId: string | null;
-  rightDock?: React.ReactNode;
+  dock?: Readonly<{ node: React.ReactNode; position: DockPosition }>;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -172,13 +173,29 @@ export function EncounterMap({
   };
   const resetView = () => {
     if (!size) return;
-    // The docked Initiative panel overlays the right of the stage; shift the center so the map
-    // lands in the visible (non-docked) area instead of hiding behind the panel.
-    const stage = stageRef.current;
-    const stageWidth = stage?.getBoundingClientRect().width ?? 0;
-    const dockWidth = stage?.querySelector<HTMLElement>(".encounter-map-dock")?.getBoundingClientRect().width ?? 0;
-    const centerX = size.width / 2 + (stageWidth > 0 ? (size.width * dockWidth) / (2 * stageWidth) : 0);
-    setCamera({ center: { x: centerX, y: size.height / 2 }, zoom: 1 });
+    // Frame the whole map in the area the dock leaves visible: treat the dock's inner edge as the new
+    // edge of the canvas, fit the map into that rectangle, and center it there. `baseScale` is the
+    // zoom-1 meet-scale (image px -> screen px), read from the SVG's actual box so letterboxing and
+    // the stage's max-height are accounted for — the earlier stage-width ratio got this wrong.
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    const dockRect = stageRef.current?.querySelector<HTMLElement>(".encounter-map-dock")?.getBoundingClientRect();
+    let center = { x: size.width / 2, y: size.height / 2 };
+    let zoom = 1;
+    if (svgRect && dockRect && svgRect.width > 0 && svgRect.height > 0) {
+      const baseScale = Math.min(svgRect.width / size.width, svgRect.height / size.height);
+      let visibleW = svgRect.width, visibleH = svgRect.height, offsetX = 0, offsetY = 0;
+      if (dock?.position === "right") { visibleW -= dockRect.width; offsetX = -dockRect.width / 2; }
+      else if (dock?.position === "left") { visibleW -= dockRect.width; offsetX = dockRect.width / 2; }
+      else if (dock?.position === "bottom") { visibleH -= dockRect.height; offsetY = -dockRect.height / 2; }
+      else if (dock?.position === "top") { visibleH -= dockRect.height; offsetY = dockRect.height / 2; }
+      if (visibleW > 0 && visibleH > 0 && baseScale > 0) {
+        const fit = Math.min(visibleW / (size.width * baseScale), visibleH / (size.height * baseScale));
+        zoom = Math.max(MIN_ZOOM, Math.min(1, fit));
+        const scale = baseScale * zoom;
+        center = { x: size.width / 2 - offsetX / scale, y: size.height / 2 - offsetY / scale };
+      }
+    }
+    setCamera({ center, zoom });
   };
   const zoomCenter = (factor: number) => { const svg = svgRef.current; if (!svg || !size) return; const rect = svg.getBoundingClientRect(); zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor); };
   const toggleFullscreen = () => { const el = stageRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else { setEnlarged(false); void el.requestFullscreen?.(); } };
@@ -386,7 +403,7 @@ export function EncounterMap({
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
     </div>
-    <div className={`encounter-map-stage${rightDock ? " has-right-dock" : ""}`} ref={stageRef} aria-busy={image.status !== "ready"}>
+    <div className={`encounter-map-stage${dock ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           <div className="encounter-map-eye">
@@ -477,9 +494,9 @@ export function EncounterMap({
           </div>;
         })()}
 
-        {rightDock && <div className="encounter-map-dock">{rightDock}</div>}
+        {dock && <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>}
 
-        <div className={`encounter-map-zoom${rightDock ? " docked-left" : ""}`} role="group" aria-label="Map controls">
+        <div className={`encounter-map-zoom${dock ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
           <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
           <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
           <button type="button" onClick={resetView}>Reset view</button>
