@@ -8,6 +8,7 @@ import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilityS
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
+import { setCondition } from "./actor-conditions.js";
 import { addActorFromDefinition, removeActor } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
@@ -16,7 +17,7 @@ import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } fr
 import { developmentClientUrl } from "./client-hosting.js";
 import { endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
-import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type HpScope } from "./hit-points.js";
+import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -64,6 +65,7 @@ const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.st
 const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -319,13 +321,13 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be removed." }); }
     });
     // GM adjusts anyone's hit points; a player only their own claimed character (checked in the reducer).
-    const hpScope = (): HpScope | null => {
+    const actorScope = (): ActorScope | null => {
       if (auth.verify(socket.handshake.auth.token)) return { role: "gm" };
       const player = auth.verifyPlayer(socket.handshake.auth.token);
       return player ? { role: "player", sessionId: player.sessionId } : null;
     };
     socket.on("actor:apply-damage", async (payload, acknowledge) => {
-      const scope = hpScope();
+      const scope = actorScope();
       if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
       const request = HpAmountSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The damage command is malformed." });
@@ -337,7 +339,7 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The damage could not be applied." }); }
     });
     socket.on("actor:heal", async (payload, acknowledge) => {
-      const scope = hpScope();
+      const scope = actorScope();
       if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
       const request = HpAmountSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The healing command is malformed." });
@@ -349,7 +351,7 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The healing could not be applied." }); }
     });
     socket.on("actor:set-temp-hp", async (payload, acknowledge) => {
-      const scope = hpScope();
+      const scope = actorScope();
       if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
       const request = TempHpSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The temporary hit point command is malformed." });
@@ -359,6 +361,24 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The temporary hit points could not be set." }); }
+    });
+    socket.on("content:conditions", (_payload, acknowledge) => {
+      // Reference text is public information: any joined session (GM or player) may read it.
+      if (!auth.verify(socket.handshake.auth.token) && !auth.verifyPlayer(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Join the table before browsing reference content." });
+      acknowledge({ ok: true, conditions: contentLibrary.conditionSummaries() });
+    });
+    socket.on("actor:set-condition", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking conditions." });
+      const request = SetConditionSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The condition command is malformed." });
+      if (!contentLibrary.hasCondition(request.data.conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled rules." });
+      try {
+        const { commandId, actorId, conditionId, active, level, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision }, (state) => setCondition(state, actorId, conditionId, active, level, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
     });
     socket.on("actor:set-hp", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set hit points directly." });

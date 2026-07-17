@@ -73,6 +73,23 @@
 .health-chip { display: inline-block; margin-left: .5rem; padding: .1rem .45rem; border-radius: 999px; font: 800 .62rem/1.5 sans-serif; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
 .health-bloodied { background: #4a2c10; color: #e8a743; }
 .health-down { background: #43201d; color: #e0897f; }
+/* Conditions: tracked reference state — chips everywhere, a compact picker where editable. */
+.condition-chips { display: inline-flex; flex-wrap: wrap; gap: .25rem; margin-left: .45rem; vertical-align: middle; }
+.condition-chip { display: inline-block; padding: .1rem .5rem; border: 1px solid #5a4d6e; border-radius: 999px; background: #241f2e; color: #c9b8e8; font: 700 .66rem/1.6 sans-serif; letter-spacing: .03em; }
+button.condition-chip { cursor: pointer; }
+button.condition-chip:hover:not(:disabled) { border-color: #a98fd8; }
+button.condition-chip[aria-pressed="true"], .condition-chip-active { background: #3c3151; border-color: #a98fd8; color: #e4d7fa; }
+.condition-add { min-width: 1.5rem; text-align: center; background: transparent; color: #8f8579; border-style: dashed; }
+.condition-editor { margin-top: .35rem; }
+.initiative-list.gm .condition-editor { margin-top: .3rem; }
+.condition-picker { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; padding: .55rem; border: 1px solid #403a2c; border-radius: .5rem; background: #17140f; }
+.condition-option { display: inline-flex; align-items: center; gap: .3rem; }
+.exhaustion-level { display: inline-flex; align-items: center; gap: .25rem; }
+.exhaustion-level button { width: 1.4rem; height: 1.4rem; padding: 0; display: grid; place-items: center; border: 1px solid #6b5e4b; border-radius: .35rem; background: #241f2e; color: #e4d7fa; font-weight: 800; cursor: pointer; }
+.exhaustion-level strong { min-width: 1rem; text-align: center; color: #e4d7fa; font-size: .8rem; }
+.actor-card-conditions { margin: -.4rem 0 .8rem; }
+.actor-card-conditions .condition-chips { margin-left: 0; }
+.you-are-playing .condition-editor { margin-top: .4rem; }
 .encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed #6b5e4b; border-radius: .5rem; background: transparent; color: #e9b861; font-size: .85rem; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: #e8a743; background: #2b2115; }
 /* Monster browser: same overlay pattern as the confirm dialog, sized for a scrollable list. */

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
+import { ConditionChips, ConditionEditor } from "./conditions";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
@@ -54,8 +55,9 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
+        const actorConditions = props.state.actors.find((actor) => actor.id === entry.actorId)?.conditions ?? [];
         return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
-          <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}</span>
+          <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}<ConditionChips conditions={actorConditions} /></span>
           <strong>{entry.score}</strong>
         </li>;
       })}</ol>
@@ -186,6 +188,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
           </div>}
+          {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
         </li>;
       })}</ol>
       <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>

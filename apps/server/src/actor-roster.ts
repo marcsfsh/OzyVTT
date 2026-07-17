@@ -26,6 +26,7 @@ export function addActorFromDefinition(state: GameState, definition: ActorDefini
     armorClass: definition.armorClass,
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
+    conditions: [],
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId: definition.source.externalId
   });

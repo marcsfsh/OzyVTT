@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domain";
 import { useConfirm } from "../components/feedback";
+import { ConditionChips, ConditionEditor } from "../encounter/conditions";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -96,7 +97,7 @@ export function ActorRoster(props: Props) {
       <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
     </div>
     {props.role === "player" && ownedActor && <div className="you-are-playing">
-      <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span></div>
+      <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
       <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
       <button className="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</button>
     </div>}
@@ -109,6 +110,7 @@ export function ActorRoster(props: Props) {
         return <article className={`actor-card${mine ? " actor-card-owned" : ""}`} key={actor.id}>
           <div className="actor-card-title"><div className="actor-monogram" aria-hidden="true">{actor.name.slice(0, 1)}</div><div><h3>{actor.name}{mine && <span className="you-badge">YOU</span>}</h3><span className={`claim-status${mine ? " claim-status-owned" : ""}`}>{status}</span>{actor.presence && <span className={`presence presence-${actor.presence}`} role="status"><span className="presence-dot" aria-hidden="true"></span>{presenceLabel(actor.presence)}</span>}</div></div>
           <dl><div><dt>HP</dt><dd>{hpLabel(actor.hp)}</dd></div><div><dt>AC</dt><dd>{actor.armorClass ?? "—"}</dd></div><div><dt>Initiative</dt><dd>{actor.initiative === undefined ? "—" : actor.initiative >= 0 ? `+${actor.initiative}` : actor.initiative}</dd></div></dl>
+          {actor.conditions.length > 0 && <div className="actor-card-conditions"><ConditionChips conditions={actor.conditions} /></div>}
           {props.role === "player" && (mine
             ? <button className="actor-action actor-release" disabled={busy} onClick={() => release(actor.name)}>Release character</button>
             : <button className="actor-action" disabled={unavailable || busy} onClick={() => ownedActor ? switchTo(actor.id, actor.name, ownedActor.name) : claim(actor.id, actor.name)}>{claiming === actor.id ? (ownedActor ? "Switching…" : "Claiming…") : unavailable ? "Already claimed" : ownedActor ? "Switch to this" : "Claim character"}</button>)}

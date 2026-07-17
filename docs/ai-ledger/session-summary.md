@@ -8,6 +8,30 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Phase D: condition tracking (reference level)
+
+Conditions become trackable state. `Actor.conditions` (additive: `{id, level?}` entries,
+level = exhaustion 1-6). Server: `actor-conditions.ts` `setCondition` reducer (sorted,
+idempotent, level rules) reusing the hp `ActorScope` (renamed from HpScope — GM anyone,
+player own character); handler validates the id against the bundled 15 via ContentLibrary;
+`content:conditions` read (any joined session — reference text is public). Per ADR-0008
+this is reference level: displayed with SRD text, never auto-applied to rolls. Client:
+shared `conditions.tsx` — `ConditionChips` (tooltips carry rules text) + `ConditionEditor`
+(chips + 15-condition picker, exhaustion level stepper), used in GM initiative rows, player
+initiative (client-side join from actors), roster cards, and the you-are-playing card
+(player self-marking). The smoke exposed a cache-poisoning bug (a transient failed fetch
+bricked condition names for the session) — replaced with a never-cache-failure pub-sub that
+retries on picker open.
+
+Verified: check/test (206: +3 condition tests — set/clear/sort/idempotence, exhaustion
+levels + level rejection on others, player scoping + public projection)/build green; live
+Playwright — GM sets/unsets conditions from the row picker, steps Exhaustion to 3 on a PC;
+player sees the chips and self-marks Poisoned; tooltips loaded; narrow-viewport picker; zero
+page errors.
+
+**Follow-up:** Phase E (action economy + End Turn). Token condition badges + viewer
+condition display deferred to a polish pass.
+
 ## 2026-07-17 — Phase C: hit-point tracking with band-safe projections
 
 Server: `hit-points.ts` reducers — `applyDamage` (temp HP absorbs first, floor 0),

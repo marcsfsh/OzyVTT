@@ -1,6 +1,6 @@
-import type { ContentMonsterSummary } from "@vtt/domain";
+import type { ContentConditionSummary, ContentMonsterSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { loadAttribution, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
+import { loadAttribution, loadConditions, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 
 /**
  * Read-only access to the bundled SRD content for command handlers. Loaded once per process;
@@ -35,4 +35,9 @@ export class ContentLibrary {
 
   monsterSummaries(): readonly ContentMonsterSummary[] { return this.summaries; }
   monster(definitionId: string): ActorDefinition | undefined { return this.byId.get(definitionId); }
+  conditionSummaries(): readonly ContentConditionSummary[] { return conditionSummaries; }
+  hasCondition(conditionId: string): boolean { return conditionIds.has(conditionId); }
 }
+
+const conditionSummaries: readonly ContentConditionSummary[] = loadConditions().map(({ id, name, description }) => ({ id, name, description }));
+const conditionIds = new Set(conditionSummaries.map((condition) => condition.id));

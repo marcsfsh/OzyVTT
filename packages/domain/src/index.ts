@@ -167,6 +167,9 @@ export type ActorAddResult = MutationResult & { actorId?: string };
 /** Compact browse row for bundled monster content; the server maps content definitions into this wire shape. */
 export type ContentMonsterSummary = Readonly<{ id: string; name: string; challengeRating: number; type: string; size: string; armorClass: number; hitPoints: number }>;
 export type ContentMonstersResult = { ok: boolean; message?: string; monsters?: readonly ContentMonsterSummary[]; attribution?: string };
+/** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
+export type ContentConditionSummary = Readonly<{ id: string; name: string; description: string }>;
+export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[] };
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -179,6 +182,8 @@ export interface ClientToServerEvents {
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-temp-hp": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
   "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

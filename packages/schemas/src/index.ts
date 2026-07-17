@@ -13,7 +13,9 @@ export const ActorSchema = z.object({
   ownerSessionId: z.string().uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
   /** Provenance: slug of the content-bundle definition this actor was instantiated from (additive; absent for seeded/imported actors). */
-  definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional()
+  definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional(),
+  /** Active conditions by content-bundle id; `level` is only meaningful for exhaustion (1-6). Tracked and displayed, never auto-applied (ADR-0008 reference level). */
+  conditions: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), level: z.number().int().min(1).max(6).optional() }).strict()).max(20).default([])
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
