@@ -4,4 +4,14 @@
 .own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
 .own-hp-tracker button { padding: .5rem .7rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #17140f; color: #f5efe3; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
 .own-hp-tracker button:hover:not(:disabled) { border-color: #e8a743; } .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; } .table-sidebar > .dice-proof { margin-top: auto; } .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; } .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; } @media (min-width: 980px) { .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); align-items: start; }
+/* When the tracker is docked into the map, the sidebar is just the dice panel — stretch it to the
+   map's height and let the dice sit at the bottom so its lower edge lines up with the battlemap. */
+.table-layout.docked { align-items: stretch; } .table-layout.docked .table-sidebar { min-height: 100%; }
 .viewer-preview-toggle { margin-top: .6rem; } }
+
+.roster-minimize { flex: 0 0 auto; align-self: start; padding: .45rem .9rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: #211d16; color: #c8c0b1; font-size: .8rem; font-weight: 700; text-align: center; }
+.roster-minimize:hover { border-color: #e8a743; color: #f5efe3; }
+.roster.collapsed { padding-top: 1.1rem; padding-bottom: 1.1rem; }
+.roster.collapsed .roster-heading { margin: 0; }
+
+.table-status { margin: 0 0 .8rem; color: #9f9789; font-size: .85rem; }

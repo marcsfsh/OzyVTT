@@ -134,5 +134,5 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet — the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
     </div>
-  </div>, document.body);
+  </div>, document.fullscreenElement ?? document.body);
 }

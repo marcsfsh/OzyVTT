@@ -148,6 +148,6 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
         </footer>
       </div>
     </div>,
-    document.body
+    document.fullscreenElement ?? document.body
   );
 }

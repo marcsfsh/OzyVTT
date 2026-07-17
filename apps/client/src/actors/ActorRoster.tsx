@@ -47,6 +47,8 @@ export function ActorRoster(props: Props) {
   const [claiming, setClaiming] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("vtt.roster-collapsed") === "1");
+  const toggleCollapsed = () => setCollapsed((current) => { const next = !current; localStorage.setItem("vtt.roster-collapsed", next ? "1" : "0"); return next; });
   const importFileRef = useRef<HTMLInputElement | null>(null);
 
   const importSheet = (file: File) => {
@@ -106,11 +108,13 @@ export function ActorRoster(props: Props) {
     });
   };
 
-  return <section className="roster" aria-labelledby="roster-heading">
+  return <section className={`roster${collapsed ? " collapsed" : ""}`} aria-labelledby="roster-heading">
     <div className="roster-heading">
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
-      <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
+      {!collapsed && <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>}
+      <button type="button" className="roster-minimize" aria-expanded={!collapsed} aria-controls="roster-body" onClick={toggleCollapsed}>{collapsed ? `Show roster (${actors.length})` : "Minimize"}</button>
     </div>
+    {collapsed ? null : <div id="roster-body">
     {props.role === "gm" && <div className="roster-import">
       <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
       <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</button>
@@ -142,6 +146,7 @@ export function ActorRoster(props: Props) {
       })}
     </div>}
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
+    </div>}
     {dialog}
   </section>;
 }

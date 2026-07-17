@@ -121,7 +121,7 @@
 .token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }
 
 /* Transient battlemap event toasts (top-center, inside the stage so they show enlarged). */
-.map-toast-stack { position: absolute; left: 50%; top: .7rem; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: .35rem; max-width: calc(100% - 1.4rem); pointer-events: none; }
+.map-toast-stack { position: absolute; left: 50%; top: 3.4rem; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: .35rem; max-width: min(90%, 26rem); pointer-events: none; }
 .map-toast { padding: .4rem .85rem; border-radius: 999px; background: rgb(23 19 13 / 94%); border: 1px solid #6b5e4b; color: #f5efe3; font-size: .8rem; font-weight: 700; box-shadow: 0 4px 14px rgb(0 0 0 / 45%); animation: map-toast-in .18s ease-out; }
 .map-toast-damage { border-color: #b5544c; color: #ffb4ab; }
 .map-toast-heal { border-color: #5fbf6f; color: #a7e8b0; }
@@ -132,7 +132,11 @@
 .encounter-token.targetable { cursor: crosshair; }
 .encounter-token.targetable .encounter-token-body { stroke: #ffd27a; stroke-dasharray: 5 4; }
 .encounter-token.targeted .encounter-token-body { stroke: #ffc34d; stroke-width: 6; stroke-dasharray: none; }
-.encounter-target-bar { position: absolute; left: 50%; bottom: .7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: calc(100% - 1.4rem); padding: .5rem .8rem; border: 1px solid #7c633e; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); font-size: .85rem; }
+.encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: .5rem .8rem; border: 1px solid #7c633e; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); font-size: .85rem; }
+/* Center the transient overlays over the MAP area, not the whole stage — when the tracker is docked
+   into the stage, half the width is the dock, so a plain 50% would sit over the initiative list. */
+.encounter-map-stage.has-dock-left .map-toast-stack, .encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
+.encounter-map-stage.has-dock-right .map-toast-stack, .encounter-map-stage.has-dock-right .encounter-target-bar { left: calc(50% - var(--dock-side-width) / 2); }
 .encounter-target-bar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .encounter-target-bar-buttons { display: inline-flex; flex: none; gap: .4rem; }
 .encounter-target-bar-buttons button { padding: .45rem .8rem; font-size: .8rem; text-align: center; }

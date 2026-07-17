@@ -64,6 +64,8 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   // Clamp so the menu stays on-screen near the pointer.
   const style: React.CSSProperties = { left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.max(8, Math.min(y, window.innerHeight - 340)) };
 
+  // In fullscreen, only the fullscreen element's subtree renders — portal into it (not document.body,
+  // which is hidden) so the menu is visible. Falls back to body when not in fullscreen.
   return createPortal(
     <div ref={ref} className="token-context-menu" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
       <div className="token-context-head"><strong>{actor.name}</strong><button type="button" aria-label="Close menu" onClick={onClose}>✕</button></div>
@@ -79,6 +81,6 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       <div className="token-context-conditions"><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
       {feedback && <p className="token-context-feedback" role="status">{feedback}</p>}
     </div>,
-    document.body
+    document.fullscreenElement ?? document.body
   );
 }

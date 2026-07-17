@@ -156,7 +156,7 @@ function App() {
     ? { position: dockPosition, onChange: setDockPosition, width: dockWidth, onWidthChange: setDockWidth, node: showDocked ? encounterPanel : null }
     : undefined;
   return <main>
-    <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>
+    {mode === "home" && <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
     <Notice notice={notice} />
     {mode === "home" && <section className="choices">
@@ -177,9 +177,9 @@ function App() {
         {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}
       </nav>}
 
-      {(mode === "player" || gmTab === "table") && <div className="table-layout">
+      {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
         <section className="table">
-          <div><span className="eyebrow">{mode === "gm" ? "GM VIEW" : "AT THE TABLE"}</span><h2>Battle map</h2><p>{state.combat.active ? `Encounter running · Round ${state.combat.round}` : mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p></div>
+          {!state.combat.active && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
           {state.combat.active && state.combat.mapAssetId ? <EncounterMap
             assetId={state.combat.mapAssetId}
             token={mapToken}
