@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
+import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 import { RichText } from "./RichText";
+import { beginTargeting, clearTargeting, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -18,21 +19,24 @@ const summaryOf = (action: ContentActionSummary) => {
 };
 
 /**
- * The GM's action runner for the current stat-block combatant: pick an action, pick targets,
- * resolve on the server, then apply the proposed damage with explicit taps.
+ * The GM's action runner for the current stat-block combatant: pick an action, pick targets (in the
+ * list here or by clicking tokens on the map — both drive the shared targeting store), resolve on the
+ * server, then apply the proposed damage with explicit taps.
  */
 export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmView; actor: GmActor; onFeedback: (text: string) => void }>) {
   const [actions, setActions] = useState<readonly ContentActionSummary[] | null>(actionCache.get(actor.definitionId ?? "") ?? null);
-  const [picking, setPicking] = useState<ContentActionSummary | null>(null);
-  const [targets, setTargets] = useState<ReadonlySet<string>>(new Set());
-  const [result, setResult] = useState<ActionResolution | null>(null);
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const session = useTargeting();
+  const result = useTargetingResult();
+  const resolveBusy = useTargetingBusy();
+  // Targeting/result in the store belong to this runner only when they're for this attacker.
+  const picking = session && session.attackerId === actor.id ? session : null;
 
   const definitionId = actor.definitionId;
   useEffect(() => {
-    setPicking(null); setResult(null); setTargets(new Set()); setApplied(new Set()); setOpenReference(null);
+    clearTargeting(); setTargetingResult(null); setOpenReference(null);
     if (!definitionId) return;
     const cached = actionCache.get(definitionId);
     if (cached) { setActions(cached); return; }
@@ -42,20 +46,15 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       else onFeedback(response.message ?? "The stat block could not be loaded.");
     });
   }, [definitionId, actor.id, onFeedback]);
+  // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
+  useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
+  // Fresh result (from this runner's Roll or the map confirm bar) clears prior apply bookkeeping.
+  useEffect(() => { setApplied(new Set()); }, [result]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => { const target = state.actors.find((item) => item.id === entry.actorId); return target ? [target] : []; });
 
-  const resolve = () => {
-    if (!picking || targets.size === 0) return;
-    setBusy(true);
-    socket.emit("action:resolve", { commandId: newId(), actorId: actor.id, actionId: picking.id, targetIds: [...targets], expectedRevision: state.revision }, (response) => {
-      setBusy(false);
-      if (!response.ok || !response.resolution) { onFeedback(response.message ?? "The action could not be resolved."); return; }
-      setResult(response.resolution);
-      setPicking(null);
-    });
-  };
+  const resolve = () => resolveTargeting(state.revision, (ok, message) => { if (!ok) onFeedback(message ?? "The action could not be resolved."); });
 
   const applyDamage = (targetId: string, targetName: string, amount: number, key: string) => {
     if (amount <= 0) { setApplied((current) => new Set([...current, key])); return; }
@@ -73,7 +72,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
     {actions && !picking && !result && <ul className="action-list">
       {actions.map((action) => <li key={action.id}>
         {isResolvable(action)
-          ? <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => { setPicking(action); setTargets(new Set()); }}>
+          ? <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => beginTargeting(action, actor.id)}>
               <strong>{action.name}</strong><small>{summaryOf(action)}</small>
             </button>
           : <>
@@ -84,34 +83,24 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             </>}
       </li>)}
     </ul>}
-    {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.name}`}>
-      <p className="action-targeting-head"><strong>{picking.name}</strong> — {picking.attackBonus !== null ? "choose one target" : "choose targets"}</p>
+    {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
+      <p className="action-targeting-head"><strong>{picking.action.name}</strong> — {picking.mode === "single" ? "choose one target (or click a token)" : "choose targets (or click tokens)"}</p>
       <ul className="action-target-list">{combatants.filter((target) => target.id !== actor.id).map((target) => {
-        const checked = targets.has(target.id);
+        const checked = picking.selected.includes(target.id);
         return <li key={target.id}>
           <label className="action-target">
-            <input
-              type={picking.attackBonus !== null ? "radio" : "checkbox"}
-              name="action-target"
-              checked={checked}
-              onChange={() => setTargets((current) => {
-                if (picking.attackBonus !== null) return new Set([target.id]);
-                const next = new Set(current);
-                checked ? next.delete(target.id) : next.add(target.id);
-                return next;
-              })}
-            />
+            <input type={picking.mode === "single" ? "radio" : "checkbox"} name="action-target" checked={checked} onChange={() => toggleTarget(target.id)} />
             <span>{target.name}{target.armorClass !== undefined ? ` (AC ${target.armorClass})` : ""}</span>
           </label>
         </li>;
       })}</ul>
       <div className="action-targeting-buttons">
-        <button type="button" className="secondary" disabled={busy} onClick={() => setPicking(null)}>Back</button>
-        <button type="button" className="encounter-primary" disabled={busy || targets.size === 0} onClick={resolve}>Roll {picking.name}</button>
+        <button type="button" className="secondary" disabled={resolveBusy} onClick={() => clearTargeting()}>Back</button>
+        <button type="button" className="encounter-primary" disabled={resolveBusy || picking.selected.length === 0} onClick={resolve}>Roll {picking.action.name}</button>
       </div>
     </div>}
     {result && <div className="action-result" role="status">
-      <div className="action-result-head"><strong>{result.actionName}</strong><button type="button" className="secondary action-result-close" aria-label="Dismiss result" onClick={() => { setResult(null); setApplied(new Set()); }}>✕</button></div>
+      <div className="action-result-head"><strong>{result.actionName}</strong><button type="button" className="secondary action-result-close" aria-label="Dismiss result" onClick={() => setTargetingResult(null)}>✕</button></div>
       {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
         {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} — {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "no AC on record" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
       </p>}

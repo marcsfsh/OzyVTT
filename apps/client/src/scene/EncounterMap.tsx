@@ -4,6 +4,7 @@ import { footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, sna
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
 import { CharacterSheet } from "../encounter/CharacterSheet";
+import { clearTargeting, resolveTargeting, toggleTarget, useTargeting, useTargetingBusy } from "../encounter/targeting";
 import { TokenContextMenu } from "./TokenContextMenu";
 import type { DockPosition } from "../encounter/EncounterPanel";
 import { newId } from "../lib/ids";
@@ -102,6 +103,10 @@ export function EncounterMap({
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
   const [rulerWhileMoving, setRulerWhileMoving] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
+  // Click-to-target: only the GM resolves actions, so the shared targeting session is inert for players.
+  const targetingSession = useTargeting();
+  const targetingBusy = useTargetingBusy();
+  const activeTargeting = role === "gm" ? targetingSession : null;
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const longPressRef = useRef<{ startX: number; startY: number } | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,7 +166,7 @@ export function EncounterMap({
       if (!svgRef.current || !size) return;
       // Wheeling over an overlaid panel (a docked initiative tracker, an open menu, the shape editor)
       // must scroll that panel, not zoom the map behind it — mirror the pointer-down guard below.
-      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor")) return;
+      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor, .encounter-target-bar")) return;
       event.preventDefault();
       zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
     };
@@ -303,7 +308,7 @@ export function EncounterMap({
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
-    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize")) return;
+    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize, .encounter-target-bar")) return;
     if (tool === "ping") {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); void submitPing(point);
@@ -326,6 +331,13 @@ export function EncounterMap({
       }
     }
     const tokenId = target.closest<HTMLElement>("[data-token-id]")?.dataset.tokenId;
+    // Click-to-target intercepts token pointer-downs while a targeting session is live (GM only):
+    // selecting a target must never start a drag. The attacker itself stays draggable.
+    if (activeTargeting && tokenId && tokensById.has(tokenId) && tokenId !== activeTargeting.attackerId) {
+      event.preventDefault();
+      toggleTarget(tokenId);
+      return;
+    }
     if (tool === "select" && tokenId && tokensById.has(tokenId)) {
       if (!canMove(tokenId)) return;
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
@@ -533,7 +545,9 @@ export function EncounterMap({
             const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
             const movable = tool === "select" && canMove(actor.id);
             const active = activeActorId === actor.id;
-            return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
+            const targetable = activeTargeting !== null && actor.id !== activeTargeting.attackerId;
+            const targeted = targetable && activeTargeting.selected.includes(actor.id);
+            return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
               <TokenGlyph sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
               <TokenStatusBadges sizePx={encounterToken.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map(conditionBadgeLabel)} />
@@ -573,6 +587,17 @@ export function EncounterMap({
           <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>
           <div className={`encounter-map-dock-resize dock-resize-${dock.position}`} role="separator" aria-label="Drag to resize the docked tracker" title="Drag to resize" onPointerDown={beginDockResize} />
         </>}
+
+        {activeTargeting && (() => {
+          const names = activeTargeting.selected.map((id) => actorsById.get(id)?.name ?? "?");
+          return <div className="encounter-target-bar" role="group" aria-label={`Targets for ${activeTargeting.action.name}`}>
+            <span><strong>{activeTargeting.action.name}</strong>{names.length ? ` → ${names.join(", ")}` : activeTargeting.mode === "single" ? " — click a token to target it" : " — click tokens to target them"}</span>
+            <span className="encounter-target-bar-buttons">
+              <button type="button" className="secondary" disabled={targetingBusy} onClick={() => clearTargeting()}>Cancel</button>
+              <button type="button" className="encounter-primary" disabled={targetingBusy || activeTargeting.selected.length === 0} onClick={() => resolveTargeting(revision, (ok, resultMessage) => setMessage(ok ? "" : resultMessage ?? "The action could not be resolved."))}>Roll {activeTargeting.action.name}</button>
+            </span>
+          </div>;
+        })()}
 
         <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
           {dock && <span className="encounter-map-dock-control" role="group" aria-label="Dock the tracker">

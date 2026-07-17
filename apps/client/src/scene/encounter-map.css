@@ -120,6 +120,15 @@
 .token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }
 
+/* Click-to-target: rings while a targeting session is live. Targetable = subtle dashed invite; targeted = solid amber. */
+.encounter-token.targetable { cursor: crosshair; }
+.encounter-token.targetable .encounter-token-body { stroke: #ffd27a; stroke-dasharray: 5 4; }
+.encounter-token.targeted .encounter-token-body { stroke: #ffc34d; stroke-width: 6; stroke-dasharray: none; }
+.encounter-target-bar { position: absolute; left: 50%; bottom: .7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: calc(100% - 1.4rem); padding: .5rem .8rem; border: 1px solid #7c633e; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); font-size: .85rem; }
+.encounter-target-bar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.encounter-target-bar-buttons { display: inline-flex; flex: none; gap: .4rem; }
+.encounter-target-bar-buttons button { padding: .45rem .8rem; font-size: .8rem; text-align: center; }
+
 /* Token right-click / long-press menu — portaled to <body>, so it clears the dock/enlarged stacking contexts. */
 .token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: #17130d; box-shadow: 0 10px 30px rgb(0 0 0 / 60%); }
 .token-context-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
