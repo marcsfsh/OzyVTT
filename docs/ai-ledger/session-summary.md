@@ -8,6 +8,32 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Phase F: targeting + stat-block action resolution
+
+The convergence phase: content + dice + HP + economy meet. Server
+(`action-resolution.ts`, `action:resolve`, GM-only): resolves a definition action — d20 +
+bonus vs the target's AC (nat 20 = crit with dice-only doubling via parsed-term transform,
+nat 1 = fumble, AC-less targets report "unknown" but still propose damage), save actions
+surface DC+ability across up to 20 targets with one damage roll, typed damage parts rolled
+with the authoritative grammar. Every roll lands in the shared history attributed to the
+attacker (visibility gm-only when the attacker is hidden). Economy auto-marks
+(action/bonus on own turn, reactions any time). Damage is PROPOSED, never auto-applied —
+application is an explicit `actor:apply-damage` tap (BUILD_PLAN Propose→Apply ladder), so
+temp-HP absorption etc. ride the existing pipeline. `content:monster-actions` read feeds
+the client. Client: `ActionRunner` under the GM economy strip — stat-block action list
+(structured summary chips; unstructured actions shown as reference rows), radio/checkbox
+target picker with ACs, result card (outcome, damage breakdown, Apply / per-target
+Full-Half-None for saves).
+
+Verified: check/test (216: +6 resolution tests — hit/miss/crit/fumble/unknown-AC, save
+multi-target, hidden-attacker visibility, economy marking, validation)/build green; live
+Playwright — the (GM-only) Goblin Boss's Scimitar hit Borin 19 vs AC 18, damage 3 applied
+through temp HP first (24/28+8 → 24/28+5), rolls in history as "Goblin Boss · Just me
+(GM)"; zero page errors.
+
+**Follow-up:** Phase G (character-sheet panel). PCs still lack definitions, so the runner
+is monster-only until sheet import lands (later phases per ADR-0018).
+
 ## 2026-07-17 — Phase E: turn economy + player End Turn
 
 Action economy becomes tracked state (never enforced — ADR-0008). `CombatState` gains

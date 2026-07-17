@@ -174,6 +174,21 @@ export type ContentMonstersResult = { ok: boolean; message?: string; monsters?: 
 /** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
 export type ContentConditionSummary = Readonly<{ id: string; name: string; description: string }>;
 export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[] };
+/** A definition action flattened for the GM's action runner. Structured fields only where the content has them. */
+export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }> }>;
+export type ContentActionsResult = { ok: boolean; message?: string; actions?: readonly ContentActionSummary[] };
+/** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
+export type ActionResolutionAttack = Readonly<{ targetId: string; targetName: string; total: number; naturalRoll: number; targetAc: number | null; outcome: "crit" | "hit" | "miss" | "fumble" | "unknown" }>;
+export type ActionResolution = Readonly<{
+  actionName: string;
+  activation: "action" | "bonus-action" | "reaction" | "other";
+  attack: ActionResolutionAttack | null;
+  save: { ability: string; dc: number; targets: ReadonlyArray<{ targetId: string; targetName: string }> } | null;
+  damage: ReadonlyArray<{ formula: string; type: string; total: number }>;
+  damageTotal: number;
+  crit: boolean;
+}>;
+export type ActionResolveResult = MutationResult & { resolution?: ActionResolution };
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -188,6 +203,8 @@ export interface ClientToServerEvents {
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
+  "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
+  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
   "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

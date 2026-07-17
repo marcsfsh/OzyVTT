@@ -9,6 +9,7 @@ import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
+import { resolveDefinitionAction } from "./action-resolution.js";
 import { addActorFromDefinition, removeActor } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
@@ -68,6 +69,8 @@ const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string(
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActionResolveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), actionId: z.string().regex(/^[a-z0-9-]+$/).max(120), targetIds: z.array(z.string().uuid()).min(1).max(20), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
@@ -382,6 +385,33 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
+    });
+    socket.on("content:monster-actions", (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse stat blocks." });
+      const request = ContentActionsSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The action lookup is malformed." });
+      const actions = contentLibrary.monsterActionSummaries(request.data.definitionId);
+      if (!actions) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
+      acknowledge({ ok: true, actions });
+    });
+    socket.on("action:resolve", async (payload, acknowledge) => {
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can resolve stat-block actions." });
+      const request = ActionResolveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The action command is malformed." });
+      try {
+        const { commandId, actorId, actionId, targetIds, expectedRevision } = request.data;
+        let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
+        const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision }, (state) => {
+          const attacker = state.actors.find((item) => item.id === actorId);
+          if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
+          const action = contentLibrary.monsterAction(attacker.definitionId, actionId);
+          if (!action) throw new CommandRejectedError("That action is not on the stat block.");
+          resolution = resolveDefinitionAction(state, action, { actorId, targetIds, commandId }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
+        });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The action could not be resolved." }); }
     });
     socket.on("turn:use", async (payload, acknowledge) => {
       const scope = actorScope();

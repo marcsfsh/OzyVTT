@@ -41,8 +41,11 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   surfaces — reference level per ADR-0008). Phase E done: turn economy (`combat.turn`
   action/bonus reset on turn change; per-combatant `reactionsUsed` refreshing at own turn
   start; `turn:use`/`turn:use-reaction`/`turn:end` — player End Turn gated to their own
-  turn; hidden-turn economy stays opaque to players). Next: F targeting + action
-  resolution → G character-sheet panel. Plan reviewed with the owner 2026-07-17.
+  turn; hidden-turn economy stays opaque to players). Phase F done: `action:resolve` —
+  the GM runs a stat-block combatant's actions from the Turn order (attack vs target AC
+  with 2024 crit doubling, save-DC surfacing, typed damage), rolls recorded in the shared
+  history (gm-only for hidden attackers), economy auto-marked, damage applied by explicit
+  tap through the existing hp commands (Propose→Apply). Next: G character-sheet panel. Plan reviewed with the owner 2026-07-17.
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.

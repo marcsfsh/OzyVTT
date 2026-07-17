@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
+import { ActionRunner } from "./ActionRunner";
 import { ConditionChips, ConditionEditor } from "./conditions";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
@@ -216,12 +217,13 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const current = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
         if (!current) return null;
         const reactionUsed = state.combat.reactionsUsed.includes(current.id);
-        return <div className="turn-economy" role="group" aria-label={`Turn resources for ${current.name}`}>
+        return <><div className="turn-economy" role="group" aria-label={`Turn resources for ${current.name}`}>
           <span className="turn-economy-name">{current.name}</span>
           <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
           <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
           <button type="button" className="economy-slot" aria-pressed={reactionUsed} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: current.id, used: !reactionUsed, expectedRevision: state.revision }), reactionUsed ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
-        </div>;
+        </div>
+        <ActionRunner state={state} actor={current} onFeedback={setMessage} /></>;
       })()}
       <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
       <button type="button" className="encounter-end" disabled={busy} onClick={end}>End encounter</button>

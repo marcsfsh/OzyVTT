@@ -1,4 +1,4 @@
-import type { ContentConditionSummary, ContentMonsterSummary } from "@vtt/domain";
+import type { ContentActionSummary, ContentConditionSummary, ContentMonsterSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadAttribution, loadConditions, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 
@@ -37,6 +37,23 @@ export class ContentLibrary {
   monster(definitionId: string): ActorDefinition | undefined { return this.byId.get(definitionId); }
   conditionSummaries(): readonly ContentConditionSummary[] { return conditionSummaries; }
   hasCondition(conditionId: string): boolean { return conditionIds.has(conditionId); }
+  monsterAction(definitionId: string, actionId: string): ActorDefinition["actions"][number] | undefined {
+    return this.byId.get(definitionId)?.actions.find((action) => action.id === actionId);
+  }
+  monsterActionSummaries(definitionId: string): readonly ContentActionSummary[] | undefined {
+    return this.byId.get(definitionId)?.actions.map((action) => ({
+      id: action.id,
+      name: action.name,
+      activation: action.activation,
+      description: action.description,
+      attackBonus: action.attack?.bonus ?? null,
+      reachFeet: action.attack?.reachFeet ?? null,
+      rangeFeet: action.attack?.rangeFeet ?? null,
+      saveAbility: action.save?.ability ?? null,
+      saveDc: action.save?.dc ?? null,
+      damage: action.damage.map((part) => ({ formula: part.formula, type: part.type }))
+    }));
+  }
 }
 
 const conditionSummaries: readonly ContentConditionSummary[] = loadConditions().map(({ id, name, description }) => ({ id, name, description }));
