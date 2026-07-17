@@ -10,8 +10,10 @@ import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/E
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ScenePanel } from "./scenes/ScenePanel";
+import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
+import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
 
@@ -43,6 +45,7 @@ function App() {
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [showViewerPreview, setShowViewerPreview] = useState(false);
+  const previewSceneId = usePreviewScene();
   const [dockPosition, setDockPosition] = useState<DockPosition>(() => {
     const stored = localStorage.getItem("vtt.dock-position");
     if (stored === "top" || stored === "bottom") return "right"; // top/bottom docking was removed; nearest edge is right
@@ -155,6 +158,14 @@ function App() {
   const mapDock = combatMapActive
     ? { position: dockPosition, onChange: setDockPosition, width: dockWidth, onWidthChange: setDockWidth, node: showDocked ? encounterPanel : null }
     : undefined;
+  // GM-private scene staging: when the GM is previewing a prepared scene, the table map renders THAT
+  // scene (its map + staged tokens) for arranging — players and the shared screen are unaffected.
+  const previewScene = mode === "gm" && previewSceneId ? (state as GmView | null)?.combat.scenes.find((scene) => scene.id === previewSceneId) ?? null : null;
+  useEffect(() => {
+    // Drop the preview if its scene was removed or went live (it's the live map then, not a private one).
+    if (previewSceneId && !(mode === "gm" && (state as GmView | null)?.combat.scenes.some((scene) => scene.id === previewSceneId && scene.id !== (state as GmView).combat.activeSceneId))) setPreviewScene(null);
+  }, [previewSceneId, state, mode]);
+  const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
   return <main>
     {mode === "home" && <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
@@ -179,6 +190,16 @@ function App() {
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
         <section className="table">
+          {previewScene ? <>
+            <div className="scene-preview-banner" role="status">
+              <span>Staging <strong>{previewScene.name}</strong> — only you see this. Drag tokens from the tray to place them.</span>
+              <span className="scene-preview-actions">
+                <button type="button" className="encounter-primary" onClick={() => makeSceneLive(previewScene.id)}>Make live</button>
+                <button type="button" className="secondary" onClick={() => setPreviewScene(null)}>Close</button>
+              </span>
+            </div>
+            <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} moveSceneId={previewScene.id} />
+          </> : <>
           {!state.combat.active && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
           {state.combat.active && state.combat.mapAssetId ? <EncounterMap
             assetId={state.combat.mapAssetId}
@@ -193,7 +214,8 @@ function App() {
             reactionsUsed={state.combat.reactionsUsed}
             dock={mapDock}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
-          {mode === "gm" && gmToken && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
+          </>}
+          {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>
         <div className="table-sidebar">
           {!showDocked && encounterPanel}

@@ -15,3 +15,7 @@
 .roster.collapsed .roster-heading { margin: 0; }
 
 .table-status { margin: 0 0 .8rem; color: #9f9789; font-size: .85rem; }
+
+.scene-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; padding: .7rem 1rem; border: 1px solid #d79b3d; border-radius: .6rem; background: linear-gradient(90deg, #2a2115, #1d1a14); color: #f3c77d; font-size: .9rem; }
+.scene-preview-actions { display: flex; gap: .5rem; flex: none; }
+.scene-preview-actions button { padding: .5rem 1rem; text-align: center; }

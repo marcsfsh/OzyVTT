@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "../src/scenes.js";
 import { startEncounter, nextInitiativeTurn } from "../src/encounter.js";
-import { moveEncounterToken } from "../src/token-placement.js";
+import { moveEncounterToken, moveSceneToken } from "../src/token-placement.js";
 import { removeActor } from "../src/actor-roster.js";
 import { projectPlayerCombat } from "../src/projections.js";
 
@@ -60,6 +60,21 @@ describe("scene preparation", () => {
     expect(() => setSceneCombatants(game, IDS.sceneA, [IDS.beta], GEOMETRY)).toThrow(/live/i);
     setSceneCombatants(game, IDS.sceneB, [IDS.alpha, IDS.beta], GEOMETRY);
     expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.alpha, IDS.beta]);
+  });
+});
+
+describe("scene staging (GM-private token placement)", () => {
+  it("moves a token within a prepared scene and rejects staging the live one", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit); // A is live
+    // Stage the parked scene B privately — its token gets a position, and the live top-level is untouched.
+    moveSceneToken(game, IDS.sceneB, IDS.beta, { x: 200, y: 150 }, GEOMETRY);
+    expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.tokens.find((token) => token.actorId === IDS.beta)!.position).toEqual({ x: 200, y: 150 });
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+    // The live scene A can't be staged this way (edit it on the live map instead).
+    expect(() => moveSceneToken(game, IDS.sceneA, IDS.alpha, { x: 10, y: 10 }, GEOMETRY)).toThrow(/live/i);
   });
 });
 

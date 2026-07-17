@@ -32,7 +32,7 @@ import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
-import { ensureEncounterTokens, moveEncounterToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
+import { ensureEncounterTokens, moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
@@ -92,7 +92,7 @@ const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.stri
 const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SceneNameSchema = z.string().trim().min(1).max(120);
 const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -769,11 +769,21 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(socket.handshake.auth.token);
       const player = auth.verifyPlayer(socket.handshake.auth.token);
       if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before moving tokens." });
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before moving tokens." });
+      const { commandId, actorId, position, sceneId, expectedRevision } = request.data;
       try {
+        if (sceneId !== undefined) {
+          // GM staging a prepared (off-table) scene privately. Geometry comes from that scene's own map.
+          if (!gm) return acknowledge({ ok: false, message: "Only the GM can stage a prepared scene." });
+          const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
+          if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
+          const sceneGeometry = await tokenGeometryFor(scene.mapAssetId);
+          const result = await store.execute({ id: commandId, type: "token.move-scene", actorId, expectedRevision }, (state) => moveSceneToken(state, sceneId, actorId, position, sceneGeometry));
+          if (!result.duplicate) await publishGameState(result.state);
+          return acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+        }
+        const mapAssetId = store.snapshot.combat.mapAssetId;
+        if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before moving tokens." });
         const geometry = await tokenGeometryFor(mapAssetId);
-        const { commandId, actorId, position, expectedRevision } = request.data;
         const result = await store.execute({ id: commandId, type: "token.move", actorId, expectedRevision }, (state) => {
           if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
           if (!gm) {

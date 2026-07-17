@@ -80,7 +80,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], dock
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], dock, moveSceneId
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -93,6 +93,8 @@ export function EncounterMap({
   activeActorId: string | null;
   reactionsUsed?: readonly string[];
   dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
+  /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene, not the live encounter. */
+  moveSceneId?: string;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -258,7 +260,7 @@ export function EncounterMap({
     if (busyActorId || !canMove(actorId)) return;
     setBusyActorId(actorId); setMessage("");
     try {
-      const result = await emitMove({ commandId: newId(), actorId, position, expectedRevision: revision });
+      const result = await emitMove({ commandId: newId(), actorId, position, ...(moveSceneId ? { sceneId: moveSceneId } : {}), expectedRevision: revision });
       if (!result.ok) throw new Error(result.message ?? "The token move was rejected.");
       setMessage(position ? "Token moved." : "Token returned to the tray.");
     } catch (error) { setMessage((error as Error).message); }

@@ -3,6 +3,7 @@ import type { GmActor, Scene } from "@vtt/domain";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import type { MapSelection } from "../maps/MapManager";
+import { setPreviewScene } from "./scenePreview";
 import "./scene-panel.css";
 
 type Ack = (result: { ok: boolean; message?: string }) => void;
@@ -73,7 +74,8 @@ export function ScenePanel({ scenes, activeSceneId, combatActive, combatRound, a
           </div>
           {live && <span className="scene-badge">{combatActive ? `Live · Round ${combatRound}` : "Live · staged"}</span>}
           <div className="scene-row-actions">
-            {!live && <button type="button" disabled={busy} onClick={() => emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched.")}>Switch to</button>}
+            {!live && <button type="button" disabled={busy} onClick={() => setPreviewScene(scene.id)}>Preview / edit</button>}
+            {!live && <button type="button" disabled={busy} onClick={() => { if (!combatActive || window.confirm(`Make “${scene.name}” live? Players and the shared screen switch to it now; the current fight is parked and resumes when you switch back.`)) emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched."); }}>Make live</button>}
             <button type="button" className="secondary" disabled={busy} onClick={() => { const next = window.prompt("Rename scene:", scene.name)?.trim(); if (next) emit("scene:rename", { sceneId: scene.id, name: next }, "The scene could not be renamed."); }}>Rename</button>
             {!live && <button type="button" className="secondary" disabled={busy} onClick={() => { if (window.confirm(`Remove “${scene.name}”?`)) emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed."); }}>Remove</button>}
           </div>

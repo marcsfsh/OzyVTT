@@ -107,6 +107,27 @@ export function setActorSize(state: GameState, actorId: string, size: CreatureSi
   }
 }
 
+/**
+ * Moves a token within a PREPARED (non-live) scene while the GM stages it privately — players and the
+ * viewer never see this scene until it goes live. Snaps against that scene's own map. Rejects the
+ * active scene (that one is edited through the normal live token move). GM-only at the command layer.
+ */
+export function moveSceneToken(state: GameState, sceneId: string, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
+  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live — move its tokens on the encounter map instead.");
+  const token = scene.combat.tokens.find((candidate) => candidate.actorId === actorId);
+  if (!token) throw new CommandRejectedError("That combatant is not staged in this scene.");
+  if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y))) throw new CommandRejectedError("Token position must contain finite coordinates.");
+  const nextPosition = position === null ? null : snappedPosition(position, token.sizePx / 2, geometry, token.sizeCells);
+  state.combat = {
+    ...state.combat,
+    scenes: state.combat.scenes.map((candidate) => candidate.id === sceneId
+      ? { ...candidate, combat: { ...candidate.combat, tokens: candidate.combat.tokens.map((entry) => entry.actorId === actorId ? { ...entry, position: nextPosition } : entry) } }
+      : candidate)
+  };
+}
+
 export function moveEncounterToken(state: GameState, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before moving tokens.");
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
