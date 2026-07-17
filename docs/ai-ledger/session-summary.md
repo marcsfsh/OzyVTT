@@ -8,6 +8,29 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Phase G: character sheet (track, never build) — plan complete
+
+`CharacterSheet` overlay: live actor state (HP with in-sheet Dmg/Heal/Temp[/Set], the
+shared ConditionEditor) over the immutable stat block — six abilities with modifiers and
+save bonuses, AC + armor detail, speeds, senses/passive Perception, languages,
+vulnerabilities/resistances/immunities, proficiency, traits and actions as full rules text,
+CC-BY attribution line. Data via GM-gated `content:monster-sheet` (full ActorDefinition;
+inert content). GM opens any combatant by tapping its initiative name; a player opens only
+their own sheet from the you-are-playing card — a player token calling the stat-block fetch
+directly is rejected (smoke-probed live). PC sheets show live data + a "no imported sheet
+yet" note until character import (ADR-018 path) lands. Sheet typeline verified against 2024
+rules quirks (goblins are Small fey, CR shown as 1/4).
+
+Verified: check/test (216)/build green; live Playwright — goblin sheet renders all
+sections, in-sheet heal 5 → 8/10 then damage 2 → 6/10 with the initiative chip tracking,
+PC sheet note shown, player own-sheet works, player stat-block probe rejected ("Only the
+GM can read stat blocks."); zero page errors.
+
+**This completes phases A–G of the SRD combat-content integration** — offline bundle →
+instantiate → HP → conditions → economy/End Turn → action resolution → sheets. Known
+deferred items: token footprints/condition badges on tokens, viewer HP/condition display,
+PC imports (ADR-018), API parity (PR F), movement enforcement.
+
 ## 2026-07-17 — Phase F: targeting + stat-block action resolution
 
 The convergence phase: content + dice + HP + economy meet. Server

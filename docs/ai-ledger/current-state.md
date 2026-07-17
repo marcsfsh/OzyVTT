@@ -45,7 +45,12 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   the GM runs a stat-block combatant's actions from the Turn order (attack vs target AC
   with 2024 crit doubling, save-DC surfacing, typed damage), rolls recorded in the shared
   history (gm-only for hidden attackers), economy auto-marked, damage applied by explicit
-  tap through the existing hp commands (Propose→Apply). Next: G character-sheet panel. Plan reviewed with the owner 2026-07-17.
+  tap through the existing hp commands (Propose→Apply). Phase G done: `CharacterSheet`
+  overlay — live HP/conditions over the full immutable stat block (abilities+saves, senses,
+  languages, immunities, traits, actions, CC-BY line) via GM-gated `content:monster-sheet`;
+  GM opens any combatant from the initiative, a player only their own (server-rejected
+  otherwise; PC sheets stay thin until import). **All seven phases (A–G) of the SRD
+  combat-content integration are complete on `claude/srd-content-pipeline`.** Plan reviewed with the owner 2026-07-17.
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.

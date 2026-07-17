@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ActorSchema, type Actor } from "@vtt/schemas";
 
-export { ACTOR_SCHEMA_VERSION, ActorSchema, type Actor } from "@vtt/schemas";
+export { ACTOR_SCHEMA_VERSION, ActorSchema, type Actor, type ActorDefinition } from "@vtt/schemas";
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
 export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "manual"]);
@@ -177,6 +177,8 @@ export type ContentConditionsResult = { ok: boolean; message?: string; condition
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them. */
 export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }> }>;
 export type ContentActionsResult = { ok: boolean; message?: string; actions?: readonly ContentActionSummary[] };
+/** Full stat-block payload for the GM's sheet view; inert content data, GM-gated. */
+export type ContentSheetResult = { ok: boolean; message?: string; definition?: import("@vtt/schemas").ActorDefinition };
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
 export type ActionResolutionAttack = Readonly<{ targetId: string; targetName: string; total: number; naturalRoll: number; targetAc: number | null; outcome: "crit" | "hit" | "miss" | "fumble" | "unknown" }>;
 export type ActionResolution = Readonly<{
@@ -204,6 +206,7 @@ export interface ClientToServerEvents {
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
+  "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
   "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
   "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

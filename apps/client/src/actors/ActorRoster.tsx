@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domain";
 import { useConfirm } from "../components/feedback";
+import { CharacterSheet } from "../encounter/CharacterSheet";
 import { ConditionChips, ConditionEditor } from "../encounter/conditions";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -45,6 +46,7 @@ export function ActorRoster(props: Props) {
   const [feedback, setFeedback] = useState("");
   const [claiming, setClaiming] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { confirm, dialog } = useConfirm();
   const actors = props.state.actors.filter((actor) => actor.kind === "player-character");
   const ownedActor = props.role === "player" ? actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine") ?? null : null;
@@ -99,8 +101,12 @@ export function ActorRoster(props: Props) {
     {props.role === "player" && ownedActor && <div className="you-are-playing">
       <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
       <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
-      <button className="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</button>
+      <div className="you-are-playing-buttons">
+        <button className="secondary" disabled={busy} onClick={() => setSheetOpen(true)}>View sheet</button>
+        <button className="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</button>
+      </div>
     </div>}
+    {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" onClose={() => setSheetOpen(false)} />}
     {actors.length === 0 ? <p className="roster-empty">No characters have been added yet.</p> : <div className="actor-grid">
       {actors.map((actor) => {
         const playerActor = "claimStatus" in actor ? actor : null;

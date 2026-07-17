@@ -3,6 +3,7 @@ import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
+import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionEditor } from "./conditions";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
@@ -97,6 +98,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
+  const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [hpActorId, setHpActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
   const cancelEditRef = useRef(false);
@@ -195,7 +197,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const down = actor !== undefined && actor.hp.current <= 0;
         return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}`.trim()} aria-current={active ? "step" : undefined}>
           <div className="initiative-row-main">
-            <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}<span>{actor?.name ?? "Removed combatant"}</span>{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
+            <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}{actor ? <button type="button" className="initiative-sheet-link" title={`Open ${actor.name}'s sheet`} onClick={() => setSheetActorId(actor.id)}>{actor.name}</button> : <span>Removed combatant</span>}{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
             <span className="initiative-row-side">
               {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Track hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={hpActorId === entry.actorId} onClick={() => { setHpActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
               {editing
@@ -230,5 +232,6 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
+    {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" onClose={() => setSheetActorId(null)} /> : null; })()}
   </section>;
 }

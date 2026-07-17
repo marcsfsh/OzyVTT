@@ -394,6 +394,14 @@ export function createServer(options: CreateServerOptions) {
       if (!actions) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
       acknowledge({ ok: true, actions });
     });
+    socket.on("content:monster-sheet", (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can read stat blocks." });
+      const request = ContentActionsSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The stat-block lookup is malformed." });
+      const definition = contentLibrary.monster(request.data.definitionId);
+      if (!definition) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
+      acknowledge({ ok: true, definition });
+    });
     socket.on("action:resolve", async (payload, acknowledge) => {
       const gm = auth.verify(socket.handshake.auth.token);
       if (!gm) return acknowledge({ ok: false, message: "Only the GM can resolve stat-block actions." });
