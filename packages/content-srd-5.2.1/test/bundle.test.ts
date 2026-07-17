@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { parseDiceFormula } from "@vtt/rules-5e";
-import { loadAttribution, loadConditions, loadMonsterDefinitions } from "../src/index.js";
+import {
+  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadMonsterDefinitions,
+  loadRules, loadSkills, loadSpells, loadWeaponProperties, loadWeapons
+} from "../src/index.js";
 
 describe("SRD 5.2.1 monster bundle", () => {
   const monsters = loadMonsterDefinitions();
 
-  it("contains the full srd-2024 bestiary", () => {
-    expect(monsters.length).toBe(331);
+  it("contains the full srd-2024 bestiary (330 statblocks, cross-validated against the SRD text)", () => {
+    expect(monsters.length).toBe(330);
     const ids = monsters.map((monster) => monster.source.externalId);
     expect(new Set(ids).size).toBe(monsters.length);
+    // giant-fly is open5e over-inclusion: the SRD 5.2.1 has no such statblock.
+    expect(ids).not.toContain("giant-fly");
   });
 
   it("every definition passes the canonical schema", () => {
@@ -44,6 +49,19 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(consume?.save).toEqual({ ability: "int", dc: 16 });
   });
 
+  it("carries the SRD-printed tiny sizes that upstream flattens to small", () => {
+    const sizeOf = (id: string) => monsters.find((monster) => monster.source.externalId === id)?.size;
+    expect(sizeOf("rat")).toBe("tiny");
+    expect(sizeOf("imp")).toBe("tiny");
+    expect(sizeOf("sprite")).toBe("tiny");
+    expect(sizeOf("will-o-wisp")).toBe("tiny");
+    expect(monsters.filter((monster) => monster.size === "tiny").length).toBe(25);
+    // octopus ability-score correction (upstream stored modifiers)
+    const octopus = monsters.find((monster) => monster.source.externalId === "octopus");
+    expect(octopus?.abilityScores.con).toBe(11);
+    expect(octopus?.abilityScores.cha).toBe(4);
+  });
+
   it("keeps monsters hostile and within token footprint bounds", () => {
     for (const monster of monsters) {
       expect(monster.token.disposition).toBe("hostile");
@@ -53,21 +71,53 @@ describe("SRD 5.2.1 monster bundle", () => {
   });
 });
 
-describe("SRD 5.2.1 conditions", () => {
+describe("SRD 5.2.1 reference bundles", () => {
   it("carries the fifteen standard conditions", () => {
-    const conditions = loadConditions();
-    expect(conditions.map((condition) => condition.id)).toEqual([
+    expect(loadConditions().map((condition) => condition.id)).toEqual([
       "blinded", "charmed", "deafened", "exhaustion", "frightened", "grappled", "incapacitated",
       "invisible", "paralyzed", "petrified", "poisoned", "prone", "restrained", "stunned", "unconscious"
     ]);
   });
+
+  it("carries all 339 spells with faithful structured fields (fireball spot-check)", () => {
+    const spells = loadSpells();
+    expect(spells.length).toBe(339);
+    const fireball = spells.find((spell) => spell.id === "fireball");
+    expect(fireball).toMatchObject({
+      name: "Fireball", level: 3, school: "evocation", concentration: false, ritual: false,
+      attackRoll: false, save: "dex", damage: { roll: "8d6", types: ["fire"] },
+      shape: { type: "sphere", size: 20, unit: "feet" }, classes: ["sorcerer", "wizard"]
+    });
+    expect(fireball!.castingOptions.length).toBeGreaterThanOrEqual(6);
+    expect(fireball!.castingOptions[0].damageRoll).toBe("9d6");
+    for (const spell of spells) if (spell.damage.roll) expect(() => parseDiceFormula(spell.damage.roll!), spell.id).not.toThrow();
+  });
+
+  it("carries the weapon and armor tables (battleaxe and breastplate spot-checks)", () => {
+    const weapons = loadWeapons();
+    expect(weapons.length).toBe(38);
+    expect(weapons.find((weapon) => weapon.id === "battleaxe")).toMatchObject({ category: "martial", damage: { dice: "1d8", type: "slashing" } });
+    expect(loadWeaponProperties().length).toBe(17);
+    const armor = loadArmor();
+    expect(armor.length).toBe(13);
+    expect(armor.find((piece) => piece.id === "breastplate")).toMatchObject({ acBase: 14, addDexModifier: true, dexModifierCap: 2 });
+  });
+
+  it("carries skills, damage types, and the rules glossary", () => {
+    expect(loadSkills().length).toBe(18);
+    expect(loadDamageTypes().length).toBe(13);
+    const rules = loadRules();
+    expect(rules.length).toBe(56);
+    expect(rules.some((rule) => rule.ruleset === "Combat")).toBe(true);
+    expect(rules.some((rule) => rule.name === "Saving Throws")).toBe(true);
+  });
 });
 
 describe("attribution", () => {
-  it("carries the required CC BY 4.0 statement", () => {
+  it("carries the exact CC BY 4.0 statement the SRD requires", () => {
     const attribution = loadAttribution();
     expect(attribution.license).toBe("CC-BY-4.0");
-    expect(attribution.attribution).toContain("System Reference Document 5.2.1");
-    expect(attribution.attribution).toContain("Creative Commons Attribution 4.0");
+    expect(attribution.attribution).toContain("This work includes material from the System Reference Document 5.2.1");
+    expect(attribution.attribution).toContain("https://creativecommons.org/licenses/by/4.0/legalcode");
   });
 });

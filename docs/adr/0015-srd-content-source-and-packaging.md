@@ -45,23 +45,27 @@ Its fixtures are vendored unmodified into
 third-party/OGL publisher data is deliberately excluded). A deterministic build-time ETL
 (`scripts/build-bundle.ts`) joins the fixtures and adapts each stat block into canonical
 `ActorDefinition` v1 JSON per ADR-0007/ADR-0008 — structured attack/save/damage where the
-source is structured, inert text (`extensions`, descriptions) for everything else. The
-generated bundles (`bundles/monsters.v1.json`, `bundles/conditions.v1.json`,
-`bundles/attribution.json`) are committed and reviewed like code; the ETL refuses to write if
-any record fails schema validation. Reviewed corrections for upstream fixture bugs live in
-an explicit `CORRECTIONS` table in the ETL (with the printed SRD values), never as edits to
-the vendored sources. The required CC BY 4.0 attribution ships in the bundle and must be
-shown by any surface that displays the content.
+source is structured, inert text (`extensions`, descriptions) for everything else. Combat-
+and sheet-relevant reference data ships alongside the bestiary: spells (with structured
+save/attack/damage/upcast fields), the weapon and armor tables, weapon property/mastery
+texts, skills, damage types, conditions, and the core-rules glossary. The generated bundles
+under `bundles/` are committed and reviewed like code; the ETL validates every bundle
+fail-closed before writing. Reviewed corrections for upstream fixture bugs live in explicit
+`CORRECTIONS` tables in the ETL (with the printed SRD values), and fixtures open5e mislabels
+as SRD are dropped via an `EXCLUSIONS` list — never edits to the vendored sources. The
+required CC BY 4.0 attribution ships in the bundle and must be shown by any surface that
+displays the content.
 
 ## Consequences and tradeoffs
 
-The app gains a complete offline 2024 bestiary and condition reference under one permissive
-license, at the cost of vendoring ~1.7 MB of source fixtures plus ~0.9 MB of generated
-bundle in git. Regenerating after an upstream refresh is a re-run of the ETL plus a
-reviewable diff. Choosing 2024 (SRD 5.2.1) over 2014 (SRD 5.1) means the older bestiary is
-not bundled; a future OGL 5.1 bundle would be a separate package with its own license
-notice, not a mix-in. Spells, classes, and the markdown rules glossary are deliberately
-deferred until a consumer exists (same pipeline, additive bundles).
+The app gains a complete offline 2024 bestiary, spellbook, equipment tables, and rules
+reference under one permissive license, at the cost of vendoring ~2.7 MB of source fixtures
+plus ~1.6 MB of generated bundles in git. Regenerating after an upstream refresh is a re-run
+of the ETL plus a reviewable diff. Choosing 2024 (SRD 5.2.1) over 2014 (SRD 5.1) means the
+older bestiary is not bundled; a future OGL 5.1 bundle would be a separate package with its
+own license notice, not a mix-in. Classes, species, feats, backgrounds, and magic items are
+deliberately not bundled — character-build and loot content outside the product's "not a
+character builder" scope (revisit only with a concrete consumer).
 
 ## Mobile, security, and visibility impact
 
@@ -81,11 +85,18 @@ directories.
 
 ## Validation evidence
 
-`packages/content-srd-5.2.1/test/bundle.test.ts` (7 tests): all 331 definitions pass
-`ActorDefinitionSchema`; every hit-point and damage formula parses with the authoritative
-`@vtt/rules-5e` grammar; the aboleth stat block spot-checks faithfully (AC 17, HP 150
-`20d10 + 40`, tentacle +9 reach 15 `2d6 + 5` bludgeoning, Consume Memories save INT DC 16);
-monsters are uniformly hostile with bounded footprints; the 15 SRD conditions and the CC BY
-4.0 attribution statement are present. ETL report: 989 actions adapted — 390 structured
-attacks, 184 structured saves; one documented upstream correction (octopus CON/CHA stored
-as modifiers). Full workspace `check`/`test`/`build` green (185 tests).
+`packages/content-srd-5.2.1/test/bundle.test.ts` (11 tests): all 330 definitions pass
+`ActorDefinitionSchema`; every hit-point, damage, and spell formula parses with the
+authoritative `@vtt/rules-5e` grammar; the aboleth stat block spot-checks faithfully (AC 17,
+HP 150 `20d10 + 40`, tentacle +9 reach 15 `2d6 + 5` bludgeoning, Consume Memories save INT
+DC 16); fireball, battleaxe, and breastplate spot-check across the reference bundles;
+monsters are uniformly hostile with bounded footprints; the 15 SRD conditions and the exact
+CC BY 4.0 attribution statement (verified against the SRD's own Legal Information page) are
+present. The full bundle was cross-validated statblock-by-statblock against an independent
+CC-BY copy of the SRD text: exact 330/330 name coverage in both directions and zero
+AC/HP/CR mismatches. Documented curation: `giant-fly` excluded (no SRD statblock — verified
+against the SRD text), 25 Tiny sizes restored (upstream flattens Tiny to small), octopus
+CON/CHA and greater-invisibility description corrected. ETL report: 989 actions adapted —
+390 structured attacks, 184 structured saves. Every bundle (monsters, spells, weapons,
+weapon properties, armor, skills, damage types, rules, conditions, attribution) is validated
+fail-closed before writing. Full workspace `check`/`test`/`build` green (189 tests).

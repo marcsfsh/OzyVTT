@@ -126,6 +126,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -290,6 +292,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -438,6 +442,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -597,6 +603,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -756,6 +764,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -919,6 +929,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -1078,6 +1090,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -1230,6 +1244,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -1378,6 +1394,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -1537,6 +1555,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -1678,6 +1698,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ice Walk",
@@ -1793,6 +1815,8 @@
     "damageResistances": "lightning",
     "damageImmunities": "poison, thunder",
     "conditionImmunities": "exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Air Form",
@@ -1900,6 +1924,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -2043,6 +2069,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -2191,6 +2219,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (4/Day, or 5/Day in Lair)",
@@ -2350,6 +2380,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (4/Day, or 5/Day in Lair)",
@@ -2509,6 +2541,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -2672,6 +2706,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (4/Day, or 5/Day in Lair)",
@@ -2831,6 +2867,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -2983,6 +3021,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -3131,6 +3171,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (4/Day, or 5/Day in Lair)",
@@ -3290,6 +3332,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (4/Day, or 5/Day in Lair)",
@@ -3431,6 +3475,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ice Walk",
@@ -3535,6 +3581,8 @@
     "damageResistances": null,
     "damageImmunities": "poison, psychic",
     "conditionImmunities": "charmed, deafened, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -3623,6 +3671,8 @@
     "damageResistances": null,
     "damageImmunities": "poison, psychic",
     "conditionImmunities": "charmed, deafened, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -3711,6 +3761,8 @@
     "damageResistances": null,
     "damageImmunities": "poison, psychic",
     "conditionImmunities": "charmed, deafened, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -3802,6 +3854,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Tunneler",
@@ -3900,6 +3954,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -4009,6 +4065,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -4102,6 +4160,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -4222,6 +4282,8 @@
     "damageResistances": null,
     "damageImmunities": "psychic",
     "conditionImmunities": "charmed",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -4343,6 +4405,8 @@
     "damageResistances": "poison",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Evasion",
@@ -4425,6 +4489,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -4511,6 +4577,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -4597,6 +4665,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -4683,6 +4753,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Fire Aura",
@@ -4778,6 +4850,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -4796,8 +4870,8 @@
    "externalId": "badger"
   },
   "name": "Badger",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 10,
    "dex": 11,
@@ -4862,6 +4936,8 @@
     "damageResistances": "poison",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -4980,6 +5056,8 @@
     "damageResistances": "cold, lightning",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "charmed, frightened, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Death Throes",
@@ -5099,6 +5177,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -5215,6 +5295,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -5342,6 +5424,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Barbed Hide",
@@ -5454,6 +5538,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -5467,8 +5553,8 @@
    "externalId": "bat"
   },
   "name": "Bat",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 15,
@@ -5533,6 +5619,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -5648,6 +5736,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "frightened, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -5781,6 +5871,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -5867,6 +5959,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Bloodied Frenzy",
@@ -5967,6 +6061,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -6078,6 +6174,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -6178,6 +6276,8 @@
     "damageResistances": null,
     "damageImmunities": "acid, cold, lightning",
     "conditionImmunities": "charmed, deafened, exhaustion, frightened, grappled, prone, restrained",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amorphous",
@@ -6286,6 +6386,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -6372,6 +6474,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -6488,6 +6592,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -6574,6 +6680,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Bloodied Fury",
@@ -6690,6 +6798,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Diabolical Restoration",
@@ -6810,6 +6920,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -6928,6 +7040,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -7044,6 +7158,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -7158,6 +7274,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Abduct",
@@ -7258,6 +7376,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Abduct",
@@ -7377,6 +7497,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -7465,6 +7587,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -7478,8 +7602,8 @@
    "externalId": "cat"
   },
   "name": "Cat",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 3,
    "dex": 15,
@@ -7544,6 +7668,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Jumper",
@@ -7669,6 +7795,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -7782,6 +7910,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Diabolical Restoration",
@@ -7929,6 +8059,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -8035,6 +8167,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -8146,6 +8280,8 @@
     "damageResistances": null,
     "damageImmunities": "acid, poison, psychic",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Acid Absorption",
@@ -8292,6 +8428,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Light Sensitivity",
@@ -8420,6 +8558,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -8512,6 +8652,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -8598,6 +8740,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Training",
@@ -8702,6 +8846,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -8813,6 +8959,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -8926,6 +9074,8 @@
     "damageResistances": null,
     "damageImmunities": "psychic, radiant",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Shielded Mind",
@@ -8944,8 +9094,8 @@
    "externalId": "crab"
   },
   "name": "Crab",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 6,
    "dex": 11,
@@ -9010,6 +9160,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -9101,6 +9253,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hold Breath",
@@ -9192,6 +9346,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -9292,6 +9448,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -9387,6 +9545,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -9486,6 +9646,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -9574,6 +9736,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Agile",
@@ -9688,6 +9852,8 @@
     "damageResistances": "radiant",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Exalted Restoration",
@@ -9785,6 +9951,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -9901,6 +10069,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning, thunder",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Elemental Restoration",
@@ -10025,6 +10195,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -10111,6 +10283,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -10233,6 +10407,8 @@
     "damageResistances": "fire",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -10337,6 +10513,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -10455,6 +10633,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -10584,6 +10764,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -10709,6 +10891,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -10824,6 +11008,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Death Burst",
@@ -10906,6 +11092,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -11018,6 +11206,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, paralyzed, petrified, poisoned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Earth Glide",
@@ -11145,6 +11335,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Elemental Restoration",
@@ -11262,6 +11454,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -11350,6 +11544,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -11463,6 +11659,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Diabolical Restoration",
@@ -11605,6 +11803,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -11725,6 +11925,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -11820,6 +12022,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison",
     "conditionImmunities": "exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Fire Aura",
@@ -11946,6 +12150,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -12041,6 +12247,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning, poison",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Aversion to Fire",
@@ -12075,8 +12283,8 @@
    "externalId": "flying-snake"
   },
   "name": "Flying Snake",
-  "summary": "Small monstrosity, unaligned — CR 0.125",
-  "size": "small",
+  "summary": "Tiny monstrosity, unaligned — CR 0.125",
+  "size": "tiny",
   "abilityScores": {
    "str": 4,
    "dex": 15,
@@ -12141,6 +12349,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -12159,8 +12369,8 @@
    "externalId": "frog"
   },
   "name": "Frog",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 1,
    "dex": 13,
@@ -12225,6 +12435,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -12350,6 +12562,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -12445,6 +12659,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -12549,6 +12765,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, prone",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ooze Cube",
@@ -12666,6 +12884,8 @@
     "damageResistances": "necrotic",
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Stench",
@@ -12795,6 +13015,8 @@
     "damageResistances": "acid, cold, fire, lightning, thunder",
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, frightened, grappled, paralyzed, petrified, poisoned, prone, restrained",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ethereal Sight",
@@ -12919,6 +13141,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13030,6 +13254,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13118,6 +13344,8 @@
     "damageResistances": "poison",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13206,6 +13434,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13292,6 +13522,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Bloodied Fury",
@@ -13385,6 +13617,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13491,6 +13725,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13579,6 +13815,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -13693,6 +13931,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hold Breath",
@@ -13791,6 +14031,8 @@
     "damageResistances": "necrotic, radiant",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13879,6 +14121,8 @@
     "damageResistances": "necrotic, radiant",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -13958,83 +14202,14 @@
     "damageResistances": "fire",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Illumination",
       "description": "The beetle sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet."
      }
     ]
-   }
-  }
- },
- {
-  "schemaId": "vtt.actor-monster",
-  "schemaVersion": 1,
-  "source": {
-   "name": "SRD 5.2.1",
-   "version": "5.2.1",
-   "externalId": "giant-fly"
-  },
-  "name": "Giant Fly",
-  "summary": "Large beast, unaligned — CR 0",
-  "size": "large",
-  "abilityScores": {
-   "str": 14,
-   "dex": 13,
-   "con": 13,
-   "int": 2,
-   "wis": 10,
-   "cha": 3
-  },
-  "proficiencyBonus": 2,
-  "armorClass": 11,
-  "hitPoints": {
-   "maximum": 19,
-   "formula": "3d10 + 3"
-  },
-  "initiativeBonus": 1,
-  "speedFeet": 30,
-  "actions": [],
-  "token": {
-   "disposition": "hostile",
-   "footprint": {
-    "width": 2,
-    "height": 2
-   }
-  },
-  "extensions": {
-   "open5e.srd-2024": {
-    "challengeRating": 0,
-    "experiencePoints": null,
-    "type": "beast",
-    "alignment": "unaligned",
-    "armorDetail": "natural armor",
-    "speeds": {
-     "walk": 30,
-     "swim": null,
-     "fly": 60,
-     "climb": null,
-     "burrow": null,
-     "hover": false
-    },
-    "senses": [
-     "darkvision 60 ft."
-    ],
-    "passivePerception": 10,
-    "languages": null,
-    "savingThrows": {
-     "str": 2,
-     "dex": 1,
-     "con": 1,
-     "int": -4,
-     "wis": 0,
-     "cha": -4
-    },
-    "damageVulnerabilities": null,
-    "damageResistances": null,
-    "damageImmunities": null,
-    "conditionImmunities": null,
-    "traits": []
    }
   }
  },
@@ -14129,6 +14304,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -14226,6 +14403,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -14321,6 +14500,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -14409,6 +14590,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -14509,6 +14692,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Water Breathing",
@@ -14609,6 +14794,8 @@
     "damageResistances": "necrotic, radiant",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -14693,6 +14880,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -14809,6 +14998,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -14902,6 +15093,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Water Breathing",
@@ -14993,6 +15186,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Water Breathing",
@@ -15097,6 +15292,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -15201,6 +15398,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -15298,6 +15497,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -15386,6 +15587,8 @@
     "damageResistances": "necrotic",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -15477,6 +15680,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -15570,6 +15775,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -15659,6 +15866,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -15763,6 +15972,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Aberrant Ground",
@@ -15885,6 +16096,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Demonic Restoration",
@@ -16006,6 +16219,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16117,6 +16332,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16196,6 +16413,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16321,6 +16540,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16417,6 +16638,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16528,6 +16751,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16646,6 +16871,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -16761,6 +16988,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -16849,6 +17078,8 @@
     "damageResistances": "acid, cold, fire",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amorphous",
@@ -16969,6 +17200,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -17076,6 +17309,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -17196,6 +17431,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -17291,6 +17528,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -17379,6 +17618,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -17466,6 +17707,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -17576,6 +17819,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -17689,6 +17934,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, paralyzed, poisoned, restrained",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Celestial Restoration",
@@ -17808,6 +18055,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Draconic Origin",
@@ -17910,6 +18159,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -17923,8 +18174,8 @@
    "externalId": "hawk"
   },
   "name": "Hawk",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 5,
    "dex": 16,
@@ -17987,6 +18238,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -18093,6 +18346,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -18200,6 +18455,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Demonic Restoration",
@@ -18322,6 +18579,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -18415,6 +18674,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -18513,6 +18774,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hold Breath",
@@ -18629,6 +18892,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Aura of Authority",
@@ -18738,6 +19003,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -18756,8 +19023,8 @@
    "externalId": "homunculus"
   },
   "name": "Homunculus",
-  "summary": "Small construct, neutral — CR 0",
-  "size": "small",
+  "summary": "Tiny construct, neutral — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 4,
    "dex": 15,
@@ -18826,6 +19093,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Telepathic Bond",
@@ -18953,6 +19222,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Diabolical Restoration",
@@ -19041,6 +19312,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Water Breathing",
@@ -19141,6 +19414,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hold Breath",
@@ -19242,6 +19517,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -19366,6 +19643,8 @@
     "damageResistances": null,
     "damageImmunities": "cold, fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Diabolical Restoration",
@@ -19481,6 +19760,8 @@
     "damageResistances": null,
     "damageImmunities": "cold, poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Death Burst",
@@ -19499,8 +19780,8 @@
    "externalId": "imp"
   },
   "name": "Imp",
-  "summary": "Small fiend, lawful evil — CR 1",
-  "size": "small",
+  "summary": "Tiny fiend, lawful evil — CR 1",
+  "size": "tiny",
   "abilityScores": {
    "str": 6,
    "dex": 17,
@@ -19588,6 +19869,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -19706,6 +19989,8 @@
     "damageResistances": "cold, fire, poison, psychic",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Succubus Form",
@@ -19817,6 +20102,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Air Form",
@@ -19948,6 +20235,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison, psychic",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Fire Absorption",
@@ -20049,6 +20338,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -20137,6 +20428,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hold Breath",
@@ -20258,6 +20551,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -20347,6 +20642,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -20502,6 +20799,8 @@
     "damageResistances": null,
     "damageImmunities": "cold, lightning",
     "conditionImmunities": "frightened, grappled, paralyzed, restrained",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -20635,6 +20934,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -20723,6 +21024,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "charmed, frightened, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hellish Restoration",
@@ -20879,6 +21182,8 @@
     "damageResistances": "cold, lightning",
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (4/Day, or 5/Day in Lair)",
@@ -20994,6 +21299,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -21016,8 +21323,8 @@
    "externalId": "lizard"
   },
   "name": "Lizard",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 11,
@@ -21082,6 +21389,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -21202,6 +21511,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -21301,6 +21612,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Death Burst",
@@ -21401,6 +21714,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Death Burst",
@@ -21510,6 +21825,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -21621,6 +21938,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -21741,6 +22060,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Demonic Restoration",
@@ -21842,6 +22163,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -21980,6 +22303,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -22067,6 +22392,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -22200,6 +22527,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -22307,6 +22636,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": "prone",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Adhesive (Object Form Only)",
@@ -22416,6 +22747,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -22520,6 +22853,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -22606,6 +22941,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Beast of Burden",
@@ -22717,6 +23054,8 @@
     "damageResistances": null,
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -22874,6 +23213,8 @@
     "damageResistances": null,
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -23007,6 +23348,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "frightened, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Demonic Restoration",
@@ -23132,6 +23475,8 @@
     "damageResistances": "cold, fire",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -23234,6 +23579,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Confer Fire Resistance",
@@ -23336,6 +23683,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -23431,6 +23780,8 @@
     "damageResistances": "acid",
     "damageImmunities": "lightning",
     "conditionImmunities": "charmed, deafened, exhaustion, frightened, grappled, prone, restrained",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amorphous",
@@ -23530,6 +23881,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Compression",
@@ -23644,6 +23997,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -23732,6 +24087,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Undead Fortitude",
@@ -23869,6 +24226,8 @@
     "damageResistances": "cold",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Regeneration",
@@ -24000,6 +24359,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -24013,8 +24374,8 @@
    "externalId": "owl"
   },
   "name": "Owl",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 3,
    "dex": 13,
@@ -24079,6 +24440,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -24179,6 +24542,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -24274,6 +24639,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -24360,6 +24727,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -24462,6 +24831,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ethereal Sight",
@@ -24488,8 +24859,8 @@
    "externalId": "piranha"
   },
   "name": "Piranha",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 16,
@@ -24554,6 +24925,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Water Breathing",
@@ -24664,6 +25037,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -24791,6 +25166,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -24929,6 +25306,8 @@
     "damageResistances": "cold",
     "damageImmunities": "fire, poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Diabolical Restoration",
@@ -25066,6 +25445,8 @@
     "damageResistances": "radiant",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Divine Awareness",
@@ -25165,6 +25546,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Hold Breath",
@@ -25265,6 +25648,8 @@
     "damageResistances": "cold",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -25351,6 +25736,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -25474,6 +25861,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -25590,6 +25979,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -25603,8 +25994,8 @@
    "externalId": "pseudodragon"
   },
   "name": "Pseudodragon",
-  "summary": "Small dragon, neutral good — CR 0.25",
-  "size": "small",
+  "summary": "Tiny dragon, neutral good — CR 0.25",
+  "size": "tiny",
   "abilityScores": {
    "str": 6,
    "dex": 15,
@@ -25697,6 +26088,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -25788,6 +26181,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Flyby",
@@ -25916,6 +26311,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Tunneler",
@@ -25934,8 +26331,8 @@
    "externalId": "quasit"
   },
   "name": "Quasit",
-  "summary": "Small fiend, chaotic evil — CR 1",
-  "size": "small",
+  "summary": "Tiny fiend, chaotic evil — CR 1",
+  "size": "tiny",
   "abilityScores": {
    "str": 5,
    "dex": 17,
@@ -26034,6 +26431,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -26152,6 +26551,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Fiendish Restoration",
@@ -26174,8 +26575,8 @@
    "externalId": "rat"
   },
   "name": "Rat",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 11,
@@ -26240,6 +26641,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Agile",
@@ -26258,8 +26661,8 @@
    "externalId": "raven"
   },
   "name": "Raven",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 14,
@@ -26322,6 +26725,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Mimicry",
@@ -26438,6 +26843,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -26526,6 +26933,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -26635,6 +27044,8 @@
     "damageResistances": null,
     "damageImmunities": "cold, fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Heat Aura",
@@ -26726,6 +27137,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -26812,6 +27225,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -26928,6 +27343,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -27037,6 +27454,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -27162,6 +27581,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Iron Scent",
@@ -27269,6 +27690,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Running Leap",
@@ -27376,6 +27799,8 @@
     "damageResistances": "acid, cold",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Blood Frenzy",
@@ -27496,6 +27921,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Fire Aura",
@@ -27598,6 +28025,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -27616,8 +28045,8 @@
    "externalId": "scorpion"
   },
   "name": "Scorpion",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 11,
@@ -27682,6 +28111,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -27791,6 +28222,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -27897,6 +28330,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -27919,8 +28354,8 @@
    "externalId": "seahorse"
   },
   "name": "Seahorse",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 1,
    "dex": 12,
@@ -27983,6 +28418,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Water Breathing",
@@ -28083,6 +28520,8 @@
     "damageResistances": "acid, cold, fire, lightning, thunder",
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "exhaustion, frightened, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amorphous",
@@ -28198,6 +28637,8 @@
     "damageResistances": "cold, fire",
     "damageImmunities": "lightning",
     "conditionImmunities": "deafened, exhaustion",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Lightning Absorption",
@@ -28306,6 +28747,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Bound",
@@ -28398,6 +28841,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -28516,6 +28961,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -28620,6 +29067,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -28763,6 +29212,8 @@
     "damageResistances": null,
     "damageImmunities": "poison, radiant",
     "conditionImmunities": "charmed, exhaustion, frightened, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Divine Awareness",
@@ -28868,6 +29319,8 @@
     "damageResistances": "acid, cold, fire, lightning, thunder",
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Incorporeal Movement",
@@ -29008,6 +29461,8 @@
     "damageResistances": "necrotic, radiant",
     "damageImmunities": "psychic",
     "conditionImmunities": "charmed, frightened",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Inscrutable",
@@ -29148,6 +29603,8 @@
     "damageResistances": "necrotic, radiant",
     "damageImmunities": "psychic",
     "conditionImmunities": "charmed, frightened",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Inscrutable",
@@ -29170,8 +29627,8 @@
    "externalId": "sphinx-of-wonder"
   },
   "name": "Sphinx of Wonder",
-  "summary": "Small celestial, lawful good — CR 1",
-  "size": "small",
+  "summary": "Tiny celestial, lawful good — CR 1",
+  "size": "tiny",
   "abilityScores": {
    "str": 6,
    "dex": 17,
@@ -29252,6 +29709,8 @@
     "damageResistances": "necrotic, psychic, radiant",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Magic Resistance",
@@ -29270,8 +29729,8 @@
    "externalId": "spider"
   },
   "name": "Spider",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 14,
@@ -29336,6 +29795,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -29463,6 +29924,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Fiendish Restoration",
@@ -29481,8 +29944,8 @@
    "externalId": "sprite"
   },
   "name": "Sprite",
-  "summary": "Small fey, neutral good — CR 0.25",
-  "size": "small",
+  "summary": "Tiny fey, neutral good — CR 0.25",
+  "size": "tiny",
   "abilityScores": {
    "str": 3,
    "dex": 18,
@@ -29579,6 +30042,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -29688,6 +30153,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -29787,6 +30254,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Blurred Form",
@@ -29809,8 +30278,8 @@
    "externalId": "stirge"
   },
   "name": "Stirge",
-  "summary": "Small monstrosity, unaligned — CR 0.125",
-  "size": "small",
+  "summary": "Tiny monstrosity, unaligned — CR 0.125",
+  "size": "tiny",
   "abilityScores": {
    "str": 4,
    "dex": 16,
@@ -29884,6 +30353,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -30002,6 +30473,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -30120,6 +30593,8 @@
     "damageResistances": null,
     "damageImmunities": "poison, psychic",
     "conditionImmunities": "charmed, exhaustion, frightened, paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Immutable Form",
@@ -30259,6 +30734,8 @@
     "damageResistances": "cold",
     "damageImmunities": "lightning, thunder",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -30384,6 +30861,8 @@
     "damageResistances": "cold, fire, poison, psychic",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Incubus Form",
@@ -30477,6 +30956,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Swarm",
@@ -30570,6 +31051,8 @@
     "damageResistances": null,
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Swarm",
@@ -30663,6 +31146,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -30751,6 +31236,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Swarm",
@@ -30848,6 +31335,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Swarm",
@@ -30950,6 +31439,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Swarm",
@@ -31043,6 +31534,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Swarm",
@@ -31211,6 +31704,8 @@
     "damageResistances": null,
     "damageImmunities": "fire, poison",
     "conditionImmunities": "charmed, deafened, frightened, paralyzed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (6/Day)",
@@ -31323,6 +31818,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -31425,6 +31922,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -31539,6 +32038,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -31660,6 +32161,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Siege Monster",
@@ -31758,6 +32261,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -31860,6 +32365,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Loathsome Limbs (4/Day)",
@@ -31957,6 +32464,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Regeneration",
@@ -32075,6 +32584,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -32214,6 +32725,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "charmed, paralyzed, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day)",
@@ -32357,6 +32870,8 @@
     "damageResistances": "necrotic",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Legendary Resistance (3/Day, or 4/Day in Lair)",
@@ -32477,6 +32992,8 @@
     "damageResistances": "necrotic",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Vampiric Connection",
@@ -32595,6 +33112,8 @@
     "damageResistances": "necrotic",
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Spider Climb",
@@ -32617,8 +33136,8 @@
    "externalId": "venomous-snake"
   },
   "name": "Venomous Snake",
-  "summary": "Small beast, unaligned — CR 0.125",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0.125",
+  "size": "tiny",
   "abilityScores": {
    "str": 2,
    "dex": 15,
@@ -32692,6 +33211,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -32787,6 +33308,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -32904,6 +33427,8 @@
     "damageResistances": "cold, fire, lightning",
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Demonic Restoration",
@@ -32999,6 +33524,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -33090,6 +33617,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -33178,6 +33707,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -33265,6 +33796,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -33386,6 +33919,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -33492,6 +34027,8 @@
     "damageResistances": "acid, fire",
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Freeze",
@@ -33514,8 +34051,8 @@
    "externalId": "weasel"
   },
   "name": "Weasel",
-  "summary": "Small beast, unaligned — CR 0",
-  "size": "small",
+  "summary": "Tiny beast, unaligned — CR 0",
+  "size": "tiny",
   "abilityScores": {
    "str": 3,
    "dex": 16,
@@ -33580,6 +34117,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -33719,6 +34258,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -33856,6 +34397,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -33994,6 +34537,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -34139,6 +34684,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -34277,6 +34824,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -34393,6 +34942,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ice Walk",
@@ -34520,6 +35071,8 @@
     "damageResistances": "necrotic",
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Sunlight Sensitivity",
@@ -34538,8 +35091,8 @@
    "externalId": "will-o-wisp"
   },
   "name": "Will-o'-Wisp",
-  "summary": "Small undead, chaotic evil — CR 2",
-  "size": "small",
+  "summary": "Tiny undead, chaotic evil — CR 2",
+  "size": "tiny",
   "abilityScores": {
    "str": 1,
    "dex": 28,
@@ -34631,6 +35184,8 @@
     "damageResistances": "acid, cold, fire, necrotic",
     "damageImmunities": "lightning, poison",
     "conditionImmunities": "exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ephemeral",
@@ -34741,6 +35296,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -34834,6 +35391,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Pack Tactics",
@@ -34927,6 +35486,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -35022,6 +35583,8 @@
     "damageResistances": "acid, cold, fire",
     "damageImmunities": "necrotic, poison",
     "conditionImmunities": "charmed, exhaustion, grappled, paralyzed, petrified, poisoned, prone, restrained, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Incorporeal Movement",
@@ -35142,6 +35705,8 @@
     "damageResistances": null,
     "damageImmunities": null,
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -35261,6 +35826,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "paralyzed, petrified, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Earth Glide",
@@ -35381,6 +35948,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -35497,6 +36066,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -35615,6 +36186,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -35733,6 +36306,8 @@
     "damageResistances": null,
     "damageImmunities": "lightning",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -35856,6 +36431,8 @@
     "damageResistances": null,
     "damageImmunities": "acid",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -35974,6 +36551,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -36090,6 +36669,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Amphibious",
@@ -36206,6 +36787,8 @@
     "damageResistances": null,
     "damageImmunities": "fire",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -36324,6 +36907,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": []
    }
   }
@@ -36435,6 +37020,8 @@
     "damageResistances": null,
     "damageImmunities": "cold",
     "conditionImmunities": null,
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Ice Walk",
@@ -36528,6 +37115,8 @@
     "damageResistances": null,
     "damageImmunities": "poison",
     "conditionImmunities": "exhaustion, poisoned",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
     "traits": [
      {
       "name": "Undead Fortitude",

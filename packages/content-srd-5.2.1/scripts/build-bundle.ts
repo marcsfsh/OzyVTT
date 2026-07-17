@@ -10,7 +10,12 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import {
+  ArmorReferenceSchema, ConditionReferenceSchema, ContentAttributionSchema, RuleReferenceSchema,
+  SpellReferenceSchema, WeaponPropertyReferenceSchema, WeaponReferenceSchema
+} from "../src/index.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceDir = join(root, "sources", "open5e-srd-2024");
@@ -45,6 +50,22 @@ type AttackFields = {
 type TraitFields = { parent: string; name: string; desc: string; type: string | null };
 type ConditionFields = { describes: string; desc: string; document: string };
 type DocumentFields = { name: string; display_name: string; author: string; publisher: string; licenses: readonly string[]; permalink: string };
+type SpellFields = {
+  name: string; desc: string; level: number; school: string; document: string;
+  casting_time: string; reaction_condition: string | null; range: number | null; range_unit: string | null; range_text: string | null;
+  verbal: boolean; somatic: boolean; material: boolean; material_specified: string | null; material_cost: string | null; material_consumed: boolean;
+  duration: string; concentration: boolean; ritual: boolean; higher_level: string | null;
+  attack_roll: boolean; damage_roll: string | null; damage_types: readonly string[]; saving_throw_ability: string | null;
+  target_type: string | null; target_count: number | null; shape_type: string | null; shape_size: number | null; shape_size_unit: string | null;
+  classes: readonly string[];
+};
+type SpellOptionFields = { parent: string; type: string; damage_roll: string | null; target_count: number | null; range: number | null; duration: string | null; concentration: boolean | null; shape_size: number | null; desc: string | null };
+type WeaponFields = { name: string; document: string; damage_dice: string; damage_type: string; is_simple: boolean; is_improvised: boolean; range: number; long_range: number; distance_unit: string | null };
+type WeaponPropertyFields = { name: string; desc: string; type: string | null; document: string };
+type ArmorFields = { name: string; document: string; ac_base: number; ac_add_dexmod: boolean; ac_cap_dexmod: number | null; grants_stealth_disadvantage: boolean; strength_score_required: number | null };
+type DescribesFields = { describes: string; desc: string; document: string };
+type RuleFields = { name: string; desc: string; index: number; ruleset: string; document: string; initialHeaderLevel: number | null };
+type RuleSetFields = { name: string; desc: string; document: string };
 
 const load = <T>(file: string): Fixture<T>[] => JSON.parse(readFileSync(join(sourceDir, file), "utf8")) as Fixture<T>[];
 
@@ -54,6 +75,15 @@ const attacks = load<AttackFields>("CreatureActionAttack.json");
 const traits = load<TraitFields>("CreatureTrait.json");
 const conditions = load<ConditionFields>("ConditionDescription.json");
 const documents = load<DocumentFields>("Document.json");
+const spells = load<SpellFields>("Spell.json");
+const spellOptions = load<SpellOptionFields>("SpellCastingOption.json");
+const weapons = load<WeaponFields>("Weapon.json");
+const weaponProperties = load<WeaponPropertyFields>("WeaponProperty.json");
+const armors = load<ArmorFields>("Armor.json");
+const skills = load<DescribesFields>("SkillDescription.json");
+const damageTypes = load<DescribesFields>("DamageTypeDescription.json");
+const rules = load<RuleFields>("Rule.json");
+const ruleSets = load<RuleSetFields>("RuleSet.json");
 
 const srdDocument = documents.find((doc) => doc.pk === "srd-2024");
 if (!srdDocument || !srdDocument.fields.licenses.includes("cc-by-40")) throw new Error("Expected the srd-2024 document fixture with a cc-by-40 license.");
@@ -110,18 +140,56 @@ const usesSuffix = (action: ActionFields): string => {
 };
 
 /**
+ * Reviewed exclusions: fixtures open5e labels `srd-2024` that are not actually SRD 5.2.1
+ * content. Verified against the SRD 5.2.1 text (repo root `5.2.1 SRD.md`).
+ * - giant-fly: the SRD mentions a giant fly only inside the Figurine of Wondrous Power item;
+ *   it has no statblock, so an "SRD 5.2.1" bundle must not ship one.
+ */
+const EXCLUSIONS = new Set(["srd-2024_giant-fly"]);
+
+/**
+ * Creatures the SRD prints as Tiny but open5e stores as "small" (its srd-2024 fixtures carry
+ * no tiny size at all). List obtained by cross-validating every bundled statblock against an
+ * independent CC-BY copy of the SRD text; footprints are unaffected (tiny and small are both
+ * one cell), but display and future size-based rules need the real value.
+ */
+const TINY_PER_SRD = [
+  "badger", "bat", "cat", "crab", "flying-snake", "frog", "hawk", "homunculus", "imp", "lizard",
+  "owl", "piranha", "pseudodragon", "quasit", "rat", "raven", "scorpion", "seahorse",
+  "sphinx-of-wonder", "spider", "sprite", "stirge", "venomous-snake", "weasel", "will-o-wisp"
+];
+
+/**
  * Reviewed corrections for upstream fixture bugs, applied before adaptation so the vendored
  * sources stay byte-identical to open5e. Values are the printed SRD 5.2.1 ones.
  * - octopus: upstream stores the CON/CHA *modifiers* (0 / -3) where the scores (11 / 4) belong.
+ * - TINY_PER_SRD: see above. (The SRD's "Medium or Small" NPC statblocks stay at open5e's
+ *   "small" — that value is within the SRD's own dual-size statement.)
  */
 const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
-  "srd-2024_octopus": { ability_score_constitution: 11, ability_score_charisma: 4 }
+  "srd-2024_octopus": { ability_score_constitution: 11, ability_score_charisma: 4 },
+  ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }]))
 };
+
+/**
+ * Same idea for spells. greater-invisibility ships with an empty `desc` upstream; the text is
+ * the printed SRD 5.2.1 sentence.
+ */
+const SPELL_CORRECTIONS: Record<string, Partial<SpellFields>> = {
+  "srd-2024_greater-invisibility": { desc: "A creature you touch has the Invisible condition until the spell ends." }
+};
+
+for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
+  if (!creatures.some((creature) => creature.pk === pk)) throw new Error(`Correction/exclusion targets unknown creature ${pk} — check for a typo or an upstream rename.`);
+}
+for (const pk of Object.keys(SPELL_CORRECTIONS)) {
+  if (!spells.some((spell) => spell.pk === pk)) throw new Error(`Spell correction targets unknown spell ${pk} — check for a typo or an upstream rename.`);
+}
 
 const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, structuredSaves: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
 
 const monsters: ActorDefinition[] = creatures
-  .filter((creature) => creature.fields.document === "srd-2024")
+  .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
   .sort((left, right) => left.pk.localeCompare(right.pk))
   .map((creature) => {
     const correction = CORRECTIONS[creature.pk];
@@ -208,6 +276,8 @@ const monsters: ActorDefinition[] = creatures
           damageResistances: fields.damage_resistances_display || null,
           damageImmunities: fields.damage_immunities_display || null,
           conditionImmunities: fields.condition_immunities_display || null,
+          nonmagicalAttackImmunity: fields.nonmagical_attack_immunity,
+          nonmagicalAttackResistance: fields.nonmagical_attack_resistance,
           traits: (traitsByCreature.get(creature.pk) ?? [])
             .sort((left, right) => left.fields.name.localeCompare(right.fields.name))
             .map((trait) => ({ name: trait.fields.name, description: trait.fields.desc }))
@@ -237,6 +307,96 @@ const conditionRecords = conditions
     description: condition.fields.desc
   }));
 
+const titleCase = (slug: string) => slug.split("-").map((part) => `${part[0].toUpperCase()}${part.slice(1)}`).join(" ");
+const abilityShort: Record<string, "str" | "dex" | "con" | "int" | "wis" | "cha"> = { strength: "str", dexterity: "dex", constitution: "con", intelligence: "int", wisdom: "wis", charisma: "cha" };
+const onlySrd = <T extends { document: string }>(rows: Fixture<T>[]) => rows.filter((row) => row.fields.document === "srd-2024").sort((left, right) => left.pk.localeCompare(right.pk));
+
+const spellOptionsBySpell = new Map<string, Fixture<SpellOptionFields>[]>();
+for (const option of spellOptions) {
+  const list = spellOptionsBySpell.get(option.fields.parent) ?? [];
+  list.push(option);
+  spellOptionsBySpell.set(option.fields.parent, list);
+}
+
+const spellRecords = onlySrd(spells).map((spell) => {
+  const correction = SPELL_CORRECTIONS[spell.pk];
+  if (correction) report.corrections.push(spell.pk);
+  const fields = { ...spell.fields, ...correction };
+  if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability]) throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
+  return {
+    id: slugOf(spell.pk),
+    name: fields.name,
+    level: fields.level,
+    school: fields.school,
+    castingTime: fields.casting_time,
+    reactionCondition: fields.reaction_condition || null,
+    range: { distance: fields.range, unit: fields.range_unit, text: fields.range_text || null },
+    components: { verbal: fields.verbal, somatic: fields.somatic, material: fields.material, materialText: fields.material_specified || null, materialConsumed: fields.material_consumed },
+    duration: fields.duration,
+    concentration: fields.concentration,
+    ritual: fields.ritual,
+    attackRoll: fields.attack_roll,
+    damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
+    save: fields.saving_throw_ability ? abilityShort[fields.saving_throw_ability] : null,
+    target: { type: fields.target_type, count: fields.target_count },
+    shape: fields.shape_type ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit } : null,
+    classes: fields.classes.map(slugOf).sort(),
+    description: fields.desc,
+    higherLevel: fields.higher_level || null,
+    castingOptions: (spellOptionsBySpell.get(spell.pk) ?? [])
+      .sort((left, right) => left.fields.type.localeCompare(right.fields.type))
+      .map((option) => ({ type: option.fields.type, damageRoll: option.fields.damage_roll || null, targetCount: option.fields.target_count, description: option.fields.desc || null }))
+  };
+});
+
+const weaponRecords = onlySrd(weapons).map((weapon) => ({
+  id: slugOf(weapon.pk),
+  name: weapon.fields.name,
+  category: weapon.fields.is_simple ? "simple" as const : "martial" as const,
+  improvised: weapon.fields.is_improvised,
+  damage: { dice: weapon.fields.damage_dice, type: weapon.fields.damage_type },
+  // range 0 means a melee weapon; open5e's srd-2024 model does not link per-weapon
+  // properties (Finesse, Light, ...) — the property texts ship separately below.
+  rangeFeet: weapon.fields.range || null,
+  longRangeFeet: weapon.fields.long_range || null
+}));
+
+const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
+  id: slugOf(property.pk),
+  name: property.fields.name,
+  kind: property.fields.type === "Mastery" ? "mastery" as const : "property" as const,
+  description: property.fields.desc
+}));
+
+const armorRecords = onlySrd(armors).map((armor) => ({
+  id: slugOf(armor.pk),
+  name: armor.fields.name,
+  acBase: armor.fields.ac_base,
+  addDexModifier: armor.fields.ac_add_dexmod,
+  dexModifierCap: armor.fields.ac_cap_dexmod,
+  stealthDisadvantage: armor.fields.grants_stealth_disadvantage,
+  strengthRequired: armor.fields.strength_score_required
+}));
+
+const describesRecords = (rows: Fixture<DescribesFields>[]) => onlySrd(rows).map((row) => ({
+  id: row.fields.describes,
+  name: titleCase(row.fields.describes),
+  description: row.fields.desc
+}));
+const skillRecords = describesRecords(skills);
+const damageTypeRecords = describesRecords(damageTypes);
+
+const ruleSetNames = new Map(onlySrd(ruleSets).map((set) => [set.pk, set.fields.name]));
+const ruleRecords = onlySrd(rules)
+  .sort((left, right) => left.fields.ruleset.localeCompare(right.fields.ruleset) || left.fields.index - right.fields.index)
+  .map((rule) => ({
+    id: `${slugOf(rule.fields.ruleset)}-${rule.fields.index}`,
+    name: rule.fields.name,
+    ruleset: ruleSetNames.get(rule.fields.ruleset) ?? slugOf(rule.fields.ruleset),
+    order: rule.fields.index,
+    description: rule.fields.desc
+  }));
+
 const attribution = {
   license: "CC-BY-4.0",
   attribution: "This work includes material from the System Reference Document 5.2.1 (“SRD 5.2.1”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.",
@@ -250,13 +410,40 @@ const attribution = {
   }
 };
 
+// Fail closed on every bundle, not just monsters: nothing is written unless everything validates.
+const validateBundle = (label: string, schema: z.ZodTypeAny, value: unknown) => {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    console.error(`REFUSING TO WRITE — ${label} failed validation:`);
+    for (const issue of parsed.error.issues.slice(0, 10)) console.error(`  - ${issue.path.join(".")}: ${issue.message}`);
+    process.exit(1);
+  }
+};
+validateBundle("conditions", z.array(ConditionReferenceSchema), conditionRecords);
+validateBundle("spells", z.array(SpellReferenceSchema), spellRecords);
+validateBundle("weapons", z.array(WeaponReferenceSchema), weaponRecords);
+validateBundle("weapon properties", z.array(WeaponPropertyReferenceSchema), weaponPropertyRecords);
+validateBundle("armor", z.array(ArmorReferenceSchema), armorRecords);
+validateBundle("skills", z.array(ConditionReferenceSchema), skillRecords);
+validateBundle("damage types", z.array(ConditionReferenceSchema), damageTypeRecords);
+validateBundle("rules", z.array(RuleReferenceSchema), ruleRecords);
+validateBundle("attribution", ContentAttributionSchema, attribution);
+
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "monsters.v1.json"), `${JSON.stringify(monsters, null, 1)}\n`);
 writeFileSync(join(outDir, "conditions.v1.json"), `${JSON.stringify(conditionRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "spells.v1.json"), `${JSON.stringify(spellRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "weapons.v1.json"), `${JSON.stringify(weaponRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "weapon-properties.v1.json"), `${JSON.stringify(weaponPropertyRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "armor.v1.json"), `${JSON.stringify(armorRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "skills.v1.json"), `${JSON.stringify(skillRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "damage-types.v1.json"), `${JSON.stringify(damageTypeRecords, null, 1)}\n`);
+writeFileSync(join(outDir, "rules.v1.json"), `${JSON.stringify(ruleRecords, null, 1)}\n`);
 writeFileSync(join(outDir, "attribution.json"), `${JSON.stringify(attribution, null, 2)}\n`);
 
-console.log(`monsters: ${report.monsters} (all valid)`);
+console.log(`monsters: ${report.monsters} (all valid; excluded: ${[...EXCLUSIONS].map(slugOf).join(", ") || "none"})`);
 console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks}, structured saves ${report.structuredSaves}`);
-console.log(`conditions: ${conditionRecords.length}`);
-if (report.corrections.length > 0) console.log(`upstream corrections applied: ${report.corrections.join(", ")}`);
+console.log(`conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`);
+console.log(`skills: ${skillRecords.length} | damage types: ${damageTypeRecords.length} | rules: ${ruleRecords.length}`);
+if (report.corrections.length > 0) console.log(`upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`);
 if (report.untypedDamage.length > 0) console.log(`untyped damage fallbacks (${report.untypedDamage.length}): ${report.untypedDamage.join(", ")}`);

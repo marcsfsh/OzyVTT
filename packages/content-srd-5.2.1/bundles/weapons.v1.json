@@ -1,0 +1,458 @@
+[
+ {
+  "id": "battleaxe",
+  "name": "Battleaxe",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "blowgun",
+  "name": "Blowgun",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1",
+   "type": "piercing"
+  },
+  "rangeFeet": 25,
+  "longRangeFeet": 100
+ },
+ {
+  "id": "club",
+  "name": "Club",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "dagger",
+  "name": "Dagger",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "piercing"
+  },
+  "rangeFeet": 20,
+  "longRangeFeet": 60
+ },
+ {
+  "id": "dart",
+  "name": "Dart",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "piercing"
+  },
+  "rangeFeet": 20,
+  "longRangeFeet": 60
+ },
+ {
+  "id": "flail",
+  "name": "Flail",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "glaive",
+  "name": "Glaive",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d10",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "greataxe",
+  "name": "Greataxe",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d12",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "greatclub",
+  "name": "Greatclub",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "greatsword",
+  "name": "Greatsword",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "2d6",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "halberd",
+  "name": "Halberd",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d10",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "hand-crossbow",
+  "name": "Hand Crossbow",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "piercing"
+  },
+  "rangeFeet": 30,
+  "longRangeFeet": 120
+ },
+ {
+  "id": "handaxe",
+  "name": "Handaxe",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "slashing"
+  },
+  "rangeFeet": 20,
+  "longRangeFeet": 60
+ },
+ {
+  "id": "heavy-crossbow",
+  "name": "Heavy Crossbow",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d10",
+   "type": "piercing"
+  },
+  "rangeFeet": 100,
+  "longRangeFeet": 400
+ },
+ {
+  "id": "javelin",
+  "name": "Javelin",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "piercing"
+  },
+  "rangeFeet": 30,
+  "longRangeFeet": 120
+ },
+ {
+  "id": "lance",
+  "name": "Lance",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d10",
+   "type": "piercing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "light-crossbow",
+  "name": "Light Crossbow",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "piercing"
+  },
+  "rangeFeet": 80,
+  "longRangeFeet": 320
+ },
+ {
+  "id": "light-hammer",
+  "name": "Light Hammer",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": 20,
+  "longRangeFeet": 60
+ },
+ {
+  "id": "longbow",
+  "name": "Longbow",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "piercing"
+  },
+  "rangeFeet": 150,
+  "longRangeFeet": 600
+ },
+ {
+  "id": "longsword",
+  "name": "Longsword",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "mace",
+  "name": "Mace",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "maul",
+  "name": "Maul",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "2d6",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "morningstar",
+  "name": "Morningstar",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "piercing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "musket",
+  "name": "Musket",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d12",
+   "type": "piercing"
+  },
+  "rangeFeet": 40,
+  "longRangeFeet": 120
+ },
+ {
+  "id": "pike",
+  "name": "Pike",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d10",
+   "type": "piercing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "pistol",
+  "name": "Pistol",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d10",
+   "type": "piercing"
+  },
+  "rangeFeet": 30,
+  "longRangeFeet": 90
+ },
+ {
+  "id": "quarterstaff",
+  "name": "Quarterstaff",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "rapier",
+  "name": "Rapier",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "piercing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "scimitar",
+  "name": "Scimitar",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "shortbow",
+  "name": "Shortbow",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "piercing"
+  },
+  "rangeFeet": 80,
+  "longRangeFeet": 320
+ },
+ {
+  "id": "shortsword",
+  "name": "Shortsword",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "piercing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "sickle",
+  "name": "Sickle",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "sling",
+  "name": "Sling",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": 30,
+  "longRangeFeet": 120
+ },
+ {
+  "id": "spear",
+  "name": "Spear",
+  "category": "simple",
+  "improvised": false,
+  "damage": {
+   "dice": "1d6",
+   "type": "piercing"
+  },
+  "rangeFeet": 20,
+  "longRangeFeet": 60
+ },
+ {
+  "id": "trident",
+  "name": "Trident",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "piercing"
+  },
+  "rangeFeet": 20,
+  "longRangeFeet": 60
+ },
+ {
+  "id": "war-pick",
+  "name": "War Pick",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "piercing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "warhammer",
+  "name": "Warhammer",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d8",
+   "type": "bludgeoning"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ },
+ {
+  "id": "whip",
+  "name": "Whip",
+  "category": "martial",
+  "improvised": false,
+  "damage": {
+   "dice": "1d4",
+   "type": "slashing"
+  },
+  "rangeFeet": null,
+  "longRangeFeet": null
+ }
+]

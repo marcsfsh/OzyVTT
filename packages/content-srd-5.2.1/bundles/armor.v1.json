@@ -1,0 +1,119 @@
+[
+ {
+  "id": "breastplate",
+  "name": "Breastplate",
+  "acBase": 14,
+  "addDexModifier": true,
+  "dexModifierCap": 2,
+  "stealthDisadvantage": false,
+  "strengthRequired": null
+ },
+ {
+  "id": "chain-mail",
+  "name": "Chain Mail",
+  "acBase": 16,
+  "addDexModifier": false,
+  "dexModifierCap": null,
+  "stealthDisadvantage": true,
+  "strengthRequired": 13
+ },
+ {
+  "id": "chain-shirt",
+  "name": "Chain Shirt",
+  "acBase": 13,
+  "addDexModifier": true,
+  "dexModifierCap": 2,
+  "stealthDisadvantage": false,
+  "strengthRequired": null
+ },
+ {
+  "id": "half-plate-armor",
+  "name": "Half Plate Armor",
+  "acBase": 15,
+  "addDexModifier": true,
+  "dexModifierCap": 2,
+  "stealthDisadvantage": true,
+  "strengthRequired": null
+ },
+ {
+  "id": "hide-armor",
+  "name": "Hide Armor",
+  "acBase": 12,
+  "addDexModifier": true,
+  "dexModifierCap": 2,
+  "stealthDisadvantage": false,
+  "strengthRequired": null
+ },
+ {
+  "id": "leather-armor",
+  "name": "Leather Armor",
+  "acBase": 11,
+  "addDexModifier": true,
+  "dexModifierCap": null,
+  "stealthDisadvantage": false,
+  "strengthRequired": null
+ },
+ {
+  "id": "padded-armor",
+  "name": "Padded Armor",
+  "acBase": 11,
+  "addDexModifier": true,
+  "dexModifierCap": null,
+  "stealthDisadvantage": true,
+  "strengthRequired": null
+ },
+ {
+  "id": "plate-armor",
+  "name": "Plate Armor",
+  "acBase": 18,
+  "addDexModifier": false,
+  "dexModifierCap": null,
+  "stealthDisadvantage": true,
+  "strengthRequired": 15
+ },
+ {
+  "id": "ring-mail",
+  "name": "Ring Mail",
+  "acBase": 14,
+  "addDexModifier": false,
+  "dexModifierCap": null,
+  "stealthDisadvantage": true,
+  "strengthRequired": null
+ },
+ {
+  "id": "scale-mail",
+  "name": "Scale Mail",
+  "acBase": 14,
+  "addDexModifier": true,
+  "dexModifierCap": 2,
+  "stealthDisadvantage": true,
+  "strengthRequired": null
+ },
+ {
+  "id": "shield",
+  "name": "Shield",
+  "acBase": 2,
+  "addDexModifier": false,
+  "dexModifierCap": null,
+  "stealthDisadvantage": false,
+  "strengthRequired": null
+ },
+ {
+  "id": "splint-armor",
+  "name": "Splint Armor",
+  "acBase": 17,
+  "addDexModifier": false,
+  "dexModifierCap": null,
+  "stealthDisadvantage": true,
+  "strengthRequired": 15
+ },
+ {
+  "id": "studded-leather-armor",
+  "name": "Studded Leather Armor",
+  "acBase": 12,
+  "addDexModifier": true,
+  "dexModifierCap": null,
+  "stealthDisadvantage": false,
+  "strengthRequired": null
+ }
+]

@@ -1,0 +1,67 @@
+[
+ {
+  "id": "acid",
+  "name": "Acid",
+  "description": "Corrosive liquids, digestive enzymes"
+ },
+ {
+  "id": "bludgeoning",
+  "name": "Bludgeoning",
+  "description": "Blunt objects, constriction, falling"
+ },
+ {
+  "id": "cold",
+  "name": "Cold",
+  "description": "Freezing water, icy blasts"
+ },
+ {
+  "id": "fire",
+  "name": "Fire",
+  "description": "Flames, unbearable heat"
+ },
+ {
+  "id": "force",
+  "name": "Force",
+  "description": "Pure magical energy"
+ },
+ {
+  "id": "lightning",
+  "name": "Lightning",
+  "description": "Electricity"
+ },
+ {
+  "id": "necrotic",
+  "name": "Necrotic",
+  "description": "Life-draining energy"
+ },
+ {
+  "id": "piercing",
+  "name": "Piercing",
+  "description": "Fangs, puncturing objects"
+ },
+ {
+  "id": "poison",
+  "name": "Poison",
+  "description": "Toxic gas, venom"
+ },
+ {
+  "id": "psychic",
+  "name": "Psychic",
+  "description": "Mind-rending energy"
+ },
+ {
+  "id": "radiant",
+  "name": "Radiant",
+  "description": "Holy energy, searing radiation"
+ },
+ {
+  "id": "slashing",
+  "name": "Slashing",
+  "description": "Claws, cutting objects"
+ },
+ {
+  "id": "thunder",
+  "name": "Thunder",
+  "description": "Concussive sound"
+ }
+]
