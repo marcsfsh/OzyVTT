@@ -9,7 +9,7 @@ import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end" | "scene:activate";
+type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end" | "scene:activate";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -308,6 +308,19 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
           </>}
         </li>;
       })}</ol>
+      {(() => {
+        // Combatants can join a running fight: every roster actor not already in initiative can be
+        // dropped in (server rolls its initiative and places a token), plus the SRD browser for new ones.
+        const available = state.actors.filter((actor) => !state.combat.initiative.some((entry) => entry.actorId === actor.id));
+        return <details className="encounter-add-combatant">
+          <summary>Add a combatant to this fight</summary>
+          {available.length > 0 && <ul className="add-combatant-list">{available.map((actor) => <li key={actor.id}>
+            <span>{actor.name}{actor.visibility === "gm-only" ? " · GM-only" : ""}</span>
+            <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight.`)}>Add</button>
+          </li>)}</ul>}
+          <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
+        </details>;
+      })()}
       <button type="button" className="encounter-end" disabled={busy} onClick={end}>End encounter</button>
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}

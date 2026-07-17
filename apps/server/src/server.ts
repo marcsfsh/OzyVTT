@@ -17,7 +17,7 @@ import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
+import { addCombatant, endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
 import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
@@ -32,7 +32,7 @@ import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
-import { ensureEncounterTokens, moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { ensureEncounterTokens, moveEncounterToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
@@ -68,9 +68,11 @@ const EncounterStartSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), sizeCells: z.number().int().min(1).max(4), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -430,6 +432,19 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token image could not be set." }); }
     });
+    socket.on("actor:set-size", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can resize tokens." });
+      const request = SetActorSizeSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The token size command is malformed." });
+      try {
+        const { commandId, actorId, sizeCells, expectedRevision } = request.data;
+        const mapAssetId = store.snapshot.combat.mapAssetId;
+        const geometry = mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
+        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision }, (state) => setActorSize(state, actorId, sizeCells, geometry));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be resized." }); }
+    });
     // GM adjusts anyone's hit points; a player only their own claimed character (checked in the reducer).
     const actorScope = (): ActorScope | null => {
       if (auth.verify(socket.handshake.auth.token)) return { role: "gm" };
@@ -702,6 +717,20 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not end." }); }
+    });
+    socket.on("encounter:add-combatant", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can add a combatant." });
+      const request = AddCombatantSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The add-combatant command is malformed." });
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before adding a combatant." });
+      try {
+        const { commandId, actorId, score, expectedRevision } = request.data;
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const result = await store.execute({ id: commandId, type: "encounter.add-combatant", actorId, expectedRevision }, (state) => addCombatant(state, actorId, score, () => randomInt(1, 21), geometry));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
     });
     socket.on("initiative:set", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change Initiative." });

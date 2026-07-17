@@ -57,6 +57,14 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       if (!result.ok) setFeedback(result.message ?? "The reaction could not be updated.");
     });
   };
+  const setSize = (sizeCells: number) => {
+    setBusy(true);
+    socket.emit("actor:set-size", { commandId: newId(), actorId: actor.id, sizeCells }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
+    });
+  };
+  const SIZES: ReadonlyArray<readonly [string, number, string]> = [["M", 1, "Medium"], ["L", 2, "Large"], ["H", 3, "Huge"], ["G", 4, "Gargantuan"]];
 
   // The image picker replaces the menu while open; closing it dismisses the whole flow.
   if (library && gmToken) return <TokenLibrary actorId={actor.id} actorName={actor.name} definitionId={actor.definitionId ?? null} currentAssetId={actor.tokenAssetId ?? null} gmToken={gmToken} onClose={onClose} />;
@@ -73,6 +81,10 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
         <input type="number" min="1" max="1000" placeholder="HP" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", "Damaged")}>Dmg</button>
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", "Healed")}>Heal</button>
+      </div>}
+      {role === "gm" && <div className="token-context-size" role="group" aria-label="Token size">
+        <span>Size</span>
+        {SIZES.map(([label, cells, full]) => <button key={cells} type="button" aria-pressed={(actor.sizeCells ?? 1) === cells} disabled={busy} title={`${full} (${cells}×${cells})`} onClick={() => setSize(cells)}>{label}</button>)}
       </div>}
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
       {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}

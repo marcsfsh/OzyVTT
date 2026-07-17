@@ -152,6 +152,11 @@
 .token-context-hp button { flex: 1; text-align: center; }
 .token-context-item { text-align: left; }
 .token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: #e8a743; }
+.token-context-size { display: flex; align-items: center; gap: .3rem; }
+.token-context-size span { flex: 0 0 auto; margin-right: .15rem; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+.token-context-size button { flex: 1; min-height: 2.4rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; text-align: center; cursor: pointer; }
+.token-context-size button:hover:not(:disabled) { border-color: #e8a743; }
+.token-context-size button[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
 .token-context-conditions { margin-top: .1rem; }
 .token-context-feedback { margin: .1rem 0 0; color: #e9b861; font-size: .75rem; }

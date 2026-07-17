@@ -57,6 +57,23 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
   };
 }
 
+/** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its token. GM-only at the command layer. */
+export function addCombatant(state: GameState, actorId: string, score: number | undefined, rollD20: () => number, tokenGeometry: TokenMapGeometry) {
+  if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  if (state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("That combatant is already in the encounter.");
+  if (state.combat.initiative.length >= 200) throw new CommandRejectedError("This encounter already has 200 combatants.");
+  const tieBreaker = actor.initiative ?? 0;
+  const rolled = score === undefined ? rollD20() + tieBreaker : score;
+  if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+  state.combat = {
+    ...state.combat,
+    initiative: ordered(state, [...state.combat.initiative, { actorId, score: rolled, tieBreaker }]),
+    tokens: [...state.combat.tokens, ...createEncounterTokens([{ actorId, sizeCells: actor.sizeCells ?? 1 }], tokenGeometry)]
+  };
+}
+
 export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [] };

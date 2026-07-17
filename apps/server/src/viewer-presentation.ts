@@ -264,7 +264,16 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
     };
     next = { ...state, pings: [...state.pings.filter((item) => item.id !== ping.id && item.expiresAt > now), ping].slice(-20) };
   } else if (payload.type === "viewer.initiative.set") next = { ...state, initiative: initiative(payload.initiative) };
-  else if (payload.type === "viewer.encounter.set") next = { ...state, initiative: initiative(payload.initiative), encounter: encounter(payload.encounter) };
+  else if (payload.type === "viewer.encounter.set") {
+    const scene = encounter(payload.encounter);
+    // Combat-first: while an encounter is live (it carries a map), the shared screen follows that map
+    // automatically, so the image never lags behind the fight and the GM needn't re-present on every
+    // scene switch. When combat ends (no map), the last-shown map stays until the GM changes it.
+    const activeMap = scene.mapAssetId
+      ? { assetId: scene.mapAssetId, altText: state.activeMap?.assetId === scene.mapAssetId ? state.activeMap.altText : "Battle map" }
+      : state.activeMap;
+    next = { ...state, initiative: initiative(payload.initiative), encounter: scene, activeMap };
+  }
 
   next = {
     ...next,

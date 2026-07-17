@@ -84,6 +84,25 @@ function snappedPosition(point: EncounterTokenPosition, radius: number, geometry
   return nearest ? { x: rounded(nearest.x), y: rounded(nearest.y) } : { x: rounded(requested.x), y: rounded(requested.y) };
 }
 
+/**
+ * Sets a combatant's token footprint (1–4 cells: Medium … Gargantuan). The actor's sizeCells drives
+ * every future token; if the actor already has a token in the live encounter, its appearance is
+ * recomputed and its position re-snapped to the new footprint. Works with no active map too (just
+ * records the size for the next encounter). GM-only at the command layer.
+ */
+export function setActorSize(state: GameState, actorId: string, sizeCells: number, geometry: TokenMapGeometry | null) {
+  if (!Number.isInteger(sizeCells) || sizeCells < 1 || sizeCells > 4) throw new CommandRejectedError("Token size must be Medium, Large, Huge, or Gargantuan (1–4 cells).");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, sizeCells } : candidate);
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+  if (token && geometry) {
+    const appearance = encounterTokenAppearance(geometry, sizeCells);
+    const position = token.position ? snappedPosition(token.position, appearance.sizePx / 2, geometry, sizeCells) : null;
+    state.combat = { ...state.combat, tokens: state.combat.tokens.map((candidate) => candidate.actorId === actorId ? { ...candidate, ...appearance, position } : candidate) };
+  }
+}
+
 export function moveEncounterToken(state: GameState, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before moving tokens.");
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
