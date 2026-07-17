@@ -34,8 +34,10 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   attribution (ADR-0015). Phase B done: GM browses the bestiary in encounter setup
   (`MonsterBrowser`), `actor:add-from-definition`/`actor:remove`/`content:monsters`
   commands instantiate/remove monsters with live HP and provenance (`Actor.definitionId`).
-  Next: C HP/damage tracking → D conditions → E action economy/End Turn → F targeting +
-  action resolution → G character-sheet panel. Plan reviewed with the owner 2026-07-17.
+  Phase C done: server-authoritative HP tracking (damage/heal/temp/set commands, GM +
+  own-character player scopes) with band-safe player projections (exact PC hp, monster
+  bands). Next: D conditions → E action economy/End Turn → F targeting + action resolution
+  → G character-sheet panel. Plan reviewed with the owner 2026-07-17.
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.

@@ -6,7 +6,7 @@ import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove";
+type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -54,7 +54,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
-        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}><span>{entry.name}{isMe && <span className="you-badge">YOU</span>}</span><strong>{entry.score}</strong></li>;
+        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
+          <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}</span>
+          <strong>{entry.score}</strong>
+        </li>;
       })}</ol>
     </section>;
   }
@@ -70,6 +73,8 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
+  const [hpActorId, setHpActorId] = useState<string | null>(null);
+  const [hpAmount, setHpAmount] = useState("");
   const cancelEditRef = useRef(false);
   const knownActorIdsRef = useRef<ReadonlySet<string>>(new Set(state.actors.map((actor) => actor.id)));
   const actorsById = useMemo(() => new Map(state.actors.map((actor) => [actor.id, actor])), [state.actors]);
@@ -127,6 +132,16 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
     if (!window.confirm(`Remove ${name} from the roster?`)) return;
     void run(() => emitCommand("actor:remove", { commandId: newId(), actorId, expectedRevision: state.revision }), `Removed ${name}.`);
   };
+  const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string) => {
+    const value = Number(hpAmount.trim());
+    const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
+    if (!Number.isInteger(value) || value < minimum || value > 1000) { setMessage(`Enter a whole number (${minimum}-1000).`); return; }
+    const verbs = { "actor:apply-damage": `${name} took ${value} damage.`, "actor:heal": `${name} healed ${value}.`, "actor:set-temp-hp": `${name} has ${value} temporary HP.`, "actor:set-hp": `${name} set to ${value} HP.` } as const;
+    setHpAmount("");
+    void run(() => event === "actor:set-hp"
+      ? emitCommand(event, { commandId: newId(), actorId, current: value, expectedRevision: state.revision })
+      : emitCommand(event, { commandId: newId(), actorId, amount: value, expectedRevision: state.revision }), verbs[event]);
+  };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
     <div className="encounter-heading"><div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>{state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}</div>
@@ -153,11 +168,24 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;
         const editing = editingActorId === entry.actorId;
-        return <li key={entry.actorId} className={active ? "active" : ""} aria-current={active ? "step" : undefined}>
-          <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}<span>{actor?.name ?? "Removed combatant"}</span>{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
-          {editing
-            ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
-            : <button type="button" className="initiative-score-value" disabled={busy} title="Click to edit initiative" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+        const down = actor !== undefined && actor.hp.current <= 0;
+        return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}`.trim()} aria-current={active ? "step" : undefined}>
+          <div className="initiative-row-main">
+            <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}<span>{actor?.name ?? "Removed combatant"}</span>{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
+            <span className="initiative-row-side">
+              {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Track hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={hpActorId === entry.actorId} onClick={() => { setHpActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
+              {editing
+                ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
+                : <button type="button" className="initiative-score-value" disabled={busy} title="Click to edit initiative" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+            </span>
+          </div>
+          {hpActorId === entry.actorId && actor && <div className="hp-editor" role="group" aria-label={`Adjust hit points for ${actor.name}`}>
+            <input type="number" min="0" max="1000" placeholder="0" autoFocus aria-label="Amount" value={hpAmount} onChange={(event) => setHpAmount(event.target.value)} />
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
+          </div>}
         </li>;
       })}</ol>
       <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>

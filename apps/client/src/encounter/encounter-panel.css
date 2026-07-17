@@ -55,6 +55,24 @@
 .encounter-end:disabled { opacity: .45; cursor: not-allowed; }
 .hidden-turn { padding: .7rem; border-left: 4px solid #d69442; background: #2b2115; color: #f3c77d !important; }
 .encounter-feedback { min-height: 1.3rem; color: #e9b861 !important; }
+/* HP tracking: GM rows carry an exact chip that expands an inline editor; players see bands. */
+.initiative-list.gm li { flex-direction: column; align-items: stretch; }
+.initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.initiative-row-side { display: flex; align-items: center; gap: .4rem; flex: none; }
+.initiative-list.gm li.down .initiative-name { opacity: .55; text-decoration: line-through; }
+.initiative-hp { flex: none; padding: .4rem .55rem; border: 1px solid transparent; border-radius: .45rem; background: #0c0a07; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
+.initiative-hp small { margin-left: .2rem; font-size: .68rem; color: #7fc7e8; }
+.initiative-hp.hp-healthy { color: #8fd69a; }
+.initiative-hp.hp-bloodied { color: #e8a743; }
+.initiative-hp.hp-down { color: #e0897f; }
+.initiative-hp:hover:not(:disabled) { border-color: #e8a743; }
+.hp-editor { display: flex; gap: .35rem; margin-top: .45rem; }
+.hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
+.hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #17140f; color: #f5efe3; font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
+.hp-editor button:hover:not(:disabled) { border-color: #e8a743; }
+.health-chip { display: inline-block; margin-left: .5rem; padding: .1rem .45rem; border-radius: 999px; font: 800 .62rem/1.5 sans-serif; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
+.health-bloodied { background: #4a2c10; color: #e8a743; }
+.health-down { background: #43201d; color: #e0897f; }
 .encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed #6b5e4b; border-radius: .5rem; background: transparent; color: #e9b861; font-size: .85rem; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: #e8a743; background: #2b2115; }
 /* Monster browser: same overlay pattern as the confirm dialog, sized for a scrollable list. */

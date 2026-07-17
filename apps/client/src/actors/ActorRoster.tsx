@@ -9,6 +9,36 @@ type Props = { role: "gm"; state: GmView } | { role: "player"; state: PlayerView
 function statusForGm(ownerSessionId: string | null) { return ownerSessionId ? "Claimed" : "Available"; }
 function statusForPlayer(actor: PlayerActor) { return actor.claimStatus === "mine" ? "Your character" : actor.claimStatus === "claimed" ? "Taken" : "Available"; }
 function presenceLabel(presence: PresenceStatus) { return presence === "online" ? "Online" : presence === "reconnecting" ? "Reconnecting" : "Offline"; }
+const BAND_LABELS = { healthy: "Healthy", bloodied: "Bloodied", down: "Down" } as const;
+const exactHpLabel = (hp: { current: number; maximum: number; temporary: number }) => `${hp.current}/${hp.maximum}${hp.temporary > 0 ? ` +${hp.temporary}` : ""}`;
+/** GM actors carry exact hp; player-view actors carry exact hp only for player characters. */
+function hpLabel(hp: GmView["actors"][number]["hp"] | PlayerActor["hp"]) {
+  if (!("kind" in hp)) return exactHpLabel(hp);
+  return hp.kind === "band" ? BAND_LABELS[hp.band] : exactHpLabel(hp);
+}
+
+/** Players track their own sheet: damage, healing, and temporary HP for the claimed character only. */
+function OwnHpTracker({ actorId, onFeedback }: Readonly<{ actorId: string; onFeedback: (text: string) => void }>) {
+  const [amount, setAmount] = useState("");
+  const [sending, setSending] = useState(false);
+  const send = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp", verb: string) => {
+    const value = Number(amount.trim());
+    const minimum = event === "actor:set-temp-hp" ? 0 : 1;
+    if (!Number.isInteger(value) || value < minimum || value > 1000) { onFeedback(`Enter a whole number (${minimum}-1000).`); return; }
+    setSending(true);
+    socket.emit(event, { commandId: newId(), actorId, amount: value }, (result) => {
+      setSending(false);
+      onFeedback(result.ok ? `${verb} ${value}.` : result.message ?? "The hit point change was rejected.");
+      if (result.ok) setAmount("");
+    });
+  };
+  return <div className="own-hp-tracker" role="group" aria-label="Track your hit points">
+    <input type="number" min="0" max="1000" placeholder="0" aria-label="Hit point amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
+    <button type="button" disabled={sending} onClick={() => send("actor:apply-damage", "Took")}>Damage</button>
+    <button type="button" disabled={sending} onClick={() => send("actor:heal", "Healed")}>Heal</button>
+    <button type="button" disabled={sending} onClick={() => send("actor:set-temp-hp", "Temp HP set to")}>Temp</button>
+  </div>;
+}
 
 export function ActorRoster(props: Props) {
   const [feedback, setFeedback] = useState("");
@@ -66,7 +96,8 @@ export function ActorRoster(props: Props) {
       <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
     </div>
     {props.role === "player" && ownedActor && <div className="you-are-playing">
-      <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong></div>
+      <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span></div>
+      <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
       <button className="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</button>
     </div>}
     {actors.length === 0 ? <p className="roster-empty">No characters have been added yet.</p> : <div className="actor-grid">
@@ -77,7 +108,7 @@ export function ActorRoster(props: Props) {
         const status = "ownerSessionId" in actor ? statusForGm(actor.ownerSessionId) : statusForPlayer(actor);
         return <article className={`actor-card${mine ? " actor-card-owned" : ""}`} key={actor.id}>
           <div className="actor-card-title"><div className="actor-monogram" aria-hidden="true">{actor.name.slice(0, 1)}</div><div><h3>{actor.name}{mine && <span className="you-badge">YOU</span>}</h3><span className={`claim-status${mine ? " claim-status-owned" : ""}`}>{status}</span>{actor.presence && <span className={`presence presence-${actor.presence}`} role="status"><span className="presence-dot" aria-hidden="true"></span>{presenceLabel(actor.presence)}</span>}</div></div>
-          <dl><div><dt>HP</dt><dd>{actor.hp.current}/{actor.hp.maximum}</dd></div><div><dt>AC</dt><dd>{actor.armorClass ?? "—"}</dd></div><div><dt>Initiative</dt><dd>{actor.initiative === undefined ? "—" : actor.initiative >= 0 ? `+${actor.initiative}` : actor.initiative}</dd></div></dl>
+          <dl><div><dt>HP</dt><dd>{hpLabel(actor.hp)}</dd></div><div><dt>AC</dt><dd>{actor.armorClass ?? "—"}</dd></div><div><dt>Initiative</dt><dd>{actor.initiative === undefined ? "—" : actor.initiative >= 0 ? `+${actor.initiative}` : actor.initiative}</dd></div></dl>
           {props.role === "player" && (mine
             ? <button className="actor-action actor-release" disabled={busy} onClick={() => release(actor.name)}>Release character</button>
             : <button className="actor-action" disabled={unavailable || busy} onClick={() => ownedActor ? switchTo(actor.id, actor.name, ownedActor.name) : claim(actor.id, actor.name)}>{claiming === actor.id ? (ownedActor ? "Switching…" : "Claiming…") : unavailable ? "Already claimed" : ownedActor ? "Switch to this" : "Claim character"}</button>)}

@@ -8,6 +8,30 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Phase C: hit-point tracking with band-safe projections
+
+Server: `hit-points.ts` reducers — `applyDamage` (temp HP absorbs first, floor 0),
+`healActor` (cap at max, never restores temp), `setTemporaryHp` (replace, not stack),
+`setCurrentHp` (GM-only correction, clamped) — all scoped: GM adjusts anyone, a player only
+their own claimed character. Four socket commands (`actor:apply-damage`/`heal`/
+`set-temp-hp`/`set-hp`). **Projection change (viewer-safety relevant):** players now
+receive exact hp only for player-characters; monsters/NPCs project as a `HealthBand`
+("healthy" / "bloodied" ≤ half per 2024 rules / "down") — previously exact monster hp
+reached players. `PlayerInitiativeEntry` gains `health`; the viewer picks fields explicitly
+and a test asserts no health/hp key leaks there. Client: GM initiative rows get exact HP
+chips (green/amber/red) expanding an inline Dmg/Heal/Temp/Set editor, down rows strike
+through; player initiative shows Bloodied/Down chips; the you-are-playing card gains an
+own-HP tracker (Damage/Heal/Temp).
+
+Verified: check/test (203: +7 hit-point tests incl. band thresholds, ownership rejections,
+viewer no-leak; 2 existing projection tests updated for the `health` field)/build green;
+live Playwright — GM damages goblin 10/10→4/10 (bloodied) → temp 5 → heal 3 (7/10 +5) →
+50 dmg → 0/10 struck-through Down; player claims PC, self-damages 28→24, sets temp +8;
+player view shows only the band chip for the goblin with no exact "/10" anywhere in the
+DOM; narrow-viewport HP editor pass; zero page errors.
+
+**Follow-up:** Phase D (conditions). Dice→damage wiring is Phase F.
+
 ## 2026-07-17 — Phase B: SRD monsters instantiate into encounters
 
 First consumer of the content bundle. Server: `ContentLibrary` (loads the monster bundle +

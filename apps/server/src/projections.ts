@@ -1,6 +1,14 @@
-import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import { healthBandOf } from "./hit-points.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
+
+/** Party members stay exact for each other; monster/NPC hit points reach players only as a coarse band. */
+function playerHp(actor: GameState["actors"][number]): PlayerHp {
+  return actor.kind === "player-character"
+    ? { kind: "exact", current: actor.hp.current, maximum: actor.hp.maximum, temporary: actor.hp.temporary }
+    : { kind: "band", band: healthBandOf(actor.hp) };
+}
 
 function visibleToPlayer(roll: RollRecord, playerSessionId?: string) {
   return roll.visibility === "public" || (roll.visibility === "self-only" && roll.initiatorSessionId === playerSessionId);
@@ -15,7 +23,7 @@ export function projectPublicInitiative(state: GameState): readonly PlayerInitia
   const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
   return state.combat.initiative.flatMap((entry) => {
     const actor = publicActors.get(entry.actorId);
-    return actor ? [{ actorId: actor.id, name: actor.name, score: entry.score, active: state.combat.active && state.combat.turnActorId === actor.id }] : [];
+    return actor ? [{ actorId: actor.id, name: actor.name, score: entry.score, active: state.combat.active && state.combat.turnActorId === actor.id, health: healthBandOf(actor.hp) }] : [];
   });
 }
 
@@ -60,11 +68,15 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
   return {
     revision: state.revision,
     combat: projectPlayerCombat(state, playerSessionId, now),
-    actors: state.actors.filter((actor) => actor.visibility === "public").map(({ notes: _notes, ownerSessionId, ...actor }) => ({
-      ...actor,
-      claimStatus: ownerSessionId === null ? "available" as const : ownerSessionId === playerSessionId ? "mine" as const : "claimed" as const,
-      presence: ownerSessionId === null ? null : presenceFor(ownerSessionId)
-    })),
+    actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
+      const { notes: _notes, ownerSessionId, hp: _exactHp, ...actor } = source;
+      return {
+        ...actor,
+        hp: playerHp(source),
+        claimStatus: ownerSessionId === null ? "available" as const : ownerSessionId === playerSessionId ? "mine" as const : "claimed" as const,
+        presence: ownerSessionId === null ? null : presenceFor(ownerSessionId)
+      };
+    }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)
   };
 }
