@@ -6,7 +6,7 @@ import { ActorRoster } from "./actors/ActorRoster";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
-import { EncounterPanel } from "./encounter/EncounterPanel";
+import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/EncounterPanel";
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { EncounterMap } from "./scene/EncounterMap";
@@ -42,7 +42,10 @@ function App() {
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [showViewerPreview, setShowViewerPreview] = useState(false);
-  const [dockInitiative, setDockInitiative] = useState(false);
+  const [dockPosition, setDockPosition] = useState<DockPosition>(() => {
+    const stored = localStorage.getItem("vtt.dock-position");
+    return DOCK_POSITIONS.includes(stored as DockPosition) ? (stored as DockPosition) : "sidebar";
+  });
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   const { confirm, dialog } = useConfirm();
@@ -71,6 +74,7 @@ function App() {
       socket.io.off("reconnect_failed", onGaveUp);
     };
   }, []);
+  useEffect(() => { localStorage.setItem("vtt.dock-position", dockPosition); }, [dockPosition]);
 
   const joinPlayer = () => {
     setBusy(true);
@@ -132,8 +136,8 @@ function App() {
 
   const mapToken = mode === "gm" ? gmToken : localStorage.getItem(PLAYER_TOKEN_KEY);
   const combatMapActive = !!state && state.combat.active && !!state.combat.mapAssetId;
-  const showDocked = dockInitiative && combatMapActive;
-  const encounterDock = combatMapActive ? { docked: dockInitiative, onToggle: () => setDockInitiative((current) => !current) } : undefined;
+  const showDocked = combatMapActive && dockPosition !== "sidebar";
+  const encounterDock = combatMapActive ? { position: dockPosition, onChange: setDockPosition } : undefined;
   const encounterPanel = state
     ? (mode === "gm"
       ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} dock={encounterDock} />
@@ -175,7 +179,7 @@ function App() {
             annotations={state.combat.annotations}
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
-            rightDock={showDocked ? encounterPanel : undefined}
+            dock={showDocked ? { node: encounterPanel, position: dockPosition } : undefined}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
         </section>
         <div className="table-sidebar">
