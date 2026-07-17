@@ -52,9 +52,12 @@ the map inside the full-viewport "Enlarge map" overlay). See `docs/ai-context/te
 ## Claude Code tooling
 
 This repo now carries a Claude Code tooling layer (this upgrade): `CLAUDE.md` index,
-`docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, and the full
-`.claude/skills/` roster — `vtt-task-packet`, `vtt-context-router`, `vtt-implement`,
+`docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, the full
+`.claude/skills/` roster (`vtt-task-packet`, `vtt-context-router`, `vtt-implement`,
 `vtt-qa-check`, `vtt-ledger-update`, `vtt-ux-review`, `vtt-test-pass`, `vtt-branch-safety`,
-`vtt-schedule`. Still planned (see `docs/claude-code-tooling-outline.md`): the three
-lifecycle hooks (Stop / UserPromptSubmit / PreToolUse) and an optional GitHub Actions
-scheduled ledger-drift workflow.
+`vtt-schedule`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
+PreToolUse, `scope-guard` UserPromptSubmit, `stop-reminder` Stop — see
+`.claude/hooks/README.md`). A GitHub Actions schedule scaffold
+(`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** — its cron is
+commented out and the job is a placeholder until configured. Design/roadmap in
+`docs/claude-code-tooling-outline.md`.

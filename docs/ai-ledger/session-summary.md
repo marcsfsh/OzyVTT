@@ -8,6 +8,25 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Hooks + scheduled-workflow scaffold
+
+Completed the remaining active outline items on the same branch:
+
+- **Lifecycle hooks** (`.claude/settings.json` + `.claude/hooks/`, Node, fail-open):
+  `danger-guard` (PreToolUse/Bash — deny catastrophic, ask on destructive),
+  `scope-guard` (UserPromptSubmit — inject sensitive-area invariants as context),
+  `stop-reminder` (Stop — non-blocking completion-hygiene nudge when code is
+  uncommitted). Tested each with sample payloads. `.claude/hooks/README.md` documents
+  them; `.gitignore` now ignores `.claude/settings.local.json`.
+- **GitHub Actions schedule scaffold** (`.github/workflows/scheduled-ledger-drift.yml`):
+  intentionally inert — cron commented out, `workflow_dispatch` only, placeholder job —
+  the "bones" to configure later.
+
+Still no application code touched. Remaining outline item: the optional reviewer
+subagents (`ux-reviewer`, `test-reviewer`, `architecture-reviewer`) — the outline marks
+them optional/sparing, and the `vtt-ux-review` / `vtt-test-pass` skills already cover
+those lenses inline.
+
 ## 2026-07-17 — Claude Code tooling upgrade (foundation + scheduled slice)
 
 Stood up the Claude Code tooling layer described in `docs/claude-code-tooling-outline.md`
@@ -31,9 +50,8 @@ slice**:
 No application code touched — this is a tooling-only change on
 `claude/code-improvements-outline-eqvh9n`.
 
-**Follow-up (remaining outline work):** add the three lifecycle hooks (Stop /
-UserPromptSubmit / PreToolUse) in `.claude/settings.json`; optionally add a GitHub Actions
-scheduled ledger-drift workflow beside `ci.yml`.
+**Follow-up:** hooks and the GitHub Actions scaffold were completed later the same day
+(see the entry above).
 
 ## Before 2026-07-17 (context)
 

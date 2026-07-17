@@ -79,3 +79,8 @@ Durable decisions and roadmap: `docs/adr/`, `docs/product/`, `BUILD_PLAN.md`,
 The skill system that supports this workflow (task packets, context routing, QA,
 ledger updates, scheduling) is described in `docs/claude-code-tooling-outline.md`
 and lives in `.claude/skills/`. Use a skill when its trigger matches; don't force it.
+
+Lightweight hooks in `.claude/settings.json` enforce a few of these rules
+automatically (destructive-command guard, sensitive-area reminders, a
+completion-hygiene nudge) — see `.claude/hooks/README.md`. They fail open and are
+not a substitute for the judgment above.
