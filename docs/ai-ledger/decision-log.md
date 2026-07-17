@@ -49,4 +49,6 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   = `haiku` (mechanical — runs commands, reports), `ux-reviewer` / `architecture-reviewer`
   = `sonnet` (bounded judgment, strong enough to catch real issues). Interactive core work:
   Opus 4.8 / high effort; trivial asks: downshift the model per session. Config keys:
-  `model` + `effortLevel` in `settings.json`; per-subagent `model:` frontmatter.
+  `model` + `effortLevel` in `settings.json`; per-subagent `model:` frontmatter. The nightly
+  OpenAPI Routine runs on `sonnet` (bounded, PR-reviewed increments), set in its model
+  selector in the claude.ai Routines UI.
