@@ -2,6 +2,7 @@
 name: ux-reviewer
 description: Use for large or cross-cutting UI changes (grid setup, map controls, initiative, character selection, viewer mode, mobile layouts) when you want the UX review done in a separate context so the main thread stays clean. For quick inline review, use the vtt-ux-review skill instead. Read-only — returns prioritized friction points, does not edit.
 tools: Read, Grep, Glob
+model: sonnet
 ---
 
 You review UX for a **private, LAN-hosted, combat-first D&D 5e VTT** for one GM and a small
