@@ -22,10 +22,13 @@ Completed the remaining active outline items on the same branch:
   intentionally inert — cron commented out, `workflow_dispatch` only, placeholder job —
   the "bones" to configure later.
 
-Still no application code touched. Remaining outline item: the optional reviewer
-subagents (`ux-reviewer`, `test-reviewer`, `architecture-reviewer`) — the outline marks
-them optional/sparing, and the `vtt-ux-review` / `vtt-test-pass` skills already cover
-those lenses inline.
+- **Optional reviewer subagents** (`.claude/agents/`): `ux-reviewer`, `test-reviewer`,
+  `architecture-reviewer` — read-only, separate-context reviewers for large/cross-cutting
+  changes, complementing the inline `vtt-ux-review` / `vtt-test-pass` skills. The outline
+  marks these optional/sparing; delete them if you prefer inline-only review.
+
+Opened PR #33 to `main`. This completes every item in the tooling outline except
+configuring the (intentionally inert) scheduled workflow. Still no application code touched.
 
 ## 2026-07-17 — Claude Code tooling upgrade (foundation + scheduled slice)
 

@@ -57,7 +57,8 @@ This repo now carries a Claude Code tooling layer (this upgrade): `CLAUDE.md` in
 `vtt-qa-check`, `vtt-ledger-update`, `vtt-ux-review`, `vtt-test-pass`, `vtt-branch-safety`,
 `vtt-schedule`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
 PreToolUse, `scope-guard` UserPromptSubmit, `stop-reminder` Stop — see
-`.claude/hooks/README.md`). A GitHub Actions schedule scaffold
-(`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** — its cron is
-commented out and the job is a placeholder until configured. Design/roadmap in
+`.claude/hooks/README.md`). Three optional read-only reviewer subagents live in `.claude/agents/` (`ux-reviewer`,
+`test-reviewer`, `architecture-reviewer`) for large/cross-cutting changes. A GitHub Actions
+schedule scaffold (`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** —
+its cron is commented out and the job is a placeholder until configured. Design/roadmap in
 `docs/claude-code-tooling-outline.md`.
