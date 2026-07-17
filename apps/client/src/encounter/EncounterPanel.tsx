@@ -238,7 +238,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
     <div className="encounter-heading"><div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>{state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}</div>
-    {state.combat.scenes.length > 1 && <label className="scene-switch">Scene
+    {state.combat.scenes.length >= 1 && <label className="scene-switch">Scene
       <select value={state.combat.activeSceneId ?? ""} disabled={busy} onChange={(event) => {
         const sceneId = event.target.value;
         if (!sceneId || sceneId === state.combat.activeSceneId) return;

@@ -72,7 +72,7 @@ const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.s
 const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), sizeCells: z.number().int().min(1).max(4), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -437,10 +437,10 @@ export function createServer(options: CreateServerOptions) {
       const request = SetActorSizeSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The token size command is malformed." });
       try {
-        const { commandId, actorId, sizeCells, expectedRevision } = request.data;
+        const { commandId, actorId, size, expectedRevision } = request.data;
         const mapAssetId = store.snapshot.combat.mapAssetId;
         const geometry = mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
-        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision }, (state) => setActorSize(state, actorId, sizeCells, geometry));
+        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision }, (state) => setActorSize(state, actorId, size, geometry));
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be resized." }); }
@@ -561,7 +561,7 @@ export function createServer(options: CreateServerOptions) {
           } else {
             resolvedTargetIds = targetIds!;
           }
-          resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
+          resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id) });
           // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
           if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gm.sessionId, role: "gm" }, now: Date.now() }, geometry!);
         });

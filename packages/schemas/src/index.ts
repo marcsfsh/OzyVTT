@@ -16,6 +16,8 @@ export const ActorSchema = z.object({
   definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional(),
   /** Token footprint in grid cells per side (large 2, huge 3, gargantuan 4); absent means 1. */
   sizeCells: z.number().int().min(1).max(4).optional(),
+  /** D&D creature size label; drives sizeCells and lets the GM pick Tiny/Small/Medium (all 1×1). Absent means Medium. */
+  size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
   /** Custom uploaded token image (a token-asset id); absent means the initials glyph. Additive. */
   tokenAssetId: z.string().uuid().optional(),
   /** Active conditions by content-bundle id; `level` is only meaningful for exhaustion (1-6). Tracked and displayed, never auto-applied (ADR-0008 reference level). */

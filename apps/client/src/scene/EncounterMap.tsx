@@ -104,6 +104,9 @@ export function EncounterMap({
   const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
   const [rulerWhileMoving, setRulerWhileMoving] = useState(false);
+  // GM-controlled: whether measure-while-moving adds the +5 ft-per-occupied-cell penalty. Persisted.
+  const [showOccupied, setShowOccupied] = useState(() => localStorage.getItem("vtt.show-occupied") !== "0");
+  useEffect(() => { localStorage.setItem("vtt.show-occupied", showOccupied ? "1" : "0"); }, [showOccupied]);
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
   // Click-to-target: only the GM resolves actions, so the shared targeting session is inert for players.
   const targetingSession = useTargeting();
@@ -470,7 +473,7 @@ export function EncounterMap({
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   })() : "0 0 1 1";
   // Cells occupied by every OTHER visible token (players never receive hidden tokens, so no leak).
-  const occupiedByOthers = rulerWhileMoving && calibration && dragging
+  const occupiedByOthers = rulerWhileMoving && showOccupied && calibration && dragging
     ? new Set<string>(tokens.flatMap((encounterToken) => encounterToken.actorId !== dragging.actorId && encounterToken.position ? [...footprintCells(calibration, encounterToken.position, encounterToken.sizeCells)] : []))
     : null;
   const liveMove = rulerWhileMoving && calibration && dragSnappedPoint && dragging?.origin && occupiedByOthers
@@ -525,6 +528,7 @@ export function EncounterMap({
             {TOOLS.map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && entry.id !== "ping" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
           </div>
           <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on — extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
           {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active — new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
           <div className="encounter-map-wrench">
             <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>

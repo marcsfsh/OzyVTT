@@ -28,6 +28,7 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     conditions: [],
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
+    size: definition.size,
     sizeCells: Math.max(definition.token.footprint.width, definition.token.footprint.height)
   });
 }

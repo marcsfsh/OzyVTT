@@ -57,14 +57,16 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       if (!result.ok) setFeedback(result.message ?? "The reaction could not be updated.");
     });
   };
-  const setSize = (sizeCells: number) => {
+  const setSize = (size: string) => {
     setBusy(true);
-    socket.emit("actor:set-size", { commandId: newId(), actorId: actor.id, sizeCells }, (result: { ok: boolean; message?: string }) => {
+    socket.emit("actor:set-size", { commandId: newId(), actorId: actor.id, size: size as "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan" }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
       if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
     });
   };
-  const SIZES: ReadonlyArray<readonly [string, number, string]> = [["M", 1, "Medium"], ["L", 2, "Large"], ["H", 3, "Huge"], ["G", 4, "Gargantuan"]];
+  const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
+  const cap = (value: string) => `${value[0].toUpperCase()}${value.slice(1)}`;
+  const currentSize = actor.size ?? (actor.sizeCells === 4 ? "gargantuan" : actor.sizeCells === 3 ? "huge" : actor.sizeCells === 2 ? "large" : "medium");
 
   // The image picker replaces the menu while open; closing it dismisses the whole flow.
   if (library && gmToken) return <TokenLibrary actorId={actor.id} actorName={actor.name} definitionId={actor.definitionId ?? null} currentAssetId={actor.tokenAssetId ?? null} gmToken={gmToken} onClose={onClose} />;
@@ -82,10 +84,11 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", "Damaged")}>Dmg</button>
         <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", "Healed")}>Heal</button>
       </div>}
-      {role === "gm" && <div className="token-context-size" role="group" aria-label="Token size">
-        <span>Size</span>
-        {SIZES.map(([label, cells, full]) => <button key={cells} type="button" aria-pressed={(actor.sizeCells ?? 1) === cells} disabled={busy} title={`${full} (${cells}×${cells})`} onClick={() => setSize(cells)}>{label}</button>)}
-      </div>}
+      {role === "gm" && <label className="token-context-size">Size
+        <select value={currentSize} disabled={busy} onChange={(event) => setSize(event.target.value)}>
+          {SIZES.map((size) => <option key={size} value={size}>{cap(size)}</option>)}
+        </select>
+      </label>}
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
       {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}
       <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent — restore" : "Use reaction"}</button>

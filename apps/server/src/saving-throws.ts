@@ -22,6 +22,22 @@ export function halfOnSuccessFrom(description: string): boolean {
   return !/success:?\s*(the target )?(takes? )?no\b/i.test(description);
 }
 
+const CONDITION_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bprone\b/i, "prone"], [/\bpoisoned\b/i, "poisoned"], [/\bparalyzed\b/i, "paralyzed"], [/\bstunned\b/i, "stunned"],
+  [/\brestrained\b/i, "restrained"], [/\bgrappled\b/i, "grappled"], [/\bfrightened\b/i, "frightened"], [/\bblinded\b/i, "blinded"],
+  [/\bcharmed\b/i, "charmed"], [/\bdeafened\b/i, "deafened"], [/\bincapacitated\b/i, "incapacitated"], [/\bpetrified\b/i, "petrified"],
+  [/\bunconscious\b/i, "unconscious"]
+];
+/**
+ * Best-guess condition a failed save imposes, read from the action's prose (SRD save actions name it
+ * plainly: "…or be Poisoned"). The answerer sees "+ condition" and confirms before it applies, so a
+ * false positive is visible and reversible. Null when none is clearly named. Validate the id before use.
+ */
+export function conditionFrom(description: string): string | null {
+  for (const [pattern, id] of CONDITION_WORDS) if (pattern.test(description)) return id;
+  return null;
+}
+
 /**
  * Best-known save modifier for a target. Monsters carry final per-ability save bonuses in the
  * (untyped) open5e extension; anything else falls back to the ability modifier from the definition's

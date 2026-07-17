@@ -2,11 +2,11 @@ import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
 import { parseDiceFormula, resolveDice, type DiceExpression, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { createPendingSaves, halfOnSuccessFrom } from "./saving-throws.js";
+import { conditionFrom, createPendingSaves, halfOnSuccessFrom } from "./saving-throws.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 export type ResolveInput = Readonly<{ actorId: string; targetIds: readonly string[]; commandId: string; conditionId?: string | null }>;
-export type ResolveDependencies = Readonly<{ random: RandomSource; newRollId: () => string; gmSessionId: string; now: () => string }>;
+export type ResolveDependencies = Readonly<{ random: RandomSource; newRollId: () => string; gmSessionId: string; now: () => string; hasCondition?: (id: string) => boolean }>;
 
 /** Double every dice term (2024 crit rule: extra dice, modifiers once) and rebuild a matching formula string. */
 function criticalExpression(expression: DiceExpression): DiceExpression {
@@ -103,7 +103,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       targetIds: targets.map((target) => target.id),
       proposedDamage: damage.reduce((sum, part) => sum + part.total, 0),
       halfOnSuccess: halfOnSuccessFrom(action.description),
-      conditionId: input.conditionId ?? null,
+      // GM's explicit choice wins; otherwise auto-detect a condition from the action prose (only if the
+      // bundle actually has it), so "…or be Poisoned" applies on a failed save without manual tagging.
+      conditionId: input.conditionId ?? ((autoCondition) => autoCondition && (!deps.hasCondition || deps.hasCondition(autoCondition)) ? autoCondition : null)(conditionFrom(action.description)),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });

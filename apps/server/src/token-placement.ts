@@ -84,17 +84,21 @@ function snappedPosition(point: EncounterTokenPosition, radius: number, geometry
   return nearest ? { x: rounded(nearest.x), y: rounded(nearest.y) } : { x: rounded(requested.x), y: rounded(requested.y) };
 }
 
+export type CreatureSize = "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+/** D&D size → square-grid footprint. Tiny/Small/Medium all occupy one 5-ft cell; larger sizes scale up. */
+export const SIZE_CELLS: Readonly<Record<CreatureSize, number>> = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
+
 /**
- * Sets a combatant's token footprint (1–4 cells: Medium … Gargantuan). The actor's sizeCells drives
- * every future token; if the actor already has a token in the live encounter, its appearance is
- * recomputed and its position re-snapped to the new footprint. Works with no active map too (just
- * records the size for the next encounter). GM-only at the command layer.
+ * Sets a combatant's creature size (Tiny … Gargantuan). The size drives the token footprint (sizeCells);
+ * if the actor already has a token in the live encounter, its appearance is recomputed and its position
+ * re-snapped. Works with no active map too (just records the size for the next encounter). GM-only.
  */
-export function setActorSize(state: GameState, actorId: string, sizeCells: number, geometry: TokenMapGeometry | null) {
-  if (!Number.isInteger(sizeCells) || sizeCells < 1 || sizeCells > 4) throw new CommandRejectedError("Token size must be Medium, Large, Huge, or Gargantuan (1–4 cells).");
+export function setActorSize(state: GameState, actorId: string, size: CreatureSize, geometry: TokenMapGeometry | null) {
+  const sizeCells = SIZE_CELLS[size];
+  if (sizeCells === undefined) throw new CommandRejectedError("Choose a creature size from Tiny to Gargantuan.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, sizeCells } : candidate);
+  state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, size, sizeCells } : candidate);
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (token && geometry) {
     const appearance = encounterTokenAppearance(geometry, sizeCells);

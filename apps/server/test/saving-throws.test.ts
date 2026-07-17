@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { answerSave, createPendingSaves, dismissSave, halfOnSuccessFrom, saveModifierFor, type SaveAnswerDependencies } from "../src/saving-throws.js";
+import { answerSave, conditionFrom, createPendingSaves, dismissSave, halfOnSuccessFrom, saveModifierFor, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
 import { projectPlayerCombat } from "../src/projections.js";
@@ -63,6 +63,12 @@ describe("saving-throw prompts", () => {
     expect(halfOnSuccessFrom("Success: Half damage.")).toBe(true);
     expect(halfOnSuccessFrom("Failure: 10 damage. Success: No damage.")).toBe(false);
     expect(halfOnSuccessFrom("some prose")).toBe(true);
+  });
+
+  it("detects a condition a failed save imposes from the action prose", () => {
+    expect(conditionFrom("Failure: The target has the Poisoned condition until the end of its next turn.")).toBe("poisoned");
+    expect(conditionFrom("On a failed save the target is knocked Prone.")).toBe("prone");
+    expect(conditionFrom("Failure: 15 Fire damage.")).toBeNull();
   });
 
   it("auto-applies full damage and the condition on a failed save", () => {

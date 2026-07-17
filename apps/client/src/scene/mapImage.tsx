@@ -238,7 +238,10 @@ export function occupiedPathCost(calibration: GridCalibration, origin: { x: numb
   const to = imageToGridPreview(calibration, target);
   const originCell = `${Math.floor(from.column)},${Math.floor(from.row)}`;
   const destCell = `${Math.floor(to.column)},${Math.floor(to.row)}`;
-  const steps = Math.max(Math.abs(Math.floor(to.column) - Math.floor(from.column)), Math.abs(Math.floor(to.row) - Math.floor(from.row)));
+  // Chebyshev distance from the raw center-to-center grid delta (matches chebyshevFeetPreview). Using
+  // floor-differences here is unstable for even footprints (Large/Huge/Gargantuan center on integer
+  // grid intersections, where floating-point noise flips the floor) — that caused the 10→20 ft skips.
+  const steps = Math.round(Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row)));
   let penaltyCells = 0;
   for (const cell of cellsOnGridSegment(from.column, from.row, to.column, to.row)) {
     if (cell !== originCell && cell !== destCell && occupied.has(cell)) penaltyCells++;
