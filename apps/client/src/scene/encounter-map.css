@@ -16,7 +16,7 @@
 .tray-token.npc { background: #35432a; }
 .tray-token.npc > span { background: #52623d; }
 .tray-token.hidden { border-style: dashed; opacity: .76; }
-.encounter-map-stage { --dock-side-width: 22rem; --dock-strip-height: 16rem; position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; touch-action: none; }
+.encounter-map-stage { --dock-side-width: 22rem; position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; touch-action: none; }
 .encounter-map-stage svg { display: block; width: 100%; max-height: min(72vh, 680px); background: #090806; user-select: none; }
 .encounter-map-stage > p { padding: 2rem; text-align: center; }
 .encounter-token { outline: none; }
@@ -31,17 +31,23 @@
 .encounter-token-name { dominant-baseline: hanging; }
 .encounter-token.movable:focus-visible .encounter-token-body { stroke: #ffcf62; stroke-width: 6; }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
-.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; gap: .35rem; }
-/* Keep the zoom cluster clear of the docked panel: opposite side for a left/right dock, lifted above a bottom strip. */
-.encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; }
-.encounter-map-zoom.zoom-dock-bottom { bottom: calc(var(--dock-strip-height) + .7rem); }
+.encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
+/* Keep the zoom cluster clear of a left/right docked panel by moving it to the opposite corner. */
+.encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
+/* The 3-way dock control lives in the zoom cluster so it's reachable even inside the enlarged map. */
+.encounter-map-dock-control { display: inline-flex; gap: .35rem; margin-right: .2rem; }
+.encounter-map-zoom .encounter-map-dock-control button[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 /* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize. */
 .encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: rgb(20 17 12 / 94%); }
 .encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid #514936; }
 .encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid #514936; }
-.encounter-map-dock.dock-top { top: 0; left: 0; right: 0; height: var(--dock-strip-height); border-bottom: 1px solid #514936; }
-.encounter-map-dock.dock-bottom { bottom: 0; left: 0; right: 0; height: var(--dock-strip-height); border-top: 1px solid #514936; }
 .encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
+/* Inner-edge grab strip to resize a left/right dock; spans the full height so you can grab anywhere. */
+.encounter-map-dock-resize { position: absolute; top: 0; bottom: 0; width: 14px; z-index: 3; cursor: col-resize; touch-action: none; }
+.encounter-map-dock-resize.dock-resize-left { left: calc(var(--dock-side-width) - 7px); }
+.encounter-map-dock-resize.dock-resize-right { right: calc(var(--dock-side-width) - 7px); }
+.encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: #514936; transition: background .15s, width .15s; }
+.encounter-map-dock-resize:hover::before, .encounter-map-dock-resize:active::before { background: #e8a743; width: 3px; }
 .encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-map-zoom button:hover { border-color: #e8a743; }
 .encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: #090806; }
@@ -86,11 +92,9 @@
 
 .encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
 /* Slide the overlaid tool cluster (top-left) and shape editor (top-right) clear of a docked panel
-   sharing their edge, so a left/top dock never hides the tools and a right/top dock never hides the editor. */
+   sharing their edge, so a left dock never hides the tools and a right dock never hides the editor. */
 .encounter-map-stage.has-dock-left .encounter-map-overlay { left: calc(var(--dock-side-width) + .7rem); }
-.encounter-map-stage.has-dock-top .encounter-map-overlay { top: calc(var(--dock-strip-height) + .7rem); }
 .encounter-map-stage.has-dock-right .encounter-shape-editor { right: calc(var(--dock-side-width) + .7rem); }
-.encounter-map-stage.has-dock-top .encounter-shape-editor { top: calc(var(--dock-strip-height) + .7rem); }
 .encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .encounter-shape-editor-head strong { text-transform: capitalize; }
 .encounter-shape-editor-head span { color: #9f9789; font-size: .7rem; }

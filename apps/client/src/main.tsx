@@ -44,7 +44,12 @@ function App() {
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const [dockPosition, setDockPosition] = useState<DockPosition>(() => {
     const stored = localStorage.getItem("vtt.dock-position");
+    if (stored === "top" || stored === "bottom") return "right"; // top/bottom docking was removed; nearest edge is right
     return DOCK_POSITIONS.includes(stored as DockPosition) ? (stored as DockPosition) : "sidebar";
+  });
+  const [dockWidth, setDockWidth] = useState<number>(() => {
+    const stored = Number(localStorage.getItem("vtt.dock-width"));
+    return Number.isFinite(stored) && stored >= 240 ? stored : 352; // 22rem default
   });
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
@@ -75,6 +80,7 @@ function App() {
     };
   }, []);
   useEffect(() => { localStorage.setItem("vtt.dock-position", dockPosition); }, [dockPosition]);
+  useEffect(() => { localStorage.setItem("vtt.dock-width", String(dockWidth)); }, [dockWidth]);
 
   const joinPlayer = () => {
     setBusy(true);
@@ -143,6 +149,11 @@ function App() {
       ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} dock={encounterDock} />
       : <EncounterPanel role="player" state={state as PlayerView} dock={encounterDock} />)
     : null;
+  // The map dock is present whenever combat is running (even in sidebar mode) so its in-map dock
+  // control is reachable from inside the enlarged map; `node` is only the panel when actually docked.
+  const mapDock = combatMapActive
+    ? { position: dockPosition, onChange: setDockPosition, width: dockWidth, onWidthChange: setDockWidth, node: showDocked ? encounterPanel : null }
+    : undefined;
   return <main>
     <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
@@ -178,7 +189,7 @@ function App() {
             annotations={state.combat.annotations}
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
-            dock={showDocked ? { node: encounterPanel, position: dockPosition } : undefined}
+            dock={mapDock}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
           {mode === "gm" && gmToken && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>

@@ -86,7 +86,7 @@ export function EncounterMap({
   annotations: readonly AnyAnnotation[];
   revision: number;
   activeActorId: string | null;
-  dock?: Readonly<{ node: React.ReactNode; position: DockPosition }>;
+  dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -154,7 +154,7 @@ export function EncounterMap({
       if (!svgRef.current || !size) return;
       // Wheeling over an overlaid panel (a docked initiative tracker, an open menu, the shape editor)
       // must scroll that panel, not zoom the map behind it — mirror the pointer-down guard below.
-      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor")) return;
+      if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor")) return;
       event.preventDefault();
       zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
     };
@@ -190,8 +190,6 @@ export function EncounterMap({
       let visibleW = svgRect.width, visibleH = svgRect.height, offsetX = 0, offsetY = 0;
       if (dock?.position === "right") { visibleW -= dockRect.width; offsetX = -dockRect.width / 2; }
       else if (dock?.position === "left") { visibleW -= dockRect.width; offsetX = dockRect.width / 2; }
-      else if (dock?.position === "bottom") { visibleH -= dockRect.height; offsetY = -dockRect.height / 2; }
-      else if (dock?.position === "top") { visibleH -= dockRect.height; offsetY = dockRect.height / 2; }
       if (visibleW > 0 && visibleH > 0 && baseScale > 0) {
         const fit = Math.min(visibleW / (size.width * baseScale), visibleH / (size.height * baseScale));
         zoom = Math.max(MIN_ZOOM, Math.min(1, fit));
@@ -204,6 +202,28 @@ export function EncounterMap({
   const zoomCenter = (factor: number) => { const svg = svgRef.current; if (!svg || !size) return; const rect = svg.getBoundingClientRect(); zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor); };
   const toggleFullscreen = () => { const el = stageRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else { setEnlarged(false); void el.requestFullscreen?.(); } };
   const toggleEnlarged = () => setEnlarged((current) => { if (!current && fullscreen) void document.exitFullscreen?.(); return !current; });
+  // Drag the docked panel's inner-edge strip to resize its width. Pointer-capture keeps the drag
+  // alive off the strip; width is clamped to [16rem, 60% of the stage] and persisted by the parent.
+  const beginDockResize = (event: React.PointerEvent) => {
+    if (!dock) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = dock.width;
+    const stageWidth = stageRef.current?.getBoundingClientRect().width ?? 1000;
+    const maxWidth = stageWidth * 0.6;
+    const minWidth = 16 * 16; // 16rem
+    const onMove = (move: PointerEvent) => {
+      const delta = dock.position === "left" ? move.clientX - startX : startX - move.clientX;
+      dock.onWidthChange(Math.max(minWidth, Math.min(maxWidth, startWidth + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const canMove = (actorId: string) => {
     if (role === "gm") return true;
@@ -257,7 +277,7 @@ export function EncounterMap({
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
-    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock")) return;
+    if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize")) return;
     if (tool === "ping") {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); void submitPing(point);
@@ -408,7 +428,7 @@ export function EncounterMap({
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
     </div>
-    <div className={`encounter-map-stage${dock ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} aria-busy={image.status !== "ready"}>
+    <div className={`encounter-map-stage${dock?.node ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} style={dock?.node ? ({ "--dock-side-width": `${dock.width}px` } as React.CSSProperties) : undefined} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           <div className="encounter-map-eye">
@@ -500,9 +520,17 @@ export function EncounterMap({
           </div>;
         })()}
 
-        {dock && <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>}
+        {dock?.node && <>
+          <div className={`encounter-map-dock dock-${dock.position}`}>{dock.node}</div>
+          <div className={`encounter-map-dock-resize dock-resize-${dock.position}`} role="separator" aria-label="Drag to resize the docked tracker" title="Drag to resize" onPointerDown={beginDockResize} />
+        </>}
 
-        <div className={`encounter-map-zoom${dock ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
+        <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
+          {dock && <span className="encounter-map-dock-control" role="group" aria-label="Dock the tracker">
+            <button type="button" aria-label="Dock tracker left" aria-pressed={dock.position === "left"} title="Dock tracker left" onClick={() => dock.onChange("left")}>◧</button>
+            <button type="button" aria-label="Dock tracker right" aria-pressed={dock.position === "right"} title="Dock tracker right" onClick={() => dock.onChange("right")}>◨</button>
+            <button type="button" aria-label="Move tracker to the sidebar" aria-pressed={dock.position === "sidebar"} title="Move tracker to the sidebar" onClick={() => dock.onChange("sidebar")}>▦</button>
+          </span>}
           <button type="button" aria-label="Zoom in" onClick={() => zoomCenter(1.3)}>+</button>
           <button type="button" aria-label="Zoom out" onClick={() => zoomCenter(1 / 1.3)}>−</button>
           <button type="button" onClick={resetView}>Reset view</button>

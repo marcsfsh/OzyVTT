@@ -19,19 +19,18 @@ function emitCommand(event: CommandEvent, payload: CommandPayload) {
 
 const validInitiativeScore = (value: string | undefined) => value !== undefined && value.trim() !== "" && Number.isInteger(Number(value)) && Number(value) >= -1000 && Number(value) <= 1000;
 
-export const DOCK_POSITIONS = ["sidebar", "left", "right", "top", "bottom"] as const;
+export const DOCK_POSITIONS = ["sidebar", "left", "right"] as const;
 export type DockPosition = (typeof DOCK_POSITIONS)[number];
 type DockControl = Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;
 type GmProps = Readonly<{ role: "gm"; state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>;
 type PlayerProps = Readonly<{ role: "player"; state: PlayerView; dock?: DockControl }>;
 
-// The glyph is a square with the shaded half showing where the panel lands (left/right/top/bottom),
-// plus a "sidebar" option that pops it back out beside the map.
+// The glyph is a square with the shaded half showing which edge the panel lands on (left/right),
+// plus a "sidebar" option that pops it back out beside the map. Width is adjustable by dragging the
+// docked panel's inner edge (see EncounterMap's resize strip).
 const DOCK_CHOICES: ReadonlyArray<{ value: DockPosition; glyph: string; label: string }> = [
   { value: "left", glyph: "◧", label: "Dock left of the map" },
   { value: "right", glyph: "◨", label: "Dock right of the map" },
-  { value: "top", glyph: "⬒", label: "Dock above the map" },
-  { value: "bottom", glyph: "⬓", label: "Dock below the map" },
   { value: "sidebar", glyph: "▦", label: "Move back to the sidebar" }
 ];
 // Compact position picker on its own row (never competes with the title for width). Each docked
