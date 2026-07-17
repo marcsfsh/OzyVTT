@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domain";
 import { useConfirm } from "../components/feedback";
 import { CharacterSheet } from "../encounter/CharacterSheet";
@@ -47,6 +47,19 @@ export function ActorRoster(props: Props) {
   const [claiming, setClaiming] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const importFileRef = useRef<HTMLInputElement | null>(null);
+
+  const importSheet = (file: File) => {
+    setFeedback(`Importing ${file.name}…`);
+    file.text().then((text) => {
+      let parsed: unknown;
+      try { parsed = JSON.parse(text); } catch { setFeedback("That file is not valid JSON."); return; }
+      socket.emit("actor:import-definition", { commandId: newId(), definition: parsed }, (result) => {
+        const name = typeof parsed === "object" && parsed !== null && "name" in parsed ? String((parsed as { name: unknown }).name) : file.name;
+        setFeedback(result.ok ? `Imported ${name} — it's ready to claim below.` : result.message ?? "The sheet could not be imported.");
+      });
+    }).catch(() => setFeedback("The file could not be read."));
+  };
   const { confirm, dialog } = useConfirm();
   const actors = props.state.actors.filter((actor) => actor.kind === "player-character");
   const ownedActor = props.role === "player" ? actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine") ?? null : null;
@@ -98,6 +111,10 @@ export function ActorRoster(props: Props) {
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
       <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
     </div>
+    {props.role === "gm" && <div className="roster-import">
+      <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
+      <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</button>
+    </div>}
     {props.role === "player" && ownedActor && <div className="you-are-playing">
       <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
       <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />

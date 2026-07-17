@@ -20,7 +20,7 @@ function activeState() {
     combat: {
       active: true, round: 1, turnActorId: ACTOR, mapAssetId: MAP,
       initiative: [{ actorId: ACTOR, score: 20 }],
-      tokens: createEncounterTokens([ACTOR], geometry)
+      tokens: createEncounterTokens([{ actorId: ACTOR }], geometry)
     }
   });
 }

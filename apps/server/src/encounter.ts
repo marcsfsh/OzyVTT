@@ -38,7 +38,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     turnActorId: sorted[0].actorId,
     mapAssetId: input.mapAssetId,
     initiative: sorted,
-    tokens: createEncounterTokens(sorted.map((entry) => entry.actorId), tokenGeometry),
+    tokens: createEncounterTokens(sorted.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), tokenGeometry),
     annotations: [],
     turn: { actionUsed: false, bonusActionUsed: false },
     reactionsUsed: []

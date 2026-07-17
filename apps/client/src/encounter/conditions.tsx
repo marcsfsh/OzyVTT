@@ -38,6 +38,17 @@ export function useConditionReference(): readonly ContentConditionSummary[] {
   return reference;
 }
 
+/** Reference-free display label for badges (the viewer uses the same shape server-side): "Prone", "Exhaustion 3". */
+export const conditionBadgeLabel = (instance: ConditionInstance) =>
+  `${instance.id.split("-").map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`).join(" ")}${instance.level !== undefined ? ` ${instance.level}` : ""}`;
+
+/** Band from whichever hp shape the audience receives (GM exact, player exact-or-band). */
+export function healthBandFor(hp: { current: number; maximum: number; temporary: number } | { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: "healthy" | "bloodied" | "down" }): "healthy" | "bloodied" | "down" {
+  if ("kind" in hp && hp.kind === "band") return hp.band;
+  const exact = hp as { current: number; maximum: number };
+  return exact.current <= 0 ? "down" : exact.current * 2 <= exact.maximum ? "bloodied" : "healthy";
+}
+
 const labelFor = (instance: ConditionInstance, reference: readonly ContentConditionSummary[]) => {
   const name = reference.find((entry) => entry.id === instance.id)?.name ?? instance.id;
   return instance.id === "exhaustion" && instance.level !== undefined ? `${name} ${instance.level}` : name;

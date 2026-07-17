@@ -1,7 +1,11 @@
 import { z } from "zod";
-import { ActorSchema, type Actor } from "@vtt/schemas";
+import { ActorDefinitionSchema, ActorSchema, type Actor, type ActorDefinition } from "@vtt/schemas";
 
 export { ACTOR_SCHEMA_VERSION, ActorSchema, type Actor, type ActorDefinition } from "@vtt/schemas";
+
+/** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
+export const StoredDefinitionSchema = z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(200), definition: ActorDefinitionSchema }).strict();
+export type StoredDefinition = z.infer<typeof StoredDefinitionSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
 export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "manual"]);
@@ -47,7 +51,9 @@ export const EncounterTokenSchema = z.object({
   position: EncounterTokenPositionSchema.nullable().default(null),
   sizePx: z.number().finite().positive().max(4096),
   gridSizePx: z.number().finite().positive().max(4096).nullable().default(null),
-  gridRotationRadians: z.number().finite().min(-Math.PI).max(Math.PI).nullable().default(null)
+  gridRotationRadians: z.number().finite().min(-Math.PI).max(Math.PI).nullable().default(null),
+  /** Footprint in cells per side; even sizes snap to grid intersections instead of cell centers. */
+  sizeCells: z.number().int().min(1).max(4).default(1)
 }).strict();
 export type EncounterTokenPosition = z.infer<typeof EncounterTokenPositionSchema>;
 export type EncounterToken = z.infer<typeof EncounterTokenSchema>;
@@ -139,7 +145,9 @@ export const GameStateSchema = z.object({
   revision: z.number().int().nonnegative().default(0),
   actors: z.array(ActorSchema).default([]),
   rolls: z.array(RollRecordSchema).default([]),
-  combat: CombatStateSchema.default({ active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [], tokens: [], annotations: [] })
+  combat: CombatStateSchema.default({ active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [], tokens: [], annotations: [] }),
+  /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign, additive per ADR-0007. */
+  definitions: z.array(StoredDefinitionSchema).max(100).default([])
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
@@ -152,7 +160,7 @@ export type PresenceStatus = z.infer<typeof PresenceStatusSchema>;
 export type HealthBand = "healthy" | "bloodied" | "down";
 /** Player characters stay exact for the whole party; monsters/NPCs reach players only as a band so the GM keeps exact numbers. */
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp"> & { hp: PlayerHp; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp"> & { hp: PlayerHp; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[] }>;
@@ -199,6 +207,7 @@ export interface ClientToServerEvents {
   "content:monsters": (payload: Record<string, never>, acknowledgement: (result: ContentMonstersResult) => void) => void;
   "actor:add-from-definition": (payload: { commandId: string; definitionId: string; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:remove": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:import-definition": (payload: { commandId: string; definition: unknown; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-temp-hp": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

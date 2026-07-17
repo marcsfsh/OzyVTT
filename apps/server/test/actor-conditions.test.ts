@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import { setCondition } from "../src/actor-conditions.js";
+import { startEncounter } from "../src/encounter.js";
 import { projectPlayerView } from "../src/projections.js";
+import { projectViewerEncounter } from "../src/viewer-encounter.js";
 
 const IDS = {
   pc: "10000000-0000-4000-8000-000000000001",
@@ -39,6 +41,20 @@ describe("condition tracking", () => {
     setCondition(game, IDS.pc, "exhaustion", true, 3, GM);
     expect(game.actors[0].conditions).toEqual([{ id: "exhaustion", level: 3 }]);
     expect(() => setCondition(game, IDS.pc, "prone", true, 2, GM)).toThrow(/Only exhaustion/);
+  });
+
+  it("projects display labels to the viewer for public combatants only", () => {
+    const game = state();
+    startEncounter(game, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: IDS.pc, score: 15 }, { actorId: IDS.monster, score: 10 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    setCondition(game, IDS.monster, "prone", true, undefined, GM);
+    setCondition(game, IDS.monster, "exhaustion", true, 2, GM);
+    game.actors[1].visibility = "public";
+    const viewer = projectViewerEncounter(game);
+    const entry = viewer.initiative.entries.find((item) => item.actorId === IDS.monster);
+    expect(entry?.conditions).toEqual(["Exhaustion 2", "Prone"]);
+    game.actors[1].visibility = "gm-only";
+    const hiddenViewer = projectViewerEncounter(game);
+    expect(JSON.stringify(hiddenViewer)).not.toContain(IDS.monster);
   });
 
   it("scopes players to their own character and projects conditions publicly", () => {

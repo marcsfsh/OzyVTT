@@ -8,6 +8,36 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Post-A–G polish: token footprints, condition/health badges, PC sheet import
+
+Three deferred slices, on `claude/srd-content-pipeline` atop phases A–G:
+
+- **Token footprints.** `Actor.sizeCells` (1–4, derived from the definition's token
+  footprint) drives multi-cell tokens: large 2×2, huge 3×3, gargantuan 4×4. The server owns
+  the geometry — `encounterTokenAppearance`/`snappedPosition` size the token to the footprint
+  and snap odd footprints centered on a cell (offset 0.5) vs even footprints on a grid
+  intersection (offset 0); the client drag preview mirrors the same offset so placement is
+  WYSIWYG. `EncounterTokenSchema` and start-encounter/roster wiring carry `sizeCells`.
+- **Condition + health badges.** Map tokens gain a bloodied/down status dot and up to three
+  condition-initial badges (+N overflow); the same coarse health band + condition labels now
+  show in the **viewer** initiative and on viewer tokens. Viewer safety held: only bands and
+  condition labels are projected — exact HP never reaches the public screen, and hidden
+  actors are excluded (test-asserted no-leak).
+- **PC sheet import.** GM imports a canonical `ActorDefinition` JSON from the roster
+  (`actor:import-definition`, GM-only, 256 KB cap, schema-validated) as a claimable
+  player-character. The stat block is stored in `GameState.definitions` and projected **only
+  to the owning player**; `CharacterSheet` prefers the owned definition over a fetch so a
+  player sees their full imported sheet while strangers see nothing. `removeActor` refuses a
+  claimed PC and garbage-collects an orphaned imported definition.
+
+Verified: check / test (222: +2 footprint, +3 import, viewer-safety + no-leak assertions
+updated) / build all green. Browser pass deferred to the owner's manual test (their stated
+plan) — the server-boot smoke was declined this session; viewer-safety and projection
+invariants are covered by the automated suite.
+
+**Follow-up:** owner tests these three, then merges `claude/srd-content-pipeline`. Next PR is
+API + UX/UI (public API parity per PR F, plus UX polish).
+
 ## 2026-07-17 — Phase G: character sheet (track, never build) — plan complete
 
 `CharacterSheet` overlay: live actor state (HP with in-sheet Dmg/Heal/Temp[/Set], the

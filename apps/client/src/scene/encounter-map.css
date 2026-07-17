@@ -108,3 +108,10 @@
 
 @media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
 @media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } .encounter-shape-editor { width: 12rem; } }
+/* Health/condition badges over tokens: bloodied amber, down red; condition initials beneath. */
+.token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.token-health-bloodied { fill: #e8a743; }
+.token-health-down { fill: #d9605a; }
+.token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }

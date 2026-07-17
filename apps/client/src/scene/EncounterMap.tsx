@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
 import type { DockPosition } from "../encounter/EncounterPanel";
 import { newId } from "../lib/ids";
@@ -367,7 +368,8 @@ export function EncounterMap({
   const unplaced = tokens.filter((encounterToken) => encounterToken.position === null && canMove(encounterToken.actorId));
   const dragging = gesture?.kind === "token" ? gesture : null;
   // Show the dragged token snapped to the grid live (mirrors the server snap on release).
-  const dragSnappedPoint = dragging?.point ? (calibration ? snapCellCenterPreview(calibration, dragging.point) : dragging.point) : null;
+  const draggingSizeCells = dragging ? tokens.find((token) => token.actorId === dragging.actorId)?.sizeCells ?? 1 : 1;
+  const dragSnappedPoint = dragging?.point ? (calibration ? snapCellCenterPreview(calibration, dragging.point, draggingSizeCells) : dragging.point) : null;
   const visibleTokens = tokens.flatMap((encounterToken) => {
     const position = dragging?.actorId === encounterToken.actorId ? dragSnappedPoint : encounterToken.position;
     return position ? [{ ...encounterToken, position }] : [];
@@ -462,6 +464,7 @@ export function EncounterMap({
             return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
               <TokenGlyph sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
+              <TokenStatusBadges sizePx={encounterToken.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map(conditionBadgeLabel)} />
             </g>;
           })}
           {/* Measurements and pings render above the token layer so they're never hidden behind a piece. */}

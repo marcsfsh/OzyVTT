@@ -112,7 +112,7 @@ describe("live authoritative encounter workflow", () => {
         visible: true,
         round: 1,
         hiddenTurn: true,
-        entries: [{ actorId: HERO_ID, name: "Public Hero", initiative: 18, active: false }]
+        entries: [{ actorId: HERO_ID, name: "Public Hero", initiative: 18, active: false, health: "healthy", conditions: [] }]
       });
       const activeMap = await fetch(`${base}/api/v1/map-assets/${imported.metadata.id}/content`, { headers: { authorization: `Bearer ${playerToken}` } });
       expect(activeMap.status).toBe(200);
@@ -203,8 +203,8 @@ describe("live authoritative encounter workflow", () => {
       const moved = await emitCommand(ownerSocket, "token:move", { commandId: "61000000-0000-4000-8000-000000000004", actorId: HERO_ID, position: { x: 78, y: 74 }, expectedRevision: 2 });
       expect(moved).toMatchObject({ ok: true, revision: 3, duplicate: false });
       const ownerView = await ownerConvergence;
-      expect(ownerView.combat.tokens).toEqual([{ actorId: HERO_ID, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0 }]);
-      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false }], annotations: [] });
+      expect(ownerView.combat.tokens).toEqual([{ actorId: HERO_ID, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 }]);
+      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false, health: "healthy", conditions: [] }], annotations: [] });
 
       const hiddenMoveId = "61000000-0000-4000-8000-000000000005";
       expect(await emitCommand(gmSocket, "token:move", { commandId: hiddenMoveId, actorId: SECRET_ID, position: { x: 127, y: 127 }, expectedRevision: 3 })).toMatchObject({ ok: true, revision: 4, duplicate: false });

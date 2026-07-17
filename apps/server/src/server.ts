@@ -6,11 +6,11 @@ import { Server } from "socket.io";
 import { z } from "zod";
 import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
-import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
+import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema } from "@vtt/schemas";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
 import { resolveDefinitionAction } from "./action-resolution.js";
-import { addActorFromDefinition, removeActor } from "./actor-roster.js";
+import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
@@ -315,6 +315,23 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
     });
+    socket.on("actor:import-definition", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can import sheets." });
+      const envelope = z.object({ commandId: z.string().uuid(), definition: z.unknown(), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict().safeParse(payload);
+      if (!envelope.success) return acknowledge({ ok: false, message: "The import command is malformed." });
+      if (JSON.stringify(envelope.data.definition ?? null).length > 262_144) return acknowledge({ ok: false, message: "That sheet is too large to import." });
+      const parsed = ActorDefinitionSchema.safeParse(envelope.data.definition);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return acknowledge({ ok: false, message: `That file is not a valid actor definition (${issue.path.join(".") || "root"}: ${issue.message}).` });
+      }
+      try {
+        const actorId = envelope.data.commandId;
+        const result = await store.execute({ id: envelope.data.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.data.expectedRevision }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.data.visibility));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The sheet could not be imported." }); }
+    });
     socket.on("actor:remove", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove combatants." });
       const request = ActorRemoveSchema.safeParse(payload);
@@ -386,11 +403,16 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
     });
+    // Imported stat blocks take precedence over the bundle so sheets/actions resolve for both.
+    const resolveDefinition = (definitionId: string) => storedDefinition(store.snapshot, definitionId) ?? contentLibrary.monster(definitionId);
     socket.on("content:monster-actions", (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse stat blocks." });
       const request = ContentActionsSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The action lookup is malformed." });
-      const actions = contentLibrary.monsterActionSummaries(request.data.definitionId);
+      const imported = storedDefinition(store.snapshot, request.data.definitionId);
+      const actions = imported
+        ? imported.actions.map((action) => ({ id: action.id, name: action.name, activation: action.activation, description: action.description, attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, saveAbility: action.save?.ability ?? null, saveDc: action.save?.dc ?? null, damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })) }))
+        : contentLibrary.monsterActionSummaries(request.data.definitionId);
       if (!actions) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
       acknowledge({ ok: true, actions });
     });
@@ -398,7 +420,7 @@ export function createServer(options: CreateServerOptions) {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can read stat blocks." });
       const request = ContentActionsSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The stat-block lookup is malformed." });
-      const definition = contentLibrary.monster(request.data.definitionId);
+      const definition = resolveDefinition(request.data.definitionId);
       if (!definition) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
       acknowledge({ ok: true, definition });
     });
@@ -413,7 +435,7 @@ export function createServer(options: CreateServerOptions) {
         const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision }, (state) => {
           const attacker = state.actors.find((item) => item.id === actorId);
           if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
-          const action = contentLibrary.monsterAction(attacker.definitionId, actionId);
+          const action = (storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId))?.actions.find((candidate) => candidate.id === actionId);
           if (!action) throw new CommandRejectedError("That action is not on the stat block.");
           resolution = resolveDefinitionAction(state, action, { actorId, targetIds, commandId }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
         });

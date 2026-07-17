@@ -1,16 +1,26 @@
-import type { GameState } from "@vtt/domain";
+import type { Actor, GameState } from "@vtt/domain";
+import { healthBandOf } from "./hit-points.js";
 import { projectPublicInitiative } from "./projections.js";
 import type { ViewerEncounterScene, ViewerInitiative } from "./viewer-presentation.js";
 
+/** Display labels for the shared screen (which has no rules-reference lookup): "Prone", "Exhaustion 3". */
+function conditionLabels(actor: Actor): readonly string[] {
+  return actor.conditions.map((condition) => `${condition.id.split("-").map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`).join(" ")}${condition.level !== undefined ? ` ${condition.level}` : ""}`);
+}
+
 export function projectViewerInitiative(state: GameState): ViewerInitiative {
   if (!state.combat.active) return { visible: false, round: 0, hiddenTurn: false, entries: [] };
+  const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
   const publicEntries = projectPublicInitiative(state);
   const hasPublicActiveEntry = publicEntries.some((entry) => entry.active);
   return {
     visible: true,
     round: state.combat.round,
     hiddenTurn: state.combat.turnActorId !== null && !hasPublicActiveEntry,
-    entries: publicEntries.map((entry) => ({ actorId: entry.actorId, name: entry.name, initiative: entry.score, active: entry.active }))
+    entries: publicEntries.map((entry) => {
+      const actor = publicActors.get(entry.actorId);
+      return { actorId: entry.actorId, name: entry.name, initiative: entry.score, active: entry.active, health: entry.health, conditions: actor ? conditionLabels(actor) : [] };
+    })
   };
 }
 
@@ -27,7 +37,9 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
         kind: actor.kind,
         position: token.position,
         sizePx: token.sizePx,
-        active: state.combat.turnActorId === actor.id
+        active: state.combat.turnActorId === actor.id,
+        health: healthBandOf(actor.hp),
+        conditions: conditionLabels(actor)
       }] : [];
     }),
     // The shared screen is a public display, so only `public` annotations reach it; expired

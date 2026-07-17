@@ -96,6 +96,34 @@ export function TokenGlyph({ sizePx, name, active, turnClassName, bodyClassName,
   </>;
 }
 
+/**
+ * Health/condition badges layered over a token: a bloodied/down dot at the top-right and up
+ * to three condition initials beneath the body (with a +N overflow). Shared by the table
+ * client and the viewer so both read the same at a glance.
+ */
+export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly string[] }>) {
+  const radius = Math.max(4, sizePx * 0.11);
+  const shown = conditions.slice(0, 3);
+  const overflow = conditions.length - shown.length;
+  const badgeY = sizePx * 0.5 + radius * 1.15;
+  const startX = -((shown.length + (overflow > 0 ? 1 : 0)) - 1) * radius * 1.1;
+  return <>
+    {health !== "healthy" && <circle className={`token-health token-health-${health}`} cx={sizePx * 0.38} cy={-sizePx * 0.38} r={radius}>
+      <title>{health === "down" ? "Down" : "Bloodied"}</title>
+    </circle>}
+    {shown.map((label, index) => <g key={label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>
+      <title>{conditions.join(", ")}</title>
+      <circle r={radius} />
+      <text style={{ fontSize: radius * 1.25 }}>{label[0]?.toUpperCase() ?? "?"}</text>
+    </g>)}
+    {overflow > 0 && <g className="token-condition token-condition-more" transform={`translate(${startX + shown.length * radius * 2.2} ${badgeY})`}>
+      <title>{conditions.join(", ")}</title>
+      <circle r={radius} />
+      <text style={{ fontSize: radius * 1.1 }}>+{overflow}</text>
+    </g>}
+  </>;
+}
+
 export type GridCalibration = Readonly<{ origin: { x: number; y: number }; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
 
 /** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret — the client already receives grid-derived token sizing. */
@@ -137,9 +165,11 @@ export function gridToImagePreview(calibration: GridCalibration, point: { column
   const sine = Math.sin(calibration.rotationRadians);
   return { x: calibration.origin.x + cosine * localX - sine * localY, y: calibration.origin.y + sine * localX + cosine * localY };
 }
-export function snapCellCenterPreview(calibration: GridCalibration, point: { x: number; y: number }) {
+export function snapCellCenterPreview(calibration: GridCalibration, point: { x: number; y: number }, sizeCells = 1) {
+  // Mirrors the server: odd footprints center on a cell, even ones on a grid intersection.
+  const centerOffset = sizeCells % 2 === 0 ? 0 : 0.5;
   const grid = imageToGridPreview(calibration, point);
-  return gridToImagePreview(calibration, { column: Math.floor(grid.column) + 0.5, row: Math.floor(grid.row) + 0.5 });
+  return gridToImagePreview(calibration, { column: Math.floor(grid.column) + centerOffset, row: Math.floor(grid.row) + centerOffset });
 }
 /** Whole-cell Chebyshev distance in feet between two image points — every cell (including diagonals) costs one step, matching the server's default measurement rule. */
 export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: number; y: number }, b: { x: number; y: number }) {

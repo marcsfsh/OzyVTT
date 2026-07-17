@@ -55,16 +55,17 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
  */
 export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
-  const [definition, setDefinition] = useState<ActorDefinition | null>(definitionId ? sheetCache.get(definitionId) ?? null : null);
+  const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
+  const [definition, setDefinition] = useState<ActorDefinition | null>(ownDefinition ?? (definitionId ? sheetCache.get(definitionId) ?? null : null));
   const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
-    if (role !== "gm" || !definitionId || sheetCache.has(definitionId)) return;
+    if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
     socket.emit("content:monster-sheet", { definitionId }, (result) => {
       if (result.ok && result.definition) { sheetCache.set(definitionId, result.definition); setDefinition(result.definition); }
       else setFeedback(result.message ?? "The stat block could not be loaded.");
     });
-  }, [definitionId, role]);
+  }, [definitionId, role, ownDefinition]);
 
   const extension = (definition?.extensions["open5e.srd-2024"] ?? {}) as SrdExtension;
   const hp = actor.hp;
@@ -125,7 +126,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
         <p className="sheet-attribution">Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.</p>
       </>}
       {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
-      {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet — hit points, conditions, and dice live here; the full sheet arrives with character import.</p>}
+      {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet — the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
     </div>
   </div>;

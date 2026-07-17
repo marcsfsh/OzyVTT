@@ -12,8 +12,10 @@ export const ActorSchema = z.object({
   initiative: z.number().int().optional(),
   ownerSessionId: z.string().uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
-  /** Provenance: slug of the content-bundle definition this actor was instantiated from (additive; absent for seeded/imported actors). */
+  /** Provenance: slug of the definition this actor was instantiated from — a content-bundle id or an imported definition id (additive; absent for seeded actors). */
   definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional(),
+  /** Token footprint in grid cells per side (large 2, huge 3, gargantuan 4); absent means 1. */
+  sizeCells: z.number().int().min(1).max(4).optional(),
   /** Active conditions by content-bundle id; `level` is only meaningful for exhaustion (1-6). Tracked and displayed, never auto-applied (ADR-0008 reference level). */
   conditions: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), level: z.number().int().min(1).max(6).optional() }).strict()).max(20).default([])
 });

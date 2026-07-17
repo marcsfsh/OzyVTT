@@ -167,6 +167,9 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .sheet-attribution { margin: 1rem 0 0; color: #79715f; font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: #a69e91; font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: #e9b861; font-size: .8rem; }
+.roster-import { margin-top: 1rem; }
+.roster-import button { padding: .55rem .9rem; border: 1px dashed #6b5e4b; border-radius: .5rem; font-size: .82rem; color: #e9b861; text-align: center; }
+.roster-import button:hover { border-color: #e8a743; }
 .you-are-playing-buttons { display: flex; gap: .5rem; }
 .you-are-playing-buttons button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }

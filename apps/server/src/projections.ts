@@ -73,11 +73,15 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
       const { notes: _notes, ownerSessionId, hp: _exactHp, ...actor } = source;
+      const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
+      // Only your own claimed character's imported sheet travels to you; nobody else's does.
+      const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
       return {
         ...actor,
         hp: playerHp(source),
-        claimStatus: ownerSessionId === null ? "available" as const : ownerSessionId === playerSessionId ? "mine" as const : "claimed" as const,
-        presence: ownerSessionId === null ? null : presenceFor(ownerSessionId)
+        claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
+        presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
+        ...(ownDefinition ? { definition: ownDefinition } : {})
       };
     }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)

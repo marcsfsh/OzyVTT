@@ -15,20 +15,26 @@ function positiveDimension(value: number, label: string) {
 
 const rounded = (value: number) => Math.round(value * 1_000) / 1_000;
 
-export function encounterTokenAppearance(geometry: TokenMapGeometry) {
+export function encounterTokenAppearance(geometry: TokenMapGeometry, sizeCells = 1) {
   const width = positiveDimension(geometry.width, "Map width");
   const height = positiveDimension(geometry.height, "Map height");
   const shortestSide = Math.min(width, height);
   if (geometry.calibration) {
     const gridSizePx = geometry.calibration.cellSizePx;
-    return { sizePx: rounded(Math.min(shortestSide, gridSizePx * 0.82)), gridSizePx, gridRotationRadians: geometry.calibration.rotationRadians };
+    // A multi-cell creature fills its footprint: 2 cells across for large, 3 for huge, ...
+    const diameter = sizeCells === 1 ? gridSizePx * 0.82 : gridSizePx * (sizeCells - 0.08);
+    return { sizePx: rounded(Math.min(shortestSide, diameter)), gridSizePx, gridRotationRadians: geometry.calibration.rotationRadians, sizeCells };
   }
-  return { sizePx: rounded(Math.min(shortestSide, Math.max(12, Math.min(72, shortestSide / 18)))), gridSizePx: null, gridRotationRadians: null };
+  const base = Math.min(shortestSide, Math.max(12, Math.min(72, shortestSide / 18)));
+  return { sizePx: rounded(Math.min(shortestSide, base * sizeCells)), gridSizePx: null, gridRotationRadians: null, sizeCells };
 }
 
-export function createEncounterTokens(actorIds: readonly string[], geometry: TokenMapGeometry): EncounterToken[] {
-  const appearance = encounterTokenAppearance(geometry);
-  return actorIds.map((actorId) => ({ actorId, position: null, ...appearance }));
+function actorSizeCells(state: GameState, actorId: string) {
+  return state.actors.find((actor) => actor.id === actorId)?.sizeCells ?? 1;
+}
+
+export function createEncounterTokens(entries: ReadonlyArray<{ actorId: string; sizeCells?: number }>, geometry: TokenMapGeometry): EncounterToken[] {
+  return entries.map(({ actorId, sizeCells }) => ({ actorId, position: null, ...encounterTokenAppearance(geometry, sizeCells ?? 1) }));
 }
 
 /** Adds tokens when upgrading a persisted active encounter created before tokens existed. */
@@ -37,7 +43,7 @@ export function ensureEncounterTokens(state: GameState, geometry: TokenMapGeomet
   const existing = new Set(state.combat.tokens.map((token) => token.actorId));
   const missing = state.combat.initiative.map((entry) => entry.actorId).filter((actorId) => !existing.has(actorId));
   if (!missing.length) return false;
-  state.combat = { ...state.combat, tokens: [...state.combat.tokens, ...createEncounterTokens(missing, geometry)] };
+  state.combat = { ...state.combat, tokens: [...state.combat.tokens, ...createEncounterTokens(missing.map((actorId) => ({ actorId, sizeCells: actorSizeCells(state, actorId) })), geometry)] };
   return true;
 }
 
@@ -56,17 +62,20 @@ function fits(point: EncounterTokenPosition, radius: number, geometry: TokenMapG
   return point.x >= radius && point.y >= radius && point.x <= geometry.width - radius && point.y <= geometry.height - radius;
 }
 
-function snappedPosition(point: EncounterTokenPosition, radius: number, geometry: TokenMapGeometry) {
+function snappedPosition(point: EncounterTokenPosition, radius: number, geometry: TokenMapGeometry, sizeCells = 1) {
   const requested = bounded(point, radius, geometry);
   if (!geometry.calibration) return { x: rounded(requested.x), y: rounded(requested.y) };
 
+  // Odd footprints center on a cell (offset .5); even footprints center on a grid intersection
+  // so a 2x2 creature covers exactly four cells.
+  const centerOffset = sizeCells % 2 === 0 ? 0 : 0.5;
   const grid = imageToGrid(geometry.calibration, requested);
   const baseColumn = Math.floor(grid.column);
   const baseRow = Math.floor(grid.row);
   const candidates: EncounterTokenPosition[] = [];
   for (let columnOffset = -4; columnOffset <= 4; columnOffset++) {
     for (let rowOffset = -4; rowOffset <= 4; rowOffset++) {
-      const candidate = gridToImage(geometry.calibration, { column: baseColumn + columnOffset + 0.5, row: baseRow + rowOffset + 0.5 });
+      const candidate = gridToImage(geometry.calibration, { column: baseColumn + columnOffset + centerOffset, row: baseRow + rowOffset + centerOffset });
       if (fits(candidate, radius, geometry)) candidates.push(candidate);
     }
   }
@@ -80,7 +89,7 @@ export function moveEncounterToken(state: GameState, actorId: string, position: 
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant does not have a token in this encounter.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y))) throw new CommandRejectedError("Token position must contain finite coordinates.");
-  const nextPosition = position === null ? null : snappedPosition(position, token.sizePx / 2, geometry);
+  const nextPosition = position === null ? null : snappedPosition(position, token.sizePx / 2, geometry, token.sizeCells);
   state.combat = {
     ...state.combat,
     tokens: state.combat.tokens.map((candidate) => candidate.actorId === actorId ? { ...candidate, position: nextPosition } : candidate)

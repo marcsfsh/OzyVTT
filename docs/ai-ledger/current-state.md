@@ -51,6 +51,14 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   GM opens any combatant from the initiative, a player only their own (server-rejected
   otherwise; PC sheets stay thin until import). **All seven phases (A–G) of the SRD
   combat-content integration are complete on `claude/srd-content-pipeline`.** Plan reviewed with the owner 2026-07-17.
+  Three follow-on slices then landed on the same branch: **token footprints** (large/huge/
+  gargantuan tokens size to `Actor.sizeCells` and snap even/odd footprints on the correct
+  cell/intersection — server owns the geometry, client preview mirrors it); **condition
+  badges + viewer health/conditions** (bloodied/down dot and condition-initial badges on map
+  tokens, plus coarse health band + condition labels in the viewer initiative/tokens — bands
+  only, exact HP never leaves for the public screen); **PC sheet import** (GM imports a
+  canonical `ActorDefinition` JSON as a claimable player-character; the stat block is stored
+  in `GameState.definitions` and projected only to the owning player, `actor:import-definition`).
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.
