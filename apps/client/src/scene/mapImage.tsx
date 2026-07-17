@@ -177,6 +177,37 @@ export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: numbe
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
 }
+/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection — mirrors the server). Preview-only. */
+export function footprintCells(calibration: GridCalibration, position: { x: number; y: number }, sizeCells = 1): Set<string> {
+  const grid = imageToGridPreview(calibration, position);
+  const odd = sizeCells % 2 === 1;
+  const topLeftCol = odd ? Math.floor(grid.column) - (sizeCells - 1) / 2 : Math.round(grid.column) - sizeCells / 2;
+  const topLeftRow = odd ? Math.floor(grid.row) - (sizeCells - 1) / 2 : Math.round(grid.row) - sizeCells / 2;
+  const cells = new Set<string>();
+  for (let column = 0; column < sizeCells; column++) for (let row = 0; row < sizeCells; row++) cells.add(`${topLeftCol + column},${topLeftRow + row}`);
+  return cells;
+}
+/**
+ * 5e movement-through-occupied-cells cost, display-only. Walks the whole-cell Chebyshev line from
+ * origin to target; each intermediate cell (not the destination) that another token occupies adds one
+ * cell of movement (+distancePerCell). Preview-only — the client only ever has the tokens it may see,
+ * so nothing hidden leaks into the count.
+ */
+export function occupiedPathCost(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }, occupied: ReadonlySet<string>): { baseFeet: number; penaltyFeet: number } {
+  const from = imageToGridPreview(calibration, origin);
+  const to = imageToGridPreview(calibration, target);
+  let column = Math.floor(from.column), row = Math.floor(from.row);
+  const destColumn = Math.floor(to.column), destRow = Math.floor(to.row);
+  const steps = Math.max(Math.abs(destColumn - column), Math.abs(destRow - row));
+  let penaltyCells = 0;
+  for (let step = 0; step < steps; step++) {
+    if (column !== destColumn) column += Math.sign(destColumn - column);
+    if (row !== destRow) row += Math.sign(destRow - row);
+    const atDestination = column === destColumn && row === destRow;
+    if (!atDestination && occupied.has(`${column},${row}`)) penaltyCells++;
+  }
+  return { baseFeet: steps * calibration.distancePerCell, penaltyFeet: penaltyCells * calibration.distancePerCell };
+}
 
 export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; target: { x: number; y: number }; feet: number }>;
 

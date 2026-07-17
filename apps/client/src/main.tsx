@@ -189,6 +189,7 @@ function App() {
             annotations={state.combat.annotations}
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
+            reactionsUsed={state.combat.reactionsUsed}
             dock={mapDock}
           /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter to place tokens." : "The GM will load the battle map when combat begins."}</span></div>}
           {mode === "gm" && gmToken && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}

@@ -119,3 +119,18 @@
 .token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }
+
+/* Token right-click / long-press menu — portaled to <body>, so it clears the dock/enlarged stacking contexts. */
+.token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: #17130d; box-shadow: 0 10px 30px rgb(0 0 0 / 60%); }
+.token-context-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.token-context-head strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.token-context-head button { flex: none; padding: .2rem .5rem; border: 0; background: transparent; color: #c8c0b1; font-size: .9rem; cursor: pointer; }
+.token-context-hp { display: flex; gap: .3rem; }
+.token-context-hp input { width: 3.4rem; margin: 0; padding: .5rem; text-align: center; }
+.token-context-hp button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.token-context-hp button { flex: 1; text-align: center; }
+.token-context-item { text-align: left; }
+.token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: #e8a743; }
+.token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
+.token-context-conditions { margin-top: .1rem; }
+.token-context-feedback { margin: .1rem 0 0; color: #e9b861; font-size: .75rem; }

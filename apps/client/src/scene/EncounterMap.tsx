@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { chebyshevFeetPreview, imagePointFromClient, initialsOf, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenGlyph, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
+import { CharacterSheet } from "../encounter/CharacterSheet";
+import { TokenContextMenu } from "./TokenContextMenu";
 import type { DockPosition } from "../encounter/EncounterPanel";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -75,7 +77,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, dock
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], dock
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -86,6 +88,7 @@ export function EncounterMap({
   annotations: readonly AnyAnnotation[];
   revision: number;
   activeActorId: string | null;
+  reactionsUsed?: readonly string[];
   dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
@@ -98,6 +101,10 @@ export function EncounterMap({
   const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
   const [rulerWhileMoving, setRulerWhileMoving] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
+  const [sheetActorId, setSheetActorId] = useState<string | null>(null);
+  const longPressRef = useRef<{ startX: number; startY: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [enlarged, setEnlarged] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
@@ -274,6 +281,25 @@ export function EncounterMap({
   const setMovable = (id: string, movableByOthers: boolean) => runAnnotation(id, () => emitAnnotationSetMovable({ commandId: newId(), id, movableByOthers, expectedRevision: revision }), "Move control could not be changed.");
   const clearAnnotations = (scope: "mine" | "players" | "all") => { setWrenchOpen(false); void runAnnotation("clear", () => emitAnnotationClear({ commandId: newId(), scope, expectedRevision: revision }), "Shapes could not be removed."); };
 
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+    longPressRef.current = null;
+  };
+  const openContextMenuFor = (actorId: string, x: number, y: number) => {
+    if (!actorsById.has(actorId)) return;
+    if (role === "player" && !canMove(actorId)) return; // players only act on their own claimed token
+    setSelectedId(null);
+    setContextMenu({ actorId, x, y });
+  };
+  // Mouse right-click opens the token menu; touch uses a long-press started in beginGesture.
+  const onContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    const actorId = (event.target as Element).closest<HTMLElement>("[data-token-id]")?.dataset.tokenId;
+    if (!actorId || !tokensById.has(actorId)) return; // let the browser's default menu show off-token
+    if (role === "player" && !canMove(actorId)) return;
+    event.preventDefault();
+    openContextMenuFor(actorId, event.clientX, event.clientY);
+  };
+
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
     const target = event.target as Element;
@@ -306,6 +332,17 @@ export function EncounterMap({
       setSelectedId(null);
       const origin = tokensById.get(tokenId)?.position ?? null;
       setMessage(""); setGesture({ kind: "token", actorId: tokenId, point: origin, origin });
+      if (event.pointerType === "touch") {
+        const captureEl = event.currentTarget, pointerId = event.pointerId, startX = event.clientX, startY = event.clientY;
+        clearLongPress();
+        longPressRef.current = { startX, startY };
+        longPressTimerRef.current = setTimeout(() => {
+          clearLongPress();
+          try { captureEl.releasePointerCapture(pointerId); } catch { /* pointer already released */ }
+          setGesture(null);
+          openContextMenuFor(tokenId, startX, startY);
+        }, 500);
+      }
       return;
     }
     if (tool !== "select" && calibration) {
@@ -325,7 +362,11 @@ export function EncounterMap({
   const continueGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     event.preventDefault();
-    if (gesture.kind === "token") { setGesture({ ...gesture, point: pointFromScreen(event.clientX, event.clientY) }); return; }
+    if (gesture.kind === "token") {
+      if (longPressRef.current && (Math.abs(event.clientX - longPressRef.current.startX) > 8 || Math.abs(event.clientY - longPressRef.current.startY) > 8)) clearLongPress();
+      setGesture({ ...gesture, point: pointFromScreen(event.clientX, event.clientY) });
+      return;
+    }
     if (gesture.kind === "pan") {
       const dx = (event.clientX - gesture.startClient.x) * gesture.scaleX;
       const dy = (event.clientY - gesture.startClient.y) * gesture.scaleY;
@@ -344,6 +385,7 @@ export function EncounterMap({
     setGesture({ ...gesture, current: point });
   };
   const finishGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    clearLongPress();
     if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     event.preventDefault(); event.currentTarget.releasePointerCapture(event.pointerId);
     if (gesture.kind === "pan") { setGesture(null); return; }
@@ -368,6 +410,7 @@ export function EncounterMap({
     setGesture(null); void submitAnnotationAdd("shape", gesture.kind, gesture.origin, gesture.current);
   };
   const cancelGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    clearLongPress();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setGesture(null); setMessage("Cancelled.");
   };
@@ -401,7 +444,13 @@ export function EncounterMap({
     const width = size.width / camera.zoom, height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   })() : "0 0 1 1";
-  const liveTokenDistanceFeet = rulerWhileMoving && calibration && dragSnappedPoint && dragging?.origin ? chebyshevFeetPreview(calibration, dragging.origin, dragSnappedPoint) : null;
+  // Cells occupied by every OTHER visible token (players never receive hidden tokens, so no leak).
+  const occupiedByOthers = rulerWhileMoving && calibration && dragging
+    ? new Set<string>(tokens.flatMap((encounterToken) => encounterToken.actorId !== dragging.actorId && encounterToken.position ? [...footprintCells(calibration, encounterToken.position, encounterToken.sizeCells)] : []))
+    : null;
+  const liveMove = rulerWhileMoving && calibration && dragSnappedPoint && dragging?.origin && occupiedByOthers
+    ? occupiedPathCost(calibration, dragging.origin, dragSnappedPoint, occupiedByOthers)
+    : null;
 
   // Live, grid-snapped preview for the in-progress measure/shape/move/resize gesture (WYSIWYG with the saved result).
   const preview: { data: AnnotationGlyphData; snap: SnappedGeometry } | null = (() => {
@@ -419,7 +468,7 @@ export function EncounterMap({
     ? [{ scope: "mine", label: "Remove all my shapes" }, { scope: "players", label: "Remove all player shapes" }, { scope: "all", label: "Remove all shapes" }]
     : [{ scope: "mine", label: "Remove all my shapes" }];
 
-  return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture}>
+  return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onContextMenu={onContextMenu}>
     <div className="encounter-map-help"><strong>{role === "gm" ? "Drag any token to move it" : "Drag your highlighted character"}</strong><span>{role === "gm" ? "Calibrated maps snap automatically. Drop a token back in the tray to remove it from the map." : "Other tokens are view-only. Your moves snap automatically when the map has a grid."} Scroll or pinch to zoom; drag empty map space to pan.</span></div>
     <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Unplaced token tray">
       <div><strong>Token tray</strong><span>{unplaced.length ? "Drag onto the map, click to place near its center, or press Enter." : "Drag a token here to take it off the map."}</span></div>
@@ -498,9 +547,9 @@ export function EncounterMap({
           {annotations.map((annotation) => annotation.kind === "ping"
             ? <PingGlyph key={annotation.id} point={annotation.geometry.origin} color={annotation.color} label={annotation.label} size={pingSize} />
             : null)}
-          {liveTokenDistanceFeet !== null && dragSnappedPoint && dragging?.origin && <g className="encounter-move-guide">
+          {liveMove !== null && dragSnappedPoint && dragging?.origin && <g className="encounter-move-guide">
             <line className="encounter-move-line" x1={dragging.origin.x} y1={dragging.origin.y} x2={dragSnappedPoint.x} y2={dragSnappedPoint.y} />
-            <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragSnappedPoint.x} y={dragSnappedPoint.y - labelSize * 1.3}>{liveTokenDistanceFeet} ft</text>
+            <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragSnappedPoint.x} y={dragSnappedPoint.y - labelSize * 1.3}>{liveMove.penaltyFeet > 0 ? `${liveMove.baseFeet} ft + ${liveMove.penaltyFeet} ft (occupied)` : `${liveMove.baseFeet} ft`}</text>
           </g>}
         </svg>
 
@@ -541,5 +590,15 @@ export function EncounterMap({
     </div>
     {busyActorId && <p className="encounter-map-saving" role="status">Saving move…</p>}
     {image.status === "ready" && <p className="encounter-map-feedback" role="status" aria-live="polite">{message}</p>}
+    {contextMenu && (() => {
+      const actor = actorsById.get(contextMenu.actorId);
+      return actor
+        ? <TokenContextMenu actor={actor} role={role} x={contextMenu.x} y={contextMenu.y} reactionUsed={reactionsUsed.includes(actor.id)} placed={tokensById.get(actor.id)?.position != null} onOpenSheet={() => setSheetActorId(actor.id)} onReturnToTray={() => void submitMove(actor.id, null)} onClose={() => setContextMenu(null)} />
+        : null;
+    })()}
+    {sheetActorId && (() => {
+      const actor = actorsById.get(sheetActorId);
+      return actor ? <CharacterSheet actor={actor} role={role} onClose={() => setSheetActorId(null)} /> : null;
+    })()}
   </div>;
 }

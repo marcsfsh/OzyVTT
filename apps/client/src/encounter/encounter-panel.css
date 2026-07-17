@@ -59,6 +59,10 @@
 .initiative-list.gm li { flex-direction: column; align-items: stretch; }
 .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .initiative-row-side { display: flex; align-items: center; gap: .4rem; flex: none; }
+/* Per-row reaction chip: reactions are off-turn resources, so every combatant gets a quick toggle. */
+.initiative-reaction { flex: none; width: 1.85rem; padding: .38rem 0; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #d9d2c4; font-size: .78rem; font-weight: 800; text-align: center; cursor: pointer; }
+.initiative-reaction:hover:not(:disabled) { border-color: #e8a743; }
+.initiative-reaction[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; text-decoration: line-through; }
 .initiative-list.gm li.down .initiative-name { opacity: .55; text-decoration: line-through; }
 .initiative-hp { flex: none; padding: .4rem .55rem; border: 1px solid transparent; border-radius: .45rem; background: #0c0a07; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
 .initiative-hp small { margin-left: .2rem; font-size: .68rem; color: #7fc7e8; }
