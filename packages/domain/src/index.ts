@@ -196,7 +196,9 @@ export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatVie
 export type GmActor = Actor & { presence: PresenceStatus | null };
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[] };
 
-export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; }
+/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState — presentation only; the roll history is the durable record. */
+export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction"; text: string; actorIds: readonly string[]; at: number }>;
+export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
 export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };

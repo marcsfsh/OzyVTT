@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents, type TableEvent } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema } from "@vtt/schemas";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry } from "./annotations.js";
@@ -156,6 +156,24 @@ export function createServer(options: CreateServerOptions) {
       socket.emit("state:updated", gm ? projectGmView(state, presenceFor) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
+  /**
+   * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
+   * GM-only AND every referenced actor is public — so a hidden combatant is never narrated to players.
+   * Not stored in GameState (ephemeral presentation); the viewer channel gets nothing.
+   */
+  function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
+    const state = store.snapshot;
+    const actorIds = event.actorIds ?? [];
+    const publicToPlayers = !event.gmOnly && actorIds.every((id) => state.actors.find((actor) => actor.id === id)?.visibility === "public");
+    const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
+    for (const socket of io.sockets.sockets.values()) {
+      const token = socket.handshake.auth?.token;
+      if (auth.verify(token)) socket.emit("table:event", payload);
+      else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
+    }
+  }
+  const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
+  const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
   async function tokenGeometryFor(mapAssetId: string): Promise<TokenMapGeometry> {
     const [asset, entry] = await Promise.all([mapAssets.get(mapAssetId), Promise.resolve(mapCatalog.get(mapAssetId))]);
     if (!asset || !entry || entry.kind !== "battlemap") throw new CommandRejectedError("The active encounter battlemap is unavailable.");
@@ -380,7 +398,7 @@ export function createServer(options: CreateServerOptions) {
       try {
         const { commandId, actorId, amount, expectedRevision } = request.data;
         const result = await store.execute({ id: commandId, type: "actor.apply-damage", actorId, expectedRevision }, (state) => applyDamage(state, actorId, amount, scope));
-        if (!result.duplicate) await publishGameState(result.state);
+        if (!result.duplicate) { await publishGameState(result.state); broadcastTableEvent({ kind: "damage", text: `${actorName(actorId)} took ${amount} damage.`, actorIds: [actorId] }); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The damage could not be applied." }); }
     });
@@ -392,7 +410,7 @@ export function createServer(options: CreateServerOptions) {
       try {
         const { commandId, actorId, amount, expectedRevision } = request.data;
         const result = await store.execute({ id: commandId, type: "actor.heal", actorId, expectedRevision }, (state) => healActor(state, actorId, amount, scope));
-        if (!result.duplicate) await publishGameState(result.state);
+        if (!result.duplicate) { await publishGameState(result.state); broadcastTableEvent({ kind: "heal", text: `${actorName(actorId)} healed ${amount}.`, actorIds: [actorId] }); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The healing could not be applied." }); }
     });
@@ -422,7 +440,11 @@ export function createServer(options: CreateServerOptions) {
       try {
         const { commandId, actorId, conditionId, active, level, expectedRevision } = request.data;
         const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision }, (state) => setCondition(state, actorId, conditionId, active, level, scope));
-        if (!result.duplicate) await publishGameState(result.state);
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          const conditionName = contentLibrary.conditionSummaries().find((entry) => entry.id === conditionId)?.name ?? conditionId;
+          broadcastTableEvent({ kind: "condition", text: active ? `${actorName(actorId)} is ${conditionName}${conditionId === "exhaustion" && level ? ` ${level}` : ""}.` : `${actorName(actorId)} is no longer ${conditionName}.`, actorIds: [actorId] });
+        }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
     });
@@ -482,7 +504,7 @@ export function createServer(options: CreateServerOptions) {
           // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
           if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gm.sessionId, role: "gm" }, now: Date.now() }, geometry!);
         });
-        if (!result.duplicate) await publishGameState(result.state);
+        if (!result.duplicate) { await publishGameState(result.state); if (resolution) broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The action could not be resolved." }); }
     });
@@ -494,6 +516,7 @@ export function createServer(options: CreateServerOptions) {
       const sessionId = scope.role === "gm" ? auth.verify(socket.handshake.auth.token)!.sessionId : scope.sessionId;
       try {
         const { commandId, saveId, method, total, expectedRevision } = request.data;
+        const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
         let outcome: ReturnType<typeof answerSave> | undefined;
         const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision }, (state) => {
           outcome = answerSave(state, commandId, saveId, method, total, scope, {
@@ -505,7 +528,10 @@ export function createServer(options: CreateServerOptions) {
             resolveDefinition
           });
         });
-        if (!result.duplicate) await publishGameState(result.state);
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          if (outcome && pending) broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+        }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be answered." }); }
     });
@@ -541,7 +567,7 @@ export function createServer(options: CreateServerOptions) {
       try {
         const { commandId, actorId, used, expectedRevision } = request.data;
         const result = await store.execute({ id: commandId, type: "turn.use-reaction", actorId, expectedRevision }, (state) => setReactionUsed(state, actorId, used, scope));
-        if (!result.duplicate) await publishGameState(result.state);
+        if (!result.duplicate) { await publishGameState(result.state); if (used) broadcastTableEvent({ kind: "reaction", text: `${actorName(actorId)} used its reaction.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The reaction could not be updated." }); }
     });

@@ -6,6 +6,7 @@ import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData 
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import { clearTargeting, resolveTargeting, setTemplatePlacement, toggleTarget, useTargeting, useTargetingBusy } from "../encounter/targeting";
 import { TokenContextMenu } from "./TokenContextMenu";
+import { MapToastStack } from "./toasts";
 import type { DockPosition } from "../encounter/EncounterPanel";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -618,6 +619,8 @@ export function EncounterMap({
             </span>
           </div>;
         })()}
+
+        <MapToastStack />
 
         <div className={`encounter-map-zoom${dock?.node ? ` zoom-dock-${dock.position}` : ""}`} role="group" aria-label="Map controls">
           {dock && <span className="encounter-map-dock-control" role="group" aria-label="Dock the tracker">
