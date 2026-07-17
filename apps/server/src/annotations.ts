@@ -71,7 +71,7 @@ function pointableGeometry(calibration: SquareGridCalibration, origin: Annotatio
   return { origin: snappedOrigin, target: snappedTarget, sizeFeet: cells * calibration.distancePerCell };
 }
 
-function shapeGeometry(calibration: SquareGridCalibration, shape: AnnotationShapeKind, origin: AnnotationPoint, target: AnnotationPoint): AnnotationGeometry {
+export function shapeGeometry(calibration: SquareGridCalibration, shape: AnnotationShapeKind, origin: AnnotationPoint, target: AnnotationPoint): AnnotationGeometry {
   if (shape === "square") return squareGeometry(calibration, origin, target);
   if (shape === "circle") return radialGeometry(calibration, origin, target);
   return pointableGeometry(calibration, origin, target);

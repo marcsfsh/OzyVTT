@@ -1,6 +1,7 @@
 import type { ContentActionSummary, ContentConditionSummary, ContentMonsterSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadAttribution, loadConditions, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
+import { parseAreaProse } from "./area-targeting.js";
 
 /**
  * Read-only access to the bundled SRD content for command handlers. Loaded once per process;
@@ -51,7 +52,8 @@ export class ContentLibrary {
       rangeFeet: action.attack?.rangeFeet ?? null,
       saveAbility: action.save?.ability ?? null,
       saveDc: action.save?.dc ?? null,
-      damage: action.damage.map((part) => ({ formula: part.formula, type: part.type }))
+      damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
+      area: parseAreaProse(action.description)
     }));
   }
 }

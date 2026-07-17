@@ -4,7 +4,7 @@ import { footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, sna
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
 import { CharacterSheet } from "../encounter/CharacterSheet";
-import { clearTargeting, resolveTargeting, toggleTarget, useTargeting, useTargetingBusy } from "../encounter/targeting";
+import { clearTargeting, resolveTargeting, setTemplatePlacement, toggleTarget, useTargeting, useTargetingBusy } from "../encounter/targeting";
 import { TokenContextMenu } from "./TokenContextMenu";
 import type { DockPosition } from "../encounter/EncounterPanel";
 import { newId } from "../lib/ids";
@@ -314,6 +314,14 @@ export function EncounterMap({
       event.preventDefault(); void submitPing(point);
       return;
     }
+    // Placing an area template takes over the drag (GM only): draw the template's shape anywhere,
+    // even starting on a token — the server computes who is caught.
+    if (activeTargeting?.mode === "template" && activeTargeting.template && calibration) {
+      const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
+      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      setSelectedId(null); setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
+      return;
+    }
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
     const shapeId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && shapeId) {
@@ -419,6 +427,9 @@ export function EncounterMap({
     if (gesture.kind === "annotation-resize") { setGesture(null); void submitAnnotationMove(gesture.id, gesture.anchor, gesture.current); return; }
     if (gesture.kind === "annotation-move") { setGesture(null); void submitAnnotationMove(gesture.id, gesture.geometry.origin, gesture.geometry.target); return; }
     if (gesture.kind === "measure") { setGesture(null); void submitAnnotationAdd("measurement", undefined, gesture.origin, gesture.current); return; }
+    // A shape drawn while placing an area template is stored on the targeting session, not added as a
+    // standalone annotation — the server draws the real blast when the action resolves.
+    if (activeTargeting?.mode === "template") { const { origin, current } = gesture; setGesture(null); setTemplatePlacement(origin, current); return; }
     setGesture(null); void submitAnnotationAdd("shape", gesture.kind, gesture.origin, gesture.current);
   };
   const cancelGesture = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -540,12 +551,16 @@ export function EncounterMap({
             </g>;
           })}
           {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} color={sessionColor} /></g>}
+          {activeTargeting?.mode === "template" && activeTargeting.template?.placed && calibration && !preview && (() => {
+            const snap = snapShapePreview(calibration, activeTargeting.template.shape, activeTargeting.template.placed.origin, activeTargeting.template.placed.target);
+            return <g className="annotation-shape live"><AnnotationGlyph data={{ kind: "shape", shape: activeTargeting.template.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet }} arrowSize={arrowSize} labelSize={labelSize} color="#ff9d5c" /></g>;
+          })()}
 
           {visibleTokens.map((encounterToken) => {
             const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
             const movable = tool === "select" && canMove(actor.id);
             const active = activeActorId === actor.id;
-            const targetable = activeTargeting !== null && actor.id !== activeTargeting.attackerId;
+            const targetable = activeTargeting !== null && activeTargeting.mode !== "template" && actor.id !== activeTargeting.attackerId;
             const targeted = targetable && activeTargeting.selected.includes(actor.id);
             return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
@@ -589,12 +604,17 @@ export function EncounterMap({
         </>}
 
         {activeTargeting && (() => {
+          const isTemplate = activeTargeting.mode === "template";
           const names = activeTargeting.selected.map((id) => actorsById.get(id)?.name ?? "?");
+          const label = isTemplate
+            ? (activeTargeting.template?.placed ? " — placed; Roll to catch everyone under it" : ` — drag the ${activeTargeting.action.area?.sizeFeet}-ft ${activeTargeting.action.area?.shape} on the map`)
+            : names.length ? ` → ${names.join(", ")}` : activeTargeting.mode === "single" ? " — click a token to target it" : " — click tokens to target them";
+          const ready = isTemplate ? Boolean(activeTargeting.template?.placed) : activeTargeting.selected.length > 0;
           return <div className="encounter-target-bar" role="group" aria-label={`Targets for ${activeTargeting.action.name}`}>
-            <span><strong>{activeTargeting.action.name}</strong>{names.length ? ` → ${names.join(", ")}` : activeTargeting.mode === "single" ? " — click a token to target it" : " — click tokens to target them"}</span>
+            <span><strong>{activeTargeting.action.name}</strong>{label}</span>
             <span className="encounter-target-bar-buttons">
               <button type="button" className="secondary" disabled={targetingBusy} onClick={() => clearTargeting()}>Cancel</button>
-              <button type="button" className="encounter-primary" disabled={targetingBusy || activeTargeting.selected.length === 0} onClick={() => resolveTargeting(revision, (ok, resultMessage) => setMessage(ok ? "" : resultMessage ?? "The action could not be resolved."))}>Roll {activeTargeting.action.name}</button>
+              <button type="button" className="encounter-primary" disabled={targetingBusy || !ready} onClick={() => resolveTargeting(revision, (ok, resultMessage) => setMessage(ok ? "" : resultMessage ?? "The action could not be resolved."))}>Roll {activeTargeting.action.name}</button>
             </span>
           </div>;
         })()}

@@ -7,9 +7,10 @@ import { z } from "zod";
 import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema } from "@vtt/schemas";
-import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
+import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
 import { resolveDefinitionAction } from "./action-resolution.js";
+import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
@@ -70,7 +71,15 @@ const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string(
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const ActionResolveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), actionId: z.string().regex(/^[a-z0-9-]+$/).max(120), targetIds: z.array(z.string().uuid()).min(1).max(20), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActionResolveSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  actionId: z.string().regex(/^[a-z0-9-]+$/).max(120),
+  targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+  template: z.object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict().optional(),
+  conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict().refine((payload) => (payload.targetIds === undefined) !== (payload.template === undefined), { message: "Provide either explicit targets or an area template, not both." });
 const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -425,7 +434,7 @@ export function createServer(options: CreateServerOptions) {
       if (!request.success) return acknowledge({ ok: false, message: "The action lookup is malformed." });
       const imported = storedDefinition(store.snapshot, request.data.definitionId);
       const actions = imported
-        ? imported.actions.map((action) => ({ id: action.id, name: action.name, activation: action.activation, description: action.description, attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, saveAbility: action.save?.ability ?? null, saveDc: action.save?.dc ?? null, damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })) }))
+        ? imported.actions.map((action) => ({ id: action.id, name: action.name, activation: action.activation, description: action.description, attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, saveAbility: action.save?.ability ?? null, saveDc: action.save?.dc ?? null, damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })), area: parseAreaProse(action.description) }))
         : contentLibrary.monsterActionSummaries(request.data.definitionId);
       if (!actions) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
       acknowledge({ ok: true, actions });
@@ -442,17 +451,36 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(socket.handshake.auth.token);
       if (!gm) return acknowledge({ ok: false, message: "Only the GM can resolve stat-block actions." });
       const request = ActionResolveSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The action command is malformed." });
+      if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The action command is malformed." });
       try {
-        const { commandId, actorId, actionId, targetIds, conditionId, expectedRevision } = request.data;
+        const { commandId, actorId, actionId, targetIds, template, conditionId, expectedRevision } = request.data;
         if (conditionId !== undefined && !contentLibrary.hasCondition(conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled reference." });
+        // A template needs the map's grid up front (async fetch) so containment runs inside the mutation.
+        const mapAssetId = store.snapshot.combat.mapAssetId;
+        const geometry = template && mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
+        if (template && (!mapAssetId || !geometry?.calibration)) return acknowledge({ ok: false, message: "Calibrate this map before placing an area template." });
         let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
         const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision }, (state) => {
           const attacker = state.actors.find((item) => item.id === actorId);
           if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
           const action = (storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId))?.actions.find((candidate) => candidate.id === actionId);
           if (!action) throw new CommandRejectedError("That action is not on the stat block.");
-          resolution = resolveDefinitionAction(state, action, { actorId, targetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
+          let resolvedTargetIds: readonly string[];
+          if (template) {
+            if (action.attack) throw new CommandRejectedError("Attacks target a single token — pick it directly instead of placing a template.");
+            if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
+            const calibration = geometry!.calibration!;
+            // Snap the template the same way the drawn annotation will, then find who is under it.
+            const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
+            resolvedTargetIds = tokensInTemplate(state, calibration, snapped, template.shape, parseAreaProse(action.description)?.widthFeet ?? null)
+              .filter((id) => id !== actorId && state.combat.initiative.some((entry) => entry.actorId === id));
+            if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
+          } else {
+            resolvedTargetIds = targetIds!;
+          }
+          resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString() });
+          // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
+          if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gm.sessionId, role: "gm" }, now: Date.now() }, geometry!);
         });
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) });

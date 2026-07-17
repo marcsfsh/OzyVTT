@@ -84,19 +84,23 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       </li>)}
     </ul>}
     {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
-      <p className="action-targeting-head"><strong>{picking.action.name}</strong> — {picking.mode === "single" ? "choose one target (or click a token)" : "choose targets (or click tokens)"}</p>
-      <ul className="action-target-list">{combatants.filter((target) => target.id !== actor.id).map((target) => {
-        const checked = picking.selected.includes(target.id);
-        return <li key={target.id}>
-          <label className="action-target">
-            <input type={picking.mode === "single" ? "radio" : "checkbox"} name="action-target" checked={checked} onChange={() => toggleTarget(target.id)} />
-            <span>{target.name}{target.armorClass !== undefined ? ` (AC ${target.armorClass})` : ""}</span>
-          </label>
-        </li>;
-      })}</ul>
+      {picking.mode === "template"
+        ? <p className="action-targeting-head"><strong>{picking.action.name}</strong> — drag the {picking.action.area?.sizeFeet}-ft {picking.action.area?.shape} on the map{picking.template?.placed ? " (placed — Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.</p>
+        : <>
+            <p className="action-targeting-head"><strong>{picking.action.name}</strong> — {picking.mode === "single" ? "choose one target (or click a token)" : "choose targets (or click tokens)"}</p>
+            <ul className="action-target-list">{combatants.filter((target) => target.id !== actor.id).map((target) => {
+              const checked = picking.selected.includes(target.id);
+              return <li key={target.id}>
+                <label className="action-target">
+                  <input type={picking.mode === "single" ? "radio" : "checkbox"} name="action-target" checked={checked} onChange={() => toggleTarget(target.id)} />
+                  <span>{target.name}{target.armorClass !== undefined ? ` (AC ${target.armorClass})` : ""}</span>
+                </label>
+              </li>;
+            })}</ul>
+          </>}
       <div className="action-targeting-buttons">
         <button type="button" className="secondary" disabled={resolveBusy} onClick={() => clearTargeting()}>Back</button>
-        <button type="button" className="encounter-primary" disabled={resolveBusy || picking.selected.length === 0} onClick={resolve}>Roll {picking.action.name}</button>
+        <button type="button" className="encounter-primary" disabled={resolveBusy || (picking.mode === "template" ? !picking.template?.placed : picking.selected.length === 0)} onClick={resolve}>Roll {picking.action.name}</button>
       </div>
     </div>}
     {result && <div className="action-result" role="status">
