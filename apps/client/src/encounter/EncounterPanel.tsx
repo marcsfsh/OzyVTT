@@ -7,7 +7,7 @@ import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp";
+type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -42,6 +42,26 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
   </div>;
 }
 
+/** A player's own economy: Action/Bonus live only on their turn; the reaction is an off-turn resource, markable any time. Pressed = spent. */
+function PlayerTurnEconomy({ combat, myId, myTurn }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean }>) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const emit = (run: () => Promise<MutationResult>, failure: string) => {
+    setBusy(true);
+    void run().then((result) => { setBusy(false); setFeedback(result.ok ? "" : result.message ?? failure); });
+  };
+  const reactionUsed = combat.reactionsUsed.includes(myId);
+  return <div className="turn-economy" role="group" aria-label="Your turn resources">
+    {myTurn && <>
+      <button type="button" className="economy-slot" aria-pressed={combat.turn.actionUsed} disabled={busy} onClick={() => emit(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !combat.turn.actionUsed }), "The action could not be updated.")}>Action</button>
+      <button type="button" className="economy-slot" aria-pressed={combat.turn.bonusActionUsed} disabled={busy} onClick={() => emit(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !combat.turn.bonusActionUsed }), "The bonus action could not be updated.")}>Bonus</button>
+    </>}
+    <button type="button" className="economy-slot" aria-pressed={reactionUsed} disabled={busy} title="Reactions refresh when your turn starts" onClick={() => emit(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: myId, used: !reactionUsed }), "The reaction could not be updated.")}>Reaction</button>
+    {myTurn && <button type="button" className="encounter-primary turn-end" disabled={busy} onClick={() => emit(() => emitCommand("turn:end", { commandId: newId() }), "The turn could not end.")}>End turn</button>}
+    {feedback && <span className="economy-feedback" role="status">{feedback}</span>}
+  </div>;
+}
+
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
@@ -51,8 +71,9 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel" aria-labelledby="player-initiative-title">
       <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><strong className="encounter-round">Round {combat.round}</strong></div>
       <DockPicker dock={props.dock} />
-      {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then let the GM know you're done.</p>}
+      {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then end your turn below.</p>}
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
+      {myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} />}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const actorConditions = props.state.actors.find((actor) => actor.id === entry.actorId)?.conditions ?? [];
@@ -191,6 +212,17 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
           {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
         </li>;
       })}</ol>
+      {(() => {
+        const current = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
+        if (!current) return null;
+        const reactionUsed = state.combat.reactionsUsed.includes(current.id);
+        return <div className="turn-economy" role="group" aria-label={`Turn resources for ${current.name}`}>
+          <span className="turn-economy-name">{current.name}</span>
+          <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
+          <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
+          <button type="button" className="economy-slot" aria-pressed={reactionUsed} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: current.id, used: !reactionUsed, expectedRevision: state.revision }), reactionUsed ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+        </div>;
+      })()}
       <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
       <button type="button" className="encounter-end" disabled={busy} onClick={end}>End encounter</button>
     </>}

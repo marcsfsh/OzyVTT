@@ -29,7 +29,7 @@ describe("recipient-safe encounter projections", () => {
   it("omits hidden combatants and reports a safe hidden-turn indicator", () => {
     const state = game(HIDDEN);
     const combat = projectPlayerCombat(state);
-    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy" }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null }], annotations: [] });
+    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy" }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [] });
     const serialized = JSON.stringify(projectPlayerView(state, undefined, () => null));
     expect(serialized).not.toContain(HIDDEN);
     expect(serialized).not.toContain("Secret Lurker");

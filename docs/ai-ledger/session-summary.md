@@ -8,6 +8,29 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — Phase E: turn economy + player End Turn
+
+Action economy becomes tracked state (never enforced — ADR-0008). `CombatState` gains
+`turn: {actionUsed, bonusActionUsed}` (current turn's actor, reset on any turn change) and
+`reactionsUsed: actorId[]` (reactions are off-turn resources; an actor's id clears when
+their own turn starts — 5e refresh timing, wired into next/previous/start/end reducers).
+Server: `turn-economy.ts` — `setTurnSlot` (player only on their character's turn),
+`setReactionUsed` (player only their own character, any time), `endTurn` (player End Turn =
+the GM's Next gated to their own turn). Projection: a hidden combatant's turn stays opaque
+(economy flags read idle; reactionsUsed filtered to public actors — test-asserted with a
+no-leak JSON check). Client: GM Turn order gains an economy strip for the current actor
+(Action/Bonus/Reaction, pressed = spent, strikethrough); players get their own strip —
+Action/Bonus + End turn on their turn, Reaction always.
+
+Verified: check/test (210: +4 turn-economy tests)/build green; live Playwright — GM toggles
+action, Next resets it; player claims a PC, spends reaction OFF-turn, sees it refresh when
+their turn starts, spends action, hits End turn and the GM's strip advances to the next
+combatant; zero page errors. (Smoke infra: stale claims from prior runs now force-released
+first.)
+
+**Follow-up:** Phase F (targeting + action resolution through the dice engine) — the
+convergence phase. Movement tracking/enforcement stays deferred per BUILD_PLAN.
+
 ## 2026-07-17 — Phase D: condition tracking (reference level)
 
 Conditions become trackable state. `Actor.conditions` (additive: `{id, level?}` entries,

@@ -39,13 +39,15 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     mapAssetId: input.mapAssetId,
     initiative: sorted,
     tokens: createEncounterTokens(sorted.map((entry) => entry.actorId), tokenGeometry),
-    annotations: []
+    annotations: [],
+    turn: { actionUsed: false, bonusActionUsed: false },
+    reactionsUsed: []
   };
 }
 
 export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
-  state.combat = { ...state.combat, active: false, turnActorId: null };
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [] };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {
@@ -63,10 +65,14 @@ export function nextInitiativeTurn(state: GameState) {
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   const wraps = currentIndex === state.combat.initiative.length - 1;
+  const nextActorId = state.combat.initiative[wraps ? 0 : currentIndex + 1].actorId;
   state.combat = {
     ...state.combat,
     round: wraps ? state.combat.round + 1 : state.combat.round,
-    turnActorId: state.combat.initiative[wraps ? 0 : currentIndex + 1].actorId
+    turnActorId: nextActorId,
+    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes.
+    turn: { actionUsed: false, bonusActionUsed: false },
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId)
   };
 }
 
@@ -75,9 +81,13 @@ export function previousInitiativeTurn(state: GameState) {
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   const wraps = currentIndex === 0;
+  const previousActorId = state.combat.initiative[wraps ? state.combat.initiative.length - 1 : currentIndex - 1].actorId;
   state.combat = {
     ...state.combat,
     round: wraps && state.combat.round > 1 ? state.combat.round - 1 : state.combat.round,
-    turnActorId: state.combat.initiative[wraps ? state.combat.initiative.length - 1 : currentIndex - 1].actorId
+    turnActorId: previousActorId,
+    // Backing up is a GM correction; treat it like any turn change so the strip starts clean.
+    turn: { actionUsed: false, bonusActionUsed: false },
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId)
   };
 }

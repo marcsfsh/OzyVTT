@@ -111,7 +111,11 @@ export const CombatStateSchema = z.object({
   mapAssetId: z.string().uuid().nullable().default(null),
   initiative: z.array(InitiativeEntrySchema).max(200).default([]),
   tokens: z.array(EncounterTokenSchema).max(200).default([]),
-  annotations: z.array(AnnotationSchema).max(300).default([])
+  annotations: z.array(AnnotationSchema).max(300).default([]),
+  /** Action economy of the current turn's actor; reset whenever the turn changes. Tracked, never enforced. */
+  turn: z.object({ actionUsed: z.boolean().default(false), bonusActionUsed: z.boolean().default(false) }).default({ actionUsed: false, bonusActionUsed: false }),
+  /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
+  reactionsUsed: z.array(z.string().uuid()).max(200).default([])
 }).superRefine((combat, context) => {
   const actorIds = new Set<string>();
   for (const [index, entry] of combat.initiative.entries()) {
@@ -151,7 +155,7 @@ export type PlayerHp = { kind: "exact"; current: number; maximum: number; tempor
 export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp"> & { hp: PlayerHp; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[] }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[] }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[] };
@@ -184,6 +188,9 @@ export interface ClientToServerEvents {
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
+  "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
   "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

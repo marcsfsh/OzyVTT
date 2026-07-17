@@ -90,6 +90,14 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .actor-card-conditions { margin: -.4rem 0 .8rem; }
 .actor-card-conditions .condition-chips { margin-left: 0; }
 .you-are-playing .condition-editor { margin-top: .4rem; }
+/* Turn economy: pressed = spent. */
+.turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .9rem; padding: .55rem .65rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; }
+.turn-economy-name { margin-right: .15rem; color: #a69e91; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
+.economy-slot { padding: .4rem .7rem; border: 1px solid #6b5e4b; border-radius: 999px; background: #241f17; color: #d9d2c4; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.economy-slot:hover:not(:disabled) { border-color: #e8a743; }
+.economy-slot[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; text-decoration: line-through; }
+.turn-end { margin-left: auto; padding: .5rem .95rem; }
+.economy-feedback { width: 100%; color: #e9b861; font-size: .78rem; }
 .encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed #6b5e4b; border-radius: .5rem; background: transparent; color: #e9b861; font-size: .85rem; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: #e8a743; background: #2b2115; }
 /* Monster browser: same overlay pattern as the confirm dialog, sized for a scrollable list. */

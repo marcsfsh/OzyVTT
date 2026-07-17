@@ -27,6 +27,7 @@ import { createMapRouter } from "./map-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 import { ensureEncounterTokens, moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
@@ -66,6 +67,8 @@ const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.strin
 const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -379,6 +382,41 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
+    });
+    socket.on("turn:use", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking turns." });
+      const request = TurnUseSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The turn command is malformed." });
+      try {
+        const { commandId, slot, used, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "turn.use", expectedRevision }, (state) => setTurnSlot(state, slot, used, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not be updated." }); }
+    });
+    socket.on("turn:use-reaction", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking turns." });
+      const request = TurnReactionSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The reaction command is malformed." });
+      try {
+        const { commandId, actorId, used, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "turn.use-reaction", actorId, expectedRevision }, (state) => setReactionUsed(state, actorId, used, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The reaction could not be updated." }); }
+    });
+    socket.on("turn:end", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before ending a turn." });
+      const request = CommandIdentitySchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The end-turn command is malformed." });
+      try {
+        const result = await store.execute({ id: request.data.commandId, type: "turn.end", expectedRevision: request.data.expectedRevision }, (state) => endTurn(state, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not end." }); }
     });
     socket.on("actor:set-hp", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set hit points directly." });

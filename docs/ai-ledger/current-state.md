@@ -38,8 +38,11 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   own-character player scopes) with band-safe player projections (exact PC hp, monster
   bands). Phase D done: condition tracking (`Actor.conditions`, `actor:set-condition`,
   15 bundled SRD conditions with exhaustion levels, chips + pickers across GM/player
-  surfaces — reference level per ADR-0008). Next: E action economy/End Turn → F targeting
-  + action resolution → G character-sheet panel. Plan reviewed with the owner 2026-07-17.
+  surfaces — reference level per ADR-0008). Phase E done: turn economy (`combat.turn`
+  action/bonus reset on turn change; per-combatant `reactionsUsed` refreshing at own turn
+  start; `turn:use`/`turn:use-reaction`/`turn:end` — player End Turn gated to their own
+  turn; hidden-turn economy stays opaque to players). Next: F targeting + action
+  resolution → G character-sheet panel. Plan reviewed with the owner 2026-07-17.
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.

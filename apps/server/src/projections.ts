@@ -60,7 +60,10 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     hiddenTurn: state.combat.active && state.combat.turnActorId !== null && !currentIsPublic,
     initiative,
     tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : [],
-    annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : []
+    annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
+    // A hidden combatant's turn stays opaque: economy flags reset to idle rather than narrating its activity.
+    turn: currentIsPublic ? { ...state.combat.turn } : { actionUsed: false, bonusActionUsed: false },
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId))
   };
 }
 
