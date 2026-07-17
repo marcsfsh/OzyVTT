@@ -8,6 +8,24 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-17 — SRD 5.2.1 content pipeline (integration phase A)
+
+Reviewed 7 candidate content/tool repos with the owner; decision (ADR-0015): source SRD
+content from **open5e `srd-2024` (CC BY 4.0)** — the only complete *structured* 2024
+bestiary; 2014/OGL and third-party data excluded. Built the pipeline in
+`packages/content-srd-5.2.1`: vendored fixtures (`sources/open5e-srd-2024/`), deterministic
+ETL/adapter (`scripts/build-bundle.ts`, refuses to write on validation failure, reviewed
+`CORRECTIONS` table for upstream bugs — octopus CON/CHA), committed bundles
+(`bundles/monsters.v1.json` 331 monsters as `ActorDefinition` v1 — 390 structured attacks, 184
+structured saves; `conditions.v1.json`; `attribution.json`), server-side loaders
+(`src/index.ts`), 7 tests incl. dice-grammar validation of every formula. `check`/`test`
+(185)/`build` green. Also merged PR #32 (dock + declutter) after live verification.
+
+**Follow-up:** phase B — GM browses bundle + `actor:add-from-definition` command
+instantiates monsters into encounters (then C HP/damage → D conditions → E action economy →
+F targeting/resolution → G sheet panel). Spells/classes/rules-glossary bundles deferred
+until a consumer exists.
+
 ## 2026-07-17 — Hooks + scheduled-workflow scaffold
 
 Completed the remaining active outline items on the same branch:

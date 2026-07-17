@@ -16,10 +16,10 @@
 | [012](0012-dice-authority-and-presentation.md) | Accepted | Server-authoritative dice and replaceable authorized 2D presentation |
 | 013 | Proposed | Transactional command/event log with snapshots and bounded undo |
 | [014](0014-device-support.md) | Accepted | Functional parity on phone and desktop; exact browser baseline pending |
-| 015 | Proposed | Curated, versioned SRD bundle separate from executable code |
+| [015](0015-srd-content-source-and-packaging.md) | Accepted | SRD 5.2.1 content from open5e `srd-2024` (CC BY 4.0), vendored and adapted into committed canonical bundles |
 | [016](0016-public-integration-api.md) | Proposed | Versioned public integration API over shared authoritative commands, events, authorization, and projections |
 | [017](0017-open-source-distribution.md) | Proposed | Open-source self-host distribution, licensing boundaries, contribution policy, and release governance |
 | [018](0018-character-sheet-pdf-ingestion.md) | Proposed | Isolated MarkItDown extraction followed by reviewed conversion into canonical character JSON |
 | [019](0019-ai-character-participants.md) | Proposed / long-term | Actor-bound AI players with structured persona, bounded autonomy/memory, safe observations, typed intents, and human control |
 
-Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence. Every row with a dedicated file is linked; ADR-003/009/010/013/015 remain index-only entries pending their spikes.
+Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence. Every row with a dedicated file is linked; ADR-003/009/010/013 remain index-only entries pending their spikes.
