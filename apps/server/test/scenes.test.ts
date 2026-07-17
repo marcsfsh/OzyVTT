@@ -1,0 +1,159 @@
+import { describe, expect, it } from "vitest";
+import { GameStateSchema } from "@vtt/domain";
+import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "../src/scenes.js";
+import { startEncounter, nextInitiativeTurn } from "../src/encounter.js";
+import { moveEncounterToken } from "../src/token-placement.js";
+import { removeActor } from "../src/actor-roster.js";
+import { projectPlayerCombat } from "../src/projections.js";
+
+const IDS = {
+  alpha: "10000000-0000-4000-8000-000000000001",
+  beta: "10000000-0000-4000-8000-000000000002",
+  extra: "10000000-0000-4000-8000-000000000003",
+  map1: "20000000-0000-5000-8000-000000000001",
+  map2: "20000000-0000-5000-8000-000000000002",
+  sceneA: "30000000-0000-4000-8000-00000000000a",
+  sceneB: "30000000-0000-4000-8000-00000000000b",
+  implicit: "30000000-0000-4000-8000-00000000000f"
+} as const;
+const GEOMETRY = { width: 900, height: 600, calibration: null } as const;
+
+function state() {
+  return GameStateSchema.parse({ schemaVersion: 1, actors: [
+    { id: IDS.alpha, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, initiative: 5 },
+    { id: IDS.beta, name: "Beta", kind: "monster", visibility: "public", hp: { current: 15, maximum: 15 }, initiative: 2 },
+    { id: IDS.extra, name: "Extra", kind: "monster", visibility: "gm-only", hp: { current: 8, maximum: 8 }, initiative: 0 }
+  ] });
+}
+
+const liveOf = (combat: ReturnType<typeof state>["combat"]) => ({ active: combat.active, round: combat.round, turnActorId: combat.turnActorId, initiative: combat.initiative, tokens: combat.tokens, annotations: combat.annotations, turn: combat.turn, reactionsUsed: combat.reactionsUsed, pendingSaves: combat.pendingSaves });
+
+describe("scene preparation", () => {
+  it("creates a prepared (inactive) scene with score-0 initiative and unplaced tokens, and stays schema-valid", () => {
+    const game = state();
+    const scene = createScene(game, { sceneId: IDS.sceneA, name: "Ambush", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.beta] }, GEOMETRY);
+    expect(scene).toMatchObject({ id: IDS.sceneA, name: "Ambush", mapAssetId: IDS.map1 });
+    expect(scene.combat.active).toBe(false);
+    expect(scene.combat.initiative).toEqual([
+      { actorId: IDS.alpha, score: 0, tieBreaker: 5 },
+      { actorId: IDS.beta, score: 0, tieBreaker: 2 }
+    ]);
+    expect(scene.combat.tokens.map((token) => token.position)).toEqual([null, null]);
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+  });
+
+  it("renames a scene and rejects removing the live one", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "One", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    renameScene(game, IDS.sceneA, "Renamed");
+    expect(game.combat.scenes[0].name).toBe("Renamed");
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    expect(() => removeScene(game, IDS.sceneA)).toThrow(/another scene/i);
+    expect(() => renameScene(game, "40000000-0000-4000-8000-000000000000", "X")).toThrow(/no longer exists/i);
+  });
+
+  it("rejects changing combatants of the live scene, allows it for a parked one", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    expect(() => setSceneCombatants(game, IDS.sceneA, [IDS.beta], GEOMETRY)).toThrow(/live/i);
+    setSceneCombatants(game, IDS.sceneB, [IDS.alpha, IDS.beta], GEOMETRY);
+    expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.alpha, IDS.beta]);
+  });
+});
+
+describe("scene park and resume", () => {
+  it("preserves a running fight when switching away and resumes it exactly on switch-back", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "Fight", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.beta] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "Next room", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+
+    // Run a real fight on scene A: start, advance into round 2, place Alpha's token.
+    startEncounter(game, { mapAssetId: IDS.map1, entries: [{ actorId: IDS.alpha, score: 18 }, { actorId: IDS.beta, score: 9 }] }, () => 10, GEOMETRY);
+    nextInitiativeTurn(game); nextInitiativeTurn(game); // wraps to round 2
+    moveEncounterToken(game, IDS.alpha, { x: 120, y: 90 }, GEOMETRY);
+    expect(game.combat.round).toBe(2);
+    const running = structuredClone(liveOf(game.combat));
+
+    // Switch to scene B: A parks, B resumes (prepared/inactive on its own map).
+    activateScene(game, IDS.sceneB, IDS.implicit);
+    expect(game.combat.activeSceneId).toBe(IDS.sceneB);
+    expect(game.combat.mapAssetId).toBe(IDS.map2);
+    expect(game.combat.active).toBe(false);
+    // The parked scene A holds the frozen fight; the active scene B's own slot is empty.
+    expect(liveOf(game.combat.scenes.find((scene) => scene.id === IDS.sceneA)!.combat)).toEqual(running);
+    expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.initiative).toEqual([]);
+
+    // Switch back to A: the fight resumes byte-for-byte.
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    expect(game.combat.activeSceneId).toBe(IDS.sceneA);
+    expect(game.combat.mapAssetId).toBe(IDS.map1);
+    expect(liveOf(game.combat)).toEqual(running);
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+  });
+
+  it("keeps actor HP global across scene swaps (damage persists) and rejects re-activating the live scene", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    game.actors.find((actor) => actor.id === IDS.alpha)!.hp.current = 4; // wounded on scene A
+    activateScene(game, IDS.sceneB, IDS.implicit);
+    expect(game.actors.find((actor) => actor.id === IDS.alpha)!.hp.current).toBe(4);
+    expect(() => activateScene(game, IDS.sceneB, IDS.implicit)).toThrow(/already live/i);
+  });
+});
+
+describe("scene migration and projections", () => {
+  it("binds a pre-scenes encounter to one implicit active scene, leaving the player projection unchanged", () => {
+    const game = state();
+    startEncounter(game, { mapAssetId: IDS.map1, entries: [{ actorId: IDS.alpha, score: 12 }, { actorId: IDS.beta, score: 6 }] }, () => 10, GEOMETRY);
+    const before = projectPlayerCombat(game);
+    migrateToScene(game, IDS.sceneA);
+    expect(game.combat.scenes).toHaveLength(1);
+    expect(game.combat.activeSceneId).toBe(IDS.sceneA);
+    expect(game.combat.scenes[0]).toMatchObject({ id: IDS.sceneA, mapAssetId: IDS.map1 });
+    // The active scene's own slot is empty; the live copy stays top-level.
+    expect(game.combat.scenes[0].combat.initiative).toEqual([]);
+    // Players never see scenes: the projection is byte-identical and carries no scene keys.
+    const after = projectPlayerCombat(game);
+    expect(after).toEqual(before);
+    expect("scenes" in after).toBe(false);
+    expect("activeSceneId" in after).toBe(false);
+    // Migration is one-shot: nothing to do once a scene exists.
+    migrateToScene(game, IDS.sceneB);
+    expect(game.combat.scenes).toHaveLength(1);
+  });
+});
+
+describe("scene ripples on encounter start and actor removal", () => {
+  it("rejects starting on a different map than the active scene and preserves pre-placed positions", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    expect(() => startEncounter(game, { mapAssetId: IDS.map2, entries: [{ actorId: IDS.alpha }] }, () => 10, GEOMETRY)).toThrow(/different map/i);
+    // Pre-place Beta's token on the live prepared scene, then start on the matching map: the position survives.
+    game.combat = { ...game.combat, active: false };
+    game.combat = { ...game.combat, tokens: game.combat.tokens.map((token) => token.actorId === IDS.beta ? { ...token, position: { x: 300, y: 200 } } : token) };
+    startEncounter(game, { mapAssetId: IDS.map1, entries: [{ actorId: IDS.alpha, score: 5 }, { actorId: IDS.beta, score: 3 }] }, () => 10, GEOMETRY);
+    expect(game.combat.tokens.find((token) => token.actorId === IDS.beta)!.position).toEqual({ x: 300, y: 200 });
+  });
+
+  it("prunes a removed actor from inactive scenes and blocks removal from a parked active fight", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.extra] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    // Extra (gm-only monster) is only in the inactive scene A → removing it prunes A cleanly.
+    removeActor(game, IDS.extra);
+    expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneA)!.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.alpha]);
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+
+    // Now make scene B a parked, still-running fight; Beta (a monster) can't be removed while paused there.
+    activateScene(game, IDS.sceneB, IDS.implicit);
+    startEncounter(game, { mapAssetId: IDS.map2, entries: [{ actorId: IDS.beta, score: 5 }] }, () => 10, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    expect(() => removeActor(game, IDS.beta)).toThrow(/paused encounter/i);
+  });
+});

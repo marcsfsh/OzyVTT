@@ -20,6 +20,13 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
 export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry) {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200) throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
+  // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
+  if (state.combat.activeSceneId !== null) {
+    const activeScene = state.combat.scenes.find((scene) => scene.id === state.combat.activeSceneId);
+    if (activeScene && activeScene.mapAssetId !== input.mapAssetId) throw new CommandRejectedError("This scene uses a different map. Start on the scene's map, or switch scenes first.");
+  }
+  // Preserve any positions already placed during scene prep (or a prior setup); new combatants start unplaced.
+  const placedPositions = new Map(state.combat.tokens.map((token) => [token.actorId, token.position]));
   const actorIds = new Set<string>();
   const initiative = input.entries.map((entry) => {
     if (actorIds.has(entry.actorId)) throw new CommandRejectedError("Each actor can appear in Initiative only once.");
@@ -41,7 +48,8 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     turnActorId: sorted[0].actorId,
     mapAssetId: input.mapAssetId,
     initiative: sorted,
-    tokens: createEncounterTokens(sorted.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), tokenGeometry),
+    tokens: createEncounterTokens(sorted.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), tokenGeometry)
+      .map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
     annotations: [],
     turn: { actionUsed: false, bonusActionUsed: false },
     reactionsUsed: [],

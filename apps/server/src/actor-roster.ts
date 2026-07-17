@@ -59,7 +59,15 @@ export function removeActor(state: GameState, actorId: string) {
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
     throw new CommandRejectedError("End the encounter before removing a combatant who is in it.");
   }
+  // A parked scene can hold a paused, still-active fight; block removal if this actor is in one.
+  if (state.combat.scenes.some((scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId))) {
+    throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this combatant first.");
+  }
   state.actors = state.actors.filter((item) => item.id !== actorId);
+  // Drop the actor from every inactive prepared scene so no scene references a combatant that no longer exists.
+  if (state.combat.scenes.some((scene) => !scene.combat.active && (scene.combat.initiative.some((entry) => entry.actorId === actorId) || scene.combat.tokens.some((token) => token.actorId === actorId)))) {
+    state.combat = { ...state.combat, scenes: state.combat.scenes.map((scene) => scene.combat.active ? scene : ({ ...scene, combat: { ...scene.combat, initiative: scene.combat.initiative.filter((entry) => entry.actorId !== actorId), tokens: scene.combat.tokens.filter((token) => token.actorId !== actorId) } })) };
+  }
   // Imported stat blocks live only for their actors; drop one nothing references anymore.
   if (actor.definitionId?.startsWith("import-") && !state.actors.some((item) => item.definitionId === actor.definitionId)) {
     state.definitions = state.definitions.filter((entry) => entry.id !== actor.definitionId);

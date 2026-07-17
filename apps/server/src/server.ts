@@ -18,6 +18,7 @@ import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
+import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
 import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { createInitialGameState } from "./initial-game-state.js";
@@ -90,6 +91,11 @@ const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.str
 const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneNameSchema = z.string().trim().min(1).max(120);
+const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneIdSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneSetCombatantsSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const AnnotationAddSchema = z.object({
@@ -751,6 +757,67 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be moved." }); }
     });
+    socket.on("scene:create", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can prepare scenes." });
+      const request = SceneCreateSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene setup is malformed." });
+      const sceneMap = mapCatalog.get(request.data.mapAssetId);
+      if (!sceneMap || sceneMap.kind !== "battlemap") return acknowledge({ ok: false, message: "Prepare scenes on an uploaded battlemap." });
+      try {
+        const { commandId, name, mapAssetId, combatantIds, expectedRevision } = request.data;
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be created." }); }
+    });
+    socket.on("scene:rename", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can rename scenes." });
+      const request = SceneRenameSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene rename is malformed." });
+      try {
+        const { commandId, sceneId, name, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "scene.rename", expectedRevision }, (state) => renameScene(state, sceneId, name));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be renamed." }); }
+    });
+    socket.on("scene:remove", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove scenes." });
+      const request = SceneIdSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
+      try {
+        const { commandId, sceneId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "scene.remove", expectedRevision }, (state) => removeScene(state, sceneId));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be removed." }); }
+    });
+    socket.on("scene:activate", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can switch scenes." });
+      const request = SceneIdSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
+      try {
+        const { commandId, sceneId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "scene.activate", expectedRevision }, (state) => activateScene(state, sceneId, commandId));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be switched." }); }
+    });
+    socket.on("scene:set-combatants", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change a scene's combatants." });
+      const request = SceneSetCombatantsSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene update is malformed." });
+      try {
+        const { commandId, sceneId, combatantIds, expectedRevision } = request.data;
+        const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
+        if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
+        const geometry = await tokenGeometryFor(scene.mapAssetId);
+        const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be updated." }); }
+    });
     socket.on("annotation:add", async (payload, acknowledge) => {
       const request = AnnotationAddSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The annotation is malformed." });
@@ -893,6 +960,11 @@ export function createServer(options: CreateServerOptions) {
         const geometry = await tokenGeometryFor(persisted.combat.mapAssetId);
         await store.execute({ id: `encounter.tokens.prepare:${persisted.revision}`, type: "encounter.tokens.prepare" }, (state) => { ensureEncounterTokens(state, geometry); });
       } catch { /* Preserve startup for an old encounter whose map asset was removed; the GM can end it and start a new encounter. */ }
+    }
+    // Bind a pre-scenes encounter/map to one implicit active scene so park-and-resume has a home.
+    const beforeScenes = store.snapshot;
+    if (beforeScenes.combat.scenes.length === 0 && beforeScenes.combat.mapAssetId !== null) {
+      await store.execute({ id: `scene.migrate:${beforeScenes.revision}`, type: "scene.migrate" }, (state) => migrateToScene(state, randomUUID()));
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
