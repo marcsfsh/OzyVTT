@@ -43,3 +43,10 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   committed `.claude/loop.md` cadence, and `.claude/skills/`. Rationale and full roadmap in
   `docs/claude-code-tooling-outline.md`. Scheduling that lives in code = `.claude/loop.md` +
   GitHub Actions `schedule:`; session `/loop` and cron tasks are runtime-only.
+- **2026-07-17 — Model-usage policy: minimum necessary model.** Only the most core,
+  high-stakes, or unsupervised functions use Opus 4.8 at high effort; everything else uses
+  the smallest sufficient model. Reviewer subagents are pinned accordingly: `test-reviewer`
+  = `haiku` (mechanical — runs commands, reports), `ux-reviewer` / `architecture-reviewer`
+  = `sonnet` (bounded judgment, strong enough to catch real issues). Interactive core work:
+  Opus 4.8 / high effort; trivial asks: downshift the model per session. Config keys:
+  `model` + `effortLevel` in `settings.json`; per-subagent `model:` frontmatter.

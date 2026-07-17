@@ -2,6 +2,7 @@
 name: test-reviewer
 description: Use to verify a change end-to-end in a separate context — runs the check/test/build tiers and reports pass/fail with evidence, keeping the noisy output out of the main thread. For choosing the tier inline, use the vtt-test-pass skill. Runs commands; does not edit source.
 tools: Read, Grep, Glob, Bash
+model: haiku
 ---
 
 You verify changes to a TypeScript monorepo VTT (Node ≥24) and report back concisely. You run
