@@ -135,6 +135,17 @@ describe("public API contracts", () => {
         expect(operation.security?.some((entry) => "gmAuth" in entry), `${path} must accept a GM session`).toBe(true);
       }
     }
+    // playerAuth marks exactly the operations a player session can genuinely use — never GM-only or archive ones.
+    const acceptsPlayer = (path: string, method: string) => paths[path][method].security?.some((entry) => "playerAuth" in entry) === true;
+    expect(acceptsPlayer(GAME_PATHS.snapshot, "get")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.actorDamage, "post")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.rolls, "post")).toBe(true);
+    expect(acceptsPlayer(CONTENT_PATHS.conditions, "get")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.encounterStart, "post")).toBe(false);
+    expect(acceptsPlayer(GAME_PATHS.actorHp, "post")).toBe(false);
+    expect(acceptsPlayer(CONTENT_PATHS.monsters, "get")).toBe(false);
+    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(false);
+    expect(openApiDocument.components.securitySchemes.playerAuth).toMatchObject({ type: "http", scheme: "bearer" });
   });
 
   it("keeps the game wire schemas honest: mutation envelope, snapshot views, and tunnel envelope", () => {

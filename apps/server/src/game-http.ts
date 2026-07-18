@@ -122,16 +122,23 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     return { commandId: newId(), ...body, ...extras };
   }
 
-  const runCommand = (scope: IntegrationScope, run: (principal: GamePrincipal, payload: Record<string, unknown>) => Promise<Record<string, unknown>>, extras?: (req: Request) => Record<string, unknown>) =>
-    [authorize(scope), async (req: Request, res: Response) => {
+  /**
+   * A typed route for one cataloged command: scope AND handler come from the registry (the same
+   * one the generic tunnel dispatches through), so a typed route can never drift from the tunnel.
+   */
+  const command = (type: string, extras?: (req: Request) => Record<string, unknown>) => {
+    const descriptor = options.registry.get(type);
+    if (!descriptor) throw new Error(`game-http route references an uncataloged command type: ${type}`);
+    return [authorize(descriptor.scope), async (req: Request, res: Response) => {
       const payload = commandPayload(req, extras?.(req));
       try {
-        const data = await run(res.locals.principal as GamePrincipal, payload);
+        const data = await descriptor.run(res.locals.principal as GamePrincipal, payload);
         sendData(res, { commandId: payload.commandId, ...data });
       } catch (error) {
         sendOperationError(res, error);
       }
     }] as const;
+  };
 
   const ops = options.operations;
 
@@ -194,37 +201,40 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Typed command routes (same operations the socket handlers call) ----------
 
-  router.post(expressPath(GAME_PATHS.encounterStart), ...runCommand("combat:write", (p, payload) => ops.encounterStart(p, payload)));
-  router.post(expressPath(GAME_PATHS.encounterEnd), ...runCommand("combat:write", (p, payload) => ops.encounterEnd(p, payload)));
-  router.post(expressPath(GAME_PATHS.encounterCombatants), ...runCommand("combat:write", (p, payload) => ops.encounterAddCombatant(p, payload)));
-  router.post(expressPath(GAME_PATHS.initiativeSet), ...runCommand("combat:write", (p, payload) => ops.initiativeSet(p, payload)));
-  router.post(expressPath(GAME_PATHS.initiativeNext), ...runCommand("combat:write", (p, payload) => ops.initiativeNext(p, payload)));
-  router.post(expressPath(GAME_PATHS.initiativePrevious), ...runCommand("combat:write", (p, payload) => ops.initiativePrevious(p, payload)));
-  router.post(expressPath(GAME_PATHS.turnEnd), ...runCommand("combat:write", (p, payload) => ops.turnEnd(p, payload)));
-  router.post(expressPath(GAME_PATHS.turnUse), ...runCommand("combat:write", (p, payload) => ops.turnUse(p, payload)));
-  router.post(expressPath(GAME_PATHS.turnReaction), ...runCommand("combat:write", (p, payload) => ops.turnUseReaction(p, payload)));
-  router.post(expressPath(GAME_PATHS.tokenMove), ...runCommand("combat:write", (p, payload) => ops.tokenMove(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.actors), ...runCommand("actor:write", (p, payload) => ops.actorAddFromDefinition(p, payload)));
-  router.delete(expressPath(GAME_PATHS.actorById), ...runCommand("actor:write", (p, payload) => ops.actorRemove(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.actorDamage), ...runCommand("actor:write", (p, payload) => ops.actorApplyDamage(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.actorHeal), ...runCommand("actor:write", (p, payload) => ops.actorHeal(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.actorTempHp), ...runCommand("actor:write", (p, payload) => ops.actorSetTempHp(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.actorHp), ...runCommand("actor:write", (p, payload) => ops.actorSetHp(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.actorConditions), ...runCommand("actor:write", (p, payload) => ops.actorSetCondition(p, payload), (req) => ({ actorId: req.params.actorId })));
-  router.post(expressPath(GAME_PATHS.definitionsImport), ...runCommand("actor:write", (p, payload) => ops.actorImportDefinition(p, payload)));
-  router.post(expressPath(GAME_PATHS.rolls), ...runCommand("roll:create", (p, payload) => ops.diceRoll(p, payload)));
-  router.post(expressPath(GAME_PATHS.actionResolve), ...runCommand("combat:write", (p, payload) => ops.actionResolve(p, payload)));
-  router.post(expressPath(GAME_PATHS.saveAnswer), ...runCommand("combat:write", (p, payload) => ops.saveAnswer(p, payload), (req) => ({ saveId: req.params.saveId })));
-  router.post(expressPath(GAME_PATHS.saveDismiss), ...runCommand("combat:write", (p, payload) => ops.saveDismiss(p, payload), (req) => ({ saveId: req.params.saveId })));
+  const actorIdParam = (req: Request) => ({ actorId: req.params.actorId });
+  const saveIdParam = (req: Request) => ({ saveId: req.params.saveId });
+  const idParam = (req: Request) => ({ id: req.params.id });
+  router.post(expressPath(GAME_PATHS.encounterStart), ...command("encounter.start"));
+  router.post(expressPath(GAME_PATHS.encounterEnd), ...command("encounter.end"));
+  router.post(expressPath(GAME_PATHS.encounterCombatants), ...command("encounter.add-combatant"));
+  router.post(expressPath(GAME_PATHS.initiativeSet), ...command("initiative.set"));
+  router.post(expressPath(GAME_PATHS.initiativeNext), ...command("initiative.next"));
+  router.post(expressPath(GAME_PATHS.initiativePrevious), ...command("initiative.previous"));
+  router.post(expressPath(GAME_PATHS.turnEnd), ...command("turn.end"));
+  router.post(expressPath(GAME_PATHS.turnUse), ...command("turn.use"));
+  router.post(expressPath(GAME_PATHS.turnReaction), ...command("turn.use-reaction"));
+  router.post(expressPath(GAME_PATHS.tokenMove), ...command("token.move", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actors), ...command("actor.add-from-definition"));
+  router.delete(expressPath(GAME_PATHS.actorById), ...command("actor.remove", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorDamage), ...command("actor.apply-damage", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorHeal), ...command("actor.heal", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorTempHp), ...command("actor.set-temp-hp", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorHp), ...command("actor.set-hp", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorConditions), ...command("actor.set-condition", actorIdParam));
+  router.post(expressPath(GAME_PATHS.definitionsImport), ...command("actor.import-definition"));
+  router.post(expressPath(GAME_PATHS.rolls), ...command("dice.roll"));
+  router.post(expressPath(GAME_PATHS.actionResolve), ...command("action.resolve"));
+  router.post(expressPath(GAME_PATHS.saveAnswer), ...command("save.answer", saveIdParam));
+  router.post(expressPath(GAME_PATHS.saveDismiss), ...command("save.dismiss", saveIdParam));
   // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
-  router.post(expressPath(GAME_PATHS.annotationsPing), ...runCommand("combat:write", (p, payload) => ops.annotationPing(p, payload)));
-  router.post(expressPath(GAME_PATHS.annotationsClear), ...runCommand("combat:write", (p, payload) => ops.annotationClear(p, payload)));
-  router.post(expressPath(GAME_PATHS.annotations), ...runCommand("combat:write", (p, payload) => ops.annotationAdd(p, payload)));
-  router.delete(expressPath(GAME_PATHS.annotationById), ...runCommand("combat:write", (p, payload) => ops.annotationRemove(p, payload), (req) => ({ id: req.params.id })));
-  router.post(expressPath(GAME_PATHS.annotationMove), ...runCommand("combat:write", (p, payload) => ops.annotationMove(p, payload), (req) => ({ id: req.params.id })));
-  router.post(expressPath(GAME_PATHS.annotationColor), ...runCommand("combat:write", (p, payload) => ops.annotationSetColor(p, payload), (req) => ({ id: req.params.id })));
-  router.post(expressPath(GAME_PATHS.annotationVisibility), ...runCommand("combat:write", (p, payload) => ops.annotationSetVisibility(p, payload), (req) => ({ id: req.params.id })));
-  router.post(expressPath(GAME_PATHS.annotationMovable), ...runCommand("combat:write", (p, payload) => ops.annotationSetMovable(p, payload), (req) => ({ id: req.params.id })));
+  router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
+  router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));
+  router.post(expressPath(GAME_PATHS.annotations), ...command("annotation.add"));
+  router.delete(expressPath(GAME_PATHS.annotationById), ...command("annotation.remove", idParam));
+  router.post(expressPath(GAME_PATHS.annotationMove), ...command("annotation.move", idParam));
+  router.post(expressPath(GAME_PATHS.annotationColor), ...command("annotation.set-color", idParam));
+  router.post(expressPath(GAME_PATHS.annotationVisibility), ...command("annotation.set-visibility", idParam));
+  router.post(expressPath(GAME_PATHS.annotationMovable), ...command("annotation.set-movable", idParam));
 
   // ---------- Bundled content reads ----------
 

@@ -199,11 +199,14 @@ export function createServer(options: CreateServerOptions) {
   // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
   // by the operation itself) fit through the HTTP surface too.
   app.use(express.json({ limit: "512kb" }));
-  // Open CORS for the programmatic API: every /api credential travels as a bearer header (or a
-  // SameSite=Strict cookie the browser refuses to send cross-origin anyway), so a wildcard origin
-  // grants nothing a token doesn't already grant — and it lets browser-based integrations
-  // (overlays, dashboards) call the documented surface directly.
-  app.use("/api", (req, res, next) => {
+  // Open CORS for the VERSIONED integration surface only: every /api/v1 credential travels as a
+  // bearer header (or a SameSite=Strict cookie the browser refuses to send cross-origin anyway),
+  // so a wildcard origin grants nothing a token doesn't already grant — and it lets browser-based
+  // integrations (overlays, dashboards) call the documented surface directly. The legacy
+  // /api/gm/* session endpoints — password login above all — deliberately stay same-origin:
+  // wildcard CORS there would let any web page relay password guesses through a LAN browser.
+  app.use((req, res, next) => {
+    if (req.path !== "/api/v1" && !req.path.startsWith("/api/v1/")) return next();
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
     res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");

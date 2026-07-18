@@ -22,8 +22,9 @@ import {
   ActionResolveSchema, ActorAddFromDefinitionSchema, ActorImportDefinitionSchema, ActorRemoveSchema, AddCombatantSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, CommandIdentitySchema, ContentActionsSchema,
-  DiceRollSchema, EncounterStartSchema, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema, InitiativeScoreSchema,
-  SaveAnswerSchema, SaveDismissSchema, SetConditionSchema, SetHpSchema, TempHpSchema, TokenMoveSchema, TurnReactionSchema, TurnUseSchema
+  DiceRollSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
+  InitiativeScoreSchema, SaveAnswerSchema, SaveDismissSchema, SetConditionSchema, SetHpSchema, TempHpSchema, TokenMoveSchema,
+  TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
 /**
@@ -630,50 +631,50 @@ export function createGameOperations(context: GameOperationsContext) {
 }
 
 /**
- * The command catalog for the generic HTTP tunnel (`POST /api/v1/game/commands`) and its GET
- * discovery listing: every game command reachable over the integration API, its required credential
- * scope, and the operation that runs it. Types use the store's dot-separated receipt form — the same
- * strings the archive journal and `domain_events` table record.
+ * The command catalog for the generic HTTP tunnel (`POST /api/v1/game/commands`), its GET discovery
+ * listing, AND the typed HTTP routes (which derive their scope + handler from here rather than
+ * restating them). Types use the store's dot-separated receipt form — the same strings the archive
+ * journal and `domain_events` table record. Scopes come from `GAME_COMMAND_SCOPES` (single source).
  */
 export type GameCommandDescriptor = Readonly<{
-  type: string;
+  type: GameCommandType;
   scope: IntegrationScope;
   summary: string;
   run: (principal: GamePrincipal, payload: unknown) => Promise<GameMutationResult>;
 }>;
 
 export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<string, GameCommandDescriptor> {
-  const descriptors: readonly GameCommandDescriptor[] = [
-    { type: "encounter.start", scope: "combat:write", summary: "Start an encounter on a battlemap with initial combatants (GM).", run: (p, raw) => operations.encounterStart(p, raw) },
-    { type: "encounter.end", scope: "combat:write", summary: "End the encounter and archive it permanently (GM).", run: (p, raw) => operations.encounterEnd(p, raw) },
-    { type: "encounter.add-combatant", scope: "combat:write", summary: "Add a rostered actor to the running encounter (GM).", run: (p, raw) => operations.encounterAddCombatant(p, raw) },
-    { type: "initiative.set", scope: "combat:write", summary: "Set a combatant's initiative score (GM).", run: (p, raw) => operations.initiativeSet(p, raw) },
-    { type: "initiative.next", scope: "combat:write", summary: "Advance the turn; steps forward through recorded history while rewound (GM).", run: (p, raw) => operations.initiativeNext(p, raw) },
-    { type: "initiative.previous", scope: "combat:write", summary: "Rewind the whole table to the previous turn boundary (GM).", run: (p, raw) => operations.initiativePrevious(p, raw) },
-    { type: "turn.end", scope: "combat:write", summary: "End the current turn (GM anyone; a player only their own turn).", run: (p, raw) => operations.turnEnd(p, raw) },
-    { type: "turn.use", scope: "combat:write", summary: "Mark the current turn's action or bonus action used/unused.", run: (p, raw) => operations.turnUse(p, raw) },
-    { type: "turn.use-reaction", scope: "combat:write", summary: "Mark a combatant's reaction used/unused.", run: (p, raw) => operations.turnUseReaction(p, raw) },
-    { type: "token.move", scope: "combat:write", summary: "Move a combatant's token (server-snapped); position null returns it to the tray.", run: (p, raw) => operations.tokenMove(p, raw) },
-    { type: "actor.add-from-definition", scope: "actor:write", summary: "Instantiate a bundled SRD monster onto the roster (GM).", run: (p, raw) => operations.actorAddFromDefinition(p, raw) },
-    { type: "actor.import-definition", scope: "actor:write", summary: "Import a canonical ActorDefinition JSON as a claimable actor (GM).", run: (p, raw) => operations.actorImportDefinition(p, raw) },
-    { type: "actor.remove", scope: "actor:write", summary: "Remove an actor from the roster (GM).", run: (p, raw) => operations.actorRemove(p, raw) },
-    { type: "actor.apply-damage", scope: "actor:write", summary: "Apply damage (GM anyone; a player their claimed character).", run: (p, raw) => operations.actorApplyDamage(p, raw) },
-    { type: "actor.heal", scope: "actor:write", summary: "Heal hit points (GM anyone; a player their claimed character).", run: (p, raw) => operations.actorHeal(p, raw) },
-    { type: "actor.set-temp-hp", scope: "actor:write", summary: "Set temporary hit points (GM anyone; a player their claimed character).", run: (p, raw) => operations.actorSetTempHp(p, raw) },
-    { type: "actor.set-hp", scope: "actor:write", summary: "Set current hit points directly (GM).", run: (p, raw) => operations.actorSetHp(p, raw) },
-    { type: "actor.set-condition", scope: "actor:write", summary: "Apply or clear an SRD condition, with exhaustion levels.", run: (p, raw) => operations.actorSetCondition(p, raw) },
-    { type: "dice.roll", scope: "roll:create", summary: "Roll dice into the shared, auditable roll history.", run: (p, raw) => operations.diceRoll(p, raw) },
-    { type: "action.resolve", scope: "combat:write", summary: "Run a stat-block action: attack vs AC or save-DC with typed damage (GM).", run: (p, raw) => operations.actionResolve(p, raw) },
-    { type: "save.answer", scope: "combat:write", summary: "Answer a pending saving throw by rolling or entering a total.", run: (p, raw) => operations.saveAnswer(p, raw) },
-    { type: "save.dismiss", scope: "combat:write", summary: "Dismiss a pending saving throw without resolving it.", run: (p, raw) => operations.saveDismiss(p, raw) },
-    { type: "annotation.add", scope: "combat:write", summary: "Draw a measurement or area shape on the encounter map.", run: (p, raw) => operations.annotationAdd(p, raw) },
-    { type: "annotation.ping", scope: "combat:write", summary: "Ping a point on the encounter map.", run: (p, raw) => operations.annotationPing(p, raw) },
-    { type: "annotation.move", scope: "combat:write", summary: "Move or resize an annotation you may edit.", run: (p, raw) => operations.annotationMove(p, raw) },
-    { type: "annotation.remove", scope: "combat:write", summary: "Remove an annotation you may edit.", run: (p, raw) => operations.annotationRemove(p, raw) },
-    { type: "annotation.set-color", scope: "combat:write", summary: "Change an annotation's color.", run: (p, raw) => operations.annotationSetColor(p, raw) },
-    { type: "annotation.set-visibility", scope: "combat:write", summary: "Change who can see an annotation.", run: (p, raw) => operations.annotationSetVisibility(p, raw) },
-    { type: "annotation.set-movable", scope: "combat:write", summary: "Allow or disallow other players moving a shape.", run: (p, raw) => operations.annotationSetMovable(p, raw) },
-    { type: "annotation.clear", scope: "combat:write", summary: "Clear drawn shapes by scope (mine/players/all).", run: (p, raw) => operations.annotationClear(p, raw) }
+  const entries: ReadonlyArray<[GameCommandType, string, GameCommandDescriptor["run"]]> = [
+    ["encounter.start", "Start an encounter on a battlemap with initial combatants (GM).", (p, raw) => operations.encounterStart(p, raw)],
+    ["encounter.end", "End the encounter and archive it permanently (GM).", (p, raw) => operations.encounterEnd(p, raw)],
+    ["encounter.add-combatant", "Add a rostered actor to the running encounter (GM).", (p, raw) => operations.encounterAddCombatant(p, raw)],
+    ["initiative.set", "Set a combatant's initiative score (GM).", (p, raw) => operations.initiativeSet(p, raw)],
+    ["initiative.next", "Advance the turn; steps forward through recorded history while rewound (GM).", (p, raw) => operations.initiativeNext(p, raw)],
+    ["initiative.previous", "Rewind the whole table to the previous turn boundary (GM).", (p, raw) => operations.initiativePrevious(p, raw)],
+    ["turn.end", "End the current turn (GM anyone; a player only their own turn).", (p, raw) => operations.turnEnd(p, raw)],
+    ["turn.use", "Mark the current turn's action or bonus action used/unused.", (p, raw) => operations.turnUse(p, raw)],
+    ["turn.use-reaction", "Mark a combatant's reaction used/unused.", (p, raw) => operations.turnUseReaction(p, raw)],
+    ["token.move", "Move a combatant's token (server-snapped); position null returns it to the tray.", (p, raw) => operations.tokenMove(p, raw)],
+    ["actor.add-from-definition", "Instantiate a bundled SRD monster onto the roster (GM).", (p, raw) => operations.actorAddFromDefinition(p, raw)],
+    ["actor.import-definition", "Import a canonical ActorDefinition JSON as a claimable actor (GM).", (p, raw) => operations.actorImportDefinition(p, raw)],
+    ["actor.remove", "Remove an actor from the roster (GM).", (p, raw) => operations.actorRemove(p, raw)],
+    ["actor.apply-damage", "Apply damage (GM anyone; a player their claimed character).", (p, raw) => operations.actorApplyDamage(p, raw)],
+    ["actor.heal", "Heal hit points (GM anyone; a player their claimed character).", (p, raw) => operations.actorHeal(p, raw)],
+    ["actor.set-temp-hp", "Set temporary hit points (GM anyone; a player their claimed character).", (p, raw) => operations.actorSetTempHp(p, raw)],
+    ["actor.set-hp", "Set current hit points directly (GM).", (p, raw) => operations.actorSetHp(p, raw)],
+    ["actor.set-condition", "Apply or clear an SRD condition, with exhaustion levels.", (p, raw) => operations.actorSetCondition(p, raw)],
+    ["dice.roll", "Roll dice into the shared, auditable roll history.", (p, raw) => operations.diceRoll(p, raw)],
+    ["action.resolve", "Run a stat-block action: attack vs AC or save-DC with typed damage (GM).", (p, raw) => operations.actionResolve(p, raw)],
+    ["save.answer", "Answer a pending saving throw by rolling or entering a total.", (p, raw) => operations.saveAnswer(p, raw)],
+    ["save.dismiss", "Dismiss a pending saving throw without resolving it.", (p, raw) => operations.saveDismiss(p, raw)],
+    ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
+    ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
+    ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],
+    ["annotation.remove", "Remove an annotation you may edit.", (p, raw) => operations.annotationRemove(p, raw)],
+    ["annotation.set-color", "Change an annotation's color.", (p, raw) => operations.annotationSetColor(p, raw)],
+    ["annotation.set-visibility", "Change who can see an annotation.", (p, raw) => operations.annotationSetVisibility(p, raw)],
+    ["annotation.set-movable", "Allow or disallow other players moving a shape.", (p, raw) => operations.annotationSetMovable(p, raw)],
+    ["annotation.clear", "Clear drawn shapes by scope (mine/players/all).", (p, raw) => operations.annotationClear(p, raw)]
   ];
-  return new Map(descriptors.map((descriptor) => [descriptor.type, descriptor]));
+  return new Map<string, GameCommandDescriptor>(entries.map(([type, summary, run]) => [type, { type, scope: GAME_COMMAND_SCOPES[type], summary, run }]));
 }

@@ -3,8 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GameStateSchema } from "@vtt/domain";
-import { CONTENT_PATHS, ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS, GameCommandCatalogResponseSchema, GameLogResponseSchema, GameMutationAcceptedResponseSchema, GameSnapshotResponseSchema, EncounterArchiveListResponseSchema } from "@vtt/api-contract";
+import { CONTENT_PATHS, ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS, GameCommandCatalogResponseSchema, GameLogResponseSchema, GameMutationAcceptedResponseSchema, GameSnapshotResponseSchema, EncounterArchiveListResponseSchema, openApiDocument } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
+import { GAME_COMMAND_SCOPES } from "../src/game-commands.js";
 import { createServer } from "../src/server.js";
 
 /**
@@ -333,7 +334,7 @@ describe("public game API over /api/v1", () => {
     expect(await (await fetch(`${base}/api/gm/encounters`, { headers: { authorization: `Bearer ${gmToken}` } })).json()).toEqual({ encounters: [] });
   });
 
-  it("answers CORS preflights and exposes the integration headers for browser-based tools", async () => {
+  it("answers CORS preflights for /api/v1 only — never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, { method: "OPTIONS", headers: { origin: "https://overlay.example", "access-control-request-method": "GET", "access-control-request-headers": "authorization" } });
     expect(preflight.status).toBe(204);
@@ -343,5 +344,57 @@ describe("public game API over /api/v1", () => {
     const health = await fetch(`${base}/api/v1/system/health`, { headers: { origin: "https://overlay.example" } });
     expect(health.headers.get("access-control-allow-origin")).toBe("*");
     expect(health.headers.get("access-control-expose-headers")).toContain("etag");
+
+    // The password endpoint must stay same-origin: wildcard CORS there would let any web page
+    // relay password guesses through a browser on the LAN and read the outcome.
+    const loginPreflight = await fetch(`${base}/api/gm/login`, { method: "OPTIONS", headers: { origin: "https://evil.example", "access-control-request-method": "POST" } });
+    expect(loginPreflight.headers.get("access-control-allow-origin")).toBeNull();
+    const loginPost = await fetch(`${base}/api/gm/login`, { method: "POST", headers: { origin: "https://evil.example", "content-type": "application/json" }, body: JSON.stringify({ password: "wrong" }) });
+    expect(loginPost.headers.get("access-control-allow-origin")).toBeNull();
+    const legacyState = await fetch(`${base}/api/state`, { headers: { origin: "https://evil.example" } });
+    expect(legacyState.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("keeps the OpenAPI-documented scopes identical to the runtime command scopes (no drift between doc, tunnel, and typed routes)", () => {
+    const TYPED_ROUTES: ReadonlyArray<[string, "post" | "delete", keyof typeof GAME_COMMAND_SCOPES]> = [
+      [GAME_PATHS.encounterStart, "post", "encounter.start"],
+      [GAME_PATHS.encounterEnd, "post", "encounter.end"],
+      [GAME_PATHS.encounterCombatants, "post", "encounter.add-combatant"],
+      [GAME_PATHS.initiativeSet, "post", "initiative.set"],
+      [GAME_PATHS.initiativeNext, "post", "initiative.next"],
+      [GAME_PATHS.initiativePrevious, "post", "initiative.previous"],
+      [GAME_PATHS.turnEnd, "post", "turn.end"],
+      [GAME_PATHS.turnUse, "post", "turn.use"],
+      [GAME_PATHS.turnReaction, "post", "turn.use-reaction"],
+      [GAME_PATHS.tokenMove, "post", "token.move"],
+      [GAME_PATHS.actors, "post", "actor.add-from-definition"],
+      [GAME_PATHS.actorById, "delete", "actor.remove"],
+      [GAME_PATHS.actorDamage, "post", "actor.apply-damage"],
+      [GAME_PATHS.actorHeal, "post", "actor.heal"],
+      [GAME_PATHS.actorTempHp, "post", "actor.set-temp-hp"],
+      [GAME_PATHS.actorHp, "post", "actor.set-hp"],
+      [GAME_PATHS.actorConditions, "post", "actor.set-condition"],
+      [GAME_PATHS.definitionsImport, "post", "actor.import-definition"],
+      [GAME_PATHS.rolls, "post", "dice.roll"],
+      [GAME_PATHS.actionResolve, "post", "action.resolve"],
+      [GAME_PATHS.saveAnswer, "post", "save.answer"],
+      [GAME_PATHS.saveDismiss, "post", "save.dismiss"],
+      [GAME_PATHS.annotations, "post", "annotation.add"],
+      [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
+      [GAME_PATHS.annotationsClear, "post", "annotation.clear"],
+      [GAME_PATHS.annotationById, "delete", "annotation.remove"],
+      [GAME_PATHS.annotationMove, "post", "annotation.move"],
+      [GAME_PATHS.annotationColor, "post", "annotation.set-color"],
+      [GAME_PATHS.annotationVisibility, "post", "annotation.set-visibility"],
+      [GAME_PATHS.annotationMovable, "post", "annotation.set-movable"]
+    ];
+    // Every cataloged command has exactly one typed route in this table...
+    expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMAND_SCOPES).sort());
+    // ...and the documented bearer scope for that route equals the runtime scope the tunnel + typed route enforce.
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>>;
+    for (const [path, method, type] of TYPED_ROUTES) {
+      const documented = paths[path][method].security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
+      expect(documented, `${method.toUpperCase()} ${path} (${type})`).toEqual([GAME_COMMAND_SCOPES[type]]);
+    }
   });
 });
