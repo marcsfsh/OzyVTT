@@ -39,7 +39,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The aboleth makes two Tentacle attacks and uses either Consume Memories or Dominate Mind if available.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "tentacle",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "psychic-drain",
@@ -61,6 +67,17 @@
      {
       "formula": "2d6 + 5",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -197,7 +214,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Acid Arrow (level 3 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "frightful-presence",
@@ -259,6 +282,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
@@ -347,7 +373,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Shatter.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -409,6 +441,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -493,7 +528,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Sleep Breath or (B) Spellcasting to cast Scorching Ray.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "pounce",
@@ -570,6 +611,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -654,7 +698,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Repulsion Breath or (B) Spellcasting to cast Guiding Bolt (level 2 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "pounce",
@@ -731,6 +781,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -823,7 +876,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Slowing Breath or (B) Spellcasting to cast Mind Spike (level 4 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "mind-jolt",
@@ -896,6 +955,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
@@ -984,7 +1046,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Spellcasting to cast Guiding Bolt (level 2 version) or (B) Weakening Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "guiding-light",
@@ -1057,6 +1125,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -1145,7 +1216,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Mind Spike (level 3 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "noxious-miasma",
@@ -1211,6 +1288,12 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -1299,7 +1382,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Scorching Ray.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "fiery-rays",
@@ -1361,6 +1450,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -1445,7 +1537,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Paralyzing Breath or (B) Spellcasting to cast Ice Knife.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "cold-gale",
@@ -1522,6 +1620,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -1610,7 +1711,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "pounce",
@@ -1665,6 +1772,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -1746,7 +1856,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The elemental makes two Thunderous Slam attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "thunderous-slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "thunderous-slam",
@@ -1783,6 +1899,23 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -1974,7 +2107,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Acid Arrow (level 4 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "frightful-presence",
@@ -2036,6 +2175,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -2124,7 +2266,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Shatter (level 3 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -2186,6 +2334,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
@@ -2270,7 +2421,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Sleep Breath or (B) Spellcasting to cast Scorching Ray (level 3 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "pounce",
@@ -2347,6 +2504,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -2431,7 +2591,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Repulsion Breath or (B) Spellcasting to cast Guiding Bolt (level 2 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "pounce",
@@ -2508,6 +2674,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 22,
@@ -2600,7 +2769,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Slowing Breath or (B) Spellcasting to cast Mind Spike (level 5 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "mind-jolt",
@@ -2673,6 +2848,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -2761,7 +2939,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Spellcasting to cast Guiding Bolt (level 4 version) or (B) Weakening Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "guiding-light",
@@ -2834,6 +3018,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 24,
@@ -2922,7 +3109,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Mind Spike (level 5 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "noxious-miasma",
@@ -2988,6 +3181,12 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 22,
@@ -3076,7 +3275,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Scorching Ray (level 3 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "fiery-rays",
@@ -3138,6 +3343,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 24,
@@ -3222,7 +3430,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Paralyzing Breath or (B) Spellcasting to cast Ice Knife (level 2 version).",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "cold-gale",
@@ -3299,6 +3513,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
@@ -3387,7 +3604,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "pounce",
@@ -3442,6 +3665,9 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -3523,7 +3749,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The armor makes two Slam attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "slam",
@@ -3549,6 +3781,19 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -3639,6 +3884,19 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -3729,6 +3987,19 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -3812,6 +4083,17 @@
      {
       "formula": "1d6",
       "type": "acid"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -3911,7 +4193,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ankylosaurus makes two Tail attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "tail",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "tail",
@@ -3926,6 +4214,16 @@
      {
       "formula": "1d10 + 4",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "huge"
      }
     ]
    }
@@ -4006,7 +4304,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ape makes two Fist attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "fist",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "fist",
@@ -4117,7 +4421,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The archelon makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -4224,7 +4534,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The archmage makes four Arcane Burst attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "arcane-burst",
+      "count": 4
+     }
+    ]
    },
    {
     "id": "protective-magic",
@@ -4265,6 +4581,12 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 12,
@@ -4388,6 +4710,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "poison"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -4740,6 +5065,13 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -4925,6 +5257,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "poison"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -4996,7 +5331,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The balor makes one Flame Whip attack and one Lightning Blade attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "flame-whip",
+      "count": 1
+     },
+     {
+      "actionId": "lightning-blade",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "teleport",
@@ -5045,6 +5390,19 @@
     "height": 3
    }
   },
+  "damageResistances": [
+   "cold",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "frightened",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 19,
@@ -5355,7 +5713,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The devil makes one Claws attack and one Tail attack, or it makes two Hurl Flame attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claws",
+      "count": 1
+     },
+     {
+      "actionId": "tail",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "claws",
@@ -5370,6 +5738,17 @@
      {
       "formula": "2d6 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -5413,6 +5792,16 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -5683,7 +6072,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The devil makes one Beard attack and one Infernal Glaive attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "beard",
+      "count": 1
+     },
+     {
+      "actionId": "infernal-glaive",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "beard",
@@ -5729,6 +6128,17 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "frightened",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -5864,6 +6274,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -6028,7 +6441,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The bear makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -6125,7 +6544,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -6166,6 +6591,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -6269,6 +6697,20 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "acid",
+   "cold",
+   "lightning"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "prone",
+   "restrained"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -6543,7 +6985,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -6584,6 +7032,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -6749,7 +7200,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The devil makes two Claw attacks and one Infernal Sting attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -6791,6 +7248,16 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -6912,6 +7379,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -6984,7 +7454,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -7032,6 +7508,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -7109,7 +7588,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The bear makes one Bite attack and one Claw attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -7140,6 +7629,16 @@
      {
       "formula": "1d4 + 3",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
      }
     ]
    }
@@ -7361,6 +7860,17 @@
       "formula": "2d6 + 2",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 12,
+      "maxTargetSize": "medium"
+     }
     ]
    },
    {
@@ -7471,7 +7981,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The bulette makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -7882,7 +8398,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The devil makes two Chain attacks and uses Conjure Infernal Chain.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "chain",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "unnerving-gaze",
@@ -7905,6 +8427,17 @@
       "formula": "2d6 + 4",
       "type": "slashing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -7926,6 +8459,16 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -8054,6 +8597,16 @@
       "formula": "1d12 + 4",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "medium"
+     }
     ]
    },
    {
@@ -8146,7 +8699,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The chuul makes two Pincer attacks and uses Paralyzing Tentacles.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "pincer",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "pincer",
@@ -8161,6 +8720,17 @@
      {
       "formula": "1d10 + 4",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -8183,6 +8753,12 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -8270,7 +8846,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The golem makes two Slam attacks, or it makes three Slam attacks if it used Hasten this turn.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "slam",
@@ -8296,6 +8878,19 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "acid",
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -8974,6 +9569,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -9090,6 +9688,10 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "psychic",
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -9264,6 +9866,20 @@
      {
       "formula": "1d8 + 2",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       },
+       {
+        "id": "restrained"
+       }
+      ],
+      "escapeDc": 12,
+      "maxTargetSize": "medium"
      }
     ]
    }
@@ -9636,7 +10252,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The death dog makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -9839,7 +10461,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The deva makes two Holy Mace attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "holy-mace",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "holy-mace",
@@ -9872,6 +10500,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -9960,6 +10591,16 @@
      {
       "formula": "1d10 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
      }
     ]
    }
@@ -10083,6 +10724,16 @@
       "formula": "3d8",
       "type": "thunder"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -10111,6 +10762,10 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "lightning",
+   "thunder"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -10195,7 +10850,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The doppelganger makes two Slam attacks and uses Unsettling Visage if available.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -10405,7 +11066,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Bite attacks. It can replace one attack with a Tail attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "bite",
@@ -10437,6 +11104,16 @@
       "formula": "2d10 + 7",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "huge"
+     }
     ]
    },
    {
@@ -10458,6 +11135,9 @@
     "height": 4
    }
   },
+  "damageResistances": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -10564,6 +11244,17 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -11059,6 +11750,13 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -11255,6 +11953,16 @@
       "formula": "1d6 + 5",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
+     }
     ]
    }
   ],
@@ -11265,6 +11973,16 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -11395,6 +12113,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -11479,7 +12200,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The elephant makes two Gore attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "gore",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "trample",
@@ -11675,7 +12402,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The erinyes makes three Withering Sword attacks and can use Entangling Rope.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "withering-sword",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "parry",
@@ -11719,6 +12452,16 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 12,
@@ -11803,7 +12546,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ettercap makes one Bite attack and one Claw attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "reel",
@@ -11943,7 +12696,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ettin makes one Battleaxe attack and one Morningstar attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "battleaxe",
+      "count": 1
+     },
+     {
+      "actionId": "morningstar",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "battleaxe",
@@ -11958,6 +12721,16 @@
      {
       "formula": "2d8 + 5",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -12056,7 +12829,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The elemental makes two Burn attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "burn",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "burn",
@@ -12082,6 +12861,20 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -12212,6 +13005,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -12281,7 +13077,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The golem makes two Slam attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "slam",
@@ -12307,6 +13109,18 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "lightning",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -12632,6 +13446,9 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -12701,7 +13518,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The gargoyle makes two Claw attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -12727,6 +13550,14 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -12833,6 +13664,17 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "prone"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -12952,6 +13794,17 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "necrotic"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -13028,7 +13881,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ghost makes two Withering Touch attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "withering-touch",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "withering-touch",
@@ -13083,6 +13942,28 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire",
+   "lightning",
+   "thunder"
+  ],
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -13163,7 +14044,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ghoul makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -13209,6 +14096,14 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -13287,7 +14182,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The ape makes two Fist attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "fist",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "fist",
@@ -13412,6 +14313,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "poison"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -13873,6 +14777,17 @@
       "formula": "1d6 + 1",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 11,
+      "maxTargetSize": "medium"
+     }
     ]
    }
   ],
@@ -13959,7 +14874,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The crocodile makes one Bite attack and one Tail attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "tail",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -13974,6 +14899,20 @@
      {
       "formula": "3d10 + 5",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       },
+       {
+        "id": "restrained"
+       }
+      ],
+      "escapeDc": 15,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -13991,6 +14930,19 @@
       "formula": "3d8 + 5",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
+     }
+    ],
+    "targetRules": [
+     "not-grappled-by-source"
     ]
    }
   ],
@@ -14075,7 +15027,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The eagle makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -14101,6 +15059,10 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "necrotic",
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -14189,6 +15151,10 @@
     "height": 3
    }
   },
+  "damageResistances": [
+   "necrotic",
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -14274,6 +15240,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -14358,6 +15327,17 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 11,
+      "maxTargetSize": "medium"
      }
     ]
    },
@@ -14754,6 +15734,20 @@
       "formula": "2d6 + 3",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       },
+       {
+        "id": "restrained"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "medium"
+     }
     ]
    }
   ],
@@ -14866,6 +15860,10 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "necrotic",
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -15037,7 +16035,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The scorpion makes two Claw attacks and one Sting attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -15052,6 +16056,17 @@
      {
       "formula": "1d6 + 3",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -15250,7 +16265,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The shark makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -15471,6 +16492,17 @@
       "formula": "1d6 + 2",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 12,
+      "maxTargetSize": "medium"
+     }
     ]
    },
    {
@@ -15677,6 +16709,9 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "necrotic"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -16041,6 +17076,16 @@
       "formula": "2d6",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "medium"
+     }
     ]
    },
    {
@@ -16142,7 +17187,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The glabrezu makes two Pincer attacks and uses Pummel or Spellcasting.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "pincer",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "pincer",
@@ -16157,6 +17208,17 @@
      {
       "formula": "2d10 + 5",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 15,
+      "maxTargetSize": "medium"
      }
     ]
    },
@@ -16186,6 +17248,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -16266,7 +17339,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The gladiator makes three Spear attacks. It can replace one attack with a use of Shield Bash.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "spear",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "parry",
@@ -16916,7 +17995,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -16964,6 +18049,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -17172,6 +18260,11 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -17252,7 +18345,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -17293,6 +18392,12 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -17370,7 +18475,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hag makes two Claw attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -17483,7 +18594,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The grick makes one Beak attack and one Tentacles attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "beak",
+      "count": 1
+     },
+     {
+      "actionId": "tentacles",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "beak",
@@ -17514,6 +18635,17 @@
      {
       "formula": "1d10 + 2",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 12,
+      "maxTargetSize": "medium"
      }
     ]
    }
@@ -17596,7 +18728,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The griffon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -17611,6 +18749,17 @@
      {
       "formula": "1d8 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "medium"
      }
     ]
    }
@@ -17984,7 +19133,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The naga makes two Bite attacks. It can replace any attack with a use of Poisonous Spittle.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -18028,6 +19183,15 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "paralyzed",
+   "poisoned",
+   "restrained"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -18111,7 +19275,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The half-dragon makes two Claw attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -18407,7 +19577,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hound makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -18444,6 +19620,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -18527,7 +19706,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hezrou makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -18553,6 +19738,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -18653,6 +19849,16 @@
       "formula": "3d8 + 5",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -18748,7 +19954,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hippogriff makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -18848,7 +20060,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hippopotamus makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -19195,6 +20413,13 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -19324,6 +20549,13 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -19704,7 +20936,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The devil makes three Ice Spear attacks. It can replace one attack with a Tail attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "ice-spear",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "ice-spear",
@@ -19754,6 +20992,14 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "cold",
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
@@ -19871,6 +21117,14 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "cold",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -19980,6 +21234,16 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -20056,7 +21320,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The incubus makes two Restless Touch attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "restless-touch",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "nightmare-recharge-6",
@@ -20100,6 +21370,12 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "poison",
+   "psychic"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -20176,7 +21452,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The stalker makes three Wind Swipe attacks. It can replace one attack with a use of Vortex.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "wind-swipe",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "wind-swipe",
@@ -20213,6 +21495,19 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -20346,6 +21641,19 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -20833,7 +22141,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The kraken makes two Tentacle attacks and uses Fling, Lightning Strike, or Swallow.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "tentacle",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "storm-bolt",
@@ -20855,6 +22169,16 @@
      {
       "formula": "4d6 + 10",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 20
      }
     ]
    },
@@ -20910,6 +22234,16 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "cold",
+   "lightning"
+  ],
+  "conditionImmunities": [
+   "frightened",
+   "grappled",
+   "paralyzed",
+   "restrained"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
@@ -21001,7 +22335,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The lamia makes two Claw attacks. It can replace one attack with a use of Corrupting Touch.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -21135,6 +22475,18 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "frightened",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -21293,6 +22645,21 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -21373,7 +22740,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The lion makes two Rend attacks. It can replace one attack with a use of Roar.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -21587,7 +22960,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The mage makes three Arcane Burst attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "arcane-burst",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "protective-magic",
@@ -21727,6 +23106,14 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -21829,6 +23216,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -21905,7 +23295,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The mammoth makes two Gore attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "gore",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "trample",
@@ -22175,6 +23571,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -22268,6 +23675,16 @@
       "formula": "1d6 + 1",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "medium"
+     }
     ]
    }
   ],
@@ -22349,7 +23766,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The medusa makes two Claw attacks and one Snake Hair attack, or it makes three Poison Ray attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "petrifying-gaze-recharge-5-6",
@@ -22754,6 +24177,17 @@
       "formula": "1d8 + 3",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "large"
+     }
     ]
    }
   ],
@@ -22764,6 +24198,12 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
+  "conditionImmunities": [
+   "prone"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -22981,6 +24421,13 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -23145,7 +24592,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The mummy makes two Rotting Fist attacks and uses Dreadful Glare.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rotting-fist",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rotting-fist",
@@ -23182,6 +24635,17 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -23341,6 +24805,17 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -23436,7 +24911,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The nalfeshnee makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "nalfeshnee-pursuit",
@@ -23476,6 +24957,18 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "frightened",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -23556,7 +25049,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hag makes two Claw attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -23603,6 +25102,10 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -23709,6 +25212,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -23908,6 +25414,21 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "acid"
+  ],
+  "damageImmunities": [
+   "lightning"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "prone",
+   "restrained"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -24215,6 +25736,13 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -24354,6 +25882,9 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
@@ -24465,6 +25996,17 @@
      {
       "formula": "2d8 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "medium"
      }
     ]
    },
@@ -24648,7 +26190,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The owlbear makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -24937,7 +26485,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The spider makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -25137,7 +26691,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The pirate makes two Dagger attacks. It can replace one attack with a use of Enthralling Panache.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "dagger",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "dagger",
@@ -25442,6 +27002,16 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -25537,7 +27107,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The planetar makes three Radiant Sword attacks or uses Holy Burst twice.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "radiant-sword",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "radiant-sword",
@@ -25581,6 +27157,9 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -25758,7 +27337,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The bear makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -25784,6 +27369,9 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -26186,7 +27774,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The pseudodragon makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -26393,7 +27987,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The worm makes one Bite attack and one Tail Stinger attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "tail-stinger",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "swallow",
@@ -26419,6 +28023,17 @@
      {
       "formula": "3d8 + 9",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 19,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -26567,6 +28182,17 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -26643,7 +28269,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The rakshasa makes three Cursed Touch attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "cursed-touch",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "cursed-touch",
@@ -26945,7 +28577,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -26986,6 +28624,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -27166,6 +28807,17 @@
       "formula": "2d10 + 7",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 17,
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -27187,6 +28839,10 @@
     "height": 3
    }
   },
+  "damageImmunities": [
+   "cold",
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -27440,7 +29096,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The roc makes two Beak attacks. It can replace one attack with a Talons attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "beak",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "swoop-recharge-5-6",
@@ -27478,6 +29140,17 @@
      {
       "formula": "4d6 + 9",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 19,
+      "maxTargetSize": "huge"
      }
     ]
    }
@@ -27558,7 +29231,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The roper makes two Tentacle attacks, uses Reel, and makes two Bite attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "tentacle",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -27585,7 +29264,17 @@
      "bonus": 7,
      "reachFeet": 60
     },
-    "damage": []
+    "damage": [],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14
+     }
+    ]
    },
    {
     "id": "reel",
@@ -27805,7 +29494,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The tiger makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "nimble-escape",
@@ -27921,7 +29616,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The sahuagin makes two Claw attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -27947,6 +29648,10 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -28031,7 +29736,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The salamander makes two Flame Spear attacks. It can replace one attack with a use of Constrict.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "flame-spear",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "flame-spear",
@@ -28069,6 +29780,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -28672,6 +30386,28 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire",
+   "lightning",
+   "thunder"
+  ],
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -28752,7 +30488,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The shambling mound makes three Charged Tendril attacks. It can replace one attack with a use of Engulf.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "charged-tendril",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "charged-tendril",
@@ -28789,6 +30531,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire"
+  ],
+  "damageImmunities": [
+   "lightning"
+  ],
+  "conditionImmunities": [
+   "deafened",
+   "exhaustion"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -28865,7 +30618,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The guardian makes two Fist attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "fist",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "protection",
@@ -28898,6 +30657,17 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
@@ -29064,7 +30834,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -29112,6 +30888,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -29219,6 +30998,13 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -29308,7 +31094,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The solar makes two Flying Sword attacks. It can replace one attack with a use of Slaying Bow.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "flying-sword",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "flying-sword",
@@ -29364,6 +31156,16 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison",
+   "radiant"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -29471,6 +31273,28 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire",
+   "lightning",
+   "thunder"
+  ],
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -29558,7 +31382,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The sphinx makes three Claw attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "claw",
@@ -29613,6 +31443,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "necrotic",
+   "radiant"
+  ],
+  "damageImmunities": [
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "frightened"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -29700,7 +31541,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The sphinx makes two Claw attacks and uses Roar.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -29755,6 +31602,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "necrotic",
+   "radiant"
+  ],
+  "damageImmunities": [
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "frightened"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -29861,6 +31719,11 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "necrotic",
+   "psychic",
+   "radiant"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -30080,6 +31943,13 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -30414,6 +32284,14 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -30623,6 +32501,16 @@
       "formula": "2d8 + 6",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
+     }
     ]
    }
   ],
@@ -30753,6 +32641,18 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison",
+   "psychic"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -30893,6 +32793,13 @@
     "height": 3
    }
   },
+  "damageResistances": [
+   "cold"
+  ],
+  "damageImmunities": [
+   "lightning",
+   "thunder"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -31021,6 +32928,12 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "poison",
+   "psychic"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -31201,6 +33114,16 @@
       "formula": "4d8 + 2",
       "type": "necrotic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "medium"
+     }
     ]
    }
   ],
@@ -31211,6 +33134,23 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -31813,6 +33753,16 @@
       "formula": "4d12 + 10",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 20
+     }
     ]
    },
    {
@@ -31852,6 +33802,16 @@
       "formula": "3d8 + 10",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "huge"
+     }
     ]
    },
    {
@@ -31873,6 +33833,17 @@
     "height": 4
    }
   },
+  "damageImmunities": [
+   "fire",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "deafened",
+   "frightened",
+   "paralyzed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 30,
@@ -31976,6 +33947,16 @@
      {
       "formula": "2d6 + 3",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
      }
     ]
    }
@@ -32283,7 +34264,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The treant makes two Slam attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "slam",
@@ -32406,7 +34393,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The triceratops makes two Gore attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "gore",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "gore",
@@ -32508,7 +34501,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The troll makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -32713,7 +34712,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The tyrannosaurus makes one Bite attack and one Tail attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "tail",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -32728,6 +34737,20 @@
      {
       "formula": "4d12 + 7",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       },
+       {
+        "id": "restrained"
+       }
+      ],
+      "escapeDc": 17,
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -32744,6 +34767,16 @@
      {
       "formula": "4d8 + 7",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "huge"
      }
     ]
    }
@@ -32831,7 +34864,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The unicorn makes one Hooves attack and one Radiant Horn attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "hooves",
+      "count": 1
+     },
+     {
+      "actionId": "radiant-horn",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "unicorn-s-blessing-3-day",
@@ -32894,6 +34937,14 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "paralyzed",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -32981,7 +35032,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The vampire makes two Grave Strike attacks and uses Bite.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "grave-strike",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -33018,6 +35075,17 @@
       "formula": "1d8 + 4",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -33039,6 +35107,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "necrotic"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -33134,7 +35205,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The familiar makes two Umbral Dagger attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "umbral-dagger",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "umbral-dagger",
@@ -33161,6 +35238,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "necrotic"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -33244,7 +35324,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The vampire makes two Claw attacks and uses Bite.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "claw",
@@ -33259,6 +35345,17 @@
      {
       "formula": "2d4 + 3",
       "type": "slashing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "medium"
      }
     ]
    },
@@ -33281,6 +35378,9 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "necrotic"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -33451,7 +35551,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The fungus makes two Rotting Touch attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rotting-touch",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rotting-touch",
@@ -33548,7 +35654,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The vrock makes two Shred attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "shred",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "shred",
@@ -33596,6 +35708,17 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "cold",
+   "fire",
+   "lightning"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -33876,6 +35999,13 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -34159,7 +36289,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The elemental makes two Slam attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "slam",
@@ -34174,6 +36310,16 @@
      {
       "formula": "2d8 + 4",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "medium"
      }
     ]
    },
@@ -34196,6 +36342,23 @@
     "height": 2
    }
   },
+  "damageResistances": [
+   "acid",
+   "fire"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -35073,7 +37236,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes two Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "rend",
@@ -35114,6 +37283,9 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -35244,6 +37416,16 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "necrotic"
+  ],
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -35357,6 +37539,26 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire",
+   "necrotic"
+  ],
+  "damageImmunities": [
+   "lightning",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -35450,6 +37652,16 @@
       "formula": "2d6 + 4",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -35471,6 +37683,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -35553,6 +37768,16 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "medium"
      }
     ]
    }
@@ -35756,6 +37981,26 @@
     "height": 1
    }
   },
+  "damageResistances": [
+   "acid",
+   "cold",
+   "fire"
+  ],
+  "damageImmunities": [
+   "necrotic",
+   "poison"
+  ],
+  "conditionImmunities": [
+   "charmed",
+   "exhaustion",
+   "grappled",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "unconscious"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -35836,7 +38081,17 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The wyvern makes one Bite attack and one Sting attack.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "sting",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -35998,6 +38253,14 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "paralyzed",
+   "petrified",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -36079,7 +38342,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36120,6 +38389,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
@@ -36197,7 +38469,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36238,6 +38516,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -36310,7 +38591,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace two attacks with a use of Sleep Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36358,6 +38645,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -36430,7 +38720,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Repulsion Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36478,6 +38774,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "lightning"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -36555,7 +38854,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Slowing Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36603,6 +38908,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "acid"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
@@ -36675,7 +38983,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Weakening Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36723,6 +39037,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -36800,7 +39117,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36841,6 +39164,12 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -36918,7 +39247,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -36959,6 +39294,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "fire"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -37031,7 +39369,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Paralyzing Breath.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -37079,6 +39423,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -37151,7 +39498,13 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dragon makes three Rend attacks.",
-    "damage": []
+    "damage": [],
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "rend",
@@ -37192,6 +39545,9 @@
     "height": 2
    }
   },
+  "damageImmunities": [
+   "cold"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -37288,6 +39644,13 @@
     "height": 1
    }
   },
+  "damageImmunities": [
+   "poison"
+  ],
+  "conditionImmunities": [
+   "exhaustion",
+   "poisoned"
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,

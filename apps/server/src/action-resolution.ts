@@ -1,16 +1,46 @@
 import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
-import { parseDiceFormula, resolveDice, type DiceExpression, type RandomSource } from "@vtt/rules-5e";
+import { aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
-import { CommandRejectedError } from "./game-store.js";
+import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { addEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom } from "./saving-throws.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
-export type ResolveInput = Readonly<{ actorId: string; targetIds: readonly string[]; commandId: string; conditionId?: string | null }>;
-export type ResolveDependencies = Readonly<{ random: RandomSource; newRollId: () => string; gmSessionId: string; now: () => string; hasCondition?: (id: string) => boolean }>;
+type LiveActor = GameState["actors"][number];
+export type ResolveInput = Readonly<{
+  actorId: string;
+  targetIds: readonly string[];
+  commandId: string;
+  conditionId?: string | null;
+  /** Explicit GM roll-mode choice; wins over the aggregated advantage/disadvantage sources. */
+  rollMode?: "advantage" | "disadvantage" | "normal" | null;
+  /** GM override of a rules-mode rejection; audited in the log and journal (ADR-0020). */
+  override?: Readonly<{ reason: string }> | null;
+}>;
+export type ResolveDependencies = Readonly<{
+  random: RandomSource;
+  newRollId: () => string;
+  gmSessionId: string;
+  now: () => string;
+  hasCondition?: (id: string) => boolean;
+  /** The attacker's full definition — multiattack composition and limited-use lookups need sibling actions. */
+  definition?: ActorDefinition;
+  /** Authoritative map distance in feet between two combatants' tokens; null when unmeasurable (no positions / no calibration). */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+}>;
 
-/** Double every dice term (2024 crit rule: extra dice, modifiers once) and rebuild a matching formula string. */
-function criticalExpression(expression: DiceExpression): DiceExpression {
-  const terms = expression.terms.map((term) => term.kind === "dice" ? { ...term, count: term.count * 2 } : term);
+/**
+ * 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds bonus weapon
+ * dice to the first term (Savage Attacks) on top of the doubling.
+ */
+function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
+  let firstDice = true;
+  const terms = expression.terms.map((term) => {
+    if (term.kind !== "dice") return term;
+    const extra = firstDice ? extraFirstTermDice : 0;
+    firstDice = false;
+    return { ...term, count: term.count * 2 + extra };
+  });
   const source = terms
     .map((term, index) => {
       const sign = term.sign === -1 ? "- " : index === 0 ? "" : "+ ";
@@ -39,11 +69,189 @@ function recordRoll(state: GameState, resolution: ReturnType<typeof resolveDice>
   if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
 }
 
+const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
+function sizeAtMost(size: string | undefined, limit: string): boolean {
+  return SIZE_ORDER.indexOf((size ?? "medium") as (typeof SIZE_ORDER)[number]) <= SIZE_ORDER.indexOf(limit as (typeof SIZE_ORDER)[number]);
+}
+
+function conditionLabel(conditionId: string): string {
+  return conditionId.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+type RuleViolation = Readonly<{ rule: string; message: string }>;
+/** How this resolve settles the action economy once it succeeds. */
+type EconomyPlan = Readonly<{
+  markAction: boolean;
+  markBonus: boolean;
+  markReaction: boolean;
+  /** The compound-action components remaining AFTER this resolve (null clears/leaves no instance). */
+  instance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
+  /** Limited-use spend to record, keyed per scope. */
+  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" }> | null;
+}>;
+
+/** The multiattack parents (sibling actions) that list `action` as a component. */
+function multiattackParents(definition: ActorDefinition | undefined, action: DefinitionAction): DefinitionAction[] {
+  if (!definition) return [];
+  return definition.actions.filter((candidate) => candidate.multiattack?.some((component) => component.actionId === action.id) ?? false);
+}
+
+function componentMap(parent: DefinitionAction): Record<string, number> {
+  const components: Record<string, number> = {};
+  for (const entry of parent.multiattack ?? []) components[entry.actionId] = (components[entry.actionId] ?? 0) + entry.count;
+  return components;
+}
+
 /**
- * Resolve a definition action on the server: roll the attack against the target's AC (or
- * surface the save DC), roll typed damage with 2024 crit doubling, record every roll in the
- * shared history, and mark the action economy. Damage is PROPOSED to the GM, never applied
- * here — application stays an explicit actor:apply-damage (BUILD_PLAN automation ladder).
+ * Validate the resolve against the encounter's rules mode and plan its economy commitment
+ * (ADR-0020). Strict rejects the first violation with an override path; assisted converts
+ * violations to warnings; freeform skips validation. Economy/instance gating applies only on the
+ * attacker's own turn — off-turn resolves (opportunity attacks, GM improvisation) stay ungated.
+ */
+function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[]): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
+  const violations: RuleViolation[] = [];
+  const softViolations: RuleViolation[] = [];
+  const mode = state.combat.rulesMode;
+  const onOwnTurn = state.combat.turnActorId === attacker.id;
+  const turn = state.combat.turn;
+  // An actor whose stat block has a prose-only Multiattack can't be validated fairly: its extra
+  // attacks live in text the engine can't see, so action-slot violations degrade to warnings.
+  const proseMultiattack = definition?.actions.some((candidate) => /multiattack/i.test(candidate.name) && !candidate.multiattack) ?? false;
+
+  if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag)) {
+    violations.push({ rule: "feature.requires-effect", message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.` });
+  }
+
+  let spendUse: EconomyPlan["spendUse"] = null;
+  if (action.uses) {
+    const key = action.uses.pool ?? action.id;
+    const spent = action.uses.per === "turn" ? (turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
+    if (spent >= action.uses.limit) {
+      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.limit}/${action.uses.per === "turn" ? "turn" : action.uses.per === "encounter" ? "encounter" : "long rest"}).` });
+    }
+    spendUse = { key, per: action.uses.per };
+  }
+
+  let markAction = false;
+  let markBonus = false;
+  let markReaction = false;
+  let instance: EconomyPlan["instance"] = state.combat.turn.actionInstance;
+  if (onOwnTurn && action.activation === "bonus-action") {
+    if (turn.bonusActionUsed) violations.push({ rule: "economy.bonus-action-used", message: `${attacker.name} has already used a bonus action this turn.` });
+    markBonus = true;
+  } else if (onOwnTurn && action.activation === "action") {
+    const active = instance && instance.actorId === attacker.id ? instance : null;
+    if (!turn.actionUsed) {
+      // Fresh action slot: open a compound instance when the action (or its multiattack parent) declares one.
+      const parents = multiattackParents(definition, action);
+      let components: Record<string, number> | null = null;
+      if (action.multiattack) {
+        components = componentMap(action); // resolving the parent itself opens the full plan, no rolls consumed
+      } else if (parents.length === 1) {
+        components = componentMap(parents[0]);
+        components[action.id] = (components[action.id] ?? 1) - 1;
+      } else if (parents.length > 1) {
+        if (action.attack && (action.attack.count ?? 1) > 1) components = { attack: (action.attack.count ?? 1) - 1 };
+        warnings.push(`${action.name} belongs to more than one Multiattack — tracking it standalone.`);
+      } else if (action.attack && (action.attack.count ?? 1) > 1) {
+        // Count-based attacks open a generic pool so Extra Attack can mix weapons legally.
+        components = { attack: (action.attack.count ?? 1) - 1 };
+      }
+      markAction = true;
+      // The instance stays in state even once exhausted (zeroed components) so a further resolve
+      // gets the specific "no attacks remaining" rejection, not a generic "action already used".
+      instance = components ? { actorId: attacker.id, components } : null;
+    } else if (active) {
+      const components = { ...active.components };
+      if ((components[action.id] ?? 0) > 0) {
+        components[action.id] -= 1;
+      } else if (action.attack && (components["attack"] ?? 0) > 0) {
+        components["attack"] -= 1;
+      } else {
+        (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: `${attacker.name} has no attacks remaining in this action.` });
+      }
+      instance = { actorId: attacker.id, components };
+    } else {
+      (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: `${attacker.name} has already used an action this turn.` });
+    }
+  } else if (action.activation === "reaction") {
+    if (state.combat.reactionsUsed.includes(attacker.id)) violations.push({ rule: "economy.reaction-used", message: `${attacker.name} has already used a reaction this round.` });
+    markReaction = true;
+  }
+
+  // Targeting restrictions the definition declares (Tail can't target the creature this crocodile grapples).
+  if (action.targetRules?.includes("not-grappled-by-source")) {
+    for (const targetId of input.targetIds) {
+      const target = state.actors.find((candidate) => candidate.id === targetId);
+      if (target?.effects.some((effect) => effect.sourceActorId === attacker.id && effect.tags.includes("grapple"))) {
+        violations.push({ rule: "target.grappled-by-source", message: `${target.name} is grappled by ${attacker.name} and can't be targeted by ${action.name}.` });
+      }
+    }
+  }
+
+  let overridden: { rule: string; reason: string } | null = null;
+  const allViolations = [...violations, ...softViolations];
+  if (mode !== "freeform" && allViolations.length > 0) {
+    if (input.override) {
+      overridden = { rule: allViolations[0].rule, reason: input.override.reason };
+    } else if (mode === "strict" && violations.length > 0) {
+      throw new RulesBlockedError(violations[0].rule, violations[0].message);
+    } else {
+      warnings.push(...allViolations.map((violation) => violation.message));
+      if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only — extra attacks aren't validated.`);
+    }
+  }
+
+  return { plan: { markAction, markBonus, markReaction, instance, spendUse }, overridden };
+}
+
+/** Advantage/disadvantage sources the engine can see; the explicit GM rollMode choice wins over all of them. */
+function attackRollSources(state: GameState, attacker: LiveActor, target: LiveActor, action: DefinitionAction, deps: ResolveDependencies): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
+  const advantage: RollModeSource[] = [];
+  const disadvantage: RollModeSource[] = [];
+  const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
+  const onOwnTurn = state.combat.turnActorId === attacker.id;
+
+  // Effect modifiers: attack-advantage is turn-scoped by definition (Reckless Attack semantics).
+  if (onOwnTurn) {
+    for (const effect of attacker.effects) {
+      if (effect.modifiers.some((modifier) => modifier.type === "attack-advantage")) advantage.push({ source: effect.id, label: effect.name });
+    }
+  }
+  for (const effect of target.effects) {
+    if (effect.modifiers.some((modifier) => modifier.type === "incoming-attack-advantage")) advantage.push({ source: effect.id, label: `Target: ${effect.name}` });
+  }
+
+  if (has(attacker, "prone")) disadvantage.push({ source: "attacker-prone", label: "Attacker is Prone" });
+  if (has(attacker, "restrained")) disadvantage.push({ source: "attacker-restrained", label: "Attacker is Restrained" });
+  if (has(attacker, "poisoned")) disadvantage.push({ source: "attacker-poisoned", label: "Attacker is Poisoned" });
+  if (has(attacker, "blinded")) disadvantage.push({ source: "attacker-blinded", label: "Attacker is Blinded" });
+  if (has(target, "restrained")) advantage.push({ source: "target-restrained", label: "Target is Restrained" });
+  if (has(target, "blinded")) advantage.push({ source: "target-blinded", label: "Target is Blinded" });
+  if (has(target, "stunned")) advantage.push({ source: "target-stunned", label: "Target is Stunned" });
+  if (has(target, "paralyzed")) advantage.push({ source: "target-paralyzed", label: "Target is Paralyzed" });
+  if (has(target, "petrified")) advantage.push({ source: "target-petrified", label: "Target is Petrified" });
+  if (has(target, "unconscious")) advantage.push({ source: "target-unconscious", label: "Target is Unconscious" });
+  if (has(target, "prone")) {
+    // 2024 rule: the incoming modifier is distance-based for every attack — advantage within 5 feet,
+    // disadvantage beyond. Unknown distance (unplaced tokens, uncalibrated map) contributes nothing.
+    const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
+    if (distance !== null && distance <= 5) advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });
+    else if (distance !== null) disadvantage.push({ source: "target-prone", label: "Target is Prone (beyond 5 ft)" });
+  }
+  void action;
+  return { advantage, disadvantage };
+}
+
+/**
+ * Resolve a definition action on the server (ADR-0020): validate the action economy, compound-action
+ * instance, feature requirements, and limited uses against the encounter's rules mode; aggregate
+ * advantage/disadvantage with explainable sources; roll the attack against the target's AC (or
+ * surface the save DC); roll typed damage with 2024 crit doubling plus declared critical bonus dice
+ * and active damage-bonus effects; apply declared on-hit riders as source-linked effects; create
+ * granted self effects (Rage); record every roll in the shared history; and commit the economy.
+ * Damage is still PROPOSED to the GM — application stays an explicit actor:apply-damage carrying the
+ * typed parts (propose→apply ladder), while conditions ride the save/rider carve-outs.
  */
 export function resolveDefinitionAction(state: GameState, action: DefinitionAction, input: ResolveInput, deps: ResolveDependencies): ActionResolution {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
@@ -56,39 +264,129 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     return target;
   });
   if (action.attack && targets.length !== 1) throw new CommandRejectedError("An attack roll resolves against exactly one target.");
-  if (targets.length === 0) throw new CommandRejectedError("Choose at least one target.");
-  if (!action.attack && !action.save && action.damage.length === 0) throw new CommandRejectedError("That action has no structured effect to resolve — run it from its description.");
+  const structuredWithoutTargets = action.grants !== undefined || action.multiattack !== undefined;
+  if (targets.length === 0 && !structuredWithoutTargets) throw new CommandRejectedError("Choose at least one target.");
+  if (!action.attack && !action.save && action.damage.length === 0 && !structuredWithoutTargets) throw new CommandRejectedError("That action has no structured effect to resolve — run it from its description.");
+
+  const warnings: string[] = [];
+  const { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings);
 
   // A hidden attacker's rolls stay GM-only; everyone else's fight in the open.
   const visibility = attacker.visibility === "gm-only" ? "gm-only" as const : "public" as const;
   const rollBase = { commandId: input.commandId, initiatorSessionId: deps.gmSessionId, initiatorLabel: attacker.name, actorId: attacker.id, visibility, createdAt: deps.now() };
 
   let attack: ActionResolution["attack"] = null;
+  let rollMode: ActionResolution["rollMode"];
   let crit = false;
-  if (action.attack) {
-    const bonus = action.attack.bonus;
-    const attackResolution = resolveDice(parseDiceFormula(`1d20 ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), deps.random);
-    recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
-    const naturalRoll = attackResolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!.dice[0].face;
+  if (action.attack && targets.length === 1) {
     const target = targets[0];
+    const sources = attackRollSources(state, attacker, target, action, deps);
+    const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
+    const mode = input.rollMode ?? aggregated.mode;
+    rollMode = input.rollMode
+      ? { mode: input.rollMode, advantage: input.rollMode === "advantage" ? ["GM choice"] : [], disadvantage: input.rollMode === "disadvantage" ? ["GM choice"] : [] }
+      : aggregated;
+    const bonus = action.attack.bonus;
+    const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
+    const attackResolution = resolveDice(parseDiceFormula(`${die} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), deps.random);
+    recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
+    const diceTerm = attackResolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
+    const naturalRoll = (diceTerm.dice.find((dieResult) => dieResult.kept) ?? diceTerm.dice[0]).face;
     const targetAc = target.armorClass ?? null;
     crit = naturalRoll === 20;
-    const outcome = naturalRoll === 20 ? "crit" as const
+    let outcome = naturalRoll === 20 ? "crit" as const
       : naturalRoll === 1 ? "fumble" as const
       : targetAc === null ? "unknown" as const
       : attackResolution.total >= targetAc ? "hit" as const : "miss" as const;
+    // 2024: hitting an Unconscious creature from within 5 feet is a critical hit.
+    if (outcome === "hit" && target.conditions.some((condition) => condition.id === "unconscious")) {
+      const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
+      if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
+        outcome = "crit";
+        crit = true;
+      }
+    }
     attack = { targetId: target.id, targetName: target.name, total: attackResolution.total, naturalRoll, targetAc, outcome };
   }
 
   // Damage is rolled unless the attack already whiffed outright.
   const damage: Array<{ formula: string; type: string; total: number }> = [];
-  if (attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown") {
+  const bonusDamage: Array<{ amount: number; type: string; source: string }> = [];
+  if (action.damage.length > 0 && (attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown")) {
+    let firstPart = true;
     for (const part of action.damage) {
       const expression = parseDiceFormula(part.formula);
-      const rolled = resolveDice(crit ? criticalExpression(expression) : expression, deps.random);
+      const extraCritDice = firstPart ? action.attack?.criticalBonusDice ?? 0 : 0;
+      const rolled = resolveDice(crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
       recordRoll(state, rolled, { ...rollBase, id: deps.newRollId(), purpose: "damage" });
       damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+      firstPart = false;
     }
+    // Flat damage bonuses from active effects (Rage +2 melee) land as their own explainable line.
+    if (action.attack) {
+      const melee = action.attack.reachFeet !== undefined || action.attack.rangeFeet === undefined;
+      for (const effect of attacker.effects) {
+        for (const modifier of effect.modifiers) {
+          if (modifier.type === "damage-bonus" && (modifier.appliesTo === "all" || melee)) {
+            bonusDamage.push({ amount: modifier.amount, type: damage[0]?.type ?? "untyped", source: effect.name });
+          }
+        }
+      }
+    }
+  }
+
+  // Declared on-hit riders (Bite: Grappled + Restrained, escape DC 15) apply as ONE source-linked
+  // effect per rider — the condition carve-out class shared with save auto-apply (ADR-0020).
+  const effectsApplied: Array<{ targetId: string; targetName: string; name: string; conditionIds: readonly string[] }> = [];
+  if (action.onHit && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
+    const target = targets[0];
+    action.onHit.forEach((rider, index) => {
+      if (rider.maxTargetSize && !sizeAtMost(target.size, rider.maxTargetSize)) {
+        warnings.push(`${target.name} is too large for ${action.name}'s ${rider.conditions.map((condition) => conditionLabel(condition.id)).join("/")} rider.`);
+        return;
+      }
+      const conditionIds = rider.conditions.map((condition) => condition.id);
+      const effect = addEffect(state, target.id, {
+        id: `${input.commandId}:hit:${target.id}:${index}`,
+        name: `${conditionLabel(conditionIds[0])} by ${attacker.name} (${action.name})`,
+        tags: conditionIds.includes("grappled") ? ["grapple"] : [],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        sourceActionId: `${action.id}:${index}`,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        modifiers: [],
+        linkedConditionIds: conditionIds,
+        escapeDc: rider.escapeDc ?? null,
+        onEnd: [],
+        endsWithTag: null
+      });
+      effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
+    });
+  }
+
+  // Granted self effects (Rage, Reckless Attack): replace-on-refresh, end at 0 HP (can't be sustained while down).
+  let effectGranted: ActionResolution["effectGranted"] = null;
+  if (action.grants) {
+    const grant = action.grants;
+    const effect = addEffect(state, attacker.id, {
+      id: `${input.commandId}:grant`,
+      name: grant.name ?? action.name,
+      tags: grant.tags,
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      sourceActionId: action.id,
+      startedRound: state.combat.round,
+      duration: grant.duration.type === "rounds" ? { type: "rounds", remaining: grant.duration.rounds } : grant.duration,
+      endsWhenSourceDefeated: true,
+      modifiers: grant.modifiers,
+      linkedConditionIds: [],
+      escapeDc: null,
+      onEnd: grant.onEnd,
+      endsWithTag: grant.endsWithTag ?? null
+    });
+    effectGranted = { name: effect.name, tags: effect.tags };
   }
 
   // A save action leaves one pending save per target: prompts appear in the tracker rows, each
@@ -102,6 +400,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       dc: action.save.dc,
       targetIds: targets.map((target) => target.id),
       proposedDamage: damage.reduce((sum, part) => sum + part.total, 0),
+      proposedDamageParts: damage.map((part) => ({ amount: part.total, type: part.type })),
       halfOnSuccess: halfOnSuccessFrom(action.description),
       // GM's explicit choice wins; otherwise auto-detect a condition from the action prose (only if the
       // bundle actually has it), so "…or be Poisoned" applies on a failed save without manual tagging.
@@ -111,20 +410,41 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     });
   }
 
-  // Bookkeeping, never a gate: resolving marks the matching economy slot.
-  if (state.combat.turnActorId === attacker.id && (action.activation === "action" || action.activation === "bonus-action")) {
-    state.combat = { ...state.combat, turn: { ...state.combat.turn, [action.activation === "action" ? "actionUsed" : "bonusActionUsed"]: true } };
-  } else if (action.activation === "reaction") {
+  // Commit the validated economy plan (ADR-0020): slots, the compound-action instance, limited uses.
+  if (plan.markAction || plan.markBonus) {
+    state.combat = { ...state.combat, turn: { ...state.combat.turn, actionUsed: state.combat.turn.actionUsed || plan.markAction, bonusActionUsed: state.combat.turn.bonusActionUsed || plan.markBonus, actionInstance: plan.instance ? { actorId: plan.instance.actorId, components: { ...plan.instance.components } } : null } };
+  } else if (plan.instance !== state.combat.turn.actionInstance) {
+    state.combat = { ...state.combat, turn: { ...state.combat.turn, actionInstance: plan.instance ? { actorId: plan.instance.actorId, components: { ...plan.instance.components } } : null } };
+  }
+  if (plan.markReaction) {
     state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id] };
   }
+  if (plan.spendUse) {
+    if (plan.spendUse.per === "turn") {
+      const key = `${attacker.id}:${plan.spendUse.key}`;
+      state.combat = { ...state.combat, turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: (state.combat.turn.turnUses[key] ?? 0) + 1 } } };
+    } else {
+      attacker.actionUses = { ...attacker.actionUses, [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + 1 };
+    }
+  }
 
+  const damageTotal = damage.reduce((sum, part) => sum + part.total, 0) + bonusDamage.reduce((sum, part) => sum + part.amount, 0);
   return {
     actionName: action.name,
     activation: action.activation,
     attack,
     save: action.save ? { ability: action.save.ability, dc: action.save.dc, targets: targets.map((target) => ({ targetId: target.id, targetName: target.name })) } : null,
     damage,
-    damageTotal: damage.reduce((sum, part) => sum + part.total, 0),
-    crit
+    damageTotal,
+    crit,
+    ...(rollMode && (rollMode.advantage.length > 0 || rollMode.disadvantage.length > 0) ? { rollMode } : {}),
+    ...(bonusDamage.length > 0 ? { bonusDamage } : {}),
+    ...(effectsApplied.length > 0 ? { effectsApplied } : {}),
+    effectGranted,
+    componentsRemaining: state.combat.turn.actionInstance?.actorId === attacker.id && Object.values(state.combat.turn.actionInstance.components).some((remaining) => remaining > 0)
+      ? state.combat.turn.actionInstance.components
+      : null,
+    ...(warnings.length > 0 ? { warnings } : {}),
+    overridden
   };
 }

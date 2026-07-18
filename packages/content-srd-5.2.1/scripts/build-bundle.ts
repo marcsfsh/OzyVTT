@@ -132,6 +132,70 @@ const primaryDamageType = (attack: AttackFields, desc: string): string => {
   return candidate && (DAMAGE_TYPES as readonly string[]).includes(candidate) ? candidate : "untyped";
 };
 
+/**
+ * ADR-0020 structured mechanics, extracted only from the SRD 2024 statblock house style —
+ * confident patterns only, everything else stays prose (fail-open per ADR-0008).
+ */
+const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 };
+
+/**
+ * Multiattack composition. Two stock phrasings: "The X makes one Bite attack and one Tail attack."
+ * and "The X makes three Rend attacks." (a trailing "It can replace…" sentence leaves the main plan
+ * structured; the replacement option stays prose). Names must resolve to sibling action ids.
+ */
+const parseMultiattack = (desc: string, siblingIdByName: ReadonlyMap<string, string>): Array<{ actionId: string; count: number }> | null => {
+  const resolve = (name: string) => siblingIdByName.get(name.trim().toLowerCase());
+  const pair = desc.match(/makes one ([A-Za-z' -]+?) attack and one ([A-Za-z' -]+?) attack/i);
+  if (pair) {
+    const first = resolve(pair[1]);
+    const second = resolve(pair[2]);
+    if (first && second) return first === second ? [{ actionId: first, count: 2 }] : [{ actionId: first, count: 1 }, { actionId: second, count: 1 }];
+    return null;
+  }
+  const repeated = desc.match(/makes (one|two|three|four|\d) ([A-Za-z' -]+?) attacks\b/i);
+  if (repeated) {
+    const count = NUMBER_WORDS[repeated[1].toLowerCase()] ?? Number.parseInt(repeated[1], 10);
+    const actionId = resolve(repeated[2]);
+    if (actionId && Number.isInteger(count) && count >= 1 && count <= 4) return [{ actionId, count }];
+  }
+  return null;
+};
+
+/**
+ * On-hit condition riders from the stock phrasing: "If the target is a Large or smaller creature,
+ * it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained
+ * condition." and "…it has the Prone condition." Only attack actions get riders (a save action's
+ * conditions flow through the pending-save pipeline instead).
+ */
+type OnHitRider = { conditions: Array<{ id: string }>; escapeDc?: number; maxTargetSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan" };
+const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
+  const size = desc.match(/If the target is a (Tiny|Small|Medium|Large|Huge) or smaller creature/i);
+  const maxTargetSize = size ? size[1].toLowerCase() as NonNullable<OnHitRider["maxTargetSize"]> : undefined;
+  const riders: OnHitRider[] = [];
+  const grapple = desc.match(/has the Grappled condition \(escape DC (\d+)\)/i);
+  if (grapple) {
+    const conditions = [{ id: "grappled" }];
+    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc)) conditions.push({ id: "restrained" });
+    riders.push({ conditions, escapeDc: Number.parseInt(grapple[1], 10), ...(maxTargetSize ? { maxTargetSize } : {}) });
+  } else if (/it has the Prone condition/i.test(desc)) {
+    riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
+  }
+  return riders.length > 0 ? riders : null;
+};
+
+/** Typed defense lists from the display strings: exact damage-type/condition-id tokens only; qualified phrases ("…from nonmagical attacks") stay display-only. */
+const splitTypedList = (display: string, known: ReadonlySet<string>): string[] =>
+  display.toLowerCase().split(/[,;]|\band\b/).map((token) => token.trim()).filter((token) => known.has(token));
+
+/**
+ * Reviewed per-action enrichments the prose states but no generic pattern captures. Keyed
+ * "<creature slug>/<action id>"; values merge into the adapted action.
+ * - giant-crocodile tail: "…can't be targeted by the crocodile's Tail" (stated on Bite).
+ */
+const ACTION_ENRICHMENTS: Record<string, { targetRules: ["not-grappled-by-source"] }> = {
+  "giant-crocodile/tail": { targetRules: ["not-grappled-by-source"] }
+};
+
 const usesSuffix = (action: ActionFields): string => {
   if (action.uses_type === "PER_DAY" && action.uses_param) return ` (${action.uses_param}/Day)`;
   if (action.uses_type === "RECHARGE_ON_ROLL" && action.uses_param) return ` (Recharge ${action.uses_param}${action.uses_param < 6 ? "-6" : ""})`;
@@ -220,7 +284,10 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk)) throw new Error(`Spell correction targets unknown spell ${pk} — check for a typo or an upstream rename.`);
 }
 
-const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
+const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
+
+const KNOWN_CONDITION_IDS = new Set(conditions.filter((condition) => condition.fields.document === "srd-2024").map((condition) => condition.fields.describes));
+const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
 
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
@@ -233,8 +300,11 @@ const monsters: ActorDefinition[] = creatures
     if (!SIZES.has(fields.size)) throw new Error(`${slug}: unexpected size ${fields.size}`);
     const challenge = Number.parseFloat(fields.challenge_rating);
     const footprint = FOOTPRINT_BY_SIZE[fields.size];
-    const creatureActions = (actionsByCreature.get(creature.pk) ?? [])
-      .sort((left, right) => (left.fields.order_in_statblock ?? 0) - (right.fields.order_in_statblock ?? 0) || left.pk.localeCompare(right.pk))
+    const sortedActions = (actionsByCreature.get(creature.pk) ?? [])
+      .sort((left, right) => (left.fields.order_in_statblock ?? 0) - (right.fields.order_in_statblock ?? 0) || left.pk.localeCompare(right.pk));
+    // Sibling action names -> ids (raw upstream names, before any uses suffix) for Multiattack composition.
+    const siblingIdByName = new Map(sortedActions.map((sibling) => [sibling.fields.name.trim().toLowerCase(), idSafe(slugOf(sibling.pk).replace(`${slug}_`, ""))]));
+    const creatureActions = sortedActions
       .map((action) => {
         const row = attackByAction.get(action.pk)?.fields;
         const prose = row ? null : parseProseAttack(action.fields.desc);
@@ -258,19 +328,32 @@ const monsters: ActorDefinition[] = creatures
           : prose
             ? { bonus: prose.bonus, ...(prose.reachFeet !== null ? { reachFeet: prose.reachFeet } : {}), ...(prose.rangeFeet !== null ? { rangeFeet: prose.rangeFeet } : {}) }
             : null;
+        const actionId = idSafe(slugOf(action.pk).replace(`${slug}_`, ""));
+        // ADR-0020 structured mechanics, all confident-pattern-only with prose fallback.
+        const multiattack = !legendary && action.fields.action_type === "ACTION" && /multiattack/i.test(action.fields.name)
+          ? parseMultiattack(action.fields.desc, siblingIdByName)
+          : null;
+        const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
+        const enrichment = ACTION_ENRICHMENTS[`${slug}/${actionId}`];
         report.actionsTotal += 1;
         if (row) report.structuredAttacks += 1;
         if (prose) report.proseAttacks += 1;
         if (save) report.structuredSaves += 1;
+        if (multiattack) report.structuredMultiattacks += 1;
+        else if (/multiattack/i.test(action.fields.name)) report.proseMultiattacks += 1;
+        if (onHit) report.onHitRiders += 1;
         for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
         return {
-          id: idSafe(slugOf(action.pk).replace(`${slug}_`, "")),
+          id: actionId,
           name: `${action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
           activation: action.fields.action_type === "ACTION" ? "action" as const : action.fields.action_type === "BONUS_ACTION" ? "bonus-action" as const : action.fields.action_type === "REACTION" ? "reaction" as const : "other" as const,
           description: `${legendaryPrefix}${action.fields.desc}`.slice(0, 12000),
           ...(attack ? { attack } : {}),
           ...(save ? { save: { ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME], dc: Number.parseInt(save[2], 10) } } : {}),
-          damage
+          damage,
+          ...(multiattack ? { multiattack } : {}),
+          ...(onHit ? { onHit } : {}),
+          ...(enrichment ?? {})
         };
       });
     const senses = [
@@ -280,6 +363,13 @@ const monsters: ActorDefinition[] = creatures
       fields.truesight_range ? `truesight ${fields.truesight_range} ft.` : null
     ].filter((sense): sense is string => sense !== null);
     report.monsters += 1;
+    // Typed defenses (ADR-0020): exact-token splits of the display strings drive automatic
+    // resistance/immunity/vulnerability on typed damage. Qualified phrases stay display-only.
+    const damageResistances = splitTypedList(fields.damage_resistances_display, KNOWN_DAMAGE_TYPES);
+    const damageImmunities = splitTypedList(fields.damage_immunities_display, KNOWN_DAMAGE_TYPES);
+    const damageVulnerabilities = splitTypedList(fields.damage_vulnerabilities_display, KNOWN_DAMAGE_TYPES);
+    const conditionImmunities = splitTypedList(fields.condition_immunities_display, KNOWN_CONDITION_IDS);
+    if (damageResistances.length > 0 || damageImmunities.length > 0 || damageVulnerabilities.length > 0) report.typedDefenses += 1;
     return {
       schemaId: "vtt.actor-monster" as const,
       schemaVersion: 1 as const,
@@ -298,6 +388,10 @@ const monsters: ActorDefinition[] = creatures
       speedFeet: fields.walk ?? 0,
       actions: creatureActions,
       token: { disposition: "hostile" as const, footprint: { width: footprint, height: footprint } },
+      ...(damageResistances.length > 0 ? { damageResistances } : {}),
+      ...(damageImmunities.length > 0 ? { damageImmunities } : {}),
+      ...(damageVulnerabilities.length > 0 ? { damageVulnerabilities } : {}),
+      ...(conditionImmunities.length > 0 ? { conditionImmunities } : {}),
       extensions: {
         "open5e.srd-2024": {
           challengeRating: challenge,
@@ -484,6 +578,7 @@ writeFileSync(join(outDir, "attribution.json"), `${JSON.stringify(attribution, n
 
 console.log(`monsters: ${report.monsters} (all valid; excluded: ${[...EXCLUSIONS].map(slugOf).join(", ") || "none"})`);
 console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks} (+${report.proseAttacks} prose-parsed), structured saves ${report.structuredSaves}`);
+console.log(`rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, monsters with typed defenses ${report.typedDefenses}`);
 console.log(`conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`);
 console.log(`skills: ${skillRecords.length} | damage types: ${damageTypeRecords.length} | rules: ${ruleRecords.length}`);
 if (report.corrections.length > 0) console.log(`upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`);

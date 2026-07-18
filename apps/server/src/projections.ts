@@ -1,4 +1,4 @@
-import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerEffect, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
 import { healthBandOf } from "./hit-points.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -61,8 +61,12 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     initiative,
     tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : [],
     annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
-    // A hidden combatant's turn stays opaque: economy flags reset to idle rather than narrating its activity.
-    turn: currentIsPublic ? { ...state.combat.turn } : { actionUsed: false, bonusActionUsed: false },
+    // A hidden combatant's turn stays opaque: economy flags (and the compound-action instance /
+    // per-turn uses, which name stat-block action ids) reset to idle rather than narrating its activity.
+    turn: currentIsPublic
+      ? { actionUsed: state.combat.turn.actionUsed, bonusActionUsed: state.combat.turn.bonusActionUsed, actionInstance: state.combat.turn.actionInstance ? { actorId: state.combat.turn.actionInstance.actorId, components: { ...state.combat.turn.actionInstance.components } } : null, turnUses: { ...state.combat.turn.turnUses } }
+      : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} },
+    rulesMode: state.combat.rulesMode,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag
     // (a banner), never the turn labels — those can name hidden combatants.
@@ -75,21 +79,35 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
+/**
+ * An effect as players see it (viewer safety): source ids never cross the wire, and a hidden
+ * source's name is masked — a player learns "Grappled by A hidden threat", never who.
+ */
+function playerEffect(effect: GameState["actors"][number]["effects"][number], publicActorIds: ReadonlySet<string>): PlayerEffect {
+  const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
+  return { ...visible, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : effect.sourceName };
+}
+
 export function projectPlayerView(state: GameState, playerSessionId: string | undefined, presenceFor: PresenceLookup, now = Date.now()): PlayerView {
+  const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
   return {
     revision: state.revision,
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
-      const { notes: _notes, ownerSessionId, hp: _exactHp, ...actor } = source;
+      // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below) and
+      // actionUses (limited-use spending names stat-block action ids — own claimed character only).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
       const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
       return {
         ...actor,
         hp: playerHp(source),
+        effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
         claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
-        ...(ownDefinition ? { definition: ownDefinition } : {})
+        ...(ownDefinition ? { definition: ownDefinition } : {}),
+        ...(mine ? { actionUses: { ...actionUses } } : {})
       };
     }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)

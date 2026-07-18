@@ -10,7 +10,7 @@ import {
   type ApiErrorCode,
   type IntegrationScope
 } from "@vtt/api-contract";
-import { CommandRejectedError, RevisionConflictError, TimelineConfirmationRequired, type EncounterArchiveSummary } from "./game-store.js";
+import { CommandRejectedError, RevisionConflictError, RulesBlockedError, TimelineConfirmationRequired, type EncounterArchiveSummary } from "./game-store.js";
 import { GameAccessDeniedError, GameInputError, isGmGrade, type GameCommandDescriptor, type GameOperations, type GamePrincipal } from "./game-operations.js";
 
 /**
@@ -86,6 +86,9 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     if (error instanceof GameAccessDeniedError) return sendError(res, 403, "forbidden", error.message);
     if (error instanceof TimelineConfirmationRequired) return sendError(res, 409, "conflict", error.message, { needsConfirm: error.confirm });
     if (error instanceof RevisionConflictError) return sendError(res, 409, "conflict", error.message, undefined, options.revision());
+    // Rules-mode rejections (ADR-0020) stay 409 conflict but carry machine-readable blocked details
+    // so integrations can resend with `override: {reason}` without parsing prose.
+    if (error instanceof RulesBlockedError) return sendError(res, 409, "conflict", error.message, { blocked: { rule: error.rule, message: error.message, overridable: error.overridable } });
     if (error instanceof CommandRejectedError) return sendError(res, 409, "conflict", error.message);
     return sendError(res, 500, "internal_error", "The command could not be processed.");
   }
@@ -231,6 +234,11 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actionResolve), ...command("action.resolve"));
   router.post(expressPath(GAME_PATHS.saveAnswer), ...command("save.answer", saveIdParam));
   router.post(expressPath(GAME_PATHS.saveDismiss), ...command("save.dismiss", saveIdParam));
+  router.post(expressPath(GAME_PATHS.effects), ...command("effect.add", actorIdParam));
+  router.post(expressPath(GAME_PATHS.effectEnd), ...command("effect.end", (req: Request) => ({ actorId: req.params.actorId, effectId: req.params.effectId })));
+  router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));
+  router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
+  router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
   // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
   router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
   router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));

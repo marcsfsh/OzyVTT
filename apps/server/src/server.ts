@@ -17,7 +17,7 @@ import { CombatLogStore } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
-import { CommandRejectedError, GameStore, TimelineConfirmationRequired } from "./game-store.js";
+import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -433,6 +433,9 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, ...(await work(principal)) } as unknown as Result);
       } catch (error) {
         if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message } as unknown as Result);
+        // A rules-mode rejection carries machine-readable details so the client can offer the
+        // one-tap audited override instead of parsing prose (ADR-0020).
+        if (error instanceof RulesBlockedError) return acknowledge({ ok: false, message: error.message, blocked: { rule: error.rule, message: error.message, overridable: error.overridable } } as unknown as Result);
         acknowledge({ ok: false, message: error instanceof Error ? error.message : fallbackMessage } as unknown as Result);
       }
     };
@@ -455,6 +458,11 @@ export function createServer(options: CreateServerOptions) {
     socket.on("action:resolve", (payload, acknowledge) => respond(acknowledge, "Only the GM can resolve stat-block actions.", "The action could not be resolved.", (principal) => operations.actionResolve(principal, payload)));
     socket.on("save:answer", (payload, acknowledge) => respond(acknowledge, "Join the table before answering saving throws.", "The saving throw could not be answered.", (principal) => operations.saveAnswer(principal, payload)));
     socket.on("save:dismiss", (payload, acknowledge) => respond(acknowledge, "Join the table before managing saving throws.", "The saving throw could not be dismissed.", (principal) => operations.saveDismiss(principal, payload)));
+    socket.on("effect:add", (payload, acknowledge) => respond(acknowledge, "Only the GM can add effects.", "The effect could not be added.", (principal) => operations.effectAdd(principal, payload)));
+    socket.on("effect:end", (payload, acknowledge) => respond(acknowledge, "Join the table before managing effects.", "The effect could not be ended.", (principal) => operations.effectEnd(principal, payload)));
+    socket.on("death-save:roll", (payload, acknowledge) => respond(acknowledge, "Join the table before rolling death saves.", "The death save failed.", (principal) => operations.deathSaveRoll(principal, payload)));
+    socket.on("encounter:set-rules-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the rules mode.", "The rules mode could not be changed.", (principal) => operations.encounterSetRulesMode(principal, payload)));
+    socket.on("actor:rest", (payload, acknowledge) => respond(acknowledge, "Only the GM can apply a rest.", "The rest could not be applied.", (principal) => operations.actorRest(principal, payload)));
     socket.on("turn:use", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The turn could not be updated.", (principal) => operations.turnUse(principal, payload)));
     socket.on("turn:use-reaction", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The reaction could not be updated.", (principal) => operations.turnUseReaction(principal, payload)));
     socket.on("turn:end", (payload, acknowledge) => respond(acknowledge, "Join the table before ending a turn.", "The turn could not end.", (principal) => operations.turnEnd(principal, payload)));

@@ -20,6 +20,8 @@ export const EncounterStartSchema = z.object({
   commandId: z.string().uuid(),
   mapAssetId: z.string().uuid(),
   entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional() }).strict()).min(1).max(200),
+  /** Rules-engine enforcement for this fight (ADR-0020); omitted keeps the table's current mode. */
+  rulesMode: z.enum(["strict", "assisted", "freeform"]).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 export const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -30,6 +32,22 @@ export const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorI
 export const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * Damage keeps the legacy untyped `amount` for manual adjustments; the ADR-0020 typed path adds
+ * optional `parts` (per-type components the server runs through defenses), the source attribution
+ * that makes the log explainable, and the crit flag driving death-save failure ticks.
+ */
+export const ApplyDamageSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  amount: z.number().int().min(1).max(1000),
+  parts: z.array(z.object({ amount: z.number().int().min(0).max(1000), type: z.string().min(1).max(40) }).strict()).min(1).max(9).optional(),
+  sourceActorId: z.string().uuid().optional(),
+  sourceActionId: z.string().regex(/^[a-z0-9-]+$/).max(120).optional(),
+  sourceName: z.string().min(1).max(120).optional(),
+  critical: z.boolean().optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
 export const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -41,13 +59,41 @@ export const ActionResolveSchema = z.object({
   targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
   template: z.object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict().optional(),
   conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(),
+  /** Explicit GM roll-mode choice; wins over the engine's advantage/disadvantage aggregation. */
+  rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+  /** Bypass a rules-mode rejection; the reason is audited in the combat log and journal (ADR-0020). */
+  override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
-}).strict().refine((payload) => (payload.targetIds === undefined) !== (payload.template === undefined), { message: "Provide either explicit targets or an area template, not both." });
+}).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." });
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 export const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM-added house effect (ADR-0020); structured actions create richer instances via their `grants`/`onHit` declarations. */
+export const EffectAddSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  tags: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(8).optional(),
+  duration: z.discriminatedUnion("type", [
+    z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
+    z.object({ type: z.literal("until-source-next-turn") }).strict(),
+    z.object({ type: z.literal("encounter") }).strict(),
+    z.object({ type: z.literal("manual") }).strict()
+  ]).optional(),
+  modifiers: z.array(z.discriminatedUnion("type", [
+    z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
+    z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20) }).strict(),
+    z.object({ type: z.literal("attack-advantage") }).strict(),
+    z.object({ type: z.literal("incoming-attack-advantage") }).strict()
+  ])).max(8).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), effectId: z.string().min(1).max(120), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.literal("long"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);

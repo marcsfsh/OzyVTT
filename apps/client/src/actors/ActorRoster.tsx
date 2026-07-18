@@ -28,7 +28,7 @@ function OwnHpTracker({ actorId, onFeedback }: Readonly<{ actorId: string; onFee
     const minimum = event === "actor:set-temp-hp" ? 0 : 1;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { onFeedback(`Enter a whole number (${minimum}-1000).`); return; }
     setSending(true);
-    socket.emit(event, { commandId: newId(), actorId, amount: value }, (result) => {
+    socket.emit(event, { commandId: newId(), actorId, amount: value }, (result: { ok: boolean; message?: string }) => {
       setSending(false);
       onFeedback(result.ok ? `${verb} ${value}.` : result.message ?? "The hit point change was rejected.");
       if (result.ok) setAmount("");

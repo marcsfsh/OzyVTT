@@ -23,6 +23,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     tokens: combat.tokens,
     annotations: combat.annotations,
     turn: combat.turn,
+    rulesMode: combat.rulesMode,
     reactionsUsed: combat.reactionsUsed,
     pendingSaves: combat.pendingSaves
   };
@@ -30,7 +31,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} }, rulesMode: "strict", reactionsUsed: [], pendingSaves: [] };
 }
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */
@@ -45,7 +46,8 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     return { actorId, score: 0, tieBreaker: actor.initiative ?? 0 };
   });
   const tokens = createEncounterTokens(initiative.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), geometry);
-  return { ...emptySceneCombat(), initiative, tokens };
+  // A newly prepared scene inherits the table's current rules mode rather than resetting to the default.
+  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, initiative, tokens };
 }
 
 export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry): Scene {

@@ -2,7 +2,7 @@ import type { AbilityId, GameState, PendingSave, RollRecord } from "@vtt/domain"
 import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { applyDamage, adjustableActor, type ActorScope } from "./hit-points.js";
+import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 
 export type SaveAnswerDependencies = Readonly<{
@@ -58,7 +58,7 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
 export function createPendingSaves(state: GameState, input: Readonly<{
   sourceActorId: string; sourceName: string; actionName: string; ability: AbilityId; dc: number;
-  targetIds: readonly string[]; proposedDamage: number; halfOnSuccess: boolean; conditionId: string | null;
+  targetIds: readonly string[]; proposedDamage: number; proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>; halfOnSuccess: boolean; conditionId: string | null;
   newSaveId: () => string; createdAt: number;
 }>) {
   const additions: PendingSave[] = input.targetIds.map((targetActorId) => ({
@@ -70,6 +70,7 @@ export function createPendingSaves(state: GameState, input: Readonly<{
     sourceName: input.sourceName,
     actionName: input.actionName,
     proposedDamage: input.proposedDamage,
+    ...(input.proposedDamageParts && input.proposedDamageParts.length > 0 ? { proposedDamageParts: [...input.proposedDamageParts] } : {}),
     halfOnSuccess: input.halfOnSuccess,
     conditionId: input.conditionId,
     createdAt: input.createdAt
@@ -138,7 +139,15 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   }
 
   const success = total >= pending.dc;
-  const outcomeDamage = !success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0);
+  // Typed parts (ADR-0020) halve per part on success and run the defense pipeline on application;
+  // saves persisted before the field fall back to the untyped total.
+  const parts = pending.proposedDamageParts;
+  const outcomeParts = parts && parts.length > 0
+    ? (!success ? parts : pending.halfOnSuccess ? parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })) : [])
+    : null;
+  const outcomeDamage = outcomeParts !== null
+    ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
+    : (!success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0));
   const outcomeCondition = !success && pending.conditionId !== null;
 
   // Preview (commit=false): the die roll is still recorded for the table so everyone sees it, but the
@@ -148,7 +157,10 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
 
   let appliedDamage = 0;
   let conditionApplied = false;
-  if (outcomeDamage > 0) { applyDamage(state, target.id, outcomeDamage, { role: "gm" }); appliedDamage = outcomeDamage; }
+  if (outcomeDamage > 0) {
+    const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId) });
+    appliedDamage = outcome.application.totalApplied;
+  }
   if (outcomeCondition && pending.conditionId) { setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }); conditionApplied = true; }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
   return { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true };

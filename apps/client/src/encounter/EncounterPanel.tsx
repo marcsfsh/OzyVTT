@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientToServerEvents, GmView, MutationResult, PendingSave, PlayerPendingSave, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingSave, PlayerEffect, PlayerPendingSave, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
@@ -97,12 +97,79 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ sav
   </div>;
 }
 
+/**
+ * Active rules-engine effects (Rage, a grapple) as chips beside the condition chips. Ending one is
+ * a real engine transition — linked conditions clear and on-end grants fire server-side (ADR-0020).
+ */
+function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorId: string; effects: ReadonlyArray<PlayerEffect & { escapeDc?: number | null }>; canEnd: boolean; onFeedback: (text: string) => void }>) {
+  const [busy, setBusy] = useState(false);
+  if (effects.length === 0) return null;
+  const durationLabel = (effect: PlayerEffect) => effect.duration.type === "rounds" ? `${effect.duration.remaining} rounds left` : effect.duration.type === "until-source-next-turn" ? "until next turn" : effect.duration.type === "encounter" ? "this encounter" : "until ended";
+  const end = (effectId: string, name: string) => {
+    setBusy(true);
+    socket.emit("effect:end", { commandId: newId(), actorId, effectId }, (result: MutationResult) => {
+      setBusy(false);
+      onFeedback(result.ok ? `${name} ended.` : result.message ?? "The effect could not be ended.");
+    });
+  };
+  return <span className="effect-chips">
+    {effects.map((effect) => <span key={effect.id} className="effect-chip" title={`${effect.name}${effect.sourceName ? ` — from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`}>
+      {effect.name}{effect.escapeDc ? <small> DC {effect.escapeDc}</small> : null}
+      {canEnd && <button type="button" className="effect-chip-end" disabled={busy} aria-label={`End ${effect.name}`} onClick={() => end(effect.id, effect.name)}>✕</button>}
+    </span>)}
+  </span>;
+}
+
+/**
+ * A dying player character's death-save tracker (ADR-0020): success/failure pips plus the roll —
+ * the replay's "heal 1 HP so the turn isn't skipped" workaround, replaced by the real state machine.
+ */
+function DyingTracker({ actorId, name, deathSaves, canRoll, onFeedback }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves; canRoll: boolean; onFeedback: (text: string) => void }>) {
+  const [busy, setBusy] = useState(false);
+  const dead = deathSaves.failures >= 3;
+  const roll = () => {
+    setBusy(true);
+    socket.emit("death-save:roll", { commandId: newId(), actorId }, (result: DeathSaveResult) => {
+      setBusy(false);
+      if (!result.ok) { onFeedback(result.message ?? "The death save failed."); return; }
+      const outcome = result.deathSave;
+      if (outcome) onFeedback(outcome.regainedConsciousness ? `${name} rolled a natural 20 and regains 1 HP!` : outcome.dead ? `${name} died.` : outcome.stable ? `${name} is stable.` : `${name}: ${outcome.successes} successes, ${outcome.failures} failures.`);
+    });
+  };
+  return <div className="dying-tracker" role="group" aria-label={`Death saves for ${name}`}>
+    <span className={`dying-label${dead ? " dead" : ""}`}>{dead ? "Dead" : deathSaves.stable ? "Stable" : "Dying"}</span>
+    <span className="dying-pips" aria-label={`${deathSaves.successes} successes, ${deathSaves.failures} failures`}>
+      {[0, 1, 2].map((index) => <span key={`s${index}`} className={`pip success${index < deathSaves.successes ? " filled" : ""}`} />)}
+      <span className="pip-divider" />
+      {[0, 1, 2].map((index) => <span key={`f${index}`} className={`pip failure${index < deathSaves.failures ? " filled" : ""}`} />)}
+    </span>
+    {canRoll && !deathSaves.stable && !dead && <button type="button" className="dying-roll" disabled={busy} onClick={roll}>Roll death save</button>}
+  </div>;
+}
+
 /** A player's own pending saves with a local feedback line (the GM panel uses its shared message instead). */
 function OwnSavePrompts({ saves, targetName }: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string }>) {
   const [feedback, setFeedback] = useState("");
   if (saves.length === 0 && !feedback) return null;
   return <div className="own-save-prompts">
     {saves.map((save) => <SavePrompt key={save.id} save={save} targetName={targetName} canDismiss={false} onFeedback={setFeedback} />)}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
+  </div>;
+}
+
+/** Player-side wrappers with their own feedback lines (the GM panel routes through its shared message). */
+function PlayerEffectRow({ actorId, effects, isMe }: Readonly<{ actorId: string; effects: readonly PlayerEffect[]; isMe: boolean }>) {
+  const [feedback, setFeedback] = useState("");
+  if (effects.length === 0 && !feedback) return null;
+  return <div className="own-effect-row">
+    <EffectChips actorId={actorId} effects={effects} canEnd={isMe} onFeedback={setFeedback} />
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
+  </div>;
+}
+function OwnDyingTracker({ actorId, name, deathSaves }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves }>) {
+  const [feedback, setFeedback] = useState("");
+  return <div className="own-dying">
+    <DyingTracker actorId={actorId} name={name} deathSaves={deathSaves} canRoll onFeedback={setFeedback} />
     {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
@@ -142,13 +209,15 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
       {myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} />}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
-        const actorConditions = props.state.actors.find((actor) => actor.id === entry.actorId)?.conditions ?? [];
+        const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
         return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
           <div className="initiative-row-main">
-            <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}<ConditionChips conditions={actorConditions} /></span>
+            <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}<ConditionChips conditions={rowActor?.conditions ?? []} /></span>
             <strong>{entry.score}</strong>
           </div>
+          {rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
+          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} />}
         </li>;
       })}</ol>
@@ -306,6 +375,14 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
       </div>}
       {/* Turn navigation sits above the order so Previous/Next are reachable without scrolling past the list. */}
       <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}</button></div>
+      {/* Rules-engine mode (ADR-0020): strict blocks invalid structured actions (one-tap override), assisted warns, freeform stays hands-off. */}
+      <label className="rules-mode-control">Rules
+        <select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules mode: ${mode}.` : result.message ?? "The rules mode could not be changed.")); }}>
+          <option value="strict">Strict — block invalid actions (override available)</option>
+          <option value="assisted">Assisted — allow with warnings</option>
+          <option value="freeform">Freeform — no checks</option>
+        </select>
+      </label>
       {confirm && <div className="turn-confirm" role="alertdialog" aria-label="Confirm history change">
         <span>{confirm.message}</span>
         <div className="turn-confirm-actions">
@@ -337,6 +414,8 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
           </div>}
           {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
+          {actor && <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />}
+          {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} />}
           {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} />)}
           {/* The active combatant's economy + action runner live on its own initiative row, not in a
               detached block at the bottom, so actions read against the creature they belong to. */}

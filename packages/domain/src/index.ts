@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, type Actor, type ActorDefinition } from "@vtt/schemas";
+import { ActorDefinitionSchema, ActorSchema, type Actor, type ActorDefinition, type EffectInstance, type EffectModifier } from "@vtt/schemas";
 
-export { ACTOR_SCHEMA_VERSION, ActorSchema, type Actor, type ActorDefinition } from "@vtt/schemas";
+export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier } from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(200), definition: ActorDefinitionSchema }).strict();
@@ -131,6 +131,8 @@ export const PendingSaveSchema = z.object({
   sourceName: z.string().min(1).max(120),
   actionName: z.string().min(1).max(120),
   proposedDamage: z.number().int().nonnegative().max(10000).default(0),
+  /** Typed components of the proposed damage (additive — absent on saves created before ADR-0020); when present, application runs the typed-defense pipeline. */
+  proposedDamageParts: z.array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict()).max(9).optional(),
   halfOnSuccess: z.boolean().default(true),
   conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).nullable().default(null),
   createdAt: z.number().int().nonnegative()
@@ -168,8 +170,21 @@ const sceneCombatShape = {
   initiative: z.array(InitiativeEntrySchema).max(200).default([]),
   tokens: z.array(EncounterTokenSchema).max(200).default([]),
   annotations: z.array(AnnotationSchema).max(300).default([]),
-  /** Action economy of the current turn's actor; reset whenever the turn changes. Tracked, never enforced. */
-  turn: z.object({ actionUsed: z.boolean().default(false), bonusActionUsed: z.boolean().default(false) }).default({ actionUsed: false, bonusActionUsed: false }),
+  /**
+   * Action economy of the current turn's actor; reset whenever the turn changes. Structured action
+   * resolution validates against it per the encounter's rulesMode (ADR-0020); the manual turn.use
+   * toggles remain a free escape hatch. `actionInstance` tracks an open compound action (Extra
+   * Attack, Multiattack) as remaining component counts; `turnUses` tracks per-turn limited uses
+   * keyed `${actorId}:${actionId}` (off-turn actors can spend per-turn features via reactions).
+   */
+  turn: z.object({
+    actionUsed: z.boolean().default(false),
+    bonusActionUsed: z.boolean().default(false),
+    actionInstance: z.object({ actorId: z.string().uuid(), components: z.record(z.string(), z.number().int().nonnegative()) }).strict().nullable().default(null),
+    turnUses: z.record(z.string(), z.number().int().nonnegative()).default({})
+  }).default({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} }),
+  /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
+  rulesMode: z.enum(["strict", "assisted", "freeform"]).default("strict"),
   /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
   reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
   /** Saving throws still owed by targets (see PendingSaveSchema). */
@@ -238,25 +253,27 @@ export type PresenceStatus = z.infer<typeof PresenceStatusSchema>;
 export type HealthBand = "healthy" | "bloodied" | "down";
 /** Player characters stay exact for the whole party; monsters/NPCs reach players only as a band so the GM keeps exact numbers. */
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp"> & { hp: PlayerHp; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition };
+/** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
+export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts — only on the requesting player's own claimed character. */ actionUses?: Record<string, number> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; the source actor id never crosses the wire, and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number> }; rulesMode: "strict" | "assisted" | "freeform"; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
 export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[]; turnHistory?: readonly TurnHistoryEntry[] };
 /** A persisted combat-log line. Players only ever receive gmOnly=false entries; the GM sees all. */
-export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll" | "movement"; text: string; gmOnly: boolean; revision: number }>;
+export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll" | "movement" | "effect" | "death-save" | "override"; text: string; gmOnly: boolean; revision: number }>;
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState — presentation only; the roll history is the durable record. */
-export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction"; text: string; actorIds: readonly string[]; at: number }>;
+export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save"; text: string; actorIds: readonly string[]; at: number }>;
 export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
-export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string; needsConfirm?: "rewrite-history" | "discard-changes" };
+export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string; needsConfirm?: "rewrite-history" | "discard-changes"; /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
 export type EncounterStartEntry = Readonly<{ actorId: string; score?: number }>;
 export type AnnotationGeometryInput = Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>;
@@ -271,13 +288,15 @@ export type ContentConditionSummary = Readonly<{ id: string; name: string; descr
 export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[] };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
-/** A definition action flattened for the GM's action runner. Structured fields only where the content has them. */
-export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }>; area: ContentActionArea | null }>;
+/** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
+export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }>; area: ContentActionArea | null; attackCount: number | null; usesLimit: number | null; usesPer: "turn" | "encounter" | "long-rest" | null; usesPool: string | null; requiresEffectTag: string | null; multiattack: ReadonlyArray<{ actionId: string; count: number }> | null; grants: boolean }>;
 export type ContentActionsResult = { ok: boolean; message?: string; actions?: readonly ContentActionSummary[] };
 /** Full stat-block payload for the GM's sheet view; inert content data, GM-gated. */
 export type ContentSheetResult = { ok: boolean; message?: string; definition?: import("@vtt/schemas").ActorDefinition };
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
 export type ActionResolutionAttack = Readonly<{ targetId: string; targetName: string; total: number; naturalRoll: number; targetAc: number | null; outcome: "crit" | "hit" | "miss" | "fumble" | "unknown" }>;
+/** Why an attack rolled with advantage/disadvantage — every contributing source, so the table can see the math (ADR-0020 explainability). */
+export type ActionRollMode = Readonly<{ mode: "advantage" | "disadvantage" | "normal"; advantage: readonly string[]; disadvantage: readonly string[] }>;
 export type ActionResolution = Readonly<{
   actionName: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
@@ -286,8 +305,44 @@ export type ActionResolution = Readonly<{
   damage: ReadonlyArray<{ formula: string; type: string; total: number }>;
   damageTotal: number;
   crit: boolean;
+  /** Advantage/disadvantage aggregation for the attack roll; absent when nothing contributed (plain 1d20). */
+  rollMode?: ActionRollMode;
+  /** Flat typed damage added by active effects (Rage +2 melee), included in damageTotal. */
+  bonusDamage?: ReadonlyArray<{ amount: number; type: string; source: string }>;
+  /** Source-linked effects the hit applied to targets (Bite: Grappled + Restrained). */
+  effectsApplied?: ReadonlyArray<{ targetId: string; targetName: string; name: string; conditionIds: readonly string[] }>;
+  /** The self effect this action granted (Rage, Reckless Attack). */
+  effectGranted?: Readonly<{ name: string; tags: readonly string[] }> | null;
+  /** Remaining components of the open compound action after this resolve ("Attack 2 of 2" UI). */
+  componentsRemaining?: Readonly<Record<string, number>> | null;
+  /** Assisted-mode rule conflicts that were allowed through (also logged). */
+  warnings?: readonly string[];
+  /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
+  overridden?: Readonly<{ rule: string; reason: string }> | null;
 }>;
+/** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
+export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;
 export type ActionResolveResult = MutationResult & { resolution?: ActionResolution };
+/**
+ * Server-computed application of typed damage: per-part defense adjustments (immunity → resistance →
+ * vulnerability), temp-HP absorption, and any zero-HP transition — the explainable "17 → 8" record.
+ */
+export type DamageApplication = Readonly<{
+  totalRequested: number;
+  totalApplied: number;
+  parts: ReadonlyArray<{ type: string; amount: number; adjusted: number; adjustment: "resistance" | "immunity" | "vulnerability" | null; adjustmentSource: string | null }>;
+  temporaryAbsorbed: number;
+  hpBefore: number;
+  hpAfter: number;
+  /** Zero-HP machine outcomes (player characters). */
+  droppedToZero: boolean;
+  deathSaveFailuresAdded: number;
+  instantDeath: boolean;
+  /** A non-PC hit 0 HP: effects it sustained were ended (grapples released). */
+  defeated: boolean;
+}>;
+export type DamageApplyResult = MutationResult & { applied?: DamageApplication };
+export type DeathSaveResult = MutationResult & { deathSave?: Readonly<{ naturalRoll: number; outcome: "success" | "failure" | "critical-success" | "critical-failure"; successes: number; failures: number; stable: boolean; dead: boolean; regainedConsciousness: boolean }> };
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
 export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean } };
 export interface ClientToServerEvents {
@@ -301,7 +356,7 @@ export interface ClientToServerEvents {
   "actor:import-definition": (payload: { commandId: string; definition: unknown; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-size": (payload: { commandId: string; actorId: string; size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-temp-hp": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -309,7 +364,12 @@ export interface ClientToServerEvents {
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
-  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
+  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
+  "effect:add": (payload: { commandId: string; actorId: string; name: string; tags?: readonly string[]; duration?: { type: "rounds"; rounds: number } | { type: "until-source-next-turn" } | { type: "encounter" } | { type: "manual" }; modifiers?: readonly EffectModifier[]; expectedRevision?: number }, acknowledgement: (result: MutationResult & { effectId?: string }) => void) => void;
+  "effect:end": (payload: { commandId: string; actorId: string; effectId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "death-save:roll": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: DeathSaveResult) => void) => void;
+  "encounter:set-rules-mode": (payload: { commandId: string; mode: "strict" | "assisted" | "freeform"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:rest": (payload: { commandId: string; actorId: string; kind: "long"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; commit?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

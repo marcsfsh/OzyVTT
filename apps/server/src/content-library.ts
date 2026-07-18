@@ -42,20 +42,32 @@ export class ContentLibrary {
     return this.byId.get(definitionId)?.actions.find((action) => action.id === actionId);
   }
   monsterActionSummaries(definitionId: string): readonly ContentActionSummary[] | undefined {
-    return this.byId.get(definitionId)?.actions.map((action) => ({
-      id: action.id,
-      name: action.name,
-      activation: action.activation,
-      description: action.description,
-      attackBonus: action.attack?.bonus ?? null,
-      reachFeet: action.attack?.reachFeet ?? null,
-      rangeFeet: action.attack?.rangeFeet ?? null,
-      saveAbility: action.save?.ability ?? null,
-      saveDc: action.save?.dc ?? null,
-      damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
-      area: parseAreaProse(action.description)
-    }));
+    return this.byId.get(definitionId)?.actions.map(actionSummaryOf);
   }
+}
+
+/** One flattening for both content sources (bundled + imported), so the runner's wire shape can't fork. */
+export function actionSummaryOf(action: ActorDefinition["actions"][number]): ContentActionSummary {
+  return {
+    id: action.id,
+    name: action.name,
+    activation: action.activation,
+    description: action.description,
+    attackBonus: action.attack?.bonus ?? null,
+    reachFeet: action.attack?.reachFeet ?? null,
+    rangeFeet: action.attack?.rangeFeet ?? null,
+    saveAbility: action.save?.ability ?? null,
+    saveDc: action.save?.dc ?? null,
+    damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
+    area: parseAreaProse(action.description),
+    attackCount: action.attack?.count ?? null,
+    usesLimit: action.uses?.limit ?? null,
+    usesPer: action.uses?.per ?? null,
+    usesPool: action.uses?.pool ?? null,
+    requiresEffectTag: action.requiresEffectTag ?? null,
+    multiattack: action.multiattack ?? null,
+    grants: action.grants !== undefined
+  };
 }
 
 const conditionSummaries: readonly ContentConditionSummary[] = loadConditions().map(({ id, name, description }) => ({ id, name, description }));

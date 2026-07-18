@@ -1,4 +1,5 @@
 import type { ActorDefinition, GameState } from "@vtt/domain";
+import { endEffectsSustainedBy } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ACTORS = 200;
@@ -26,6 +27,9 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],
+    effects: [],
+    deathSaves: null,
+    actionUses: {},
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,
@@ -67,6 +71,8 @@ export function removeActor(state: GameState, actorId: string) {
   if (state.combat.scenes.some((scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId))) {
     throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this combatant first.");
   }
+  // A removed actor can no longer sustain effects on others (its grapples release, ADR-0020).
+  endEffectsSustainedBy(state, actorId);
   state.actors = state.actors.filter((item) => item.id !== actorId);
   // Drop the actor from every inactive prepared scene so no scene references a combatant that no longer exists.
   if (state.combat.scenes.some((scene) => !scene.combat.active && (scene.combat.initiative.some((entry) => entry.actorId === actorId) || scene.combat.tokens.some((token) => token.actorId === actorId)))) {

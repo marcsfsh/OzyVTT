@@ -35,7 +35,9 @@ function restorableSlice(state: GameState): string {
   const { scenes: _scenes, activeSceneId: _activeSceneId, historyCursor: _cursor, historyDirty: _dirty, annotations, ...combat } = state.combat;
   return JSON.stringify({
     combat: { ...combat, annotations: annotations.filter((annotation) => annotation.expiresAt === null) },
-    actors: state.actors.map((actor) => ({ id: actor.id, hp: actor.hp, conditions: actor.conditions }))
+    // Rules-engine state (effects, dying, spent uses) restores with hp/conditions — a rewind must
+    // undo a Rage grant or a death-save tick, or the strict engine reasons from corrupt state.
+    actors: state.actors.map((actor) => ({ id: actor.id, hp: actor.hp, conditions: actor.conditions, effects: actor.effects, deathSaves: actor.deathSaves, actionUses: actor.actionUses }))
   });
 }
 
@@ -65,7 +67,7 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
   const turnActorId = snapshot.combat.turnActorId !== null && currentActorIds.has(snapshot.combat.turnActorId) ? snapshot.combat.turnActorId : initiative[0].actorId;
   state.actors = state.actors.map((actor) => {
     const past = snapshotActors.get(actor.id);
-    return past ? { ...actor, hp: structuredClone(past.hp), conditions: structuredClone(past.conditions) } : actor;
+    return past ? { ...actor, hp: structuredClone(past.hp), conditions: structuredClone(past.conditions), effects: structuredClone(past.effects), deathSaves: structuredClone(past.deathSaves), actionUses: structuredClone(past.actionUses) } : actor;
   });
   state.combat = {
     ...structuredClone(snapshot.combat),

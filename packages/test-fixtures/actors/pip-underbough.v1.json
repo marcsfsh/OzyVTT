@@ -1,0 +1,150 @@
+{
+ "schemaId": "vtt.actor-character",
+ "schemaVersion": 1,
+ "source": {
+  "name": "Example imports (SRD 5.2.1)",
+  "version": "1.0.0",
+  "externalId": "example-import-pip"
+ },
+ "name": "Pip Underbough",
+ "summary": "Level 7 halfling Thief rogue \u2014 skirmisher, scout, and lock-whisperer with a vicious Sneak Attack.",
+ "size": "small",
+ "abilityScores": {
+  "str": 10,
+  "dex": 18,
+  "con": 14,
+  "int": 13,
+  "wis": 12,
+  "cha": 14
+ },
+ "proficiencyBonus": 3,
+ "armorClass": 16,
+ "hitPoints": {
+  "maximum": 52
+ },
+ "initiativeBonus": 4,
+ "speedFeet": 25,
+ "actions": [
+  {
+   "id": "rapier",
+   "name": "Rapier",
+   "activation": "action",
+   "description": "*Melee Attack Roll:* +7, reach 5 ft. *Hit:* 1d8 + 4 piercing damage. Use the Sneak Attack variant below when the target is distracted.",
+   "attack": {
+    "bonus": 7,
+    "reachFeet": 5
+   },
+   "damage": [
+    {
+     "formula": "1d8 + 4",
+     "type": "piercing"
+    }
+   ]
+  },
+  {
+   "id": "rapier-sneak-attack",
+   "name": "Rapier + Sneak Attack",
+   "activation": "action",
+   "description": "*Melee Attack Roll:* +7, reach 5 ft. *Hit:* 1d8 + 4 piercing plus **4d6 Sneak Attack** \u2014 once per turn, when Pip has Advantage or an ally is within 5 ft of the target (and he doesn't have Disadvantage).",
+   "attack": {
+    "bonus": 7,
+    "reachFeet": 5
+   },
+   "damage": [
+    {
+     "formula": "1d8 + 4",
+     "type": "piercing"
+    },
+    {
+     "formula": "4d6",
+     "type": "piercing"
+    }
+   ],
+   "uses": {
+    "limit": 1,
+    "per": "turn",
+    "pool": "sneak-attack"
+   }
+  },
+  {
+   "id": "shortbow",
+   "name": "Shortbow",
+   "activation": "action",
+   "description": "*Ranged Attack Roll:* +7, range 80/320 ft. *Hit:* 1d6 + 4 piercing damage. Add **4d6 Sneak Attack** (roll separately) when it applies.",
+   "attack": {
+    "bonus": 7,
+    "rangeFeet": 320
+   },
+   "damage": [
+    {
+     "formula": "1d6 + 4",
+     "type": "piercing"
+    }
+   ]
+  },
+  {
+   "id": "cunning-action",
+   "name": "Cunning Action",
+   "activation": "bonus-action",
+   "description": "*Bonus Action every turn:* **Dash**, **Disengage**, or **Hide**. As a Thief, Pip may instead use an object or make a Sleight of Hand check (Fast Hands), and climbing costs no extra movement (Second-Story Work).",
+   "damage": []
+  },
+  {
+   "id": "uncanny-dodge",
+   "name": "Uncanny Dodge",
+   "activation": "reaction",
+   "description": "*Reaction, when an attacker he can see hits him:* halve the attack's damage against him.",
+   "damage": []
+  }
+ ],
+ "token": {
+  "disposition": "friendly",
+  "footprint": {
+   "width": 1,
+   "height": 1
+  }
+ },
+ "extensions": {
+  "open5e.srd-2024": {
+   "type": "Rogue 7 (halfling)",
+   "alignment": "Chaotic Good",
+   "armorDetail": "studded leather",
+   "passivePerception": 14,
+   "languages": "Common, Halfling, Thieves' Cant",
+   "savingThrows": {
+    "str": 0,
+    "dex": 7,
+    "con": 2,
+    "int": 4,
+    "wis": 1,
+    "cha": 2
+   },
+   "traits": [
+    {
+     "name": "Sneak Attack (4d6)",
+     "description": "Once per turn, extra 4d6 damage when he hits with a Finesse or ranged weapon and has Advantage, or when another enemy of the target is within 5 ft of it."
+    },
+    {
+     "name": "Evasion",
+     "description": "On a Dexterity save for half damage: no damage on a success, half on a failure."
+    },
+    {
+     "name": "Expertise",
+     "description": "Double proficiency on Stealth (+10) and Thieves' Tools (+10); also proficient in Perception, Acrobatics, Sleight of Hand, Investigation."
+    },
+    {
+     "name": "Lucky",
+     "description": "When he rolls a 1 on an attack roll, ability check, or saving throw, he can reroll and must use the new roll."
+    },
+    {
+     "name": "Brave",
+     "description": "Advantage on saving throws against the Frightened condition."
+    },
+    {
+     "name": "Halfling Nimbleness",
+     "description": "He can move through the space of any creature at least one size larger."
+    }
+   ]
+  }
+ }
+}

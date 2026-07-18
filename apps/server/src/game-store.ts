@@ -4,6 +4,14 @@ import { DatabaseSync } from "node:sqlite";
 import { GameStateSchema, type GameState, type TurnHistoryEntry } from "@vtt/domain";
 
 export class CommandRejectedError extends Error {}
+/**
+ * A rules-mode validation rejected the command (ADR-0020). A subclass of CommandRejectedError so
+ * the store rolls back without burning the commandId; carries the machine-readable rule id and
+ * whether resending with `override: {reason}` may bypass it. Adapters surface `blocked` details.
+ */
+export class RulesBlockedError extends CommandRejectedError {
+  constructor(public readonly rule: string, message: string, public readonly overridable: boolean = true) { super(message); }
+}
 export class RevisionConflictError extends Error {}
 /** A timeline navigation needs an explicit GM confirmation first. Thrown from a timeline plan BEFORE any transaction, so it burns no receipt, no revision, and no domain event — the client re-sends with the confirm flag and a fresh commandId. */
 export class TimelineConfirmationRequired extends Error {

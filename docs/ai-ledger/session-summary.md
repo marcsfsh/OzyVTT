@@ -8,6 +8,59 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-18 — Combat rules engine (ADR-0020) (`claude/vtt-combat-rules-validation-hkw7tn`)
+
+Owner-directed from a forensic diff of two archived runs of one encounter (manual GM run vs
+API-scripted recreation) plus a gap-analysis report: the engine recorded mechanics but didn't own
+them. Direction: legal action = easiest path, clear explanations, explicit audited GM overrides.
+
+- **Mechanics vocabulary (additive on schemaVersion 1).** ActionSchema: `attack.count`,
+  `attack.criticalBonusDice`, `multiattack`, `onHit` riders (conditions + escape DC + size cap),
+  `targetRules`, `grants` (effects with typed modifiers/durations/onEnd/endsWithTag),
+  `requiresEffectTag`, `uses` (turn/encounter/long-rest + shared pools). ActorDefinition: typed
+  `damageResistances/Immunities/Vulnerabilities/conditionImmunities`. JSON-schema twin regenerated
+  (fixed its pre-existing missing-`save` drift) and now pinned against the enriched fixtures.
+- **Validated resolution.** Per-encounter `rulesMode` (strict default/assisted/freeform);
+  action.resolve validates economy + compound-action instances (generic attack pool so Extra Attack
+  mixes weapons; actionId components for Multiattack) + requirements + uses on the actor's own turn;
+  rejections carry `blocked {rule, overridable}` (socket ack + HTTP 409 details) and re-sending with
+  `override:{reason}` bypasses with a loud `override` log line. Prose-only Multiattack degrades
+  blocking to warnings. Manual `turn.use` stays free and clears the instance when un-marking.
+- **Effects engine** (`effects.ts`): EffectInstances on actors with source links, durations
+  (rounds/until-source-next-turn/encounter/manual), linked conditions, escape DCs, onEnd grants,
+  endsWithTag cascades (Frenzy's Exhaustion fires exactly once however the Rage ends), grant
+  refresh-not-stack, turn-boundary expiry, source-defeat release (0 HP or removal), encounter-end
+  sweep scoped to the fight's combatants (parked scenes keep theirs).
+- **Typed damage + dying.** `actor.apply-damage` accepts typed `parts` → immunity/resistance/
+  vulnerability from definition + active effects with a per-part breakdown ("17 bludgeoning → 8,
+  resistance: Rage") logged and returned; amount-only stays exact. All five HP entry points share
+  the zero-HP machine: PCs drop dying (Unconscious+Prone+death saves; crit = 2 failures; overflow ≥
+  max = instant death; stabilization resets counters), `death-save.roll` runs the d20 pipeline,
+  heal/set-hp above 0 restores consciousness; non-PCs at 0 release sustained effects.
+- **Advantage aggregation** with explainable sources (Reckless out/in, prone 2024 distance rule via
+  token distance, restrained/poisoned/blinded/stunned/paralyzed/petrified/unconscious,
+  unconscious-adjacent auto-crit); explicit `rollMode` wins; sources shown in result + archived.
+- **Commands/API.** New `effect.add`, `effect.end`, `death-save.roll`, `encounter.set-rules-mode`,
+  `actor.rest` through operations layer + both transports + OpenAPI (45 commands now); damage/
+  resolve/encounter.start requests extended additively; capabilities gains `rulesEngine: true`;
+  api-reference regenerated; `turn.use` contract wording updated (no longer "never enforced").
+- **ETL enrichment** (confident patterns only, fail-open): 126/178 Multiattacks structured, 47
+  on-hit riders (crocodile Bite = Grappled+Restrained, escape DC 15, Large cap), 146 monsters with
+  typed defenses; giant-crocodile Tail `not-grappled-by-source` via reviewed ACTION_ENRICHMENTS.
+- **Client.** Action rows show availability hints but stay tappable (server authority) with a
+  blocked→override dialog; "N attacks remaining" instance notes; typed apply with breakdown
+  feedback; effect chips (+end), dying tracker with death-save roll (GM + owning player), rules-mode
+  select. Projections: PlayerEffect strips source ids/masks hidden names; actionUses own-only;
+  hidden-turn instance masked; viewer untouched.
+- **Verification.** New 25-test replay-derived regression suite + rules-5e combat unit tests;
+  timeline restore now covers effects/deathSaves/actionUses; suites: 277 server / 16 contract /
+  23 rules / 7 schema / 15 content green; full check + build green. Playwright smoke still pending
+  this session (documented below).
+- **Unsupported (deliberate, listed in ADR-0020):** reaction prompts (Uncanny Dodge), triggered
+  features (Relentless Endurance, Dark One's Blessing, Sneak Attack *eligibility*), concentration/
+  Hex, movement legality, rolled grapple escapes, player action.resolve, monster death policies,
+  ruleset declarations, structured recharge/legendary.
+
 ## 2026-07-18 — Public Open API v1 core (PR F) + Time Machine v2 (`claude/open-api-core-m75t9d`)
 
 Owner-directed: RESTful API foundation with core endpoints working, maximum integration openness;

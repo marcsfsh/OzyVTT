@@ -8,6 +8,18 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
+  `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
+  (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
+  linked conditions, escape DCs, onEnd grants, and endsWithTag cascades; typed damage with automatic
+  resistance/immunity/vulnerability breakdowns; advantage/disadvantage aggregation with explainable
+  sources (incl. 2024 prone distance rule + unconscious-adjacent auto-crit); PC dying state machine
+  with death-save rolls; commands `effect.add/end`, `death-save.roll`, `encounter.set-rules-mode`,
+  `actor.rest` (45 total); SRD bundle enriched (126/178 structured Multiattacks, 47 on-hit riders,
+  146 typed-defense monsters); enriched replay-party fixtures + a 25-test regression suite derived
+  from the two archived encounter runs. Unsupported items are listed in ADR-0020 (reaction prompts,
+  triggered features, concentration, movement legality, rolled escapes, ruleset declarations).
+
 - TypeScript monorepo: React/Vite client (`@vtt/web`) + authoritative Express + Socket.IO
   server (`@vtt/server`); packages `domain`, `rules-5e`, `schemas`, `api-contract`, `ui`,
   `content-srd-5.2.1`, `test-fixtures`.

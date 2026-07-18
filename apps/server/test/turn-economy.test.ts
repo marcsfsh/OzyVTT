@@ -30,12 +30,12 @@ describe("turn economy", () => {
     const game = combatState();
     setTurnSlot(game, "action", true, GM);
     setTurnSlot(game, "bonus-action", true, GM);
-    expect(game.combat.turn).toEqual({ actionUsed: true, bonusActionUsed: true });
+    expect(game.combat.turn).toEqual({ actionUsed: true, bonusActionUsed: true, actionInstance: null, turnUses: {} });
     nextInitiativeTurn(game);
-    expect(game.combat.turn).toEqual({ actionUsed: false, bonusActionUsed: false });
+    expect(game.combat.turn).toEqual({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} });
     setTurnSlot(game, "action", true, GM);
     previousInitiativeTurn(game);
-    expect(game.combat.turn).toEqual({ actionUsed: false, bonusActionUsed: false });
+    expect(game.combat.turn).toEqual({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} });
   });
 
   it("spends reactions off-turn and refreshes them when the owner's turn starts", () => {
@@ -71,7 +71,7 @@ describe("turn economy", () => {
     setReactionUsed(game, IDS.monster, true, GM);
     const view = projectPlayerCombat(game);
     expect(view.hiddenTurn).toBe(true);
-    expect(view.turn).toEqual({ actionUsed: false, bonusActionUsed: false });
+    expect(view.turn).toEqual({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} });
     expect(view.reactionsUsed).toEqual([IDS.monster]);
     expect(JSON.stringify(view)).not.toContain(IDS.hidden);
   });

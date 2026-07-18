@@ -626,7 +626,7 @@ export function EncounterMap({
             <span><strong>{activeTargeting.action.name}</strong>{label}</span>
             <span className="encounter-target-bar-buttons">
               <button type="button" className="secondary" disabled={targetingBusy} onClick={() => clearTargeting()}>Cancel</button>
-              <button type="button" className="encounter-primary" disabled={targetingBusy || !ready} onClick={() => resolveTargeting(revision, (ok, resultMessage) => setMessage(ok ? "" : resultMessage ?? "The action could not be resolved."))}>Roll {activeTargeting.action.name}</button>
+              <button type="button" className="encounter-primary" disabled={targetingBusy || !ready} onClick={() => resolveTargeting(revision, (ok, resultMessage) => setMessage(ok || resultMessage === undefined ? "" : resultMessage))}>Roll {activeTargeting.action.name}</button>
             </span>
           </div>;
         })()}

@@ -22,6 +22,16 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **The server owns combat rules, not just combat records (ADR-0020, 2026-07-18).** Structured
+  `action.resolve` validates action economy, compound-action instances, feature requirements, and
+  limited uses against engine-owned state, per an encounter-level `rulesMode` (strict default /
+  assisted / freeform); every rejection is machine-readable and overridable with an audited
+  `override: {reason}`. Persistent `EffectInstance`s (Rage, grapples) with engine-owned lifecycle;
+  typed damage with automatic RVI and per-part breakdowns; a PC dying state machine shared by every
+  HP write. Supersedes the "tracked, never enforced" posture for structured resolution only — manual
+  commands stay free escape hatches, prose-only mechanics degrade to warnings, and one command still
+  equals one roll burst so journals/archives replay (under freeform). Mechanics vocabulary is
+  additive on schemaVersion 1; ADR-0008's no-imported-code rules are unchanged.
 - **Full phone+laptop functional parity**, one responsive client, no separate mobile build.
   (ADR-0014, ADR-0001)
 - **SRD content source is open5e `srd-2024` (SRD 5.2.1, CC BY 4.0).** Fixtures are vendored

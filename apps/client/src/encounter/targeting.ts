@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, ContentActionSummary } from "@vtt/domain";
+import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, ContentActionSummary, RulesBlocked } from "@vtt/domain";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -21,6 +21,12 @@ export type TargetingSession = Readonly<{
 let session: TargetingSession | null = null;
 let result: ActionResolution | null = null;
 let busy = false;
+/**
+ * A strict-mode rejection awaiting the GM's call (ADR-0020). Lives in the store — not component
+ * state — because the resolve may come from the sidebar runner, the docked runner, OR the map's
+ * confirm bar, and the override dialog must appear regardless of which surface rolled.
+ */
+let blockedPrompt: { blocked: RulesBlocked; retry: (override: { reason: string }) => void } | null = null;
 const listeners = new Set<() => void>();
 const emit = () => { for (const listener of listeners) listener(); };
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -48,26 +54,46 @@ export function toggleTarget(actorId: string) {
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
   if (session?.template) { session = { ...session, template: { ...session.template, placed: { origin, target } } }; emit(); }
 }
-export function clearTargeting() { if (session !== null) { session = null; emit(); } }
+export function clearTargeting() { if (session !== null || blockedPrompt !== null) { session = null; blockedPrompt = null; emit(); } }
 export function setTargetingResult(next: ActionResolution | null) { result = next; emit(); }
+export function clearBlockedPrompt() { if (blockedPrompt !== null) { blockedPrompt = null; emit(); } }
 
-/** Resolve the current session through the authoritative action:resolve; both the runner's Roll button and the map's confirm bar call this. */
-export function resolveTargeting(revision: number, onResult: (ok: boolean, message?: string) => void) {
+/**
+ * Resolve the current session through the authoritative action:resolve; both the runner's Roll
+ * button and the map's confirm bar call this. A rules-mode rejection (ADR-0020) surfaces its
+ * machine-readable `blocked` details so the caller can offer the one-tap audited override —
+ * re-calling with `override` keeps the same targets.
+ */
+export function resolveTargeting(revision: number | undefined, onResult: (ok: boolean, message?: string) => void, override?: { reason: string }) {
   if (!session || busy) return;
   const { attackerId, action, mode, selected, template } = session;
   const payload = mode === "template"
-    ? (template?.placed ? { commandId: newId(), actorId: attackerId, actionId: action.id, template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target }, expectedRevision: revision } : null)
-    : (selected.length > 0 ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], expectedRevision: revision } : null);
+    ? (template?.placed ? { commandId: newId(), actorId: attackerId, actionId: action.id, template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target }, ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) } : null)
+    : (selected.length > 0 ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) } : null);
   if (!payload) return;
-  busy = true; emit();
-  socket.emit("action:resolve", payload, (response: { ok: boolean; message?: string; resolution?: ActionResolution }) => {
+  busy = true; blockedPrompt = null; emit();
+  socket.emit("action:resolve", payload, (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
     busy = false;
     if (response.ok && response.resolution) { result = response.resolution; session = null; }
+    // Overridable rejection: keep the session (same targets) and surface the one-tap audited
+    // override; the retry skips expectedRevision since it's an explicit human confirmation.
+    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveTargeting(undefined, onResult, confirmed) };
     emit();
-    onResult(response.ok, response.message);
+    onResult(response.ok, response.blocked ? undefined : response.message);
+  });
+}
+
+/** Resolve a targetless action (Rage, Reckless Attack, a Multiattack plan) without a targeting session. */
+export function resolveActionDirect(attackerId: string, actionId: string, revision: number | undefined, onResult: (ok: boolean, message?: string) => void, override?: { reason: string }) {
+  socket.emit("action:resolve", { commandId: newId(), actorId: attackerId, actionId, ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) }, (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
+    if (response.ok && response.resolution) { result = response.resolution; session = null; }
+    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed) };
+    emit();
+    onResult(response.ok, response.blocked ? undefined : response.message);
   });
 }
 
 export function useTargeting() { return useSyncExternalStore(subscribe, () => session, () => session); }
 export function useTargetingResult() { return useSyncExternalStore(subscribe, () => result, () => result); }
 export function useTargetingBusy() { return useSyncExternalStore(subscribe, () => busy, () => busy); }
+export function useTargetingBlocked() { return useSyncExternalStore(subscribe, () => blockedPrompt, () => blockedPrompt); }

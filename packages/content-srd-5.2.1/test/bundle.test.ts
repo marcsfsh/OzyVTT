@@ -49,6 +49,25 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(consume?.save).toEqual({ ability: "int", dc: 16 });
   });
 
+  it("carries structured rules mechanics for the giant crocodile (ADR-0020 golden check)", () => {
+    const crocodile = monsters.find((monster) => monster.source.externalId === "giant-crocodile")!;
+    expect(crocodile.actions.find((action) => action.id === "multiattack")!.multiattack).toEqual([{ actionId: "bite", count: 1 }, { actionId: "tail", count: 1 }]);
+    // Bite: Grappled AND Restrained ride one source-linked rider with the printed escape DC and size cap.
+    expect(crocodile.actions.find((action) => action.id === "bite")!.onHit).toEqual([{ conditions: [{ id: "grappled" }, { id: "restrained" }], escapeDc: 15, maxTargetSize: "large" }]);
+    const tail = crocodile.actions.find((action) => action.id === "tail")!;
+    expect(tail.onHit).toEqual([{ conditions: [{ id: "prone" }], maxTargetSize: "large" }]);
+    expect(tail.targetRules).toEqual(["not-grappled-by-source"]);
+  });
+
+  it("splits typed defense lists from the display strings (adult red dragon golden check)", () => {
+    const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
+    expect(dragon.damageImmunities).toEqual(["fire"]);
+    // Coverage floor: enrichment must not silently regress on a rebuild.
+    expect(monsters.filter((monster) => monster.actions.some((action) => action.multiattack)).length).toBeGreaterThanOrEqual(120);
+    expect(monsters.filter((monster) => monster.actions.some((action) => action.onHit)).length).toBeGreaterThanOrEqual(40);
+    expect(monsters.filter((monster) => (monster.damageResistances?.length ?? 0) + (monster.damageImmunities?.length ?? 0) + (monster.damageVulnerabilities?.length ?? 0) > 0).length).toBeGreaterThanOrEqual(140);
+  });
+
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
     // rat: flat "1 Piercing damage" — attack is structured, damage stays prose-only.

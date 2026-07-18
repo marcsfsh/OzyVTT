@@ -76,6 +76,11 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `action.resolve` | `combat:write` |
 | `save.answer` | `combat:write` |
 | `save.dismiss` | `combat:write` |
+| `effect.add` | `combat:write` |
+| `effect.end` | `combat:write` |
+| `death-save.roll` | `combat:write` |
+| `encounter.set-rules-mode` | `combat:write` |
+| `actor.rest` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
 | `annotation.move` | `combat:write` |
@@ -289,6 +294,7 @@ Starts an encounter on a calibrated battlemap with initial combatants (GM-grade 
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mapAssetId` | string (uuid) | yes |  |
+| `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted keeps the table's current mode |
 | `entries` | object[] | yes |  |
 | `entries[].actorId` | string (uuid) | yes |  |
 | `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
@@ -393,7 +399,7 @@ Ends the current turn and advances. The GM (or an integration) may end anyone's 
 
 ### `POST /api/v1/game/turn/use`
 
-Marks the current turn's action or bonus action used/unused (tracked, never enforced).
+Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.
 
 **Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
 
@@ -480,7 +486,7 @@ Removes an actor from the roster (GM-grade only); rejected for claimed character
 
 ### `POST /api/v1/game/actors/{actorId}/damage`
 
-Applies damage (temporary hit points absorb first). Player sessions may target only their claimed character.
+Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline — immunity, then resistance (half, rounded down), then vulnerability (double) — from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). Player sessions may target only their claimed character.
 
 **Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
 
@@ -492,7 +498,14 @@ Applies damage (temporary hit points absorb first). Player sessions may target o
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
-| `amount` | integer (1–1000) | yes |  |
+| `amount` | integer (1–1000) | yes | Untyped total — used when `parts` is absent; kept for compatibility either way |
+| `parts` | object[] | no | Typed components; the server applies the target's defenses and returns the breakdown |
+| `parts[].amount` | integer (0–1000) | yes |  |
+| `parts[].type` | string | yes |  |
+| `sourceActorId` | string (uuid) | no |  |
+| `sourceActionId` | string (pattern) | no |  |
+| `sourceName` | string | no |  |
+| `critical` | boolean | no | Adds two death-save failures instead of one when the target is already dying |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -626,6 +639,9 @@ Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit dou
 | `template.origin` | ImagePoint | yes |  |
 | `template.target` | ImagePoint | yes |  |
 | `conditionId` | string (pattern) | no |  |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | Explicit GM choice; wins over the engine's advantage/disadvantage aggregation |
+| `override` | object | no | Bypasses a rules-mode rejection; audited in the combat log and journal |
+| `override.reason` | string | yes |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -663,6 +679,97 @@ Dismisses a pending saving throw without resolving it (GM-grade, or the owing pl
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/effects`
+
+Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `name` | string | yes |  |
+| `tags` | string (pattern)[] | no |  |
+| `duration` | object | no | rounds \| until-source-next-turn \| encounter \| manual (default manual) |
+| `duration.type` | `rounds` \| `until-source-next-turn` \| `encounter` \| `manual` | yes |  |
+| `duration.rounds` | integer (1–100) | no |  |
+| `modifiers` | object (free-form)[] | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/effects/{effectId}/end`
+
+Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire (a Frenzied Rage ending adds Exhaustion). GM-grade anyone; a player session only their claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid) · `effectId` (path) — string
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/death-save`
+
+Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/rules-mode`
+
+Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `mode` | `strict` \| `assisted` \| `freeform` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/rest`
+
+Applies a long rest to a rostered actor outside combat (GM-grade only): remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, and Exhaustion drops one level.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `kind` | `long` | yes |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
