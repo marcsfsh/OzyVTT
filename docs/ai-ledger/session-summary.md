@@ -51,7 +51,7 @@ webhooks explicitly deferred; archive should save as much fight data as possible
   clients exist. Every game command now has both adapters; the socket-only list is empty. 10 new
   commands in the catalog (40 total), contract + generated reference updated, 2 new end-to-end
   test blocks (claim lifecycle over HTTP incl. contested claim + force-release; scene staging incl.
-  active-scene-removal rejection). 292 tests green.
+  active-scene-removal rejection). 286 tests green across all workspaces.
 - **Remaining follow-ups:** SSE stream, webhooks, rate limiting, credential `gameId` plumbing
   (known-bugs).
 
