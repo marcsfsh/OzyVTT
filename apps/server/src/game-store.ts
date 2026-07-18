@@ -242,7 +242,11 @@ export class GameStore {
     const applied = database.prepare("SELECT 1 FROM application_seeds WHERE seed_key = ?").get(PLACEHOLDER_ROSTER_SEED);
     if (applied) return;
     const nextState = structuredClone(this.state);
-    if (nextState.actors.length === 0 && this.initialState.actors.length > 0) nextState.actors = structuredClone(this.initialState.actors);
+    if (nextState.actors.length === 0 && this.initialState.actors.length > 0) {
+      nextState.actors = structuredClone(this.initialState.actors);
+      // Carry the starter sheets too, so backfilled actors don't reference a missing definition.
+      if (nextState.definitions.length === 0) nextState.definitions = structuredClone(this.initialState.definitions);
+    }
     const now = new Date().toISOString();
     database.exec("BEGIN IMMEDIATE");
     try {
