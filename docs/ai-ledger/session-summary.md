@@ -44,8 +44,16 @@ webhooks explicitly deferred; archive should save as much fight data as possible
   smoke against the running service passed 17/17 external-integration steps (credential → discovery
   → map upload → snapshot views → REST encounter → ETag 304 → tunnel → idempotent retry → archive v2
   journal → revocation cutoff).
-- **Follow-ups:** scenes/claims/cosmetics over the API, SSE stream, webhooks, rate limiting,
-  credential `gameId` plumbing (known-bugs).
+- **Follow-up slice landed the same session — full coverage:** claims (player-principal-only, GM
+  force-release), token image/size cosmetics, and staged scenes (create/rename/remove/activate/
+  combatants, `scene:write` scope) moved into the operations layer with typed routes + tunnel
+  entries; `POST /api/v1/sessions/player` mirrors the socket's open join so pure-HTTP player
+  clients exist. Every game command now has both adapters; the socket-only list is empty. 10 new
+  commands in the catalog (40 total), contract + generated reference updated, 2 new end-to-end
+  test blocks (claim lifecycle over HTTP incl. contested claim + force-release; scene staging incl.
+  active-scene-removal rejection). 292 tests green.
+- **Remaining follow-ups:** SSE stream, webhooks, rate limiting, credential `gameId` plumbing
+  (known-bugs).
 
 ---
 

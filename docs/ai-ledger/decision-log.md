@@ -65,8 +65,11 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   Socket.IO handlers in `server.ts` and the public HTTP routes in `game-http.ts` are both thin
   adapters over these exact functions — the ADR-0016 "adapters, never forks" rule is now structural,
   not a convention. New game capabilities get added to the operations layer first; adding a
-  socket-only or HTTP-only capability is a regression. Claims, scenes, and token cosmetics remain
-  socket-only adapters for now (not yet in the operations layer or the public API).
+  socket-only or HTTP-only capability is a regression. As of the same day's follow-up slice, claims,
+  scenes, and token cosmetics are in the layer too — every game command has both adapters, and
+  `POST /api/v1/sessions/player` mirrors the socket's open join so pure-HTTP player clients exist.
+  Claims stay player-principal-only on both transports (GM/integration principals are refused);
+  scenes use the `scene:write` scope.
 
 - **2026-07-18 — Public game API v1 shape (PR F).** `GET /api/v1/game` returns the caller's
   projection: GM sessions and GM-minted integration credentials get the full GM view (an integration

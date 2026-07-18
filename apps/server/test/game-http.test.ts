@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GameStateSchema } from "@vtt/domain";
-import { CONTENT_PATHS, ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS, GameCommandCatalogResponseSchema, GameLogResponseSchema, GameMutationAcceptedResponseSchema, GameSnapshotResponseSchema, EncounterArchiveListResponseSchema, openApiDocument } from "@vtt/api-contract";
+import { CONTENT_PATHS, ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS, GameCommandCatalogResponseSchema, GameLogResponseSchema, GameMutationAcceptedResponseSchema, GameSnapshotResponseSchema, EncounterArchiveListResponseSchema, openApiDocument, PlayerSessionIssuedResponseSchema, SESSION_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_COMMAND_SCOPES } from "../src/game-commands.js";
 import { createServer } from "../src/server.js";
@@ -334,6 +334,71 @@ describe("public game API over /api/v1", () => {
     expect(await (await fetch(`${base}/api/gm/encounters`, { headers: { authorization: `Bearer ${gmToken}` } })).json()).toEqual({ encounters: [] });
   });
 
+  it("issues player sessions over HTTP and runs the claim lifecycle end to end", async () => {
+    const { base, gmToken } = await boot();
+    const integration = await issueCredential(base, gmToken, "seat manager", ["game:read", "actor:write"]);
+
+    // Two players join over pure HTTP — the socketless mirror of the open LAN join.
+    const seatA = PlayerSessionIssuedResponseSchema.parse(await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json());
+    const seatB = PlayerSessionIssuedResponseSchema.parse(await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json());
+    expect(seatA.data.sessionId).not.toBe(seatB.data.sessionId);
+
+    // A claims the hero; B is refused; A shows up as owner in the GM view.
+    const claimed = await post(base, GAME_PATHS.claims, seatA.data.token, { actorId: HERO_ID });
+    expect(claimed.status).toBe(200);
+    const contested = await post(base, GAME_PATHS.claims, seatB.data.token, { actorId: HERO_ID });
+    expect(contested.status).toBe(409);
+    expect((await contested.json()).error.message).toBe("That character is already claimed.");
+    const view = GameSnapshotResponseSchema.parse(await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(integration.token) })).json());
+    expect((view.data.game as { actors: Array<{ id: string; ownerSessionId: string | null }> }).actors.find((actor) => actor.id === HERO_ID)?.ownerSessionId).toBe(seatA.data.sessionId);
+
+    // Claimed player can act on their character over HTTP; GM-grade principals cannot claim.
+    expect((await post(base, GAME_PATHS.actorDamage.replace("{actorId}", HERO_ID), seatA.data.token, { amount: 2 })).status).toBe(200);
+    const gmClaim = await post(base, GAME_PATHS.claims, gmToken, { actorId: HERO_ID });
+    expect(gmClaim.status).toBe(403);
+    expect((await gmClaim.json()).error.message).toBe("GM sessions do not claim player characters.");
+
+    // Force-release via an actor:write integration, then A releases nothing further; B claims freely.
+    expect((await post(base, GAME_PATHS.claimForceRelease.replace("{actorId}", HERO_ID), integration.token, {})).status).toBe(200);
+    expect((await post(base, GAME_PATHS.claimsRelease, seatA.data.token, {})).status).toBe(200);
+    expect((await post(base, GAME_PATHS.claims, seatB.data.token, { actorId: HERO_ID })).status).toBe(200);
+  });
+
+  it("stages, edits, activates, and removes scenes over HTTP with the scene:write scope", async () => {
+    const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
+    const stager = await issueCredential(base, gmToken, "scene stager", ["game:read", "scene:write"]);
+    const noScope = await issueCredential(base, gmToken, "combat only", ["combat:write"]);
+
+    // Wrong scope → 403; wrong map kind → 409 with the table's message.
+    expect((await post(base, GAME_PATHS.scenes, noScope.token, { name: "Nope", mapAssetId, combatantIds: [] })).status).toBe(403);
+    const otherMap = await server.mapAssets.import(png(600, 400), "world.png");
+    server.mapCatalog.register(otherMap.metadata.id, "World", "world");
+    const wrongKind = await post(base, GAME_PATHS.scenes, stager.token, { name: "Nope", mapAssetId: otherMap.metadata.id, combatantIds: [] });
+    expect(wrongKind.status).toBe(409);
+    expect((await wrongKind.json()).error.message).toBe("Prepare scenes on an uploaded battlemap.");
+
+    // Create → rename → set combatants → activate → the live table now runs this scene's map.
+    const created = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.scenes, stager.token, { name: "Ambush", mapAssetId, combatantIds: [HERO_ID] })).json());
+    const sceneId = created.data.sceneId as string;
+    expect((await post(base, GAME_PATHS.sceneRename.replace("{sceneId}", sceneId), stager.token, { name: "Bridge Ambush" })).status).toBe(200);
+    expect((await post(base, GAME_PATHS.sceneCombatants.replace("{sceneId}", sceneId), stager.token, { combatantIds: [HERO_ID, SECRET_ID] })).status).toBe(200);
+    expect((await post(base, GAME_PATHS.sceneActivate.replace("{sceneId}", sceneId), stager.token, {})).status).toBe(200);
+    expect(server.store.snapshot.combat.activeSceneId).toBe(sceneId);
+    expect(server.store.snapshot.combat.mapAssetId).toBe(mapAssetId);
+
+    // The active scene refuses removal; a second prepared scene deletes fine.
+    const removeActive = await fetch(base + GAME_PATHS.sceneById.replace("{sceneId}", sceneId), { method: "DELETE", headers: bearer(stager.token) });
+    expect(removeActive.status).toBe(409);
+    const spare = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.scenes, stager.token, { name: "Spare", mapAssetId, combatantIds: [] })).json());
+    expect((await fetch(base + GAME_PATHS.sceneById.replace("{sceneId}", spare.data.sceneId as string), { method: "DELETE", headers: bearer(stager.token) })).status).toBe(200);
+
+    // Cosmetics: size + clearing a token image, via the same actor routes namespace.
+    const cosmetics = await issueCredential(base, gmToken, "cosmetics", ["actor:write"]);
+    expect((await post(base, GAME_PATHS.actorSize.replace("{actorId}", HERO_ID), cosmetics.token, { size: "large" })).status).toBe(200);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)?.sizeCells).toBe(2);
+    expect((await post(base, GAME_PATHS.actorTokenImage.replace("{actorId}", HERO_ID), cosmetics.token, { tokenAssetId: null })).status).toBe(200);
+  });
+
   it("answers CORS preflights for /api/v1 only — never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, { method: "OPTIONS", headers: { origin: "https://overlay.example", "access-control-request-method": "GET", "access-control-request-headers": "authorization" } });
@@ -386,7 +451,17 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.annotationMove, "post", "annotation.move"],
       [GAME_PATHS.annotationColor, "post", "annotation.set-color"],
       [GAME_PATHS.annotationVisibility, "post", "annotation.set-visibility"],
-      [GAME_PATHS.annotationMovable, "post", "annotation.set-movable"]
+      [GAME_PATHS.annotationMovable, "post", "annotation.set-movable"],
+      [GAME_PATHS.claims, "post", "character.claim"],
+      [GAME_PATHS.claimsRelease, "post", "character.release"],
+      [GAME_PATHS.claimForceRelease, "post", "character.force-release"],
+      [GAME_PATHS.actorTokenImage, "post", "actor.set-token-image"],
+      [GAME_PATHS.actorSize, "post", "actor.set-size"],
+      [GAME_PATHS.scenes, "post", "scene.create"],
+      [GAME_PATHS.sceneById, "delete", "scene.remove"],
+      [GAME_PATHS.sceneRename, "post", "scene.rename"],
+      [GAME_PATHS.sceneActivate, "post", "scene.activate"],
+      [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"]
     ];
     // Every cataloged command has exactly one typed route in this table...
     expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMAND_SCOPES).sort());

@@ -8,14 +8,16 @@ import { setCondition } from "./actor-conditions.js";
 import { resolveDefinitionAction } from "./action-resolution.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
+import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import type { ContentLibrary } from "./content-library.js";
 import { addCombatant, endEncounter, setInitiativeScore, startEncounter } from "./encounter.js";
+import { activateScene, createScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
 import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
-import { moveEncounterToken, moveSceneToken, type TokenMapGeometry } from "./token-placement.js";
+import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
@@ -23,8 +25,9 @@ import {
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, CommandIdentitySchema, ContentActionsSchema,
   DiceRollSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
-  InitiativeScoreSchema, SaveAnswerSchema, SaveDismissSchema, SetConditionSchema, SetHpSchema, TempHpSchema, TokenMoveSchema,
-  TurnReactionSchema, TurnUseSchema, type GameCommandType
+  InitiativeScoreSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
+  SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetHpSchema, SetTokenImageSchema, TempHpSchema,
+  TokenMoveSchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
 /**
@@ -92,6 +95,7 @@ export type GameOperationsContext = Readonly<{
   combatLog: CombatLogStore;
   contentLibrary: ContentLibrary;
   mapCatalog: Readonly<{ get: (assetId: string) => { kind: string } | undefined | null }>;
+  tokenCatalog: Readonly<{ get: (assetId: string) => unknown; touchLastUsed: (assetId: string) => void; rememberForDefinition: (definitionId: string, assetId: string) => void }>;
   tokenGeometryFor: (mapAssetId: string) => Promise<TokenMapGeometry>;
   publishGameState: (state: GameState) => Promise<void>;
   broadcastTableEvent: (event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) => void;
@@ -626,6 +630,134 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "annotation.clear", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => { clearAnnotations(state, scope, actor); });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    // ---------- Character claims ----------
+
+    async characterClaim(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      // Claims bind a character to a PLAYER session; GM sessions and integrations (GM authority) are
+      // refused with the table's own message. Integrations wanting a seat hold a player session.
+      if (isGmGrade(principal)) throw new GameAccessDeniedError("GM sessions do not claim player characters.");
+      const request = parse(ActorRemoveSchema, raw, "The claim command is malformed.");
+      const { commandId, actorId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => claimCharacter(state, actorId, principal.sessionId));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterRelease(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      // Same audience rule as the socket: only a player session has claims to release.
+      if (isGmGrade(principal)) throw new GameAccessDeniedError("Join a session first.");
+      const request = parse(CommandIdentitySchema, raw, "The release command is malformed.");
+      const { commandId, expectedRevision } = request;
+      const sessionId = principal.sessionId;
+      const result = await store.execute({ id: commandId, type: "character.release", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => releaseCharactersForSession(state, sessionId));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterForceRelease(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can force-release a character.");
+      const request = parse(ActorRemoveSchema, raw, "The force-release command is malformed.");
+      const { commandId, actorId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => forceReleaseCharacter(state, actorId, "gm"));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    // ---------- Actor cosmetics ----------
+
+    async actorSetTokenImage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can set token images.");
+      const request = parse(SetTokenImageSchema, raw, "The token image command is malformed.");
+      const { commandId, actorId, tokenAssetId, expectedRevision } = request;
+      if (tokenAssetId !== null && !context.tokenCatalog.get(tokenAssetId)) throw new CommandRejectedError("That token image is not in your library.");
+      const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((item) => item.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        if (tokenAssetId === null) delete actor.tokenAssetId; else actor.tokenAssetId = tokenAssetId;
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        if (tokenAssetId !== null) {
+          context.tokenCatalog.touchLastUsed(tokenAssetId);
+          const definitionId = result.state.actors.find((item) => item.id === actorId)?.definitionId;
+          if (definitionId) context.tokenCatalog.rememberForDefinition(definitionId, tokenAssetId);
+        }
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async actorSetSize(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can resize tokens.");
+      const request = parse(SetActorSizeSchema, raw, "The token size command is malformed.");
+      const { commandId, actorId, size, expectedRevision } = request;
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      const geometry = mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
+      const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setActorSize(state, actorId, size, geometry));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    // ---------- Scenes ----------
+
+    async sceneCreate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can prepare scenes.");
+      const request = parse(SceneCreateSchema, raw, "The scene setup is malformed.");
+      const sceneMap = context.mapCatalog.get(request.mapAssetId);
+      if (!sceneMap || sceneMap.kind !== "battlemap") throw new CommandRejectedError("Prepare scenes on an uploaded battlemap.");
+      const { commandId, name, mapAssetId, combatantIds, expectedRevision } = request;
+      const geometry = await context.tokenGeometryFor(mapAssetId);
+      const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId };
+    },
+
+    async sceneRename(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can rename scenes.");
+      const request = parse(SceneRenameSchema, raw, "The scene rename is malformed.");
+      const { commandId, sceneId, name, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "scene.rename", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => renameScene(state, sceneId, name));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async sceneRemove(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can remove scenes.");
+      const request = parse(SceneIdSchema, raw, "The scene command is malformed.");
+      const { commandId, sceneId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "scene.remove", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => removeScene(state, sceneId));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async sceneActivate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can switch scenes.");
+      const request = parse(SceneIdSchema, raw, "The scene command is malformed.");
+      const { commandId, sceneId, expectedRevision } = request;
+      const result = await store.executeTimeline({ id: commandId, type: "scene.activate", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
+        activateScene(state, sceneId, commandId); // rejects while rewound
+        // Snapshots belong to the scene that was live; the swap invalidates them, so start clean.
+        timeline.truncateAll();
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        const scene = result.state.combat.scenes.find((candidate) => candidate.id === sceneId);
+        context.appendLog({ kind: "scene", text: `Switched to scene "${scene?.name ?? "Untitled"}".`, gmOnly: true });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async sceneSetCombatants(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can change a scene's combatants.");
+      const request = parse(SceneSetCombatantsSchema, raw, "The scene update is malformed.");
+      const { commandId, sceneId, combatantIds, expectedRevision } = request;
+      const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
+      if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+      const geometry = await context.tokenGeometryFor(scene.mapAssetId);
+      const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
     }
   };
 }
@@ -674,7 +806,17 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["annotation.set-color", "Change an annotation's color.", (p, raw) => operations.annotationSetColor(p, raw)],
     ["annotation.set-visibility", "Change who can see an annotation.", (p, raw) => operations.annotationSetVisibility(p, raw)],
     ["annotation.set-movable", "Allow or disallow other players moving a shape.", (p, raw) => operations.annotationSetMovable(p, raw)],
-    ["annotation.clear", "Clear drawn shapes by scope (mine/players/all).", (p, raw) => operations.annotationClear(p, raw)]
+    ["annotation.clear", "Clear drawn shapes by scope (mine/players/all).", (p, raw) => operations.annotationClear(p, raw)],
+    ["character.claim", "Claim an unclaimed player character for the calling player session.", (p, raw) => operations.characterClaim(p, raw)],
+    ["character.release", "Release every character claimed by the calling player session.", (p, raw) => operations.characterRelease(p, raw)],
+    ["character.force-release", "Force-release a claimed character (GM).", (p, raw) => operations.characterForceRelease(p, raw)],
+    ["actor.set-token-image", "Set or clear a combatant's token image from the token library (GM).", (p, raw) => operations.actorSetTokenImage(p, raw)],
+    ["actor.set-size", "Set a combatant's creature size; the token re-snaps to its footprint (GM).", (p, raw) => operations.actorSetSize(p, raw)],
+    ["scene.create", "Prepare a staged scene on a battlemap without touching the live table (GM).", (p, raw) => operations.sceneCreate(p, raw)],
+    ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],
+    ["scene.remove", "Remove a prepared scene (GM).", (p, raw) => operations.sceneRemove(p, raw)],
+    ["scene.activate", "Switch the live table to a prepared scene, parking the current one (GM).", (p, raw) => operations.sceneActivate(p, raw)],
+    ["scene.set-combatants", "Replace a prepared scene's combatant list (GM).", (p, raw) => operations.sceneSetCombatants(p, raw)]
   ];
   return new Map<string, GameCommandDescriptor>(entries.map(([type, summary, run]) => [type, { type, scope: GAME_COMMAND_SCOPES[type], summary, run }]));
 }

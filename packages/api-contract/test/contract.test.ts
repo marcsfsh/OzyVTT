@@ -22,6 +22,7 @@ import {
   openApiDocument,
   REALTIME_PROTOCOL_VERSION,
   RotateIntegrationCredentialRequestSchema,
+  SESSION_PATHS,
   SYSTEM_PATHS,
   SystemCapabilitiesResponseSchema,
   SystemVersionResponseSchema,
@@ -84,7 +85,7 @@ describe("public API contracts", () => {
     expect(openApiDocument.info.version).toBe(API_VERSION);
     expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
 
-    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS)];
+    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS), ...Object.values(SESSION_PATHS)];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(IntegrationScopeSchema.options);
     for (const path of Object.values(SYSTEM_PATHS)) expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(/^#\/components\/schemas\//);
@@ -159,12 +160,16 @@ describe("public API contracts", () => {
     expect(() => GameCommandEnvelopeSchema.parse({ type: "NotACommand!" })).toThrow();
   });
 
-  it("never declares a secret-bearing property on any public component schema except the one-time-issue response", () => {
+  it("never declares a secret-bearing property on any public component schema except the deliberate issuance responses", () => {
     const forbiddenNames = /secret|hash|password|token/i;
+    // The two responses whose entire purpose is issuing a credential: the one-time integration
+    // secret, and the player session token (the open LAN-trust join). Everything else stays clean.
+    const issuance = new Set(["IntegrationCredentialIssued.token", "PlayerSessionIssuedData.token"]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties = "properties" in schema ? Object.keys((schema as { properties: Record<string, unknown> }).properties) : [];
       for (const property of properties) {
-        if (name === "IntegrationCredentialIssued" && property === "token") continue;
+        if (issuance.has(`${name}.${property}`)) continue;
+        if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces, not credentials
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }

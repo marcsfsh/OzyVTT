@@ -6,6 +6,7 @@ import {
   ENCOUNTER_ARCHIVE_PATHS,
   GAME_PATHS,
   GameCommandEnvelopeSchema,
+  SESSION_PATHS,
   type ApiErrorCode,
   type IntegrationScope
 } from "@vtt/api-contract";
@@ -39,6 +40,10 @@ export type GameApiRouterOptions = Readonly<{
     list: () => readonly EncounterArchiveSummary[];
     get: (id: number) => string | null;
     remove: (id: number) => void;
+  }>;
+  sessions: Readonly<{
+    /** Issues a fresh player session (the socket's open LAN-trust join, over HTTP), or null before GM setup. */
+    issuePlayer: () => Readonly<{ token: string; sessionId: string }> | null;
   }>;
   revision: () => number;
   newId?: () => string;
@@ -235,6 +240,24 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.annotationColor), ...command("annotation.set-color", idParam));
   router.post(expressPath(GAME_PATHS.annotationVisibility), ...command("annotation.set-visibility", idParam));
   router.post(expressPath(GAME_PATHS.annotationMovable), ...command("annotation.set-movable", idParam));
+  router.post(expressPath(GAME_PATHS.claims), ...command("character.claim"));
+  router.post(expressPath(GAME_PATHS.claimsRelease), ...command("character.release"));
+  router.post(expressPath(GAME_PATHS.claimForceRelease), ...command("character.force-release", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorTokenImage), ...command("actor.set-token-image", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
+  router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
+  router.delete(expressPath(GAME_PATHS.sceneById), ...command("scene.remove", (req) => ({ sceneId: req.params.sceneId })));
+  router.post(expressPath(GAME_PATHS.sceneRename), ...command("scene.rename", (req) => ({ sceneId: req.params.sceneId })));
+  router.post(expressPath(GAME_PATHS.sceneActivate), ...command("scene.activate", (req) => ({ sceneId: req.params.sceneId })));
+  router.post(expressPath(GAME_PATHS.sceneCombatants), ...command("scene.set-combatants", (req) => ({ sceneId: req.params.sceneId })));
+
+  // ---------- Player sessions (headless / alternate player clients) ----------
+
+  router.post(expressPath(SESSION_PATHS.player), (_req, res) => {
+    const issued = options.sessions.issuePlayer();
+    if (!issued) return sendError(res, 409, "conflict", "The host must complete GM setup before players join.");
+    return res.status(201).json({ ok: true, apiVersion: API_VERSION, data: issued });
+  });
 
   // ---------- Bundled content reads ----------
 

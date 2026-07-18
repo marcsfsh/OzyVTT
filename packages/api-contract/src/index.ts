@@ -86,7 +86,22 @@ export const GAME_PATHS = {
   annotationMove: `${API_NAMESPACE}/game/annotations/{id}/move`,
   annotationColor: `${API_NAMESPACE}/game/annotations/{id}/color`,
   annotationVisibility: `${API_NAMESPACE}/game/annotations/{id}/visibility`,
-  annotationMovable: `${API_NAMESPACE}/game/annotations/{id}/movable`
+  annotationMovable: `${API_NAMESPACE}/game/annotations/{id}/movable`,
+  claims: `${API_NAMESPACE}/game/claims`,
+  claimsRelease: `${API_NAMESPACE}/game/claims/release`,
+  claimForceRelease: `${API_NAMESPACE}/game/claims/{actorId}/force-release`,
+  actorTokenImage: `${API_NAMESPACE}/game/actors/{actorId}/token-image`,
+  actorSize: `${API_NAMESPACE}/game/actors/{actorId}/size`,
+  scenes: `${API_NAMESPACE}/game/scenes`,
+  sceneById: `${API_NAMESPACE}/game/scenes/{sceneId}`,
+  sceneRename: `${API_NAMESPACE}/game/scenes/{sceneId}/rename`,
+  sceneActivate: `${API_NAMESPACE}/game/scenes/{sceneId}/activate`,
+  sceneCombatants: `${API_NAMESPACE}/game/scenes/{sceneId}/combatants`
+} as const;
+
+/** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
+export const SESSION_PATHS = {
+  player: `${API_NAMESPACE}/sessions/player`
 } as const;
 
 /** Bundled SRD reference content (read-only; GM-grade except conditions, which any session may read). */
@@ -288,7 +303,17 @@ export const GAME_COMMAND_SCOPES = {
   "annotation.set-color": "combat:write",
   "annotation.set-visibility": "combat:write",
   "annotation.set-movable": "combat:write",
-  "annotation.clear": "combat:write"
+  "annotation.clear": "combat:write",
+  "character.claim": "actor:write",
+  "character.release": "actor:write",
+  "character.force-release": "actor:write",
+  "actor.set-token-image": "actor:write",
+  "actor.set-size": "actor:write",
+  "scene.create": "scene:write",
+  "scene.rename": "scene:write",
+  "scene.remove": "scene:write",
+  "scene.activate": "scene:write",
+  "scene.set-combatants": "scene:write"
 } as const satisfies Record<string, z.infer<typeof IntegrationScopeSchema>>;
 export type GameCommandType = keyof typeof GAME_COMMAND_SCOPES;
 
@@ -349,6 +374,9 @@ export const EncounterArchiveListSchema = z.object({ encounters: z.array(Encount
 export const EncounterArchiveDocumentSchema = z.object({ id: z.number().int().positive(), document: z.record(z.unknown()) }).strict();
 export const EncounterArchiveDeletedSchema = z.object({ id: z.number().int().positive(), deleted: z.literal(true) }).strict();
 
+/** Issued by POST /sessions/player — the same open, LAN-trust join the socket performs. */
+export const PlayerSessionIssuedSchema = z.object({ token: z.string().min(1), sessionId: z.string().uuid() }).strict();
+
 export const GameMutationAcceptedResponseSchema = successEnvelopeSchema(GameMutationAcceptedSchema);
 export const GameSnapshotResponseSchema = successEnvelopeSchema(GameSnapshotSchema);
 export const GameLogResponseSchema = successEnvelopeSchema(GameLogSchema);
@@ -356,6 +384,7 @@ export const GameCommandCatalogResponseSchema = successEnvelopeSchema(GameComman
 export const EncounterArchiveListResponseSchema = successEnvelopeSchema(EncounterArchiveListSchema);
 export const EncounterArchiveDocumentResponseSchema = successEnvelopeSchema(EncounterArchiveDocumentSchema);
 export const EncounterArchiveDeletedResponseSchema = successEnvelopeSchema(EncounterArchiveDeletedSchema);
+export const PlayerSessionIssuedResponseSchema = successEnvelopeSchema(PlayerSessionIssuedSchema);
 
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
 export type IntegrationScope = z.infer<typeof IntegrationScopeSchema>;
@@ -491,6 +520,17 @@ export const openApiDocument = {
     [GAME_PATHS.annotationColor]: { post: gameCommandOperation("setAnnotationColor", "combat:write", "Changes an annotation's color.", "AnnotationColorRequest", [uuidParam("id")], true, true) },
     [GAME_PATHS.annotationVisibility]: { post: gameCommandOperation("setAnnotationVisibility", "combat:write", "Changes who can see an annotation (public, gm-only, owner-only, owner-gm, gm-actor).", "AnnotationVisibilityRequest", [uuidParam("id")], true, true) },
     [GAME_PATHS.annotationMovable]: { post: gameCommandOperation("setAnnotationMovable", "combat:write", "Allows or disallows other players moving a shape.", "AnnotationMovableRequest", [uuidParam("id")], true, true) },
+    [GAME_PATHS.claims]: { post: gameCommandOperation("claimCharacter", "actor:write", "Claims an unclaimed player character for the calling session. Player sessions only — GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).", "ClaimRequest", undefined, true, true) },
+    [GAME_PATHS.claimsRelease]: { post: gameCommandOperation("releaseCharacters", "actor:write", "Releases every character claimed by the calling player session.", "CommandControlRequest", undefined, false, true) },
+    [GAME_PATHS.claimForceRelease]: { post: gameCommandOperation("forceReleaseCharacter", "actor:write", "Force-releases a claimed character (GM-grade only) — the recovery path for a lost player device.", "CommandControlRequest", [uuidParam("actorId")], false) },
+    [GAME_PATHS.actorTokenImage]: { post: gameCommandOperation("setActorTokenImage", "actor:write", "Sets or clears (null) a combatant's token image from the uploaded token library (GM-grade only).", "TokenImageRequest", [uuidParam("actorId")]) },
+    [GAME_PATHS.actorSize]: { post: gameCommandOperation("setActorSize", "actor:write", "Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).", "ActorSizeRequest", [uuidParam("actorId")]) },
+    [GAME_PATHS.scenes]: { post: gameCommandOperation("createScene", "scene:write", "Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.", "SceneCreateRequest") },
+    [GAME_PATHS.sceneById]: { delete: gameCommandOperation("removeScene", "scene:write", "Removes a prepared scene (GM-grade only); the active scene cannot be removed.", "CommandControlRequest", [uuidParam("sceneId")], false) },
+    [GAME_PATHS.sceneRename]: { post: gameCommandOperation("renameScene", "scene:write", "Renames a prepared scene (GM-grade only).", "SceneRenameRequest", [uuidParam("sceneId")]) },
+    [GAME_PATHS.sceneActivate]: { post: gameCommandOperation("activateScene", "scene:write", "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.", "CommandControlRequest", [uuidParam("sceneId")], false) },
+    [GAME_PATHS.sceneCombatants]: { post: gameCommandOperation("setSceneCombatants", "scene:write", "Replaces a prepared scene's combatant list (GM-grade only).", "SceneCombatantsRequest", [uuidParam("sceneId")]) },
+    [SESSION_PATHS.player]: { post: { operationId: "issuePlayerSession", security: [], description: "Issues a player session token — the HTTP mirror of the socket's open join, for headless or custom player clients. LAN-trust by design: no credentials required, but the host must have completed GM setup. The token then authenticates player-limited calls across this API.", responses: { "201": { description: "Player session issued", content: { "application/json": { schema: { $ref: "#/components/schemas/PlayerSessionIssuedResponse" } } } }, "409": apiError } } },
     [CONTENT_PATHS.monsters]: { get: { operationId: "listContentMonsters", security: gameSecurity("game:read"), description: "Browse the bundled SRD bestiary (GM-grade only). Includes the CC BY 4.0 attribution line.", responses: { "200": { description: "Monster summaries + attribution", content: { "application/json": { schema: { $ref: "#/components/schemas/ContentMonstersResponse" } } } }, "401": apiError, "403": apiError } } },
     [CONTENT_PATHS.monsterById]: { get: { operationId: "getContentMonster", security: gameSecurity("game:read"), description: "One full stat block (GM-grade only). Imported definitions shadow bundled ids, matching the live server's resolution.", parameters: [{ name: "definitionId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 200 } }], responses: { "200": { description: "The full ActorDefinition", content: { "application/json": { schema: { $ref: "#/components/schemas/ContentMonsterSheetResponse" } } } }, "401": apiError, "403": apiError, "404": apiError } } },
     [CONTENT_PATHS.monsterActions]: { get: { operationId: "getContentMonsterActions", security: gameSecurity("game:read"), description: "A stat block's actions flattened for running them (GM-grade only): attack bonus, reach/range, save DC, damage formulas, parsed area.", parameters: [{ name: "definitionId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 200 } }], responses: { "200": { description: "Runnable action summaries", content: { "application/json": { schema: { $ref: "#/components/schemas/ContentMonsterActionsResponse" } } } }, "401": apiError, "403": apiError, "404": apiError } } },
@@ -593,7 +633,15 @@ export const openApiDocument = {
       EncounterArchiveDocumentData: { type: "object", additionalProperties: false, required: ["id", "document"], properties: { id: { type: "integer", minimum: 1 }, document: { type: "object", additionalProperties: true, description: "archiveSchemaVersion 2: { archiveSchemaVersion, startedAt, endedAt, turnCount, turns[{index,kind,label,revision,at,state}], log[], journal[{seq,commandId,type,actorId,principal,payload,revision,at}], finalState, rolls[], definitions[{id,source,definition}], attribution }" } } },
       EncounterArchiveDocumentResponse: envelopeSchema("#/components/schemas/EncounterArchiveDocumentData"),
       EncounterArchiveDeletedData: { type: "object", additionalProperties: false, required: ["id", "deleted"], properties: { id: { type: "integer", minimum: 1 }, deleted: { const: true } } },
-      EncounterArchiveDeletedResponse: envelopeSchema("#/components/schemas/EncounterArchiveDeletedData")
+      EncounterArchiveDeletedResponse: envelopeSchema("#/components/schemas/EncounterArchiveDeletedData"),
+      ClaimRequest: { type: "object", additionalProperties: false, required: ["actorId"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, actorId: { type: "string", format: "uuid" } } },
+      TokenImageRequest: { type: "object", additionalProperties: false, required: ["tokenAssetId"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, tokenAssetId: { type: ["string", "null"], format: "uuid", description: "A token-library asset id, or null to clear the image" } } },
+      ActorSizeRequest: { type: "object", additionalProperties: false, required: ["size"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, size: { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] } } },
+      SceneCreateRequest: { type: "object", additionalProperties: false, required: ["name", "mapAssetId", "combatantIds"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, name: { type: "string", minLength: 1, maxLength: 120 }, mapAssetId: { type: "string", format: "uuid" }, combatantIds: { type: "array", maxItems: 200, items: { type: "string", format: "uuid" } } } },
+      SceneRenameRequest: { type: "object", additionalProperties: false, required: ["name"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, name: { type: "string", minLength: 1, maxLength: 120 } } },
+      SceneCombatantsRequest: { type: "object", additionalProperties: false, required: ["combatantIds"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, combatantIds: { type: "array", maxItems: 200, items: { type: "string", format: "uuid" } } } },
+      PlayerSessionIssuedData: { type: "object", additionalProperties: false, required: ["token", "sessionId"], properties: { token: { type: "string", minLength: 1, description: "Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust)." }, sessionId: { type: "string", format: "uuid" } } },
+      PlayerSessionIssuedResponse: envelopeSchema("#/components/schemas/PlayerSessionIssuedData")
     }
   }
 } as const;

@@ -22,22 +22,27 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   server snapping, per-drawing annotation colors, GM/player layer toggle, pings.
 - Paired **table viewer** (second screen): pairing codes, "Present <map>", player-safe
   projection over SSE. Viewer bundle never receives full `GameState`.
-- **Public integration API v1 (PR F) — core surface live.** All core combat capabilities are
-  extracted into a transport-agnostic operations layer (`game-operations.ts` + shared schemas in
+- **Public integration API v1 (PR F) — FULL game coverage.** Every game capability is extracted
+  into a transport-agnostic operations layer (`game-operations.ts` + shared schemas in
   `game-commands.ts`); Socket.IO handlers and the HTTP routes in `game-http.ts` are thin adapters
   over the same functions (ADR-0016, structural). Surface: `GET /api/v1/game` (GM-full or
-  `?view=player` player-safe projection, weak-ETag polling), `GET /api/v1/game/log`, ~30 typed
+  `?view=player` player-safe projection, weak-ETag polling), `GET /api/v1/game/log`, 40 typed
   command routes (encounter lifecycle, initiative incl. timeline next/previous with 409
   `needsConfirm`, turn economy, token move, HP/conditions, roster add/import/remove, dice,
-  action resolve, saves, annotations), a generic `POST /api/v1/game/commands` tunnel +
-  `GET` catalog (type → required scope), `/api/v1/content/*` reads, and `/api/v1/encounters`
-  archives (list/get behind `combat:read`, delete behind `admin`; legacy `/api/gm/encounters`
-  kept). Auth per route: GM session, player session (player-limited, same reducer checks as the
-  table), or GM-minted integration credential checked against per-route scopes; writes are
-  idempotent by `commandId` with `expectedRevision` conflicts carrying `currentRevision`. CORS
-  open on `/api` (bearer auth only), JSON body limit 512kb, OpenAPI 3.1 fully documents the
-  surface (served byte-identical from `@vtt/api-contract`), capabilities advertise
-  `gameApi`/`commandTunnel`/`encounterArchives`. No SSE/webhooks yet (deferred by design).
+  action resolve, saves, annotations, character claims incl. GM force-release, token
+  image/size cosmetics, staged scenes create/rename/remove/activate/combatants), a generic
+  `POST /api/v1/game/commands` tunnel + `GET` catalog (type → required scope, single-sourced as
+  `GAME_COMMAND_SCOPES` in the contract), `POST /api/v1/sessions/player` (HTTP mirror of the
+  socket's open join — pure-HTTP player clients), `/api/v1/content/*` reads, and
+  `/api/v1/encounters` archives (list/get behind `combat:read`, delete behind `admin`; legacy
+  `/api/gm/encounters` kept). Auth per route: GM session, player session (player-limited, same
+  reducer checks as the table), or GM-minted integration credential checked against per-route
+  scopes (`scene:write` now in real use); writes are idempotent by `commandId` with
+  `expectedRevision` conflicts carrying `currentRevision`. CORS open on `/api/v1` only (login
+  stays same-origin), JSON body limit 512kb, OpenAPI 3.1 fully documents the surface (served
+  byte-identical from `@vtt/api-contract`; human reference GENERATED to `docs/api-reference.md`
+  with a freshness test), capabilities advertise `gameApi`/`commandTunnel`/`encounterArchives`.
+  No SSE/webhooks yet (deferred by design).
 - **Time Machine v2 encounter archives.** Migration v5 `encounter_journal`: every accepted
   command while a fight is live is journaled in-transaction (type, payload, principal tag,
   revision, timestamp); `archiveSchemaVersion` 2 adds `journal[]` (start→end inclusive),

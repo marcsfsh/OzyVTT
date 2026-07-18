@@ -11,12 +11,10 @@ import { nextAnnotationExpiry } from "./annotations.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
-import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
+import { migrateToScene } from "./scenes.js";
 import { CombatLogStore } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
-import { SceneCreateSchema, SceneIdSchema, SceneRenameSchema, SceneSetCombatantsSchema, SetActorSizeSchema, SetTokenImageSchema } from "./game-commands.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
 import { CommandRejectedError, GameStore, TimelineConfirmationRequired } from "./game-store.js";
@@ -30,7 +28,7 @@ import { TokenCatalogStore } from "./token-catalog.js";
 import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
-import { ensureEncounterTokens, setActorSize, type TokenMapGeometry } from "./token-placement.js";
+import { ensureEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
@@ -98,7 +96,6 @@ export function createServer(options: CreateServerOptions) {
     annotationExpiryTimers.add(timer);
   }
 
-  function roleFor(socketId: string): ClientRole { return auth.verify(io.sockets.sockets.get(socketId)?.handshake.auth?.token) ? "gm" : "player"; }
   /** GM view + the time-travel timeline (labels can name hidden combatants, so this is GM-only metadata). */
   function gmView(state: GameState, now = Date.now()) { return { ...projectGmView(state, presenceFor, now), turnHistory: store.listTurnSnapshots() }; }
   /** Also reauthorizes every connected socket against the latest revocation state, so a revoked GM client is downgraded or disconnected on its next check rather than only when it next sends a command. */
@@ -182,6 +179,7 @@ export function createServer(options: CreateServerOptions) {
     combatLog,
     contentLibrary,
     mapCatalog,
+    tokenCatalog,
     tokenGeometryFor,
     publishGameState,
     broadcastTableEvent,
@@ -335,6 +333,15 @@ export function createServer(options: CreateServerOptions) {
       get: (id) => store.getEncounterArchive(id),
       remove: (id) => store.deleteEncounterArchive(id)
     },
+    sessions: {
+      // The HTTP mirror of the socket's open LAN-trust join: anyone who can reach the host may
+      // take a player seat once GM setup is complete — same rule as session:join below.
+      issuePlayer: () => {
+        if (!auth.isBootstrapped) return null;
+        const token = auth.issuePlayerSession();
+        return { token, sessionId: auth.verifyPlayer(token)!.sessionId };
+      }
+    },
     revision: () => store.revision,
     newId: randomUUID
   });
@@ -429,71 +436,15 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: false, message: error instanceof Error ? error.message : fallbackMessage } as unknown as Result);
       }
     };
-    socket.on("character:claim", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
-      if (roleFor(socket.id) !== "player") return acknowledge({ ok: false, message: "GM sessions do not claim player characters." });
-      const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
-      try {
-        const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision, payload: { commandId, actorId }, principal: `player:${sessionId}` }, (state) => claimCharacter(state, actorId, sessionId));
-        if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character claim failed." }); }
-    });
-    socket.on("character:release", async ({ commandId, expectedRevision }, acknowledge) => {
-      const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
-      try {
-        const result = await store.execute({ id: commandId, type: "character.release", expectedRevision, payload: { commandId }, principal: `player:${sessionId}` }, (state) => releaseCharactersForSession(state, sessionId));
-        if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character release failed." }); }
-    });
-    socket.on("character:force-release", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can force-release a character." });
-      try {
-        const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision, payload: { commandId, actorId }, principal: `gm:${gm.sessionId}` }, (state) => forceReleaseCharacter(state, actorId, "gm"));
-        if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character force-release failed." }); }
-    });
+    socket.on("character:claim", (payload, acknowledge) => respond(acknowledge, "Join a session first.", "The character claim failed.", (principal) => operations.characterClaim(principal, payload)));
+    socket.on("character:release", (payload, acknowledge) => respond(acknowledge, "Join a session first.", "The character release failed.", (principal) => operations.characterRelease(principal, payload)));
+    socket.on("character:force-release", (payload, acknowledge) => respond(acknowledge, "Only the GM can force-release a character.", "The character force-release failed.", (principal) => operations.characterForceRelease(principal, payload)));
     socket.on("content:monsters", (_payload, acknowledge) => respond(acknowledge, "Only the GM can browse bundled content.", "The bundled content is unavailable.", (principal) => operations.contentMonsters(principal)));
     socket.on("actor:add-from-definition", (payload, acknowledge) => respond(acknowledge, "Only the GM can add combatants.", "The combatant could not be added.", (principal) => operations.actorAddFromDefinition(principal, payload)));
     socket.on("actor:import-definition", (payload, acknowledge) => respond(acknowledge, "Only the GM can import sheets.", "The sheet could not be imported.", (principal) => operations.actorImportDefinition(principal, payload)));
     socket.on("actor:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) => operations.actorRemove(principal, payload)));
-    socket.on("actor:set-token-image", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can set token images." });
-      const request = SetTokenImageSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The token image command is malformed." });
-      try {
-        const { commandId, actorId, tokenAssetId, expectedRevision } = request.data;
-        if (tokenAssetId !== null && !tokenCatalog.get(tokenAssetId)) return acknowledge({ ok: false, message: "That token image is not in your library." });
-        const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => {
-          const actor = state.actors.find((item) => item.id === actorId);
-          if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-          if (tokenAssetId === null) delete actor.tokenAssetId; else actor.tokenAssetId = tokenAssetId;
-        });
-        if (!result.duplicate) {
-          await publishGameState(result.state);
-          if (tokenAssetId !== null) {
-            tokenCatalog.touchLastUsed(tokenAssetId);
-            const definitionId = result.state.actors.find((item) => item.id === actorId)?.definitionId;
-            if (definitionId) tokenCatalog.rememberForDefinition(definitionId, tokenAssetId);
-          }
-        }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token image could not be set." }); }
-    });
-    socket.on("actor:set-size", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can resize tokens." });
-      const request = SetActorSizeSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The token size command is malformed." });
-      try {
-        const { commandId, actorId, size, expectedRevision } = request.data;
-        const mapAssetId = store.snapshot.combat.mapAssetId;
-        const geometry = mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
-        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => setActorSize(state, actorId, size, geometry));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be resized." }); }
-    });
+    socket.on("actor:set-token-image", (payload, acknowledge) => respond(acknowledge, "Only the GM can set token images.", "The token image could not be set.", (principal) => operations.actorSetTokenImage(principal, payload)));
+    socket.on("actor:set-size", (payload, acknowledge) => respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) => operations.actorSetSize(principal, payload)));
     socket.on("actor:apply-damage", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The damage could not be applied.", (principal) => operations.actorApplyDamage(principal, payload)));
     socket.on("actor:heal", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The healing could not be applied.", (principal) => operations.actorHeal(principal, payload)));
     socket.on("actor:set-temp-hp", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The temporary hit points could not be set.", (principal) => operations.actorSetTempHp(principal, payload)));
@@ -517,80 +468,11 @@ export function createServer(options: CreateServerOptions) {
     socket.on("initiative:previous", (payload, acknowledge) => respond(acknowledge, "Only the GM can move Initiative backward.", "Initiative could not move backward.", (principal) => operations.initiativePrevious(principal, payload)));
     socket.on("log:read", (_payload, acknowledge) => respond(acknowledge, "Join the table to read the combat log.", "The combat log is unavailable.", (principal) => ({ entries: operations.logEntries(principal) })));
     socket.on("token:move", (payload, acknowledge) => respond(acknowledge, "Join a session before moving tokens.", "The token could not be moved.", (principal) => operations.tokenMove(principal, payload)));
-    socket.on("scene:create", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can prepare scenes." });
-      const request = SceneCreateSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The scene setup is malformed." });
-      const sceneMap = mapCatalog.get(request.data.mapAssetId);
-      if (!sceneMap || sceneMap.kind !== "battlemap") return acknowledge({ ok: false, message: "Prepare scenes on an uploaded battlemap." });
-      try {
-        const { commandId, name, mapAssetId, combatantIds, expectedRevision } = request.data;
-        const geometry = await tokenGeometryFor(mapAssetId);
-        const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be created." }); }
-    });
-    socket.on("scene:rename", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can rename scenes." });
-      const request = SceneRenameSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The scene rename is malformed." });
-      try {
-        const { commandId, sceneId, name, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "scene.rename", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => renameScene(state, sceneId, name));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be renamed." }); }
-    });
-    socket.on("scene:remove", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can remove scenes." });
-      const request = SceneIdSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
-      try {
-        const { commandId, sceneId, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "scene.remove", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => removeScene(state, sceneId));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be removed." }); }
-    });
-    socket.on("scene:activate", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can switch scenes." });
-      const request = SceneIdSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
-      try {
-        const { commandId, sceneId, expectedRevision } = request.data;
-        const result = await store.executeTimeline({ id: commandId, type: "scene.activate", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state, timeline) => {
-          activateScene(state, sceneId, commandId); // rejects while rewound
-          // Snapshots belong to the scene that was live; the swap invalidates them, so start clean.
-          timeline.truncateAll();
-        });
-        if (!result.duplicate) {
-          await publishGameState(result.state);
-          const scene = result.state.combat.scenes.find((candidate) => candidate.id === sceneId);
-          appendLog({ kind: "scene", text: `Switched to scene "${scene?.name ?? "Untitled"}".`, gmOnly: true });
-        }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be switched." }); }
-    });
-    socket.on("scene:set-combatants", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can change a scene's combatants." });
-      const request = SceneSetCombatantsSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The scene update is malformed." });
-      try {
-        const { commandId, sceneId, combatantIds, expectedRevision } = request.data;
-        const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
-        if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
-        const geometry = await tokenGeometryFor(scene.mapAssetId);
-        const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be updated." }); }
-    });
+    socket.on("scene:create", (payload, acknowledge) => respond(acknowledge, "Only the GM can prepare scenes.", "The scene could not be created.", (principal) => operations.sceneCreate(principal, payload)));
+    socket.on("scene:rename", (payload, acknowledge) => respond(acknowledge, "Only the GM can rename scenes.", "The scene could not be renamed.", (principal) => operations.sceneRename(principal, payload)));
+    socket.on("scene:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove scenes.", "The scene could not be removed.", (principal) => operations.sceneRemove(principal, payload)));
+    socket.on("scene:activate", (payload, acknowledge) => respond(acknowledge, "Only the GM can switch scenes.", "The scene could not be switched.", (principal) => operations.sceneActivate(principal, payload)));
+    socket.on("scene:set-combatants", (payload, acknowledge) => respond(acknowledge, "Only the GM can change a scene's combatants.", "The scene could not be updated.", (principal) => operations.sceneSetCombatants(principal, payload)));
     socket.on("annotation:add", (payload, acknowledge) => respond(acknowledge, "Join a session before adding to the map.", "That could not be added to the map.", (principal) => operations.annotationAdd(principal, payload)));
     socket.on("annotation:ping", (payload, acknowledge) => respond(acknowledge, "Join a session before pinging the map.", "The ping could not be sent.", (principal) => operations.annotationPing(principal, payload)));
     socket.on("annotation:set-color", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "The color could not be changed.", (principal) => operations.annotationSetColor(principal, payload)));

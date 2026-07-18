@@ -15,10 +15,9 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device
   coverage you haven't actually run.
 - **[api] ~~Public API drift~~ — closed 2026-07-18 (PR F on `claude/open-api-core-m75t9d`).**
-  The core combat surface is now fully reachable over `/api/v1` (see `current-state.md`).
-  Still socket-only: `scene:*`, `character:claim/release/force-release`,
-  `actor:set-token-image`, `actor:set-size`, `content:monsters` browse events — additive
-  follow-ups, reachable later via the same operations layer.
+  EVERY game command is now reachable over `/api/v1` (see `current-state.md`) — combat core plus
+  scenes, character claims, token cosmetics, and HTTP player-session issuance. Nothing is
+  socket-only anymore; Socket.IO remains the push channel, HTTP the pull/command channel.
 - **[api] Credential `gameId` binding is dead plumbing** — `CreateIntegrationCredentialRequest`
   accepts a `gameId`, and `IntegrationCredentialStore.verify` enforces it, but no caller ever
   passes a `gameId` through (`api-v1.ts` / `game-http.ts` wiring), so a credential minted with a

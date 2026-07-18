@@ -28,9 +28,9 @@ Every request authenticates with `Authorization: Bearer <token>` (the viewer's c
 | `system:read` | Capability discovery and the command catalog. |
 | `game:read` | Game-state snapshots (GM-full or player-safe) and reference content. |
 | `actor:read` | Reserved — no endpoint requires it yet. |
-| `actor:write` | Roster changes, hit points, conditions, and sheet imports. |
-| `scene:read` | Reserved — scenes are not on the HTTP surface yet. |
-| `scene:write` | Reserved — scenes are not on the HTTP surface yet. |
+| `actor:write` | Roster changes, hit points, conditions, sheet imports, claims management, and token cosmetics. |
+| `scene:read` | Reserved — no endpoint requires it yet. |
+| `scene:write` | Preparing, editing, activating, and removing staged scenes. |
 | `combat:read` | The combat log and encounter archives. |
 | `combat:write` | Encounter lifecycle, initiative/timeline, turns, tokens, actions, saves, annotations. |
 | `roll:create` | Dice rolls into the shared history. |
@@ -84,6 +84,16 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `annotation.set-visibility` | `combat:write` |
 | `annotation.set-movable` | `combat:write` |
 | `annotation.clear` | `combat:write` |
+| `character.claim` | `actor:write` |
+| `character.release` | `actor:write` |
+| `character.force-release` | `actor:write` |
+| `actor.set-token-image` | `actor:write` |
+| `actor.set-size` | `actor:write` |
+| `scene.create` | `scene:write` |
+| `scene.rename` | `scene:write` |
+| `scene.remove` | `scene:write` |
+| `scene.activate` | `scene:write` |
+| `scene.set-combatants` | `scene:write` |
 
 ## Encounter archive document (`archiveSchemaVersion` 2)
 
@@ -205,9 +215,21 @@ Minting, rotating, revoking, and auditing the scoped bearer tokens integrations 
 
 **Responses:** `200` Safe audit history: no secrets, only usage/lifecycle metadata — envelope of `IntegrationCredentialAudit` · errors `401` `404`
 
+## Player sessions
+
+Session issuance for headless or custom player clients — the HTTP mirror of the socket's open, LAN-trust join.
+
+### `POST /api/v1/sessions/player`
+
+Issues a player session token — the HTTP mirror of the socket's open join, for headless or custom player clients. LAN-trust by design: no credentials required, but the host must have completed GM setup. The token then authenticates player-limited calls across this API.
+
+**Auth:** Public — no credentials required.
+
+**Responses:** `201` Player session issued — envelope of `PlayerSessionIssuedData` · errors `409`
+
 ## Live game
 
-The authoritative game state and every core combat command. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.
+The authoritative game state and every game command — combat, initiative and time-travel, turns, tokens, hit points, conditions, roster, dice, actions, saves, annotations, character claims, and staged scenes. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.
 
 ### `GET /api/v1/game`
 
@@ -786,6 +808,178 @@ Allows or disallows other players moving a shape.
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `movableByOthers` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/claims`
+
+Claims an unclaimed player character for the calling session. Player sessions only — GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/claims/release`
+
+Releases every character claimed by the calling player session.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/claims/{actorId}/force-release`
+
+Force-releases a claimed character (GM-grade only) — the recovery path for a lost player device.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/token-image`
+
+Sets or clears (null) a combatant's token image from the uploaded token library (GM-grade only).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `tokenAssetId` | string \| null | yes | A token-library asset id, or null to clear the image |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/size`
+
+Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `size` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes`
+
+Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `name` | string | yes |  |
+| `mapAssetId` | string (uuid) | yes |  |
+| `combatantIds` | string (uuid)[] | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `DELETE /api/v1/game/scenes/{sceneId}`
+
+Removes a prepared scene (GM-grade only); the active scene cannot be removed.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/rename`
+
+Renames a prepared scene (GM-grade only).
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `name` | string | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/activate`
+
+Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/combatants`
+
+Replaces a prepared scene's combatant list (GM-grade only).
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `combatantIds` | string (uuid)[] | yes |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

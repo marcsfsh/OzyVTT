@@ -45,8 +45,13 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
     match: (path) => path.startsWith(`${API_NAMESPACE}/gm/integration-credentials`)
   },
   {
+    title: "Player sessions",
+    intro: "Session issuance for headless or custom player clients — the HTTP mirror of the socket's open, LAN-trust join.",
+    match: (path) => path.startsWith(`${API_NAMESPACE}/sessions`)
+  },
+  {
     title: "Live game",
-    intro: "The authoritative game state and every core combat command. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.",
+    intro: "The authoritative game state and every game command — combat, initiative and time-travel, turns, tokens, hit points, conditions, roster, dice, actions, saves, annotations, character claims, and staged scenes. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/game`)
   },
   {
@@ -75,9 +80,9 @@ const SCOPE_NOTES: Record<string, string> = {
   "system:read": "Capability discovery and the command catalog.",
   "game:read": "Game-state snapshots (GM-full or player-safe) and reference content.",
   "actor:read": "Reserved — no endpoint requires it yet.",
-  "actor:write": "Roster changes, hit points, conditions, and sheet imports.",
-  "scene:read": "Reserved — scenes are not on the HTTP surface yet.",
-  "scene:write": "Reserved — scenes are not on the HTTP surface yet.",
+  "actor:write": "Roster changes, hit points, conditions, sheet imports, claims management, and token cosmetics.",
+  "scene:read": "Reserved — no endpoint requires it yet.",
+  "scene:write": "Preparing, editing, activating, and removing staged scenes.",
   "combat:read": "The combat log and encounter archives.",
   "combat:write": "Encounter lifecycle, initiative/timeline, turns, tokens, actions, saves, annotations.",
   "roll:create": "Dice rolls into the shared history.",
