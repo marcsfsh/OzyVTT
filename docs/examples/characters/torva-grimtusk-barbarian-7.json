@@ -1,0 +1,74 @@
+{
+  "schemaId": "vtt.actor-character",
+  "schemaVersion": 1,
+  "source": { "name": "Example imports (SRD 5.2.1)", "version": "1.0.0", "externalId": "example-import-torva" },
+  "name": "Torva Grimtusk",
+  "summary": "Level 7 half-orc Berserker barbarian — reckless front-line damage and a mountain of hit points.",
+  "size": "medium",
+  "speedFeet": 40,
+  "abilityScores": { "str": 18, "dex": 14, "con": 16, "int": 8, "wis": 12, "cha": 10 },
+  "proficiencyBonus": 3,
+  "armorClass": 15,
+  "hitPoints": { "maximum": 75 },
+  "initiativeBonus": 2,
+  "actions": [
+    {
+      "id": "greataxe",
+      "name": "Greataxe",
+      "activation": "action",
+      "attack": { "bonus": 7, "reachFeet": 5 },
+      "damage": [{ "formula": "1d12 + 4", "type": "slashing" }],
+      "description": "*Melee Attack Roll:* +7, reach 5 ft. *Hit:* 1d12 + 4 slashing damage (**+2 while Raging** — add it to the total). *Extra Attack:* Torva makes **two** attacks with this action. *Brutal Critical:* on a crit, roll one extra weapon die."
+    },
+    {
+      "id": "handaxe-thrown",
+      "name": "Handaxe (Thrown)",
+      "activation": "action",
+      "attack": { "bonus": 7, "rangeFeet": 60 },
+      "damage": [{ "formula": "1d6 + 4", "type": "slashing" }],
+      "description": "*Ranged Attack Roll:* +7, range 20/60 ft. *Hit:* 1d6 + 4 slashing damage (+2 while Raging). *Extra Attack:* two throws."
+    },
+    {
+      "id": "rage",
+      "name": "Rage",
+      "activation": "bonus-action",
+      "damage": [],
+      "description": "*Bonus Action (4 per Long Rest, lasts 1 minute):* Advantage on Strength checks and saves, **+2 melee damage** with Strength weapons, and **resistance to bludgeoning, piercing, and slashing** damage."
+    },
+    {
+      "id": "frenzy",
+      "name": "Frenzy (while Raging)",
+      "activation": "bonus-action",
+      "attack": { "bonus": 7, "reachFeet": 5 },
+      "damage": [{ "formula": "1d12 + 4", "type": "slashing" }],
+      "description": "*Bonus Action on each turn of a Frenzied Rage:* one extra Greataxe attack (+2 Rage damage applies). Torva gains one level of Exhaustion when the rage ends."
+    },
+    {
+      "id": "reckless-attack",
+      "name": "Reckless Attack",
+      "activation": "other",
+      "damage": [],
+      "description": "*When making her first attack on her turn:* attack rolls using Strength have **Advantage** this turn, but attack rolls against her have Advantage until her next turn."
+    }
+  ],
+  "token": { "disposition": "friendly", "footprint": { "width": 1, "height": 1 } },
+  "extensions": {
+    "open5e.srd-2024": {
+      "type": "Barbarian 7 (half-orc)",
+      "alignment": "Chaotic Good",
+      "armorDetail": "Unarmored Defense (10 + Dex + Con)",
+      "senses": ["Darkvision 60 ft."],
+      "passivePerception": 14,
+      "languages": "Common, Orc",
+      "savingThrows": { "str": 7, "dex": 2, "con": 6, "int": -1, "wis": 1, "cha": 0 },
+      "traits": [
+        { "name": "Feral Instinct", "description": "Advantage on Initiative rolls, and she can act normally on the first turn even when surprised if she enters her Rage first." },
+        { "name": "Danger Sense", "description": "Advantage on Dexterity saving throws against effects she can see (traps, spells) while not Blinded, Deafened, or Incapacitated." },
+        { "name": "Fast Movement", "description": "Speed increased by 10 ft (already included) while not wearing heavy armor." },
+        { "name": "Mindless Rage", "description": "She can't be Charmed or Frightened while Raging." },
+        { "name": "Relentless Endurance", "description": "Once per Long Rest, when reduced to 0 hit points but not killed outright, she drops to 1 hit point instead." },
+        { "name": "Savage Attacks", "description": "On a critical hit with a melee weapon, roll one additional weapon damage die." }
+      ]
+    }
+  }
+}
