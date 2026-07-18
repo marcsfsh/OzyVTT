@@ -75,6 +75,11 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // crosses the wire, and a hidden source's name is masked so gm-only attackers stay unnarrated.
     pendingSaves: state.combat.pendingSaves
       .filter((entry) => { const target = state.actors.find((actor) => actor.id === entry.targetActorId); return target !== undefined && target.ownerSessionId !== null && target.ownerSessionId === playerSessionId; })
+      .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName })),
+    // Same boundary as saves: a player sees only their own claimed character's reaction prompts,
+    // with the source actor id stripped and a hidden source's name masked.
+    pendingReactions: state.combat.pendingReactions
+      .filter((entry) => { const reactor = state.actors.find((actor) => actor.id === entry.actorId); return reactor !== undefined && reactor.ownerSessionId !== null && reactor.ownerSessionId === playerSessionId; })
       .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName }))
   };
 }

@@ -3,7 +3,8 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
-import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { actionAvailability, resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { answerReaction, dismissReaction } from "../src/reactions.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { endEffect, endEncounterEffects, expireEffectsAtTurnStart } from "../src/effects.js";
 import { applyTimelineRestore } from "../src/combat-history.js";
@@ -428,5 +429,141 @@ describe("report test 2/3 supplement — Eldritch Blast beams", () => {
     expect(second.componentsRemaining).toBeNull();
     expect(() => resolve(game, sableDefinition, "eldritch-blast", { actorId: IDS.sable, targetIds: [IDS.croc1] }, []))
       .toThrow(/no attacks remaining/);
+  });
+});
+
+describe("reaction prompts — Uncanny Dodge (ADR-0020 amendment)", () => {
+  // Prompt creation needs the TARGET's definition, so these resolves carry the game's own resolver.
+  const gameResolver = (game: GameState) => (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition;
+  const resolveLive = (game: GameState, definition: ActorDefinition, actionId: string, input: { actorId: string; targetIds?: readonly string[] }, faces: number[]) =>
+    resolveDefinitionAction(game, actionOf(definition, actionId), { actorId: input.actorId, targetIds: input.targetIds ?? [], commandId: nextCommandId() }, { ...deps(faces, definition), resolveDefinition: gameResolver(game) });
+
+  it("parks a hit's damage on a pending prompt instead of the apply button", () => {
+    const game = buildGame();
+    // Croc 1 bites Pip: 15 + 8 = 23 vs AC 16 hits; 6+6+6+5 = 23 piercing.
+    const bite = resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
+    expect(bite.reactionPrompts).toEqual([{ actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge" }]);
+    expect(game.combat.pendingReactions).toHaveLength(1);
+    const prompt = game.combat.pendingReactions[0];
+    expect(prompt).toMatchObject({ actorId: IDS.pip, actionId: "uncanny-dodge", sourceActorId: IDS.croc1, sourceName: "Giant Crocodile", proposedDamage: 23, proposedDamageParts: [{ amount: 23, type: "piercing" }], critical: false });
+    // The bite's grapple rider still applied immediately — only the DAMAGE waits on the answer.
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.conditions.map((condition) => condition.id).sort()).toEqual(["grappled", "restrained"]);
+    expect(pip.hp.current).toBe(52); // nothing applied yet
+  });
+
+  it("answering use spends the reaction and applies half; the prompt clears", () => {
+    const game = buildGame();
+    resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
+    const outcome = answerReaction(game, game.combat.pendingReactions[0].id, true, { role: "gm" }, { resolveDefinition: gameResolver(game) });
+    expect(outcome).toMatchObject({ used: true, appliedDamage: 11, actorName: "Pip Underbough", actionName: "Uncanny Dodge" }); // floor(23/2)
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.hp.current).toBe(52 - 11);
+    expect(game.combat.reactionsUsed).toContain(IDS.pip);
+    expect(game.combat.pendingReactions).toHaveLength(0);
+  });
+
+  it("declining applies the full parked damage and keeps the reaction", () => {
+    const game = buildGame();
+    resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
+    const outcome = answerReaction(game, game.combat.pendingReactions[0].id, false, { role: "gm" }, { resolveDefinition: gameResolver(game) });
+    expect(outcome).toMatchObject({ used: false, appliedDamage: 23 });
+    expect(game.actors.find((actor) => actor.id === IDS.pip)!.hp.current).toBe(52 - 23);
+    expect(game.combat.reactionsUsed).not.toContain(IDS.pip);
+    expect(game.combat.pendingReactions).toHaveLength(0);
+  });
+
+  it("offers no prompt when the reaction is already spent, the reactor is incapacitated, or the mode is freeform", () => {
+    const spent = buildGame();
+    spent.combat = { ...spent.combat, reactionsUsed: [IDS.pip] };
+    expect(resolveLive(spent, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]).reactionPrompts).toBeUndefined();
+    expect(spent.combat.pendingReactions).toHaveLength(0);
+
+    const stunned = buildGame();
+    stunned.actors.find((actor) => actor.id === IDS.pip)!.conditions = [{ id: "stunned" }];
+    // A stunned target gives the attack advantage, so the roll consumes two d20 faces.
+    expect(resolveLive(stunned, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 3, 6, 6, 6]).reactionPrompts).toBeUndefined();
+
+    const freeform = buildGame();
+    freeform.combat = { ...freeform.combat, rulesMode: "freeform" };
+    expect(resolveLive(freeform, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]).reactionPrompts).toBeUndefined();
+  });
+
+  it("a spent reaction rejects use (decline stays open) and the GM dismiss drops the prompt without damage", () => {
+    const game = buildGame();
+    resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
+    game.combat = { ...game.combat, reactionsUsed: [IDS.pip] }; // spent between the hit and the answer
+    const promptId = game.combat.pendingReactions[0].id;
+    expect(() => answerReaction(game, promptId, true, { role: "gm" }, { resolveDefinition: gameResolver(game) }))
+      .toThrow(/already used a reaction/);
+    expect(game.combat.pendingReactions).toHaveLength(1); // still owed an answer
+    expect(() => dismissReaction(game, promptId, { role: "player", sessionId: IDS.gmSession })).toThrow(/Only the GM/);
+    dismissReaction(game, promptId, { role: "gm" });
+    expect(game.combat.pendingReactions).toHaveLength(0);
+    expect(game.actors.find((actor) => actor.id === IDS.pip)!.hp.current).toBe(52); // dismiss never applies damage
+  });
+
+  it("a player may answer only their own claimed character's prompt", () => {
+    const game = buildGame();
+    resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
+    const promptId = game.combat.pendingReactions[0].id;
+    expect(() => answerReaction(game, promptId, true, { role: "player", sessionId: IDS.gmSession }, { resolveDefinition: gameResolver(game) }))
+      .toThrow();
+    game.actors.find((actor) => actor.id === IDS.pip)!.ownerSessionId = IDS.gmSession;
+    const outcome = answerReaction(game, promptId, true, { role: "player", sessionId: IDS.gmSession }, { resolveDefinition: gameResolver(game) });
+    expect(outcome.used).toBe(true);
+  });
+
+  it("prompts persist across a turn advance so parked damage is never silently lost", () => {
+    const game = buildGame();
+    resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
+    nextInitiativeTurn(game);
+    expect(game.combat.pendingReactions).toHaveLength(1);
+  });
+});
+
+describe("incapacitation gates the action economy (SRD 2024 Incapacitated)", () => {
+  it("blocks actions, bonus actions, and reactions for an incapacitated combatant, with the rule named", () => {
+    const game = buildGame();
+    game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "unconscious" }];
+    try {
+      resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("condition.incapacitated");
+    }
+    expect(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []))
+      .toThrow(/Unconscious and can't take actions, bonus actions, or reactions/);
+  });
+});
+
+describe("available-actions projection (server-computed availability)", () => {
+  it("reports the same rules the resolve path enforces, with uses and instance counts", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    const before = actionAvailability(game, torva, torvaDefinition);
+    const frenzyRow = before.find((row) => row.id === "frenzy")!;
+    expect(frenzyRow.available).toBe(false);
+    expect(frenzyRow.violations.map((violation) => violation.rule)).toContain("feature.requires-effect");
+    const rageRow = before.find((row) => row.id === "rage")!;
+    expect(rageRow).toMatchObject({ available: true, usesRemaining: 4 });
+
+    // Rage, then the first Greataxe swing: the report tracks the spent bonus action, the spent use,
+    // and the open Extra Attack instance.
+    resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6, 6]);
+    const after = actionAvailability(game, torva, torvaDefinition);
+    expect(after.find((row) => row.id === "rage")).toMatchObject({ available: false, usesRemaining: 3 });
+    expect(after.find((row) => row.id === "greataxe")).toMatchObject({ available: true, componentsRemaining: 1 });
+    expect(after.find((row) => row.id === "frenzy")!.violations.map((violation) => violation.rule)).toContain("economy.bonus-action-used");
+  });
+
+  it("never mutates state", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    const snapshot = JSON.stringify(game);
+    actionAvailability(game, torva, torvaDefinition);
+    expect(JSON.stringify(game)).toBe(snapshot);
   });
 });

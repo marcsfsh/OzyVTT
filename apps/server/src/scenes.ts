@@ -25,13 +25,14 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     turn: combat.turn,
     rulesMode: combat.rulesMode,
     reactionsUsed: combat.reactionsUsed,
-    pendingSaves: combat.pendingSaves
+    pendingSaves: combat.pendingSaves,
+    pendingReactions: combat.pendingReactions
   };
 }
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} }, rulesMode: "strict", reactionsUsed: [], pendingSaves: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} }, rulesMode: "strict", reactionsUsed: [], pendingSaves: [], pendingReactions: [] };
 }
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */

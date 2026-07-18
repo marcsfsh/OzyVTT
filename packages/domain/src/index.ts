@@ -140,6 +140,32 @@ export const PendingSaveSchema = z.object({
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
 
 /**
+ * A declared reaction the engine offered and someone still owes an answer (ADR-0020 amendment): an
+ * attack hit a combatant whose stat block declares a matching reaction (Uncanny Dodge), so the
+ * triggering damage is parked here instead of the runner's apply button. Answering "use" spends the
+ * reaction and applies the halved damage; "decline" applies it in full; the GM may dismiss (e.g.
+ * after applying the damage manually). Prompts persist until answered so damage is never lost.
+ */
+export const PendingReactionSchema = z.object({
+  id: z.string().uuid(),
+  /** The combatant who may react (the one that was hit). */
+  actorId: z.string().uuid(),
+  actionId: z.string().regex(/^[a-z0-9-]+$/).max(120),
+  actionName: z.string().min(1).max(120),
+  /** Source actor for GM bookkeeping; stripped from player projections. */
+  sourceActorId: z.string().uuid().nullable().default(null),
+  sourceName: z.string().min(1).max(120),
+  /** The action.resolve command that rolled the triggering attack. */
+  triggerCommandId: z.string().uuid(),
+  proposedDamage: z.number().int().nonnegative().max(10000).default(0),
+  proposedDamageParts: z.array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict()).max(18).default([]),
+  /** The triggering attack was a critical hit (drives death-save failure ticks when the damage lands). */
+  critical: z.boolean().default(false),
+  createdAt: z.number().int().nonnegative()
+}).strict();
+export type PendingReaction = z.infer<typeof PendingReactionSchema>;
+
+/**
  * Shared invariants for a combat context — the live top-level combat AND each parked scene's frozen
  * copy. Extracted so a scene's stored combat is validated with exactly the same rules as the active
  * one. Paths are relative to whichever combat object owns the refine, so Zod nests them correctly
@@ -188,7 +214,9 @@ const sceneCombatShape = {
   /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
   reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
   /** Saving throws still owed by targets (see PendingSaveSchema). */
-  pendingSaves: z.array(PendingSaveSchema).max(100).default([])
+  pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
+  /** Reaction prompts still owed an answer (see PendingReactionSchema). */
+  pendingReactions: z.array(PendingReactionSchema).max(20).default([])
 };
 
 /** A parked scene's frozen combat — same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -227,7 +255,7 @@ export const CombatStateSchema = z.object({
   }
   if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["activeSceneId"], message: "The active scene must be one of the prepared scenes." });
   const active = combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
-  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || active.combat.pendingSaves.length > 0)) {
+  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty — its live copy is the top-level combat." });
   }
 });
@@ -260,7 +288,9 @@ export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; sc
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; the source actor id never crosses the wire, and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number> }; rulesMode: "strict" | "assisted" | "freeform"; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
+/** A player's own pending reaction prompts only; same masking rules as saves. */
+export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number> }; rulesMode: "strict" | "assisted" | "freeform"; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
@@ -289,7 +319,7 @@ export type ContentConditionsResult = { ok: boolean; message?: string; condition
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
-export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }>; area: ContentActionArea | null; attackCount: number | null; usesLimit: number | null; usesPer: "turn" | "encounter" | "long-rest" | null; usesPool: string | null; requiresEffectTag: string | null; multiattack: ReadonlyArray<{ actionId: string; count: number }> | null; grants: boolean }>;
+export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }>; area: ContentActionArea | null; attackCount: number | null; usesLimit: number | null; usesPer: "turn" | "encounter" | "long-rest" | null; usesPool: string | null; requiresEffectTag: string | null; multiattack: ReadonlyArray<{ actionId: string; count: number }> | null; grants: boolean; reaction: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null }>;
 export type ContentActionsResult = { ok: boolean; message?: string; actions?: readonly ContentActionSummary[] };
 /** Full stat-block payload for the GM's sheet view; inert content data, GM-gated. */
 export type ContentSheetResult = { ok: boolean; message?: string; definition?: import("@vtt/schemas").ActorDefinition };
@@ -319,6 +349,8 @@ export type ActionResolution = Readonly<{
   warnings?: readonly string[];
   /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
   overridden?: Readonly<{ rule: string; reason: string }> | null;
+  /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
+  reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;
@@ -345,6 +377,22 @@ export type DamageApplyResult = MutationResult & { applied?: DamageApplication }
 export type DeathSaveResult = MutationResult & { deathSave?: Readonly<{ naturalRoll: number; outcome: "success" | "failure" | "critical-success" | "critical-failure"; successes: number; failures: number; stable: boolean; dead: boolean; regainedConsciousness: boolean }> };
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
 export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean } };
+/** Outcome of answering a reaction prompt; the (halved or full) damage already applied server-side. */
+export type ReactionAnswerResult = MutationResult & { outcome?: { used: boolean; appliedDamage: number } };
+/** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020 explainability). */
+export type ActionAvailability = Readonly<{
+  id: string;
+  name: string;
+  activation: "action" | "bonus-action" | "reaction" | "other";
+  /** Whether strict mode would allow resolving this action right now (target-specific rules can't be pre-checked). */
+  available: boolean;
+  violations: ReadonlyArray<{ rule: string; message: string }>;
+  /** Limited-use spending left in the current scope; null when the action has no use limit. */
+  usesRemaining: number | null;
+  /** Rolls left in the open compound-action instance for this action; null when no instance applies. */
+  componentsRemaining: number | null;
+}>;
+export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[] };
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -372,6 +420,9 @@ export interface ClientToServerEvents {
   "actor:rest": (payload: { commandId: string; actorId: string; kind: "long"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; commit?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "reaction:answer": (payload: { commandId: string; reactionId: string; use: boolean; expectedRevision?: number }, acknowledgement: (result: ReactionAnswerResult) => void) => void;
+  "reaction:dismiss": (payload: { commandId: string; reactionId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:available-actions": (payload: { actorId: string }, acknowledgement: (result: ActorActionsAvailabilityResult) => void) => void;
   "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

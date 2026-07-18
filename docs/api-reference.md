@@ -76,6 +76,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `action.resolve` | `combat:write` |
 | `save.answer` | `combat:write` |
 | `save.dismiss` | `combat:write` |
+| `reaction.answer` | `combat:write` |
+| `reaction.dismiss` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
 | `death-save.roll` | `combat:write` |
@@ -682,6 +684,51 @@ Dismisses a pending saving throw without resolving it (GM-grade, or the owing pl
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/reactions/{reactionId}/answer`
+
+Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damage was parked on the prompt, so both answers apply it here: `use: true` spends the reaction and halves each typed part first; `use: false` applies it in full. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `reactionId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `use` | boolean | yes | true spends the reaction and applies half the parked damage; false applies it in full |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/reactions/{reactionId}/dismiss`
+
+Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade only) — for when the damage was already applied manually.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Parameters:** `reactionId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `GET /api/v1/game/actors/{actorId}/available-actions`
+
+Server-computed action availability for one combatant: per stat-block action, whether strict mode would allow resolving it right now, every violated rule (machine-readable rule ids + messages), and the remaining limited uses / open compound-action rolls. Runs the exact evaluation `action.resolve` enforces, so this report can never drift from enforcement. GM-grade any combatant; a player session only their claimed character. Target-specific rules (e.g. grapple targeting) need a target and are not pre-checked here.
+
+**Auth:** Integration credential with `combat:read` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Responses:** `200` Per-action availability with explanations — envelope of `ActorAvailableActionsData` · errors `401` `403` `404`
+
 ### `POST /api/v1/game/actors/{actorId}/effects`
 
 Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.
@@ -1144,7 +1191,7 @@ Permanent records of ended encounters, newest first (GM sessions and integration
 
 ### `GET /api/v1/encounters/{id}`
 
-One archive's full machine-readable document (archiveSchemaVersion 2): per-turn full states, combat log, complete per-command journal, final state, all dice rolls, and the stat blocks used. GM-grade data — hidden combatants included; never reaches player sessions.
+One archive's full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. GM-grade data — hidden combatants included; never reaches player sessions.
 
 **Auth:** Integration credential with `combat:read` · GM session
 

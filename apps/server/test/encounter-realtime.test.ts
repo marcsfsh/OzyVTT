@@ -242,7 +242,7 @@ describe("live authoritative encounter workflow", () => {
       expect(typeof list.encounters[0].endedAt).toBe("string");
 
       const document = await (await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { headers: gmHeaders })).json();
-      expect(document.archiveSchemaVersion).toBe(2);
+      expect(document.archiveSchemaVersion).toBe(3);
       expect(document.turns.length).toBe(list.encounters[0].turnCount);
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
       expect(Array.isArray(document.log)).toBe(true);
@@ -252,6 +252,8 @@ describe("live authoritative encounter workflow", () => {
       expect(document.journal[0].principal).toMatch(/^gm:/);
       expect(document.journal[0].payload.mapAssetId).toBe(imported.metadata.id);
       expect(document.finalState.combat.active).toBe(true);
+      // v3: the post-encounter aftermath — combat cleared, end-of-fight sweeps landed.
+      expect(document.postEncounterState.combat.active).toBe(false);
       expect(Array.isArray(document.rolls)).toBe(true);
       expect(Array.isArray(document.definitions)).toBe(true);
 

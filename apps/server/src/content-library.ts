@@ -66,7 +66,8 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     usesPool: action.uses?.pool ?? null,
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,
-    grants: action.grants !== undefined
+    grants: action.grants !== undefined,
+    reaction: action.reaction ?? null
   };
 }
 

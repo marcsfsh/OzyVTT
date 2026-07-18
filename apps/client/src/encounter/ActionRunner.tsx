@@ -191,11 +191,20 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
         ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
       ].join(" + ")}){result.crit ? " — crit dice doubled" : ""}</p>}
-      {result.attack && (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (
-        applied.has(result.attack.targetId)
+      {result.attack && (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
+        // A reaction window (Uncanny Dodge) parked this damage on a prompt: the answer applies it
+        // server-side, so the apply button never shows for this target — that would double-apply.
+        const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+        if (prompt) {
+          const waiting = state.combat.pendingReactions.some((reaction) => reaction.actorId === result.attack!.targetId && reaction.sourceActorId === actor.id);
+          return waiting
+            ? <p className="action-save-note">Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong> — answer it in the turn order; the damage applies there.</p>
+            : <p className="action-applied">{prompt.actionName} answered — damage handled in the turn order.</p>;
+        }
+        return applied.has(result.attack.targetId)
           ? <p className="action-applied">Applied to {result.attack.targetName}.</p>
-          : <button type="button" className="action-apply" disabled={busy} onClick={() => applyDamage(result.attack!.targetId, result.attack!.targetName, result.attack!.targetId)}>Apply {result.damageTotal} to {result.attack.targetName}</button>
-      )}
+          : <button type="button" className="action-apply" disabled={busy} onClick={() => applyDamage(result.attack!.targetId, result.attack!.targetName, result.attack!.targetId)}>Apply {result.damageTotal} to {result.attack.targetName}</button>;
+      })()}
       {result.warnings?.map((warning) => <p key={warning} className="action-warning">⚠ {warning}</p>)}
       {result.save && (() => {
         // Reflect the LIVE count of unanswered saves for this action (matched by attacker + action),

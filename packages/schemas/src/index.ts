@@ -147,7 +147,9 @@ const ActionSchema = z.object({
   /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
   requiresEffectTag: EffectTagSchema.optional(),
   /** Limited uses; "turn" resets every turn, "encounter" at encounter start, "long-rest" via a rest. `pool` shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon). */
-  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional() }).strict().optional()
+  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional() }).strict().optional(),
+  /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
+  reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional()
 });
 export const ActorDefinitionSchema = z.object({
   schemaId: z.enum(["vtt.actor-character", "vtt.actor-monster"]), schemaVersion: z.literal(ACTOR_DEFINITION_SCHEMA_VERSION),

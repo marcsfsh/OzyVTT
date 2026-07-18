@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingSave, PlayerEffect, PlayerPendingSave, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
@@ -94,6 +94,51 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ sav
           <span className="save-prompt-manual"><input type="number" min="-20" max="60" placeholder="or type total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
           {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
         </span>}
+  </div>;
+}
+
+/**
+ * A reaction window awaiting an answer (Uncanny Dodge): the triggering hit's damage is parked on the
+ * prompt, so BOTH buttons apply it — Use spends the reaction and halves each part, Decline applies it
+ * in full. The shown numbers are before resistances; the server reports the final applied total. The
+ * GM's ✕ dismisses without applying, for damage already entered by hand.
+ */
+function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonly<{ reaction: PendingReaction | PlayerPendingReaction; actorName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
+  const [busy, setBusy] = useState(false);
+  const halved = reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
+  const answer = (use: boolean) => {
+    setBusy(true);
+    socket.emit("reaction:answer", { commandId: newId(), reactionId: reaction.id, use }, (result: ReactionAnswerResult) => {
+      setBusy(false);
+      if (!result.ok) { onFeedback(result.message ?? "The reaction could not be answered."); return; }
+      const outcome = result.outcome;
+      if (outcome) onFeedback(use ? `${actorName} used ${reaction.actionName} — ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.` : `${actorName} took ${outcome.appliedDamage} damage.`);
+    });
+  };
+  const dismiss = () => {
+    setBusy(true);
+    socket.emit("reaction:dismiss", { commandId: newId(), reactionId: reaction.id }, (result: MutationResult) => {
+      setBusy(false);
+      onFeedback(result.ok ? "Reaction prompt dismissed — no damage applied." : result.message ?? "The prompt could not be dismissed.");
+    });
+  };
+  return <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
+    <span className="save-prompt-label"><strong>{reaction.actionName}</strong> vs {reaction.sourceName}{reaction.critical ? " (crit)" : ""} · {reaction.proposedDamage} dmg incoming</span>
+    <span className="save-prompt-actions">
+      <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use — take {halved}</button>
+      <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline — take {reaction.proposedDamage}</button>
+      {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying damage" onClick={dismiss}>✕</button>}
+    </span>
+  </div>;
+}
+
+/** A player's own pending reaction prompts with a local feedback line (the GM panel uses its shared message). */
+function OwnReactionPrompts({ reactions, actorName }: Readonly<{ reactions: readonly PlayerPendingReaction[]; actorName: string }>) {
+  const [feedback, setFeedback] = useState("");
+  if (reactions.length === 0 && !feedback) return null;
+  return <div className="own-save-prompts">
+    {reactions.map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actorName} canDismiss={false} onFeedback={setFeedback} />)}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
 
@@ -219,6 +264,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} />}
+          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} />}
         </li>;
       })}</ol>
     </section>;
@@ -417,6 +463,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
           {actor && <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />}
           {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} />}
           {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} />)}
+          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} />)}
           {/* The active combatant's economy + action runner live on its own initiative row, not in a
               detached block at the bottom, so actions read against the creature they belong to. */}
           {active && actor && <>

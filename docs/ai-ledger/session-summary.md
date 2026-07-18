@@ -8,6 +8,33 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-18 — Rules engine slice 2: reactions, incapacitation, availability API, archive v3 (same branch/PR #38)
+
+Owner sent a follow-up milestone prompt written without baseline knowledge; per instruction it was
+reviewed and corrected first — the assessment + remaining-work roadmap lives in
+`docs/product/rules-engine-followup-assessment.md` (kept: strict-by-default modes and one-command-
+one-roll instances; substituted: in-repo SRD sources for the external mirror). Then the largest
+coherent remaining slice shipped on the same PR:
+
+- **Reaction prompts (Uncanny Dodge).** `reaction {trigger, response}` vocabulary on ActionSchema;
+  a qualifying hit parks its typed damage on `combat.pendingReactions` instead of the apply button;
+  `reaction.answer` applies half (use — spends the reaction) or full (decline); `reaction.dismiss`
+  (GM) drops without damage. Eligibility: reaction free, not incapacitated, not freeform. Prompts
+  persist until answered (parked damage is never lost). Pip's fixture carries the declaration.
+- **Incapacitation gating**: `condition.incapacitated` violations for action/bonus/reaction while
+  Incapacitated/Paralyzed/Petrified/Stunned/Unconscious — same strict/assisted/override ladder.
+- **Available-actions read** (`GET .../actors/{id}/available-actions` + socket): per-action
+  availability from the *shared* `evaluateActionEconomy` (report can't drift from enforcement),
+  with rule violations, uses remaining, instance counts. GM any; player own claimed only.
+- **Archive v3**: additive `postEncounterState` (aftermath after encounter.end's sweeps — Frenzy's
+  Exhaustion now recorded); finalState unchanged. 47 commands total now.
+- **Client**: reaction prompt rows (GM all / player own) beside save prompts; ActionRunner replaces
+  its apply button with a waiting note while a prompt is open (double-apply impossible).
+- **Verification**: regression suite 25 → 35 tests (prompt lifecycle, gating, availability); +HTTP
+  availability test; archive/projection/scope pins updated; api-reference regenerated; suites 288
+  server / 16 contract / 23 rules+schemas green; full check + build green. ADR-0020 amended (items
+  9–12).
+
 ## 2026-07-18 — Combat rules engine (ADR-0020) (`claude/vtt-combat-rules-validation-hkw7tn`)
 
 Owner-directed from a forensic diff of two archived runs of one encounter (manual GM run vs

@@ -166,6 +166,7 @@ describe("turn time-travel timeline", () => {
       log: LOG,
       journal: timeline.journalEntries(),
       finalState,
+      postEncounterState: structuredClone(state),
       endedAt: new Date(1000).toISOString(),
       resolveBundledDefinition: () => undefined,
       attribution: "test attribution"
@@ -188,7 +189,7 @@ describe("turn time-travel timeline", () => {
     expect(archives[0].turnCount).toBe(captured);
 
     const document = JSON.parse(store.getEncounterArchive(archives[0].id)!);
-    expect(document.archiveSchemaVersion).toBe(2);
+    expect(document.archiveSchemaVersion).toBe(3);
     expect(document.turns).toHaveLength(captured);
     // Each turn carries the FULL machine-readable state captured at that boundary, plus the log slice.
     expect(document.turns[0].state.actors.find((a: { id: string }) => a.id === PC)).toBeDefined();
@@ -197,6 +198,8 @@ describe("turn time-travel timeline", () => {
     // v2 additions: the journal of the fight's commands and the last live picture before the end wiped it.
     expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["initiative.next", "initiative.next"]);
     expect(document.finalState.combat.active).toBe(true);
+    // v3 addition: the true aftermath — captured after encounter.end cleared the fight.
+    expect(document.postEncounterState.combat.active).toBe(false);
     expect(store.listJournal()).toHaveLength(0); // wiped with the fight, atomically
 
     store.deleteEncounterArchive(archives[0].id);

@@ -15,10 +15,16 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   resistance/immunity/vulnerability breakdowns; advantage/disadvantage aggregation with explainable
   sources (incl. 2024 prone distance rule + unconscious-adjacent auto-crit); PC dying state machine
   with death-save rolls; commands `effect.add/end`, `death-save.roll`, `encounter.set-rules-mode`,
-  `actor.rest` (45 total); SRD bundle enriched (126/178 structured Multiattacks, 47 on-hit riders,
-  146 typed-defense monsters); enriched replay-party fixtures + a 25-test regression suite derived
-  from the two archived encounter runs. Unsupported items are listed in ADR-0020 (reaction prompts,
-  triggered features, concentration, movement legality, rolled escapes, ruleset declarations).
+  `actor.rest`, and (slice 2, same day) reaction prompts as first-class pending windows — a hit
+  parks its damage on `pendingReactions`, `reaction.answer` applies half (Uncanny Dodge) or full,
+  `reaction.dismiss` for manual bookkeeping — plus incapacitation gating
+  (`condition.incapacitated`), a server-computed `available-actions` read (shared evaluation with
+  enforcement), and archive v3 `postEncounterState` (47 commands total); SRD bundle enriched
+  (126/178 structured Multiattacks, 47 on-hit riders, 146 typed-defense monsters); enriched
+  replay-party fixtures + a 35-test regression suite derived from the two archived encounter runs.
+  Unsupported items are listed in ADR-0020's amended list; the remaining-work roadmap is
+  `docs/product/rules-engine-followup-assessment.md` (triggered features, more reaction triggers,
+  movement legality, concentration, import compatibility states).
 
 - TypeScript monorepo: React/Vite client (`@vtt/web`) + authoritative Express + Socket.IO
   server (`@vtt/server`); packages `domain`, `rules-5e`, `schemas`, `api-contract`, `ui`,

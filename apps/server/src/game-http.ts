@@ -168,6 +168,16 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     }
   });
 
+  // Server-computed action availability: the same evaluation strict-mode resolution runs, as a read.
+  router.get(expressPath(GAME_PATHS.actorAvailableActions), authorize("combat:read"), (req, res) => {
+    try {
+      return sendData(res, ops.actorAvailableActions(res.locals.principal as GamePrincipal, { actorId: req.params.actorId }));
+    } catch (error) {
+      if (error instanceof CommandRejectedError) return sendError(res, 404, "not_found", error.message);
+      return sendOperationError(res, error);
+    }
+  });
+
   router.get(expressPath(GAME_PATHS.log), authorize("combat:read"), (req, res) => {
     const rawLimit = req.query.limit;
     let limit: number | undefined;
@@ -234,6 +244,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actionResolve), ...command("action.resolve"));
   router.post(expressPath(GAME_PATHS.saveAnswer), ...command("save.answer", saveIdParam));
   router.post(expressPath(GAME_PATHS.saveDismiss), ...command("save.dismiss", saveIdParam));
+  router.post(expressPath(GAME_PATHS.reactionAnswer), ...command("reaction.answer", (req: Request) => ({ reactionId: req.params.reactionId })));
+  router.post(expressPath(GAME_PATHS.reactionDismiss), ...command("reaction.dismiss", (req: Request) => ({ reactionId: req.params.reactionId })));
   router.post(expressPath(GAME_PATHS.effects), ...command("effect.add", actorIdParam));
   router.post(expressPath(GAME_PATHS.effectEnd), ...command("effect.end", (req: Request) => ({ actorId: req.params.actorId, effectId: req.params.effectId })));
   router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));

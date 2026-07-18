@@ -315,8 +315,9 @@ describe("public game API over /api/v1", () => {
     const envelope = await documentResponse.json();
     expect(envelope.ok).toBe(true);
     const document = envelope.data.document;
-    // The v2 document: turns, log, complete journal (start..end), final state, dice, and the fight's stat blocks.
-    expect(document.archiveSchemaVersion).toBe(2);
+    // The v3 document: turns, log, complete journal (start..end), final + post-encounter states, dice, and the fight's stat blocks.
+    expect(document.archiveSchemaVersion).toBe(3);
+    expect(document.postEncounterState.combat.active).toBe(false);
     expect(document.turns.length).toBeGreaterThan(0);
     expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["encounter.start", "dice.roll", "actor.apply-damage", "initiative.next", "encounter.end"]);
     expect(document.journal.every((entry: { principal: string }) => entry.principal.startsWith("gm:"))).toBe(true);
@@ -453,6 +454,30 @@ describe("public game API over /api/v1", () => {
     expect(legacyState.headers.get("access-control-allow-origin")).toBeNull();
   });
 
+  it("serves server-computed action availability with role gating", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+
+    // Roster a bundled crocodile; the response's actorId equals the commandId.
+    const commandId = randomUUID();
+    const added = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.actors, gmToken, { commandId, definitionId: "giant-crocodile" })).json());
+    const crocId = added.data.actorId as string;
+
+    const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
+    expect((await fetch(base + path)).status).toBe(401);
+    // A player who hasn't claimed this actor is refused — availability names stat-block internals.
+    expect((await fetch(base + path, { headers: bearer(playerToken) })).status).toBe(403);
+    expect((await fetch(base + GAME_PATHS.actorAvailableActions.replace("{actorId}", randomUUID()), { headers: bearer(gmToken) })).status).toBe(404);
+
+    const body = await (await fetch(base + path, { headers: bearer(gmToken) })).json();
+    expect(body.ok).toBe(true);
+    expect(body.data.rulesMode).toBe("strict");
+    const rows = body.data.actions as ReadonlyArray<{ id: string; available: boolean; violations: readonly unknown[] }>;
+    expect(rows.map((row) => row.id).sort()).toEqual(["bite", "multiattack", "tail"]);
+    // No encounter running: nothing is spent, so everything reports available with no violations.
+    expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
+  });
+
   it("keeps the OpenAPI-documented scopes identical to the runtime command scopes (no drift between doc, tunnel, and typed routes)", () => {
     const TYPED_ROUTES: ReadonlyArray<[string, "post" | "delete", keyof typeof GAME_COMMAND_SCOPES]> = [
       [GAME_PATHS.encounterStart, "post", "encounter.start"],
@@ -477,6 +502,8 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.actionResolve, "post", "action.resolve"],
       [GAME_PATHS.saveAnswer, "post", "save.answer"],
       [GAME_PATHS.saveDismiss, "post", "save.dismiss"],
+      [GAME_PATHS.reactionAnswer, "post", "reaction.answer"],
+      [GAME_PATHS.reactionDismiss, "post", "reaction.dismiss"],
       [GAME_PATHS.effects, "post", "effect.add"],
       [GAME_PATHS.effectEnd, "post", "effect.end"],
       [GAME_PATHS.deathSaveRoll, "post", "death-save.roll"],

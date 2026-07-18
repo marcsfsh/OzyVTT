@@ -68,6 +68,11 @@ export const ActionResolveSchema = z.object({
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Answer a pending reaction prompt: use (spend the reaction, apply half the parked damage) or decline (apply it in full). */
+export const ReactionAnswerSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), use: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const ReactionDismissSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Read-only availability lookup (no commandId — nothing mutates). */
+export const ActorAvailableActionsSchema = z.object({ actorId: z.string().uuid() }).strict();
 export const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 export const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM-added house effect (ADR-0020); structured actions create richer instances via their `grants`/`onHit` declarations. */

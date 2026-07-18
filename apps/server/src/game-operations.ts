@@ -5,7 +5,7 @@ import { ActorDefinitionSchema } from "@vtt/schemas";
 import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
-import { resolveDefinitionAction } from "./action-resolution.js";
+import { actionAvailability, resolveDefinitionAction } from "./action-resolution.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
@@ -23,13 +23,14 @@ import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporary
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
+import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, AddCombatantSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, AddCombatantSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
-  InitiativeScoreSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
+  InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
@@ -231,6 +232,9 @@ export function createGameOperations(context: GameOperationsContext) {
             log: context.combatLog.exportSince(entries[0].revision),
             journal: [...journal, endEntry],
             finalState,
+            // The state AFTER the end command's own work (effect sweeps, their on-end grants —
+            // Frenzy's Exhaustion) — the fight's true aftermath, which finalState predates.
+            postEncounterState: structuredClone(state),
             endedAt,
             resolveBundledDefinition: (definitionId) => contentLibrary.monster(definitionId),
             attribution: contentLibrary.attribution
@@ -566,7 +570,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!positionA || !positionB) return null;
           return mapDistance(geometry, positionA, positionB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
@@ -585,6 +589,12 @@ export function createGameOperations(context: GameOperationsContext) {
         if (resolution.effectGranted) {
           context.appendLog({ kind: "effect", text: `${actorName(actorId)} gains ${resolution.effectGranted.name}.`, actorIds: [actorId], gmOnly: hidden });
           context.broadcastTableEvent({ kind: "effect", text: `${actorName(actorId)} gains ${resolution.effectGranted.name}.`, actorIds: [actorId], gmOnly: hidden });
+        }
+        // A reaction window opened: the rolled damage waits on the answer, so the whole table hears why nothing landed yet.
+        for (const prompt of resolution.reactionPrompts ?? []) {
+          const promptHidden = hidden || actorHidden(prompt.actorId);
+          context.appendLog({ kind: "reaction", text: `${prompt.actorName} may use ${prompt.actionName} — the damage waits on their answer.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
+          context.broadcastTableEvent({ kind: "reaction", text: `${prompt.actorName} may use ${prompt.actionName}.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
         }
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) };
@@ -621,6 +631,59 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "save.dismiss", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => dismissSave(state, saveId, scope));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    // ---------- Reaction prompts (ADR-0020 amendment) ----------
+
+    async reactionAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(ReactionAnswerSchema, raw, "The reaction answer is malformed.");
+      const scope = actorScopeOf(principal);
+      const { commandId, reactionId, use, expectedRevision } = request;
+      let outcome: ReturnType<typeof answerReaction> | undefined;
+      const result = await store.execute({ id: commandId, type: "reaction.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        outcome = answerReaction(state, reactionId, use, scope, { resolveDefinition });
+      });
+      if (!result.duplicate && outcome) {
+        await context.publishGameState(result.state);
+        const hidden = actorHidden(outcome.actorId);
+        if (outcome.used) {
+          const text = `${outcome.actorName} used ${outcome.actionName} — ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}.`;
+          context.appendLog({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
+          context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
+        } else {
+          const text = `${outcome.actorName} declined ${outcome.actionName} — ${outcome.sourceName} hit for ${outcome.appliedDamage} damage.`;
+          context.appendLog({ kind: "damage", text, actorIds: [outcome.actorId], gmOnly: hidden });
+          context.broadcastTableEvent({ kind: "damage", text, actorIds: [outcome.actorId], gmOnly: hidden });
+        }
+        publishNarrations(outcome.events);
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage } } : {}) };
+    },
+
+    async reactionDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(ReactionDismissSchema, raw, "The dismissal is malformed.");
+      const scope = actorScopeOf(principal);
+      const { commandId, reactionId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "reaction.dismiss", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => dismissReaction(state, reactionId, scope));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    /**
+     * Server-computed action availability (read-only): per stat-block action, whether strict mode
+     * would allow it right now and every violated rule — the same evaluation resolution runs, so the
+     * report can never drift from enforcement. GM-grade any combatant; a player their claimed one.
+     */
+    actorAvailableActions(principal: GamePrincipal, raw: unknown) {
+      const request = parse(ActorAvailableActionsSchema, raw, "The availability lookup is malformed.");
+      const state = store.snapshot;
+      const actor = state.actors.find((candidate) => candidate.id === request.actorId);
+      if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+      if (!isGmGrade(principal) && actor.ownerSessionId !== principal.sessionId) throw new GameAccessDeniedError("You can only check your own character's actions.");
+      if (!actor.definitionId) return { rulesMode: state.combat.rulesMode, actions: [] };
+      const definition = resolveDefinition(actor.definitionId);
+      if (!definition) throw new CommandRejectedError("That combatant's stat block is unavailable.");
+      return { rulesMode: state.combat.rulesMode, actions: actionAvailability(state, actor, definition) };
     },
 
     // ---------- Effects, death saves, rest (ADR-0020) ----------
@@ -1023,6 +1086,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["action.resolve", "Run a stat-block action: attack vs AC or save-DC with typed damage (GM).", (p, raw) => operations.actionResolve(p, raw)],
     ["save.answer", "Answer a pending saving throw by rolling or entering a total.", (p, raw) => operations.saveAnswer(p, raw)],
     ["save.dismiss", "Dismiss a pending saving throw without resolving it.", (p, raw) => operations.saveDismiss(p, raw)],
+    ["reaction.answer", "Answer a pending reaction prompt: use it (spend the reaction, halve the parked damage) or decline (apply it in full).", (p, raw) => operations.reactionAnswer(p, raw)],
+    ["reaction.dismiss", "Dismiss a pending reaction prompt without applying its damage (GM).", (p, raw) => operations.reactionDismiss(p, raw)],
     ["effect.add", "Add a rules-engine effect to a combatant (GM).", (p, raw) => operations.effectAdd(p, raw)],
     ["effect.end", "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.", (p, raw) => operations.effectEnd(p, raw)],
     ["death-save.roll", "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).", (p, raw) => operations.deathSaveRoll(p, raw)],

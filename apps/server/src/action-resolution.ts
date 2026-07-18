@@ -27,6 +27,8 @@ export type ResolveDependencies = Readonly<{
   definition?: ActorDefinition;
   /** Authoritative map distance in feet between two combatants' tokens; null when unmeasurable (no positions / no calibration). */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Resolves ANY combatant's definition (imported over bundled) — needed to offer the TARGET's declared reactions. */
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
 }>;
 
 /**
@@ -102,21 +104,40 @@ function componentMap(parent: DefinitionAction): Record<string, number> {
   return components;
 }
 
+/** Conditions that include Incapacitated (SRD 2024): no actions, bonus actions, or reactions while any is active. */
+const INCAPACITATING_CONDITIONS = ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] as const;
+
+type EconomyEvaluation = Readonly<{
+  violations: readonly RuleViolation[];
+  softViolations: readonly RuleViolation[];
+  plan: EconomyPlan;
+  proseMultiattack: boolean;
+  /** Informational notes that surface as warnings regardless of mode (ambiguous multiattack membership). */
+  notes: readonly string[];
+}>;
+
 /**
- * Validate the resolve against the encounter's rules mode and plan its economy commitment
- * (ADR-0020). Strict rejects the first violation with an override path; assisted converts
- * violations to warnings; freeform skips validation. Economy/instance gating applies only on the
- * attacker's own turn — off-turn resolves (opportunity attacks, GM improvisation) stay ungated.
+ * Pure rules evaluation for one action: every violated rule (never throws) plus the economy plan a
+ * successful resolve would commit. Shared by the resolve path (which applies the rules mode) and the
+ * read-only availability projection, so what the API reports as blocked and what resolution rejects
+ * can never drift. Economy/instance gating applies only on the attacker's own turn — off-turn
+ * resolves (opportunity attacks, GM improvisation) stay ungated.
  */
-function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[]): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
+export function evaluateActionEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, targetIds: readonly string[], definition: ActorDefinition | undefined): EconomyEvaluation {
   const violations: RuleViolation[] = [];
   const softViolations: RuleViolation[] = [];
-  const mode = state.combat.rulesMode;
+  const notes: string[] = [];
   const onOwnTurn = state.combat.turnActorId === attacker.id;
   const turn = state.combat.turn;
   // An actor whose stat block has a prose-only Multiattack can't be validated fairly: its extra
   // attacks live in text the engine can't see, so action-slot violations degrade to warnings.
   const proseMultiattack = definition?.actions.some((candidate) => /multiattack/i.test(candidate.name) && !candidate.multiattack) ?? false;
+
+  // Incapacitation forbids all three activation kinds outright (SRD 2024 "Incapacitated").
+  if (action.activation !== "other") {
+    const incapacitating = attacker.conditions.find((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id));
+    if (incapacitating) violations.push({ rule: "condition.incapacitated", message: `${attacker.name} is ${conditionLabel(incapacitating.id)} and can't take actions, bonus actions, or reactions.` });
+  }
 
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag)) {
     violations.push({ rule: "feature.requires-effect", message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.` });
@@ -152,7 +173,7 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
         components[action.id] = (components[action.id] ?? 1) - 1;
       } else if (parents.length > 1) {
         if (action.attack && (action.attack.count ?? 1) > 1) components = { attack: (action.attack.count ?? 1) - 1 };
-        warnings.push(`${action.name} belongs to more than one Multiattack — tracking it standalone.`);
+        notes.push(`${action.name} belongs to more than one Multiattack — tracking it standalone.`);
       } else if (action.attack && (action.attack.count ?? 1) > 1) {
         // Count-based attacks open a generic pool so Extra Attack can mix weapons legally.
         components = { attack: (action.attack.count ?? 1) - 1 };
@@ -181,13 +202,62 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
 
   // Targeting restrictions the definition declares (Tail can't target the creature this crocodile grapples).
   if (action.targetRules?.includes("not-grappled-by-source")) {
-    for (const targetId of input.targetIds) {
+    for (const targetId of targetIds) {
       const target = state.actors.find((candidate) => candidate.id === targetId);
       if (target?.effects.some((effect) => effect.sourceActorId === attacker.id && effect.tags.includes("grapple"))) {
         violations.push({ rule: "target.grappled-by-source", message: `${target.name} is grappled by ${attacker.name} and can't be targeted by ${action.name}.` });
       }
     }
   }
+
+  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse }, proseMultiattack, notes };
+}
+
+/**
+ * Read-only availability projection over an actor's whole action list (the `available-actions` API):
+ * per action, whether strict mode would allow it right now, every violated rule, and the remaining
+ * limited uses / open-instance rolls. Target-specific rules (`targetRules`) can't be pre-checked
+ * without a target and are deliberately absent here. Never mutates state.
+ */
+export function actionAvailability(state: GameState, attacker: LiveActor, definition: ActorDefinition): ReadonlyArray<{
+  id: string; name: string; activation: DefinitionAction["activation"]; available: boolean;
+  violations: ReadonlyArray<{ rule: string; message: string }>; usesRemaining: number | null; componentsRemaining: number | null;
+}> {
+  return definition.actions.map((action) => {
+    const evaluation = evaluateActionEconomy(state, attacker, action, [], definition);
+    let usesRemaining: number | null = null;
+    if (action.uses) {
+      const key = action.uses.pool ?? action.id;
+      const spent = action.uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
+      usesRemaining = Math.max(0, action.uses.limit - spent);
+    }
+    const instance = state.combat.turn.actionInstance;
+    let componentsRemaining: number | null = null;
+    if (instance && instance.actorId === attacker.id && state.combat.turnActorId === attacker.id && action.activation === "action" && !action.multiattack) {
+      if (instance.components[action.id] !== undefined) componentsRemaining = instance.components[action.id];
+      else if (action.attack && instance.components["attack"] !== undefined) componentsRemaining = instance.components["attack"];
+    }
+    return {
+      id: action.id,
+      name: action.name,
+      activation: action.activation,
+      available: evaluation.violations.length === 0,
+      violations: evaluation.violations,
+      usesRemaining,
+      componentsRemaining
+    };
+  });
+}
+
+/**
+ * Validate the resolve against the encounter's rules mode and plan its economy commitment
+ * (ADR-0020). Strict rejects the first violation with an override path; assisted converts
+ * violations to warnings; freeform skips validation.
+ */
+function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[]): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
+  const mode = state.combat.rulesMode;
+  const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition);
+  warnings.push(...notes);
 
   let overridden: { rule: string; reason: string } | null = null;
   const allViolations = [...violations, ...softViolations];
@@ -202,7 +272,7 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
     }
   }
 
-  return { plan: { markAction, markBonus, markReaction, instance, spendUse }, overridden };
+  return { plan, overridden };
 }
 
 /** Advantage/disadvantage sources the engine can see; the explicit GM rollMode choice wins over all of them. */
@@ -389,6 +459,44 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     effectGranted = { name: effect.name, tags: effect.tags };
   }
 
+  // A hit against a combatant whose stat block declares a matching reaction (Uncanny Dodge) parks
+  // the rolled damage in a pending prompt instead of the runner's apply button: answering "use"
+  // spends the reaction and applies half, "decline" applies it in full (see reactions.ts). Freeform
+  // mode stays prompt-free — reference-level play keeps the manual damage flow.
+  const reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }> = [];
+  if (attack !== null && (attack.outcome === "crit" || attack.outcome === "hit") && state.combat.rulesMode !== "freeform" && deps.resolveDefinition) {
+    const target = targets[0];
+    const proposedParts = [
+      ...damage.map((part) => ({ amount: part.total, type: part.type })),
+      ...bonusDamage.map((part) => ({ amount: part.amount, type: part.type }))
+    ].filter((part) => part.amount > 0);
+    const proposedTotal = proposedParts.reduce((sum, part) => sum + part.amount, 0);
+    const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+    const declared = targetDefinition?.actions.find((candidate) => candidate.activation === "reaction" && candidate.reaction?.trigger === "hit-by-attack" && candidate.reaction.response === "half-damage");
+    const targetIncapacitated = target.conditions.some((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id));
+    if (declared && proposedTotal > 0 && target.id !== attacker.id && !targetIncapacitated
+      && !state.combat.reactionsUsed.includes(target.id)
+      && state.combat.pendingReactions.length < 20) {
+      state.combat = {
+        ...state.combat,
+        pendingReactions: [...state.combat.pendingReactions, {
+          id: deps.newRollId(),
+          actorId: target.id,
+          actionId: declared.id,
+          actionName: declared.name,
+          sourceActorId: attacker.id,
+          sourceName: attacker.name,
+          triggerCommandId: input.commandId,
+          proposedDamage: proposedTotal,
+          proposedDamageParts: proposedParts,
+          critical: crit,
+          createdAt: Date.parse(deps.now())
+        }]
+      };
+      reactionPrompts.push({ actorId: target.id, actorName: target.name, actionName: declared.name });
+    }
+  }
+
   // A save action leaves one pending save per target: prompts appear in the tracker rows, each
   // answered by rolling or typing a total, and the outcome auto-applies (see saving-throws.ts).
   if (action.save) {
@@ -445,6 +553,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       ? state.combat.turn.actionInstance.components
       : null,
     ...(warnings.length > 0 ? { warnings } : {}),
-    overridden
+    overridden,
+    ...(reactionPrompts.length > 0 ? { reactionPrompts } : {})
   };
 }

@@ -94,7 +94,11 @@
    "name": "Uncanny Dodge",
    "activation": "reaction",
    "description": "*Reaction, when an attacker he can see hits him:* halve the attack's damage against him.",
-   "damage": []
+   "damage": [],
+   "reaction": {
+    "trigger": "hit-by-attack",
+    "response": "half-damage"
+   }
   }
  ],
  "token": {
