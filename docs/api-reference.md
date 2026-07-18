@@ -1,0 +1,1238 @@
+# Combat-First VTT Integration API — API reference (v1)
+
+<!-- GENERATED FILE — do not edit by hand. -->
+<!-- Rendered from packages/api-contract (the same document served at /api/v1/openapi.json). -->
+<!-- Regenerate: npm run docs:generate -w @vtt/api-contract -->
+
+Versioned, recipient-safe integration contract for a self-hosted VTT. Every write accepts an optional `commandId` (UUID): supply your own and resend it to retry safely — the server executes a commandId exactly once and replays the stored outcome with `duplicate: true`. Omitting it mints one server-side (echoed in the response), which is convenient but gives a lost response no safe retry. `expectedRevision` rejects stale writes with 409 + `error.currentRevision`.
+
+- **Base path:** `/api/v1` on the LAN host (default port 3001).
+- **Machine-readable contract:** `GET /api/v1/openapi.json` serves the OpenAPI 3.1 document this reference is generated from, byte-identical to `@vtt/api-contract`.
+- **Realtime sibling:** the built-in clients drive the same commands over Socket.IO (protocol version 1); command `type` strings below are shared between both transports.
+- **Webhooks / server push:** not part of v1 core yet — poll with ETags (below).
+
+## Authentication
+
+Every request authenticates with `Authorization: Bearer <token>` (the viewer's cookie is the one exception). Three principal kinds exist:
+
+| Principal | Token | Authority |
+| --- | --- | --- |
+| **GM session** | from `POST /api/gm/login` (GM password; same-origin only) | Everything, including credential management. |
+| **Player session** | issued when a player joins the table | Exactly the table's player limits: player-safe projections, own claimed character only. |
+| **Integration credential** | `vtt_int_…`, minted by the GM (below) | GM authority, filtered by the credential's scopes. Rotatable, revocable, audited. |
+
+### Scopes
+
+| Scope | Grants |
+| --- | --- |
+| `system:read` | Capability discovery and the command catalog. |
+| `game:read` | Game-state snapshots (GM-full or player-safe) and reference content. |
+| `actor:read` | Reserved — no endpoint requires it yet. |
+| `actor:write` | Roster changes, hit points, conditions, sheet imports, claims management, and token cosmetics. |
+| `scene:read` | Reserved — no endpoint requires it yet. |
+| `scene:write` | Preparing, editing, activating, and removing staged scenes. |
+| `combat:read` | The combat log and encounter archives. |
+| `combat:write` | Encounter lifecycle, initiative/timeline, turns, tokens, actions, saves, annotations. |
+| `roll:create` | Dice rolls into the shared history. |
+| `events:read` | Reserved for the future event stream. |
+| `webhooks:manage` | Reserved for future webhooks. |
+| `admin` | Every scope, including destructive operations (archive deletion). Grant sparingly. |
+
+## Conventions
+
+- **Envelopes.** Success: `{ "ok": true, "apiVersion": "1", "data": … }`. Failure: `{ "ok": false, "apiVersion": "1", "error": { "code", "message", "requestId", "details"?, "currentRevision"?, "retryAfterSeconds"? } }`.
+- **Request IDs.** Send `X-Request-Id` (UUID) to correlate; the server echoes it (minting one otherwise) on the response header and in error bodies.
+- **Idempotency.** Every write accepts `commandId` (UUID). The server executes each commandId exactly once; retries replay the stored outcome with `duplicate: true`. Omitted ids are minted server-side and echoed — supply your own whenever you might need to retry.
+- **Optimistic concurrency.** Pass `expectedRevision` to reject writes against a state you haven't seen; a stale value returns `409` with `error.currentRevision`.
+- **Error statuses.** `400 validation_failed` (malformed request, `details.issues`), `401 unauthenticated` (no token), `403 forbidden` (invalid/revoked/underscoped token, or a role denial), `404 not_found`, `409 conflict` for everything the game itself refuses — rule rejections, stale revisions, and timeline confirmations (`details.needsConfirm`: resend with `confirmRewrite`/`confirmDiscard`), `413` oversized body (limit 512kb).
+- **Polling.** `GET /game` sends a weak ETag derived from the revision; send `If-None-Match` to get free `304`s. Presence and timed-annotation expiry don't bump the revision — re-fetch when you need those fresh.
+- **CORS.** Wide open on `/api/v1` (bearer-only surface), so browser-based overlays can call it directly. The legacy same-origin endpoints (`/api/gm/login` etc.) deliberately have no CORS.
+
+## Command catalog
+
+Every command is reachable two ways with identical semantics: its **typed route** (below) or the **generic tunnel** `POST /game/commands` with `{ "type", "payload", "commandId"?, "expectedRevision"? }`. `GET /game/commands` serves this catalog with live summaries. Scopes bind to the command, not the transport:
+
+| Command type | Required scope |
+| --- | --- |
+| `encounter.start` | `combat:write` |
+| `encounter.end` | `combat:write` |
+| `encounter.add-combatant` | `combat:write` |
+| `initiative.set` | `combat:write` |
+| `initiative.next` | `combat:write` |
+| `initiative.previous` | `combat:write` |
+| `turn.end` | `combat:write` |
+| `turn.use` | `combat:write` |
+| `turn.use-reaction` | `combat:write` |
+| `token.move` | `combat:write` |
+| `actor.add-from-definition` | `actor:write` |
+| `actor.import-definition` | `actor:write` |
+| `actor.remove` | `actor:write` |
+| `actor.apply-damage` | `actor:write` |
+| `actor.heal` | `actor:write` |
+| `actor.set-temp-hp` | `actor:write` |
+| `actor.set-hp` | `actor:write` |
+| `actor.set-condition` | `actor:write` |
+| `dice.roll` | `roll:create` |
+| `action.resolve` | `combat:write` |
+| `save.answer` | `combat:write` |
+| `save.dismiss` | `combat:write` |
+| `annotation.add` | `combat:write` |
+| `annotation.ping` | `combat:write` |
+| `annotation.move` | `combat:write` |
+| `annotation.remove` | `combat:write` |
+| `annotation.set-color` | `combat:write` |
+| `annotation.set-visibility` | `combat:write` |
+| `annotation.set-movable` | `combat:write` |
+| `annotation.clear` | `combat:write` |
+| `character.claim` | `actor:write` |
+| `character.release` | `actor:write` |
+| `character.force-release` | `actor:write` |
+| `actor.set-token-image` | `actor:write` |
+| `actor.set-size` | `actor:write` |
+| `scene.create` | `scene:write` |
+| `scene.rename` | `scene:write` |
+| `scene.remove` | `scene:write` |
+| `scene.activate` | `scene:write` |
+| `scene.set-combatants` | `scene:write` |
+
+## Encounter archive document (`archiveSchemaVersion` 2)
+
+`GET /encounters/{id}` returns `data.document`, the permanent Time Machine record of one ended fight, stored verbatim at `encounter.end` in the same transaction that closes the encounter:
+
+- `startedAt` / `endedAt` (ISO 8601) and `turnCount`.
+- `turns[]` — `{ index, kind: "turn"|"return", label, revision, at, state }`: one **full GameState** per turn boundary.
+- `log[]` — the fight's timestamped combat-log slice (`{ id, at, kind, text, gmOnly, revision }`), GM-only lines included.
+- `journal[]` — **every accepted command while the fight was live**, `encounter.start` through `encounter.end` inclusive: `{ seq, commandId, type, actorId, principal, payload, revision, at }`. `principal` is `gm:<sessionId>`, `player:<sessionId>`, or `integration:<credentialId>`.
+- `finalState` — the last live GameState, captured just before ending cleared the fight.
+- `rolls[]` — every dice roll seen across the fight (survives the live state's rolling 200-roll cap).
+- `definitions[]` — `{ id, source: "imported"|"bundled", definition }`: the full stat blocks the fight used, making the document self-contained.
+- `attribution` — the CC BY 4.0 line when bundled SRD content is included, else `null`.
+
+`turns`, `log`, and `journal` join on `revision` — align "what the state was" with "what was commanded" and "what was narrated". Archives are GM-grade only (full state, hidden combatants included) and never reach player sessions.
+
+## Quick start
+
+```bash
+# 1. GM signs in (same-origin) and mints a scoped credential — the token is shown exactly once.
+GM=$(curl -s -X POST http://host:3001/api/gm/login -H 'content-type: application/json' \
+  -d '{"password":"…"}' | jq -r .token)
+TOKEN=$(curl -s -X POST http://host:3001/api/v1/gm/integration-credentials \
+  -H "Authorization: Bearer $GM" -H 'content-type: application/json' \
+  -d '{"name":"my bot","scopes":["system:read","game:read","combat:read","combat:write","actor:write","roll:create"]}' | jq -r .data.token)
+
+# 2. Discover, read, act.
+curl -s http://host:3001/api/v1/system/capabilities -H "Authorization: Bearer $TOKEN"
+curl -s http://host:3001/api/v1/game -H "Authorization: Bearer $TOKEN"
+curl -s -X POST http://host:3001/api/v1/game/rolls -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"formula":"2d20kh1+7","purpose":"attack","visibility":"public"}'
+
+# 3. Same command via the generic tunnel.
+curl -s -X POST http://host:3001/api/v1/game/commands -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"type":"actor.apply-damage","payload":{"actorId":"<uuid>","amount":5}}'
+```
+
+## System & discovery
+
+Liveness, version negotiation, capability discovery, and the machine-readable contract itself.
+
+### `GET /api/v1/system/health`
+
+**Auth:** Public — no credentials required.
+
+**Responses:** `200` Server is live — envelope of `SystemHealth`
+
+### `GET /api/v1/system/version`
+
+**Auth:** Public — no credentials required.
+
+**Responses:** `200` Public protocol versions — envelope of `SystemVersion`
+
+### `GET /api/v1/system/capabilities`
+
+**Auth:** Integration credential with `system:read`
+
+**Responses:** `200` Authorized server capabilities — envelope of `SystemCapabilities` · errors `401` `403`
+
+### `GET /api/v1/openapi.json`
+
+**Auth:** Public — no credentials required.
+
+**Responses:** `200` This exact OpenAPI 3.1 document, served from the running instance — object (free-form)
+
+## Integration credentials (GM-managed)
+
+Minting, rotating, revoking, and auditing the scoped bearer tokens integrations authenticate with. GM sessions only — an integration token can never manage credentials.
+
+### `GET /api/v1/gm/integration-credentials`
+
+**Auth:** GM session
+
+**Responses:** `200` Safe metadata for every credential; never includes a secret — envelope of `IntegrationCredentialList` · errors `401`
+
+### `POST /api/v1/gm/integration-credentials`
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `scopes` | `system:read` \| `game:read` \| `actor:read` \| `actor:write` \| `scene:read` \| `scene:write` \| `combat:read` \| `combat:write` \| `roll:create` \| `events:read` \| `webhooks:manage` \| `admin`[] | yes |  |
+| `gameId` | string \| null | no |  |
+| `expiresAt` | string \| null | no |  |
+
+**Responses:** `201` Credential created; the token is shown exactly once — envelope of `IntegrationCredentialIssued` · errors `400` `401`
+
+### `POST /api/v1/gm/integration-credentials/{id}/rotate`
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `expiresAt` | string \| null | no | Omit to keep the current expiration; null clears it. |
+
+**Responses:** `200` Credential rotated; the new token is shown exactly once — envelope of `IntegrationCredentialIssued` · errors `401` `404` `409`
+
+### `POST /api/v1/gm/integration-credentials/{id}/revoke`
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Responses:** `200` Credential revoked; access denied immediately — envelope of `IntegrationCredentialMetadata` · errors `401` `404`
+
+### `GET /api/v1/gm/integration-credentials/{id}/audit`
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Responses:** `200` Safe audit history: no secrets, only usage/lifecycle metadata — envelope of `IntegrationCredentialAudit` · errors `401` `404`
+
+## Player sessions
+
+Session issuance for headless or custom player clients — the HTTP mirror of the socket's open, LAN-trust join.
+
+### `POST /api/v1/sessions/player`
+
+Issues a player session token — the HTTP mirror of the socket's open join, for headless or custom player clients. LAN-trust by design: no credentials required, but the host must have completed GM setup. The token then authenticates player-limited calls across this API.
+
+**Auth:** Public — no credentials required.
+
+**Responses:** `201` Player session issued — envelope of `PlayerSessionIssuedData` · errors `409`
+
+## Live game
+
+The authoritative game state and every game command — combat, initiative and time-travel, turns, tokens, hit points, conditions, roster, dice, actions, saves, annotations, character claims, and staged scenes. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.
+
+### `GET /api/v1/game`
+
+The authoritative game state, projected for the caller: GM sessions and integration credentials get the full GM view (hidden combatants, notes, turn-history metadata) unless `view=player` asks for the player-safe projection; player session tokens always get the player-safe view. Sends a weak ETag derived from the revision — poll with If-None-Match for cheap 304s (presence and timed-annotation expiry do not bump the revision, so re-fetch when you need those fresh).
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `view` (query, optional) — `gm` \| `player`
+
+**Responses:** `200` The projected game state, with `revision` for optimistic concurrency and polling — envelope of `GameSnapshotData` · `304` Unchanged since the revision in If-None-Match · errors `401` `403`
+
+### `GET /api/v1/game/log`
+
+The persistent combat log, oldest first. GM sessions and integration credentials receive GM-only lines; player sessions only public ones.
+
+**Auth:** Integration credential with `combat:read` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `limit` (query, optional) — integer (1–1000)
+
+**Responses:** `200` Chronological log entries — envelope of `GameLogData` · errors `400` `401` `403`
+
+### `GET /api/v1/game/commands`
+
+The full catalog of command types accepted by the tunnel, each with the credential scope it requires.
+
+**Auth:** Integration credential with `system:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Supported command types — envelope of `GameCommandCatalogData` · errors `401` `403`
+
+### `POST /api/v1/game/commands`
+
+Generic command tunnel: submits any cataloged command type with its Socket.IO payload shape, dispatched through the exact same validation/authorization/execution path as the built-in UI. The required credential scope depends on the type (see the GET catalog). Omit `commandId` to have one minted; resend the same `commandId` to retry idempotently.
+
+**Auth:** Integration credential (required scope depends on the command type — see the catalog) · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | string | yes | A cataloged command type, e.g. encounter.start or actor.apply-damage |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `payload` | object (free-form) | no | The command's Socket.IO payload shape, minus commandId/expectedRevision (carried at the envelope level) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `404` `409`
+
+### `POST /api/v1/game/encounter/start`
+
+Starts an encounter on a calibrated battlemap with initial combatants (GM-grade only). Missing initiative scores are rolled server-side.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `mapAssetId` | string (uuid) | yes |  |
+| `entries` | object[] | yes |  |
+| `entries[].actorId` | string (uuid) | yes |  |
+| `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/end`
+
+Ends the encounter (GM-grade only). The whole fight auto-archives permanently (see /encounters) in the same transaction.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/combatants`
+
+Adds a rostered actor to the running encounter (GM-grade only); rolls initiative when no score is given.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `score` | integer (-1000–1000) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/set`
+
+Sets a combatant's initiative score (GM-grade only).
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `score` | integer (-1000–1000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/next`
+
+Advances the turn (GM-grade only). While the table is rewound this steps forward through recorded history; a 409 with `needsConfirm: "rewrite-history"` asks for `confirmRewrite: true` to truncate the undone future.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `confirmRewrite` | boolean | no | Confirm rewriting history from the reviewed turn (truncates the undone future) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/previous`
+
+Rewinds the whole table to the previous turn boundary (GM-grade only). A 409 with `needsConfirm: "discard-changes"` asks for `confirmDiscard: true` to drop changes made while rewound.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `confirmDiscard` | boolean | no | Confirm discarding changes made while rewound (re-restores the viewed turn in place) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/turn/end`
+
+Ends the current turn and advances. The GM (or an integration) may end anyone's turn; a player session only their own claimed character's.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/turn/use`
+
+Marks the current turn's action or bonus action used/unused (tracked, never enforced).
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `slot` | `action` \| `bonus-action` | yes |  |
+| `used` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/turn/reaction`
+
+Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `used` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/tokens/{actorId}/move`
+
+Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. Player sessions may move only their claimed character. `sceneId` targets a prepared (GM-private) scene instead of the live table.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `position` | ImagePoint \| null | yes | Image-space coordinates (server snaps to the grid); null returns the token to the tray |
+| `sceneId` | string (uuid) | no | Target a prepared GM-private scene instead of the live encounter |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors`
+
+Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `definitionId` | string (pattern) | yes |  |
+| `visibility` | `public` \| `gm-only` | no | Default: `"public"`. |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `DELETE /api/v1/game/actors/{actorId}`
+
+Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/damage`
+
+Applies damage (temporary hit points absorb first). Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `amount` | integer (1–1000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/heal`
+
+Heals hit points up to the maximum. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `amount` | integer (1–1000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/temp-hp`
+
+Sets temporary hit points (replaces, 5e-style). Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `amount` | integer (0–1000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/hp`
+
+Sets current hit points directly (GM-grade only).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `current` | integer (0–10000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/conditions`
+
+Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `conditionId` | string (pattern) | yes |  |
+| `active` | boolean | yes |  |
+| `level` | integer (1–6) | no | Exhaustion level |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/definitions/import`
+
+Imports a canonical ActorDefinition JSON as a claimable actor with a full sheet (GM-grade only). The response's `actorId` equals the commandId.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `definition` | object (free-form) | yes | A canonical ActorDefinition JSON (schema version discoverable via /system/version) |
+| `visibility` | `public` \| `gm-only` | no | Default: `"public"`. |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/rolls`
+
+Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it.
+
+**Auth:** Integration credential with `roll:create` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `formula` | string | yes | e.g. 2d6+3, 4d6kh3, 2d20kl1 |
+| `purpose` | `attack` \| `save` \| `check` \| `damage` \| `manual` | yes |  |
+| `visibility` | `public` \| `gm-only` \| `blind` \| `self-only` | yes |  |
+| `actorId` | string (uuid) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actions/resolve`
+
+Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `actionId` | string (pattern) | yes |  |
+| `targetIds` | string (uuid)[] | no |  |
+| `template` | object | no | Area targeting: the server snaps the template and finds who is under it. Provide targetIds or template, never both. |
+| `template.shape` | `circle` \| `cone` \| `line` \| `square` | yes |  |
+| `template.origin` | ImagePoint | yes |  |
+| `template.target` | ImagePoint | yes |  |
+| `conditionId` | string (pattern) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/saves/{saveId}/answer`
+
+Answers a pending saving throw by server roll or manual total; on commit the outcome auto-applies damage/conditions. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `saveId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `method` | `roll` \| `manual` | yes |  |
+| `total` | integer (-20–60) | no | Required for method=manual |
+| `commit` | boolean | no | false previews the outcome without applying damage/conditions Default: `true`. |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/saves/{saveId}/dismiss`
+
+Dismisses a pending saving throw without resolving it (GM-grade, or the owing player).
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `saveId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations`
+
+Draws a measurement or area shape on the encounter map; the server snaps geometry to the grid. The response's `annotationId` equals the commandId.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `kind` | `measurement` \| `shape` | yes |  |
+| `shape` | `circle` \| `cone` \| `line` \| `square` | no |  |
+| `geometry` | AnnotationGeometryInput | yes |  |
+| `visibility` | `public` \| `gm-only` \| `owner-only` \| `owner-gm` \| `gm-actor` | no |  |
+| `visibleToActorId` | string \| null | no |  |
+| `movableByOthers` | boolean | no |  |
+| `color` | string (pattern) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations/ping`
+
+Pings a point on the encounter map (ephemeral, labeled with the sender).
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `point` | ImagePoint | yes |  |
+| `color` | string (pattern) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations/clear`
+
+Clears drawn shapes: your own, all player shapes (GM-grade), or everything (GM-grade).
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `scope` | `mine` \| `players` \| `all` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `DELETE /api/v1/game/annotations/{id}`
+
+Removes one annotation (owners, the GM, and GM-grade integrations).
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations/{id}/move`
+
+Moves/resizes an annotation; the server re-snaps geometry.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `geometry` | AnnotationGeometryInput | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations/{id}/color`
+
+Changes an annotation's color.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `color` | string (pattern) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations/{id}/visibility`
+
+Changes who can see an annotation (public, gm-only, owner-only, owner-gm, gm-actor).
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `visibility` | `public` \| `gm-only` \| `owner-only` \| `owner-gm` \| `gm-actor` | yes |  |
+| `visibleToActorId` | string \| null | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/annotations/{id}/movable`
+
+Allows or disallows other players moving a shape.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `movableByOthers` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/claims`
+
+Claims an unclaimed player character for the calling session. Player sessions only — GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/claims/release`
+
+Releases every character claimed by the calling player session.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/claims/{actorId}/force-release`
+
+Force-releases a claimed character (GM-grade only) — the recovery path for a lost player device.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/token-image`
+
+Sets or clears (null) a combatant's token image from the uploaded token library (GM-grade only).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `tokenAssetId` | string \| null | yes | A token-library asset id, or null to clear the image |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/size`
+
+Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `size` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes`
+
+Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `name` | string | yes |  |
+| `mapAssetId` | string (uuid) | yes |  |
+| `combatantIds` | string (uuid)[] | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `DELETE /api/v1/game/scenes/{sceneId}`
+
+Removes a prepared scene (GM-grade only); the active scene cannot be removed.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/rename`
+
+Renames a prepared scene (GM-grade only).
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `name` | string | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/activate`
+
+Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/combatants`
+
+Replaces a prepared scene's combatant list (GM-grade only).
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `combatantIds` | string (uuid)[] | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+## Reference content
+
+The bundled SRD 5.2.1 content (CC BY 4.0): bestiary, runnable action summaries, and condition reference.
+
+### `GET /api/v1/content/monsters`
+
+Browse the bundled SRD bestiary (GM-grade only). Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session
+
+**Responses:** `200` Monster summaries + attribution — envelope of `ContentMonstersData` · errors `401` `403`
+
+### `GET /api/v1/content/monsters/{definitionId}`
+
+One full stat block (GM-grade only). Imported definitions shadow bundled ids, matching the live server's resolution.
+
+**Auth:** Integration credential with `game:read` · GM session
+
+**Parameters:** `definitionId` (path) — string (pattern)
+
+**Responses:** `200` The full ActorDefinition — envelope of `ContentMonsterSheetData` · errors `401` `403` `404`
+
+### `GET /api/v1/content/monsters/{definitionId}/actions`
+
+A stat block's actions flattened for running them (GM-grade only): attack bonus, reach/range, save DC, damage formulas, parsed area.
+
+**Auth:** Integration credential with `game:read` · GM session
+
+**Parameters:** `definitionId` (path) — string (pattern)
+
+**Responses:** `200` Runnable action summaries — envelope of `ContentMonsterActionsData` · errors `401` `403` `404`
+
+### `GET /api/v1/content/conditions`
+
+The bundled SRD condition reference (public information — any GM, player, or integration session).
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Condition reference entries — envelope of `ContentConditionsData` · errors `401` `403`
+
+## Encounter archives (Time Machine)
+
+Permanent, machine-readable records of ended encounters — see the archive document section above for the full v2 shape. GM-grade principals only.
+
+### `GET /api/v1/encounters`
+
+Permanent records of ended encounters, newest first (GM sessions and integration credentials only — never player sessions).
+
+**Auth:** Integration credential with `combat:read` · GM session
+
+**Responses:** `200` Archive summaries — envelope of `EncounterArchiveListData` · errors `401` `403`
+
+### `GET /api/v1/encounters/{id}`
+
+One archive's full machine-readable document (archiveSchemaVersion 2): per-turn full states, combat log, complete per-command journal, final state, all dice rolls, and the stat blocks used. GM-grade data — hidden combatants included; never reaches player sessions.
+
+**Auth:** Integration credential with `combat:read` · GM session
+
+**Parameters:** `id` (path) — integer (≥ 1)
+
+**Responses:** `200` The stored document, verbatim — envelope of `EncounterArchiveDocumentData` · errors `400` `401` `403` `404`
+
+### `DELETE /api/v1/encounters/{id}`
+
+Permanently deletes one archived encounter (GM session or an admin-scoped credential).
+
+**Auth:** Integration credential with `admin` · GM session
+
+**Parameters:** `id` (path) — integer (≥ 1)
+
+**Responses:** `200` Deleted — envelope of `EncounterArchiveDeletedData` · errors `400` `401` `403` `404`
+
+## Map assets & calibration
+
+Uploading battlemap/regional/world images, reading their bytes, and the server-held grid-calibration wizard.
+
+### `GET /api/v1/map-assets`
+
+**Auth:** GM session
+
+**Responses:** `200` Safe metadata for every stored map asset — envelope of `MapAssetListData` · errors `401`
+
+### `POST /api/v1/map-assets`
+
+Uploads raw image bytes as the request body. `filename`, `name`, and `kind` (battlemap/regional/world) are query parameters, not a JSON body. Content-addressed: uploading identical bytes again returns the existing asset with `duplicate: true` instead of creating a copy.
+
+**Auth:** GM session
+
+**Parameters:** `filename` (query, optional) — string · `name` (query, optional) — string · `kind` (query, optional) — `battlemap` \| `regional` \| `world`
+
+**Request body:** raw `image/*` bytes.
+
+**Responses:** `200` Identical bytes already stored; the existing asset is returned — envelope of `MapAssetUploadData` · `201` New map asset stored — envelope of `MapAssetUploadData` · errors `400` `401` `413`
+
+### `GET /api/v1/map-assets/{id}`
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Responses:** `200` Safe metadata for one map asset — envelope of `MapAssetData` · errors `401` `404`
+
+### `PATCH /api/v1/map-assets/{id}`
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | no |  |
+| `kind` | `battlemap` \| `regional` \| `world` | no |  |
+
+**Responses:** `200` Updated map catalog entry — envelope of `MapAssetData` · errors `400` `401`
+
+### `GET /api/v1/map-assets/{id}/content`
+
+Renderer-safe original image bytes. Authorized for the GM, a player in the active encounter on this map, or a paired viewer session (cookie) — any one is sufficient. Supports ETag/If-None-Match (304), byte-range requests (206/416), and is always sent with `Cache-Control: private, no-store` since access can be revoked at any time.
+
+**Auth:** GM session · Paired viewer session (cookie)
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Responses:** `200` Full image bytes · `206` Partial content for a byte-range request · `304` Not modified · errors `403` `404` `416`
+
+### `PUT /api/v1/map-assets/{id}/scale`
+
+Gridless real-world scale, derived from two image points and a known distance.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `start` | ImagePoint | yes |  |
+| `end` | ImagePoint | yes |  |
+| `knownDistance` | number | yes |  |
+| `unit` | string | yes |  |
+
+**Responses:** `200` Updated map catalog entry with the new scale — envelope of `MapAssetData` · errors `400` `401`
+
+### `POST /api/v1/map-assets/{id}/calibration/wizards`
+
+Starts a server-held, TTL-bounded calibration wizard session from either a fixed 3x3 area drag or a known-axis segment measurement, and returns its ID plus a viewport-clipped grid overlay preview.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Responses:** `201` Wizard session started — envelope of `MapCalibrationWizardData` · errors `400` `401` `404`
+
+### `POST /api/v1/map-assets/{id}/calibration/wizards/{wizardId}/actions`
+
+Applies one adjust/undo/redo/verify action to an in-progress wizard session, owned by the same GM bearer token that started it.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid) · `wizardId` (path) — string (uuid)
+
+**Responses:** `200` Updated wizard state and overlay — envelope of `MapCalibrationWizardData` · errors `400` `401` `404`
+
+### `POST /api/v1/map-assets/{id}/calibration/wizards/{wizardId}/complete`
+
+Saves the wizard's current calibration to the map catalog and discards the wizard session. Verification is optional reassurance, not a requirement.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid) · `wizardId` (path) — string (uuid)
+
+**Responses:** `200` Saved calibration — envelope of `MapAssetData` · errors `400` `401` `404`
+
+## Table viewer (second screen)
+
+Pairing a shared display and driving its player-safe presentation. The viewer never authenticates with game credentials — pairing codes and an HttpOnly cookie only.
+
+### `POST /api/v1/viewer/pairings`
+
+Issues a short-lived, one-time pairing code for a second-screen display to exchange for a session.
+
+**Auth:** GM session
+
+**Responses:** `201` Pairing code issued · errors `401`
+
+### `POST /api/v1/viewer/pairings/exchange`
+
+Exchanges a pairing code for an HttpOnly, SameSite=Strict `vtt_viewer_session` cookie. No request auth: the code itself is the credential.
+
+**Auth:** Public — no credentials required.
+
+**Responses:** `201` Paired; session cookie set · errors `400`
+
+### `GET /api/v1/viewer/access`
+
+**Auth:** GM session
+
+**Responses:** `200` Every paired viewer plus which are currently connected · errors `401`
+
+### `DELETE /api/v1/viewer/access/{id}`
+
+Revokes one paired display and immediately disconnects its live event stream.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) — string (uuid)
+
+**Responses:** `200` Revoked · errors `401`
+
+### `GET /api/v1/viewer/presentation`
+
+**Auth:** GM session · Paired viewer session (cookie)
+
+**Responses:** `200` Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter) · errors `401`
+
+### `POST /api/v1/viewer/presentation/commands`
+
+GM-only optimistic-concurrency command (present/pause map, set camera, ping, set/clear measurement). `expectedRevision` mismatches return 409.
+
+**Auth:** GM session
+
+**Responses:** `200` Command applied · errors `400` `401` `409`
+
+### `GET /api/v1/viewer/events`
+
+Server-Sent Events stream of presentation updates for a paired viewer session; not a normal JSON response.
+
+**Auth:** Paired viewer session (cookie)
+
+**Responses:** `200` text/event-stream of `presentation` events · errors `401`
+
+## Shared shapes
+
+### `AnnotationGeometryInput`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `origin` | ImagePoint | yes |  |
+| `target` | ImagePoint | yes |  |
+
+### `ImagePoint`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `x` | number | yes |  |
+| `y` | number | yes |  |
+
+---
+
+*Generated from `@vtt/api-contract` (API v1). The served `/api/v1/openapi.json` is always the authoritative machine contract.*

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { IntegrationScopeSchema, type CredentialAuditEvent, type IntegrationCredentialMetadata, type IntegrationScope } from "@vtt/api-contract";
+import { ApiReference } from "./ApiReference";
 
 const SCOPES = IntegrationScopeSchema.options;
 
@@ -18,7 +19,6 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<Set<IntegrationScope>>(new Set());
   const [expiresAt, setExpiresAt] = useState("");
-  const [gameId, setGameId] = useState("");
   const [issued, setIssued] = useState<{ name: string; token: string; rotated: boolean } | null>(null);
   const [copyConfirmed, setCopyConfirmed] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
@@ -39,11 +39,13 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     try {
       const body = await api("/api/v1/gm/integration-credentials", gmToken, {
         method: "POST",
-        body: JSON.stringify({ name, scopes: [...scopes], gameId: gameId.trim() || null, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null })
+        // No gameId: nothing verifies game-bound credentials yet, so binding one would make it
+        // permanently unusable (see known-bugs). The field stays out of the UI until that lands.
+        body: JSON.stringify({ name, scopes: [...scopes], expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null })
       });
       setIssued({ name: body.data.credential.name, token: body.data.token, rotated: false });
       setCopyConfirmed(false);
-      setName(""); setScopes(new Set()); setExpiresAt(""); setGameId("");
+      setName(""); setScopes(new Set()); setExpiresAt("");
       setFeedback("");
       loadCredentials();
     } catch (error) { setFeedback((error as Error).message); }
@@ -91,7 +93,6 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       <label>Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Stream overlay" required maxLength={100} /></label>
       <fieldset><legend>Scopes</legend>{SCOPES.map((scope) => <label key={scope} className="integration-scope"><input type="checkbox" checked={scopes.has(scope)} onChange={() => toggleScope(scope)} />{scope}</label>)}</fieldset>
       <label>Expires (optional)<input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label>
-      <label>Game ID (optional)<input value={gameId} onChange={(event) => setGameId(event.target.value)} placeholder="Leave blank for unbound" /></label>
       <button type="submit">Create credential</button>
     </form>
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
@@ -108,5 +109,6 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
         {auditFor === credential.id && <ul className="integration-audit">{auditEvents.map((event) => <li key={event.id}>{formatTimestamp(event.occurredAt)} — {event.type}</li>)}</ul>}
       </li>)}
     </ul>}
+    <ApiReference gmToken={gmToken} />
   </section>;
 }

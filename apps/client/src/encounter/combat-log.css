@@ -16,3 +16,4 @@
 .combat-log-entry.log-encounter { border-left-color: #8a7c63; color: #c8c0b1; }
 .combat-log-entry.log-scene { border-left-color: #8a7c63; color: #c8c0b1; }
 .combat-log-entry.log-history { border-left-color: #e8a743; background: #201a12; color: #f3d8b8; }
+.combat-log-entry.log-movement { border-left-color: #5fbf9a; }

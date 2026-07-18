@@ -151,6 +151,53 @@ describe("live authoritative encounter workflow", () => {
     }
   });
 
+  it("broadcasts action and bonus-action usage as table toasts, like reactions", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-turnuse-live-"));
+    const options = {
+      authPath: join(directory, "auth.json"),
+      databasePath: join(directory, "vtt.sqlite"),
+      integrationCredentialsPath: join(directory, "integrations.sqlite"),
+      mapAssetsPath: join(directory, "map-assets"),
+      webDist: join(directory, "dist"),
+      useDevelopmentClient: true,
+      developmentClientPort: 5173,
+      initialGameState: initialState()
+    };
+    const running = createServer(options);
+    let gmSocket: ClientSocket | undefined;
+    let playerSocket: ClientSocket | undefined;
+    try {
+      await running.initialize();
+      await running.auth.bootstrap("a sufficiently long GM password");
+      const gmToken = (await running.auth.login("a sufficiently long GM password"))!;
+      const playerToken = running.auth.issuePlayerSession();
+      const imported = await running.mapAssets.import(png(900, 600), "arena.png");
+      running.mapCatalog.register(imported.metadata.id, "Toast Arena", "battlemap");
+      await new Promise<void>((resolve) => running.httpServer.listen(0, "127.0.0.1", resolve));
+      const address = running.httpServer.address(); if (!address || typeof address === "string") throw new Error("Server did not bind.");
+      const base = `http://127.0.0.1:${address.port}`;
+      gmSocket = await joinSocket(base, gmToken);
+      playerSocket = await joinSocket(base, playerToken);
+
+      const events: Array<{ kind: string; text: string }> = [];
+      playerSocket.on("table:event", (event: { kind: string; text: string }) => events.push(event));
+
+      await emitCommand(gmSocket, "encounter:start", { commandId: START_COMMAND_ID, mapAssetId: imported.metadata.id, entries: [{ actorId: HERO_ID, score: 18 }] });
+      await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000060", slot: "bonus-action", used: true });
+      await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000061", slot: "action", used: true });
+      // Un-marking is a correction, not an event — it must stay silent.
+      await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000062", slot: "action", used: false });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(events.map((event) => event.text)).toContain("Public Hero used a bonus action.");
+      expect(events.map((event) => event.text)).toContain("Public Hero used an action.");
+      expect(events.filter((event) => event.text.includes("used an action."))).toHaveLength(1);
+    } finally {
+      gmSocket?.disconnect(); playerSocket?.disconnect(); running.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("auto-archives an ended encounter and serves the machine-readable record over the GM-only API", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-archive-live-"));
     const options = {
@@ -195,11 +242,18 @@ describe("live authoritative encounter workflow", () => {
       expect(typeof list.encounters[0].endedAt).toBe("string");
 
       const document = await (await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { headers: gmHeaders })).json();
-      expect(document.archiveSchemaVersion).toBe(1);
+      expect(document.archiveSchemaVersion).toBe(2);
       expect(document.turns.length).toBe(list.encounters[0].turnCount);
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
       expect(Array.isArray(document.log)).toBe(true);
       expect(document.log.length).toBeGreaterThan(0); // timestamped commentary bundled in
+      // v2: the complete per-command journal (start → next → end), the final live state, and the dice record.
+      expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["encounter.start", "initiative.next", "encounter.end"]);
+      expect(document.journal[0].principal).toMatch(/^gm:/);
+      expect(document.journal[0].payload.mapAssetId).toBe(imported.metadata.id);
+      expect(document.finalState.combat.active).toBe(true);
+      expect(Array.isArray(document.rolls)).toBe(true);
+      expect(Array.isArray(document.definitions)).toBe(true);
 
       // 404 for an unknown id; delete removes it.
       expect((await fetch(`${base}/api/gm/encounters/99999`, { headers: gmHeaders })).status).toBe(404);

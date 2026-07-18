@@ -22,6 +22,8 @@ type ApiV1RouterOptions = {
   /** GM session bearer auth, distinct from integration-credential auth: only a signed-in GM may manage credentials. */
   authorizeGm: (token: string | undefined) => boolean;
   credentialStore: Pick<IntegrationCredentialStore, "create" | "list" | "get" | "rotate" | "revoke" | "auditEvents">;
+  /** The live-game surface (game-http.ts): mounted inside this router so it shares the request-id/cache-control middleware and sits before the API 404. */
+  gameRouter?: Router;
 };
 
 const CREDENTIAL_ID_PARAM = "id";
@@ -94,7 +96,7 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
         api: { version: API_VERSION, namespace: `/api/v${API_VERSION}` },
         realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" },
         supportedScopes: IntegrationScopeSchema.options,
-        features: { webhooks: false, viewer: false, battlemapGridCalibration: false }
+        features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true }
       }
     });
   });
@@ -147,6 +149,8 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     const events = options.credentialStore.auditEvents(id).map(({ id: eventId, type, occurredAt, detail }) => ({ id: eventId, type, occurredAt, detail }));
     return res.json({ ok: true, apiVersion: API_VERSION, data: { events } });
   });
+
+  if (options.gameRouter) router.use(options.gameRouter);
 
   router.use((_req, res) => sendError(res, res.locals.requestId, 404, "not_found", "API route not found."));
   return router;

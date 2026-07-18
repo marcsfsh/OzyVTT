@@ -33,8 +33,34 @@ describe("SQLite GameStore", () => {
       expect((database.prepare("SELECT COUNT(*) AS count FROM domain_events").get() as { count: number }).count).toBe(50);
       expect((database.prepare("SELECT COUNT(*) AS count FROM command_receipts").get() as { count: number }).count).toBe(50);
       expect((database.prepare("SELECT COUNT(*) AS count FROM snapshots").get() as { count: number }).count).toBe(2);
-      expect((database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count).toBe(4);
+      expect((database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get() as { count: number }).count).toBe(5);
       database.close();
+    } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("journals commands only while a fight is live, capturing payload, principal, and revision", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-journal-"));
+    let store: GameStore | undefined;
+    try {
+      store = new GameStore(join(directory, "vtt.sqlite"), GameStateSchema.parse({ schemaVersion: 1, actors: [actor] }));
+      await store.initialize();
+      // No fight yet: not journaled.
+      await store.execute({ id: "quiet-1", type: "character.claim", actorId: actor.id, payload: { actorId: actor.id }, principal: "player:p1" }, (state) => { state.actors[0].ownerSessionId = "e0bcfbbc-0211-462a-a8f9-b570545981f4"; });
+      expect(store.listJournal()).toHaveLength(0);
+      // The activating command is journaled (before-or-after active covers the start edge)...
+      await store.execute({ id: "fight-on", type: "encounter.start", payload: { entries: [] }, principal: "gm:g1" }, (state) => {
+        state.combat.active = true; state.combat.turnActorId = actor.id; state.combat.initiative = [{ actorId: actor.id, score: 10, tieBreaker: 0 }];
+      });
+      // ...as is everything during the fight, and the deactivating end itself.
+      await store.execute({ id: "mid-fight", type: "actor.apply-damage", actorId: actor.id, payload: { amount: 3 }, principal: "integration:c1" }, (state) => { state.actors[0].hp.current -= 3; });
+      await store.execute({ id: "fight-off", type: "encounter.end", payload: {}, principal: "gm:g1" }, (state) => { state.combat.active = false; state.combat.turnActorId = null; state.combat.initiative = []; });
+      await store.execute({ id: "quiet-2", type: "character.release", payload: {}, principal: "player:p1" }, (state) => { state.actors[0].ownerSessionId = null; });
+
+      const journal = store.listJournal();
+      expect(journal.map((entry) => entry.type)).toEqual(["encounter.start", "actor.apply-damage", "encounter.end"]);
+      expect(journal[1]).toMatchObject({ commandId: "mid-fight", actorId: actor.id, principal: "integration:c1", payload: { amount: 3 } });
+      expect(journal[1].revision).toBe(3);
+      expect(typeof journal[1].at).toBe("string");
     } finally { store?.close(); await rm(directory, { recursive: true, force: true }); }
   });
 

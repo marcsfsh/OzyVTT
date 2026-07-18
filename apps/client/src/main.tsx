@@ -10,6 +10,7 @@ import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/E
 import { CombatLogPanel } from "./encounter/CombatLog";
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
+import { ReplayPanel } from "./replay/ReplayPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { SceneBuilder } from "./scenes/SceneBuilder";
@@ -27,11 +28,12 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "table" | "maps" | "viewer" | "setup";
+type GmTab = "table" | "maps" | "viewer" | "replay" | "setup";
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "table", label: "Encounter" },
   { id: "maps", label: "Map Setup" },
   { id: "viewer", label: "Viewer" },
+  { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
 ];
 
@@ -237,6 +239,8 @@ function App() {
       {mode === "gm" && gmToken && gmTab === "maps" && <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} />}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
+
+      {mode === "gm" && gmToken && gmTab === "replay" && <ReplayPanel gmToken={gmToken} />}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 

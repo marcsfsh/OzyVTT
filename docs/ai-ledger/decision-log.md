@@ -57,6 +57,48 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   turn-snapshot window (250) is the safety net for a fight left un-ended. This is the pull/batch half
   of the integration story; real-time push (webhooks) is a separate future piece (pairs with PR F).
 
+- **2026-07-18 — Game capabilities live in one transport-agnostic operations layer.** Every core
+  combat capability (encounter lifecycle, initiative/timeline, turn economy, tokens, HP/conditions,
+  roster add/import/remove, dice, action resolution, saves, annotations, content reads) is a function
+  in `apps/server/src/game-operations.ts` that validates (shared zod schemas in `game-commands.ts`),
+  role-checks, dispatches through the store, and runs the side effects (publish, log, toasts). The
+  Socket.IO handlers in `server.ts` and the public HTTP routes in `game-http.ts` are both thin
+  adapters over these exact functions — the ADR-0016 "adapters, never forks" rule is now structural,
+  not a convention. New game capabilities get added to the operations layer first; adding a
+  socket-only or HTTP-only capability is a regression. As of the same day's follow-up slice, claims,
+  scenes, and token cosmetics are in the layer too — every game command has both adapters, and
+  `POST /api/v1/sessions/player` mirrors the socket's open join so pure-HTTP player clients exist.
+  Claims stay player-principal-only on both transports (GM/integration principals are refused);
+  scenes use the `scene:write` scope.
+
+- **2026-07-18 — Public game API v1 shape (PR F).** `GET /api/v1/game` returns the caller's
+  projection: GM sessions and GM-minted integration credentials get the full GM view (an integration
+  is the GM's own trusted automation), `?view=player` opts into the player-safe projection for
+  overlay-style consumers, and player session tokens only ever get the player view. Typed
+  command routes cover the core combat surface, plus a generic `POST /api/v1/game/commands` tunnel
+  that dispatches any cataloged command type (`GET` lists them with required scopes) — so every
+  present and future operation is reachable before it earns a typed route. Polling contract: weak
+  ETag derived from the revision (no SSE/webhooks yet — deferred deliberately). Error contract:
+  400 `validation_failed`, 401/403 auth, and **409 `conflict` for everything the game itself
+  refuses** — domain rejections, stale `expectedRevision` (carries `currentRevision`), and timeline
+  confirmations (carries `details.needsConfirm`). `commandId` is the idempotency key on every write
+  (minted server-side when omitted, echoed back). CORS is wide open on `/api` (bearer-only auth;
+  the viewer cookie is SameSite=Strict, so `*` grants nothing). Encounter archives moved under
+  `/api/v1/encounters` behind `combat:read` (delete: `admin`), with the legacy `/api/gm/encounters`
+  endpoints kept as-is.
+
+- **2026-07-18 — Time Machine archives are v2: full per-command journal.** Migration v5 adds an
+  `encounter_journal` table; while a fight is live (before-or-after `combat.active`), every accepted
+  command is journaled *inside its own transaction* — type, validated payload, `gm:`/`player:`/
+  `integration:` principal tag, revision, timestamp. `encounter.start` wipes the previous fight's
+  journal but keeps itself as the new fight's first entry; `encounter.end` folds the journal into the
+  archive document (appending the end command itself) and clears the table atomically.
+  `archiveSchemaVersion` bumps to 2, strictly additive: `journal[]`, `finalState` (the last live
+  state before the end cleared combat), `rolls[]` (union across all boundaries — survives the live
+  200-roll cap), `definitions[]` (full imported + bundled stat blocks used), and `attribution`
+  (CC BY line when bundled content is included). Consumers join `turns`/`log`/`journal` on
+  `revision`.
+
 ## Operating decisions (no ADR)
 
 - **Verification bar:** `check` + `test` + `build` green + live Playwright smoke for UI

@@ -51,6 +51,12 @@ bound replay. **GM/player auth lives separately in `data/auth.json`, not the gam
 - Sessions (GM/player) vs integration-API credentials are **separate** auth systems.
 - Socket.IO (bare domain payloads) vs public HTTP API v1 (versioned envelopes) are
   **different wire formats** over the same command handlers.
+- Concretely: the shared handlers live in `apps/server/src/game-operations.ts` (validation
+  schemas in `game-commands.ts`). The socket handlers in `server.ts` and the HTTP routes in
+  `game-http.ts` are both thin adapters over those functions — add new capabilities to the
+  operations layer, never to a single transport. HTTP principals: GM session, player session
+  (same player limits as the table), or a scoped integration credential (GM authority —
+  credentials are GM-minted).
 
 Governing ADRs: `0001` (authoritative LAN server), `0004` (stack), `0005` (realtime),
 `0006` (SQLite), `0011` (identity/claims), `0016` (public API). See `docs/adr/`.

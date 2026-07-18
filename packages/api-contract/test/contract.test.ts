@@ -4,9 +4,15 @@ import {
   API_VERSION,
   ApiErrorEnvelopeSchema,
   CommandEnvelopeSchema,
+  CONTENT_PATHS,
   CreateIntegrationCredentialRequestSchema,
   CredentialAuditEventSchema,
+  ENCOUNTER_ARCHIVE_PATHS,
   EventEnvelopeSchema,
+  GAME_PATHS,
+  GameCommandEnvelopeSchema,
+  GameMutationAcceptedSchema,
+  GameSnapshotSchema,
   INTEGRATION_CREDENTIAL_PATHS,
   IntegrationCredentialIssuedSchema,
   IntegrationCredentialMetadataSchema,
@@ -16,6 +22,7 @@ import {
   openApiDocument,
   REALTIME_PROTOCOL_VERSION,
   RotateIntegrationCredentialRequestSchema,
+  SESSION_PATHS,
   SYSTEM_PATHS,
   SystemCapabilitiesResponseSchema,
   SystemVersionResponseSchema,
@@ -28,7 +35,7 @@ const credentialMetadata = { id: requestId, name: "overlay", scopes: ["system:re
 describe("public API contracts", () => {
   it("accepts a version and capability response using the advertised constants", () => {
     expect(SystemVersionResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { applicationVersion: "0.1.0", apiVersion: API_VERSION, realtimeProtocolVersion: REALTIME_PROTOCOL_VERSION, schemaVersions: { actorDefinition: 1 } } }).data.apiVersion).toBe(API_VERSION);
-    const capabilities = SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: IntegrationScopeSchema.options, features: { webhooks: false, viewer: false, battlemapGridCalibration: false } } });
+    const capabilities = SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: IntegrationScopeSchema.options, features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true } } });
     expect(capabilities.data.supportedScopes).toContain("system:read");
   });
 
@@ -78,7 +85,7 @@ describe("public API contracts", () => {
     expect(openApiDocument.info.version).toBe(API_VERSION);
     expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
 
-    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS)];
+    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS), ...Object.values(SESSION_PATHS)];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(IntegrationScopeSchema.options);
     for (const path of Object.values(SYSTEM_PATHS)) expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(/^#\/components\/schemas\//);
@@ -107,12 +114,62 @@ describe("public API contracts", () => {
     expect(openApiDocument.components.securitySchemes.viewerCookieAuth).toMatchObject({ type: "apiKey", in: "cookie", name: "vtt_viewer_session" });
   });
 
-  it("never declares a secret-bearing property on any public component schema except the one-time-issue response", () => {
+  it("scopes every live-game operation to the least-privilege credential scope alongside GM sessions", () => {
+    type Operation = { security?: ReadonlyArray<Record<string, readonly string[]>> };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Operation>>;
+    const scopeOf = (path: string, method: string) => paths[path][method].security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
+    expect(scopeOf(GAME_PATHS.snapshot, "get")).toEqual(["game:read"]);
+    expect(scopeOf(GAME_PATHS.log, "get")).toEqual(["combat:read"]);
+    expect(scopeOf(GAME_PATHS.commands, "get")).toEqual(["system:read"]);
+    expect(scopeOf(GAME_PATHS.encounterStart, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(GAME_PATHS.initiativeNext, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(GAME_PATHS.tokenMove, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(GAME_PATHS.actorDamage, "post")).toEqual(["actor:write"]);
+    expect(scopeOf(GAME_PATHS.definitionsImport, "post")).toEqual(["actor:write"]);
+    expect(scopeOf(GAME_PATHS.rolls, "post")).toEqual(["roll:create"]);
+    expect(scopeOf(GAME_PATHS.actionResolve, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toEqual(["combat:read"]);
+    expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.byId, "delete")).toEqual(["admin"]);
+    // Every game/content/archive operation also accepts a GM session; the tunnel's scope varies per command type.
+    for (const path of [...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS)]) {
+      for (const operation of Object.values(paths[path])) {
+        expect(operation.security?.some((entry) => "gmAuth" in entry), `${path} must accept a GM session`).toBe(true);
+      }
+    }
+    // playerAuth marks exactly the operations a player session can genuinely use — never GM-only or archive ones.
+    const acceptsPlayer = (path: string, method: string) => paths[path][method].security?.some((entry) => "playerAuth" in entry) === true;
+    expect(acceptsPlayer(GAME_PATHS.snapshot, "get")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.actorDamage, "post")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.rolls, "post")).toBe(true);
+    expect(acceptsPlayer(CONTENT_PATHS.conditions, "get")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.encounterStart, "post")).toBe(false);
+    expect(acceptsPlayer(GAME_PATHS.actorHp, "post")).toBe(false);
+    expect(acceptsPlayer(CONTENT_PATHS.monsters, "get")).toBe(false);
+    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(false);
+    expect(openApiDocument.components.securitySchemes.playerAuth).toMatchObject({ type: "http", scheme: "bearer" });
+  });
+
+  it("keeps the game wire schemas honest: mutation envelope, snapshot views, and tunnel envelope", () => {
+    const accepted = GameMutationAcceptedSchema.parse({ commandId: requestId, revision: 7, duplicate: false, rollId: requestId });
+    expect(accepted.rollId).toBe(requestId);
+    expect(() => GameMutationAcceptedSchema.parse({ commandId: requestId, revision: 7 })).toThrow();
+    expect(GameSnapshotSchema.parse({ view: "player", revision: 3, game: { revision: 3 } }).view).toBe("player");
+    expect(() => GameSnapshotSchema.parse({ view: "viewer", revision: 3, game: {} })).toThrow();
+    expect(GameCommandEnvelopeSchema.parse({ type: "actor.apply-damage", payload: { actorId: requestId, amount: 5 } }).payload.amount).toBe(5);
+    expect(GameCommandEnvelopeSchema.parse({ type: "turn.end" }).payload).toEqual({});
+    expect(() => GameCommandEnvelopeSchema.parse({ type: "NotACommand!" })).toThrow();
+  });
+
+  it("never declares a secret-bearing property on any public component schema except the deliberate issuance responses", () => {
     const forbiddenNames = /secret|hash|password|token/i;
+    // The two responses whose entire purpose is issuing a credential: the one-time integration
+    // secret, and the player session token (the open LAN-trust join). Everything else stays clean.
+    const issuance = new Set(["IntegrationCredentialIssued.token", "PlayerSessionIssuedData.token"]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties = "properties" in schema ? Object.keys((schema as { properties: Record<string, unknown> }).properties) : [];
       for (const property of properties) {
-        if (name === "IntegrationCredentialIssued" && property === "token") continue;
+        if (issuance.has(`${name}.${property}`)) continue;
+        if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces, not credentials
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }

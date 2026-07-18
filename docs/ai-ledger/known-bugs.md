@@ -14,10 +14,19 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device
   coverage you haven't actually run.
-- **[api] Public API drift** — most capabilities grew over Socket.IO (`encounter:*`,
-  `initiative:*`, `token:move`, `annotation:*`, `dice:*`) and are **not** in `/api/v1`
-  (only bootstrap/auth, credentials, map assets, viewer presentation are). Integrators
-  can't read encounter state or drive combat through the public API. Closing this is PR F.
+- **[api] ~~Public API drift~~ — closed 2026-07-18 (PR F on `claude/open-api-core-m75t9d`).**
+  EVERY game command is now reachable over `/api/v1` (see `current-state.md`) — combat core plus
+  scenes, character claims, token cosmetics, and HTTP player-session issuance. Nothing is
+  socket-only anymore; Socket.IO remains the push channel, HTTP the pull/command channel.
+- **[api] Credential `gameId` binding is dead plumbing** — `CreateIntegrationCredentialRequest`
+  accepts a `gameId`, and `IntegrationCredentialStore.verify` enforces it, but no caller ever
+  passes a `gameId` through (`api-v1.ts` / `game-http.ts` wiring), so a credential minted with a
+  non-null `gameId` is permanently unusable (generic 403) and `rotate` can't clear it. Predates
+  the game API; harmless while everyone leaves it null (this is a single-game product). Either
+  thread a real game id through verification or drop the field in a future contract pass.
+  Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the VTT Setup credential
+  form no longer offers the field, so the footgun is API-only; the contract keeps accepting it
+  for now.
 
 ## Gotchas that look like bugs (but aren't)
 

@@ -22,6 +22,46 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   server snapping, per-drawing annotation colors, GM/player layer toggle, pings.
 - Paired **table viewer** (second screen): pairing codes, "Present <map>", player-safe
   projection over SSE. Viewer bundle never receives full `GameState`.
+- **Public integration API v1 (PR F) — FULL game coverage.** Every game capability is extracted
+  into a transport-agnostic operations layer (`game-operations.ts` + shared schemas in
+  `game-commands.ts`); Socket.IO handlers and the HTTP routes in `game-http.ts` are thin adapters
+  over the same functions (ADR-0016, structural). Surface: `GET /api/v1/game` (GM-full or
+  `?view=player` player-safe projection, weak-ETag polling), `GET /api/v1/game/log`, 40 typed
+  command routes (encounter lifecycle, initiative incl. timeline next/previous with 409
+  `needsConfirm`, turn economy, token move, HP/conditions, roster add/import/remove, dice,
+  action resolve, saves, annotations, character claims incl. GM force-release, token
+  image/size cosmetics, staged scenes create/rename/remove/activate/combatants), a generic
+  `POST /api/v1/game/commands` tunnel + `GET` catalog (type → required scope, single-sourced as
+  `GAME_COMMAND_SCOPES` in the contract), `POST /api/v1/sessions/player` (HTTP mirror of the
+  socket's open join — pure-HTTP player clients), `/api/v1/content/*` reads, and
+  `/api/v1/encounters` archives (list/get behind `combat:read`, delete behind `admin`; legacy
+  `/api/gm/encounters` kept). Auth per route: GM session, player session (player-limited, same
+  reducer checks as the table), or GM-minted integration credential checked against per-route
+  scopes (`scene:write` now in real use); writes are idempotent by `commandId` with
+  `expectedRevision` conflicts carrying `currentRevision`. CORS open on `/api/v1` only (login
+  stays same-origin), JSON body limit 512kb, OpenAPI 3.1 fully documents the surface (served
+  byte-identical from `@vtt/api-contract`; human reference GENERATED to `docs/api-reference.md`
+  with a freshness test), capabilities advertise `gameApi`/`commandTunnel`/`encounterArchives`.
+  No SSE/webhooks yet (deferred by design).
+- **Time Machine v2 encounter archives.** Migration v5 `encounter_journal`: every accepted
+  command while a fight is live is journaled in-transaction (type, payload, principal tag,
+  revision, timestamp); `archiveSchemaVersion` 2 adds `journal[]` (start→end inclusive),
+  `finalState`, complete `rolls[]`, full `definitions[]` (imported + bundled with CC-BY
+  `attribution`) to the existing turns+log document. Shape documented in
+  `apps/server/src/encounter-archive.ts`.
+- **Movement narration in the Time Machine.** Every live `token.move` appends a `movement`
+  combat-log line: distance moved plus old → new range to every placed combatant
+  (Chebyshev cells × `distancePerCell` on calibrated grids, saved image scale on gridless,
+  numberless otherwise; `apps/server/src/movement-narration.ts`). Viewer safety is structural:
+  a public line covers public combatants only; hidden combatants' ranges go in a separate
+  GM-only line (a hidden mover's whole narration is GM-only). Marking an action/bonus action
+  used now broadcasts a table toast + log line like reactions always did.
+- **GM-only Encounter Replay tool.** A "Replays" GM tab (`apps/client/src/replay/ReplayPanel.tsx`)
+  lists archived encounters and steps through one turn by turn: the map with tokens exactly as
+  they stood at each boundary (hidden combatants dashed + tagged), initiative with HP/conditions,
+  and everything logged during that turn (GM-only lines tagged). Prev/Next/slider/auto-play +
+  arrow keys; v2 archives get an "Aftermath" step from `finalState`. Data via the GM-gated
+  `/api/v1/encounters` endpoints — players and the shared viewer can never reach it.
 
 ## Active work
 
@@ -92,9 +132,9 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     gridless saveable/toggleable grid overlay (D-3) still open.
   - **PR E** — multi-scene staging (prepare maps privately, switch the live scene
     non-destructively). Large data-model refactor across domain/server/projections/viewer.
-  - **PR F** — complete the public Open API so Socket.IO capabilities (`encounter:*`,
-    `initiative:*`, `token:move`, `annotation:*`, `dice:*`) are reachable + documented via
-    `/api/v1`, reusing the same command/authorization/projection path (never a fork).
+  - **PR F** — **done on `claude/open-api-core-m75t9d`** (see "Public integration API v1" above).
+    Remaining non-core follow-ups: scenes/claims/token-cosmetics over the API, SSE event stream,
+    webhooks.
 
 ## Recently merged (Cycle 4)
 

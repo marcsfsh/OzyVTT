@@ -8,6 +8,101 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-18 — Public Open API v1 core (PR F) + Time Machine v2 (`claude/open-api-core-m75t9d`)
+
+Owner-directed: RESTful API foundation with core endpoints working, maximum integration openness;
+webhooks explicitly deferred; archive should save as much fight data as possible in the current format.
+
+- **Operations extraction.** All core combat capabilities moved out of the Socket.IO handlers into
+  `game-operations.ts` (shared zod schemas in `game-commands.ts`); sockets + new `game-http.ts` REST
+  routes are now thin adapters over identical functions — "same path, never a fork" is structural.
+  Socket behavior/messages preserved exactly (whole suite passes unchanged).
+- **API surface.** `GET /game` (GM-full / `?view=player`, weak-ETag polling), `GET /game/log`, ~30
+  typed command routes, generic `POST /game/commands` tunnel + discoverable catalog, `/content/*`
+  reads, `/encounters` archives under integration scopes. Principals: GM session, player session
+  (player-limited), scoped integration credentials (GM authority). 409-conflict error contract with
+  `currentRevision` + `needsConfirm`; idempotent `commandId` writes; CORS open on `/api`.
+- **Time Machine v2.** Migration v5 journal table: every command while a fight is live journaled
+  in-transaction with payload + principal; archive v2 adds `journal`, `finalState`, complete `rolls`,
+  `definitions` (+`attribution`), strictly additive.
+- **Contract.** OpenAPI 3.1 documents the entire surface (61 paths), served byte-identical;
+  capabilities advertise `gameApi`/`commandTunnel`/`encounterArchives`; contract tests pin scopes.
+- **Architecture review (subagent) — no blockers; fixes landed:** CORS wildcard scoped down to
+  `/api/v1` only (wildcard on `/api/gm/login` would have let any web page relay password guesses
+  through a LAN browser — negative tests added); per-command scopes single-sourced as
+  `GAME_COMMAND_SCOPES` in `@vtt/api-contract` (registry + typed routes + doc all derive/pinned by
+  test); `playerAuth` security scheme documented on exactly the player-usable operations;
+  idempotency contract stated in the API description; per-verification credential audit writes
+  throttled to one "used" row / 60s (polling would otherwise bloat the audit table). Dead credential
+  `gameId` plumbing recorded in known-bugs (pre-existing).
+- **API reference:** `docs/api-reference.md` is GENERATED from the contract
+  (`packages/api-contract/src/reference.ts`, `npm run docs:generate -w @vtt/api-contract`); a
+  freshness test fails whenever the contract changes without regenerating, so the reference cannot
+  drift. Linked from README.
+- **Verified:** `check`/`test` (284 total: 243 server incl. 8-test HTTP integration suite + journal
+  unit tests + CORS/scope-drift tests, 16 contract incl. reference freshness)/`build` green; live
+  smoke against the running service passed 17/17 external-integration steps (credential → discovery
+  → map upload → snapshot views → REST encounter → ETag 304 → tunnel → idempotent retry → archive v2
+  journal → revocation cutoff).
+- **Follow-up slice landed the same session — full coverage:** claims (player-principal-only, GM
+  force-release), token image/size cosmetics, and staged scenes (create/rename/remove/activate/
+  combatants, `scene:write` scope) moved into the operations layer with typed routes + tunnel
+  entries; `POST /api/v1/sessions/player` mirrors the socket's open join so pure-HTTP player
+  clients exist. Every game command now has both adapters; the socket-only list is empty. 10 new
+  commands in the catalog (40 total), contract + generated reference updated, 2 new end-to-end
+  test blocks (claim lifecycle over HTTP incl. contested claim + force-release; scene staging incl.
+  active-scene-removal rejection). 286 tests green across all workspaces.
+- **Remaining follow-ups:** SSE stream, webhooks, rate limiting, credential `gameId` plumbing
+  (known-bugs).
+
+## 2026-07-18 — API reference polish: expandable specs, multi-language samples, spec export
+
+Owner asks (readme.io-style reference, à la CompanyCam/AcculLynx): endpoints expand to full spec;
+request examples in more languages (Python, PowerShell); export the complete spec.
+
+- **Expandable endpoints** (`ApiReference.tsx`): clicking any endpoint reveals authorized
+  principals, parameters, request-body fields (one nested level flattened), a runnable example
+  request, and every response code with its data-payload field table — all resolved client-side
+  from the fetched OpenAPI document's component schemas, lazy-rendered per endpoint.
+- **Multi-language samples:** global Language selector (cURL / Python / PowerShell / JavaScript);
+  each endpoint's example regenerates in the chosen language (curl, `requests`, `Invoke-RestMethod`
+  here-string body, `fetch`) with a Copy button. Synthesized from the same schema/example-body data
+  (Python dicts via a True/False/None literal formatter).
+- **Export complete spec:** "⬇ Export OpenAPI spec" downloads the full OpenAPI 3.1 document
+  (`vtt-openapi-v1.json`) for Postman / openapi-generator / etc.
+- **Verified:** check/test/build green; live Playwright smoke extended — expands apply-damage and
+  asserts fields + example + response codes; switches to Python (asserts `import requests` + dict
+  payload) and PowerShell (asserts `Invoke-RestMethod -Method Post`); captures the spec download
+  and validates it (openapi 3.1.0, 72 paths, components + /game/claims present). 0 console errors.
+
+## 2026-07-18 — Encounter Replay + movement tracking + bonus-action toasts (same branch)
+
+Owner asks: a GM-only "encounter replay" study tool; bonus actions missing from toasts; movement
+absent from the Time Machine (wanted distance moved + old/new range to each creature).
+
+- **Movement narration** (`movement-narration.ts` + `tokenMove` op): every live move logs a
+  `movement` combat-log line — "Borin moved 20 ft — Mirena 5 ft → 15 ft." — measured like the
+  ruler (Chebyshev × distancePerCell; gridless uses the saved scale; neither → numberless).
+  Entering/leaving the map narrate too. Hidden combatants' ranges split into a GM-only line;
+  a hidden mover is entirely GM-only. Lands in live log + archives. New log kind `movement`.
+- **Toast fix:** `turn.use` with `used=true` now broadcasts "X used an action / a bonus action."
+  (mirrors reactions; unmarking stays silent; hidden actor → GM-only). Verified over a live socket.
+- **Encounter Replay:** new GM "Replays" tab; step/scrub/auto-play through an archive's turns —
+  map + tokens per boundary (hidden dashed + HIDDEN tag), initiative with HP/conditions, per-turn
+  log slice with GM-only tags; v2 archives add an Aftermath step. GM-gated endpoints only.
+- **Verified:** check/test/build green (293 tests: +5 narration unit, +1 movement-log HTTP
+  integration, +1 socket toast); live Playwright smoke drove the real built client end-to-end
+  (seed fight via API → Replays tab → watch → step → mobile viewport), 0 console errors,
+  screenshots captured. TokenMapGeometry gained optional `scale` so gridless distances work.
+- **Same-day follow-ups (owner):** replay **Export JSON** buttons (viewer header + per list row)
+  download the full archive document verbatim; smoke captures the download and re-parses it
+  (schema 2, turns + journal intact). VTT Setup gains a **collapsible API reference** rendered
+  live from the server's own `/api/v1/openapi.json` + command catalog (77 ops / 72 paths — can't
+  go stale), and the credential form drops the dead `gameId` field (known-bugs mitigation).
+  Smoke asserts the new endpoints (claims/sessions/scene commands) render on the page.
+
+---
+
 ## 2026-07-17 — UX bug sweep, batch 2 (owner retest)
 
 Second round from the owner's retest, same branch:
