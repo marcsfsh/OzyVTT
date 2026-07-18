@@ -399,6 +399,39 @@ describe("public game API over /api/v1", () => {
     expect((await post(base, GAME_PATHS.actorTokenImage.replace("{actorId}", HERO_ID), cosmetics.token, { tokenAssetId: null })).status).toBe(200);
   });
 
+  it("narrates token movement into the combat log with distances, keeping hidden ranges GM-only", async () => {
+    const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
+    // 50px cells at 5 ft each: cell (c,r) center = (25 + 50c, 25 + 50r).
+    server.mapCatalog.saveCalibration(mapAssetId, { calibration: { kind: "square", origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 }, verifiedAt: null, verificationPoint: null, verificationErrorPx: null });
+    const reader = await issueCredential(base, gmToken, "log reader", ["combat:read"]);
+    const playerToken = server.auth.issuePlayerSession();
+
+    await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 10 }, { actorId: SECRET_ID, score: 5 }] });
+    // Tokens auto-place on encounter start; pin both to known cells, then make the studied move.
+    await post(base, GAME_PATHS.tokenMove.replace("{actorId}", HERO_ID), gmToken, { position: { x: 25, y: 25 } });
+    await post(base, GAME_PATHS.tokenMove.replace("{actorId}", SECRET_ID), gmToken, { position: { x: 25, y: 125 } });
+    await post(base, GAME_PATHS.tokenMove.replace("{actorId}", HERO_ID), gmToken, { position: { x: 225, y: 25 } });
+
+    const gmLog = GameLogResponseSchema.parse(await (await fetch(base + GAME_PATHS.log, { headers: bearer(reader.token) })).json());
+    const movement = gmLog.data.entries.filter((entry) => entry.kind === "movement");
+    // The studied move: 4 cells = 20 ft, with the hidden Tyrant's ranges split into a GM-only line.
+    expect(movement.map((entry) => entry.text)).toContain("Public Hero moved 20 ft.");
+    expect(movement.map((entry) => entry.text)).toContain("Hidden ranges for Public Hero — Unrevealed Tyrant 10 ft → 20 ft.");
+    expect(movement.find((entry) => entry.text.startsWith("Hidden ranges"))?.gmOnly).toBe(true);
+
+    // Players get the public movement lines but never the hidden ranges.
+    const playerLog = GameLogResponseSchema.parse(await (await fetch(base + GAME_PATHS.log, { headers: bearer(playerToken) })).json());
+    const playerMovement = playerLog.data.entries.filter((entry) => entry.kind === "movement");
+    expect(playerMovement.some((entry) => entry.text === "Public Hero moved 20 ft.")).toBe(true);
+    expect(JSON.stringify(playerLog.data.entries)).not.toContain("Unrevealed Tyrant");
+
+    // The narration rides the fight into its Time Machine archive.
+    await post(base, GAME_PATHS.encounterEnd, gmToken, {});
+    const archives = EncounterArchiveListResponseSchema.parse(await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.collection, { headers: bearer(gmToken) })).json());
+    const archived = await (await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(archives.data.encounters[0].id)), { headers: bearer(gmToken) })).json();
+    expect(JSON.stringify(archived.data.document.log)).toContain("Public Hero moved 20 ft.");
+  });
+
   it("answers CORS preflights for /api/v1 only — never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, { method: "OPTIONS", headers: { origin: "https://overlay.example", "access-control-request-method": "GET", "access-control-request-headers": "authorization" } });

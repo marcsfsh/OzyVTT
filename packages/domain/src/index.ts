@@ -250,7 +250,7 @@ export type GmActor = Actor & { presence: PresenceStatus | null };
 export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
 export type GmView = Omit<GameState, "actors"> & { actors: GmActor[]; turnHistory?: readonly TurnHistoryEntry[] };
 /** A persisted combat-log line. Players only ever receive gmOnly=false entries; the GM sees all. */
-export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll"; text: string; gmOnly: boolean; revision: number }>;
+export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll" | "movement"; text: string; gmOnly: boolean; revision: number }>;
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState — presentation only; the roll history is the durable record. */
 export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction"; text: string; actorIds: readonly string[]; at: number }>;

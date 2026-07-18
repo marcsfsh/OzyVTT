@@ -17,6 +17,7 @@ import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
 import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
+import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
@@ -295,7 +296,13 @@ export function createGameOperations(context: GameOperationsContext) {
       const scope = actorScopeOf(principal);
       const { commandId, slot, used, expectedRevision } = request;
       const result = await store.execute({ id: commandId, type: "turn.use", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setTurnSlot(state, slot, used, scope));
-      if (!result.duplicate) await context.publishGameState(result.state);
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        // Marking a slot spent narrates like reactions do — bonus actions were previously invisible
+        // to the rest of the table. Un-marking (a correction) stays silent.
+        const turnActorId = result.state.combat.turnActorId;
+        if (used && turnActorId) context.broadcastTableEvent({ kind: "action", text: `${actorName(turnActorId)} used ${slot === "bonus-action" ? "a bonus action" : "an action"}.`, actorIds: [turnActorId], gmOnly: actorHidden(turnActorId) });
+      }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -326,15 +333,24 @@ export function createGameOperations(context: GameOperationsContext) {
       const mapAssetId = store.snapshot.combat.mapAssetId;
       if (!mapAssetId) throw new CommandRejectedError("Start an encounter before moving tokens.");
       const geometry = await context.tokenGeometryFor(mapAssetId);
+      let movement: MovementNarration | null | undefined;
       const result = await store.execute({ id: commandId, type: "token.move", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
         if (!isGmGrade(principal)) {
           const actor = state.actors.find((candidate) => candidate.id === actorId);
           if (!actor || actor.ownerSessionId !== principal.sessionId) throw new CommandRejectedError("You may only move your claimed character token.");
         }
+        const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         moveEncounterToken(state, actorId, position, geometry);
+        // Time Machine: narrate the move (distance + old → new range to every placed combatant)
+        // from the post-mutation state so the logged numbers are the snapped, authoritative ones.
+        movement = narrateTokenMove({ state, actorId, from, geometry });
       });
-      if (!result.duplicate) await context.publishGameState(result.state);
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        if (movement?.publicText) context.appendLog({ kind: "movement", text: movement.publicText, actorIds: [actorId] });
+        if (movement?.gmText) context.appendLog({ kind: "movement", text: movement.gmText, gmOnly: true });
+      }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 

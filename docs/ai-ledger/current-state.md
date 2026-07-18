@@ -49,6 +49,19 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   `finalState`, complete `rolls[]`, full `definitions[]` (imported + bundled with CC-BY
   `attribution`) to the existing turns+log document. Shape documented in
   `apps/server/src/encounter-archive.ts`.
+- **Movement narration in the Time Machine.** Every live `token.move` appends a `movement`
+  combat-log line: distance moved plus old → new range to every placed combatant
+  (Chebyshev cells × `distancePerCell` on calibrated grids, saved image scale on gridless,
+  numberless otherwise; `apps/server/src/movement-narration.ts`). Viewer safety is structural:
+  a public line covers public combatants only; hidden combatants' ranges go in a separate
+  GM-only line (a hidden mover's whole narration is GM-only). Marking an action/bonus action
+  used now broadcasts a table toast + log line like reactions always did.
+- **GM-only Encounter Replay tool.** A "Replays" GM tab (`apps/client/src/replay/ReplayPanel.tsx`)
+  lists archived encounters and steps through one turn by turn: the map with tokens exactly as
+  they stood at each boundary (hidden combatants dashed + tagged), initiative with HP/conditions,
+  and everything logged during that turn (GM-only lines tagged). Prev/Next/slider/auto-play +
+  arrow keys; v2 archives get an "Aftermath" step from `finalState`. Data via the GM-gated
+  `/api/v1/encounters` endpoints — players and the shared viewer can never reach it.
 
 ## Active work
 

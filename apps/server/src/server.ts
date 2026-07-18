@@ -162,7 +162,7 @@ export function createServer(options: CreateServerOptions) {
   async function tokenGeometryFor(mapAssetId: string): Promise<TokenMapGeometry> {
     const [asset, entry] = await Promise.all([mapAssets.get(mapAssetId), Promise.resolve(mapCatalog.get(mapAssetId))]);
     if (!asset || !entry || entry.kind !== "battlemap") throw new CommandRejectedError("The active encounter battlemap is unavailable.");
-    return { width: asset.width, height: asset.height, calibration: entry.calibration?.calibration ?? null };
+    return { width: asset.width, height: asset.height, calibration: entry.calibration?.calibration ?? null, scale: entry.scale ?? null };
   }
   async function publishGameState(state: GameState) {
     try { await viewerCoordinator.synchronizeEncounter(state.revision, projectViewerEncounter(state, Date.now())); }

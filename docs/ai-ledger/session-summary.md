@@ -55,6 +55,26 @@ webhooks explicitly deferred; archive should save as much fight data as possible
 - **Remaining follow-ups:** SSE stream, webhooks, rate limiting, credential `gameId` plumbing
   (known-bugs).
 
+## 2026-07-18 — Encounter Replay + movement tracking + bonus-action toasts (same branch)
+
+Owner asks: a GM-only "encounter replay" study tool; bonus actions missing from toasts; movement
+absent from the Time Machine (wanted distance moved + old/new range to each creature).
+
+- **Movement narration** (`movement-narration.ts` + `tokenMove` op): every live move logs a
+  `movement` combat-log line — "Borin moved 20 ft — Mirena 5 ft → 15 ft." — measured like the
+  ruler (Chebyshev × distancePerCell; gridless uses the saved scale; neither → numberless).
+  Entering/leaving the map narrate too. Hidden combatants' ranges split into a GM-only line;
+  a hidden mover is entirely GM-only. Lands in live log + archives. New log kind `movement`.
+- **Toast fix:** `turn.use` with `used=true` now broadcasts "X used an action / a bonus action."
+  (mirrors reactions; unmarking stays silent; hidden actor → GM-only). Verified over a live socket.
+- **Encounter Replay:** new GM "Replays" tab; step/scrub/auto-play through an archive's turns —
+  map + tokens per boundary (hidden dashed + HIDDEN tag), initiative with HP/conditions, per-turn
+  log slice with GM-only tags; v2 archives add an Aftermath step. GM-gated endpoints only.
+- **Verified:** check/test/build green (293 tests: +5 narration unit, +1 movement-log HTTP
+  integration, +1 socket toast); live Playwright smoke drove the real built client end-to-end
+  (seed fight via API → Replays tab → watch → step → mobile viewport), 0 console errors,
+  screenshots captured. TokenMapGeometry gained optional `scale` so gridless distances work.
+
 ---
 
 ## 2026-07-17 — UX bug sweep, batch 2 (owner retest)

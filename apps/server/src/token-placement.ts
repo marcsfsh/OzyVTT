@@ -1,11 +1,14 @@
 import type { EncounterToken, EncounterTokenPosition, GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
+import type { MapDistanceScale } from "./map-measurement.js";
 
 export type TokenMapGeometry = Readonly<{
   width: number;
   height: number;
   calibration: SquareGridCalibration | null;
+  /** Gridless real-world scale from the map catalog, when saved — lets movement narration measure distances on uncalibrated maps. Optional so geometry literals in tests stay small. */
+  scale?: MapDistanceScale | null;
 }>;
 
 function positiveDimension(value: number, label: string) {
