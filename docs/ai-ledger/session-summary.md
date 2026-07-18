@@ -55,6 +55,26 @@ webhooks explicitly deferred; archive should save as much fight data as possible
 - **Remaining follow-ups:** SSE stream, webhooks, rate limiting, credential `gameId` plumbing
   (known-bugs).
 
+## 2026-07-18 — API reference polish: expandable specs, multi-language samples, spec export
+
+Owner asks (readme.io-style reference, à la CompanyCam/AcculLynx): endpoints expand to full spec;
+request examples in more languages (Python, PowerShell); export the complete spec.
+
+- **Expandable endpoints** (`ApiReference.tsx`): clicking any endpoint reveals authorized
+  principals, parameters, request-body fields (one nested level flattened), a runnable example
+  request, and every response code with its data-payload field table — all resolved client-side
+  from the fetched OpenAPI document's component schemas, lazy-rendered per endpoint.
+- **Multi-language samples:** global Language selector (cURL / Python / PowerShell / JavaScript);
+  each endpoint's example regenerates in the chosen language (curl, `requests`, `Invoke-RestMethod`
+  here-string body, `fetch`) with a Copy button. Synthesized from the same schema/example-body data
+  (Python dicts via a True/False/None literal formatter).
+- **Export complete spec:** "⬇ Export OpenAPI spec" downloads the full OpenAPI 3.1 document
+  (`vtt-openapi-v1.json`) for Postman / openapi-generator / etc.
+- **Verified:** check/test/build green; live Playwright smoke extended — expands apply-damage and
+  asserts fields + example + response codes; switches to Python (asserts `import requests` + dict
+  payload) and PowerShell (asserts `Invoke-RestMethod -Method Post`); captures the spec download
+  and validates it (openapi 3.1.0, 72 paths, components + /game/claims present). 0 console errors.
+
 ## 2026-07-18 — Encounter Replay + movement tracking + bonus-action toasts (same branch)
 
 Owner asks: a GM-only "encounter replay" study tool; bonus actions missing from toasts; movement

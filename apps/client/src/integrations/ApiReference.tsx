@@ -29,6 +29,79 @@ type CatalogCommand = Readonly<{ type: string; scope: string; summary: string }>
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 const EXAMPLE_UUID = "00000000-0000-4000-8000-000000000000";
 
+type Language = "shell" | "python" | "powershell" | "javascript";
+const LANGUAGES: ReadonlyArray<{ id: Language; label: string }> = [
+  { id: "shell", label: "cURL" },
+  { id: "python", label: "Python" },
+  { id: "powershell", label: "PowerShell" },
+  { id: "javascript", label: "JavaScript" }
+];
+
+/** JSON value → Python literal (True/False/None, dicts, lists) so the example is copy-paste valid. */
+function toPythonLiteral(value: unknown, indent = 0): string {
+  const pad = "    ".repeat(indent);
+  const inner = "    ".repeat(indent + 1);
+  if (value === null) return "None";
+  if (typeof value === "boolean") return value ? "True" : "False";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return value.length === 0 ? "[]" : `[\n${value.map((entry) => inner + toPythonLiteral(entry, indent + 1)).join(",\n")}\n${pad}]`;
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.length === 0 ? "{}" : `{\n${entries.map(([key, entry]) => `${inner}${JSON.stringify(key)}: ${toPythonLiteral(entry, indent + 1)}`).join(",\n")}\n${pad}}`;
+}
+
+/** Build a runnable request sample for one endpoint in the chosen language. Synthetic — a real token and ids replace the placeholders. */
+function codeSample(language: Language, method: string, url: string, needsAuth: boolean, body: Record<string, unknown> | null, rawBodyTypes: readonly string[]): string {
+  const upper = method.toUpperCase();
+  const bodyJson = body ? JSON.stringify(body) : null;
+  const bodyPretty = body ? JSON.stringify(body, null, 2) : null;
+  const rawType = rawBodyTypes[0];
+
+  if (language === "shell") {
+    const lines = [`curl -X ${upper} ${url}`];
+    if (needsAuth) lines.push(`  -H "Authorization: Bearer $TOKEN"`);
+    if (bodyJson) { lines.push(`  -H "content-type: application/json"`); lines.push(`  -d '${bodyJson}'`); }
+    else if (rawType) { lines.push(`  -H "content-type: ${rawType}"`); lines.push(`  --data-binary @image.png`); }
+    return lines.join(" \\\n");
+  }
+
+  if (language === "python") {
+    const lines = ["import requests", "", `url = "${url}"`];
+    const headers: string[] = [];
+    if (needsAuth) headers.push(`    "Authorization": "Bearer YOUR_TOKEN"`);
+    if (bodyJson || rawType) headers.push(`    "Content-Type": "${rawType ?? "application/json"}"`);
+    if (headers.length) lines.push(`headers = {\n${headers.join(",\n")}\n}`);
+    if (body) lines.push(`payload = ${toPythonLiteral(body)}`);
+    const args = ["url"];
+    if (headers.length) args.push("headers=headers");
+    if (body) args.push("json=payload");
+    else if (rawType) args.push(`data=open("image.png", "rb").read()`);
+    lines.push("", `response = requests.${method.toLowerCase()}(${args.join(", ")})`, "print(response.json())");
+    return lines.join("\n");
+  }
+
+  if (language === "powershell") {
+    const capital = upper.charAt(0) + upper.slice(1).toLowerCase();
+    const lines: string[] = [];
+    if (needsAuth) lines.push(`$headers = @{\n    "Authorization" = "Bearer YOUR_TOKEN"\n}`);
+    if (bodyPretty) lines.push(`$body = @'\n${bodyPretty}\n'@`);
+    const args = [`-Method ${capital}`, `-Uri "${url}"`];
+    if (needsAuth) args.push("-Headers $headers");
+    if (bodyPretty) { args.push(`-ContentType "application/json"`); args.push("-Body $body"); }
+    else if (rawType) { args.push(`-ContentType "${rawType}"`); args.push(`-InFile "image.png"`); }
+    lines.push(`Invoke-RestMethod ${args.join(" ")}`);
+    return lines.join("\n");
+  }
+
+  const headerLines: string[] = [];
+  if (needsAuth) headerLines.push(`    "Authorization": "Bearer YOUR_TOKEN"`);
+  if (bodyJson || rawType) headerLines.push(`    "Content-Type": "${rawType ?? "application/json"}"`);
+  const init: string[] = [`  method: "${upper}"`];
+  if (headerLines.length) init.push(`  headers: {\n${headerLines.join(",\n")}\n  }`);
+  if (bodyPretty) init.push(`  body: JSON.stringify(${bodyPretty.replace(/\n/g, "\n  ")})`);
+  return `const response = await fetch("${url}", {\n${init.join(",\n")}\n});\nconst data = await response.json();\nconsole.log(data);`;
+}
+
 const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }> = [
   { title: "System & discovery", match: (path) => path.startsWith("/api/v1/system") || path === "/api/v1/openapi.json" },
   { title: "Integration credentials (GM)", match: (path) => path.startsWith("/api/v1/gm/integration-credentials") },
@@ -180,8 +253,9 @@ function FieldTable({ rows }: Readonly<{ rows: readonly FieldRow[] }>) {
   </table>;
 }
 
-function EndpointDetails({ method, path, operation, components, origin }: Readonly<{ method: string; path: string; operation: Operation; components: Components; origin: string }>) {
+function EndpointDetails({ method, path, operation, components, origin, language }: Readonly<{ method: string; path: string; operation: Operation; components: Components; origin: string; language: Language }>) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const parameters = operation.parameters ?? [];
   const jsonBody = operation.requestBody?.content?.["application/json"]?.schema;
   const bodySchema = jsonBody ? (typeof jsonBody.$ref === "string" ? resolveRef(jsonBody.$ref, components) : jsonBody) : undefined;
@@ -190,11 +264,8 @@ function EndpointDetails({ method, path, operation, components, origin }: Readon
 
   const examplePath = path.replace(/\{[a-zA-Z]+\}/g, EXAMPLE_UUID);
   const exampleJson = bodySchema ? exampleBody(bodySchema, components) : null;
-  const curl = [
-    `curl -X ${method.toUpperCase()} ${origin}${examplePath}`,
-    ...(needsAuth ? [`  -H "Authorization: Bearer $TOKEN"`] : []),
-    ...(exampleJson ? [`  -H "content-type: application/json"`, `  -d '${JSON.stringify(exampleJson)}'`] : rawBodyTypes.length ? [`  --data-binary @image.png  # ${rawBodyTypes.join(", ")}`] : [])
-  ].join(" \\\n");
+  const sample = codeSample(language, method, `${origin}${examplePath}`, needsAuth, exampleJson, rawBodyTypes);
+  const copySample = async () => { try { await navigator.clipboard.writeText(sample); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked; the code is selectable */ } };
 
   return <details className="api-endpoint" onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
     <summary>
@@ -223,8 +294,8 @@ function EndpointDetails({ method, path, operation, components, origin }: Readon
       {rawBodyTypes.length > 0 && <div className="api-detail-block"><h4>Request body</h4><p className="api-detail-line">Raw <code>{rawBodyTypes.join(", ")}</code> bytes.</p></div>}
 
       <div className="api-detail-block">
-        <h4>Example request</h4>
-        <pre className="api-code"><code>{curl}</code></pre>
+        <div className="api-code-header"><h4>Example request</h4><span className="api-code-lang">{LANGUAGES.find((entry) => entry.id === language)?.label}</span><button type="button" className="api-copy" onClick={copySample}>{copied ? "Copied ✓" : "Copy"}</button></div>
+        <pre className="api-code"><code>{sample}</code></pre>
       </div>
 
       <div className="api-detail-block">
@@ -243,8 +314,19 @@ function EndpointDetails({ method, path, operation, components, origin }: Readon
   </details>;
 }
 
+/** Download the full OpenAPI 3.1 spec — the complete machine-readable contract, ready for Postman/openapi-generator/etc. */
+function exportSpec(document: OpenApiDocument) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
+  const anchor = window.document.createElement("a");
+  anchor.href = url;
+  anchor.download = `vtt-openapi-v${(document.info as { version?: string }).version ?? "1"}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
   const [state, setState] = useState<{ status: "idle" | "loading" | "ready" | "error"; document: OpenApiDocument | null; commands: readonly CatalogCommand[]; message: string }>({ status: "idle", document: null, commands: [], message: "" });
+  const [language, setLanguage] = useState<Language>("shell");
 
   const load = () => {
     if (state.status !== "idle" && state.status !== "error") return;
@@ -273,6 +355,13 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
       {state.status === "loading" && <p>Loading the contract…</p>}
       {state.status === "error" && <p className="api-reference-error">{state.message} <button className="link" onClick={load}>Retry</button></p>}
       {document && <>
+        <div className="api-reference-toolbar">
+          <div className="api-lang-tabs" role="group" aria-label="Example request language">
+            <span className="api-lang-label">Language</span>
+            {LANGUAGES.map((entry) => <button key={entry.id} type="button" aria-pressed={language === entry.id} onClick={() => setLanguage(entry.id)}>{entry.label}</button>)}
+          </div>
+          <button type="button" className="secondary api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document — import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</button>
+        </div>
         <p className="api-reference-count">{operationCount} operations across {Object.keys(document.paths).length} paths. Example values are synthetic — real ids come from the game state.</p>
         {GROUPS.map((group) => {
           const paths = Object.entries(document.paths).filter(([path]) => group.match(path));
@@ -281,7 +370,7 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
             <h3>{group.title}</h3>
             <div className="api-endpoint-list">
               {paths.flatMap(([path, operations]) => METHOD_ORDER.filter((method) => operations[method]).map((method) => (
-                <EndpointDetails key={`${method} ${path}`} method={method} path={path} operation={operations[method]} components={components} origin={origin} />
+                <EndpointDetails key={`${method} ${path}`} method={method} path={path} operation={operations[method]} components={components} origin={origin} language={language} />
               )))}
             </div>
           </section>;
