@@ -135,6 +135,18 @@ export const PendingSaveSchema = z.object({
   proposedDamageParts: z.array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict()).max(9).optional(),
   halfOnSuccess: z.boolean().default(true),
   conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).nullable().default(null),
+  /**
+   * A source-linked effect applied on a committed failure (Unarmed Strike Grapple: the Grappled
+   * effect with its escape DC). Additive — absent on saves created before this field existed.
+   */
+  onFailEffect: z.object({
+    name: z.string().min(1).max(120),
+    tags: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(8).default([]),
+    linkedConditionIds: z.array(z.string().regex(/^[a-z0-9-]+$/).max(60)).max(4).default([]),
+    escapeDc: z.number().int().min(1).max(40).nullable().default(null),
+    sourceActorId: z.string().uuid().nullable().default(null),
+    sourceName: z.string().max(120).nullable().default(null)
+  }).strict().optional(),
   createdAt: z.number().int().nonnegative()
 }).strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
@@ -319,7 +331,7 @@ export type ContentConditionsResult = { ok: boolean; message?: string; condition
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
-export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }>; area: ContentActionArea | null; attackCount: number | null; usesLimit: number | null; usesPer: "turn" | "encounter" | "long-rest" | null; usesPool: string | null; requiresEffectTag: string | null; multiattack: ReadonlyArray<{ actionId: string; count: number }> | null; grants: boolean; reaction: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null }>;
+export type ContentActionSummary = Readonly<{ id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other"; description: string; attackBonus: number | null; reachFeet: number | null; rangeFeet: number | null; saveAbility: string | null; saveDc: number | null; damage: ReadonlyArray<{ formula: string; type: string }>; area: ContentActionArea | null; attackCount: number | null; usesLimit: number | null; usesPer: "turn" | "encounter" | "long-rest" | null; usesPool: string | null; requiresEffectTag: string | null; multiattack: ReadonlyArray<{ actionId: string; count: number }> | null; grants: boolean; reaction: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null; /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean; /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none" }>;
 export type ContentActionsResult = { ok: boolean; message?: string; actions?: readonly ContentActionSummary[] };
 /** Full stat-block payload for the GM's sheet view; inert content data, GM-gated. */
 export type ContentSheetResult = { ok: boolean; message?: string; definition?: import("@vtt/schemas").ActorDefinition };
@@ -351,6 +363,10 @@ export type ActionResolution = Readonly<{
   overridden?: Readonly<{ rule: string; reason: string }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
   reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null — GM adjudicates). */
+  check?: Readonly<{ skill: string; total: number; naturalRoll: number; dc: number | null; success: boolean | null }> | null;
+  /** Effects this resolve ended as a rule consequence (attacking revealed Hiding; an off-turn action released a Ready). */
+  effectsEnded?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; name: string }>>;
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;
@@ -391,6 +407,8 @@ export type ActionAvailability = Readonly<{
   usesRemaining: number | null;
   /** Rolls left in the open compound-action instance for this action; null when no instance applies. */
   componentsRemaining: number | null;
+  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) — not on the stat block. */
+  builtin?: boolean;
 }>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[] };
 export interface ClientToServerEvents {

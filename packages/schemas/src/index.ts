@@ -17,7 +17,14 @@ export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
   z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(20) }).strict(),
   z.object({ type: z.literal("attack-advantage") }).strict(),
-  z.object({ type: z.literal("incoming-attack-advantage") }).strict()
+  z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
+  /** The bearer's own attack rolls have disadvantage (always-on, unlike turn-scoped attack-advantage). */
+  z.object({ type: z.literal("attack-disadvantage") }).strict(),
+  /** Attack rolls against the bearer have disadvantage (Dodge). */
+  z.object({ type: z.literal("incoming-attack-disadvantage") }).strict(),
+  /** The bearer's saving throws have advantage; absent ability = all saves (Dodge grants Dex only). */
+  z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
+  z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict()
 ]);
 export type EffectModifier = z.infer<typeof EffectModifierSchema>;
 
@@ -47,6 +54,8 @@ export const EffectInstanceSchema = z.object({
   ]),
   /** Grapples etc.: the effect ends when its source actor drops to 0 HP or leaves the roster. */
   endsWhenSourceDefeated: z.boolean().default(false),
+  /** Dodge: the effect's modifiers stop applying while the bearer is incapacitated (SRD). Additive. */
+  voidWhileIncapacitated: z.boolean().default(false),
   /** Cascade: this effect ends when the actor no longer has any other effect carrying this tag (Frenzy's marker ends with the Rage). */
   endsWithTag: z.string().regex(/^[a-z0-9-]+$/).max(40).nullable().default(null),
   modifiers: z.array(EffectModifierSchema).max(8).default([]),
@@ -114,7 +123,11 @@ const EffectGrantSchema = z.object({
   modifiers: z.array(EffectModifierSchema).max(8).default([]),
   onEnd: z.array(EffectOnEndSchema).max(2).default([]),
   /** The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage). */
-  endsWithTag: EffectTagSchema.optional()
+  endsWithTag: EffectTagSchema.optional(),
+  /** Who receives the effect: the acting creature (default) or the action's single chosen target (Help). */
+  target: z.enum(["self", "target"]).default("self"),
+  /** Dodge: benefits lapse while the bearer is incapacitated (SRD). */
+  voidWhileIncapacitated: z.boolean().default(false)
 }).strict();
 
 /**

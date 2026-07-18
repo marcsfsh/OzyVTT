@@ -644,6 +644,8 @@ Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit dou
 | `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | Explicit GM choice; wins over the engine's advantage/disadvantage aggregation |
 | `override` | object | no | Bypasses a rules-mode rejection; audited in the combat log and journal |
 | `override.reason` | string | yes |  |
+| `effectId` | string | no | For the escape-grapple builtin: which escapable effect to break (defaults to the first with an escape DC) |
+| `note` | string | no | Free-text annotation (the Ready builtin's trigger), shown in the granted effect's name |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

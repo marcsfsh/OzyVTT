@@ -2,9 +2,9 @@ import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
 import { aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
-import { addEffect, hasEffectTag } from "./effects.js";
-import { conditionFrom, createPendingSaves, halfOnSuccessFrom } from "./saving-throws.js";
-import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
+import { addEffect, endEffect, hasEffectTag } from "./effects.js";
+import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
+import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 type LiveActor = GameState["actors"][number];
@@ -17,6 +17,12 @@ export type ResolveInput = Readonly<{
   rollMode?: "advantage" | "disadvantage" | "normal" | null;
   /** GM override of a rules-mode rejection; audited in the log and journal (ADR-0020). */
   override?: Readonly<{ reason: string }> | null;
+  /** The action came from the builtin catalog (not the stat block) — enables the builtin special cases. */
+  builtin?: boolean;
+  /** Free-text annotation (the Ready action's trigger); folded into the granted effect's name. */
+  note?: string | null;
+  /** The escapable effect to break (Escape a Grapple); defaults to the actor's first effect with an escape DC. */
+  effectId?: string | null;
 }>;
 export type ResolveDependencies = Readonly<{
   random: RandomSource;
@@ -76,6 +82,31 @@ const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as
 function sizeAtMost(size: string | undefined, limit: string): boolean {
   return SIZE_ORDER.indexOf((size ?? "medium") as (typeof SIZE_ORDER)[number]) <= SIZE_ORDER.indexOf(limit as (typeof SIZE_ORDER)[number]);
 }
+
+type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+/** Ability modifier from the definition's scores; +0 when no definition is known (documented builtin fallback). */
+export function abilityModifier(definition: ActorDefinition | undefined, ability: AbilityKey): number {
+  const score = definition?.abilityScores[ability] ?? 10;
+  return Math.floor((score - 10) / 2);
+}
+
+/** Skill bonus from the untyped open5e extension when the import carries one (mirrors saveModifierFor). */
+function skillBonusFromExtension(definition: ActorDefinition | undefined, skill: string): number | null {
+  const extension = definition?.extensions["open5e.srd-2024"];
+  if (extension && typeof extension === "object") {
+    const bonus = (extension as { skills?: Record<string, unknown> }).skills?.[skill];
+    if (typeof bonus === "number" && Number.isInteger(bonus) && bonus >= -20 && bonus <= 30) return bonus;
+  }
+  return null;
+}
+
+/** The builtin actions resolved as a plain check roll (SRD glossary [Action] entries). Hide is the only one with a fixed DC. */
+const BUILTIN_CHECKS: Record<string, { label: string; ability: AbilityKey; skill?: string; dc: number | null }> = {
+  hide: { label: "Dexterity (Stealth)", ability: "dex", skill: "stealth", dc: 15 },
+  influence: { label: "Charisma (Influence)", ability: "cha", dc: null },
+  search: { label: "Wisdom (Search)", ability: "wis", dc: null },
+  study: { label: "Intelligence (Study)", ability: "int", dc: null }
+};
 
 type RuleViolation = Readonly<{ rule: string; message: string }>;
 /** How this resolve settles the action economy once it succeeds. */
@@ -204,6 +235,17 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
+  // Unarmed grapple/shove only work on targets at most one size larger (SRD Unarmed Strike).
+  if (action.id === "unarmed-grapple" || action.id === "unarmed-shove-prone" || action.id === "unarmed-shove-push") {
+    const attackerIndex = SIZE_ORDER.indexOf((attacker.size ?? "medium") as (typeof SIZE_ORDER)[number]);
+    for (const targetId of targetIds) {
+      const target = state.actors.find((candidate) => candidate.id === targetId);
+      if (target && SIZE_ORDER.indexOf((target.size ?? "medium") as (typeof SIZE_ORDER)[number]) > attackerIndex + 1) {
+        violations.push({ rule: "target.too-large-to-grapple", message: `${target.name} is more than one size larger than ${attacker.name} and can't be grappled or shoved.` });
+      }
+    }
+  }
+
   // SRD Charmed: the charmed creature can't attack or target its charmer with harmful effects.
   // Enforceable only when the condition rides a source-linked effect naming the charmer.
   if (action.attack !== undefined || action.save !== undefined || action.damage.length > 0) {
@@ -226,11 +268,11 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
  * limited uses / open-instance rolls. Target-specific rules (`targetRules`) can't be pre-checked
  * without a target and are deliberately absent here. Never mutates state.
  */
-export function actionAvailability(state: GameState, attacker: LiveActor, definition: ActorDefinition): ReadonlyArray<{
+export function actionAvailability(state: GameState, attacker: LiveActor, actions: ReadonlyArray<DefinitionAction>, definition: ActorDefinition | undefined, builtin = false): ReadonlyArray<{
   id: string; name: string; activation: DefinitionAction["activation"]; available: boolean;
-  violations: ReadonlyArray<{ rule: string; message: string }>; usesRemaining: number | null; componentsRemaining: number | null;
+  violations: ReadonlyArray<{ rule: string; message: string }>; usesRemaining: number | null; componentsRemaining: number | null; builtin?: boolean;
 }> {
-  return definition.actions.map((action) => {
+  return actions.map((action) => {
     const evaluation = evaluateActionEconomy(state, attacker, action, [], definition);
     let usesRemaining: number | null = null;
     if (action.uses) {
@@ -251,7 +293,8 @@ export function actionAvailability(state: GameState, attacker: LiveActor, defini
       available: evaluation.violations.length === 0,
       violations: evaluation.violations,
       usesRemaining,
-      componentsRemaining
+      componentsRemaining,
+      ...(builtin ? { builtin: true } : {})
     };
   });
 }
@@ -289,14 +332,16 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
   const onOwnTurn = state.combat.turnActorId === attacker.id;
 
-  // Effect modifiers: attack-advantage is turn-scoped by definition (Reckless Attack semantics).
-  if (onOwnTurn) {
-    for (const effect of attacker.effects) {
-      if (effect.modifiers.some((modifier) => modifier.type === "attack-advantage")) advantage.push({ source: effect.id, label: effect.name });
-    }
+  // Effect modifiers: attack-advantage is turn-scoped by definition (Reckless Attack semantics);
+  // attack-disadvantage is always-on. voidWhileIncapacitated effects (Dodge) lapse per the SRD.
+  const activeEffects = (actor: LiveActor) => actor.effects.filter((effect) => !(effect.voidWhileIncapacitated && isIncapacitated(actor)));
+  for (const effect of activeEffects(attacker)) {
+    if (onOwnTurn && effect.modifiers.some((modifier) => modifier.type === "attack-advantage")) advantage.push({ source: effect.id, label: effect.name });
+    if (effect.modifiers.some((modifier) => modifier.type === "attack-disadvantage")) disadvantage.push({ source: effect.id, label: effect.name });
   }
-  for (const effect of target.effects) {
+  for (const effect of activeEffects(target)) {
     if (effect.modifiers.some((modifier) => modifier.type === "incoming-attack-advantage")) advantage.push({ source: effect.id, label: `Target: ${effect.name}` });
+    if (effect.modifiers.some((modifier) => modifier.type === "incoming-attack-disadvantage")) disadvantage.push({ source: effect.id, label: `Target: ${effect.name}` });
   }
 
   if (has(attacker, "prone")) disadvantage.push({ source: "attacker-prone", label: "Attacker is Prone" });
@@ -357,16 +402,89 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     return target;
   });
   if (action.attack && targets.length !== 1) throw new CommandRejectedError("An attack roll resolves against exactly one target.");
-  const structuredWithoutTargets = action.grants !== undefined || action.multiattack !== undefined;
-  if (targets.length === 0 && !structuredWithoutTargets) throw new CommandRejectedError("Choose at least one target.");
-  if (!action.attack && !action.save && action.damage.length === 0 && !structuredWithoutTargets) throw new CommandRejectedError("That action has no structured effect to resolve — run it from its description.");
+  // A grant aimed at the action's target (Help) needs exactly one recipient.
+  if (action.grants?.target === "target" && targets.length !== 1) throw new CommandRejectedError("Choose exactly one target for this action.");
+  const structuredWithoutTargets = (action.grants !== undefined && action.grants.target !== "target") || action.multiattack !== undefined || input.builtin === true;
+  if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target") throw new CommandRejectedError("Choose at least one target.");
+  if (!action.attack && !action.save && action.damage.length === 0 && action.grants === undefined && input.builtin !== true) {
+    if (action.multiattack === undefined) throw new CommandRejectedError("That action has no structured effect to resolve — run it from its description.");
+  }
 
   const warnings: string[] = [];
   const { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings);
 
+  // Builtin Unarmed Strike: the attack math is actor-derived (SRD: Str modifier + Proficiency Bonus),
+  // so the concrete attack is materialized at resolve time rather than declared in the catalog.
+  if (input.builtin && action.id === "unarmed-strike") {
+    action = { ...action, attack: { bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0), reachFeet: 5 } };
+  }
+
   // A hidden attacker's rolls stay GM-only; everyone else's fight in the open.
   const visibility = attacker.visibility === "gm-only" ? "gm-only" as const : "public" as const;
   const rollBase = { commandId: input.commandId, initiatorSessionId: deps.gmSessionId, initiatorLabel: attacker.name, actorId: attacker.id, visibility, createdAt: deps.now() };
+
+  // Builtin check-roll actions (Hide vs DC 15; Influence/Search/Study with the GM adjudicating):
+  // one d20 + the actor's ability modifier (stealth skill bonus when the import carries one),
+  // recorded in the shared history like every other roll.
+  let check: NonNullable<ActionResolution["check"]> | null = null;
+  let hiddenGranted: ActionResolution["effectGranted"] = null;
+  const effectsEnded: Array<{ actorId: string; actorName: string; name: string }> = [];
+  const checkSpec = input.builtin ? BUILTIN_CHECKS[action.id] : undefined;
+  if (checkSpec) {
+    let modifier = abilityModifier(deps.definition, checkSpec.ability);
+    if (checkSpec.skill) {
+      const skillBonus = skillBonusFromExtension(deps.definition, checkSpec.skill);
+      if (skillBonus !== null) modifier = skillBonus;
+    }
+    modifier += exhaustionPenalty(attacker);
+    const resolution = resolveDice(parseDiceFormula(`1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
+    recordRoll(state, resolution, { ...rollBase, id: deps.newRollId(), purpose: "check" });
+    const checkDice = resolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
+    const naturalCheckRoll = (checkDice.dice.find((die) => die.kept) ?? checkDice.dice[0]).face;
+    const success = checkSpec.dc === null ? null : resolution.total >= checkSpec.dc;
+    check = { skill: checkSpec.label, total: resolution.total, naturalRoll: naturalCheckRoll, dc: checkSpec.dc, success };
+    if (action.id === "hide" && success === true) {
+      // Hiding grants Invisible while hidden (SRD Hide); attacking ends it (see the reveal below).
+      const effect = addEffect(state, attacker.id, {
+        id: `${input.commandId}:hide`,
+        name: "Hiding",
+        tags: ["hidden"],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        sourceActionId: "hide",
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: false,
+        voidWhileIncapacitated: false,
+        modifiers: [],
+        linkedConditionIds: ["invisible"],
+        escapeDc: null,
+        onEnd: [],
+        endsWithTag: null
+      });
+      hiddenGranted = { name: effect.name, tags: effect.tags };
+    }
+  }
+
+  // Escape a Grapple (SRD Grappling): an action to roll the better of Athletics/Acrobatics against
+  // the holding effect's escape DC; success ends the effect (and its linked Grappled/Restrained).
+  if (input.builtin && action.id === "escape-grapple") {
+    const escapable = (input.effectId ? attacker.effects.find((effect) => effect.id === input.effectId) : undefined)
+      ?? attacker.effects.find((effect) => effect.escapeDc !== null);
+    if (!escapable || escapable.escapeDc === null) throw new CommandRejectedError("No escapable effect (one with an escape DC) is active on this combatant.");
+    const athletics = skillBonusFromExtension(deps.definition, "athletics") ?? abilityModifier(deps.definition, "str");
+    const acrobatics = skillBonusFromExtension(deps.definition, "acrobatics") ?? abilityModifier(deps.definition, "dex");
+    const modifier = Math.max(athletics, acrobatics) + exhaustionPenalty(attacker);
+    const resolution = resolveDice(parseDiceFormula(`1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
+    recordRoll(state, resolution, { ...rollBase, id: deps.newRollId(), purpose: "check" });
+    const escapeDice = resolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
+    const success = resolution.total >= escapable.escapeDc;
+    check = { skill: "Escape (Athletics/Acrobatics)", total: resolution.total, naturalRoll: (escapeDice.dice.find((die) => die.kept) ?? escapeDice.dice[0]).face, dc: escapable.escapeDc, success };
+    if (success) {
+      endEffect(state, attacker.id, escapable.id);
+      effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: escapable.name });
+    }
+  }
 
   let attack: ActionResolution["attack"] = null;
   let rollMode: ActionResolution["rollMode"];
@@ -429,6 +547,11 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       }
     }
   }
+  // Builtin Unarmed Strike damage is flat (SRD: 1 + Str modifier Bludgeoning, no dice) — it rides
+  // the explainable bonus-damage channel since the dice grammar has no zero-die formula.
+  if (input.builtin && action.id === "unarmed-strike" && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
+    bonusDamage.push({ amount: Math.max(0, 1 + abilityModifier(deps.definition, "str")), type: "bludgeoning", source: "Unarmed Strike" });
+  }
 
   // Declared on-hit riders (Bite: Grappled + Restrained, escape DC 15) apply as ONE source-linked
   // effect per rider — the condition carve-out class shared with save auto-apply (ADR-0020).
@@ -451,6 +574,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
         startedRound: state.combat.round,
         duration: { type: "manual" },
         endsWhenSourceDefeated: true,
+        voidWhileIncapacitated: false,
         modifiers: [],
         linkedConditionIds: conditionIds,
         escapeDc: rider.escapeDc ?? null,
@@ -461,13 +585,17 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     });
   }
 
-  // Granted self effects (Rage, Reckless Attack): replace-on-refresh, end at 0 HP (can't be sustained while down).
-  let effectGranted: ActionResolution["effectGranted"] = null;
+  // Granted effects (Rage, Reckless Attack — self; Help — the chosen ally): replace-on-refresh,
+  // end at 0 HP of the granter (can't be sustained while down).
+  let effectGranted: ActionResolution["effectGranted"] = hiddenGranted;
   if (action.grants) {
     const grant = action.grants;
-    const effect = addEffect(state, attacker.id, {
+    const recipient = grant.target === "target" ? targets[0] : attacker;
+    // The Ready action's free-text trigger travels in the effect name so the table sees it.
+    const readyNote = input.builtin && action.id === "ready" && input.note ? `Readied: ${input.note.slice(0, 100)}` : null;
+    const effect = addEffect(state, recipient.id, {
       id: `${input.commandId}:grant`,
-      name: grant.name ?? action.name,
+      name: readyNote ?? grant.name ?? action.name,
       tags: grant.tags,
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -475,13 +603,15 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       startedRound: state.combat.round,
       duration: grant.duration.type === "rounds" ? { type: "rounds", remaining: grant.duration.rounds } : grant.duration,
       endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: grant.modifiers,
       linkedConditionIds: [],
       escapeDc: null,
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null
     });
-    effectGranted = { name: effect.name, tags: effect.tags };
+    if (grant.target === "target") effectsApplied.push({ targetId: recipient.id, targetName: recipient.name, name: effect.name, conditionIds: [] });
+    else effectGranted = { name: effect.name, tags: effect.tags };
   }
 
   // A hit against a combatant whose stat block declares a matching reaction (Uncanny Dodge) parks
@@ -520,6 +650,35 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       };
       reactionPrompts.push({ actorId: target.id, actorName: target.name, actionName: declared.name });
     }
+  }
+
+  // Builtin Unarmed Strike grapple/shove (SRD): no attack roll — the target makes a Str or Dex save
+  // (its better modifier, standing in for "its choice") vs DC 8 + Str modifier + Proficiency Bonus.
+  // Failure applies the Grappled effect (with that DC as the escape DC) or Prone; a failed shove-push
+  // is narrated for the GM to move the token 5 feet.
+  let builtinSave: ActionResolution["save"] = null;
+  if (input.builtin && (action.id === "unarmed-grapple" || action.id === "unarmed-shove-prone" || action.id === "unarmed-shove-push")) {
+    if (targets.length !== 1) throw new CommandRejectedError("Choose exactly one target.");
+    const target = targets[0];
+    const dc = Math.max(1, 8 + abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0));
+    const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+    const ability: "str" | "dex" = saveModifierFor(targetDefinition, "dex") >= saveModifierFor(targetDefinition, "str") ? "dex" : "str";
+    createPendingSaves(state, {
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      actionName: action.name,
+      ability,
+      dc,
+      targetIds: [target.id],
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionId: action.id === "unarmed-shove-prone" ? "prone" : null,
+      ...(action.id === "unarmed-grapple" ? { onFailEffect: { name: `Grappled by ${attacker.name}`, tags: ["grapple"], linkedConditionIds: ["grappled"], escapeDc: dc, sourceActorId: attacker.id, sourceName: attacker.name } } : {}),
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
+    });
+    if (action.id === "unarmed-shove-push") warnings.push(`On a failed save, ${target.name} is pushed 5 feet — move the token.`);
+    builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   }
 
   // A save action leaves one pending save per target: prompts appear in the tracker rows, each
@@ -561,12 +720,32 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
   }
 
+  // Attacking reveals you (SRD Hide): a resolved attack or save action ends the hidden effect —
+  // the attack itself still enjoyed the Invisible advantage, which is the SRD's exact sequencing.
+  if ((action.attack !== undefined || action.save !== undefined) && hasEffectTag(attacker, "hidden")) {
+    const hiddenEffect = attacker.effects.find((effect) => effect.tags.includes("hidden"))!;
+    endEffect(state, attacker.id, hiddenEffect.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: hiddenEffect.name });
+  }
+  // Ready release (SRD Ready): resolving anything off-turn while Readied spends the reaction and
+  // ends the readied intent; the log ties the release to the ready.
+  if (state.combat.turnActorId !== attacker.id && action.id !== "ready" && hasEffectTag(attacker, "readied")) {
+    const readied = attacker.effects.find((effect) => effect.tags.includes("readied"))!;
+    endEffect(state, attacker.id, readied.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: readied.name });
+    if (!state.combat.reactionsUsed.includes(attacker.id)) {
+      state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed, attacker.id] };
+    } else {
+      warnings.push(`${attacker.name}'s reaction was already spent — the readied action released without one.`);
+    }
+  }
+
   const damageTotal = damage.reduce((sum, part) => sum + part.total, 0) + bonusDamage.reduce((sum, part) => sum + part.amount, 0);
   return {
     actionName: action.name,
     activation: action.activation,
     attack,
-    save: action.save ? { ability: action.save.ability, dc: action.save.dc, targets: targets.map((target) => ({ targetId: target.id, targetName: target.name })) } : null,
+    save: action.save ? { ability: action.save.ability, dc: action.save.dc, targets: targets.map((target) => ({ targetId: target.id, targetName: target.name })) } : builtinSave,
     damage,
     damageTotal,
     crit,
@@ -579,6 +758,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       : null,
     ...(warnings.length > 0 ? { warnings } : {}),
     overridden,
-    ...(reactionPrompts.length > 0 ? { reactionPrompts } : {})
+    ...(reactionPrompts.length > 0 ? { reactionPrompts } : {}),
+    ...(check ? { check } : {}),
+    ...(effectsEnded.length > 0 ? { effectsEnded } : {})
   };
 }

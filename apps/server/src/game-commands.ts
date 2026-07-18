@@ -63,6 +63,10 @@ export const ActionResolveSchema = z.object({
   rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
   /** Bypass a rules-mode rejection; the reason is audited in the combat log and journal (ADR-0020). */
   override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(),
+  /** The escapable effect to break (Escape a Grapple builtin); defaults to the actor's first effect with an escape DC. */
+  effectId: z.string().min(1).max(120).optional(),
+  /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
+  note: z.string().trim().min(1).max(100).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." });
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
@@ -91,7 +95,11 @@ export const EffectAddSchema = z.object({
     z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
     z.object({ type: z.literal("damage-resistance"), damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20) }).strict(),
     z.object({ type: z.literal("attack-advantage") }).strict(),
-    z.object({ type: z.literal("incoming-attack-advantage") }).strict()
+    z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
+    z.object({ type: z.literal("attack-disadvantage") }).strict(),
+    z.object({ type: z.literal("incoming-attack-disadvantage") }).strict(),
+    z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
+    z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict()
   ])).max(8).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();

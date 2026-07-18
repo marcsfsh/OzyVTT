@@ -7,7 +7,9 @@ import { actionAvailability, resolveDefinitionAction, type ResolveDependencies }
 import { answerReaction, dismissReaction } from "../src/reactions.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
-import { endEffect, endEncounterEffects, expireEffectsAtTurnStart } from "../src/effects.js";
+import { answerSave, saveRollSources } from "../src/saving-throws.js";
+import { builtinAction } from "../src/builtin-actions.js";
+import { endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
 import { applyTimelineRestore } from "../src/combat-history.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
@@ -543,7 +545,7 @@ describe("available-actions projection (server-computed availability)", () => {
   it("reports the same rules the resolve path enforces, with uses and instance counts", () => {
     const game = buildGame();
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
-    const before = actionAvailability(game, torva, torvaDefinition);
+    const before = actionAvailability(game, torva, torvaDefinition.actions, torvaDefinition);
     const frenzyRow = before.find((row) => row.id === "frenzy")!;
     expect(frenzyRow.available).toBe(false);
     expect(frenzyRow.violations.map((violation) => violation.rule)).toContain("feature.requires-effect");
@@ -554,7 +556,7 @@ describe("available-actions projection (server-computed availability)", () => {
     // and the open Extra Attack instance.
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6, 6]);
-    const after = actionAvailability(game, torva, torvaDefinition);
+    const after = actionAvailability(game, torva, torvaDefinition.actions, torvaDefinition);
     expect(after.find((row) => row.id === "rage")).toMatchObject({ available: false, usesRemaining: 3 });
     expect(after.find((row) => row.id === "greataxe")).toMatchObject({ available: true, componentsRemaining: 1 });
     expect(after.find((row) => row.id === "frenzy")!.violations.map((violation) => violation.rule)).toContain("economy.bonus-action-used");
@@ -564,7 +566,7 @@ describe("available-actions projection (server-computed availability)", () => {
     const game = buildGame();
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
     const snapshot = JSON.stringify(game);
-    actionAvailability(game, torva, torvaDefinition);
+    actionAvailability(game, torva, torvaDefinition.actions, torvaDefinition);
     expect(JSON.stringify(game)).toBe(snapshot);
   });
 });
@@ -681,5 +683,155 @@ describe("SRD condition modifiers — Tier A completeness (Playing the Game / co
     // Other targets stay legal.
     const other = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc2] }, [15, 6]);
     expect(other.attack?.outcome).toBe("hit");
+  });
+});
+
+describe("SRD generic actions — builtin catalog (rules glossary [Action] entries)", () => {
+  const resolveBuiltin = (game: GameState, actionId: string, input: { actorId: string; targetIds?: readonly string[]; note?: string; effectId?: string }, faces: number[], definition?: ActorDefinition) =>
+    resolveDefinitionAction(game, builtinAction(actionId)!, { actorId: input.actorId, targetIds: input.targetIds ?? [], commandId: nextCommandId(), builtin: true, note: input.note ?? null, effectId: input.effectId ?? null, rollMode: null, override: null }, { ...deps(faces, definition), resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition });
+
+  it("Dodge consumes the action, imposes incoming disadvantage and Dex-save advantage, and lapses while incapacitated", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    const dodge = resolveBuiltin(game, "dodge", { actorId: IDS.pip }, [], pipDefinition);
+    expect(dodge.effectGranted).toEqual({ name: "Dodging", tags: ["dodging"] });
+    expect(game.combat.turn.actionUsed).toBe(true);
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+
+    // Incoming attack rolls at disadvantage, labeled.
+    const bite = resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [18, 2, 6, 6, 6]);
+    expect(bite.rollMode?.disadvantage).toContain("Target: Dodging");
+    // Dex saves gain advantage from the same effect.
+    expect(saveRollSources(pip, "dex").advantage.map((entry) => entry.label)).toContain("Dodging");
+    expect(saveRollSources(pip, "str").advantage).toHaveLength(0);
+
+    // SRD: the benefits lapse while incapacitated (voidWhileIncapacitated).
+    pip.conditions = [{ id: "stunned" }];
+    expect(saveRollSources(pip, "dex").advantage).toHaveLength(0);
+  });
+
+  it("a second builtin action strict-blocks on the spent slot, like any stat-block action", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    resolveBuiltin(game, "disengage", { actorId: IDS.pip }, [], pipDefinition);
+    expect(hasEffectTag(game.actors.find((actor) => actor.id === IDS.pip)!, "disengaged")).toBe(true);
+    expect(() => resolveBuiltin(game, "dash", { actorId: IDS.pip }, [], pipDefinition)).toThrow(/already used an action/);
+  });
+
+  it("Help grants the chosen ally attack advantage that expires at the helper's next turn", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.torva, score: 12 }, { actorId: IDS.croc1, score: 8 }]);
+    const help = resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.torva] }, [], pipDefinition);
+    expect(help.effectsApplied).toEqual([{ targetId: IDS.torva, targetName: "Torva Grimtusk", name: "Helped", conditionIds: [] }]);
+
+    nextInitiativeTurn(game); // Torva's turn — the bearer attacks with advantage.
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [3, 15, 6]);
+    expect(swing.rollMode?.advantage).toContain("Helped");
+
+    nextInitiativeTurn(game); // croc
+    nextInitiativeTurn(game); // Pip's next turn: the help (sustained by Pip) expires.
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects.some((effect) => effect.name === "Helped")).toBe(false);
+  });
+
+  it("Hide rolls Dex (Stealth) vs DC 15, grants Invisible on success, and attacking reveals", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    // Pip Dex +4: face 12 → 16 ≥ 15 succeeds.
+    const hide = resolveBuiltin(game, "hide", { actorId: IDS.pip }, [12], pipDefinition);
+    expect(hide.check).toMatchObject({ total: 16, dc: 15, success: true });
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.conditions.some((condition) => condition.id === "invisible")).toBe(true);
+
+    // Attacking from hiding: the attack keeps the Invisible advantage, then the Hiding ends.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    const strike = resolve(game, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [2, 18, 5]);
+    expect(strike.rollMode?.advantage).toContain("Attacker is Invisible");
+    expect(strike.effectsEnded).toEqual([{ actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding" }]);
+    expect(pip.conditions.some((condition) => condition.id === "invisible")).toBe(false);
+  });
+
+  it("a failed Hide still spends the action and grants nothing", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    const hide = resolveBuiltin(game, "hide", { actorId: IDS.pip }, [5], pipDefinition);
+    expect(hide.check).toMatchObject({ total: 9, dc: 15, success: false });
+    expect(game.actors.find((actor) => actor.id === IDS.pip)!.effects).toHaveLength(0);
+    expect(game.combat.turn.actionUsed).toBe(true);
+  });
+
+  it("Unarmed Strike materializes Str + PB and deals flat 1 + Str Bludgeoning (SRD Unarmed Strike)", () => {
+    const game = buildGame();
+    // Torva Str +4, PB +3 → attack +7; face 10 → 17 vs AC 14 hits; damage flat 5 bludgeoning.
+    const strike = resolveBuiltin(game, "unarmed-strike", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [10], torvaDefinition);
+    expect(strike.attack).toMatchObject({ total: 17, outcome: "hit" });
+    expect(strike.bonusDamage).toEqual([{ amount: 5, type: "bludgeoning", source: "Unarmed Strike" }]);
+    expect(strike.damageTotal).toBe(5);
+  });
+
+  it("Unarmed grapple: target saves vs 8 + Str + PB; failure applies the escapable Grappled effect; escape frees; a stunned grappler releases", () => {
+    const game = buildGame();
+    // Torva grapples Pip (small — within one size): DC 8 + 4 + 3 = 15; Pip's better save is Dex (+7).
+    const grapple = resolveBuiltin(game, "unarmed-grapple", { actorId: IDS.torva, targetIds: [IDS.pip] }, [], torvaDefinition);
+    expect(grapple.save).toMatchObject({ ability: "dex", dc: 15 });
+    expect(game.combat.pendingSaves).toHaveLength(1);
+    expect(game.combat.pendingSaves[0].onFailEffect).toMatchObject({ name: "Grappled by Torva Grimtusk", escapeDc: 15, sourceActorId: IDS.torva });
+
+    // Fail the save (face 2 → 9 < 15): the Grappled effect lands with its linked condition.
+    const answered = answerSave(game, nextCommandId(), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, {
+      random: () => 2, newRollId: () => "40000000-0000-4000-8000-000000000099", sessionId: IDS.gmSession, role: "gm", now: () => "2026-07-18T00:00:00.000Z",
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+    });
+    expect(answered.outcome.success).toBe(false);
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(true);
+    const hold = pip.effects.find((effect) => effect.tags.includes("grapple"))!;
+    expect(hold.escapeDc).toBe(15);
+
+    // Escape attempt (Pip's turn): Dex +4, face 6 → 10 < 15 fails; face 12 → 16 ≥ 15 frees.
+    nextInitiativeTurn(game); // to Pip
+    const miss = resolveBuiltin(game, "escape-grapple", { actorId: IDS.pip }, [6], pipDefinition);
+    expect(miss.check).toMatchObject({ dc: 15, success: false });
+    expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(true);
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    const escape = resolveBuiltin(game, "escape-grapple", { actorId: IDS.pip }, [12], pipDefinition);
+    expect(escape.check).toMatchObject({ dc: 15, success: true });
+    expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(false);
+
+    // Re-grapple, then stun the grappler: SRD Grappling — an incapacitated grappler releases.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    resolveBuiltin(game, "unarmed-grapple", { actorId: IDS.torva, targetIds: [IDS.pip] }, [], torvaDefinition);
+    answerSave(game, nextCommandId(), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, {
+      random: () => 2, newRollId: () => "40000000-0000-4000-8000-000000000098", sessionId: IDS.gmSession, role: "gm", now: () => "2026-07-18T00:00:00.000Z",
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+    });
+    expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(true);
+    const events = setCondition(game, IDS.torva, "stunned", true, undefined, { role: "gm" });
+    expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(false);
+    expect(events.some((event) => /Grappled by Torva Grimtusk ended/.test(event.text))).toBe(true);
+  });
+
+  it("rejects grappling a target more than one size larger", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    try {
+      resolveBuiltin(game, "unarmed-grapple", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [], pipDefinition);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("target.too-large-to-grapple");
+    }
+  });
+
+  it("Ready parks the trigger; resolving off-turn releases it and spends the reaction (SRD Ready)", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    const ready = resolveBuiltin(game, "ready", { actorId: IDS.pip, note: "shoot the first crocodile that surfaces" }, [], pipDefinition);
+    expect(ready.effectGranted?.name).toBe("Readied: shoot the first crocodile that surfaces");
+    nextInitiativeTurn(game); // croc's turn — Pip acts off-turn, releasing the ready.
+    const release = resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
+    expect(release.effectsEnded?.some((ended) => ended.name.startsWith("Readied:"))).toBe(true);
+    expect(game.combat.reactionsUsed).toContain(IDS.pip);
+  });
+
+  it("builtins resolve for a combatant with no definition at all", () => {
+    const game = buildGame();
+    const extraId = "10000000-0000-4000-8000-00000000000e";
+    game.actors.push({ id: extraId, name: "Hired Guard", kind: "npc", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, conditions: [], effects: [], deathSaves: null, actionUses: {}, conditionImmunities: [] });
+    game.combat = { ...game.combat, initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }] };
+    const dodge = resolveBuiltin(game, "dodge", { actorId: extraId }, []);
+    expect(dodge.effectGranted?.name).toBe("Dodging");
   });
 });

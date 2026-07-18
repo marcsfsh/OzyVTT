@@ -4,8 +4,8 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
-import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "./condition-rules.js";
-import type { EffectNarration } from "./effects.js";
+import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
+import { addEffect, type EffectNarration } from "./effects.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -33,6 +33,15 @@ export function saveRollSources(target: Actor, ability: AbilityId): { advantage:
   const disadvantage: RollModeSource[] = [];
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
     disadvantage.push({ source: "target-restrained", label: "Restrained (Dex saves)" });
+  }
+  // Effect modifiers (Dodge's Dex-save advantage); voidWhileIncapacitated effects lapse per the SRD.
+  const incapacitated = isIncapacitated(target);
+  for (const effect of target.effects) {
+    if (effect.voidWhileIncapacitated && incapacitated) continue;
+    for (const modifier of effect.modifiers) {
+      if (modifier.type === "save-advantage" && (modifier.ability === undefined || modifier.ability === ability)) advantage.push({ source: effect.id, label: effect.name });
+      if (modifier.type === "save-disadvantage" && (modifier.ability === undefined || modifier.ability === ability)) disadvantage.push({ source: effect.id, label: effect.name });
+    }
   }
   return { advantage, disadvantage };
 }
@@ -81,6 +90,7 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 export function createPendingSaves(state: GameState, input: Readonly<{
   sourceActorId: string; sourceName: string; actionName: string; ability: AbilityId; dc: number;
   targetIds: readonly string[]; proposedDamage: number; proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>; halfOnSuccess: boolean; conditionId: string | null;
+  onFailEffect?: PendingSave["onFailEffect"];
   newSaveId: () => string; createdAt: number;
 }>) {
   const additions: PendingSave[] = input.targetIds.map((targetActorId) => ({
@@ -95,6 +105,7 @@ export function createPendingSaves(state: GameState, input: Readonly<{
     ...(input.proposedDamageParts && input.proposedDamageParts.length > 0 ? { proposedDamageParts: [...input.proposedDamageParts] } : {}),
     halfOnSuccess: input.halfOnSuccess,
     conditionId: input.conditionId,
+    ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt (one owed save per target per source action keeps the tracker readable).
@@ -203,6 +214,28 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     // setCondition narrates immunity skips; whether the condition actually landed is read back.
     events.push(...setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }));
     conditionApplied = target.conditions.some((condition) => condition.id === pending.conditionId);
+  }
+  // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple —
+  // the same carve-out class as on-hit riders, ADR-0020).
+  if (!success && pending.onFailEffect) {
+    const applied = addEffect(state, target.id, {
+      id: `${commandId}:${saveId}:fail`,
+      name: pending.onFailEffect.name,
+      tags: [...pending.onFailEffect.tags],
+      sourceActorId: pending.onFailEffect.sourceActorId,
+      sourceName: pending.onFailEffect.sourceName,
+      sourceActionId: null,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: false,
+      modifiers: [],
+      linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
+      escapeDc: pending.onFailEffect.escapeDc,
+      onEnd: [],
+      endsWithTag: null
+    });
+    events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
   }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
   return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}) }, events };

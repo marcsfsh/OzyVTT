@@ -472,8 +472,12 @@ describe("public game API over /api/v1", () => {
     const body = await (await fetch(base + path, { headers: bearer(gmToken) })).json();
     expect(body.ok).toBe(true);
     expect(body.data.rulesMode).toBe("strict");
-    const rows = body.data.actions as ReadonlyArray<{ id: string; available: boolean; violations: readonly unknown[] }>;
-    expect(rows.map((row) => row.id).sort()).toEqual(["bite", "multiattack", "tail"]);
+    const rows = body.data.actions as ReadonlyArray<{ id: string; available: boolean; violations: readonly unknown[]; builtin?: boolean }>;
+    // Stat-block rows first, then the SRD builtin generic actions flagged builtin: true.
+    expect(rows.filter((row) => !row.builtin).map((row) => row.id).sort()).toEqual(["bite", "multiattack", "tail"]);
+    for (const id of ["dodge", "dash", "disengage", "help", "hide", "ready", "unarmed-grapple", "escape-grapple"]) {
+      expect(rows.find((row) => row.id === id)?.builtin).toBe(true);
+    }
     // No encounter running: nothing is spent, so everything reports available with no violations.
     expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
   });

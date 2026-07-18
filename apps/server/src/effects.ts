@@ -134,6 +134,23 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
   return events;
 }
 
+/**
+ * SRD Grappling: the grapple ends if the grappler is incapacitated. Scoped to grapple-tagged effects
+ * (a stunned barbarian keeps their Rage — only their holds release); 0 HP still releases everything
+ * via endEffectsSustainedBy.
+ */
+export function releaseGrapplesHeldBy(state: GameState, grapplerActorId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors) {
+    for (const effect of [...actor.effects]) {
+      if (effect.tags.includes("grapple") && effect.sourceActorId === grapplerActorId) {
+        endEffectInternal(state, actor, effect.id, events);
+      }
+    }
+  }
+  return events;
+}
+
 /** A defeated (0 HP) or removed source releases everything it was sustaining (grapples, its own rage). */
 export function endEffectsSustainedBy(state: GameState, sourceActorId: string): EffectNarration[] {
   const events: EffectNarration[] = [];

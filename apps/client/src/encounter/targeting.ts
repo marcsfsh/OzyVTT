@@ -38,8 +38,9 @@ export function beginTargeting(action: ContentActionSummary, attackerId: string)
     const shape: AnnotationShapeKind = area.shape === "sphere" || area.shape === "emanation" ? "circle" : area.shape === "cube" ? "square" : area.shape;
     session = { action, attackerId, mode: "template", selected: [], template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null } };
   } else {
-    // An attack lands on exactly one target; a save / pure-damage action can hit many.
-    session = { action, attackerId, mode: action.attackBonus !== null ? "single" : "multi", selected: [], template: null };
+    // An attack lands on exactly one target; single-target builtins (Help, Unarmed Strike) too;
+    // a save / pure-damage action can hit many.
+    session = { action, attackerId, mode: action.attackBonus !== null || action.targeting === "single" ? "single" : "multi", selected: [], template: null };
   }
   result = null;
   emit();

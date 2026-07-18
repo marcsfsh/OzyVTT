@@ -1,8 +1,8 @@
 import type { GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { adjustableActor, type ActorScope } from "./hit-points.js";
-import { applyExhaustionDeath, type EffectNarration } from "./effects.js";
-import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
+import { applyExhaustionDeath, releaseGrapplesHeldBy, type EffectNarration } from "./effects.js";
+import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 
 /**
  * Track a condition on an actor. Display remains the source of truth for prose effects, but the
@@ -28,6 +28,10 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
   // SRD: Exhaustion level 6 is death — same engine-owned transition the onEnd grant path fires.
   if (conditionId === "exhaustion" && previousExhaustion < 6 && (level ?? 1) >= 6) {
     return applyExhaustionDeath(state, actor);
+  }
+  // SRD Grappling: an incapacitated grappler releases its holds (0 HP separately releases everything).
+  if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
+    return releaseGrapplesHeldBy(state, actor.id);
   }
   return [];
 }

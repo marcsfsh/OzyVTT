@@ -8,9 +8,9 @@ import { socket } from "../socket";
 /** Per-definition cache: stat blocks are immutable content, one lookup per session is plenty. */
 const actionCache = new Map<string, readonly ContentActionSummary[]>();
 
-const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null;
-/** Rage/Reckless (grants) and a Multiattack plan resolve with no target — a single Use tap. */
-const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && (action.grants || action.multiattack !== null);
+const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null || action.builtin === true;
+/** Rage/Reckless (grants), a Multiattack plan, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
+const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.builtin === true);
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const tagLabel = (tag: string) => tag.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 const summaryOf = (action: ContentActionSummary) => {

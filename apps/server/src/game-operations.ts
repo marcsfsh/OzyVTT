@@ -6,6 +6,7 @@ import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
 import { actionAvailability, resolveDefinitionAction } from "./action-resolution.js";
+import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
@@ -166,11 +167,17 @@ export function createGameOperations(context: GameOperationsContext) {
       requireGmGrade(principal, "Only the GM can browse stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The action lookup is malformed.");
       const imported = storedDefinition(store.snapshot, request.definitionId);
+      const definition = imported ?? contentLibrary.monster(request.definitionId);
       const actions = imported
         ? imported.actions.map(actionSummaryOf)
         : contentLibrary.monsterActionSummaries(request.definitionId);
       if (!actions) throw new CommandRejectedError("That stat block is not in the bundled content.");
-      return { actions };
+      // The SRD generic actions (Dodge, Dash, Help, Unarmed Strike, ...) every combatant can take
+      // ride along after the stat block's own; a declared id shadows its builtin.
+      const builtins = BUILTIN_ACTIONS
+        .filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id))
+        .map((candidate) => ({ ...actionSummaryOf(candidate), builtin: true, targeting: BUILTIN_TARGETING[candidate.id] ?? "none" as const }));
+      return { actions: [...actions, ...builtins] };
     },
 
     contentMonsterSheet(principal: GamePrincipal, raw: unknown) {
@@ -552,10 +559,14 @@ export function createGameOperations(context: GameOperationsContext) {
       let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
       const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const attacker = state.actors.find((item) => item.id === actorId);
-        if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
-        const definition = storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId);
-        const action = definition?.actions.find((candidate) => candidate.id === actionId);
+        if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
+        const definition = attacker.definitionId ? storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId) : undefined;
+        // The stat block wins on id collision; the builtin catalog (Dodge, Dash, Unarmed Strike, ...)
+        // covers every combatant — including one without a definition.
+        const statBlockAction = definition?.actions.find((candidate) => candidate.id === actionId);
+        const action = statBlockAction ?? builtinAction(actionId);
         if (!action) throw new CommandRejectedError("That action is not on the stat block.");
+        const isBuiltin = statBlockAction === undefined;
         let resolvedTargetIds: readonly string[];
         if (template) {
           if (action.attack) throw new CommandRejectedError("Attacks target a single token — pick it directly instead of placing a template.");
@@ -576,7 +587,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!positionA || !positionB) return null;
           return mapDistance(geometry, positionA, positionB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
@@ -601,6 +612,16 @@ export function createGameOperations(context: GameOperationsContext) {
           const promptHidden = hidden || actorHidden(prompt.actorId);
           context.appendLog({ kind: "reaction", text: `${prompt.actorName} may use ${prompt.actionName} — the damage waits on their answer.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
           context.broadcastTableEvent({ kind: "reaction", text: `${prompt.actorName} may use ${prompt.actionName}.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
+        }
+        // Builtin check rolls (Hide, Influence, Search, Study, Escape) and rule-consequence endings
+        // (attacking revealed Hiding; an off-turn action released a Ready) narrate to the table.
+        if (resolution.check) {
+          const verdict = resolution.check.success === null ? "" : resolution.check.success ? " — success" : " — failure";
+          context.appendLog({ kind: "action", text: `${actorName(actorId)} rolled ${resolution.check.total} on ${resolution.check.skill}${resolution.check.dc !== null ? ` vs DC ${resolution.check.dc}` : ""}${verdict}.`, actorIds: [actorId], gmOnly: hidden });
+        }
+        for (const ended of resolution.effectsEnded ?? []) {
+          context.appendLog({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
+          context.broadcastTableEvent({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
         }
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) };
@@ -688,10 +709,17 @@ export function createGameOperations(context: GameOperationsContext) {
       const actor = state.actors.find((candidate) => candidate.id === request.actorId);
       if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
       if (!isGmGrade(principal) && actor.ownerSessionId !== principal.sessionId) throw new GameAccessDeniedError("You can only check your own character's actions.");
-      if (!actor.definitionId) return { rulesMode: state.combat.rulesMode, actions: [] };
-      const definition = resolveDefinition(actor.definitionId);
-      if (!definition) throw new CommandRejectedError("That combatant's stat block is unavailable.");
-      return { rulesMode: state.combat.rulesMode, actions: actionAvailability(state, actor, definition) };
+      const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+      if (actor.definitionId && !definition) throw new CommandRejectedError("That combatant's stat block is unavailable.");
+      // Stat-block rows first, then the builtin generic actions (a stat block shadows a builtin id).
+      const builtins = BUILTIN_ACTIONS.filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id));
+      return {
+        rulesMode: state.combat.rulesMode,
+        actions: [
+          ...(definition ? actionAvailability(state, actor, definition.actions, definition) : []),
+          ...actionAvailability(state, actor, builtins, definition, true)
+        ]
+      };
     },
 
     // ---------- Effects, death saves, rest (ADR-0020) ----------
@@ -711,6 +739,7 @@ export function createGameOperations(context: GameOperationsContext) {
           startedRound: state.combat.round,
           duration: duration === undefined ? { type: "manual" } : duration.type === "rounds" ? { type: "rounds", remaining: duration.rounds } : duration,
           endsWhenSourceDefeated: false,
+          voidWhileIncapacitated: false,
           modifiers: modifiers ? [...modifiers] : [],
           linkedConditionIds: [],
           escapeDc: null,
