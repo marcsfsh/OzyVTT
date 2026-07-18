@@ -4,26 +4,22 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type CombatLogEntry, type GameState, type RollRecord, type ServerToClientEvents, type TableEvent } from "@vtt/domain";
-import { rollDice } from "@vtt/rules-5e";
-import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema } from "@vtt/schemas";
-import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry } from "./annotations.js";
-import { setCondition } from "./actor-conditions.js";
-import { resolveDefinitionAction } from "./action-resolution.js";
-import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
-import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
+import { API_VERSION } from "@vtt/api-contract";
+import type { ClientToServerEvents, ClientRole, CombatLogEntry, GameState, ServerToClientEvents, TableEvent } from "@vtt/domain";
+import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
+import { nextAnnotationExpiry } from "./annotations.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { addCombatant, endEncounter, setInitiativeScore, startEncounter } from "./encounter.js";
 import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { CombatLogStore } from "./combat-log.js";
-import { buildEncounterArchive } from "./encounter-archive.js";
-import { planNextTurn, planPreviousTurn, timelineDirtied, turnLabel, type TimelineOutcome } from "./combat-history.js";
-import { CommandRejectedError, GameStore, RevisionConflictError, TimelineConfirmationRequired } from "./game-store.js";
-import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
+import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
+import { SceneCreateSchema, SceneIdSchema, SceneRenameSchema, SceneSetCombatantsSchema, SetActorSizeSchema, SetTokenImageSchema } from "./game-commands.js";
+import { createGameApiRouter } from "./game-http.js";
+import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
+import { CommandRejectedError, GameStore, TimelineConfirmationRequired } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -34,9 +30,7 @@ import { TokenCatalogStore } from "./token-catalog.js";
 import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
-import { answerSave, dismissSave } from "./saving-throws.js";
-import { ensureEncounterTokens, moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
-import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
+import { ensureEncounterTokens, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
@@ -63,67 +57,6 @@ export type CreateServerOptions = {
 };
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-const CommandIdentitySchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-// Turn navigation carries an optional confirmation flag: Next may rewrite history, Previous may discard an in-place change.
-const InitiativeNextSchema = z.object({ commandId: z.string().uuid(), confirmRewrite: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const InitiativePreviousSchema = z.object({ commandId: z.string().uuid(), confirmDiscard: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const EncounterStartSchema = z.object({
-  commandId: z.string().uuid(),
-  mapAssetId: z.string().uuid(),
-  entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional() }).strict()).min(1).max(200),
-  expectedRevision: z.number().int().nonnegative().optional()
-}).strict();
-const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const ActionResolveSchema = z.object({
-  commandId: z.string().uuid(),
-  actorId: z.string().uuid(),
-  actionId: z.string().regex(/^[a-z0-9-]+$/).max(120),
-  targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
-  template: z.object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict().optional(),
-  conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(),
-  expectedRevision: z.number().int().nonnegative().optional()
-}).strict().refine((payload) => (payload.targetIds === undefined) !== (payload.template === undefined), { message: "Provide either explicit targets or an area template, not both." });
-const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
-  .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
-const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
-const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SceneNameSchema = z.string().trim().min(1).max(120);
-const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SceneIdSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const SceneSetCombatantsSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
-const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
-const AnnotationAddSchema = z.object({
-  commandId: z.string().uuid(),
-  kind: z.enum(["measurement", "shape"]),
-  shape: AnnotationShapeKindSchema.optional(),
-  geometry: AnnotationGeometryInputSchema,
-  visibility: AnnotationVisibilitySchema.optional(),
-  visibleToActorId: z.string().uuid().nullable().optional(),
-  movableByOthers: z.boolean().optional(),
-  color: HexColorSchema.optional(),
-  expectedRevision: z.number().int().nonnegative().optional()
-}).strict();
-const AnnotationPingSchema = z.object({ commandId: z.string().uuid(), point: AnnotationPointSchema, color: HexColorSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationColorSetSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), color: HexColorSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationMoveSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), geometry: AnnotationGeometryInputSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationRemoveSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationVisibilitySetSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), visibility: AnnotationVisibilitySchema, visibleToActorId: z.string().uuid().nullable().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationMovableSetSchema = z.object({ commandId: z.string().uuid(), id: z.string().uuid(), movableByOthers: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const AnnotationClearSchema = z.object({ commandId: z.string().uuid(), scope: z.enum(["mine", "players", "all"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 
 export function createServer(options: CreateServerOptions) {
   const app: Express = express();
@@ -229,8 +162,6 @@ export function createServer(options: CreateServerOptions) {
       case "resumed": appendLog({ kind: "history", text: "The GM resumed live play.", gmOnly: true }); break;
     }
   }
-  const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
-  const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
   async function tokenGeometryFor(mapAssetId: string): Promise<TokenMapGeometry> {
     const [asset, entry] = await Promise.all([mapAssets.get(mapAssetId), Promise.resolve(mapCatalog.get(mapAssetId))]);
     if (!asset || !entry || entry.kind !== "battlemap") throw new CommandRejectedError("The active encounter battlemap is unavailable.");
@@ -244,7 +175,53 @@ export function createServer(options: CreateServerOptions) {
     broadcast();
   }
 
-  app.use(express.json());
+  // The shared game capabilities: the Socket.IO handlers below and the public HTTP API both run
+  // these exact operations — same validation, authorization, dispatch, and narration (ADR-0016).
+  const operations = createGameOperations({
+    store,
+    combatLog,
+    contentLibrary,
+    mapCatalog,
+    tokenGeometryFor,
+    publishGameState,
+    broadcastTableEvent,
+    appendLog,
+    logTurnBegin,
+    logTimelineOutcome,
+    scheduleAnnotationExpiry,
+    gmView: (state) => gmView(state),
+    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
+    random: (sides) => randomInt(1, sides + 1),
+    newId: randomUUID
+  });
+  const commandRegistry = gameCommandRegistry(operations);
+
+  // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
+  // by the operation itself) fit through the HTTP surface too.
+  app.use(express.json({ limit: "512kb" }));
+  // Open CORS for the programmatic API: every /api credential travels as a bearer header (or a
+  // SameSite=Strict cookie the browser refuses to send cross-origin anyway), so a wildcard origin
+  // grants nothing a token doesn't already grant — and it lets browser-based integrations
+  // (overlays, dashboards) call the documented surface directly.
+  app.use("/api", (req, res, next) => {
+    res.setHeader("access-control-allow-origin", "*");
+    res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
+    res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after");
+    if (req.method === "OPTIONS") return res.status(204).end();
+    next();
+  });
+  // Malformed/oversized JSON bodies die inside express.json before any route runs; give /api/v1
+  // callers the stable error envelope instead of Express's HTML default.
+  app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (!error || res.headersSent || !(req.path === "/api/v1" || req.path.startsWith("/api/v1/"))) return next(error as Error);
+    const tooLarge = (error as { type?: string }).type === "entity.too.large";
+    return res.status(tooLarge ? 413 : 400).json({
+      ok: false,
+      apiVersion: API_VERSION,
+      error: { code: tooLarge ? "bad_request" : "validation_failed", message: tooLarge ? "The request body is too large." : "The request body is not valid JSON.", requestId: randomUUID() }
+    });
+  });
   app.get("/api/health", (_req, res) => res.json({ ok: true, bootstrapped: auth.isBootstrapped }));
   app.get("/api/bootstrap/status", (_req, res) => res.json({ bootstrapped: auth.isBootstrapped }));
   app.post("/api/bootstrap", async (req, res) => {
@@ -344,12 +321,27 @@ export function createServer(options: CreateServerOptions) {
       catch { return false; }
     }
   }));
+  const gameApiRouter = createGameApiRouter({
+    operations,
+    registry: commandRegistry,
+    gmSession: (token) => auth.verify(token),
+    playerSession: (token) => auth.verifyPlayer(token),
+    verifyIntegration: (token, scope) => credentials.verify(token, scope),
+    archives: {
+      list: () => store.listEncounterArchives(),
+      get: (id) => store.getEncounterArchive(id),
+      remove: (id) => store.deleteEncounterArchive(id)
+    },
+    revision: () => store.revision,
+    newId: randomUUID
+  });
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
     actorDefinitionVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
     authorizeIntegration: (token, requiredScope) => credentials.verify(token, requiredScope) !== null,
     authorizeGm,
-    credentialStore: credentials
+    credentialStore: credentials,
+    gameRouter: gameApiRouter
   });
   // The versioned router owns its own API-only 404 envelope. Keep that catch-all
   // scoped to /api/v1 so it cannot swallow the SPA or the dedicated TV viewer.
@@ -406,83 +398,70 @@ export function createServer(options: CreateServerOptions) {
       presence.disconnect(joinedSession.sessionId, !stillValid);
       broadcast();
     });
+    /** The caller's identity, re-verified per command from the signed token (never cached across commands). */
+    const principalOf = (): GamePrincipal | null => {
+      const token = socket.handshake.auth?.token;
+      const gm = auth.verify(token);
+      if (gm) return { kind: "gm", sessionId: gm.sessionId };
+      const player = auth.verifyPlayer(token);
+      return player ? { kind: "player", sessionId: player.sessionId } : null;
+    };
+    /**
+     * Socket adapter over the shared operations: resolve the principal (or refuse with this
+     * command's historical join/role message), run the operation, and translate outcomes back to
+     * the ack wire shape — including the timeline-confirmation bounce, which is an ok:true ack.
+     */
+    const respond = async <Result extends { ok: boolean }>(
+      acknowledge: (result: Result) => void,
+      unauthenticatedMessage: string,
+      fallbackMessage: string,
+      work: (principal: GamePrincipal) => Promise<Record<string, unknown>> | Record<string, unknown>
+    ) => {
+      const principal = principalOf();
+      if (!principal) return acknowledge({ ok: false, message: unauthenticatedMessage } as unknown as Result);
+      try {
+        acknowledge({ ok: true, ...(await work(principal)) } as unknown as Result);
+      } catch (error) {
+        if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message } as unknown as Result);
+        acknowledge({ ok: false, message: error instanceof Error ? error.message : fallbackMessage } as unknown as Result);
+      }
+    };
     socket.on("character:claim", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
       if (roleFor(socket.id) !== "player") return acknowledge({ ok: false, message: "GM sessions do not claim player characters." });
       const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
       try {
-        const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision }, (state) => claimCharacter(state, actorId, sessionId));
+        const result = await store.execute({ id: commandId, type: "character.claim", actorId, expectedRevision, payload: { commandId, actorId }, principal: `player:${sessionId}` }, (state) => claimCharacter(state, actorId, sessionId));
         if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character claim failed." }); }
     });
     socket.on("character:release", async ({ commandId, expectedRevision }, acknowledge) => {
       const sessionId = auth.verifyPlayer(socket.handshake.auth.token)?.sessionId; if (!sessionId) return acknowledge({ ok: false, message: "Join a session first." });
       try {
-        const result = await store.execute({ id: commandId, type: "character.release", expectedRevision }, (state) => releaseCharactersForSession(state, sessionId));
+        const result = await store.execute({ id: commandId, type: "character.release", expectedRevision, payload: { commandId }, principal: `player:${sessionId}` }, (state) => releaseCharactersForSession(state, sessionId));
         if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character release failed." }); }
     });
     socket.on("character:force-release", async ({ commandId, actorId, expectedRevision }, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can force-release a character." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can force-release a character." });
       try {
-        const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision }, (state) => forceReleaseCharacter(state, actorId, "gm"));
+        const result = await store.execute({ id: commandId, type: "character.force-release", actorId, expectedRevision, payload: { commandId, actorId }, principal: `gm:${gm.sessionId}` }, (state) => forceReleaseCharacter(state, actorId, "gm"));
         if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character force-release failed." }); }
     });
-    socket.on("content:monsters", (_payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse bundled content." });
-      acknowledge({ ok: true, monsters: contentLibrary.monsterSummaries(), attribution: contentLibrary.attribution });
-    });
-    socket.on("actor:add-from-definition", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can add combatants." });
-      const request = ActorAddFromDefinitionSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The add-combatant command is malformed." });
-      const definition = contentLibrary.monster(request.data.definitionId);
-      if (!definition) return acknowledge({ ok: false, message: "That monster is not in the bundled content." });
-      try {
-        // Like annotation:add, the commandId doubles as the new entity id so a duplicate
-        // delivery acks the same actorId instead of minting a fresh unused one.
-        const actorId = request.data.commandId;
-        const result = await store.execute({ id: request.data.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.data.expectedRevision }, (state) => addActorFromDefinition(state, definition, actorId, request.data.visibility));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
-    });
-    socket.on("actor:import-definition", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can import sheets." });
-      const envelope = z.object({ commandId: z.string().uuid(), definition: z.unknown(), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict().safeParse(payload);
-      if (!envelope.success) return acknowledge({ ok: false, message: "The import command is malformed." });
-      if (JSON.stringify(envelope.data.definition ?? null).length > 262_144) return acknowledge({ ok: false, message: "That sheet is too large to import." });
-      const parsed = ActorDefinitionSchema.safeParse(envelope.data.definition);
-      if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        return acknowledge({ ok: false, message: `That file is not a valid actor definition (${issue.path.join(".") || "root"}: ${issue.message}).` });
-      }
-      try {
-        const actorId = envelope.data.commandId;
-        const result = await store.execute({ id: envelope.data.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.data.expectedRevision }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.data.visibility));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The sheet could not be imported." }); }
-    });
-    socket.on("actor:remove", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove combatants." });
-      const request = ActorRemoveSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The remove-combatant command is malformed." });
-      try {
-        const { commandId, actorId, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "actor.remove", actorId, expectedRevision }, (state) => removeActor(state, actorId));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be removed." }); }
-    });
+    socket.on("content:monsters", (_payload, acknowledge) => respond(acknowledge, "Only the GM can browse bundled content.", "The bundled content is unavailable.", (principal) => operations.contentMonsters(principal)));
+    socket.on("actor:add-from-definition", (payload, acknowledge) => respond(acknowledge, "Only the GM can add combatants.", "The combatant could not be added.", (principal) => operations.actorAddFromDefinition(principal, payload)));
+    socket.on("actor:import-definition", (payload, acknowledge) => respond(acknowledge, "Only the GM can import sheets.", "The sheet could not be imported.", (principal) => operations.actorImportDefinition(principal, payload)));
+    socket.on("actor:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) => operations.actorRemove(principal, payload)));
     socket.on("actor:set-token-image", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set token images." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can set token images." });
       const request = SetTokenImageSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The token image command is malformed." });
       try {
         const { commandId, actorId, tokenAssetId, expectedRevision } = request.data;
         if (tokenAssetId !== null && !tokenCatalog.get(tokenAssetId)) return acknowledge({ ok: false, message: "That token image is not in your library." });
-        const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision }, (state) => {
+        const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => {
           const actor = state.actors.find((item) => item.id === actorId);
           if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
           if (tokenAssetId === null) delete actor.tokenAssetId; else actor.tokenAssetId = tokenAssetId;
@@ -499,420 +478,45 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token image could not be set." }); }
     });
     socket.on("actor:set-size", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can resize tokens." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can resize tokens." });
       const request = SetActorSizeSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The token size command is malformed." });
       try {
         const { commandId, actorId, size, expectedRevision } = request.data;
         const mapAssetId = store.snapshot.combat.mapAssetId;
         const geometry = mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
-        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision }, (state) => setActorSize(state, actorId, size, geometry));
+        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => setActorSize(state, actorId, size, geometry));
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be resized." }); }
     });
-    // GM adjusts anyone's hit points; a player only their own claimed character (checked in the reducer).
-    const actorScope = (): ActorScope | null => {
-      if (auth.verify(socket.handshake.auth.token)) return { role: "gm" };
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      return player ? { role: "player", sessionId: player.sessionId } : null;
-    };
-    socket.on("actor:apply-damage", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
-      const request = HpAmountSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The damage command is malformed." });
-      try {
-        const { commandId, actorId, amount, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "actor.apply-damage", actorId, expectedRevision }, (state) => applyDamage(state, actorId, amount, scope));
-        if (!result.duplicate) { await publishGameState(result.state); broadcastTableEvent({ kind: "damage", text: `${actorName(actorId)} took ${amount} damage.`, actorIds: [actorId] }); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The damage could not be applied." }); }
-    });
-    socket.on("actor:heal", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
-      const request = HpAmountSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The healing command is malformed." });
-      try {
-        const { commandId, actorId, amount, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "actor.heal", actorId, expectedRevision }, (state) => healActor(state, actorId, amount, scope));
-        if (!result.duplicate) { await publishGameState(result.state); broadcastTableEvent({ kind: "heal", text: `${actorName(actorId)} healed ${amount}.`, actorIds: [actorId] }); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The healing could not be applied." }); }
-    });
-    socket.on("actor:set-temp-hp", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
-      const request = TempHpSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The temporary hit point command is malformed." });
-      try {
-        const { commandId, actorId, amount, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "actor.set-temp-hp", actorId, expectedRevision }, (state) => setTemporaryHp(state, actorId, amount, scope));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The temporary hit points could not be set." }); }
-    });
-    socket.on("content:conditions", (_payload, acknowledge) => {
-      // Reference text is public information: any joined session (GM or player) may read it.
-      if (!auth.verify(socket.handshake.auth.token) && !auth.verifyPlayer(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Join the table before browsing reference content." });
-      acknowledge({ ok: true, conditions: contentLibrary.conditionSummaries() });
-    });
-    socket.on("actor:set-condition", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking conditions." });
-      const request = SetConditionSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The condition command is malformed." });
-      if (!contentLibrary.hasCondition(request.data.conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled rules." });
-      try {
-        const { commandId, actorId, conditionId, active, level, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision }, (state) => setCondition(state, actorId, conditionId, active, level, scope));
-        if (!result.duplicate) {
-          await publishGameState(result.state);
-          const conditionName = contentLibrary.conditionSummaries().find((entry) => entry.id === conditionId)?.name ?? conditionId;
-          broadcastTableEvent({ kind: "condition", text: active ? `${actorName(actorId)} is ${conditionName}${conditionId === "exhaustion" && level ? ` ${level}` : ""}.` : `${actorName(actorId)} is no longer ${conditionName}.`, actorIds: [actorId] });
-        }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
-    });
-    // Imported stat blocks take precedence over the bundle so sheets/actions resolve for both.
-    const resolveDefinition = (definitionId: string) => storedDefinition(store.snapshot, definitionId) ?? contentLibrary.monster(definitionId);
-    socket.on("content:monster-actions", (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse stat blocks." });
-      const request = ContentActionsSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The action lookup is malformed." });
-      const imported = storedDefinition(store.snapshot, request.data.definitionId);
-      const actions = imported
-        ? imported.actions.map((action) => ({ id: action.id, name: action.name, activation: action.activation, description: action.description, attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, saveAbility: action.save?.ability ?? null, saveDc: action.save?.dc ?? null, damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })), area: parseAreaProse(action.description) }))
-        : contentLibrary.monsterActionSummaries(request.data.definitionId);
-      if (!actions) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
-      acknowledge({ ok: true, actions });
-    });
-    socket.on("content:monster-sheet", (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can read stat blocks." });
-      const request = ContentActionsSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The stat-block lookup is malformed." });
-      const definition = resolveDefinition(request.data.definitionId);
-      if (!definition) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
-      acknowledge({ ok: true, definition });
-    });
-    socket.on("action:resolve", async (payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      if (!gm) return acknowledge({ ok: false, message: "Only the GM can resolve stat-block actions." });
-      const request = ActionResolveSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The action command is malformed." });
-      try {
-        const { commandId, actorId, actionId, targetIds, template, conditionId, expectedRevision } = request.data;
-        if (conditionId !== undefined && !contentLibrary.hasCondition(conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled reference." });
-        // A template needs the map's grid up front (async fetch) so containment runs inside the mutation.
-        const mapAssetId = store.snapshot.combat.mapAssetId;
-        const geometry = template && mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
-        if (template && (!mapAssetId || !geometry?.calibration)) return acknowledge({ ok: false, message: "Calibrate this map before placing an area template." });
-        let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
-        const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision }, (state) => {
-          const attacker = state.actors.find((item) => item.id === actorId);
-          if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
-          const action = (storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId))?.actions.find((candidate) => candidate.id === actionId);
-          if (!action) throw new CommandRejectedError("That action is not on the stat block.");
-          let resolvedTargetIds: readonly string[];
-          if (template) {
-            if (action.attack) throw new CommandRejectedError("Attacks target a single token — pick it directly instead of placing a template.");
-            if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
-            const calibration = geometry!.calibration!;
-            // Snap the template the same way the drawn annotation will, then find who is under it.
-            const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
-            resolvedTargetIds = tokensInTemplate(state, calibration, snapped, template.shape, parseAreaProse(action.description)?.widthFeet ?? null)
-              .filter((id) => id !== actorId && state.combat.initiative.some((entry) => entry.actorId === id));
-            if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
-          } else {
-            resolvedTargetIds = targetIds!;
-          }
-          resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id) });
-          // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
-          if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gm.sessionId, role: "gm" }, now: Date.now() }, geometry!);
-        });
-        if (!result.duplicate) { await publishGameState(result.state); if (resolution) broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The action could not be resolved." }); }
-    });
-    socket.on("save:answer", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before answering saving throws." });
-      const request = SaveAnswerSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The saving-throw answer is malformed." });
-      const sessionId = scope.role === "gm" ? auth.verify(socket.handshake.auth.token)!.sessionId : scope.sessionId;
-      try {
-        const { commandId, saveId, method, total, commit, expectedRevision } = request.data;
-        const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
-        let outcome: ReturnType<typeof answerSave> | undefined;
-        const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision }, (state) => {
-          outcome = answerSave(state, commandId, saveId, method, total, commit, scope, {
-            random: (sides) => randomInt(1, sides + 1),
-            newRollId: randomUUID,
-            sessionId,
-            role: scope.role,
-            now: () => new Date().toISOString(),
-            resolveDefinition
-          });
-        });
-        if (!result.duplicate) {
-          await publishGameState(result.state);
-          if (outcome && outcome.committed && pending) broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
-        }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be answered." }); }
-    });
-    socket.on("save:dismiss", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before managing saving throws." });
-      const request = SaveDismissSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The dismissal is malformed." });
-      try {
-        const { commandId, saveId, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "save.dismiss", expectedRevision }, (state) => dismissSave(state, saveId, scope));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be dismissed." }); }
-    });
-    socket.on("turn:use", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking turns." });
-      const request = TurnUseSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The turn command is malformed." });
-      try {
-        const { commandId, slot, used, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "turn.use", expectedRevision }, (state) => setTurnSlot(state, slot, used, scope));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not be updated." }); }
-    });
-    socket.on("turn:use-reaction", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking turns." });
-      const request = TurnReactionSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The reaction command is malformed." });
-      try {
-        const { commandId, actorId, used, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "turn.use-reaction", actorId, expectedRevision }, (state) => setReactionUsed(state, actorId, used, scope));
-        if (!result.duplicate) { await publishGameState(result.state); if (used) broadcastTableEvent({ kind: "reaction", text: `${actorName(actorId)} used its reaction.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The reaction could not be updated." }); }
-    });
-    socket.on("turn:end", async (payload, acknowledge) => {
-      const scope = actorScope();
-      if (!scope) return acknowledge({ ok: false, message: "Join the table before ending a turn." });
-      const request = CommandIdentitySchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The end-turn command is malformed." });
-      try {
-        // End Turn is a live forward step (same as the GM's Next): record the boundary, then advance.
-        // While the GM has the table rewound, players can't quietly push initiative past the review.
-        const result = await store.executeTimeline({ id: request.data.commandId, type: "turn.end", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
-          if (state.combat.historyCursor !== null) throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
-          planNextTurn(state, timeline, false, (advancing) => endTurn(advancing, scope));
-        });
-        if (!result.duplicate) { await publishGameState(result.state); logTurnBegin(result.state); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not end." }); }
-    });
-    socket.on("actor:set-hp", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set hit points directly." });
-      const request = SetHpSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The hit point command is malformed." });
-      try {
-        const { commandId, actorId, current, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "actor.set-hp", actorId, expectedRevision }, (state) => setCurrentHp(state, actorId, current, { role: "gm" }));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The hit points could not be set." }); }
-    });
-    socket.on("dice:roll", async ({ commandId, formula, purpose, visibility, actorId, expectedRevision }, acknowledge) => {
-      const request = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).safeParse({ commandId, formula, purpose, visibility, actorId, expectedRevision });
-      if (!request.success) return acknowledge({ ok: false, message: "The roll request is malformed." });
-      ({ commandId, formula, purpose, visibility, actorId, expectedRevision } = request.data);
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before rolling." });
-      if (!gm && visibility === "gm-only") return acknowledge({ ok: false, message: "Only the GM can make a GM-only roll." });
-      const initiatorSessionId = gm?.sessionId ?? player!.sessionId;
-      const initiatorRole = gm ? "gm" : "player";
-      try {
-        const resolution = rollDice(formula, (sides) => randomInt(1, sides + 1));
-        const rollId = randomUUID();
-        const result = await store.execute({ id: commandId, type: "dice.roll", actorId, expectedRevision }, (state) => {
-          if (actorId && !gm) {
-            const actor = state.actors.find((candidate) => candidate.id === actorId);
-            if (!actor || actor.ownerSessionId !== player!.sessionId) throw new CommandRejectedError("You may only roll for your claimed character.");
-          }
-          let group = 0;
-          const dice = resolution.terms.flatMap((term) => {
-            if (term.kind !== "dice") return [];
-            const currentGroup = group++;
-            return term.dice.map((die) => ({ group: currentGroup, sides: term.sides, face: die.face, kept: die.kept, sign: term.sign }));
-          });
-          const initiatorLabel = initiatorRole === "gm" ? "GM" : state.actors.find((candidate) => candidate.ownerSessionId === initiatorSessionId)?.name ?? "A player";
-          const record: RollRecord = {
-            id: rollId, commandId, initiatorSessionId, initiatorRole, initiatorLabel, actorId: actorId ?? null, purpose, visibility, formula,
-            normalizedFormula: resolution.expression.normalized,
-            dice,
-            modifiers: resolution.terms.filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier").map((term) => ({ value: term.value, sign: term.sign })),
-            total: resolution.total, createdAt: new Date().toISOString()
-          };
-          state.rolls.push(record);
-          if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
-        });
-        const accepted = result.state.rolls.find((roll) => roll.commandId === commandId);
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, rollId: accepted?.id, hiddenFromRoller: visibility === "blind" && !gm });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The roll failed." }); }
-    });
-    socket.on("encounter:start", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can start an encounter." });
-      const request = EncounterStartSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The encounter setup is malformed." });
-      const encounterMap = mapCatalog.get(request.data.mapAssetId);
-      if (!encounterMap || encounterMap.kind !== "battlemap") return acknowledge({ ok: false, message: "Select an uploaded battlemap before starting the encounter." });
-      try {
-        const { commandId, mapAssetId, entries, expectedRevision } = request.data;
-        const tokenGeometry = await tokenGeometryFor(mapAssetId);
-        const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision }, (state, timeline) => {
-          startEncounter(state, { mapAssetId, entries }, () => randomInt(1, 21), tokenGeometry);
-          // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
-          // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
-          timeline.truncateAll();
-          timeline.capture("turn", `Combat begins — ${turnLabel(state)}`, state);
-        });
-        if (!result.duplicate) { await publishGameState(result.state); appendLog({ kind: "encounter", text: "The encounter began.", gmOnly: false }); logTurnBegin(result.state); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not start." }); }
-    });
-    socket.on("encounter:end", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can end an encounter." });
-      const request = CommandIdentitySchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The encounter command is malformed." });
-      try {
-        const { commandId, expectedRevision } = request.data;
-        // The combat log persists independently; grab the fight's slice (from its first snapshot's
-        // revision) up front so the archive is a self-contained "state per turn + narration" document.
-        const firstRevision = store.listTurnSnapshots()[0]?.revision ?? null;
-        const logSlice = firstRevision === null ? [] : combatLog.exportSince(firstRevision);
-        const result = await store.executeTimeline({ id: commandId, type: "encounter.end", expectedRevision }, (state, timeline) => {
-          endEncounter(state); // rejects while rewound
-          // Auto-archive the whole fight permanently BEFORE wiping the live buffer — same transaction,
-          // so an ended encounter's record can never be lost. Skip a fight that captured no boundaries.
-          const entries = timeline.entries();
-          if (entries.length > 0) {
-            const document = buildEncounterArchive(entries, timeline.read, logSlice, new Date().toISOString());
-            timeline.archive({ commandId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
-          }
-          timeline.truncateAll(); // the fight is over — its live turn snapshots go with it
-        });
-        if (!result.duplicate) { await publishGameState(result.state); appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false }); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not end." }); }
-    });
-    socket.on("encounter:add-combatant", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can add a combatant." });
-      const request = AddCombatantSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The add-combatant command is malformed." });
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before adding a combatant." });
-      try {
-        const { commandId, actorId, score, expectedRevision } = request.data;
-        const geometry = await tokenGeometryFor(mapAssetId);
-        const result = await store.execute({ id: commandId, type: "encounter.add-combatant", actorId, expectedRevision }, (state) => addCombatant(state, actorId, score, () => randomInt(1, 21), geometry));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
-    });
-    socket.on("initiative:set", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change Initiative." });
-      const request = InitiativeScoreSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The Initiative update is malformed." });
-      try {
-        const { commandId, actorId, score, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "initiative.set", actorId, expectedRevision }, (state) => setInitiativeScore(state, actorId, score));
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not be updated." }); }
-    });
-    socket.on("initiative:next", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can advance Initiative." });
-      const request = InitiativeNextSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The Initiative command is malformed." });
-      try {
-        // Live: record the boundary and advance. Rewound and unchanged: step forward through history
-        // (reaching the return-point resumes live). Rewound and changed: rewrite history — but only
-        // once the GM confirms, which the plan demands by throwing TimelineConfirmationRequired.
-        let outcome: TimelineOutcome | undefined;
-        const result = await store.executeTimeline({ id: request.data.commandId, type: "initiative.next", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
-          outcome = planNextTurn(state, timeline, request.data.confirmRewrite === true);
-        });
-        if (!result.duplicate) { await publishGameState(result.state); if (outcome) logTimelineOutcome(outcome, result.state); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) {
-        if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message });
-        acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not advance." });
-      }
-    });
-    socket.on("initiative:previous", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can move Initiative backward." });
-      const request = InitiativePreviousSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The Initiative command is malformed." });
-      try {
-        // From live, park a return-point and restore the last boundary; while rewound, step further
-        // back — unless the GM changed things here, where confirming discards those changes in place.
-        let outcome: TimelineOutcome | undefined;
-        const result = await store.executeTimeline({ id: request.data.commandId, type: "initiative.previous", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
-          outcome = planPreviousTurn(state, timeline, request.data.confirmDiscard === true);
-        });
-        if (!result.duplicate) { await publishGameState(result.state); if (outcome) logTimelineOutcome(outcome, result.state); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) {
-        if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message });
-        acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not move backward." });
-      }
-    });
-    socket.on("log:read", (_payload, acknowledge) => {
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join the table to read the combat log." });
-      acknowledge({ ok: true, entries: combatLog.list(gm !== null) });
-    });
-    socket.on("token:move", async (payload, acknowledge) => {
-      const request = TokenMoveSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The token move is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before moving tokens." });
-      const { commandId, actorId, position, sceneId, expectedRevision } = request.data;
-      try {
-        if (sceneId !== undefined) {
-          // GM staging a prepared (off-table) scene privately. Geometry comes from that scene's own map.
-          if (!gm) return acknowledge({ ok: false, message: "Only the GM can stage a prepared scene." });
-          const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
-          if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
-          const sceneGeometry = await tokenGeometryFor(scene.mapAssetId);
-          const result = await store.execute({ id: commandId, type: "token.move-scene", actorId, expectedRevision }, (state) => moveSceneToken(state, sceneId, actorId, position, sceneGeometry));
-          if (!result.duplicate) await publishGameState(result.state);
-          return acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-        }
-        const mapAssetId = store.snapshot.combat.mapAssetId;
-        if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before moving tokens." });
-        const geometry = await tokenGeometryFor(mapAssetId);
-        const result = await store.execute({ id: commandId, type: "token.move", actorId, expectedRevision }, (state) => {
-          if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
-          if (!gm) {
-            const actor = state.actors.find((candidate) => candidate.id === actorId);
-            if (!actor || actor.ownerSessionId !== player!.sessionId) throw new CommandRejectedError("You may only move your claimed character token.");
-          }
-          moveEncounterToken(state, actorId, position, geometry);
-        });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be moved." }); }
-    });
+    socket.on("actor:apply-damage", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The damage could not be applied.", (principal) => operations.actorApplyDamage(principal, payload)));
+    socket.on("actor:heal", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The healing could not be applied.", (principal) => operations.actorHeal(principal, payload)));
+    socket.on("actor:set-temp-hp", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The temporary hit points could not be set.", (principal) => operations.actorSetTempHp(principal, payload)));
+    socket.on("content:conditions", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentConditions(principal)));
+    socket.on("actor:set-condition", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking conditions.", "The condition could not be updated.", (principal) => operations.actorSetCondition(principal, payload)));
+    socket.on("content:monster-actions", (payload, acknowledge) => respond(acknowledge, "Only the GM can browse stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterActions(principal, payload)));
+    socket.on("content:monster-sheet", (payload, acknowledge) => respond(acknowledge, "Only the GM can read stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterSheet(principal, payload)));
+    socket.on("action:resolve", (payload, acknowledge) => respond(acknowledge, "Only the GM can resolve stat-block actions.", "The action could not be resolved.", (principal) => operations.actionResolve(principal, payload)));
+    socket.on("save:answer", (payload, acknowledge) => respond(acknowledge, "Join the table before answering saving throws.", "The saving throw could not be answered.", (principal) => operations.saveAnswer(principal, payload)));
+    socket.on("save:dismiss", (payload, acknowledge) => respond(acknowledge, "Join the table before managing saving throws.", "The saving throw could not be dismissed.", (principal) => operations.saveDismiss(principal, payload)));
+    socket.on("turn:use", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The turn could not be updated.", (principal) => operations.turnUse(principal, payload)));
+    socket.on("turn:use-reaction", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The reaction could not be updated.", (principal) => operations.turnUseReaction(principal, payload)));
+    socket.on("turn:end", (payload, acknowledge) => respond(acknowledge, "Join the table before ending a turn.", "The turn could not end.", (principal) => operations.turnEnd(principal, payload)));
+    socket.on("actor:set-hp", (payload, acknowledge) => respond(acknowledge, "Only the GM can set hit points directly.", "The hit points could not be set.", (principal) => operations.actorSetHp(principal, payload)));
+    socket.on("dice:roll", (payload, acknowledge) => respond(acknowledge, "Join a session before rolling.", "The roll failed.", (principal) => operations.diceRoll(principal, payload)));
+    socket.on("encounter:start", (payload, acknowledge) => respond(acknowledge, "Only the GM can start an encounter.", "The encounter could not start.", (principal) => operations.encounterStart(principal, payload)));
+    socket.on("encounter:end", (payload, acknowledge) => respond(acknowledge, "Only the GM can end an encounter.", "The encounter could not end.", (principal) => operations.encounterEnd(principal, payload)));
+    socket.on("encounter:add-combatant", (payload, acknowledge) => respond(acknowledge, "Only the GM can add a combatant.", "The combatant could not be added.", (principal) => operations.encounterAddCombatant(principal, payload)));
+    socket.on("initiative:set", (payload, acknowledge) => respond(acknowledge, "Only the GM can change Initiative.", "Initiative could not be updated.", (principal) => operations.initiativeSet(principal, payload)));
+    socket.on("initiative:next", (payload, acknowledge) => respond(acknowledge, "Only the GM can advance Initiative.", "Initiative could not advance.", (principal) => operations.initiativeNext(principal, payload)));
+    socket.on("initiative:previous", (payload, acknowledge) => respond(acknowledge, "Only the GM can move Initiative backward.", "Initiative could not move backward.", (principal) => operations.initiativePrevious(principal, payload)));
+    socket.on("log:read", (_payload, acknowledge) => respond(acknowledge, "Join the table to read the combat log.", "The combat log is unavailable.", (principal) => ({ entries: operations.logEntries(principal) })));
+    socket.on("token:move", (payload, acknowledge) => respond(acknowledge, "Join a session before moving tokens.", "The token could not be moved.", (principal) => operations.tokenMove(principal, payload)));
     socket.on("scene:create", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can prepare scenes." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can prepare scenes." });
       const request = SceneCreateSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The scene setup is malformed." });
       const sceneMap = mapCatalog.get(request.data.mapAssetId);
@@ -920,40 +524,43 @@ export function createServer(options: CreateServerOptions) {
       try {
         const { commandId, name, mapAssetId, combatantIds, expectedRevision } = request.data;
         const geometry = await tokenGeometryFor(mapAssetId);
-        const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
+        const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be created." }); }
     });
     socket.on("scene:rename", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can rename scenes." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can rename scenes." });
       const request = SceneRenameSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The scene rename is malformed." });
       try {
         const { commandId, sceneId, name, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "scene.rename", expectedRevision }, (state) => renameScene(state, sceneId, name));
+        const result = await store.execute({ id: commandId, type: "scene.rename", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => renameScene(state, sceneId, name));
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be renamed." }); }
     });
     socket.on("scene:remove", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove scenes." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can remove scenes." });
       const request = SceneIdSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
       try {
         const { commandId, sceneId, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "scene.remove", expectedRevision }, (state) => removeScene(state, sceneId));
+        const result = await store.execute({ id: commandId, type: "scene.remove", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => removeScene(state, sceneId));
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be removed." }); }
     });
     socket.on("scene:activate", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can switch scenes." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can switch scenes." });
       const request = SceneIdSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
       try {
         const { commandId, sceneId, expectedRevision } = request.data;
-        const result = await store.executeTimeline({ id: commandId, type: "scene.activate", expectedRevision }, (state, timeline) => {
+        const result = await store.executeTimeline({ id: commandId, type: "scene.activate", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state, timeline) => {
           activateScene(state, sceneId, commandId); // rejects while rewound
           // Snapshots belong to the scene that was live; the swap invalidates them, so start clean.
           timeline.truncateAll();
@@ -967,7 +574,8 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be switched." }); }
     });
     socket.on("scene:set-combatants", async (payload, acknowledge) => {
-      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change a scene's combatants." });
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can change a scene's combatants." });
       const request = SceneSetCombatantsSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The scene update is malformed." });
       try {
@@ -975,142 +583,19 @@ export function createServer(options: CreateServerOptions) {
         const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
         if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
         const geometry = await tokenGeometryFor(scene.mapAssetId);
-        const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
+        const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision, payload: request.data, principal: `gm:${gm.sessionId}` }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be updated." }); }
     });
-    socket.on("annotation:add", async (payload, acknowledge) => {
-      const request = AnnotationAddSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The annotation is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before adding to the map." });
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before adding to the map." });
-      try {
-        const geometry = await tokenGeometryFor(mapAssetId);
-        const { commandId, kind, shape, geometry: geometryInput, visibility, visibleToActorId, movableByOthers, color, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.add", expectedRevision }, (state) => {
-          if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
-          addAnnotation(state, { id: commandId, kind, shape, origin: geometryInput.origin, target: geometryInput.target, visibility: visibility ?? "public", visibleToActorId: visibleToActorId ?? null, movableByOthers, color, actor, now: Date.now() }, geometry);
-        });
-        if (!result.duplicate) { await publishGameState(result.state); scheduleAnnotationExpiry(); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, annotationId: commandId });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be added to the map." }); }
-    });
-    socket.on("annotation:ping", async (payload, acknowledge) => {
-      const request = AnnotationPingSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The ping is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before pinging the map." });
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before pinging the map." });
-      try {
-        const geometry = await tokenGeometryFor(mapAssetId);
-        const { commandId, point, color, expectedRevision } = request.data;
-        const sessionId = gm?.sessionId ?? player!.sessionId;
-        const actor = { sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.ping", expectedRevision }, (state) => {
-          if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
-          const label = gm ? "GM" : state.actors.find((candidate) => candidate.ownerSessionId === sessionId)?.name ?? "A player";
-          addPing(state, { id: commandId, point, label, color, actor, now: Date.now() }, geometry);
-        });
-        if (!result.duplicate) { await publishGameState(result.state); scheduleAnnotationExpiry(); }
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The ping could not be sent." }); }
-    });
-    socket.on("annotation:set-color", async (payload, acknowledge) => {
-      const request = AnnotationColorSetSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The color change is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
-      try {
-        const { commandId, id, color, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.set-color", expectedRevision }, (state) => { setAnnotationColor(state, id, color, actor); });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The color could not be changed." }); }
-    });
-    socket.on("annotation:move", async (payload, acknowledge) => {
-      const request = AnnotationMoveSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The annotation update is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before editing the map." });
-      try {
-        const geometry = await tokenGeometryFor(mapAssetId);
-        const { commandId, id, geometry: geometryInput, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.move", expectedRevision }, (state) => {
-          moveAnnotation(state, id, geometryInput.origin, geometryInput.target, actor, geometry);
-        });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be moved." }); }
-    });
-    socket.on("annotation:remove", async (payload, acknowledge) => {
-      const request = AnnotationRemoveSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The annotation command is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
-      try {
-        const { commandId, id, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.remove", expectedRevision }, (state) => { removeAnnotation(state, id, actor); });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "That could not be removed." }); }
-    });
-    socket.on("annotation:set-visibility", async (payload, acknowledge) => {
-      const request = AnnotationVisibilitySetSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The visibility change is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
-      try {
-        const { commandId, id, visibility, visibleToActorId, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.set-visibility", expectedRevision }, (state) => { setAnnotationVisibility(state, id, visibility, visibleToActorId ?? null, actor); });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The visibility could not be changed." }); }
-    });
-    socket.on("annotation:set-movable", async (payload, acknowledge) => {
-      const request = AnnotationMovableSetSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The move-control change is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
-      try {
-        const { commandId, id, movableByOthers, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.set-movable", expectedRevision }, (state) => { setAnnotationMovable(state, id, movableByOthers, actor); });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Move control could not be changed." }); }
-    });
-    socket.on("annotation:clear", async (payload, acknowledge) => {
-      const request = AnnotationClearSchema.safeParse(payload);
-      if (!request.success) return acknowledge({ ok: false, message: "The clear command is malformed." });
-      const gm = auth.verify(socket.handshake.auth.token);
-      const player = auth.verifyPlayer(socket.handshake.auth.token);
-      if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before editing the map." });
-      try {
-        const { commandId, scope, expectedRevision } = request.data;
-        const actor = { sessionId: gm?.sessionId ?? player!.sessionId, role: (gm ? "gm" : "player") as "gm" | "player" };
-        const result = await store.execute({ id: commandId, type: "annotation.clear", expectedRevision }, (state) => { clearAnnotations(state, scope, actor); });
-        if (!result.duplicate) await publishGameState(result.state);
-        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Shapes could not be removed." }); }
-    });
+    socket.on("annotation:add", (payload, acknowledge) => respond(acknowledge, "Join a session before adding to the map.", "That could not be added to the map.", (principal) => operations.annotationAdd(principal, payload)));
+    socket.on("annotation:ping", (payload, acknowledge) => respond(acknowledge, "Join a session before pinging the map.", "The ping could not be sent.", (principal) => operations.annotationPing(principal, payload)));
+    socket.on("annotation:set-color", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "The color could not be changed.", (principal) => operations.annotationSetColor(principal, payload)));
+    socket.on("annotation:move", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "That could not be moved.", (principal) => operations.annotationMove(principal, payload)));
+    socket.on("annotation:remove", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "That could not be removed.", (principal) => operations.annotationRemove(principal, payload)));
+    socket.on("annotation:set-visibility", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "The visibility could not be changed.", (principal) => operations.annotationSetVisibility(principal, payload)));
+    socket.on("annotation:set-movable", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "Move control could not be changed.", (principal) => operations.annotationSetMovable(principal, payload)));
+    socket.on("annotation:clear", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "Shapes could not be removed.", (principal) => operations.annotationClear(principal, payload)));
     socket.emit("state:updated", projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor));
   });
 
@@ -1120,13 +605,13 @@ export function createServer(options: CreateServerOptions) {
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
         const geometry = await tokenGeometryFor(persisted.combat.mapAssetId);
-        await store.execute({ id: `encounter.tokens.prepare:${persisted.revision}`, type: "encounter.tokens.prepare" }, (state) => { ensureEncounterTokens(state, geometry); });
+        await store.execute({ id: `encounter.tokens.prepare:${persisted.revision}`, type: "encounter.tokens.prepare", principal: "system:startup" }, (state) => { ensureEncounterTokens(state, geometry); });
       } catch { /* Preserve startup for an old encounter whose map asset was removed; the GM can end it and start a new encounter. */ }
     }
     // Bind a pre-scenes encounter/map to one implicit active scene so park-and-resume has a home.
     const beforeScenes = store.snapshot;
     if (beforeScenes.combat.scenes.length === 0 && beforeScenes.combat.mapAssetId !== null) {
-      await store.execute({ id: `scene.migrate:${beforeScenes.revision}`, type: "scene.migrate" }, (state) => migrateToScene(state, randomUUID()));
+      await store.execute({ id: `scene.migrate:${beforeScenes.revision}`, type: "scene.migrate", principal: "system:startup" }, (state) => migrateToScene(state, randomUUID()));
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }

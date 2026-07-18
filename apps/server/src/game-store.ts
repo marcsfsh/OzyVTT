@@ -10,10 +10,23 @@ export class TimelineConfirmationRequired extends Error {
   constructor(public readonly confirm: "rewrite-history" | "discard-changes", message: string) { super(message); }
 }
 
-type Command = { id: string; type: string; actorId?: string; expectedRevision?: number };
+type Command = {
+  id: string;
+  type: string;
+  actorId?: string;
+  expectedRevision?: number;
+  /** The full validated wire payload, journaled verbatim while an encounter is live (Time Machine v2). */
+  payload?: unknown;
+  /** Who issued it: "gm:<sessionId>", "player:<sessionId>", "integration:<credentialId>", or a lifecycle tag. */
+  principal?: string;
+};
 type ReceiptRow = { revision: number };
 type StateRow = { state_json: string };
 type TurnSnapshotRow = { idx: number; kind: "turn" | "return"; label: string; revision: number; created_at: string };
+type JournalRow = { seq: number; command_id: string; command_type: string; actor_id: string | null; principal: string; payload_json: string; revision: number; at: string };
+
+/** One journaled command from the live fight: everything an external tool needs to replay or audit what happened. */
+export type JournalEntry = Readonly<{ seq: number; commandId: string; type: string; actorId: string | null; principal: string; payload: unknown; revision: number; at: string }>;
 const PLACEHOLDER_ROSTER_SEED = "phase-1-placeholder-roster-v1";
 
 export type GameStoreOptions = Readonly<{
@@ -47,6 +60,14 @@ export type TimelineOps = Readonly<{
   prune: (index: number) => void;
   /** Persist a permanent encounter archive row in this same transaction (used at encounter end, before truncateAll). */
   archive: (row: EncounterArchiveInput) => void;
+  /** Every journaled command of the live fight, oldest first. Reads run inside the serialized queue, so the slice is exact. */
+  journalEntries: () => readonly JournalEntry[];
+  /**
+   * Wipe the command journal in this same transaction. `exceptCommandId` protects the current
+   * command's own row (encounter.start clears the previous fight's journal but keeps itself as the
+   * new fight's first entry); the queued delete runs AFTER this command's journal insert.
+   */
+  clearJournal: (exceptCommandId?: string) => void;
 }>;
 
 export type EncounterArchiveInput = Readonly<{ commandId: string; startedAt: string | null; endedAt: string; turnCount: number; documentJson: string }>;
@@ -114,6 +135,20 @@ const MIGRATIONS = [{
       ended_at TEXT NOT NULL,
       turn_count INTEGER NOT NULL,
       document_json TEXT NOT NULL
+    ) STRICT;
+  `
+}, {
+  version: 5,
+  sql: `
+    CREATE TABLE encounter_journal (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      command_id TEXT NOT NULL,
+      command_type TEXT NOT NULL,
+      actor_id TEXT,
+      principal TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      revision INTEGER NOT NULL,
+      at TEXT NOT NULL
     ) STRICT;
   `
 }];
@@ -185,7 +220,12 @@ export class GameStore {
         truncateAll: () => { pending.push({ sql: "DELETE FROM turn_snapshots", params: [] }); nextIndex = 0; },
         remove: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx = ?", params: [index] }); },
         prune: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx < ?", params: [index] }); },
-        archive: (row) => { pending.push({ sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json) VALUES (?, ?, ?, ?, ?, ?)", params: [row.commandId, new Date().toISOString(), row.startedAt ?? "", row.endedAt, row.turnCount, row.documentJson] }); }
+        archive: (row) => { pending.push({ sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json) VALUES (?, ?, ?, ?, ?, ?)", params: [row.commandId, new Date().toISOString(), row.startedAt ?? "", row.endedAt, row.turnCount, row.documentJson] }); },
+        journalEntries: () => this.listJournal(),
+        clearJournal: (exceptCommandId) => {
+          if (exceptCommandId === undefined) pending.push({ sql: "DELETE FROM encounter_journal", params: [] });
+          else pending.push({ sql: "DELETE FROM encounter_journal WHERE command_id != ?", params: [exceptCommandId] });
+        }
       };
       plan(nextState, timeline);
       return pending;
@@ -196,6 +236,15 @@ export class GameStore {
   listTurnSnapshots(): readonly TurnHistoryEntry[] {
     return (this.requireDatabase().prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx").all() as TurnSnapshotRow[])
       .map((row) => ({ index: row.idx, kind: row.kind, label: row.label, revision: row.revision, at: row.created_at }));
+  }
+
+  /** Current revision without cloning the whole state (cheap enough for ETag checks on every poll). */
+  get revision(): number { return this.state.revision; }
+
+  /** The live fight's command journal, oldest first (GM-grade data: payloads can reference hidden combatants). */
+  listJournal(): readonly JournalEntry[] {
+    return (this.requireDatabase().prepare("SELECT seq, command_id, command_type, actor_id, principal, payload_json, revision, at FROM encounter_journal ORDER BY seq").all() as JournalRow[])
+      .map((row) => ({ seq: row.seq, commandId: row.command_id, type: row.command_type, actorId: row.actor_id, principal: row.principal, payload: JSON.parse(row.payload_json) as unknown, revision: row.revision, at: row.at }));
   }
 
   /** Permanent, machine-readable records of ended encounters (GM-only; the document holds full state). Newest first. */
@@ -231,6 +280,15 @@ export class GameStore {
         database.prepare("INSERT INTO domain_events (sequence, command_id, event_type, actor_id, occurred_at) VALUES (?, ?, ?, ?, ?)").run(nextState.revision, command.id, command.type, command.actorId ?? null, acceptedAt);
         database.prepare("UPDATE game_state SET schema_version = ?, revision = ?, state_json = ?, updated_at = ? WHERE id = 1").run(nextState.schemaVersion, nextState.revision, JSON.stringify(nextState), acceptedAt);
         if (nextState.revision % 50 === 0) database.prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)").run(nextState.revision, JSON.stringify(nextState), "periodic", acceptedAt);
+        // Time Machine v2: journal every accepted command while an encounter is live (including the
+        // start/end commands themselves — before-or-after active covers both edges). Runs BEFORE the
+        // plan's queued writes so an encounter-lifecycle clearJournal can supersede it in the same
+        // transaction (start keeps its own row via the except clause; end wipes its own too, and the
+        // archive document carries the end command instead).
+        if (this.state.combat.active || nextState.combat.active) {
+          database.prepare("INSERT INTO encounter_journal (command_id, command_type, actor_id, principal, payload_json, revision, at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            .run(command.id, command.type, command.actorId ?? null, command.principal ?? "unknown", JSON.stringify(command.payload ?? null), nextState.revision, acceptedAt);
+        }
         for (const write of pendingTimelineWrites) database.prepare(write.sql).run(...write.params);
         database.exec("COMMIT");
         this.state = nextState;

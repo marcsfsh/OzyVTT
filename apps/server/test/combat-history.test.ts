@@ -157,11 +157,22 @@ describe("turn time-travel timeline", () => {
   // truncate; here we drive that plan directly to prove the archive is atomic, complete, and permanent.
   const LOG: readonly CombatLogEntry[] = [{ id: 1, at: new Date(0).toISOString(), kind: "damage", text: "Goblin took 6 damage.", gmOnly: false, revision: 2 }];
   const endAndArchive = (endId: string) => store.executeTimeline({ id: endId, type: "encounter.end" }, (state, timeline) => {
+    const finalState = structuredClone(state);
     endEncounter(state);
     const entries = timeline.entries();
-    const document = buildEncounterArchive(entries, timeline.read, LOG, new Date(1000).toISOString());
+    const document = buildEncounterArchive({
+      entries,
+      readState: timeline.read,
+      log: LOG,
+      journal: timeline.journalEntries(),
+      finalState,
+      endedAt: new Date(1000).toISOString(),
+      resolveBundledDefinition: () => undefined,
+      attribution: "test attribution"
+    });
     timeline.archive({ commandId: endId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
     timeline.truncateAll();
+    timeline.clearJournal();
   });
 
   it("archives the whole fight permanently on end, then wipes the live buffer", async () => {
@@ -177,12 +188,16 @@ describe("turn time-travel timeline", () => {
     expect(archives[0].turnCount).toBe(captured);
 
     const document = JSON.parse(store.getEncounterArchive(archives[0].id)!);
-    expect(document.archiveSchemaVersion).toBe(1);
+    expect(document.archiveSchemaVersion).toBe(2);
     expect(document.turns).toHaveLength(captured);
     // Each turn carries the FULL machine-readable state captured at that boundary, plus the log slice.
     expect(document.turns[0].state.actors.find((a: { id: string }) => a.id === PC)).toBeDefined();
     expect(document.turns[0].revision).toBe(document.turns[0].state.revision);
     expect(document.log).toEqual(LOG);
+    // v2 additions: the journal of the fight's commands and the last live picture before the end wiped it.
+    expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["initiative.next", "initiative.next"]);
+    expect(document.finalState.combat.active).toBe(true);
+    expect(store.listJournal()).toHaveLength(0); // wiped with the fight, atomically
 
     store.deleteEncounterArchive(archives[0].id);
     expect(store.listEncounterArchives()).toHaveLength(0);

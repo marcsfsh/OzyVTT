@@ -195,11 +195,18 @@ describe("live authoritative encounter workflow", () => {
       expect(typeof list.encounters[0].endedAt).toBe("string");
 
       const document = await (await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { headers: gmHeaders })).json();
-      expect(document.archiveSchemaVersion).toBe(1);
+      expect(document.archiveSchemaVersion).toBe(2);
       expect(document.turns.length).toBe(list.encounters[0].turnCount);
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
       expect(Array.isArray(document.log)).toBe(true);
       expect(document.log.length).toBeGreaterThan(0); // timestamped commentary bundled in
+      // v2: the complete per-command journal (start → next → end), the final live state, and the dice record.
+      expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["encounter.start", "initiative.next", "encounter.end"]);
+      expect(document.journal[0].principal).toMatch(/^gm:/);
+      expect(document.journal[0].payload.mapAssetId).toBe(imported.metadata.id);
+      expect(document.finalState.combat.active).toBe(true);
+      expect(Array.isArray(document.rolls)).toBe(true);
+      expect(Array.isArray(document.definitions)).toBe(true);
 
       // 404 for an unknown id; delete removes it.
       expect((await fetch(`${base}/api/gm/encounters/99999`, { headers: gmHeaders })).status).toBe(404);

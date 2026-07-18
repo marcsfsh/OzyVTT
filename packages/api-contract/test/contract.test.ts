@@ -4,9 +4,15 @@ import {
   API_VERSION,
   ApiErrorEnvelopeSchema,
   CommandEnvelopeSchema,
+  CONTENT_PATHS,
   CreateIntegrationCredentialRequestSchema,
   CredentialAuditEventSchema,
+  ENCOUNTER_ARCHIVE_PATHS,
   EventEnvelopeSchema,
+  GAME_PATHS,
+  GameCommandEnvelopeSchema,
+  GameMutationAcceptedSchema,
+  GameSnapshotSchema,
   INTEGRATION_CREDENTIAL_PATHS,
   IntegrationCredentialIssuedSchema,
   IntegrationCredentialMetadataSchema,
@@ -28,7 +34,7 @@ const credentialMetadata = { id: requestId, name: "overlay", scopes: ["system:re
 describe("public API contracts", () => {
   it("accepts a version and capability response using the advertised constants", () => {
     expect(SystemVersionResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { applicationVersion: "0.1.0", apiVersion: API_VERSION, realtimeProtocolVersion: REALTIME_PROTOCOL_VERSION, schemaVersions: { actorDefinition: 1 } } }).data.apiVersion).toBe(API_VERSION);
-    const capabilities = SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: IntegrationScopeSchema.options, features: { webhooks: false, viewer: false, battlemapGridCalibration: false } } });
+    const capabilities = SystemCapabilitiesResponseSchema.parse({ ok: true, apiVersion: API_VERSION, data: { api: { version: API_VERSION, namespace: API_NAMESPACE }, realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" }, supportedScopes: IntegrationScopeSchema.options, features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true } } });
     expect(capabilities.data.supportedScopes).toContain("system:read");
   });
 
@@ -78,7 +84,7 @@ describe("public API contracts", () => {
     expect(openApiDocument.info.version).toBe(API_VERSION);
     expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
 
-    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS)];
+    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS)];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(IntegrationScopeSchema.options);
     for (const path of Object.values(SYSTEM_PATHS)) expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(/^#\/components\/schemas\//);
@@ -105,6 +111,39 @@ describe("public API contracts", () => {
     expect(openApiDocument.paths[VIEWER_PATHS.pairingsExchange].post.security).toEqual([]);
     expect(openApiDocument.paths[VIEWER_PATHS.presentationCommands].post.security).toEqual([{ gmAuth: [] }]);
     expect(openApiDocument.components.securitySchemes.viewerCookieAuth).toMatchObject({ type: "apiKey", in: "cookie", name: "vtt_viewer_session" });
+  });
+
+  it("scopes every live-game operation to the least-privilege credential scope alongside GM sessions", () => {
+    const scopeOf = (operation: { security: readonly Record<string, readonly string[]>[] }) => operation.security.find((entry) => "bearerAuth" in entry)?.bearerAuth;
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.snapshot].get)).toEqual(["game:read"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.log].get)).toEqual(["combat:read"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.commands].get)).toEqual(["system:read"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.encounterStart].post)).toEqual(["combat:write"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.initiativeNext].post)).toEqual(["combat:write"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.tokenMove].post)).toEqual(["combat:write"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.actorDamage].post)).toEqual(["actor:write"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.definitionsImport].post)).toEqual(["actor:write"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.rolls].post)).toEqual(["roll:create"]);
+    expect(scopeOf(openApiDocument.paths[GAME_PATHS.actionResolve].post)).toEqual(["combat:write"]);
+    expect(scopeOf(openApiDocument.paths[ENCOUNTER_ARCHIVE_PATHS.collection].get)).toEqual(["combat:read"]);
+    expect(scopeOf(openApiDocument.paths[ENCOUNTER_ARCHIVE_PATHS.byId].delete)).toEqual(["admin"]);
+    // Every game/content/archive operation also accepts a GM session; the tunnel's scope varies per command type.
+    for (const path of [...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS)]) {
+      for (const operation of Object.values(openApiDocument.paths[path]) as Array<{ security?: readonly Record<string, readonly string[]>[] }>) {
+        expect(operation.security?.some((entry) => "gmAuth" in entry)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps the game wire schemas honest: mutation envelope, snapshot views, and tunnel envelope", () => {
+    const accepted = GameMutationAcceptedSchema.parse({ commandId: requestId, revision: 7, duplicate: false, rollId: requestId });
+    expect(accepted.rollId).toBe(requestId);
+    expect(() => GameMutationAcceptedSchema.parse({ commandId: requestId, revision: 7 })).toThrow();
+    expect(GameSnapshotSchema.parse({ view: "player", revision: 3, game: { revision: 3 } }).view).toBe("player");
+    expect(() => GameSnapshotSchema.parse({ view: "viewer", revision: 3, game: {} })).toThrow();
+    expect(GameCommandEnvelopeSchema.parse({ type: "actor.apply-damage", payload: { actorId: requestId, amount: 5 } }).payload.amount).toBe(5);
+    expect(GameCommandEnvelopeSchema.parse({ type: "turn.end" }).payload).toEqual({});
+    expect(() => GameCommandEnvelopeSchema.parse({ type: "NotACommand!" })).toThrow();
   });
 
   it("never declares a secret-bearing property on any public component schema except the one-time-issue response", () => {
