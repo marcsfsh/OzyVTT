@@ -6,7 +6,8 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "docs:generate": "node --import tsx scripts/generate-api-reference.ts"
   },
   "dependencies": { "zod": "^3.24.2" },
   "devDependencies": {

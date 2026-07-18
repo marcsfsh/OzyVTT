@@ -27,11 +27,25 @@ webhooks explicitly deferred; archive should save as much fight data as possible
   `definitions` (+`attribution`), strictly additive.
 - **Contract.** OpenAPI 3.1 documents the entire surface (61 paths), served byte-identical;
   capabilities advertise `gameApi`/`commandTunnel`/`encounterArchives`; contract tests pin scopes.
-- **Verified:** `check`/`test` (291 total: 242 server incl. 8-test HTTP integration suite + journal
-  unit tests, 14 contract)/`build` green; live smoke against the running service passed 17/17
-  external-integration steps (credential → discovery → map upload → snapshot views → REST encounter →
-  ETag 304 → tunnel → idempotent retry → archive v2 journal → revocation cutoff).
-- **Follow-ups:** scenes/claims/cosmetics over the API, SSE stream, webhooks, rate limiting.
+- **Architecture review (subagent) — no blockers; fixes landed:** CORS wildcard scoped down to
+  `/api/v1` only (wildcard on `/api/gm/login` would have let any web page relay password guesses
+  through a LAN browser — negative tests added); per-command scopes single-sourced as
+  `GAME_COMMAND_SCOPES` in `@vtt/api-contract` (registry + typed routes + doc all derive/pinned by
+  test); `playerAuth` security scheme documented on exactly the player-usable operations;
+  idempotency contract stated in the API description; per-verification credential audit writes
+  throttled to one "used" row / 60s (polling would otherwise bloat the audit table). Dead credential
+  `gameId` plumbing recorded in known-bugs (pre-existing).
+- **API reference:** `docs/api-reference.md` is GENERATED from the contract
+  (`packages/api-contract/src/reference.ts`, `npm run docs:generate -w @vtt/api-contract`); a
+  freshness test fails whenever the contract changes without regenerating, so the reference cannot
+  drift. Linked from README.
+- **Verified:** `check`/`test` (284 total: 243 server incl. 8-test HTTP integration suite + journal
+  unit tests + CORS/scope-drift tests, 16 contract incl. reference freshness)/`build` green; live
+  smoke against the running service passed 17/17 external-integration steps (credential → discovery
+  → map upload → snapshot views → REST encounter → ETag 304 → tunnel → idempotent retry → archive v2
+  journal → revocation cutoff).
+- **Follow-ups:** scenes/claims/cosmetics over the API, SSE stream, webhooks, rate limiting,
+  credential `gameId` plumbing (known-bugs).
 
 ---
 

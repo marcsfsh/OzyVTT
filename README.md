@@ -42,7 +42,7 @@ The current combat canvas supports authoritative token placement/movement and vi
 
 ## Integrations (public HTTP API v1)
 
-Everything the table can do in combat is also reachable over a versioned REST API at `/api/v1`, so you can build bots, overlays, loggers, and importers without touching the internals. Quick start against a running server:
+Everything the table can do in combat is also reachable over a versioned REST API at `/api/v1`, so you can build bots, overlays, loggers, and importers without touching the internals. **Full reference: [docs/api-reference.md](docs/api-reference.md)** (generated from the contract; the running server also serves the machine-readable spec at `/api/v1/openapi.json`). Quick start against a running server:
 
 1. **Mint a credential** (GM session token from `POST /api/gm/login`):
    `curl -X POST http://<host>:3001/api/v1/gm/integration-credentials -H "Authorization: Bearer $GM" -H "content-type: application/json" -d '{"name":"my bot","scopes":["system:read","game:read","combat:read","combat:write","actor:write","roll:create"]}'`

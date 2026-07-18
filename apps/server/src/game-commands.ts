@@ -1,53 +1,16 @@
 import { z } from "zod";
 import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema } from "@vtt/domain";
-import type { IntegrationScope } from "@vtt/api-contract";
 
 /**
  * Wire schemas for every game command, shared by BOTH transports: the Socket.IO handlers in
  * `server.ts` and the public HTTP API (`game-http.ts`) parse requests with these exact schemas, so
  * the two surfaces can never drift apart on what a command accepts. `commandId` doubles as the
  * idempotency receipt key in the store; `expectedRevision` is the optimistic-concurrency guard.
+ *
+ * Per-command credential scopes are public contract and live in `@vtt/api-contract`
+ * (`GAME_COMMAND_SCOPES`); they are re-exported here for the registry and routes.
  */
-
-/**
- * The single runtime source of each command's required integration-credential scope. The command
- * registry (tunnel) and the typed HTTP routes both read from here — never restate a scope at a
- * route. The OpenAPI document declares the same scopes for consumers; a contract test in
- * `apps/server/test/game-http.test.ts` pins the two against each other.
- */
-export const GAME_COMMAND_SCOPES = {
-  "encounter.start": "combat:write",
-  "encounter.end": "combat:write",
-  "encounter.add-combatant": "combat:write",
-  "initiative.set": "combat:write",
-  "initiative.next": "combat:write",
-  "initiative.previous": "combat:write",
-  "turn.end": "combat:write",
-  "turn.use": "combat:write",
-  "turn.use-reaction": "combat:write",
-  "token.move": "combat:write",
-  "actor.add-from-definition": "actor:write",
-  "actor.import-definition": "actor:write",
-  "actor.remove": "actor:write",
-  "actor.apply-damage": "actor:write",
-  "actor.heal": "actor:write",
-  "actor.set-temp-hp": "actor:write",
-  "actor.set-hp": "actor:write",
-  "actor.set-condition": "actor:write",
-  "dice.roll": "roll:create",
-  "action.resolve": "combat:write",
-  "save.answer": "combat:write",
-  "save.dismiss": "combat:write",
-  "annotation.add": "combat:write",
-  "annotation.ping": "combat:write",
-  "annotation.move": "combat:write",
-  "annotation.remove": "combat:write",
-  "annotation.set-color": "combat:write",
-  "annotation.set-visibility": "combat:write",
-  "annotation.set-movable": "combat:write",
-  "annotation.clear": "combat:write"
-} as const satisfies Record<string, IntegrationScope>;
-export type GameCommandType = keyof typeof GAME_COMMAND_SCOPES;
+export { GAME_COMMAND_SCOPES, type GameCommandType } from "@vtt/api-contract";
 
 export const CommandIdentitySchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 // Turn navigation carries an optional confirmation flag: Next may rewrite history, Previous may discard an in-place change.

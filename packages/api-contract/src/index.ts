@@ -253,6 +253,46 @@ export const EventEnvelopeSchema = z.object({
 export const GameCommandTypeSchema = z.string().regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/).max(200);
 
 /**
+ * The single source of each game command's required integration-credential scope — part of the
+ * public contract. The server's command registry (tunnel + typed routes) enforces exactly these at
+ * runtime, the OpenAPI operations above declare them per route, and tests on both sides pin the
+ * three views together. Command types use the store's dot-separated receipt form.
+ */
+export const GAME_COMMAND_SCOPES = {
+  "encounter.start": "combat:write",
+  "encounter.end": "combat:write",
+  "encounter.add-combatant": "combat:write",
+  "initiative.set": "combat:write",
+  "initiative.next": "combat:write",
+  "initiative.previous": "combat:write",
+  "turn.end": "combat:write",
+  "turn.use": "combat:write",
+  "turn.use-reaction": "combat:write",
+  "token.move": "combat:write",
+  "actor.add-from-definition": "actor:write",
+  "actor.import-definition": "actor:write",
+  "actor.remove": "actor:write",
+  "actor.apply-damage": "actor:write",
+  "actor.heal": "actor:write",
+  "actor.set-temp-hp": "actor:write",
+  "actor.set-hp": "actor:write",
+  "actor.set-condition": "actor:write",
+  "dice.roll": "roll:create",
+  "action.resolve": "combat:write",
+  "save.answer": "combat:write",
+  "save.dismiss": "combat:write",
+  "annotation.add": "combat:write",
+  "annotation.ping": "combat:write",
+  "annotation.move": "combat:write",
+  "annotation.remove": "combat:write",
+  "annotation.set-color": "combat:write",
+  "annotation.set-visibility": "combat:write",
+  "annotation.set-movable": "combat:write",
+  "annotation.clear": "combat:write"
+} as const satisfies Record<string, z.infer<typeof IntegrationScopeSchema>>;
+export type GameCommandType = keyof typeof GAME_COMMAND_SCOPES;
+
+/**
  * The generic command tunnel's request: the same dot-separated command types the realtime protocol
  * and the store's receipts use. `commandId` is the idempotency identity — resend the same one to
  * retry safely; omit it and the server mints one (returned in the response).
