@@ -136,6 +136,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel" aria-labelledby="player-initiative-title">
       <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><strong className="encounter-round">Round {combat.round}</strong></div>
       <DockPicker dock={props.dock} />
+      {combat.rewound && <p className="table-rewound" role="status">The GM is reviewing an earlier turn. The table will catch up in a moment.</p>}
       {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then end your turn below.</p>}
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
       {myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} />}
@@ -163,6 +164,8 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
+  const [confirm, setConfirm] = useState<{ message: string; run: () => Promise<MutationResult>; success: string } | null>(null);
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
@@ -224,8 +227,37 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
     if (!validInitiativeScore(trimmed) || Number(trimmed) === previous) return;
     void run(() => emitCommand("initiative:set", { commandId: newId(), actorId, score: Number(trimmed), expectedRevision: state.revision }), "Initiative updated.");
   };
-  const next = () => void run(() => emitCommand("initiative:next", { commandId: newId(), expectedRevision: state.revision }), "Advanced to the next turn.");
-  const previous = () => void run(() => emitCommand("initiative:previous", { commandId: newId(), expectedRevision: state.revision }), "Moved to the previous turn.");
+  // Turn time-travel (#12). Previous rewinds the whole table to the end of the prior turn; Next steps
+  // forward (undoing nothing) or, once the return-point is reached, resumes live play. If the GM changed
+  // things while rewound, the server asks to confirm — Next rewrites history from here, Previous discards
+  // the change in place — and we re-send the command with the matching confirm flag once the GM agrees.
+  const cursor = state.combat.historyCursor;
+  const dirty = state.combat.historyDirty;
+  const reviewing = cursor === null ? null : {
+    label: (state.turnHistory ?? []).find((entry) => entry.index === cursor)?.label,
+    resumeNext: (state.turnHistory ?? []).find((entry) => entry.index > cursor)?.kind === "return"
+  };
+  const nextLabel = reviewing?.resumeNext ? "Resume live play" : "Next turn";
+  const runTurn = async (operation: () => Promise<MutationResult>, success: string, onConfirm?: () => Promise<MutationResult>) => {
+    setBusy(true); setMessage(""); setConfirm(null);
+    try {
+      const result = await operation();
+      if (result.needsConfirm && onConfirm) { setConfirm({ message: result.message ?? "Confirm this change?", run: onConfirm, success }); return; }
+      if (!result.ok) throw new Error(result.message ?? "The turn command was rejected.");
+      setMessage(success);
+    } catch (error) { setMessage((error as Error).message); }
+    finally { setBusy(false); }
+  };
+  const next = () => void runTurn(
+    () => emitCommand("initiative:next", { commandId: newId(), expectedRevision: state.revision }),
+    reviewing?.resumeNext ? "Resumed live play." : "Advanced to the next turn.",
+    () => emitCommand("initiative:next", { commandId: newId(), confirmRewrite: true, expectedRevision: state.revision })
+  );
+  const previous = () => void runTurn(
+    () => emitCommand("initiative:previous", { commandId: newId(), expectedRevision: state.revision }),
+    "Moved to the previous turn.",
+    () => emitCommand("initiative:previous", { commandId: newId(), confirmDiscard: true, expectedRevision: state.revision })
+  );
   const end = () => {
     if (!window.confirm("End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.")) return;
     void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
@@ -266,8 +298,21 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const total = state.combat.initiative.length;
         return placed < total ? <p className="encounter-place-nudge">{placed} of {total} tokens placed — drag the rest from the tray above.</p> : null;
       })()}
+      {reviewing && <div className={`turn-review${dirty ? " dirty" : ""}`} role="status">
+        <strong>Reviewing {reviewing.label ?? "an earlier turn"}</strong>
+        <span>{dirty
+          ? "You changed this turn. Next turn rewrites history from here (undoing everything after it); Previous discards the change."
+          : "The whole table is paused here. Step forward to resume live play — nothing is undone until you change something."}</span>
+      </div>}
       {/* Turn navigation sits above the order so Previous/Next are reachable without scrolling past the list. */}
-      <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
+      <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}</button></div>
+      {confirm && <div className="turn-confirm" role="alertdialog" aria-label="Confirm history change">
+        <span>{confirm.message}</span>
+        <div className="turn-confirm-actions">
+          <button type="button" className="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</button>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
+        </div>
+      </div>}
       <ol className="initiative-list gm">{state.combat.initiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;

@@ -242,3 +242,15 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .encounter-scenes-toggle:hover { border-color: #e8a743; color: #f5efe3; }
 .encounter-scenes-toggle[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .encounter-scenes-panel .scene-panel { margin-top: 1rem; }
+
+/* Turn time-travel (#12): the review banner, the confirm bar, and the player's paused notice. */
+.turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 1px solid #6b5e4b; border-left: 3px solid #e8a743; border-radius: .5rem; background: #201a12; display: grid; gap: .25rem; }
+.turn-review.dirty { border-left-color: #d5732f; background: #241813; }
+.turn-review strong { color: #ffdca0; font-size: .9rem; }
+.turn-review span { color: #c8c0b1; font-size: .78rem; line-height: 1.4; }
+.turn-controls .encounter-primary.resume { background: #2f6e3a; border-color: #4dd06a; }
+.turn-confirm { margin: .5rem 0 0; padding: .6rem .7rem; border: 1px solid #d5732f; border-radius: .5rem; background: #241813; display: grid; gap: .5rem; }
+.turn-confirm span { color: #f3d8b8; font-size: .82rem; line-height: 1.4; }
+.turn-confirm-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+.turn-confirm-actions button { flex: 0 0 auto; padding: .4rem .9rem; }
+.table-rewound { margin: .4rem 0 0; padding: .5rem .7rem; border-radius: .5rem; background: #201a12; color: #d8c9a8; font-size: .82rem; }

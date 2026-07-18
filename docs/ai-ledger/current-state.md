@@ -25,6 +25,27 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Turn time-travel + persistent combat log (owner item #12)** — on branch
+  `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
+  new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
+  transaction; `combat.historyCursor`/`historyDirty` (top-level combat only, never parked
+  scenes) track the reviewed position and whether it changed. Previous rewinds the WHOLE table
+  to the end state of the prior turn (combat + each actor's hp/conditions restored; rolls,
+  claims, roster, scenes kept); Next steps forward undoing nothing until the return-point
+  resumes live; a change made while rewound forces a GM confirm — Next rewrites history
+  (truncating the undone future), Previous discards it in place. All navigation runs inside
+  the store's serialized queue via `GameStore.executeTimeline`, so it can't race a command;
+  `TimelineConfirmationRequired` bounces a command back with `needsConfirm` and burns no
+  receipt. Lifecycle commands that would strand the timeline (`encounter:end`, `scene:activate`,
+  `actor:remove`, player `turn:end`) reject while rewound; encounter start/end and scene
+  switches truncate the timeline. A separate `CombatLogStore` (own SQLite table, capped ~1000)
+  persists a role-filtered narrative feed (`log:entry`/`log:read`, GM-only lines never reach
+  players); the GM view carries `turnHistory`, the player view a bare `rewound` flag (no
+  labels). Client: GM Previous/Next confirm flow + review banner + contextual "Resume live
+  play"; player "GM is reviewing" banner; a Combat log sidebar panel (module store, like the
+  map toasts). `check`/`test` (+8 timeline integration tests)/`build` green; production boot
+  applies migrations 1–3 and both new tables; browser smoke renders the log panel with no
+  console errors.
 - **Phase 2 testing-MVP vertical slice** is under active implementation; no phase exit gate
   claimed yet (see `README.md`, `BUILD_PLAN.md`).
 - **SRD combat-content integration (phases A–G).** Phase A (content pipeline) done and

@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents, type TableEvent } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type CombatLogEntry, type GameState, type RollRecord, type ServerToClientEvents, type TableEvent } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema } from "@vtt/schemas";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry } from "./annotations.js";
@@ -17,9 +17,11 @@ import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { addCombatant, endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
+import { addCombatant, endEncounter, setInitiativeScore, startEncounter } from "./encounter.js";
 import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
-import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
+import { CombatLogStore } from "./combat-log.js";
+import { planNextTurn, planPreviousTurn, timelineDirtied, turnLabel, type TimelineOutcome } from "./combat-history.js";
+import { CommandRejectedError, GameStore, RevisionConflictError, TimelineConfirmationRequired } from "./game-store.js";
 import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
@@ -61,6 +63,9 @@ export type CreateServerOptions = {
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 const CommandIdentitySchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+// Turn navigation carries an optional confirmation flag: Next may rewrite history, Previous may discard an in-place change.
+const InitiativeNextSchema = z.object({ commandId: z.string().uuid(), confirmRewrite: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const InitiativePreviousSchema = z.object({ commandId: z.string().uuid(), confirmDiscard: z.boolean().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const EncounterStartSchema = z.object({
   commandId: z.string().uuid(),
   mapAssetId: z.string().uuid(),
@@ -124,7 +129,8 @@ export function createServer(options: CreateServerOptions) {
   const httpServer = createHttpServer(app);
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: options.clientOrigin ? { origin: options.clientOrigin } : undefined });
   const auth = new AuthService(options.authPath);
-  const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState());
+  const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), { timelineDirtied });
+  const combatLog = new CombatLogStore(options.databasePath);
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
   const mapCatalog = new MapCatalogStore(options.databasePath);
@@ -159,6 +165,8 @@ export function createServer(options: CreateServerOptions) {
   }
 
   function roleFor(socketId: string): ClientRole { return auth.verify(io.sockets.sockets.get(socketId)?.handshake.auth?.token) ? "gm" : "player"; }
+  /** GM view + the time-travel timeline (labels can name hidden combatants, so this is GM-only metadata). */
+  function gmView(state: GameState, now = Date.now()) { return { ...projectGmView(state, presenceFor, now), turnHistory: store.listTurnSnapshots() }; }
   /** Also reauthorizes every connected socket against the latest revocation state, so a revoked GM client is downgraded or disconnected on its next check rather than only when it next sends a command. */
   function broadcast() {
     const state = store.snapshot;
@@ -167,7 +175,7 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(token);
       const player = auth.verifyPlayer(token);
       if (token && !gm && !player) { socket.disconnect(true); continue; }
-      socket.emit("state:updated", gm ? projectGmView(state, presenceFor) : projectPlayerView(state, player?.sessionId, presenceFor));
+      socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
   /**
@@ -184,6 +192,40 @@ export function createServer(options: CreateServerOptions) {
       const token = socket.handshake.auth?.token;
       if (auth.verify(token)) socket.emit("table:event", payload);
       else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
+    }
+    // Every transient toast is also a durable log line, gated the same way (hidden combatants stay GM-only).
+    appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
+  }
+  /**
+   * Append one line to the persistent combat log and push it live. Visibility mirrors the toast rule:
+   * GM sockets always receive it; players only when it isn't GM-only and references no hidden combatant.
+   */
+  function appendLog(entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
+    const state = store.snapshot;
+    const actorIds = entry.actorIds ?? [];
+    const gmOnly = entry.gmOnly === true || actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility === "gm-only");
+    const record = combatLog.append({ kind: entry.kind, text: entry.text, gmOnly, revision: state.revision });
+    for (const socket of io.sockets.sockets.values()) {
+      const token = socket.handshake.auth?.token;
+      if (auth.verify(token)) socket.emit("log:entry", record);
+      else if (!gmOnly && auth.verifyPlayer(token)) socket.emit("log:entry", record);
+    }
+  }
+  /** "Round 3 — Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
+  function logTurnBegin(state: GameState) {
+    if (state.combat.turnActorId === null) return;
+    const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
+    appendLog({ kind: "turn", text: `Round ${state.combat.round} — ${name}'s turn.`, actorIds: [state.combat.turnActorId] });
+  }
+  /** Translate a timeline navigation outcome into log lines — plain turns for forward play, GM-only history notes for rewinds. */
+  function logTimelineOutcome(outcome: TimelineOutcome, state: GameState) {
+    switch (outcome.kind) {
+      case "advanced": case "legacy": logTurnBegin(state); break;
+      case "rewrote": appendLog({ kind: "history", text: "The GM rewrote history from this turn — every later turn was undone.", gmOnly: true }); logTurnBegin(state); break;
+      case "rewound": appendLog({ kind: "history", text: `The GM rewound to ${outcome.label}.`, gmOnly: true }); break;
+      case "stepped": appendLog({ kind: "history", text: `The GM moved to ${outcome.label}.`, gmOnly: true }); break;
+      case "discarded": appendLog({ kind: "history", text: `The GM discarded the changes at ${outcome.label}.`, gmOnly: true }); break;
+      case "resumed": appendLog({ kind: "history", text: "The GM resumed live play.", gmOnly: true }); break;
     }
   }
   const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
@@ -241,7 +283,7 @@ export function createServer(options: CreateServerOptions) {
   app.get("/api/state", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
     const state = store.snapshot;
-    res.json(auth.verify(token) ? projectGmView(state, presenceFor) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId, presenceFor));
+    res.json(auth.verify(token) ? gmView(state) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId, presenceFor));
   });
   app.get("/api/gm/viewer-urls", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
@@ -638,8 +680,13 @@ export function createServer(options: CreateServerOptions) {
       const request = CommandIdentitySchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The end-turn command is malformed." });
       try {
-        const result = await store.execute({ id: request.data.commandId, type: "turn.end", expectedRevision: request.data.expectedRevision }, (state) => endTurn(state, scope));
-        if (!result.duplicate) await publishGameState(result.state);
+        // End Turn is a live forward step (same as the GM's Next): record the boundary, then advance.
+        // While the GM has the table rewound, players can't quietly push initiative past the review.
+        const result = await store.executeTimeline({ id: request.data.commandId, type: "turn.end", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
+          if (state.combat.historyCursor !== null) throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
+          planNextTurn(state, timeline, false, (advancing) => endTurn(advancing, scope));
+        });
+        if (!result.duplicate) { await publishGameState(result.state); logTurnBegin(result.state); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not end." }); }
     });
@@ -703,8 +750,14 @@ export function createServer(options: CreateServerOptions) {
       try {
         const { commandId, mapAssetId, entries, expectedRevision } = request.data;
         const tokenGeometry = await tokenGeometryFor(mapAssetId);
-        const result = await store.execute({ id: commandId, type: "encounter.start", expectedRevision }, (state) => startEncounter(state, { mapAssetId, entries }, () => randomInt(1, 21), tokenGeometry));
-        if (!result.duplicate) await publishGameState(result.state);
+        const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision }, (state, timeline) => {
+          startEncounter(state, { mapAssetId, entries }, () => randomInt(1, 21), tokenGeometry);
+          // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
+          // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
+          timeline.truncateAll();
+          timeline.capture("turn", `Combat begins — ${turnLabel(state)}`, state);
+        });
+        if (!result.duplicate) { await publishGameState(result.state); appendLog({ kind: "encounter", text: "The encounter began.", gmOnly: false }); logTurnBegin(result.state); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not start." }); }
     });
@@ -713,8 +766,11 @@ export function createServer(options: CreateServerOptions) {
       const request = CommandIdentitySchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The encounter command is malformed." });
       try {
-        const result = await store.execute({ id: request.data.commandId, type: "encounter.end", expectedRevision: request.data.expectedRevision }, endEncounter);
-        if (!result.duplicate) await publishGameState(result.state);
+        const result = await store.executeTimeline({ id: request.data.commandId, type: "encounter.end", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
+          endEncounter(state); // rejects while rewound
+          timeline.truncateAll(); // the fight is over — its turn snapshots go with it
+        });
+        if (!result.duplicate) { await publishGameState(result.state); appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false }); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not end." }); }
     });
@@ -745,23 +801,46 @@ export function createServer(options: CreateServerOptions) {
     });
     socket.on("initiative:next", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can advance Initiative." });
-      const request = CommandIdentitySchema.safeParse(payload);
+      const request = InitiativeNextSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The Initiative command is malformed." });
       try {
-        const result = await store.execute({ id: request.data.commandId, type: "initiative.next", expectedRevision: request.data.expectedRevision }, nextInitiativeTurn);
-        if (!result.duplicate) await publishGameState(result.state);
+        // Live: record the boundary and advance. Rewound and unchanged: step forward through history
+        // (reaching the return-point resumes live). Rewound and changed: rewrite history — but only
+        // once the GM confirms, which the plan demands by throwing TimelineConfirmationRequired.
+        let outcome: TimelineOutcome | undefined;
+        const result = await store.executeTimeline({ id: request.data.commandId, type: "initiative.next", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
+          outcome = planNextTurn(state, timeline, request.data.confirmRewrite === true);
+        });
+        if (!result.duplicate) { await publishGameState(result.state); if (outcome) logTimelineOutcome(outcome, result.state); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not advance." }); }
+      } catch (error) {
+        if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message });
+        acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not advance." });
+      }
     });
     socket.on("initiative:previous", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can move Initiative backward." });
-      const request = CommandIdentitySchema.safeParse(payload);
+      const request = InitiativePreviousSchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The Initiative command is malformed." });
       try {
-        const result = await store.execute({ id: request.data.commandId, type: "initiative.previous", expectedRevision: request.data.expectedRevision }, previousInitiativeTurn);
-        if (!result.duplicate) await publishGameState(result.state);
+        // From live, park a return-point and restore the last boundary; while rewound, step further
+        // back — unless the GM changed things here, where confirming discards those changes in place.
+        let outcome: TimelineOutcome | undefined;
+        const result = await store.executeTimeline({ id: request.data.commandId, type: "initiative.previous", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
+          outcome = planPreviousTurn(state, timeline, request.data.confirmDiscard === true);
+        });
+        if (!result.duplicate) { await publishGameState(result.state); if (outcome) logTimelineOutcome(outcome, result.state); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
-      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not move backward." }); }
+      } catch (error) {
+        if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message });
+        acknowledge({ ok: false, message: error instanceof Error ? error.message : "Initiative could not move backward." });
+      }
+    });
+    socket.on("log:read", (_payload, acknowledge) => {
+      const gm = auth.verify(socket.handshake.auth.token);
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      if (!gm && !player) return acknowledge({ ok: false, message: "Join the table to read the combat log." });
+      acknowledge({ ok: true, entries: combatLog.list(gm !== null) });
     });
     socket.on("token:move", async (payload, acknowledge) => {
       const request = TokenMoveSchema.safeParse(payload);
@@ -838,8 +917,16 @@ export function createServer(options: CreateServerOptions) {
       if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
       try {
         const { commandId, sceneId, expectedRevision } = request.data;
-        const result = await store.execute({ id: commandId, type: "scene.activate", expectedRevision }, (state) => activateScene(state, sceneId, commandId));
-        if (!result.duplicate) await publishGameState(result.state);
+        const result = await store.executeTimeline({ id: commandId, type: "scene.activate", expectedRevision }, (state, timeline) => {
+          activateScene(state, sceneId, commandId); // rejects while rewound
+          // Snapshots belong to the scene that was live; the swap invalidates them, so start clean.
+          timeline.truncateAll();
+        });
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          const scene = result.state.combat.scenes.find((candidate) => candidate.id === sceneId);
+          appendLog({ kind: "scene", text: `Switched to scene "${scene?.name ?? "Untitled"}".`, gmOnly: true });
+        }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be switched." }); }
     });
@@ -992,7 +1079,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
@@ -1007,7 +1094,7 @@ export function createServer(options: CreateServerOptions) {
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); combatLog.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }

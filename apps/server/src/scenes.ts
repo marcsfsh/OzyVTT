@@ -87,6 +87,9 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   const target = state.combat.scenes.find((scene) => scene.id === sceneId);
   if (!target) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("That scene is already live.");
+  // A scene swap replaces the live fight the timeline tracks; the handler wipes its snapshots, so
+  // block a switch while the GM is mid-review rather than silently discarding an unresolved rewind.
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before switching scenes.");
 
   let scenes = state.combat.scenes;
   if (state.combat.activeSceneId !== null) {
@@ -100,7 +103,9 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   // Resume the target (read its stored combat before we blank its slot) and reset its own slot to empty.
   const resumed = target.combat;
   scenes = scenes.map((scene) => scene.id === sceneId ? { ...scene, combat: emptySceneCombat() } : scene);
-  state.combat = { ...resumed, mapAssetId: target.mapAssetId, scenes, activeSceneId: sceneId };
+  // `resumed` is a SceneCombat and carries no timeline bookkeeping — set it explicitly so the rebuilt
+  // combat starts live (a bare spread would leave historyCursor/historyDirty undefined, not null/false).
+  state.combat = { ...resumed, mapAssetId: target.mapAssetId, scenes, activeSceneId: sceneId, historyCursor: null, historyDirty: false };
 }
 
 /**

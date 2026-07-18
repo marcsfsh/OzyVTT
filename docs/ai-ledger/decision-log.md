@@ -30,6 +30,22 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   via a reviewed `CORRECTIONS` table in the ETL, never by editing sources. 2014/OGL data and
   third-party publishers are deliberately excluded. (ADR-0015, 2026-07-17)
 
+## Feature-architecture decisions (no ADR)
+
+- **2026-07-18 — Turn time-travel snapshots live OUTSIDE `GameState`.** Per-turn-boundary
+  snapshots go in a dedicated `turn_snapshots` SQLite table, not embedded in `GameState`, so
+  the player/viewer projections stay byte-compatible and persisted state doesn't bloat. Only a
+  small cursor (`combat.historyCursor`/`historyDirty`, top-level combat only — parked scenes
+  never carry them) lives in state. Timeline writes ride the triggering command's transaction
+  (crash-consistent), and all navigation decisions run inside the store's single-writer queue
+  via `GameStore.executeTimeline` (no TOCTOU). "Which mutations dirty the timeline" is an
+  injected `timelineDirtied` comparator over a restorable slice (combat + actor hp/conditions),
+  keeping the store ignorant of domain semantics; rolls/claims/pings/scene-prep never dirty.
+  Restore is **merge, not replace** — combat + hp/conditions roll back; rolls, claims, roster,
+  cosmetics, imported definitions, and scenes are kept. Scene switches and encounter start/end
+  truncate the timeline (snapshots are per-live-fight). A history rewrite (confirmed Next while
+  rewound) is the owner-approved exception to normal forward-only play.
+
 ## Operating decisions (no ADR)
 
 - **Verification bar:** `check` + `test` + `build` green + live Playwright smoke for UI
