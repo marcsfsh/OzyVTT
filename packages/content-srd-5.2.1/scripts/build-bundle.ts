@@ -210,13 +210,14 @@ const usesSuffix = (action: ActionFields): string => {
  * damage") keeps an empty damage list so the structured part never misrepresents the text;
  * "or ... Bloodied"-style variants deliberately stay prose-only (ADR-0008).
  */
-type ProseAttack = { bonus: number; reachFeet: number | null; rangeFeet: number | null; damage: { formula: string; type: string }[] };
+type ProseAttack = { bonus: number; reachFeet: number | null; rangeFeet: number | null; rangeNormalFeet: number | null; damage: { formula: string; type: string }[] };
 const parseProseAttack = (desc: string): ProseAttack | null => {
   const roll = desc.match(/(?:Melee or Ranged|Melee|Ranged) Attack Roll:\s*([+-]\d+)(?:\s*\([^)]*\))?/);
   if (!roll) return null;
   const head = desc.slice(0, 200);
   const reach = head.match(/reach (\d+) (?:ft|feet)/);
-  const range = head.match(/range (\d+)(?:\/\d+)? (?:ft|feet)/);
+  // "range 80/320 ft": 80 is the normal band (disadvantage beyond), 320 the maximum (SRD Range).
+  const range = head.match(/range (\d+)(?:\/(\d+))? (?:ft|feet)/);
   const damage: { formula: string; type: string }[] = [];
   const primary = desc.match(/(?:(\d+)\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)|(\d+))\s+([A-Za-z]+) damage/);
   if (primary && primary[2]) {
@@ -229,7 +230,9 @@ const parseProseAttack = (desc: string): ProseAttack | null => {
       }
     }
   }
-  return { bonus: Number.parseInt(roll[1], 10), reachFeet: reach ? Number.parseInt(reach[1], 10) : null, rangeFeet: range ? Number.parseInt(range[1], 10) : null, damage };
+  const rangeNormal = range ? Number.parseInt(range[1], 10) : null;
+  const rangeLong = range?.[2] ? Number.parseInt(range[2], 10) : null;
+  return { bonus: Number.parseInt(roll[1], 10), reachFeet: reach ? Number.parseInt(reach[1], 10) : null, rangeFeet: rangeLong ?? rangeNormal, rangeNormalFeet: rangeLong ? rangeNormal : null, damage };
 };
 
 /**
@@ -323,10 +326,12 @@ const monsters: ActorDefinition[] = creatures
                 : [])
             ]
           : prose?.damage ?? [];
+        // rangeFeet is the MAXIMUM attackable range; rangeNormalFeet the normal band when the
+        // weapon has two ranges (disadvantage between them — SRD Range).
         const attack = row
-          ? { bonus: row.to_hit_mod, ...(row.reach !== null ? { reachFeet: row.reach } : {}), ...(row.range !== null ? { rangeFeet: row.range } : {}) }
+          ? { bonus: row.to_hit_mod, ...(row.reach !== null ? { reachFeet: row.reach } : {}), ...(row.range !== null ? { rangeFeet: row.long_range ?? row.range } : {}), ...(row.long_range !== null && row.range !== null ? { rangeNormalFeet: row.range } : {}) }
           : prose
-            ? { bonus: prose.bonus, ...(prose.reachFeet !== null ? { reachFeet: prose.reachFeet } : {}), ...(prose.rangeFeet !== null ? { rangeFeet: prose.rangeFeet } : {}) }
+            ? { bonus: prose.bonus, ...(prose.reachFeet !== null ? { reachFeet: prose.reachFeet } : {}), ...(prose.rangeFeet !== null ? { rangeFeet: prose.rangeFeet } : {}), ...(prose.rangeNormalFeet !== null ? { rangeNormalFeet: prose.rangeNormalFeet } : {}) }
             : null;
         const actionId = idSafe(slugOf(action.pk).replace(`${slug}_`, ""));
         // ADR-0020 structured mechanics, all confident-pattern-only with prose fallback.

@@ -105,6 +105,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ sav
  */
 function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonly<{ reaction: PendingReaction | PlayerPendingReaction; actorName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
   const [busy, setBusy] = useState(false);
+  const opportunity = reaction.kind === "leaves-reach";
   const halved = reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
   const answer = (use: boolean) => {
     setBusy(true);
@@ -112,22 +113,41 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonl
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The reaction could not be answered."); return; }
       const outcome = result.outcome;
-      if (outcome) onFeedback(use ? `${actorName} used ${reaction.actionName} — ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.` : `${actorName} took ${outcome.appliedDamage} damage.`);
+      if (!outcome) return;
+      if (opportunity) {
+        const attack = outcome.resolution?.attack;
+        onFeedback(use
+          ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`
+          : `${actorName} let ${reaction.sourceName} go.`);
+      } else {
+        onFeedback(use ? `${actorName} used ${reaction.actionName} — ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.` : `${actorName} took ${outcome.appliedDamage} damage.`);
+      }
     });
   };
   const dismiss = () => {
     setBusy(true);
     socket.emit("reaction:dismiss", { commandId: newId(), reactionId: reaction.id }, (result: MutationResult) => {
       setBusy(false);
-      onFeedback(result.ok ? "Reaction prompt dismissed — no damage applied." : result.message ?? "The prompt could not be dismissed.");
+      onFeedback(result.ok ? "Reaction prompt dismissed — nothing applied." : result.message ?? "The prompt could not be dismissed.");
     });
   };
   return <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
-    <span className="save-prompt-label"><strong>{reaction.actionName}</strong> vs {reaction.sourceName}{reaction.critical ? " (crit)" : ""} · {reaction.proposedDamage} dmg incoming</span>
+    <span className="save-prompt-label">
+      {opportunity
+        ? <><strong>Opportunity Attack</strong> — {reaction.sourceName} is leaving reach</>
+        : <><strong>{reaction.actionName}</strong> vs {reaction.sourceName}{reaction.critical ? " (crit)" : ""} · {reaction.proposedDamage} dmg incoming</>}
+    </span>
     <span className="save-prompt-actions">
-      <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use — take {halved}</button>
-      <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline — take {reaction.proposedDamage}</button>
-      {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying damage" onClick={dismiss}>✕</button>}
+      {opportunity
+        ? <>
+            <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; rolls one melee attack against the mover" onClick={() => answer(true)}>Attack</button>
+            <button type="button" disabled={busy} title="Keep the reaction; the mover leaves freely" onClick={() => answer(false)}>Let them go</button>
+          </>
+        : <>
+            <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use — take {halved}</button>
+            <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline — take {reaction.proposedDamage}</button>
+          </>}
+      {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying anything" onClick={dismiss}>✕</button>}
     </span>
   </div>;
 }
@@ -220,7 +240,7 @@ function OwnDyingTracker({ actorId, name, deathSaves }: Readonly<{ actorId: stri
 }
 
 /** A player's own economy: Action/Bonus live only on their turn; the reaction is an off-turn resource, markable any time. Pressed = spent. */
-function PlayerTurnEconomy({ combat, myId, myTurn }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean }>) {
+function PlayerTurnEconomy({ combat, myId, myTurn, mySpeedFeet }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const emit = (run: () => Promise<MutationResult>, failure: string) => {
@@ -234,6 +254,7 @@ function PlayerTurnEconomy({ combat, myId, myTurn }: Readonly<{ combat: PlayerVi
       <button type="button" className="economy-slot" aria-pressed={combat.turn.bonusActionUsed} disabled={busy} onClick={() => emit(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !combat.turn.bonusActionUsed }), "The bonus action could not be updated.")}>Bonus</button>
     </>}
     <button type="button" className="economy-slot" aria-pressed={reactionUsed} disabled={busy} title="Reactions refresh when your turn starts" onClick={() => emit(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: myId, used: !reactionUsed }), "The reaction could not be updated.")}>Reaction</button>
+    {myTurn && mySpeedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed">Move {Math.round(combat.turn.movementUsedFeet)}/{mySpeedFeet} ft</span>}
     {myTurn && <button type="button" className="encounter-primary turn-end" disabled={busy} onClick={() => emit(() => emitCommand("turn:end", { commandId: newId() }), "The turn could not end.")}>End turn</button>}
     {feedback && <span className="economy-feedback" role="status">{feedback}</span>}
   </div>;
@@ -251,7 +272,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
       {combat.rewound && <p className="table-rewound" role="status">The GM is reviewing an earlier turn. The table will catch up in a moment.</p>}
       {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then end your turn below.</p>}
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
-      {myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} />}
+      {myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={props.state.actors.find((actor) => actor.id === myId)?.speedFeet} />}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
@@ -471,6 +492,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
               <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
               <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
               <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+              {actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">Move {Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
             </div>
             <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
           </>}

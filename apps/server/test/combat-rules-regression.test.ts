@@ -11,6 +11,7 @@ import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
 import { applyTimelineRestore } from "../src/combat-history.js";
+import { applyMovementRules } from "../src/movement-rules.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
 
@@ -63,11 +64,11 @@ function buildGame(order: readonly { actorId: string; score: number }[] = [
   const game = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
-      { id: IDS.torva, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current: 75, maximum: 75 }, armorClass: 15, definitionId: "import-torva", size: "medium" },
-      { id: IDS.pip, name: "Pip Underbough", kind: "player-character", visibility: "public", hp: { current: 52, maximum: 52 }, armorClass: 16, definitionId: "import-pip", size: "small" },
-      { id: IDS.sable, name: "Sable Vex", kind: "player-character", visibility: "public", hp: { current: 52, maximum: 52 }, armorClass: 13, definitionId: "import-sable", size: "medium" },
-      { id: IDS.croc1, name: "Giant Crocodile", kind: "monster", visibility: "public", hp: { current: 85, maximum: 85 }, armorClass: 14, definitionId: "giant-crocodile", size: "huge" },
-      { id: IDS.croc2, name: "Giant Crocodile 2", kind: "monster", visibility: "public", hp: { current: 85, maximum: 85 }, armorClass: 14, definitionId: "giant-crocodile", size: "huge" }
+      { id: IDS.torva, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current: 75, maximum: 75 }, armorClass: 15, definitionId: "import-torva", size: "medium", speedFeet: 40 },
+      { id: IDS.pip, name: "Pip Underbough", kind: "player-character", visibility: "public", hp: { current: 52, maximum: 52 }, armorClass: 16, definitionId: "import-pip", size: "small", speedFeet: 25 },
+      { id: IDS.sable, name: "Sable Vex", kind: "player-character", visibility: "public", hp: { current: 52, maximum: 52 }, armorClass: 13, definitionId: "import-sable", size: "medium", speedFeet: 30 },
+      { id: IDS.croc1, name: "Giant Crocodile", kind: "monster", visibility: "public", hp: { current: 85, maximum: 85 }, armorClass: 14, definitionId: "giant-crocodile", size: "huge", speedFeet: 30 },
+      { id: IDS.croc2, name: "Giant Crocodile 2", kind: "monster", visibility: "public", hp: { current: 85, maximum: 85 }, armorClass: 14, definitionId: "giant-crocodile", size: "huge", speedFeet: 30 }
     ],
     definitions: [
       { id: "import-torva", definition: torvaDefinition },
@@ -438,6 +439,13 @@ describe("report test 2/3 supplement — Eldritch Blast beams", () => {
 describe("reaction prompts — Uncanny Dodge (ADR-0020 amendment)", () => {
   // Prompt creation needs the TARGET's definition, so these resolves carry the game's own resolver.
   const gameResolver = (game: GameState) => (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition;
+  const reactionDeps = (game: GameState, faces: number[] = []) => ({
+    resolveDefinition: gameResolver(game),
+    random: () => { const face = faces.shift(); if (face === undefined) throw new Error("dice queue empty"); return face; },
+    newRollId: () => `40000000-0000-4000-8000-${String(900 + faces.length).padStart(12, "0")}`,
+    gmSessionId: IDS.gmSession,
+    now: () => "2026-07-18T00:00:00.000Z"
+  });
   const resolveLive = (game: GameState, definition: ActorDefinition, actionId: string, input: { actorId: string; targetIds?: readonly string[] }, faces: number[]) =>
     resolveDefinitionAction(game, actionOf(definition, actionId), { actorId: input.actorId, targetIds: input.targetIds ?? [], commandId: nextCommandId() }, { ...deps(faces, definition), resolveDefinition: gameResolver(game) });
 
@@ -458,7 +466,7 @@ describe("reaction prompts — Uncanny Dodge (ADR-0020 amendment)", () => {
   it("answering use spends the reaction and applies half; the prompt clears", () => {
     const game = buildGame();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
-    const outcome = answerReaction(game, game.combat.pendingReactions[0].id, true, { role: "gm" }, { resolveDefinition: gameResolver(game) });
+    const outcome = answerReaction(game, nextCommandId(), game.combat.pendingReactions[0].id, true, undefined, { role: "gm" }, reactionDeps(game));
     expect(outcome).toMatchObject({ used: true, appliedDamage: 11, actorName: "Pip Underbough", actionName: "Uncanny Dodge" }); // floor(23/2)
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
     expect(pip.hp.current).toBe(52 - 11);
@@ -469,7 +477,7 @@ describe("reaction prompts — Uncanny Dodge (ADR-0020 amendment)", () => {
   it("declining applies the full parked damage and keeps the reaction", () => {
     const game = buildGame();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
-    const outcome = answerReaction(game, game.combat.pendingReactions[0].id, false, { role: "gm" }, { resolveDefinition: gameResolver(game) });
+    const outcome = answerReaction(game, nextCommandId(), game.combat.pendingReactions[0].id, false, undefined, { role: "gm" }, reactionDeps(game));
     expect(outcome).toMatchObject({ used: false, appliedDamage: 23 });
     expect(game.actors.find((actor) => actor.id === IDS.pip)!.hp.current).toBe(52 - 23);
     expect(game.combat.reactionsUsed).not.toContain(IDS.pip);
@@ -497,7 +505,7 @@ describe("reaction prompts — Uncanny Dodge (ADR-0020 amendment)", () => {
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     game.combat = { ...game.combat, reactionsUsed: [IDS.pip] }; // spent between the hit and the answer
     const promptId = game.combat.pendingReactions[0].id;
-    expect(() => answerReaction(game, promptId, true, { role: "gm" }, { resolveDefinition: gameResolver(game) }))
+    expect(() => answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game)))
       .toThrow(/already used a reaction/);
     expect(game.combat.pendingReactions).toHaveLength(1); // still owed an answer
     expect(() => dismissReaction(game, promptId, { role: "player", sessionId: IDS.gmSession })).toThrow(/Only the GM/);
@@ -510,10 +518,10 @@ describe("reaction prompts — Uncanny Dodge (ADR-0020 amendment)", () => {
     const game = buildGame();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const promptId = game.combat.pendingReactions[0].id;
-    expect(() => answerReaction(game, promptId, true, { role: "player", sessionId: IDS.gmSession }, { resolveDefinition: gameResolver(game) }))
+    expect(() => answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "player", sessionId: IDS.gmSession }, reactionDeps(game)))
       .toThrow();
     game.actors.find((actor) => actor.id === IDS.pip)!.ownerSessionId = IDS.gmSession;
-    const outcome = answerReaction(game, promptId, true, { role: "player", sessionId: IDS.gmSession }, { resolveDefinition: gameResolver(game) });
+    const outcome = answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "player", sessionId: IDS.gmSession }, reactionDeps(game));
     expect(outcome.used).toBe(true);
   });
 
@@ -833,5 +841,168 @@ describe("SRD generic actions — builtin catalog (rules glossary [Action] entri
     game.combat = { ...game.combat, initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }] };
     const dodge = resolveBuiltin(game, "dodge", { actorId: extraId }, []);
     expect(dodge.effectGranted?.name).toBe("Dodging");
+  });
+});
+
+describe("movement rules — speed budget and opportunity attacks (SRD Movement and Position)", () => {
+  // Feet-space positions with a straight Euclidean distance stand in for the calibrated map.
+  const feet = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(b.x - a.x, b.y - a.y);
+  const place = (game: GameState, actorId: string, x: number, y: number) => {
+    game.combat = { ...game.combat, tokens: game.combat.tokens.map((token) => token.actorId === actorId ? { ...token, position: { x, y } } : token) };
+  };
+  let promptSeq = 0;
+  const moveRules = (game: GameState, actorId: string, from: { x: number; y: number }, to: { x: number; y: number }, override: { reason: string } | null = null) =>
+    applyMovementRules(game, {
+      actorId, from, to, distance: feet, override,
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+      newPromptId: () => `70000000-0000-4000-8000-${String(++promptSeq).padStart(12, "0")}`,
+      now: () => 0, commandId: nextCommandId()
+    });
+
+  it("accumulates spent feet and strict-blocks an overrun with the remaining budget named", () => {
+    const game = buildGame(); // Torva's turn, speed 40 from the fixture
+    place(game, IDS.torva, 0, 0);
+    moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 30, y: 0 });
+    expect(game.combat.turn.movementUsedFeet).toBe(30);
+    try {
+      moveRules(game, IDS.torva, { x: 30, y: 0 }, { x: 50, y: 0 }); // 20 more > 40 total
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("movement.exceeds-speed");
+      expect((error as RulesBlockedError).message).toMatch(/10 ft of movement left/);
+    }
+    // The GM override allows and still accumulates; assisted mode warns instead of blocking.
+    const overridden = moveRules(game, IDS.torva, { x: 30, y: 0 }, { x: 50, y: 0 }, { reason: "difficult terrain house rule" });
+    expect(overridden.overridden).toBe("difficult terrain house rule");
+    expect(game.combat.turn.movementUsedFeet).toBe(50);
+  });
+
+  it("Dash doubles the budget; a grappled mover has Speed 0; exhaustion subtracts 5 ft per level", () => {
+    const dash = buildGame();
+    dash.actors.find((actor) => actor.id === IDS.torva)!.effects = [{
+      id: "d", name: "Dashing", tags: ["dashing"], sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", sourceActionId: "dash",
+      startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+      endsWithTag: null, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: []
+    }];
+    moveRules(dash, IDS.torva, { x: 0, y: 0 }, { x: 70, y: 0 }); // 70 ≤ 80 with Dash
+    expect(dash.combat.turn.movementUsedFeet).toBe(70);
+
+    const held = buildGame();
+    held.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "grappled" }];
+    expect(() => moveRules(held, IDS.torva, { x: 0, y: 0 }, { x: 5, y: 0 })).toThrow(/Speed is 0/);
+
+    const tired = buildGame();
+    tired.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "exhaustion", level: 2 }];
+    expect(() => moveRules(tired, IDS.torva, { x: 0, y: 0 }, { x: 35, y: 0 })).toThrow(/30 ft of movement left/);
+  });
+
+  it("off-turn moves never accumulate or block (GM repositioning stays free)", () => {
+    const game = buildGame(); // Torva's turn — move Pip
+    const outcome = moveRules(game, IDS.pip, { x: 0, y: 0 }, { x: 500, y: 0 });
+    expect(outcome.warning).toBeNull();
+    expect(game.combat.turn.movementUsedFeet).toBe(0);
+  });
+
+  it("leaving a crocodile's reach opens an opportunity-attack prompt; Disengage suppresses it", () => {
+    const game = buildGame();
+    place(game, IDS.croc1, 0, 0);
+    // Torva starts adjacent (5 ft) and retreats to 30 ft: past the croc's 10 ft tail reach.
+    const outcome = moveRules(game, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 });
+    expect(outcome.prompts).toEqual([{ actorId: IDS.croc1, name: "Giant Crocodile" }]);
+    const prompt = game.combat.pendingReactions[0];
+    expect(prompt).toMatchObject({ kind: "leaves-reach", actorId: IDS.croc1, targetActorId: IDS.torva, actionName: "Opportunity Attack" });
+
+    const safe = buildGame();
+    place(safe, IDS.croc1, 0, 0);
+    safe.actors.find((actor) => actor.id === IDS.torva)!.effects = [{
+      id: "dis", name: "Disengaged", tags: ["disengaged"], sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", sourceActionId: "disengage",
+      startedRound: 1, duration: { type: "until-source-next-turn" }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+      endsWithTag: null, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: []
+    }];
+    expect(moveRules(safe, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+  });
+
+  it("no prompt when the enemy's reaction is spent or it is incapacitated", () => {
+    const spent = buildGame();
+    place(spent, IDS.croc1, 0, 0);
+    spent.combat = { ...spent.combat, reactionsUsed: [IDS.croc1] };
+    expect(moveRules(spent, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    const stunned = buildGame();
+    place(stunned, IDS.croc1, 0, 0);
+    stunned.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "stunned" }];
+    expect(moveRules(stunned, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+  });
+
+  it("answering the opportunity prompt swings a real melee attack and auto-applies the damage", () => {
+    const game = buildGame();
+    place(game, IDS.croc1, 0, 0);
+    moveRules(game, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 });
+    const promptId = game.combat.pendingReactions[0].id;
+    // Croc bites: 15 + 8 = 23 hits AC 15; 6+6+6+5 = 23 piercing, applied immediately.
+    const outcome = answerReaction(game, nextCommandId(), promptId, true, "bite", { role: "gm" }, {
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+      random: (() => { const faces = [15, 6, 6, 6]; return () => faces.shift()!; })(),
+      newRollId: (() => { let n = 800; return () => `40000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; })(),
+      gmSessionId: IDS.gmSession,
+      now: () => "2026-07-18T00:00:00.000Z"
+    });
+    expect(outcome.used).toBe(true);
+    expect(outcome.resolution?.attack?.outcome).toBe("hit");
+    expect(outcome.appliedDamage).toBe(23);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBe(75 - 23);
+    expect(game.combat.reactionsUsed).toContain(IDS.croc1);
+    expect(game.combat.pendingReactions).toHaveLength(0);
+  });
+
+  it("standing from Prone costs half Speed and blocks when the budget is short (SRD Prone)", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    torva.conditions = [{ id: "prone" }];
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, movementUsedFeet: 25 } }; // 15 left of 40
+    expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" }))
+      .toThrow(/Standing up costs 20 ft/);
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, movementUsedFeet: 10 } };
+    const events = setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" });
+    expect(events.some((event) => /stood up \(20 ft of movement\)/.test(event.text))).toBe(true);
+    expect(game.combat.turn.movementUsedFeet).toBe(30);
+    expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(false);
+  });
+});
+
+describe("range and reach validation (SRD Making an Attack / Range)", () => {
+  it("blocks a melee swing beyond reach and a shot beyond maximum range; unmeasurable skips", () => {
+    const game = buildGame();
+    try {
+      resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [], () => 15);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("range.out-of-reach");
+    }
+    // Pip's shortbow (80/320): 350 ft is beyond maximum range.
+    const far = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    try {
+      resolve(far, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [], () => 350);
+      expect.unreachable();
+    } catch (error) {
+      expect((error as RulesBlockedError).rule).toBe("range.out-of-range");
+    }
+    // No distance function → the checks skip entirely (the unmeasurable pattern).
+    const blind = buildGame();
+    expect(resolve(blind, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]).attack?.outcome).toBe("hit");
+  });
+
+  it("rolls disadvantage in the long-range band and when an able enemy is within 5 feet", () => {
+    const long = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    const shot = resolve(long, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [18, 3], () => 200);
+    expect(shot.rollMode?.disadvantage).toContain("Long range (beyond 80 ft)");
+
+    // Adjacent crocodile spoils the shot at any range (ranged in close combat).
+    const crowded = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 12 }, { actorId: IDS.croc2, score: 8 }]);
+    const distances: Record<string, number> = { [IDS.croc1]: 40, [IDS.croc2]: 5 };
+    const jostled = resolve(crowded, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [18, 3], (_a, b) => distances[b] ?? null);
+    expect(jostled.rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
   });
 });

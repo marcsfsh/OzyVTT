@@ -148,7 +148,7 @@ type EconomyEvaluation = Readonly<{
  * can never drift. Economy/instance gating applies only on the attacker's own turn — off-turn
  * resolves (opportunity attacks, GM improvisation) stay ungated.
  */
-export function evaluateActionEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, targetIds: readonly string[], definition: ActorDefinition | undefined): EconomyEvaluation {
+export function evaluateActionEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, targetIds: readonly string[], definition: ActorDefinition | undefined, distanceFeet?: (actorIdA: string, actorIdB: string) => number | null): EconomyEvaluation {
   const violations: RuleViolation[] = [];
   const softViolations: RuleViolation[] = [];
   const notes: string[] = [];
@@ -235,6 +235,29 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
+  // Range/reach (SRD Making an Attack / Range): checked only when the distance is measurable —
+  // unplaced tokens or an uncalibrated map skip entirely (the unmeasurable pattern). A weapon with
+  // both reach and range (thrown) is legal in either envelope; long-range disadvantage lives in
+  // attackRollSources, not here.
+  if (action.attack !== undefined && distanceFeet !== undefined) {
+    const attackReach = action.attack.reachFeet;
+    const attackRange = action.attack.rangeFeet;
+    for (const targetId of targetIds) {
+      const distance = distanceFeet(attacker.id, targetId);
+      if (distance === null) continue;
+      const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
+      const withinReach = attackReach !== undefined && distance <= attackReach + 1e-6;
+      const rounded = Math.round(distance * 10) / 10;
+      if (withinReach) continue;
+      if (attackRange !== undefined) {
+        if (distance > attackRange + 1e-6) violations.push({ rule: "range.out-of-range", message: `${targetName} is ${rounded} ft away — beyond the ${attackRange} ft maximum range.` });
+      } else if (attackReach !== undefined || attackRange === undefined) {
+        const reach = attackReach ?? 5;
+        if (distance > reach + 1e-6) violations.push({ rule: "range.out-of-reach", message: `${targetName} is ${rounded} ft away — beyond ${attacker.name}'s ${reach} ft reach.` });
+      }
+    }
+  }
+
   // Unarmed grapple/shove only work on targets at most one size larger (SRD Unarmed Strike).
   if (action.id === "unarmed-grapple" || action.id === "unarmed-shove-prone" || action.id === "unarmed-shove-push") {
     const attackerIndex = SIZE_ORDER.indexOf((attacker.size ?? "medium") as (typeof SIZE_ORDER)[number]);
@@ -304,9 +327,9 @@ export function actionAvailability(state: GameState, attacker: LiveActor, action
  * (ADR-0020). Strict rejects the first violation with an override path; assisted converts
  * violations to warnings; freeform skips validation.
  */
-function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[]): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
+function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[], distanceFeet?: (actorIdA: string, actorIdB: string) => number | null): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
   const mode = state.combat.rulesMode;
-  const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition);
+  const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition, distanceFeet);
   warnings.push(...notes);
 
   let overridden: { rule: string; reason: string } | null = null;
@@ -377,7 +400,33 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
     if (distance !== null && distance <= 5) advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });
     else if (distance !== null) disadvantage.push({ source: "target-prone", label: "Target is Prone (beyond 5 ft)" });
   }
-  void action;
+
+  // Ranged-attack penalties (SRD Range / Ranged Attacks in Close Combat), only when this shot is
+  // actually ranged (a thrown weapon used within its reach stays melee) and distance is measurable.
+  if (action.attack?.rangeFeet !== undefined && deps.distanceFeet) {
+    const distance = deps.distanceFeet(attacker.id, target.id);
+    const usingMelee = action.attack.reachFeet !== undefined && distance !== null && distance <= action.attack.reachFeet + 1e-6;
+    if (!usingMelee) {
+      const normal = action.attack.rangeNormalFeet;
+      if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
+        disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
+      }
+      // An able enemy within 5 feet spoils the shot; "who can see you" stays GM adjudication.
+      const enemyKind = attacker.kind === "player-character" ? "monster" : attacker.kind === "monster" ? "player-character" : null;
+      if (enemyKind) {
+        for (const entry of state.combat.initiative) {
+          if (entry.actorId === attacker.id) continue;
+          const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
+          if (!enemy || enemy.kind !== enemyKind || isIncapacitated(enemy)) continue;
+          const enemyDistance = deps.distanceFeet(attacker.id, enemy.id);
+          if (enemyDistance !== null && enemyDistance <= 5 + 1e-6) {
+            disadvantage.push({ source: "ranged-in-close-combat", label: `Enemy within 5 feet (${enemy.name})` });
+            break;
+          }
+        }
+      }
+    }
+  }
   return { advantage, disadvantage };
 }
 
@@ -411,7 +460,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   const warnings: string[] = [];
-  const { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings);
+  const { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet);
 
   // Builtin Unarmed Strike: the attack math is actor-derived (SRD: Str modifier + Proficiency Bonus),
   // so the concrete attack is materialized at resolve time rather than declared in the catalog.
@@ -636,11 +685,13 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
         ...state.combat,
         pendingReactions: [...state.combat.pendingReactions, {
           id: deps.newRollId(),
+          kind: "hit-by-attack" as const,
           actorId: target.id,
           actionId: declared.id,
           actionName: declared.name,
           sourceActorId: attacker.id,
           sourceName: attacker.name,
+          targetActorId: null,
           triggerCommandId: input.commandId,
           proposedDamage: proposedTotal,
           proposedDamageParts: proposedParts,

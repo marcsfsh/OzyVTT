@@ -32,3 +32,19 @@ export function exhaustionPenalty(actor: Actor): number {
 export function conditionLabel(conditionId: string): string {
   return conditionId.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
+
+/** Conditions that set Speed to 0 (SRD conditions appendix). */
+export const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified", "stunned"] as const;
+
+/**
+ * Effective speed in feet for the current turn: base − 5 × exhaustion level (floored at 0),
+ * zeroed by Speed-0 conditions, doubled while Dashing. Null when the base speed is unknown —
+ * the movement rules then skip entirely (the unmeasurable pattern).
+ */
+export function effectiveSpeedFeet(actor: Actor): number | null {
+  if (actor.speedFeet === undefined) return null;
+  if (actor.conditions.some((condition) => (SPEED_ZERO_CONDITIONS as readonly string[]).includes(condition.id))) return 0;
+  let speed = Math.max(0, actor.speedFeet - 5 * exhaustionLevel(actor));
+  if (actor.effects.some((effect) => effect.tags.includes("dashing"))) speed *= 2;
+  return speed;
+}

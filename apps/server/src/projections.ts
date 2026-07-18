@@ -64,8 +64,9 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // A hidden combatant's turn stays opaque: economy flags (and the compound-action instance /
     // per-turn uses, which name stat-block action ids) reset to idle rather than narrating its activity.
     turn: currentIsPublic
-      ? { actionUsed: state.combat.turn.actionUsed, bonusActionUsed: state.combat.turn.bonusActionUsed, actionInstance: state.combat.turn.actionInstance ? { actorId: state.combat.turn.actionInstance.actorId, components: { ...state.combat.turn.actionInstance.components } } : null, turnUses: { ...state.combat.turn.turnUses } }
-      : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} },
+      ? { actionUsed: state.combat.turn.actionUsed, bonusActionUsed: state.combat.turn.bonusActionUsed, actionInstance: state.combat.turn.actionInstance ? { actorId: state.combat.turn.actionInstance.actorId, components: { ...state.combat.turn.actionInstance.components } } : null, turnUses: { ...state.combat.turn.turnUses }, movementUsedFeet: state.combat.turn.movementUsedFeet }
+      // Hidden turn: movement spent would narrate a hidden combatant's activity — reset with the rest.
+      : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag

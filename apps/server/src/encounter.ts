@@ -9,7 +9,7 @@ type StartEncounterInput = Readonly<{
   rulesMode?: "strict" | "assisted" | "freeform";
 }>;
 
-const EMPTY_TURN = { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {} } as const;
+const EMPTY_TURN = { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 } as const;
 
 /** A fresh fight refreshes per-encounter limited-use pools (Frenzy next fight); long-rest pools persist until a rest. */
 function clearPerEncounterUses(state: GameState, combatantIds: ReadonlySet<string>, resolveDefinition: (definitionId: string) => ActorDefinition | undefined) {

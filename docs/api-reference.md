@@ -96,6 +96,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.force-release` | `actor:write` |
 | `actor.set-token-image` | `actor:write` |
 | `actor.set-size` | `actor:write` |
+| `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
 | `scene.rename` | `scene:write` |
 | `scene.remove` | `scene:write` |
@@ -449,6 +450,8 @@ Moves a combatant's token; the server snaps to the calibrated grid. `position: n
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `position` | ImagePoint \| null | yes | Image-space coordinates (server snaps to the grid); null returns the token to the tray |
 | `sceneId` | string (uuid) | no | Target a prepared GM-private scene instead of the live encounter |
+| `override` | object | no | GM-grade bypass of a movement-budget rejection; audited in the combat log |
+| `override.reason` | string | yes |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -582,6 +585,8 @@ Applies or clears a bundled SRD condition (exhaustion carries a level). Player s
 | `conditionId` | string (pattern) | yes |  |
 | `active` | boolean | yes |  |
 | `level` | integer (1–6) | no | Exhaustion level |
+| `override` | object | no | GM-grade bypass of the stand-up movement cost rejection; audited |
+| `override.reason` | string | yes |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1048,6 +1053,24 @@ Sets a combatant's creature size; large+ tokens size to their grid footprint and
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `size` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/speed`
+
+Sets a combatant's walking speed in feet (GM-grade only); null clears it to unknown, which skips the movement rules for that combatant. Speed seeds from the imported definition automatically.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `speedFeet` | integer \| null | yes | Walking speed in feet; null clears to unknown (movement rules skip) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

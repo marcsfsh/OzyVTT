@@ -73,7 +73,8 @@
    "description": "*Ranged Attack Roll:* +7, range 80/320 ft. *Hit:* 1d6 + 4 piercing damage. Add **4d6 Sneak Attack** (roll separately) when it applies.",
    "attack": {
     "bonus": 7,
-    "rangeFeet": 320
+    "rangeFeet": 320,
+    "rangeNormalFeet": 80
    },
    "damage": [
     {

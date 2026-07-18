@@ -158,6 +158,7 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: #e8a743; }
 .save-prompt-dismiss { margin-left: auto; padding: .4rem .55rem !important; background: transparent !important; color: #c8988f !important; }
 .save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.economy-movement { font-size: .74rem; color: #b9c6a8; align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler accent so the two owed-answer kinds read apart. */
 .reaction-prompt { border-color: #4e6a8a; background: #131c26; }
 .reaction-prompt .save-prompt-label { color: #9ec7ef; }

@@ -20,6 +20,7 @@ import { activateScene, createScene, removeScene, renameScene, setSceneCombatant
 import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
+import { applyMovementRules } from "./movement-rules.js";
 import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
@@ -27,7 +28,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, AddCombatantSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, AddCombatantSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -365,8 +366,12 @@ export function createGameOperations(context: GameOperationsContext) {
       }
       const mapAssetId = store.snapshot.combat.mapAssetId;
       if (!mapAssetId) throw new CommandRejectedError("Start an encounter before moving tokens.");
+      if (request.override && !isGmGrade(principal)) throw new GameAccessDeniedError("Only the GM can override movement rules.");
       const geometry = await context.tokenGeometryFor(mapAssetId);
       let movement: MovementNarration | null | undefined;
+      let movementWarning: string | null = null;
+      let movementOverridden: string | null = null;
+      const opportunityPrompts: Array<{ actorId: string; name: string }> = [];
       const result = await store.execute({ id: commandId, type: "token.move", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
         if (!isGmGrade(principal)) {
@@ -378,11 +383,34 @@ export function createGameOperations(context: GameOperationsContext) {
         // Time Machine: narrate the move (distance + old → new range to every placed combatant)
         // from the post-mutation state so the logged numbers are the snapped, authoritative ones.
         movement = narrateTokenMove({ state, actorId, from, geometry });
+        // Movement budget + opportunity attacks (SRD) — see movement-rules.ts; runs after the snap
+        // so measured distances are authoritative, and a strict rejection discards the draft.
+        const outcome = applyMovementRules(state, {
+          actorId,
+          from,
+          to: state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null,
+          distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
+          override: request.override ?? null,
+          resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId),
+          newPromptId: context.newId,
+          now: Date.now,
+          commandId
+        });
+        movementWarning = outcome.warning;
+        movementOverridden = outcome.overridden;
+        opportunityPrompts.push(...outcome.prompts);
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         if (movement?.publicText) context.appendLog({ kind: "movement", text: movement.publicText, actorIds: [actorId] });
         if (movement?.gmText) context.appendLog({ kind: "movement", text: movement.gmText, gmOnly: true });
+        if (movementWarning) context.appendLog({ kind: "movement", text: `Rules note: ${movementWarning}`, actorIds: [actorId], gmOnly: true });
+        if (movementOverridden) context.appendLog({ kind: "override", text: `OVERRIDE (movement.exceeds-speed): ${actorName(actorId)} moved beyond its speed — ${movementOverridden}`, actorIds: [actorId] });
+        for (const prompt of opportunityPrompts) {
+          const promptHidden = actorHidden(prompt.actorId);
+          context.appendLog({ kind: "reaction", text: `${prompt.name} may make an opportunity attack against ${actorName(actorId)}.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
+          context.broadcastTableEvent({ kind: "reaction", text: `${prompt.name} may make an opportunity attack against ${actorName(actorId)}.`, actorIds: [prompt.actorId], gmOnly: promptHidden });
+        }
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
@@ -486,11 +514,12 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorSetCondition(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SetConditionSchema, raw, "The condition command is malformed.");
       if (!contentLibrary.hasCondition(request.conditionId)) throw new CommandRejectedError("That condition is not in the bundled rules.");
+      if (request.override && !isGmGrade(principal)) throw new GameAccessDeniedError("Only the GM can override movement rules.");
       const scope = actorScopeOf(principal);
       const { commandId, actorId, conditionId, active, level, expectedRevision } = request;
       let events: EffectNarration[] = [];
       const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        events = setCondition(state, actorId, conditionId, active, level, scope);
+        events = setCondition(state, actorId, conditionId, active, level, scope, { override: request.override ?? null });
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
@@ -667,15 +696,40 @@ export function createGameOperations(context: GameOperationsContext) {
     async reactionAnswer(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ReactionAnswerSchema, raw, "The reaction answer is malformed.");
       const scope = actorScopeOf(principal);
-      const { commandId, reactionId, use, expectedRevision } = request;
+      const gmSessionId = sessionIdOf(principal);
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      const geometry = mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
+      const { commandId, reactionId, use, actionId: chosenActionId, expectedRevision } = request;
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const result = await store.execute({ id: commandId, type: "reaction.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        outcome = answerReaction(state, reactionId, use, scope, { resolveDefinition });
+        const distanceFeet = (actorIdA: string, actorIdB: string): number | null => {
+          if (!geometry) return null;
+          const positionA = state.combat.tokens.find((token) => token.actorId === actorIdA)?.position ?? null;
+          const positionB = state.combat.tokens.find((token) => token.actorId === actorIdB)?.position ?? null;
+          if (!positionA || !positionB) return null;
+          return mapDistance(geometry, positionA, positionB)?.value ?? null;
+        };
+        outcome = answerReaction(state, commandId, reactionId, use, chosenActionId, scope, {
+          resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId),
+          random: (sides) => context.random(sides),
+          newRollId: context.newId,
+          gmSessionId,
+          now: () => new Date().toISOString(),
+          distanceFeet
+        });
       });
       if (!result.duplicate && outcome) {
         await context.publishGameState(result.state);
         const hidden = actorHidden(outcome.actorId);
-        if (outcome.used) {
+        if (outcome.kind === "leaves-reach") {
+          if (outcome.used && outcome.resolution) {
+            const attack = outcome.resolution.attack;
+            const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : "resolved";
+            const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} — ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage` : ""}.`;
+            context.appendLog({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
+            context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
+          }
+        } else if (outcome.used) {
           const text = `${outcome.actorName} used ${outcome.actionName} — ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}.`;
           context.appendLog({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
           context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
@@ -686,7 +740,7 @@ export function createGameOperations(context: GameOperationsContext) {
         }
         publishNarrations(outcome.events);
       }
-      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage } } : {}) };
+      return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome: { used: outcome.used, appliedDamage: outcome.appliedDamage, ...(outcome.resolution ? { resolution: outcome.resolution } : {}) } } : {}) };
     },
 
     async reactionDismiss(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1012,6 +1066,19 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async actorSetSpeed(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can set movement speed.");
+      const request = parse(ActorSetSpeedSchema, raw, "The speed command is malformed.");
+      const { commandId, actorId, speedFeet, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "actor.set-speed", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        if (speedFeet === null) delete actor.speedFeet; else actor.speedFeet = speedFeet;
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     async actorSetSize(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can resize tokens.");
       const request = parse(SetActorSizeSchema, raw, "The token size command is malformed.");
@@ -1143,6 +1210,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["character.force-release", "Force-release a claimed character (GM).", (p, raw) => operations.characterForceRelease(p, raw)],
     ["actor.set-token-image", "Set or clear a combatant's token image from the token library (GM).", (p, raw) => operations.actorSetTokenImage(p, raw)],
     ["actor.set-size", "Set a combatant's creature size; the token re-snaps to its footprint (GM).", (p, raw) => operations.actorSetSize(p, raw)],
+    ["actor.set-speed", "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).", (p, raw) => operations.actorSetSpeed(p, raw)],
     ["scene.create", "Prepare a staged scene on a battlemap without touching the live table (GM).", (p, raw) => operations.sceneCreate(p, raw)],
     ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],
     ["scene.remove", "Remove a prepared scene (GM).", (p, raw) => operations.sceneRemove(p, raw)],

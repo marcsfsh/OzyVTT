@@ -101,7 +101,9 @@ export const ActorSchema = z.object({
   /** Spent limited-use counts by action id (per-encounter and per-long-rest pools). Additive. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge — stripped from player projections. Additive. */
-  conditionImmunities: z.array(ConditionIdSchema).max(20).default([])
+  conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
+  /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown → movement rules skip, the unmeasurable pattern. Additive. */
+  speedFeet: z.number().int().min(0).max(500).optional()
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
@@ -139,6 +141,8 @@ const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1).max(120), activation: z.enum(["action", "bonus-action", "reaction", "other"]), description: z.string().min(1).max(12000),
   attack: z.object({
     bonus: z.number().int(), reachFeet: z.number().int().positive().optional(), rangeFeet: z.number().int().positive().optional(),
+    /** Normal range in feet for a two-range weapon ("80/320" → 80); attacks beyond it up to rangeFeet roll at disadvantage (SRD Range). */
+    rangeNormalFeet: z.number().int().positive().optional(),
     /** Attack rolls this action grants (Extra Attack 2, Eldritch Blast beams). Absent = 1. */
     count: z.number().int().min(1).max(10).optional(),
     /** Extra weapon dice on a critical hit beyond crit doubling (Savage Attacks). Applies to the first damage part. */

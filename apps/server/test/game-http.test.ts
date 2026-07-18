@@ -526,6 +526,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.claimForceRelease, "post", "character.force-release"],
       [GAME_PATHS.actorTokenImage, "post", "actor.set-token-image"],
       [GAME_PATHS.actorSize, "post", "actor.set-size"],
+      [GAME_PATHS.actorSpeed, "post", "actor.set-speed"],
       [GAME_PATHS.scenes, "post", "scene.create"],
       [GAME_PATHS.sceneById, "delete", "scene.remove"],
       [GAME_PATHS.sceneRename, "post", "scene.rename"],

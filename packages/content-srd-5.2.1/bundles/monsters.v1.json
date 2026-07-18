@@ -4335,7 +4335,8 @@
     "description": "Ranged Attack Roll: +5, range 25/50 ft. 10 (2d6 + 3) Bludgeoning damage.",
     "attack": {
      "bonus": 5,
-     "rangeFeet": 25
+     "rangeFeet": 50,
+     "rangeNormalFeet": 25
     },
     "damage": [
      {
@@ -4693,7 +4694,8 @@
     "description": "Ranged Attack Roll: +7, range 80/320 ft. 8 (1d8 + 4) Piercing damage plus 21 (6d6) Poison damage.",
     "attack": {
      "bonus": 7,
-     "rangeFeet": 80
+     "rangeFeet": 320,
+     "rangeNormalFeet": 80
     },
     "damage": [
      {
@@ -5509,7 +5511,8 @@
     "description": "Ranged Attack Roll: +3, range 80/320 ft. 5 (1d8 + 1) Piercing damage.",
     "attack": {
      "bonus": 3,
-     "rangeFeet": 80
+     "rangeFeet": 320,
+     "rangeNormalFeet": 80
     },
     "damage": [
      {
@@ -5627,7 +5630,8 @@
     "description": "Ranged Attack Roll: +5, range 30/90 ft. 8 (1d10 + 3) Piercing damage.",
     "attack": {
      "bonus": 5,
-     "rangeFeet": 30
+     "rangeFeet": 90,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -7742,7 +7746,8 @@
     "attack": {
      "bonus": 5,
      "reachFeet": 10,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -7881,7 +7886,8 @@
     "attack": {
      "bonus": 4,
      "reachFeet": 10,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -8312,7 +8318,8 @@
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 6 (1d8 + 2) Piercing damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -12988,7 +12995,8 @@
     "description": "Ranged Attack Roll: +11, range 60/240 ft. 23 (3d10 + 7) Bludgeoning damage plus 4 (1d8) Fire damage, and the target is pushed up to 15 feet straight away from the giant and has Disadvantage on the next attack roll it makes before the end of its next turn.",
     "attack": {
      "bonus": 11,
-     "rangeFeet": 60
+     "rangeFeet": 240,
+     "rangeNormalFeet": 60
     },
     "damage": [
      {
@@ -13429,7 +13437,8 @@
     "description": "Ranged Attack Roll: +9, range 150/600 ft. 17 (2d10 + 6) Piercing damage plus 7 (2d6) Cold damage, and the target's Speed decreases by 10 feet until the end of its next turn.",
     "attack": {
      "bonus": 9,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -17362,7 +17371,8 @@
     "attack": {
      "bonus": 7,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -17484,7 +17494,8 @@
     "description": "Ranged Attack Roll: +3, range 150/600 ft. 6 (1d10 + 1) Piercing damage.",
     "attack": {
      "bonus": 3,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -17696,7 +17707,8 @@
     "description": "Ranged Attack Roll: +4, range 80/320 ft. 5 (1d6 + 2) Piercing damage, plus 2 (1d4) Piercing damage if the attack roll had Advantage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 80
+     "rangeFeet": 320,
+     "rangeNormalFeet": 80
     },
     "damage": [
      {
@@ -17787,7 +17799,8 @@
     "attack": {
      "bonus": 4,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -17907,7 +17920,8 @@
     "description": "Ranged Attack Roll: +4, range 80/320 ft. 5 (1d6 + 2) Piercing damage, plus 2 (1d4) Piercing damage if the attack roll had Advantage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 80
+     "rangeFeet": 320,
+     "rangeNormalFeet": 80
     },
     "damage": [
      {
@@ -18935,7 +18949,8 @@
     "attack": {
      "bonus": 3,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -19031,7 +19046,8 @@
     "attack": {
      "bonus": 6,
      "reachFeet": 5,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -19868,7 +19884,8 @@
     "description": "Ranged Attack Roll: +8, range 60/240 ft. 16 (2d10 + 5) Bludgeoning damage, and the target has the Poisoned condition until the end of its next turn.",
     "attack": {
      "bonus": 8,
-     "rangeFeet": 60
+     "rangeFeet": 240,
+     "rangeNormalFeet": 60
     },
     "damage": [
      {
@@ -20191,7 +20208,8 @@
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 6 (1d8 + 2) Piercing damage plus 5 (2d4) Poison damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -20302,7 +20320,8 @@
     "description": "Ranged Attack Roll: +3, range 150/600 ft. 5 (1d8 + 1) Piercing damage plus 7 (3d4) Poison damage.",
     "attack": {
      "bonus": 3,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -20952,7 +20971,8 @@
     "attack": {
      "bonus": 10,
      "reachFeet": 5,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -21955,7 +21975,8 @@
     "description": "Ranged Attack Roll: +2, range 100/400 ft. 11 (2d10) Piercing damage plus 4 (1d8) Radiant damage.",
     "attack": {
      "bonus": 2,
-     "rangeFeet": 100
+     "rangeFeet": 400,
+     "rangeNormalFeet": 100
     },
     "damage": [
      {
@@ -22044,7 +22065,8 @@
     "attack": {
      "bonus": 4,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -23432,7 +23454,8 @@
     "description": "Ranged Attack Roll: +5, range 100/200 ft. 7 (1d8 + 3) Piercing damage.",
     "attack": {
      "bonus": 5,
-     "rangeFeet": 100
+     "rangeFeet": 200,
+     "rangeNormalFeet": 100
     },
     "damage": [
      {
@@ -23915,7 +23938,8 @@
     "attack": {
      "bonus": 2,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -24048,7 +24072,8 @@
     "attack": {
      "bonus": 6,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -25629,7 +25654,8 @@
     "attack": {
      "bonus": 6,
      "reachFeet": 5,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -26707,7 +26733,8 @@
     "attack": {
      "bonus": 5,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -26847,7 +26874,8 @@
     "description": "Ranged Attack Roll: +7, range 30/90 ft. 15 (2d10 + 4) Piercing damage.",
     "attack": {
      "bonus": 7,
-     "rangeFeet": 30
+     "rangeFeet": 90,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -29752,7 +29780,8 @@
     "attack": {
      "bonus": 7,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -30073,7 +30102,8 @@
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 6 (1d8 + 2) Piercing damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -30981,7 +31011,8 @@
     "description": "Ranged Attack Roll: +5, range 80/320 ft. 6 (1d6 + 3) Piercing damage.",
     "attack": {
      "bonus": 5,
-     "rangeFeet": 80
+     "rangeFeet": 320,
+     "rangeNormalFeet": 80
     },
     "damage": [
      {
@@ -32044,7 +32075,8 @@
     "description": "Ranged Attack Roll: +6, range 40/160 ft. 1 Piercing damage, and the target has the Charmed condition until the start of the sprite's next turn.",
     "attack": {
      "bonus": 6,
-     "rangeFeet": 40
+     "rangeFeet": 160,
+     "rangeNormalFeet": 40
     },
     "damage": []
    },
@@ -32168,7 +32200,8 @@
     "description": "Ranged Attack Roll: +4, range 30/120 ft. 5 (1d6 + 2) Piercing damage plus 7 (2d6) Poison damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -32494,7 +32527,8 @@
     "description": "Ranged Attack Roll: +9, range 60/240 ft. 15 (2d8 + 6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition.",
     "attack": {
      "bonus": 9,
-     "rangeFeet": 60
+     "rangeFeet": 240,
+     "rangeNormalFeet": 60
     },
     "damage": [
      {
@@ -34057,7 +34091,8 @@
     "description": "Ranged Attack Roll: +3, range 100/400 ft. 6 (1d10 + 1) Piercing damage.",
     "attack": {
      "bonus": 3,
-     "rangeFeet": 100
+     "rangeFeet": 400,
+     "rangeNormalFeet": 100
     },
     "damage": [
      {
@@ -34173,7 +34208,8 @@
     "description": "Ranged Attack Roll: +4, range 100/400 ft. 13 (2d10 + 2) Piercing damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 100
+     "rangeFeet": 400,
+     "rangeNormalFeet": 100
     },
     "damage": [
      {
@@ -35221,7 +35257,8 @@
     "attack": {
      "bonus": 5,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -36080,7 +36117,8 @@
     "attack": {
      "bonus": 3,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -36203,7 +36241,8 @@
     "description": "Ranged Attack Roll: +3, range 100/400 ft. 12 (2d10 + 1) Piercing damage.",
     "attack": {
      "bonus": 3,
-     "rangeFeet": 100
+     "rangeFeet": 400,
+     "rangeNormalFeet": 100
     },
     "damage": [
      {
@@ -36561,7 +36600,8 @@
     "attack": {
      "bonus": 7,
      "reachFeet": 5,
-     "rangeFeet": 20
+     "rangeFeet": 60,
+     "rangeNormalFeet": 20
     },
     "damage": [
      {
@@ -36702,7 +36742,8 @@
     "attack": {
      "bonus": 5,
      "reachFeet": 5,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -36856,7 +36897,8 @@
     "description": "Ranged Attack Roll: +5, range 30/120 ft. 6 (1d6 + 3) Piercing damage.",
     "attack": {
      "bonus": 5,
-     "rangeFeet": 30
+     "rangeFeet": 120,
+     "rangeNormalFeet": 30
     },
     "damage": [
      {
@@ -37003,7 +37045,8 @@
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 11 (2d8 + 2) Piercing damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -37143,7 +37186,8 @@
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 11 (2d8 + 2) Piercing damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {
@@ -37388,7 +37432,8 @@
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage.",
     "attack": {
      "bonus": 4,
-     "rangeFeet": 150
+     "rangeFeet": 600,
+     "rangeNormalFeet": 150
     },
     "damage": [
      {

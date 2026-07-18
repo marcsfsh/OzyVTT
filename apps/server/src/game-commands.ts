@@ -50,7 +50,7 @@ export const ApplyDamageSchema = z.object({
 }).strict();
 export const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActionResolveSchema = z.object({
   commandId: z.string().uuid(),
@@ -72,8 +72,8 @@ export const ActionResolveSchema = z.object({
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-/** Answer a pending reaction prompt: use (spend the reaction, apply half the parked damage) or decline (apply it in full). */
-export const ReactionAnswerSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), use: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Answer a pending reaction prompt: use (spend the reaction — halve the parked damage, or swing the opportunity attack) or decline. `actionId` picks the melee action for a leaves-reach answer (default: first melee attack, else Unarmed Strike). */
+export const ReactionAnswerSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), use: z.boolean(), actionId: z.string().regex(/^[a-z0-9-]+$/).max(120).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ReactionDismissSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Read-only availability lookup (no commandId — nothing mutates). */
 export const ActorAvailableActionsSchema = z.object({ actorId: z.string().uuid() }).strict();
@@ -108,7 +108,14 @@ export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), acto
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.literal("long"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const TokenMoveSchema = z.object({
+  commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),
+  /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
+  override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+/** GM-set walking speed; null clears to unknown (movement rules then skip for that combatant). */
+export const ActorSetSpeedSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), speedFeet: z.number().int().min(0).max(500).nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
 export const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
