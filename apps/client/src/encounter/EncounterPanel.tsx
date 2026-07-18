@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientToServerEvents, GmView, MutationResult, PlayerView } from "@vtt/domain";
+import type { ClientToServerEvents, GmView, MutationResult, PendingSave, PlayerPendingSave, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
+import { ActionRunner } from "./ActionRunner";
+import { CharacterSheet } from "./CharacterSheet";
+import { ConditionChips, ConditionEditor } from "./conditions";
+import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "initiative:set" | "initiative:next" | "initiative:previous";
+type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end" | "scene:activate";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -15,19 +19,18 @@ function emitCommand(event: CommandEvent, payload: CommandPayload) {
 
 const validInitiativeScore = (value: string | undefined) => value !== undefined && value.trim() !== "" && Number.isInteger(Number(value)) && Number(value) >= -1000 && Number(value) <= 1000;
 
-export const DOCK_POSITIONS = ["sidebar", "left", "right", "top", "bottom"] as const;
+export const DOCK_POSITIONS = ["sidebar", "left", "right"] as const;
 export type DockPosition = (typeof DOCK_POSITIONS)[number];
 type DockControl = Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;
 type GmProps = Readonly<{ role: "gm"; state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>;
 type PlayerProps = Readonly<{ role: "player"; state: PlayerView; dock?: DockControl }>;
 
-// The glyph is a square with the shaded half showing where the panel lands (left/right/top/bottom),
-// plus a "sidebar" option that pops it back out beside the map.
+// The glyph is a square with the shaded half showing which edge the panel lands on (left/right),
+// plus a "sidebar" option that pops it back out beside the map. Width is adjustable by dragging the
+// docked panel's inner edge (see EncounterMap's resize strip).
 const DOCK_CHOICES: ReadonlyArray<{ value: DockPosition; glyph: string; label: string }> = [
   { value: "left", glyph: "◧", label: "Dock left of the map" },
   { value: "right", glyph: "◨", label: "Dock right of the map" },
-  { value: "top", glyph: "⬒", label: "Dock above the map" },
-  { value: "bottom", glyph: "⬓", label: "Dock below the map" },
   { value: "sidebar", glyph: "▦", label: "Move back to the sidebar" }
 ];
 // Compact position picker on its own row (never competes with the title for width). Each docked
@@ -40,6 +43,90 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
   </div>;
 }
 
+/**
+ * A saving throw a combatant still owes, rendered inside its initiative row. Roll = the server rolls
+ * d20 + its best-known modifier; the typed total covers proficient/situational saves. The outcome
+ * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
+ */
+function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
+  const [manualTotal, setManualTotal] = useState("");
+  const [busy, setBusy] = useState(false);
+  // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
+  // so we can show it and let the answerer confirm rather than auto-resolving on the Roll click.
+  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean } | null>(null);
+  // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
+  // unmounts before it could show its own result.
+  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean) => {
+    setBusy(true);
+    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(total !== undefined ? { total } : {}) }, (result: SaveAnswerResult) => {
+      setBusy(false);
+      if (!result.ok) { onFeedback(result.message ?? "The saving throw could not be answered."); return; }
+      const outcome = result.outcome;
+      if (!outcome) return;
+      if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied }); return; }
+      onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " — condition applied" : ""}.`);
+    });
+  };
+  const submitManual = () => {
+    const total = Number(manualTotal.trim());
+    if (!Number.isInteger(total) || total < -20 || total > 60) { onFeedback("Enter the rolled total (-20 to 60)."); return; }
+    send("manual", total, true);
+  };
+  const dismiss = () => {
+    setBusy(true);
+    socket.emit("save:dismiss", { commandId: newId(), saveId: save.id }, (result: MutationResult) => {
+      setBusy(false);
+      onFeedback(result.ok ? "Saving throw dismissed." : result.message ?? "The saving throw could not be dismissed.");
+    });
+  };
+  return <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
+    <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName}){save.proposedDamage > 0 ? ` · ${save.proposedDamage} dmg` : ""}</span>
+    {rolled
+      // Reveal the rolled total and what it will do, and require an explicit Confirm before applying.
+      ? <span className="save-prompt-confirm">
+          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total} — {rolled.success ? "Success" : "Failure"}</strong>
+          <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => send("manual", rolled.total, true)}>Confirm</button>
+          <button type="button" className="secondary" disabled={busy} onClick={() => setRolled(null)}>Re-roll</button>
+        </span>
+      : <span className="save-prompt-actions">
+          <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => send("roll", undefined, false)}>Roll</button>
+          <span className="save-prompt-manual"><input type="number" min="-20" max="60" placeholder="or type total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
+          {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
+        </span>}
+  </div>;
+}
+
+/** A player's own pending saves with a local feedback line (the GM panel uses its shared message instead). */
+function OwnSavePrompts({ saves, targetName }: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string }>) {
+  const [feedback, setFeedback] = useState("");
+  if (saves.length === 0 && !feedback) return null;
+  return <div className="own-save-prompts">
+    {saves.map((save) => <SavePrompt key={save.id} save={save} targetName={targetName} canDismiss={false} onFeedback={setFeedback} />)}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
+  </div>;
+}
+
+/** A player's own economy: Action/Bonus live only on their turn; the reaction is an off-turn resource, markable any time. Pressed = spent. */
+function PlayerTurnEconomy({ combat, myId, myTurn }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean }>) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const emit = (run: () => Promise<MutationResult>, failure: string) => {
+    setBusy(true);
+    void run().then((result) => { setBusy(false); setFeedback(result.ok ? "" : result.message ?? failure); });
+  };
+  const reactionUsed = combat.reactionsUsed.includes(myId);
+  return <div className="turn-economy" role="group" aria-label="Your turn resources">
+    {myTurn && <>
+      <button type="button" className="economy-slot" aria-pressed={combat.turn.actionUsed} disabled={busy} onClick={() => emit(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !combat.turn.actionUsed }), "The action could not be updated.")}>Action</button>
+      <button type="button" className="economy-slot" aria-pressed={combat.turn.bonusActionUsed} disabled={busy} onClick={() => emit(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !combat.turn.bonusActionUsed }), "The bonus action could not be updated.")}>Bonus</button>
+    </>}
+    <button type="button" className="economy-slot" aria-pressed={reactionUsed} disabled={busy} title="Reactions refresh when your turn starts" onClick={() => emit(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: myId, used: !reactionUsed }), "The reaction could not be updated.")}>Reaction</button>
+    {myTurn && <button type="button" className="encounter-primary turn-end" disabled={busy} onClick={() => emit(() => emitCommand("turn:end", { commandId: newId() }), "The turn could not end.")}>End turn</button>}
+    {feedback && <span className="economy-feedback" role="status">{feedback}</span>}
+  </div>;
+}
+
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
@@ -49,11 +136,20 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel" aria-labelledby="player-initiative-title">
       <div className="encounter-heading"><div><span className="eyebrow">INITIATIVE</span><h2 id="player-initiative-title">Turn order</h2></div><strong className="encounter-round">Round {combat.round}</strong></div>
       <DockPicker dock={props.dock} />
-      {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then let the GM know you're done.</p>}
+      {myTurn && <p className="your-turn" role="status"><strong>It's your turn.</strong> Roll or move your token, then end your turn below.</p>}
       {combat.hiddenTurn && <p className="hidden-turn" role="status">The GM is taking a hidden turn.</p>}
+      {myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} />}
       <ol className="initiative-list">{combat.initiative.map((entry) => {
         const isMe = entry.actorId === myId;
-        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}><span>{entry.name}{isMe && <span className="you-badge">YOU</span>}</span><strong>{entry.score}</strong></li>;
+        const actorConditions = props.state.actors.find((actor) => actor.id === entry.actorId)?.conditions ?? [];
+        const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
+        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
+          <div className="initiative-row-main">
+            <span>{entry.name}{isMe && <span className="you-badge">YOU</span>}{entry.health !== "healthy" && <span className={`health-chip health-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}<ConditionChips conditions={actorConditions} /></span>
+            <strong>{entry.score}</strong>
+          </div>
+          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} />}
+        </li>;
       })}</ol>
     </section>;
   }
@@ -62,22 +158,41 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => new Set(state.actors.map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.map((actor) => actor.id)));
+  const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
+  const [browsing, setBrowsing] = useState(false);
+  const [sheetActorId, setSheetActorId] = useState<string | null>(null);
+  const [hpActorId, setHpActorId] = useState<string | null>(null);
+  const [hpAmount, setHpAmount] = useState("");
   const cancelEditRef = useRef(false);
+  const knownActorIdsRef = useRef<ReadonlySet<string>>(new Set(state.actors.map((actor) => actor.id)));
   const actorsById = useMemo(() => new Map(state.actors.map((actor) => [actor.id, actor])), [state.actors]);
 
   useEffect(() => {
     if (state.combat.active) setScores(Object.fromEntries(state.combat.initiative.map((entry) => [entry.actorId, String(entry.score)])));
   }, [state.combat.active, state.combat.initiative]);
   useEffect(() => {
+    // When a prepared scene becomes the live one (its map swaps in), pre-select its staged combatants
+    // so the setup view + Start reflect what the GM built, not the whole roster.
+    if (state.combat.mapAssetId !== liveMapRef.current) {
+      liveMapRef.current = state.combat.mapAssetId;
+      if (!state.combat.active && state.combat.initiative.length > 0) setSelectedActors(new Set(state.combat.initiative.map((entry) => entry.actorId)));
+    }
+  }, [state.combat.mapAssetId, state.combat.active, state.combat.initiative]);
+  useEffect(() => {
     if (state.combat.active) return;
     setSelectedActors((current) => {
+      // Prune removed actors, and auto-check actors that appear while setting up — a GM
+      // adding a monster from the browser intends it to fight.
+      const known = knownActorIdsRef.current;
       const valid = new Set([...current].filter((id) => actorsById.has(id)));
+      for (const actor of state.actors) if (!known.has(actor.id)) valid.add(actor.id);
+      knownActorIdsRef.current = new Set(state.actors.map((actor) => actor.id));
       return valid.size ? valid : new Set(state.actors.map((actor) => actor.id));
     });
   }, [actorsById, state.actors, state.combat.active]);
@@ -115,6 +230,20 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
     if (!window.confirm("End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.")) return;
     void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
   };
+  const remove = (actorId: string, name: string) => {
+    if (!window.confirm(`Remove ${name} from the roster?`)) return;
+    void run(() => emitCommand("actor:remove", { commandId: newId(), actorId, expectedRevision: state.revision }), `Removed ${name}.`);
+  };
+  const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string) => {
+    const value = Number(hpAmount.trim());
+    const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
+    if (!Number.isInteger(value) || value < minimum || value > 1000) { setMessage(`Enter a whole number (${minimum}-1000).`); return; }
+    const verbs = { "actor:apply-damage": `${name} took ${value} damage.`, "actor:heal": `${name} healed ${value}.`, "actor:set-temp-hp": `${name} has ${value} temporary HP.`, "actor:set-hp": `${name} set to ${value} HP.` } as const;
+    setHpAmount("");
+    void run(() => event === "actor:set-hp"
+      ? emitCommand(event, { commandId: newId(), actorId, current: value, expectedRevision: state.revision })
+      : emitCommand(event, { commandId: newId(), actorId, amount: value, expectedRevision: state.revision }), verbs[event]);
+  };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
     <div className="encounter-heading"><div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>{state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}</div>
@@ -124,8 +253,12 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
       <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Pick a map on the Maps tab"}</strong></div>
       <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
         <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
-        <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
+        <div className="combatant-tools">
+          {actor.kind !== "player-character" && <button type="button" className="combatant-remove" disabled={busy} title={`Remove ${actor.name} from the roster`} aria-label={`Remove ${actor.name} from the roster`} onClick={() => remove(actor.id, actor.name)}>✕</button>}
+          <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
+        </div>
       </li>)}</ul>
+      <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
       <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter</button>
     </> : <>
       {(() => {
@@ -133,20 +266,62 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const total = state.combat.initiative.length;
         return placed < total ? <p className="encounter-place-nudge">{placed} of {total} tokens placed — drag the rest from the tray above.</p> : null;
       })()}
+      {/* Turn navigation sits above the order so Previous/Next are reachable without scrolling past the list. */}
+      <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
       <ol className="initiative-list gm">{state.combat.initiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;
         const editing = editingActorId === entry.actorId;
-        return <li key={entry.actorId} className={active ? "active" : ""} aria-current={active ? "step" : undefined}>
-          <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}<span>{actor?.name ?? "Removed combatant"}</span>{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
-          {editing
-            ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
-            : <button type="button" className="initiative-score-value" disabled={busy} title="Click to edit initiative" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+        const down = actor !== undefined && actor.hp.current <= 0;
+        return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}`.trim()} aria-current={active ? "step" : undefined}>
+          <div className="initiative-row-main">
+            <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}{actor ? <button type="button" className="initiative-sheet-link" title={`Open ${actor.name}'s sheet`} onClick={() => setSheetActorId(actor.id)}>{actor.name}</button> : <span>Removed combatant</span>}{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
+            <span className="initiative-row-side">
+              {actor && <button type="button" className="initiative-reaction" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title={state.combat.reactionsUsed.includes(actor.id) ? "Reaction spent — tap to restore" : "Reaction available — tap to spend (usable off-turn)"} aria-label={`Reaction for ${actor.name}`} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>R</button>}
+              {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Track hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={hpActorId === entry.actorId} onClick={() => { setHpActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
+              {editing
+                ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
+                : <button type="button" className="initiative-score-value" disabled={busy} title="Click to edit initiative" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+            </span>
+          </div>
+          {hpActorId === entry.actorId && actor && <div className="hp-editor" role="group" aria-label={`Adjust hit points for ${actor.name}`}>
+            <input type="number" min="0" max="1000" placeholder="0" autoFocus aria-label="Amount" value={hpAmount} onChange={(event) => setHpAmount(event.target.value)} />
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
+            <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
+          </div>}
+          {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
+          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} />)}
+          {/* The active combatant's economy + action runner live on its own initiative row, not in a
+              detached block at the bottom, so actions read against the creature they belong to. */}
+          {active && actor && <>
+            <div className="turn-economy" role="group" aria-label={`Turn resources for ${actor.name}`}>
+              <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
+              <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
+              <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+            </div>
+            <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
+          </>}
         </li>;
       })}</ol>
-      <div className="turn-controls"><button disabled={busy} onClick={previous}>Previous</button><button className="encounter-primary" disabled={busy} onClick={next}>Next turn</button></div>
+      {(() => {
+        // Combatants can join a running fight: every roster actor not already in initiative can be
+        // dropped in (server rolls its initiative and places a token), plus the SRD browser for new ones.
+        const available = state.actors.filter((actor) => !state.combat.initiative.some((entry) => entry.actorId === actor.id));
+        return <details className="encounter-add-combatant">
+          <summary>Add a combatant to this fight</summary>
+          {available.length > 0 && <ul className="add-combatant-list">{available.map((actor) => <li key={actor.id}>
+            <span>{actor.name}{actor.visibility === "gm-only" ? " · GM-only" : ""}</span>
+            <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight.`)}>Add</button>
+          </li>)}</ul>}
+          <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
+        </details>;
+      })()}
       <button type="button" className="encounter-end" disabled={busy} onClick={end}>End encounter</button>
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
+    {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
+    {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" onClose={() => setSheetActorId(null)} /> : null; })()}
   </section>;
 }

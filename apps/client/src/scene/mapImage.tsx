@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 
 export type MapImageState =
   | { status: "loading" }
@@ -72,6 +72,8 @@ export type TokenGlyphProps = Readonly<{
   sizePx: number;
   name: string;
   active?: boolean;
+  /** Optional portrait; drawn clipped to the token circle. Missing or failed loads fall back to initials. */
+  imageUrl?: string | null;
   turnClassName: string;
   bodyClassName: string;
   initialsClassName: string;
@@ -82,17 +84,58 @@ export type TokenGlyphProps = Readonly<{
 }>;
 
 /**
- * The visual content of a map token (turn ring, body, initials, name) shared by the interactive
- * encounter canvas and the read-only shared-screen viewer. Each caller supplies its own class
- * names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs —
+ * The visual content of a map token (turn ring, body, portrait-or-initials, name) shared by the
+ * interactive encounter canvas and the read-only shared-screen viewer. Each caller supplies its own
+ * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs —
  * this component owns only the repeated drawing, not the per-app interaction semantics.
  */
-export function TokenGlyph({ sizePx, name, active, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
+export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
+  const clipId = useId();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [imageUrl]);
+  const radius = sizePx / 2;
+  const showImage = imageUrl != null && imageUrl !== "" && !failed;
   return <>
     {active && <circle className={turnClassName} r={sizePx * 0.64} />}
-    <circle className={bodyClassName} r={sizePx / 2} />
-    <text className={initialsClassName} style={initialsStyle}>{initialsOf(name)}</text>
+    <circle className={bodyClassName} r={radius} />
+    {showImage
+      // The portrait fills the body circle (cover-cropped) with the body ring redrawn on top so the
+      // border stays crisp; a broken/forbidden image falls back to the initials via onError.
+      ? <>
+          <clipPath id={clipId}><circle r={radius} /></clipPath>
+          <image href={imageUrl ?? undefined} x={-radius} y={-radius} width={sizePx} height={sizePx} clipPath={`url(#${clipId})`} preserveAspectRatio="xMidYMid slice" onError={() => setFailed(true)} />
+          <circle className={bodyClassName} r={radius} style={{ fill: "none" }} />
+        </>
+      : <text className={initialsClassName} style={initialsStyle}>{initialsOf(name)}</text>}
     <text className={nameClassName} y={nameY} style={nameStyle}>{name}</text>
+  </>;
+}
+
+/**
+ * Health/condition badges layered over a token: a bloodied/down dot at the top-right and up
+ * to three condition initials beneath the body (with a +N overflow). Shared by the table
+ * client and the viewer so both read the same at a glance.
+ */
+export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly string[] }>) {
+  const radius = Math.max(4, sizePx * 0.11);
+  const shown = conditions.slice(0, 3);
+  const overflow = conditions.length - shown.length;
+  const badgeY = sizePx * 0.5 + radius * 1.15;
+  const startX = -((shown.length + (overflow > 0 ? 1 : 0)) - 1) * radius * 1.1;
+  return <>
+    {health !== "healthy" && <circle className={`token-health token-health-${health}`} cx={sizePx * 0.38} cy={-sizePx * 0.38} r={radius}>
+      <title>{health === "down" ? "Down" : "Bloodied"}</title>
+    </circle>}
+    {shown.map((label, index) => <g key={label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>
+      <title>{conditions.join(", ")}</title>
+      <circle r={radius} />
+      <text style={{ fontSize: radius * 1.25 }}>{label[0]?.toUpperCase() ?? "?"}</text>
+    </g>)}
+    {overflow > 0 && <g className="token-condition token-condition-more" transform={`translate(${startX + shown.length * radius * 2.2} ${badgeY})`}>
+      <title>{conditions.join(", ")}</title>
+      <circle r={radius} />
+      <text style={{ fontSize: radius * 1.1 }}>+{overflow}</text>
+    </g>}
   </>;
 }
 
@@ -137,15 +180,73 @@ export function gridToImagePreview(calibration: GridCalibration, point: { column
   const sine = Math.sin(calibration.rotationRadians);
   return { x: calibration.origin.x + cosine * localX - sine * localY, y: calibration.origin.y + sine * localX + cosine * localY };
 }
-export function snapCellCenterPreview(calibration: GridCalibration, point: { x: number; y: number }) {
+export function snapCellCenterPreview(calibration: GridCalibration, point: { x: number; y: number }, sizeCells = 1) {
+  // Mirrors the server: odd footprints center on a cell, even ones on a grid intersection.
+  const centerOffset = sizeCells % 2 === 0 ? 0 : 0.5;
   const grid = imageToGridPreview(calibration, point);
-  return gridToImagePreview(calibration, { column: Math.floor(grid.column) + 0.5, row: Math.floor(grid.row) + 0.5 });
+  return gridToImagePreview(calibration, { column: Math.floor(grid.column) + centerOffset, row: Math.floor(grid.row) + centerOffset });
 }
 /** Whole-cell Chebyshev distance in feet between two image points — every cell (including diagonals) costs one step, matching the server's default measurement rule. */
 export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: number; y: number }, b: { x: number; y: number }) {
   const gridA = imageToGridPreview(calibration, a);
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
+}
+/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection — mirrors the server). Preview-only. */
+export function footprintCells(calibration: GridCalibration, position: { x: number; y: number }, sizeCells = 1): Set<string> {
+  const grid = imageToGridPreview(calibration, position);
+  const odd = sizeCells % 2 === 1;
+  const topLeftCol = odd ? Math.floor(grid.column) - (sizeCells - 1) / 2 : Math.round(grid.column) - sizeCells / 2;
+  const topLeftRow = odd ? Math.floor(grid.row) - (sizeCells - 1) / 2 : Math.round(grid.row) - sizeCells / 2;
+  const cells = new Set<string>();
+  for (let column = 0; column < sizeCells; column++) for (let row = 0; row < sizeCells; row++) cells.add(`${topLeftCol + column},${topLeftRow + row}`);
+  return cells;
+}
+/**
+ * Every grid cell the straight segment (grid-space) from `a` to `b` passes through, via an
+ * Amanatides–Woo voxel/DDA traversal. Unlike a Chebyshev "diagonal-first" walk, this visits exactly
+ * the cells the drawn line crosses, so the occupied-cell count matches what the ruler visibly passes
+ * over. At an exact lattice corner it steps diagonally (skips the two side cells) — the standard choice.
+ */
+function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): string[] {
+  let column = Math.floor(ax), row = Math.floor(ay);
+  const endColumn = Math.floor(bx), endRow = Math.floor(by);
+  const deltaX = bx - ax, deltaY = by - ay;
+  const stepX = Math.sign(deltaX), stepY = Math.sign(deltaY);
+  const tDeltaX = deltaX !== 0 ? Math.abs(1 / deltaX) : Infinity;
+  const tDeltaY = deltaY !== 0 ? Math.abs(1 / deltaY) : Infinity;
+  let tMaxX = deltaX !== 0 ? (stepX > 0 ? Math.floor(ax) + 1 - ax : ax - Math.floor(ax)) * tDeltaX : Infinity;
+  let tMaxY = deltaY !== 0 ? (stepY > 0 ? Math.floor(ay) + 1 - ay : ay - Math.floor(ay)) * tDeltaY : Infinity;
+  const cells = [`${column},${row}`];
+  for (let guard = 0; (column !== endColumn || row !== endRow) && guard < 1000; guard++) {
+    if (Math.abs(tMaxX - tMaxY) < 1e-9) { tMaxX += tDeltaX; tMaxY += tDeltaY; column += stepX; row += stepY; }
+    else if (tMaxX < tMaxY) { tMaxX += tDeltaX; column += stepX; }
+    else { tMaxY += tDeltaY; row += stepY; }
+    cells.push(`${column},${row}`);
+  }
+  return cells;
+}
+
+/**
+ * 5e movement-through-occupied-cells cost, display-only. Base distance is the whole-cell Chebyshev
+ * count (diagonals cost one). The penalty is every cell the straight path crosses — excluding the
+ * start and destination cells — that another token occupies, each adding one cell (+distancePerCell).
+ * Preview-only — the client only ever has the tokens it may see, so nothing hidden leaks into the count.
+ */
+export function occupiedPathCost(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }, occupied: ReadonlySet<string>): { baseFeet: number; penaltyFeet: number } {
+  const from = imageToGridPreview(calibration, origin);
+  const to = imageToGridPreview(calibration, target);
+  const originCell = `${Math.floor(from.column)},${Math.floor(from.row)}`;
+  const destCell = `${Math.floor(to.column)},${Math.floor(to.row)}`;
+  // Chebyshev distance from the raw center-to-center grid delta (matches chebyshevFeetPreview). Using
+  // floor-differences here is unstable for even footprints (Large/Huge/Gargantuan center on integer
+  // grid intersections, where floating-point noise flips the floor) — that caused the 10→20 ft skips.
+  const steps = Math.round(Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row)));
+  let penaltyCells = 0;
+  for (const cell of cellsOnGridSegment(from.column, from.row, to.column, to.row)) {
+    if (cell !== originCell && cell !== destCell && occupied.has(cell)) penaltyCells++;
+  }
+  return { baseFeet: steps * calibration.distancePerCell, penaltyFeet: penaltyCells * calibration.distancePerCell };
 }
 
 export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; target: { x: number; y: number }; feet: number }>;

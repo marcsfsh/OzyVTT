@@ -1,0 +1,12 @@
+{
+  "license": "CC-BY-4.0",
+  "attribution": "This work includes material from the System Reference Document 5.2.1 (“SRD 5.2.1”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.",
+  "source": {
+    "name": "System Reference Document 5.2",
+    "author": "Wizards of the Coast",
+    "publisher": "wizards-of-the-coast",
+    "permalink": "https://dnd.wizards.com/resources/systems-reference-document",
+    "vendoredFrom": "https://github.com/open5e/open5e-api (data/v2/wizards-of-the-coast/srd-2024, staging branch)",
+    "retrieved": "2026-07-17"
+  }
+}

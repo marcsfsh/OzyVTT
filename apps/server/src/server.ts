@@ -4,25 +4,36 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents } from "@vtt/domain";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema, type ClientToServerEvents, type ClientRole, type GameState, type RollRecord, type ServerToClientEvents, type TableEvent } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
-import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
-import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility } from "./annotations.js";
+import { ACTOR_DEFINITION_SCHEMA_VERSION, ActorDefinitionSchema } from "@vtt/schemas";
+import { addAnnotation, addPing, clearAnnotations, moveAnnotation, nextAnnotationExpiry, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry } from "./annotations.js";
+import { setCondition } from "./actor-conditions.js";
+import { resolveDefinitionAction } from "./action-resolution.js";
+import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
+import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
+import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
+import { addCombatant, endEncounter, nextInitiativeTurn, previousInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
+import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { CommandRejectedError, GameStore, RevisionConflictError } from "./game-store.js";
+import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
 import { MapAssetStore } from "./map-assets.js";
 import { MapCatalogStore } from "./map-catalog.js";
 import { createMapRouter } from "./map-http.js";
+import { TokenCatalogStore } from "./token-catalog.js";
+import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
-import { ensureEncounterTokens, moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { answerSave, dismissSave } from "./saving-throws.js";
+import { ensureEncounterTokens, moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
+import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
@@ -35,6 +46,7 @@ export type CreateServerOptions = {
   /** Separate SQLite file for integration credentials/audit, distinct from the game-state database. */
   integrationCredentialsPath: string;
   mapAssetsPath?: string;
+  tokenAssetsPath?: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
@@ -56,7 +68,36 @@ const EncounterStartSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), current: z.number().int().min(0).max(10000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SetConditionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60), active: z.boolean(), level: z.number().int().min(1).max(6).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TurnUseSchema = z.object({ commandId: z.string().uuid(), slot: z.enum(["action", "bonus-action"]), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ActionResolveSchema = z.object({
+  commandId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  actionId: z.string().regex(/^[a-z0-9-]+$/).max(120),
+  targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+  template: z.object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict().optional(),
+  conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict().refine((payload) => (payload.targetIds === undefined) !== (payload.template === undefined), { message: "Provide either explicit targets or an area template, not both." });
+const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), expectedRevision: z.number().int().nonnegative().optional() }).strict()
+  .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
+const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
+const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const TokenMoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneNameSchema = z.string().trim().min(1).max(120);
+const SceneCreateSchema = z.object({ commandId: z.string().uuid(), name: SceneNameSchema, mapAssetId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneRenameSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), name: SceneNameSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneIdSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+const SceneSetCombatantsSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid(), combatantIds: z.array(z.string().uuid()).max(200), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 const AnnotationGeometryInputSchema = z.object({ origin: AnnotationPointSchema, target: AnnotationPointSchema }).strict();
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const AnnotationAddSchema = z.object({
@@ -87,8 +128,11 @@ export function createServer(options: CreateServerOptions) {
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
   const mapCatalog = new MapCatalogStore(options.databasePath);
+  const tokenAssets = new MapAssetStore(options.tokenAssetsPath ?? join(dirname(options.databasePath), "token-assets"), { maxBytes: 5 * 1024 * 1024, maxDimensionPx: 2048, maxPixels: 2048 * 2048 });
+  const tokenCatalog = new TokenCatalogStore(options.databasePath);
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
+  const contentLibrary = new ContentLibrary();
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   const gmLoginRateLimiter = new LoginRateLimiter();
@@ -97,9 +141,19 @@ export function createServer(options: CreateServerOptions) {
   const annotationExpiryTimers = new Set<ReturnType<typeof setTimeout>>();
   /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry — same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
   function scheduleAnnotationExpiry() {
+    // Keep exactly one pending timer: clear any prior one, arm the soonest expiry, then re-arm from
+    // inside the callback so every staggered annotation drops at its own expiry — not just the first.
+    // Without the re-arm, a second ping placed after the first would linger until unrelated activity
+    // re-broadcast the state (the reported "extra pings don't disappear" bug).
+    for (const timer of annotationExpiryTimers) clearTimeout(timer);
+    annotationExpiryTimers.clear();
     const soonest = nextAnnotationExpiry(store.snapshot, Date.now());
     if (soonest === null) return;
-    const timer = setTimeout(() => { annotationExpiryTimers.delete(timer); void publishGameState(store.snapshot); }, Math.max(0, soonest - Date.now()));
+    const timer = setTimeout(() => {
+      annotationExpiryTimers.delete(timer);
+      void publishGameState(store.snapshot);
+      scheduleAnnotationExpiry();
+    }, Math.max(0, soonest - Date.now()));
     timer.unref?.();
     annotationExpiryTimers.add(timer);
   }
@@ -116,6 +170,24 @@ export function createServer(options: CreateServerOptions) {
       socket.emit("state:updated", gm ? projectGmView(state, presenceFor) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
   }
+  /**
+   * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
+   * GM-only AND every referenced actor is public — so a hidden combatant is never narrated to players.
+   * Not stored in GameState (ephemeral presentation); the viewer channel gets nothing.
+   */
+  function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
+    const state = store.snapshot;
+    const actorIds = event.actorIds ?? [];
+    const publicToPlayers = !event.gmOnly && actorIds.every((id) => state.actors.find((actor) => actor.id === id)?.visibility === "public");
+    const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
+    for (const socket of io.sockets.sockets.values()) {
+      const token = socket.handshake.auth?.token;
+      if (auth.verify(token)) socket.emit("table:event", payload);
+      else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
+    }
+  }
+  const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
+  const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
   async function tokenGeometryFor(mapAssetId: string): Promise<TokenMapGeometry> {
     const [asset, entry] = await Promise.all([mapAssets.get(mapAssetId), Promise.resolve(mapCatalog.get(mapAssetId))]);
     if (!asset || !entry || entry.kind !== "battlemap") throw new CommandRejectedError("The active encounter battlemap is unavailable.");
@@ -193,6 +265,17 @@ export function createServer(options: CreateServerOptions) {
         const presentation = viewerPresentation.project();
         return presentation.enabled && presentation.activeMap?.assetId === assetId;
       } catch { return false; }
+    }
+  }));
+  app.use(createTokenRouter({
+    assets: tokenAssets,
+    catalog: tokenCatalog,
+    authorizeGm,
+    authorizePlayer: (token, assetId) => auth.verifyPlayer(token) !== null && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
+    authorizeViewer: (token, assetId) => {
+      if (!token) return false;
+      try { viewerAccess.verify(token); return viewerPresentation.project().enabled && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId); }
+      catch { return false; }
     }
   }));
   const apiV1Router = createApiV1Router({
@@ -279,6 +362,298 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state); acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The character force-release failed." }); }
     });
+    socket.on("content:monsters", (_payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse bundled content." });
+      acknowledge({ ok: true, monsters: contentLibrary.monsterSummaries(), attribution: contentLibrary.attribution });
+    });
+    socket.on("actor:add-from-definition", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can add combatants." });
+      const request = ActorAddFromDefinitionSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The add-combatant command is malformed." });
+      const definition = contentLibrary.monster(request.data.definitionId);
+      if (!definition) return acknowledge({ ok: false, message: "That monster is not in the bundled content." });
+      try {
+        // Like annotation:add, the commandId doubles as the new entity id so a duplicate
+        // delivery acks the same actorId instead of minting a fresh unused one.
+        const actorId = request.data.commandId;
+        const result = await store.execute({ id: request.data.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.data.expectedRevision }, (state) => addActorFromDefinition(state, definition, actorId, request.data.visibility));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
+    });
+    socket.on("actor:import-definition", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can import sheets." });
+      const envelope = z.object({ commandId: z.string().uuid(), definition: z.unknown(), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict().safeParse(payload);
+      if (!envelope.success) return acknowledge({ ok: false, message: "The import command is malformed." });
+      if (JSON.stringify(envelope.data.definition ?? null).length > 262_144) return acknowledge({ ok: false, message: "That sheet is too large to import." });
+      const parsed = ActorDefinitionSchema.safeParse(envelope.data.definition);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return acknowledge({ ok: false, message: `That file is not a valid actor definition (${issue.path.join(".") || "root"}: ${issue.message}).` });
+      }
+      try {
+        const actorId = envelope.data.commandId;
+        const result = await store.execute({ id: envelope.data.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.data.expectedRevision }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.data.visibility));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, actorId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The sheet could not be imported." }); }
+    });
+    socket.on("actor:remove", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove combatants." });
+      const request = ActorRemoveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The remove-combatant command is malformed." });
+      try {
+        const { commandId, actorId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.remove", actorId, expectedRevision }, (state) => removeActor(state, actorId));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be removed." }); }
+    });
+    socket.on("actor:set-token-image", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set token images." });
+      const request = SetTokenImageSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The token image command is malformed." });
+      try {
+        const { commandId, actorId, tokenAssetId, expectedRevision } = request.data;
+        if (tokenAssetId !== null && !tokenCatalog.get(tokenAssetId)) return acknowledge({ ok: false, message: "That token image is not in your library." });
+        const result = await store.execute({ id: commandId, type: "actor.set-token-image", actorId, expectedRevision }, (state) => {
+          const actor = state.actors.find((item) => item.id === actorId);
+          if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+          if (tokenAssetId === null) delete actor.tokenAssetId; else actor.tokenAssetId = tokenAssetId;
+        });
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          if (tokenAssetId !== null) {
+            tokenCatalog.touchLastUsed(tokenAssetId);
+            const definitionId = result.state.actors.find((item) => item.id === actorId)?.definitionId;
+            if (definitionId) tokenCatalog.rememberForDefinition(definitionId, tokenAssetId);
+          }
+        }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token image could not be set." }); }
+    });
+    socket.on("actor:set-size", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can resize tokens." });
+      const request = SetActorSizeSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The token size command is malformed." });
+      try {
+        const { commandId, actorId, size, expectedRevision } = request.data;
+        const mapAssetId = store.snapshot.combat.mapAssetId;
+        const geometry = mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
+        const result = await store.execute({ id: commandId, type: "actor.set-size", actorId, expectedRevision }, (state) => setActorSize(state, actorId, size, geometry));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be resized." }); }
+    });
+    // GM adjusts anyone's hit points; a player only their own claimed character (checked in the reducer).
+    const actorScope = (): ActorScope | null => {
+      if (auth.verify(socket.handshake.auth.token)) return { role: "gm" };
+      const player = auth.verifyPlayer(socket.handshake.auth.token);
+      return player ? { role: "player", sessionId: player.sessionId } : null;
+    };
+    socket.on("actor:apply-damage", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
+      const request = HpAmountSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The damage command is malformed." });
+      try {
+        const { commandId, actorId, amount, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.apply-damage", actorId, expectedRevision }, (state) => applyDamage(state, actorId, amount, scope));
+        if (!result.duplicate) { await publishGameState(result.state); broadcastTableEvent({ kind: "damage", text: `${actorName(actorId)} took ${amount} damage.`, actorIds: [actorId] }); }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The damage could not be applied." }); }
+    });
+    socket.on("actor:heal", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
+      const request = HpAmountSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The healing command is malformed." });
+      try {
+        const { commandId, actorId, amount, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.heal", actorId, expectedRevision }, (state) => healActor(state, actorId, amount, scope));
+        if (!result.duplicate) { await publishGameState(result.state); broadcastTableEvent({ kind: "heal", text: `${actorName(actorId)} healed ${amount}.`, actorIds: [actorId] }); }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The healing could not be applied." }); }
+    });
+    socket.on("actor:set-temp-hp", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking hit points." });
+      const request = TempHpSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The temporary hit point command is malformed." });
+      try {
+        const { commandId, actorId, amount, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.set-temp-hp", actorId, expectedRevision }, (state) => setTemporaryHp(state, actorId, amount, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The temporary hit points could not be set." }); }
+    });
+    socket.on("content:conditions", (_payload, acknowledge) => {
+      // Reference text is public information: any joined session (GM or player) may read it.
+      if (!auth.verify(socket.handshake.auth.token) && !auth.verifyPlayer(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Join the table before browsing reference content." });
+      acknowledge({ ok: true, conditions: contentLibrary.conditionSummaries() });
+    });
+    socket.on("actor:set-condition", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking conditions." });
+      const request = SetConditionSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The condition command is malformed." });
+      if (!contentLibrary.hasCondition(request.data.conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled rules." });
+      try {
+        const { commandId, actorId, conditionId, active, level, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision }, (state) => setCondition(state, actorId, conditionId, active, level, scope));
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          const conditionName = contentLibrary.conditionSummaries().find((entry) => entry.id === conditionId)?.name ?? conditionId;
+          broadcastTableEvent({ kind: "condition", text: active ? `${actorName(actorId)} is ${conditionName}${conditionId === "exhaustion" && level ? ` ${level}` : ""}.` : `${actorName(actorId)} is no longer ${conditionName}.`, actorIds: [actorId] });
+        }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The condition could not be updated." }); }
+    });
+    // Imported stat blocks take precedence over the bundle so sheets/actions resolve for both.
+    const resolveDefinition = (definitionId: string) => storedDefinition(store.snapshot, definitionId) ?? contentLibrary.monster(definitionId);
+    socket.on("content:monster-actions", (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can browse stat blocks." });
+      const request = ContentActionsSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The action lookup is malformed." });
+      const imported = storedDefinition(store.snapshot, request.data.definitionId);
+      const actions = imported
+        ? imported.actions.map((action) => ({ id: action.id, name: action.name, activation: action.activation, description: action.description, attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, saveAbility: action.save?.ability ?? null, saveDc: action.save?.dc ?? null, damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })), area: parseAreaProse(action.description) }))
+        : contentLibrary.monsterActionSummaries(request.data.definitionId);
+      if (!actions) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
+      acknowledge({ ok: true, actions });
+    });
+    socket.on("content:monster-sheet", (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can read stat blocks." });
+      const request = ContentActionsSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The stat-block lookup is malformed." });
+      const definition = resolveDefinition(request.data.definitionId);
+      if (!definition) return acknowledge({ ok: false, message: "That stat block is not in the bundled content." });
+      acknowledge({ ok: true, definition });
+    });
+    socket.on("action:resolve", async (payload, acknowledge) => {
+      const gm = auth.verify(socket.handshake.auth.token);
+      if (!gm) return acknowledge({ ok: false, message: "Only the GM can resolve stat-block actions." });
+      const request = ActionResolveSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The action command is malformed." });
+      try {
+        const { commandId, actorId, actionId, targetIds, template, conditionId, expectedRevision } = request.data;
+        if (conditionId !== undefined && !contentLibrary.hasCondition(conditionId)) return acknowledge({ ok: false, message: "That condition is not in the bundled reference." });
+        // A template needs the map's grid up front (async fetch) so containment runs inside the mutation.
+        const mapAssetId = store.snapshot.combat.mapAssetId;
+        const geometry = template && mapAssetId ? await tokenGeometryFor(mapAssetId) : null;
+        if (template && (!mapAssetId || !geometry?.calibration)) return acknowledge({ ok: false, message: "Calibrate this map before placing an area template." });
+        let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
+        const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision }, (state) => {
+          const attacker = state.actors.find((item) => item.id === actorId);
+          if (!attacker?.definitionId) throw new CommandRejectedError("That combatant has no stat-block actions.");
+          const action = (storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId))?.actions.find((candidate) => candidate.id === actionId);
+          if (!action) throw new CommandRejectedError("That action is not on the stat block.");
+          let resolvedTargetIds: readonly string[];
+          if (template) {
+            if (action.attack) throw new CommandRejectedError("Attacks target a single token — pick it directly instead of placing a template.");
+            if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try again.");
+            const calibration = geometry!.calibration!;
+            // Snap the template the same way the drawn annotation will, then find who is under it.
+            const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
+            resolvedTargetIds = tokensInTemplate(state, calibration, snapped, template.shape, parseAreaProse(action.description)?.widthFeet ?? null)
+              .filter((id) => id !== actorId && state.combat.initiative.some((entry) => entry.actorId === id));
+            if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
+          } else {
+            resolvedTargetIds = targetIds!;
+          }
+          resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null }, { random: (sides) => randomInt(1, sides + 1), newRollId: randomUUID, gmSessionId: gm.sessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id) });
+          // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
+          if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gm.sessionId, role: "gm" }, now: Date.now() }, geometry!);
+        });
+        if (!result.duplicate) { await publishGameState(result.state); if (resolution) broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The action could not be resolved." }); }
+    });
+    socket.on("save:answer", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before answering saving throws." });
+      const request = SaveAnswerSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: request.error.issues[0]?.message ?? "The saving-throw answer is malformed." });
+      const sessionId = scope.role === "gm" ? auth.verify(socket.handshake.auth.token)!.sessionId : scope.sessionId;
+      try {
+        const { commandId, saveId, method, total, commit, expectedRevision } = request.data;
+        const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
+        let outcome: ReturnType<typeof answerSave> | undefined;
+        const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision }, (state) => {
+          outcome = answerSave(state, commandId, saveId, method, total, commit, scope, {
+            random: (sides) => randomInt(1, sides + 1),
+            newRollId: randomUUID,
+            sessionId,
+            role: scope.role,
+            now: () => new Date().toISOString(),
+            resolveDefinition
+          });
+        });
+        if (!result.duplicate) {
+          await publishGameState(result.state);
+          if (outcome && outcome.committed && pending) broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+        }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be answered." }); }
+    });
+    socket.on("save:dismiss", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before managing saving throws." });
+      const request = SaveDismissSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The dismissal is malformed." });
+      try {
+        const { commandId, saveId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "save.dismiss", expectedRevision }, (state) => dismissSave(state, saveId, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The saving throw could not be dismissed." }); }
+    });
+    socket.on("turn:use", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking turns." });
+      const request = TurnUseSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The turn command is malformed." });
+      try {
+        const { commandId, slot, used, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "turn.use", expectedRevision }, (state) => setTurnSlot(state, slot, used, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not be updated." }); }
+    });
+    socket.on("turn:use-reaction", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before tracking turns." });
+      const request = TurnReactionSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The reaction command is malformed." });
+      try {
+        const { commandId, actorId, used, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "turn.use-reaction", actorId, expectedRevision }, (state) => setReactionUsed(state, actorId, used, scope));
+        if (!result.duplicate) { await publishGameState(result.state); if (used) broadcastTableEvent({ kind: "reaction", text: `${actorName(actorId)} used its reaction.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The reaction could not be updated." }); }
+    });
+    socket.on("turn:end", async (payload, acknowledge) => {
+      const scope = actorScope();
+      if (!scope) return acknowledge({ ok: false, message: "Join the table before ending a turn." });
+      const request = CommandIdentitySchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The end-turn command is malformed." });
+      try {
+        const result = await store.execute({ id: request.data.commandId, type: "turn.end", expectedRevision: request.data.expectedRevision }, (state) => endTurn(state, scope));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The turn could not end." }); }
+    });
+    socket.on("actor:set-hp", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can set hit points directly." });
+      const request = SetHpSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The hit point command is malformed." });
+      try {
+        const { commandId, actorId, current, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "actor.set-hp", actorId, expectedRevision }, (state) => setCurrentHp(state, actorId, current, { role: "gm" }));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The hit points could not be set." }); }
+    });
     socket.on("dice:roll", async ({ commandId, formula, purpose, visibility, actorId, expectedRevision }, acknowledge) => {
       const request = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).safeParse({ commandId, formula, purpose, visibility, actorId, expectedRevision });
       if (!request.success) return acknowledge({ ok: false, message: "The roll request is malformed." });
@@ -343,6 +718,20 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The encounter could not end." }); }
     });
+    socket.on("encounter:add-combatant", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can add a combatant." });
+      const request = AddCombatantSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The add-combatant command is malformed." });
+      const mapAssetId = store.snapshot.combat.mapAssetId;
+      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before adding a combatant." });
+      try {
+        const { commandId, actorId, score, expectedRevision } = request.data;
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const result = await store.execute({ id: commandId, type: "encounter.add-combatant", actorId, expectedRevision }, (state) => addCombatant(state, actorId, score, () => randomInt(1, 21), geometry));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The combatant could not be added." }); }
+    });
     socket.on("initiative:set", async (payload, acknowledge) => {
       if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change Initiative." });
       const request = InitiativeScoreSchema.safeParse(payload);
@@ -380,11 +769,21 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(socket.handshake.auth.token);
       const player = auth.verifyPlayer(socket.handshake.auth.token);
       if (!gm && !player) return acknowledge({ ok: false, message: "Join a session before moving tokens." });
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before moving tokens." });
+      const { commandId, actorId, position, sceneId, expectedRevision } = request.data;
       try {
+        if (sceneId !== undefined) {
+          // GM staging a prepared (off-table) scene privately. Geometry comes from that scene's own map.
+          if (!gm) return acknowledge({ ok: false, message: "Only the GM can stage a prepared scene." });
+          const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
+          if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
+          const sceneGeometry = await tokenGeometryFor(scene.mapAssetId);
+          const result = await store.execute({ id: commandId, type: "token.move-scene", actorId, expectedRevision }, (state) => moveSceneToken(state, sceneId, actorId, position, sceneGeometry));
+          if (!result.duplicate) await publishGameState(result.state);
+          return acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+        }
+        const mapAssetId = store.snapshot.combat.mapAssetId;
+        if (!mapAssetId) return acknowledge({ ok: false, message: "Start an encounter before moving tokens." });
         const geometry = await tokenGeometryFor(mapAssetId);
-        const { commandId, actorId, position, expectedRevision } = request.data;
         const result = await store.execute({ id: commandId, type: "token.move", actorId, expectedRevision }, (state) => {
           if (state.combat.mapAssetId !== mapAssetId) throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
           if (!gm) {
@@ -396,6 +795,67 @@ export function createServer(options: CreateServerOptions) {
         if (!result.duplicate) await publishGameState(result.state);
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
       } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The token could not be moved." }); }
+    });
+    socket.on("scene:create", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can prepare scenes." });
+      const request = SceneCreateSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene setup is malformed." });
+      const sceneMap = mapCatalog.get(request.data.mapAssetId);
+      if (!sceneMap || sceneMap.kind !== "battlemap") return acknowledge({ ok: false, message: "Prepare scenes on an uploaded battlemap." });
+      try {
+        const { commandId, name, mapAssetId, combatantIds, expectedRevision } = request.data;
+        const geometry = await tokenGeometryFor(mapAssetId);
+        const result = await store.execute({ id: commandId, type: "scene.create", expectedRevision }, (state) => { createScene(state, { sceneId: commandId, name, mapAssetId, combatantIds }, geometry); });
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be created." }); }
+    });
+    socket.on("scene:rename", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can rename scenes." });
+      const request = SceneRenameSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene rename is malformed." });
+      try {
+        const { commandId, sceneId, name, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "scene.rename", expectedRevision }, (state) => renameScene(state, sceneId, name));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be renamed." }); }
+    });
+    socket.on("scene:remove", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can remove scenes." });
+      const request = SceneIdSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
+      try {
+        const { commandId, sceneId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "scene.remove", expectedRevision }, (state) => removeScene(state, sceneId));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be removed." }); }
+    });
+    socket.on("scene:activate", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can switch scenes." });
+      const request = SceneIdSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene command is malformed." });
+      try {
+        const { commandId, sceneId, expectedRevision } = request.data;
+        const result = await store.execute({ id: commandId, type: "scene.activate", expectedRevision }, (state) => activateScene(state, sceneId, commandId));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be switched." }); }
+    });
+    socket.on("scene:set-combatants", async (payload, acknowledge) => {
+      if (!auth.verify(socket.handshake.auth.token)) return acknowledge({ ok: false, message: "Only the GM can change a scene's combatants." });
+      const request = SceneSetCombatantsSchema.safeParse(payload);
+      if (!request.success) return acknowledge({ ok: false, message: "The scene update is malformed." });
+      try {
+        const { commandId, sceneId, combatantIds, expectedRevision } = request.data;
+        const scene = store.snapshot.combat.scenes.find((candidate) => candidate.id === sceneId);
+        if (!scene) return acknowledge({ ok: false, message: "That scene no longer exists." });
+        const geometry = await tokenGeometryFor(scene.mapAssetId);
+        const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
+        if (!result.duplicate) await publishGameState(result.state);
+        acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
+      } catch (error) { acknowledge({ ok: false, message: error instanceof Error ? error.message : "The scene could not be updated." }); }
     });
     socket.on("annotation:add", async (payload, acknowledge) => {
       const request = AnnotationAddSchema.safeParse(payload);
@@ -532,7 +992,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
@@ -540,9 +1000,14 @@ export function createServer(options: CreateServerOptions) {
         await store.execute({ id: `encounter.tokens.prepare:${persisted.revision}`, type: "encounter.tokens.prepare" }, (state) => { ensureEncounterTokens(state, geometry); });
       } catch { /* Preserve startup for an old encounter whose map asset was removed; the GM can end it and start a new encounter. */ }
     }
+    // Bind a pre-scenes encounter/map to one implicit active scene so park-and-resume has a home.
+    const beforeScenes = store.snapshot;
+    if (beforeScenes.combat.scenes.length === 0 && beforeScenes.combat.mapAssetId !== null) {
+      await store.execute({ id: `scene.migrate:${beforeScenes.revision}`, type: "scene.migrate" }, (state) => migrateToScene(state, randomUUID()));
+    }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); credentials.close(); mapCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }

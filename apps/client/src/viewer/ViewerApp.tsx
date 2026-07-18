@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { probeImageDimensions, TokenGlyph } from "../scene/mapImage";
+import { probeImageDimensions, TokenGlyph, TokenStatusBadges } from "../scene/mapImage";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import "./viewer.css";
 
@@ -13,8 +13,8 @@ export type Presentation = Readonly<{
   camera: Readonly<{ center: Point; zoom: number }> | null;
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
-  initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean }>[] }>;
-  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean }>[]; annotations?: readonly ViewerAnnotation[] }>;
+  initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[] }>[] }>;
+  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; tokenAssetId?: string }>[]; annotations?: readonly ViewerAnnotation[] }>;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -59,7 +59,10 @@ export function Initiative({ presentation }: Readonly<{ presentation: Presentati
     <div><span>INITIATIVE</span><strong>Round {presentation.initiative.round}</strong></div>
     {presentation.initiative.hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
     <ol>{presentation.initiative.entries.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
-      <span>{entry.name}</span><strong>{entry.initiative}</strong>
+      <span>{entry.name}
+        {entry.health && entry.health !== "healthy" && <span className={`viewer-health viewer-health-${entry.health}`}>{entry.health === "down" ? "DOWN" : "BLOODIED"}</span>}
+        {entry.conditions && entry.conditions.length > 0 && <span className="viewer-conditions">{entry.conditions.join(" · ")}</span>}
+      </span><strong>{entry.initiative}</strong>
     </li>)}</ol>
   </aside>;
 }
@@ -150,7 +153,8 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
         return <AnnotationGlyph key={annotation.id} data={data} arrowSize={arrowSize} color={annotation.color} />;
       })}
       {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
-        <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
+        <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} imageUrl={token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
+        <TokenStatusBadges sizePx={token.sizePx} health={token.health ?? "healthy"} conditions={token.conditions ?? []} />
       </g>)}
       {measurementPoints && <polyline className="viewer-measurement" points={measurementPoints} />}
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>

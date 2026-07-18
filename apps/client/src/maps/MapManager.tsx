@@ -8,6 +8,7 @@ type MapAsset = Readonly<{
   id: string;
   name: string;
   kind: MapKind;
+  folder: string | null;
   originalName: string;
   format: string;
   mediaType: string;
@@ -92,6 +93,9 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<MapKind>("battlemap");
+  const [uploadFolder, setUploadFolder] = useState("");
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | MapKind>("all");
   const [points, setPoints] = useState<Point[]>([]);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [dragCurrent, setDragCurrent] = useState<Point | null>(null);
@@ -117,6 +121,14 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const svgRef = useRef<SVGSVGElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const selected = maps.find((map) => map.id === selectedId) ?? null;
+  const folderNames = Array.from(new Set(maps.map((map) => map.folder).filter((folder): folder is string => folder !== null))).sort((a, b) => a.localeCompare(b));
+  const needle = search.trim().toLowerCase();
+  const filteredMaps = maps.filter((map) => (kindFilter === "all" || map.kind === kindFilter) && (needle === "" || map.name.toLowerCase().includes(needle)));
+  // Group the (filtered) maps by folder, unfiled last, so the GM can organize a large library.
+  const groupedMaps = [...folderNames, null].flatMap((folder) => {
+    const group = filteredMaps.filter((map) => map.folder === folder);
+    return group.length ? [{ folder, maps: group }] : [];
+  });
 
   const refresh = async (preferId?: string) => {
     const data = await api("/api/v1/map-assets", gmToken);
@@ -160,10 +172,16 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
     if (!file) return setMessage("Choose an image first.");
     await run(async () => {
       const query = new URLSearchParams({ filename: file.name, name: name || file.name.replace(/\.[^.]+$/, ""), kind });
+      if (uploadFolder.trim()) query.set("folder", uploadFolder.trim());
       const data = await api(`/api/v1/map-assets?${query}`, gmToken, { method: "POST", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
       setFile(null); setName(""); await refresh(data.asset.id); setMessage(data.duplicate ? "That image was already uploaded; the existing map is selected." : "Map uploaded. Select reference points to calibrate it.");
     });
   };
+  const moveToFolder = (folder: string | null) => run(async () => {
+    if (!selected) return;
+    await api(`/api/v1/map-assets/${selected.id}`, gmToken, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ folder }) });
+    await refresh(selected.id); setMessage(folder ? `Moved to “${folder}”.` : "Removed from its folder.");
+  });
   const pointAt = (clientX: number, clientY: number) => {
     if (!selected || !svgRef.current) return null;
     const point = imagePointFromClient(svgRef.current, clientX, clientY);
@@ -330,12 +348,34 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
         <label>Map image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !name) setName(next.name.replace(/\.[^.]+$/, "")); }} /></label>
         <label>Map name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Ruined Keep" /></label>
         <label>Map type<select value={kind} onChange={(event) => setKind(event.target.value as MapKind)}><option value="battlemap">Battlemap</option><option value="regional">Regional map</option><option value="world">World map</option></select></label>
+        <label>Folder<input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="map-folder-list" /></label>
+        <datalist id="map-folder-list">{folderNames.map((folder) => <option key={folder} value={folder} />)}</datalist>
         <button disabled={busy || !file}>Upload map</button>
       </form>
       {message && <p className="map-feedback" role="status">{message}</p>}
       {maps.length > 0 && <div className="map-workspace">
-        <nav className="map-list" aria-label="Uploaded maps">{maps.map((map) => <button key={map.id} className={map.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(map.id)}><strong>{map.name}</strong><span>{map.kind} · {map.width}×{map.height}</span><small>{map.calibration ? "Grid calibrated" : map.scale ? `Scale ${map.scale.distancePerPixel.toPrecision(3)} ${map.scale.unit}/px` : "Needs scale setup"}</small></button>)}</nav>
+        <div className="map-list-column">
+          <div className="map-list-filters" role="group" aria-label="Filter maps">
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search maps" aria-label="Search maps" />
+            <div className="map-kind-chips">{(["all", "battlemap", "regional", "world"] as const).map((value) => <button key={value} type="button" aria-pressed={kindFilter === value} onClick={() => setKindFilter(value)}>{value === "all" ? "All" : value === "battlemap" ? "Battlemaps" : value === "regional" ? "Regional" : "World"}</button>)}</div>
+          </div>
+          <nav className="map-list" aria-label="Uploaded maps">
+            {groupedMaps.length === 0 && <p className="map-list-empty">No maps match this filter.</p>}
+            {groupedMaps.map((group) => <div key={group.folder ?? "__unfiled"} className="map-folder-group">
+              <p className="map-folder-label">{group.folder ?? "Unfiled"}</p>
+              {group.maps.map((map) => <button key={map.id} className={map.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(map.id)}><strong>{map.name}</strong><span>{map.kind} · {map.width}×{map.height}</span><small>{map.calibration ? "Grid calibrated" : map.scale ? `Scale ${map.scale.distancePerPixel.toPrecision(3)} ${map.scale.unit}/px` : "Needs scale setup"}</small></button>)}
+            </div>)}
+          </nav>
+        </div>
         {selected && <div className="map-calibration">
+          <div className="map-folder-move" role="group" aria-label="Organize this map">
+            <span>Folder</span>
+            <select value={selected.folder ?? ""} onChange={(event) => moveToFolder(event.target.value || null)} disabled={busy} aria-label="Move map to folder">
+              <option value="">Unfiled</option>
+              {folderNames.map((folder) => <option key={folder} value={folder}>{folder}</option>)}
+            </select>
+            <button type="button" className="secondary" disabled={busy} onClick={() => { const folder = window.prompt("Move this map to a new folder:")?.trim(); if (folder) moveToFolder(folder); }}>New folder…</button>
+          </div>
           {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
           <div className="calibration-instruction" id="calibration-instruction" role="status">
             <span>{squareMode ? "SQUARE GRID" : selected.kind === "battlemap" ? "GRIDLESS SCALE" : "MAP SCALE"}</span>

@@ -76,18 +76,27 @@ export class ViewerCoordinator {
     if (!result.duplicate) {
       this.broadcast();
       // A ping only lasts for its duration, but nothing else may mutate state before it expires.
-      // Schedule a single re-broadcast at the soonest ping expiry so the projection (which already
-      // filters expired pings) actually reaches viewers and the ping disappears on its own.
+      // Re-broadcast at the soonest ping expiry so the projection (which already filters expired
+      // pings) actually reaches viewers and the ping disappears on its own.
       if (command.payload.type === "viewer.ping") this.schedulePingExpiry();
     }
     return result;
   }
 
   private schedulePingExpiry() {
+    // One pending timer at a time, re-armed from the callback so staggered pings each expire on the
+    // shared screen instead of only the earliest one (the rest would otherwise linger until the next
+    // broadcast).
+    for (const timer of this.pingTimers) clearTimeout(timer);
+    this.pingTimers.clear();
     const now = this.now();
     const soonest = this.presentation.snapshot.pings.map((ping) => ping.expiresAt).filter((expiry) => expiry > now).sort((a, b) => a - b)[0];
     if (soonest === undefined) return;
-    const timer = setTimeout(() => { this.pingTimers.delete(timer); this.broadcast(); }, Math.max(0, soonest - now));
+    const timer = setTimeout(() => {
+      this.pingTimers.delete(timer);
+      this.broadcast();
+      this.schedulePingExpiry();
+    }, Math.max(0, soonest - now));
     timer.unref?.();
     this.pingTimers.add(timer);
   }

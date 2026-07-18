@@ -24,6 +24,11 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   `packages/api-contract`. (ADR-0016)
 - **Full phone+laptop functional parity**, one responsive client, no separate mobile build.
   (ADR-0014, ADR-0001)
+- **SRD content source is open5e `srd-2024` (SRD 5.2.1, CC BY 4.0).** Fixtures are vendored
+  unmodified into `packages/content-srd-5.2.1/sources/`; a deterministic ETL adapts them into
+  committed canonical `ActorDefinition` bundles with attribution; upstream data bugs are fixed
+  via a reviewed `CORRECTIONS` table in the ETL, never by editing sources. 2014/OGL data and
+  third-party publishers are deliberately excluded. (ADR-0015, 2026-07-17)
 
 ## Operating decisions (no ADR)
 

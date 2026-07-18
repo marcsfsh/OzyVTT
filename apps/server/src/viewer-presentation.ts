@@ -24,6 +24,10 @@ export type ViewerInitiativeEntry = Readonly<{
   name: string;
   initiative: number;
   active: boolean;
+  /** Coarse band only — exact hit points never reach the shared screen. */
+  health: "healthy" | "bloodied" | "down";
+  /** Display labels ("Prone", "Exhaustion 3") for public combatants. */
+  conditions: readonly string[];
 }>;
 
 export type ViewerInitiative = Readonly<{
@@ -40,6 +44,9 @@ export type ViewerEncounterToken = Readonly<{
   position: ImagePoint;
   sizePx: number;
   active: boolean;
+  health: "healthy" | "bloodied" | "down";
+  conditions: readonly string[];
+  tokenAssetId?: string;
 }>;
 
 /** Player-safe drawing shown on the shared screen — only `public` annotations are ever projected here. */
@@ -146,12 +153,21 @@ function initiative(value: ViewerInitiative): ViewerInitiative {
     actorIds.add(actorId);
     if (!Number.isFinite(entry.initiative)) throw new Error("Initiative value must be finite.");
     if (entry.active) activeEntries++;
-    return { actorId, name: safeText(entry.name, "Initiative name", 100), initiative: entry.initiative, active: entry.active };
+    return { actorId, name: safeText(entry.name, "Initiative name", 100), initiative: entry.initiative, active: entry.active, health: healthBand(entry.health), conditions: conditionList(entry.conditions) };
   });
   if (activeEntries > 1) throw new Error("Viewer initiative can have at most one active entry.");
   const hiddenTurn = value.hiddenTurn ?? false;
   if (hiddenTurn && activeEntries > 0) throw new Error("Viewer initiative cannot expose a public active entry during a hidden turn.");
   return { visible: value.visible, round: value.round, hiddenTurn, entries };
+}
+
+/** Persisted viewer state is re-validated on load; unknown bands fall back to healthy and condition labels stay bounded. */
+function healthBand(value: unknown): "healthy" | "bloodied" | "down" {
+  return value === "bloodied" || value === "down" ? value : "healthy";
+}
+function conditionList(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 20).map((label) => safeText(String(label), "Condition label", 60));
 }
 
 function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
@@ -166,7 +182,7 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     if (token.active) activeTokens++;
     if (token.kind !== "player-character" && token.kind !== "monster" && token.kind !== "npc") throw new Error("Viewer token kind is invalid.");
     if (!Number.isFinite(token.sizePx) || token.sizePx <= 0 || token.sizePx > 4096) throw new Error("Viewer token size is invalid.");
-    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active };
+    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions) };
   });
   if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
   if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");
@@ -248,7 +264,16 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
     };
     next = { ...state, pings: [...state.pings.filter((item) => item.id !== ping.id && item.expiresAt > now), ping].slice(-20) };
   } else if (payload.type === "viewer.initiative.set") next = { ...state, initiative: initiative(payload.initiative) };
-  else if (payload.type === "viewer.encounter.set") next = { ...state, initiative: initiative(payload.initiative), encounter: encounter(payload.encounter) };
+  else if (payload.type === "viewer.encounter.set") {
+    const scene = encounter(payload.encounter);
+    // Combat-first: while an encounter is live (it carries a map), the shared screen follows that map
+    // automatically, so the image never lags behind the fight and the GM needn't re-present on every
+    // scene switch. When combat ends (no map), the last-shown map stays until the GM changes it.
+    const activeMap = scene.mapAssetId
+      ? { assetId: scene.mapAssetId, altText: state.activeMap?.assetId === scene.mapAssetId ? state.activeMap.altText : "Battle map" }
+      : state.activeMap;
+    next = { ...state, initiative: initiative(payload.initiative), encounter: scene, activeMap };
+  }
 
   next = {
     ...next,

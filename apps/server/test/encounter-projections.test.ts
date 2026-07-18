@@ -29,7 +29,7 @@ describe("recipient-safe encounter projections", () => {
   it("omits hidden combatants and reports a safe hidden-turn indicator", () => {
     const state = game(HIDDEN);
     const combat = projectPlayerCombat(state);
-    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null }], annotations: [] });
+    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy" }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [] });
     const serialized = JSON.stringify(projectPlayerView(state, undefined, () => null));
     expect(serialized).not.toContain(HIDDEN);
     expect(serialized).not.toContain("Secret Lurker");
@@ -39,8 +39,8 @@ describe("recipient-safe encounter projections", () => {
   it("marks a public current turn for players and the shared viewer", () => {
     const state = game(PUBLIC);
     expect(projectPlayerCombat(state)).toMatchObject({ turnActorId: PUBLIC, hiddenTurn: false, initiative: [{ actorId: PUBLIC, active: true }] });
-    expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true }] });
-    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true }], annotations: [] });
+    expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true, health: "healthy", conditions: [] }] });
+    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [] }], annotations: [] });
   });
 
   it("hides the Initiative list after combat ends", () => {

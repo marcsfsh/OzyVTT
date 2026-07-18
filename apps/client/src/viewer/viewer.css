@@ -50,3 +50,14 @@
 @keyframes viewer-pulse { from { opacity: 1; transform: scale(.45); } to { opacity: 0; transform: scale(1.25); } }
 @media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; border-left: 0; border-top: 1px solid #5d4b31; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid #393020; } .viewer-connection { right: 1rem; } }
 @media (prefers-reduced-motion: reduce) { .viewer-ping circle { animation: none; } }
+/* Health band + conditions on the shared screen (bands only, never exact numbers). */
+.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem .5rem; border-radius: 999px; font: 800 .55em/1.6 sans-serif; letter-spacing: .05em; vertical-align: middle; }
+.viewer-health-bloodied { background: #4a2c10; color: #e8a743; }
+.viewer-health-down { background: #43201d; color: #e0897f; }
+.viewer-conditions { display: block; margin-top: .15rem; color: #c9b8e8; font-size: .6em; }
+.token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.token-health-bloodied { fill: #e8a743; }
+.token-health-down { fill: #d9605a; }
+.token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }

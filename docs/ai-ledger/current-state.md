@@ -27,9 +27,41 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 - **Phase 2 testing-MVP vertical slice** is under active implementation; no phase exit gate
   claimed yet (see `README.md`, `BUILD_PLAN.md`).
+- **SRD combat-content integration (phases A–G).** Phase A (content pipeline) done and
+  audited: `packages/content-srd-5.2.1` carries vendored open5e `srd-2024` fixtures
+  (CC BY 4.0) and cross-validated canonical bundles — 330 `ActorDefinition` monsters (423
+  structured attacks), spells/weapons/armor/skills/damage-types/rules references,
+  attribution (ADR-0015). Phase B done: GM browses the bestiary in encounter setup
+  (`MonsterBrowser`), `actor:add-from-definition`/`actor:remove`/`content:monsters`
+  commands instantiate/remove monsters with live HP and provenance (`Actor.definitionId`).
+  Phase C done: server-authoritative HP tracking (damage/heal/temp/set commands, GM +
+  own-character player scopes) with band-safe player projections (exact PC hp, monster
+  bands). Phase D done: condition tracking (`Actor.conditions`, `actor:set-condition`,
+  15 bundled SRD conditions with exhaustion levels, chips + pickers across GM/player
+  surfaces — reference level per ADR-0008). Phase E done: turn economy (`combat.turn`
+  action/bonus reset on turn change; per-combatant `reactionsUsed` refreshing at own turn
+  start; `turn:use`/`turn:use-reaction`/`turn:end` — player End Turn gated to their own
+  turn; hidden-turn economy stays opaque to players). Phase F done: `action:resolve` —
+  the GM runs a stat-block combatant's actions from the Turn order (attack vs target AC
+  with 2024 crit doubling, save-DC surfacing, typed damage), rolls recorded in the shared
+  history (gm-only for hidden attackers), economy auto-marked, damage applied by explicit
+  tap through the existing hp commands (Propose→Apply). Phase G done: `CharacterSheet`
+  overlay — live HP/conditions over the full immutable stat block (abilities+saves, senses,
+  languages, immunities, traits, actions, CC-BY line) via GM-gated `content:monster-sheet`;
+  GM opens any combatant from the initiative, a player only their own (server-rejected
+  otherwise; PC sheets stay thin until import). **All seven phases (A–G) of the SRD
+  combat-content integration are complete on `claude/srd-content-pipeline`.** Plan reviewed with the owner 2026-07-17.
+  Three follow-on slices then landed on the same branch: **token footprints** (large/huge/
+  gargantuan tokens size to `Actor.sizeCells` and snap even/odd footprints on the correct
+  cell/intersection — server owns the geometry, client preview mirrors it); **condition
+  badges + viewer health/conditions** (bloodied/down dot and condition-initial badges on map
+  tokens, plus coarse health band + condition labels in the viewer initiative/tokens — bands
+  only, exact HP never leaves for the public screen); **PC sheet import** (GM imports a
+  canonical `ActorDefinition` JSON as a claimable player-character; the stat block is stored
+  in `GameState.definitions` and projected only to the owning player, `actor:import-definition`).
 - **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
-  - **PR D** — configurable dock position, Encounter/Initiative declutter, gridless
-    saveable/toggleable grid overlay.
+  - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
+    gridless saveable/toggleable grid overlay (D-3) still open.
   - **PR E** — multi-scene staging (prepare maps privately, switch the live scene
     non-destructively). Large data-model refactor across domain/server/projections/viewer.
   - **PR F** — complete the public Open API so Socket.IO capabilities (`encounter:*`,

@@ -15,20 +15,26 @@ function positiveDimension(value: number, label: string) {
 
 const rounded = (value: number) => Math.round(value * 1_000) / 1_000;
 
-export function encounterTokenAppearance(geometry: TokenMapGeometry) {
+export function encounterTokenAppearance(geometry: TokenMapGeometry, sizeCells = 1) {
   const width = positiveDimension(geometry.width, "Map width");
   const height = positiveDimension(geometry.height, "Map height");
   const shortestSide = Math.min(width, height);
   if (geometry.calibration) {
     const gridSizePx = geometry.calibration.cellSizePx;
-    return { sizePx: rounded(Math.min(shortestSide, gridSizePx * 0.82)), gridSizePx, gridRotationRadians: geometry.calibration.rotationRadians };
+    // A multi-cell creature fills its footprint: 2 cells across for large, 3 for huge, ...
+    const diameter = sizeCells === 1 ? gridSizePx * 0.82 : gridSizePx * (sizeCells - 0.08);
+    return { sizePx: rounded(Math.min(shortestSide, diameter)), gridSizePx, gridRotationRadians: geometry.calibration.rotationRadians, sizeCells };
   }
-  return { sizePx: rounded(Math.min(shortestSide, Math.max(12, Math.min(72, shortestSide / 18)))), gridSizePx: null, gridRotationRadians: null };
+  const base = Math.min(shortestSide, Math.max(12, Math.min(72, shortestSide / 18)));
+  return { sizePx: rounded(Math.min(shortestSide, base * sizeCells)), gridSizePx: null, gridRotationRadians: null, sizeCells };
 }
 
-export function createEncounterTokens(actorIds: readonly string[], geometry: TokenMapGeometry): EncounterToken[] {
-  const appearance = encounterTokenAppearance(geometry);
-  return actorIds.map((actorId) => ({ actorId, position: null, ...appearance }));
+function actorSizeCells(state: GameState, actorId: string) {
+  return state.actors.find((actor) => actor.id === actorId)?.sizeCells ?? 1;
+}
+
+export function createEncounterTokens(entries: ReadonlyArray<{ actorId: string; sizeCells?: number }>, geometry: TokenMapGeometry): EncounterToken[] {
+  return entries.map(({ actorId, sizeCells }) => ({ actorId, position: null, ...encounterTokenAppearance(geometry, sizeCells ?? 1) }));
 }
 
 /** Adds tokens when upgrading a persisted active encounter created before tokens existed. */
@@ -37,7 +43,7 @@ export function ensureEncounterTokens(state: GameState, geometry: TokenMapGeomet
   const existing = new Set(state.combat.tokens.map((token) => token.actorId));
   const missing = state.combat.initiative.map((entry) => entry.actorId).filter((actorId) => !existing.has(actorId));
   if (!missing.length) return false;
-  state.combat = { ...state.combat, tokens: [...state.combat.tokens, ...createEncounterTokens(missing, geometry)] };
+  state.combat = { ...state.combat, tokens: [...state.combat.tokens, ...createEncounterTokens(missing.map((actorId) => ({ actorId, sizeCells: actorSizeCells(state, actorId) })), geometry)] };
   return true;
 }
 
@@ -56,17 +62,20 @@ function fits(point: EncounterTokenPosition, radius: number, geometry: TokenMapG
   return point.x >= radius && point.y >= radius && point.x <= geometry.width - radius && point.y <= geometry.height - radius;
 }
 
-function snappedPosition(point: EncounterTokenPosition, radius: number, geometry: TokenMapGeometry) {
+function snappedPosition(point: EncounterTokenPosition, radius: number, geometry: TokenMapGeometry, sizeCells = 1) {
   const requested = bounded(point, radius, geometry);
   if (!geometry.calibration) return { x: rounded(requested.x), y: rounded(requested.y) };
 
+  // Odd footprints center on a cell (offset .5); even footprints center on a grid intersection
+  // so a 2x2 creature covers exactly four cells.
+  const centerOffset = sizeCells % 2 === 0 ? 0 : 0.5;
   const grid = imageToGrid(geometry.calibration, requested);
   const baseColumn = Math.floor(grid.column);
   const baseRow = Math.floor(grid.row);
   const candidates: EncounterTokenPosition[] = [];
   for (let columnOffset = -4; columnOffset <= 4; columnOffset++) {
     for (let rowOffset = -4; rowOffset <= 4; rowOffset++) {
-      const candidate = gridToImage(geometry.calibration, { column: baseColumn + columnOffset + 0.5, row: baseRow + rowOffset + 0.5 });
+      const candidate = gridToImage(geometry.calibration, { column: baseColumn + columnOffset + centerOffset, row: baseRow + rowOffset + centerOffset });
       if (fits(candidate, radius, geometry)) candidates.push(candidate);
     }
   }
@@ -75,12 +84,56 @@ function snappedPosition(point: EncounterTokenPosition, radius: number, geometry
   return nearest ? { x: rounded(nearest.x), y: rounded(nearest.y) } : { x: rounded(requested.x), y: rounded(requested.y) };
 }
 
+export type CreatureSize = "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+/** D&D size → square-grid footprint. Tiny/Small/Medium all occupy one 5-ft cell; larger sizes scale up. */
+export const SIZE_CELLS: Readonly<Record<CreatureSize, number>> = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
+
+/**
+ * Sets a combatant's creature size (Tiny … Gargantuan). The size drives the token footprint (sizeCells);
+ * if the actor already has a token in the live encounter, its appearance is recomputed and its position
+ * re-snapped. Works with no active map too (just records the size for the next encounter). GM-only.
+ */
+export function setActorSize(state: GameState, actorId: string, size: CreatureSize, geometry: TokenMapGeometry | null) {
+  const sizeCells = SIZE_CELLS[size];
+  if (sizeCells === undefined) throw new CommandRejectedError("Choose a creature size from Tiny to Gargantuan.");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, size, sizeCells } : candidate);
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+  if (token && geometry) {
+    const appearance = encounterTokenAppearance(geometry, sizeCells);
+    const position = token.position ? snappedPosition(token.position, appearance.sizePx / 2, geometry, sizeCells) : null;
+    state.combat = { ...state.combat, tokens: state.combat.tokens.map((candidate) => candidate.actorId === actorId ? { ...candidate, ...appearance, position } : candidate) };
+  }
+}
+
+/**
+ * Moves a token within a PREPARED (non-live) scene while the GM stages it privately — players and the
+ * viewer never see this scene until it goes live. Snaps against that scene's own map. Rejects the
+ * active scene (that one is edited through the normal live token move). GM-only at the command layer.
+ */
+export function moveSceneToken(state: GameState, sceneId: string, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
+  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
+  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live — move its tokens on the encounter map instead.");
+  const token = scene.combat.tokens.find((candidate) => candidate.actorId === actorId);
+  if (!token) throw new CommandRejectedError("That combatant is not staged in this scene.");
+  if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y))) throw new CommandRejectedError("Token position must contain finite coordinates.");
+  const nextPosition = position === null ? null : snappedPosition(position, token.sizePx / 2, geometry, token.sizeCells);
+  state.combat = {
+    ...state.combat,
+    scenes: state.combat.scenes.map((candidate) => candidate.id === sceneId
+      ? { ...candidate, combat: { ...candidate.combat, tokens: candidate.combat.tokens.map((entry) => entry.actorId === actorId ? { ...entry, position: nextPosition } : entry) } }
+      : candidate)
+  };
+}
+
 export function moveEncounterToken(state: GameState, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before moving tokens.");
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant does not have a token in this encounter.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y))) throw new CommandRejectedError("Token position must contain finite coordinates.");
-  const nextPosition = position === null ? null : snappedPosition(position, token.sizePx / 2, geometry);
+  const nextPosition = position === null ? null : snappedPosition(position, token.sizePx / 2, geometry, token.sizeCells);
   state.combat = {
     ...state.combat,
     tokens: state.combat.tokens.map((candidate) => candidate.actorId === actorId ? { ...candidate, position: nextPosition } : candidate)

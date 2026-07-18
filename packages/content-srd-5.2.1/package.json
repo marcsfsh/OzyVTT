@@ -2,5 +2,24 @@
   "name": "@vtt/content-srd-5.2.1",
   "version": "0.1.0",
   "private": true,
-  "description": "Reserved home for curated SRD 5.2.1 content; no generated corpus is committed yet."
+  "type": "module",
+  "description": "Curated SRD 5.2.1 content bundles (CC BY 4.0) with required attribution, generated from vendored open5e srd-2024 fixtures.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "build-bundle": "node --import tsx scripts/build-bundle.ts"
+  },
+  "dependencies": {
+    "@vtt/rules-5e": "*",
+    "@vtt/schemas": "*",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^4.1.10"
+  }
 }

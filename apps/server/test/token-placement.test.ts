@@ -19,16 +19,16 @@ function activeState() {
     combat: {
       active: true, round: 1, turnActorId: ACTOR, mapAssetId: MAP,
       initiative: [{ actorId: ACTOR, score: 20 }, { actorId: SECOND, score: 10 }],
-      tokens: createEncounterTokens([ACTOR, SECOND], geometry)
+      tokens: createEncounterTokens([{ actorId: ACTOR }, { actorId: SECOND }], geometry)
     }
   });
 }
 
 describe("authoritative encounter token placement", () => {
   it("creates an unplaced tray token sized from the calibrated grid", () => {
-    expect(encounterTokenAppearance(geometry)).toEqual({ sizePx: 41, gridSizePx: 50, gridRotationRadians: 0 });
-    expect(createEncounterTokens([ACTOR], geometry)).toEqual([{ actorId: ACTOR, position: null, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0 }]);
-    expect(encounterTokenAppearance({ width: 900, height: 600, calibration: null })).toEqual({ sizePx: 33.333, gridSizePx: null, gridRotationRadians: null });
+    expect(encounterTokenAppearance(geometry)).toEqual({ sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 });
+    expect(createEncounterTokens([{ actorId: ACTOR }], geometry)).toEqual([{ actorId: ACTOR, position: null, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 }]);
+    expect(encounterTokenAppearance({ width: 900, height: 600, calibration: null })).toEqual({ sizePx: 33.333, gridSizePx: null, gridRotationRadians: null, sizeCells: 1 });
   });
 
   it("snaps drops to cell centers, keeps tokens on-map, and returns them to the tray", () => {
