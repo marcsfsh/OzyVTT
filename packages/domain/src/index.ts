@@ -194,7 +194,15 @@ export const CombatStateSchema = z.object({
   mapAssetId: z.string().uuid().nullable().default(null),
   /** Prepared scenes the GM parks-and-resumes between. The active scene's own `combat` slot stays empty — its live copy is these top-level fields (single source of truth). */
   scenes: z.array(SceneSchema).max(20).default([]),
-  activeSceneId: z.string().uuid().nullable().default(null)
+  activeSceneId: z.string().uuid().nullable().default(null),
+  /**
+   * Turn time-travel bookkeeping (live fight only — parked scenes never carry these). `historyCursor`
+   * is the turn-snapshot index the whole table is currently viewing (null = live); `historyDirty`
+   * marks that the restorable state changed while rewound, so moving on requires GM confirmation.
+   * The snapshots themselves live outside GameState in the store's turn_snapshots table.
+   */
+  historyCursor: z.number().int().nonnegative().nullable().default(null),
+  historyDirty: z.boolean().default(false)
 }).superRefine((combat, context) => {
   refineCombatContext(combat, context);
   const sceneIds = new Set<string>();
@@ -235,16 +243,20 @@ export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; sc
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; the source actor id never crosses the wire, and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[] }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean }; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
-export type GmView = Omit<GameState, "actors"> & { actors: GmActor[] };
+/** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
+export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
+export type GmView = Omit<GameState, "actors"> & { actors: GmActor[]; turnHistory?: readonly TurnHistoryEntry[] };
+/** A persisted combat-log line. Players only ever receive gmOnly=false entries; the GM sees all. */
+export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll"; text: string; gmOnly: boolean; revision: number }>;
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState — presentation only; the roll history is the durable record. */
 export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction"; text: string; actorIds: readonly string[]; at: number }>;
-export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; }
+export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
-export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string };
+export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string; needsConfirm?: "rewrite-history" | "discard-changes" };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
 export type EncounterStartEntry = Readonly<{ actorId: string; score?: number }>;
 export type AnnotationGeometryInput = Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>;
@@ -308,8 +320,9 @@ export interface ClientToServerEvents {
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:add-combatant": (payload: { commandId: string; actorId: string; score?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:set": (payload: { commandId: string; actorId: string; score: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "initiative:next": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "initiative:previous": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "initiative:next": (payload: { commandId: string; confirmRewrite?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "initiative:previous": (payload: { commandId: string; confirmDiscard?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "log:read": (payload: Record<string, never>, acknowledgement: (result: { ok: boolean; message?: string; entries?: readonly CombatLogEntry[] }) => void) => void;
   "token:move": (payload: { commandId: string; actorId: string; position: EncounterTokenPosition | null; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:create": (payload: { commandId: string; name: string; mapAssetId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: SceneCreateResult) => void) => void;
   "scene:rename": (payload: { commandId: string; sceneId: string; name: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

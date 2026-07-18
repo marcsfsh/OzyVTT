@@ -57,6 +57,9 @@ export function removeActor(state: GameState, actorId: string) {
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (actor.kind === "player-character" && actor.ownerSessionId !== null) throw new CommandRejectedError("Release that character's claim before removing it.");
   if (actor.kind === "player-character" && !actor.definitionId?.startsWith("import-")) throw new CommandRejectedError("Player characters can't be removed from the roster.");
+  // A recorded turn snapshot may reference this actor; removing it while rewound would leave the
+  // restore pointing at a combatant that no longer exists. Make the GM leave history review first.
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before removing a combatant.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
     throw new CommandRejectedError("End the encounter before removing a combatant who is in it.");
   }

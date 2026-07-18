@@ -53,7 +53,11 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     annotations: [],
     turn: { actionUsed: false, bonusActionUsed: false },
     reactionsUsed: [],
-    pendingSaves: []
+    pendingSaves: [],
+    // A fresh fight starts live on the timeline; the handler wipes any prior fight's snapshots and
+    // captures this start state as the baseline the GM can rewind all the way back to.
+    historyCursor: null,
+    historyDirty: false
   };
 }
 
@@ -76,7 +80,9 @@ export function addCombatant(state: GameState, actorId: string, score: number | 
 
 export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [] };
+  // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [], historyCursor: null, historyDirty: false };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {

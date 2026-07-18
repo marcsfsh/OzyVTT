@@ -7,6 +7,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
 import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "./encounter/EncounterPanel";
+import { CombatLogPanel } from "./encounter/CombatLog";
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ScenePanel } from "./scenes/ScenePanel";
@@ -227,6 +228,7 @@ function App() {
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} />
             : !showDocked && encounterPanel}
           <DicePanel role={mode} state={state} />
+          <CombatLogPanel />
           {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
         </div>
       </div>}

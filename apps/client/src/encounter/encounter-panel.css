@@ -124,7 +124,13 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .action-targeting-buttons button { flex: 1; padding: .5rem; text-align: center; }
 .action-result { margin-top: .4rem; padding: .6rem .7rem; border: 1px solid #7c633e; border-radius: .55rem; background: #1f1912; }
 .action-result-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.action-result-actions { display: flex; align-items: center; gap: .4rem; flex: none; }
+/* Multiattack / Extra Attack: roll the same action again without dismissing the result first. */
+.action-again { flex: none; padding: .3rem .6rem; border: 1px solid #7c633e; border-radius: .4rem; background: #2b2213; color: #ffdca0; font-size: .78rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.action-again:hover:not(:disabled) { border-color: #ffc34d; }
 .action-result-close { flex: none; width: 1.8rem; height: 1.8rem; padding: 0; display: grid; place-items: center; border-radius: .4rem; }
+.action-result-hint { margin: .5rem 0 0; font-size: .74rem; color: #9f9789; line-height: 1.35; }
+.action-result-hint strong { color: #ffdca0; }
 .action-outcome { margin: .4rem 0 0; font-size: .85rem; font-weight: 700; }
 .outcome-crit { color: #ffd34d; }
 .outcome-hit { color: #8fd69a; }
@@ -242,3 +248,15 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .encounter-scenes-toggle:hover { border-color: #e8a743; color: #f5efe3; }
 .encounter-scenes-toggle[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .encounter-scenes-panel .scene-panel { margin-top: 1rem; }
+
+/* Turn time-travel (#12): the review banner, the confirm bar, and the player's paused notice. */
+.turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 1px solid #6b5e4b; border-left: 3px solid #e8a743; border-radius: .5rem; background: #201a12; display: grid; gap: .25rem; }
+.turn-review.dirty { border-left-color: #d5732f; background: #241813; }
+.turn-review strong { color: #ffdca0; font-size: .9rem; }
+.turn-review span { color: #c8c0b1; font-size: .78rem; line-height: 1.4; }
+.turn-controls .encounter-primary.resume { background: #2f6e3a; border-color: #4dd06a; }
+.turn-confirm { margin: .5rem 0 0; padding: .6rem .7rem; border: 1px solid #d5732f; border-radius: .5rem; background: #241813; display: grid; gap: .5rem; }
+.turn-confirm span { color: #f3d8b8; font-size: .82rem; line-height: 1.4; }
+.turn-confirm-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+.turn-confirm-actions button { flex: 0 0 auto; padding: .4rem .9rem; }
+.table-rewound { margin: .4rem 0 0; padding: .5rem .7rem; border-radius: .5rem; background: #201a12; color: #d8c9a8; font-size: .82rem; }
