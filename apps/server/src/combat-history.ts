@@ -11,7 +11,10 @@ import { nextInitiativeTurn, previousInitiativeTurn } from "./encounter.js";
  * another command.
  */
 
-const CAP = 100;
+// Rolling window of turn-boundary snapshots retained per live fight. Generous enough that a whole
+// session's fight is usually reviewable end-to-end; each snapshot is one full state JSON, so this is
+// the memory/disk knob. The oldest boundaries evict once the window is full (only ever while live).
+const CAP = 250;
 
 export type TimelineOutcome =
   | { kind: "advanced" }
