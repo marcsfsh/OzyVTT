@@ -8,6 +8,33 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-18 — Public Open API v1 core (PR F) + Time Machine v2 (`claude/open-api-core-m75t9d`)
+
+Owner-directed: RESTful API foundation with core endpoints working, maximum integration openness;
+webhooks explicitly deferred; archive should save as much fight data as possible in the current format.
+
+- **Operations extraction.** All core combat capabilities moved out of the Socket.IO handlers into
+  `game-operations.ts` (shared zod schemas in `game-commands.ts`); sockets + new `game-http.ts` REST
+  routes are now thin adapters over identical functions — "same path, never a fork" is structural.
+  Socket behavior/messages preserved exactly (whole suite passes unchanged).
+- **API surface.** `GET /game` (GM-full / `?view=player`, weak-ETag polling), `GET /game/log`, ~30
+  typed command routes, generic `POST /game/commands` tunnel + discoverable catalog, `/content/*`
+  reads, `/encounters` archives under integration scopes. Principals: GM session, player session
+  (player-limited), scoped integration credentials (GM authority). 409-conflict error contract with
+  `currentRevision` + `needsConfirm`; idempotent `commandId` writes; CORS open on `/api`.
+- **Time Machine v2.** Migration v5 journal table: every command while a fight is live journaled
+  in-transaction with payload + principal; archive v2 adds `journal`, `finalState`, complete `rolls`,
+  `definitions` (+`attribution`), strictly additive.
+- **Contract.** OpenAPI 3.1 documents the entire surface (61 paths), served byte-identical;
+  capabilities advertise `gameApi`/`commandTunnel`/`encounterArchives`; contract tests pin scopes.
+- **Verified:** `check`/`test` (291 total: 242 server incl. 8-test HTTP integration suite + journal
+  unit tests, 14 contract)/`build` green; live smoke against the running service passed 17/17
+  external-integration steps (credential → discovery → map upload → snapshot views → REST encounter →
+  ETag 304 → tunnel → idempotent retry → archive v2 journal → revocation cutoff).
+- **Follow-ups:** scenes/claims/cosmetics over the API, SSE stream, webhooks, rate limiting.
+
+---
+
 ## 2026-07-17 — UX bug sweep, batch 2 (owner retest)
 
 Second round from the owner's retest, same branch:

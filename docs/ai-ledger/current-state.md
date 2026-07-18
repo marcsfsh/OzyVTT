@@ -22,6 +22,28 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   server snapping, per-drawing annotation colors, GM/player layer toggle, pings.
 - Paired **table viewer** (second screen): pairing codes, "Present <map>", player-safe
   projection over SSE. Viewer bundle never receives full `GameState`.
+- **Public integration API v1 (PR F) — core surface live.** All core combat capabilities are
+  extracted into a transport-agnostic operations layer (`game-operations.ts` + shared schemas in
+  `game-commands.ts`); Socket.IO handlers and the HTTP routes in `game-http.ts` are thin adapters
+  over the same functions (ADR-0016, structural). Surface: `GET /api/v1/game` (GM-full or
+  `?view=player` player-safe projection, weak-ETag polling), `GET /api/v1/game/log`, ~30 typed
+  command routes (encounter lifecycle, initiative incl. timeline next/previous with 409
+  `needsConfirm`, turn economy, token move, HP/conditions, roster add/import/remove, dice,
+  action resolve, saves, annotations), a generic `POST /api/v1/game/commands` tunnel +
+  `GET` catalog (type → required scope), `/api/v1/content/*` reads, and `/api/v1/encounters`
+  archives (list/get behind `combat:read`, delete behind `admin`; legacy `/api/gm/encounters`
+  kept). Auth per route: GM session, player session (player-limited, same reducer checks as the
+  table), or GM-minted integration credential checked against per-route scopes; writes are
+  idempotent by `commandId` with `expectedRevision` conflicts carrying `currentRevision`. CORS
+  open on `/api` (bearer auth only), JSON body limit 512kb, OpenAPI 3.1 fully documents the
+  surface (served byte-identical from `@vtt/api-contract`), capabilities advertise
+  `gameApi`/`commandTunnel`/`encounterArchives`. No SSE/webhooks yet (deferred by design).
+- **Time Machine v2 encounter archives.** Migration v5 `encounter_journal`: every accepted
+  command while a fight is live is journaled in-transaction (type, payload, principal tag,
+  revision, timestamp); `archiveSchemaVersion` 2 adds `journal[]` (start→end inclusive),
+  `finalState`, complete `rolls[]`, full `definitions[]` (imported + bundled with CC-BY
+  `attribution`) to the existing turns+log document. Shape documented in
+  `apps/server/src/encounter-archive.ts`.
 
 ## Active work
 
@@ -92,9 +114,9 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     gridless saveable/toggleable grid overlay (D-3) still open.
   - **PR E** — multi-scene staging (prepare maps privately, switch the live scene
     non-destructively). Large data-model refactor across domain/server/projections/viewer.
-  - **PR F** — complete the public Open API so Socket.IO capabilities (`encounter:*`,
-    `initiative:*`, `token:move`, `annotation:*`, `dice:*`) are reachable + documented via
-    `/api/v1`, reusing the same command/authorization/projection path (never a fork).
+  - **PR F** — **done on `claude/open-api-core-m75t9d`** (see "Public integration API v1" above).
+    Remaining non-core follow-ups: scenes/claims/token-cosmetics over the API, SSE event stream,
+    webhooks.
 
 ## Recently merged (Cycle 4)
 

@@ -114,23 +114,25 @@ describe("public API contracts", () => {
   });
 
   it("scopes every live-game operation to the least-privilege credential scope alongside GM sessions", () => {
-    const scopeOf = (operation: { security: readonly Record<string, readonly string[]>[] }) => operation.security.find((entry) => "bearerAuth" in entry)?.bearerAuth;
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.snapshot].get)).toEqual(["game:read"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.log].get)).toEqual(["combat:read"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.commands].get)).toEqual(["system:read"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.encounterStart].post)).toEqual(["combat:write"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.initiativeNext].post)).toEqual(["combat:write"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.tokenMove].post)).toEqual(["combat:write"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.actorDamage].post)).toEqual(["actor:write"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.definitionsImport].post)).toEqual(["actor:write"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.rolls].post)).toEqual(["roll:create"]);
-    expect(scopeOf(openApiDocument.paths[GAME_PATHS.actionResolve].post)).toEqual(["combat:write"]);
-    expect(scopeOf(openApiDocument.paths[ENCOUNTER_ARCHIVE_PATHS.collection].get)).toEqual(["combat:read"]);
-    expect(scopeOf(openApiDocument.paths[ENCOUNTER_ARCHIVE_PATHS.byId].delete)).toEqual(["admin"]);
+    type Operation = { security?: ReadonlyArray<Record<string, readonly string[]>> };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Operation>>;
+    const scopeOf = (path: string, method: string) => paths[path][method].security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
+    expect(scopeOf(GAME_PATHS.snapshot, "get")).toEqual(["game:read"]);
+    expect(scopeOf(GAME_PATHS.log, "get")).toEqual(["combat:read"]);
+    expect(scopeOf(GAME_PATHS.commands, "get")).toEqual(["system:read"]);
+    expect(scopeOf(GAME_PATHS.encounterStart, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(GAME_PATHS.initiativeNext, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(GAME_PATHS.tokenMove, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(GAME_PATHS.actorDamage, "post")).toEqual(["actor:write"]);
+    expect(scopeOf(GAME_PATHS.definitionsImport, "post")).toEqual(["actor:write"]);
+    expect(scopeOf(GAME_PATHS.rolls, "post")).toEqual(["roll:create"]);
+    expect(scopeOf(GAME_PATHS.actionResolve, "post")).toEqual(["combat:write"]);
+    expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toEqual(["combat:read"]);
+    expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.byId, "delete")).toEqual(["admin"]);
     // Every game/content/archive operation also accepts a GM session; the tunnel's scope varies per command type.
     for (const path of [...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS)]) {
-      for (const operation of Object.values(openApiDocument.paths[path]) as Array<{ security?: readonly Record<string, readonly string[]>[] }>) {
-        expect(operation.security?.some((entry) => "gmAuth" in entry)).toBe(true);
+      for (const operation of Object.values(paths[path])) {
+        expect(operation.security?.some((entry) => "gmAuth" in entry), `${path} must accept a GM session`).toBe(true);
       }
     }
   });
