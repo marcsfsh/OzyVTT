@@ -158,7 +158,8 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => new Set(state.actors.map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.map((actor) => actor.id)));
+  const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -175,6 +176,14 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   useEffect(() => {
     if (state.combat.active) setScores(Object.fromEntries(state.combat.initiative.map((entry) => [entry.actorId, String(entry.score)])));
   }, [state.combat.active, state.combat.initiative]);
+  useEffect(() => {
+    // When a prepared scene becomes the live one (its map swaps in), pre-select its staged combatants
+    // so the setup view + Start reflect what the GM built, not the whole roster.
+    if (state.combat.mapAssetId !== liveMapRef.current) {
+      liveMapRef.current = state.combat.mapAssetId;
+      if (!state.combat.active && state.combat.initiative.length > 0) setSelectedActors(new Set(state.combat.initiative.map((entry) => entry.actorId)));
+    }
+  }, [state.combat.mapAssetId, state.combat.active, state.combat.initiative]);
   useEffect(() => {
     if (state.combat.active) return;
     setSelectedActors((current) => {

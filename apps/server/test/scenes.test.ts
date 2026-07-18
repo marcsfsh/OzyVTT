@@ -61,6 +61,19 @@ describe("scene preparation", () => {
     setSceneCombatants(game, IDS.sceneB, [IDS.alpha, IDS.beta], GEOMETRY);
     expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.alpha, IDS.beta]);
   });
+
+  it("keeps already-placed token positions when combatants are edited", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit); // A live, so B stays parked/editable
+    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    moveSceneToken(game, IDS.sceneB, IDS.beta, { x: 250, y: 175 }, GEOMETRY);
+    // Adding Alpha to scene B must not reset Beta's placed token.
+    setSceneCombatants(game, IDS.sceneB, [IDS.beta, IDS.alpha], GEOMETRY);
+    const sceneB = game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!;
+    expect(sceneB.combat.tokens.find((token) => token.actorId === IDS.beta)!.position).toEqual({ x: 250, y: 175 });
+    expect(sceneB.combat.tokens.find((token) => token.actorId === IDS.alpha)!.position).toBeNull();
+  });
 });
 
 describe("scene staging (GM-private token placement)", () => {

@@ -68,10 +68,14 @@ export function removeScene(state: GameState, sceneId: string) {
 }
 
 export function setSceneCombatants(state: GameState, sceneId: string, combatantIds: readonly string[], geometry: TokenMapGeometry) {
-  if (!state.combat.scenes.some((scene) => scene.id === sceneId)) throw new CommandRejectedError("That scene no longer exists.");
+  const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live — change its combatants from the encounter instead.");
+  // Preserve where already-staged combatants stand so adding/removing one doesn't reset the layout.
+  const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
-  state.combat = { ...state.combat, scenes: state.combat.scenes.map((scene) => scene.id === sceneId ? { ...scene, combat } : scene) };
+  const combatKeepingPositions = { ...combat, tokens: combat.tokens.map((token) => ({ ...token, position: placed.get(token.actorId) ?? token.position })) };
+  state.combat = { ...state.combat, scenes: state.combat.scenes.map((candidate) => candidate.id === sceneId ? { ...candidate, combat: combatKeepingPositions } : candidate) };
 }
 
 /**

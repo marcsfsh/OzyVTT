@@ -11,6 +11,7 @@ import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
+import { SceneBuilder } from "./scenes/SceneBuilder";
 import { EncounterMap } from "./scene/EncounterMap";
 import { socket } from "./socket";
 import { newId } from "./lib/ids";
@@ -199,8 +200,12 @@ function App() {
             <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> — only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
             <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} />
           </> : <>
-          {!state.combat.active && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
-          {state.combat.active && state.combat.mapAssetId ? <EncounterMap
+          {!state.combat.active && state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "Scene is live — add combatants and start the encounter from the panel below." : "Waiting for the GM to start combat."}</p>}
+          {!state.combat.active && !state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
+          {/* Render the map once a scene is live (has a map) even before combat starts, so making a
+              prepared scene live shows it instead of a blank "no map" page. Players still only get the
+              map once combat is active (their projection nulls mapAssetId until then). */}
+          {state.combat.mapAssetId ? <EncounterMap
             assetId={state.combat.mapAssetId}
             token={mapToken}
             altText={selectedMap?.id === state.combat.mapAssetId ? selectedMap.name : "Battle map"}
@@ -218,7 +223,9 @@ function App() {
           {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>
         <div className="table-sidebar">
-          {!showDocked && encounterPanel}
+          {previewScene
+            ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} />
+            : !showDocked && encounterPanel}
           <DicePanel role={mode} state={state} />
           {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
         </div>
