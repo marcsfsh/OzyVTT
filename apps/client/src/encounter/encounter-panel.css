@@ -124,7 +124,13 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .action-targeting-buttons button { flex: 1; padding: .5rem; text-align: center; }
 .action-result { margin-top: .4rem; padding: .6rem .7rem; border: 1px solid #7c633e; border-radius: .55rem; background: #1f1912; }
 .action-result-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.action-result-actions { display: flex; align-items: center; gap: .4rem; flex: none; }
+/* Multiattack / Extra Attack: roll the same action again without dismissing the result first. */
+.action-again { flex: none; padding: .3rem .6rem; border: 1px solid #7c633e; border-radius: .4rem; background: #2b2213; color: #ffdca0; font-size: .78rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.action-again:hover:not(:disabled) { border-color: #ffc34d; }
 .action-result-close { flex: none; width: 1.8rem; height: 1.8rem; padding: 0; display: grid; place-items: center; border-radius: .4rem; }
+.action-result-hint { margin: .5rem 0 0; font-size: .74rem; color: #9f9789; line-height: 1.35; }
+.action-result-hint strong { color: #ffdca0; }
 .action-outcome { margin: .4rem 0 0; font-size: .85rem; font-weight: 700; }
 .outcome-crit { color: #ffd34d; }
 .outcome-hit { color: #8fd69a; }

@@ -69,7 +69,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
 
   return <div className="action-runner">
     {actions === null && <p className="action-runner-status">Loading stat block…</p>}
-    {actions && !picking && !result && <ul className="action-list">
+    {actions && !picking && <ul className="action-list">
       {actions.map((action) => <li key={action.id}>
         {isResolvable(action)
           ? <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => beginTargeting(action, actor.id)}>
@@ -104,7 +104,15 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       </div>
     </div>}
     {result && <div className="action-result" role="status">
-      <div className="action-result-head"><strong>{result.actionName}</strong><button type="button" className="secondary action-result-close" aria-label="Dismiss result" onClick={() => setTargetingResult(null)}>✕</button></div>
+      <div className="action-result-head">
+        <strong>{result.actionName}</strong>
+        <div className="action-result-actions">
+          {/* Multiattack / Extra Attack: resolving marks the economy but never spends it, so the same
+              action can be rolled again and again. Re-begin targeting for it without hunting for dismiss. */}
+          {(() => { const again = actions?.find((candidate) => candidate.name === result.actionName); return again ? <button type="button" className="action-again" disabled={busy || resolveBusy} title="Resolve this action again (Multiattack / Extra Attack)" onClick={() => beginTargeting(again, actor.id)}>↻ Again</button> : null; })()}
+          <button type="button" className="secondary action-result-close" aria-label="Dismiss result" onClick={() => setTargetingResult(null)}>✕</button>
+        </div>
+      </div>
       {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
         {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} — {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "no AC on record" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
       </p>}
@@ -123,6 +131,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order — roll or enter each result there, then confirm to apply.</p>
           : <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>;
       })()}
+      <p className="action-result-hint">Multiattack or Extra Attack? Tap <strong>↻ Again</strong>, or pick another action above — the turn isn't spent.</p>
     </div>}
   </div>;
 }
