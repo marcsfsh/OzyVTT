@@ -6,6 +6,13 @@ import { IntegrationCredentialMetadataSchema, IntegrationScopeSchema, type Integ
 import { z } from "zod";
 
 const TOKEN_PREFIX = "vtt_int_";
+/**
+ * Successful verifications are audited at most once per credential per this window. The game API
+ * invites tight polling (ETag reads every second or two); auditing every poll would grow the audit
+ * table by tens of thousands of identical "used" rows a day while telling the GM nothing new.
+ * Failures are always audited — they are the security-relevant signal.
+ */
+const USED_AUDIT_THROTTLE_MS = 60_000;
 const CreateCredentialSchema = z.object({
   name: z.string().trim().min(1).max(100),
   scopes: z.array(IntegrationScopeSchema).min(1).transform((scopes) => [...new Set(scopes)]),
@@ -129,12 +136,15 @@ export class IntegrationCredentialStore {
     const scopes = IntegrationScopeSchema.array().parse(JSON.parse(row.scopes_json));
     if (!scopes.includes(requiredScope) && !scopes.includes("admin")) return this.failed(row.id, now, "scope", { requiredScope });
     if (row.game_id && row.game_id !== gameId) return this.failed(row.id, now, "game", { gameBound: true });
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      database.prepare("UPDATE integration_credentials SET last_used_at = ? WHERE id = ?").run(now, row.id);
-      this.audit(row.id, "used", now, { requiredScope, gameBound: row.game_id !== null });
-      database.exec("COMMIT");
-    } catch (error) { database.exec("ROLLBACK"); throw error; }
+    const recentlyAudited = row.last_used_at !== null && this.now() - Date.parse(row.last_used_at) < USED_AUDIT_THROTTLE_MS;
+    if (!recentlyAudited) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        database.prepare("UPDATE integration_credentials SET last_used_at = ? WHERE id = ?").run(now, row.id);
+        this.audit(row.id, "used", now, { requiredScope, gameBound: row.game_id !== null });
+        database.exec("COMMIT");
+      } catch (error) { database.exec("ROLLBACK"); throw error; }
+    }
     return this.get(row.id);
   }
 

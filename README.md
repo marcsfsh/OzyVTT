@@ -40,6 +40,20 @@ To run the single LAN service as a player would use it, build and launch it with
 
 The current combat canvas supports authoritative token placement/movement and viewer synchronization. Manual fog, targeting, HP/actions, and physical phone/TV acceptance are the next scene/combat milestones.
 
+## Integrations (public HTTP API v1)
+
+Everything the table can do in combat is also reachable over a versioned REST API at `/api/v1`, so you can build bots, overlays, loggers, and importers without touching the internals. Quick start against a running server:
+
+1. **Mint a credential** (GM session token from `POST /api/gm/login`):
+   `curl -X POST http://<host>:3001/api/v1/gm/integration-credentials -H "Authorization: Bearer $GM" -H "content-type: application/json" -d '{"name":"my bot","scopes":["system:read","game:read","combat:read","combat:write","actor:write","roll:create"]}'`
+   The `vtt_int_…` token is shown exactly once. Credentials are scoped, rotatable, revocable, and audited.
+2. **Discover the surface**: `GET /api/v1/openapi.json` (the complete OpenAPI 3.1 contract, served from the running instance), `GET /api/v1/system/capabilities`, and `GET /api/v1/game/commands` (every command type + required scope).
+3. **Read the game**: `GET /api/v1/game` returns the full GM projection for GM/integration tokens (add `?view=player` for the player-safe projection overlays should use); poll cheaply with the returned `ETag`/`If-None-Match`. `GET /api/v1/game/log` is the combat log.
+4. **Act**: typed routes (`POST /api/v1/game/encounter/start`, `/game/actors/{id}/damage`, `/game/rolls`, `/game/initiative/next`, …) or the generic tunnel `POST /api/v1/game/commands` with `{"type":"actor.apply-damage","payload":{…}}`. Every write goes through the exact same validation/authorization/execution path as the table's own UI, is idempotent by `commandId` (send your own to retry safely), and honors `expectedRevision` (409 with `currentRevision` when stale).
+5. **Mine finished fights**: `GET /api/v1/encounters` lists permanent archives; `GET /api/v1/encounters/{id}` returns the full Time Machine document — per-turn full game states, the combat log, a complete per-command journal (who did what, with payloads), the final state, every dice roll, and the stat blocks used.
+
+Webhooks/streaming push are deliberately not part of v1 core yet; polling with ETags is the supported pattern today.
+
 ## Scope boundaries
 
 This repository is intentionally not a character builder, campaign wiki, voice/video service, public SaaS, multi-tenant product, macro language, or 3D tabletop. Those boundaries prevent the core combat loop from becoming a general-purpose VTT project.
