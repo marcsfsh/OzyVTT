@@ -90,7 +90,9 @@ export const ActorSchema = z.object({
   /** Dying state at 0 HP (player characters only); null when not dying. Additive. */
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id (per-encounter and per-long-rest pools). Additive. */
-  actionUses: z.record(z.string(), z.number().int().nonnegative()).default({})
+  actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge — stripped from player projections. Additive. */
+  conditionImmunities: z.array(ConditionIdSchema).max(20).default([])
 });
 
 export type Actor = z.infer<typeof ActorSchema>;

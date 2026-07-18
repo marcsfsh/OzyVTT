@@ -99,9 +99,10 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
     revision: state.revision,
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
-      // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below) and
-      // actionUses (limited-use spending names stat-block action ids — own claimed character only).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, ...actor } = source;
+      // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
+      // actionUses (limited-use spending names stat-block action ids — own claimed character only),
+      // and conditionImmunities (monster defenses are GM knowledge).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
       const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;

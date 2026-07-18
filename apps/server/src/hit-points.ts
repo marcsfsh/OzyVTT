@@ -57,15 +57,23 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
     const innate = definitionDefenses(definition);
     const fromEffects = effectDamageDefenses(actor);
+    // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
+    const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     const adjusted = adjustDamageParts(input.parts, {
       resistances: [...innate.resistances, ...fromEffects.resistances],
-      immunities: innate.immunities,
-      vulnerabilities: innate.vulnerabilities
+      immunities: petrified ? [...innate.immunities, "poison"] : innate.immunities,
+      vulnerabilities: innate.vulnerabilities,
+      resistAll: petrified
     });
-    parts = adjusted.map((part) => ({
-      ...part,
-      adjustmentSource: part.adjustment === "resistance" ? fromEffects.sources.get(part.type.trim().toLowerCase()) ?? null : null
-    }));
+    parts = adjusted.map((part) => {
+      const type = part.type.trim().toLowerCase();
+      const effectSource = part.adjustment === "resistance" ? fromEffects.sources.get(type) ?? null : null;
+      const petrifiedSource = petrified
+        && ((part.adjustment === "resistance" && !innate.resistances.map((entry) => entry.toLowerCase()).includes(type) && effectSource === null)
+          || (part.adjustment === "immunity" && type === "poison" && !innate.immunities.map((entry) => entry.toLowerCase()).includes(type)))
+        ? "Petrified" : null;
+      return { ...part, adjustmentSource: effectSource ?? petrifiedSource };
+    });
     totalRequested = input.parts.reduce((sum, part) => sum + part.amount, 0);
     totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
   } else {

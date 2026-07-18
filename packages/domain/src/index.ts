@@ -283,7 +283,7 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts — only on the requesting player's own claimed character. */ actionUses?: Record<string, number> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts — only on the requesting player's own claimed character. */ actionUses?: Record<string, number> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; the source actor id never crosses the wire, and a hidden source's name is masked server-side. */
@@ -376,7 +376,7 @@ export type DamageApplication = Readonly<{
 export type DamageApplyResult = MutationResult & { applied?: DamageApplication };
 export type DeathSaveResult = MutationResult & { deathSave?: Readonly<{ naturalRoll: number; outcome: "success" | "failure" | "critical-success" | "critical-failure"; successes: number; failures: number; stable: boolean; dead: boolean; regainedConsciousness: boolean }> };
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
-export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean } };
+export type SaveAnswerResult = MutationResult & { outcome?: { success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean; /** Condition id that forced an automatic failure (Paralyzed on a Dex save); null/absent when rolled. */ autoFailed?: string | null; /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode } };
 /** Outcome of answering a reaction prompt; the (halved or full) damage already applied server-side. */
 export type ReactionAnswerResult = MutationResult & { outcome?: { used: boolean; appliedDamage: number } };
 /** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020 explainability). */

@@ -4,6 +4,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { addEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom } from "./saving-throws.js";
+import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 type LiveActor = GameState["actors"][number];
@@ -76,10 +77,6 @@ function sizeAtMost(size: string | undefined, limit: string): boolean {
   return SIZE_ORDER.indexOf((size ?? "medium") as (typeof SIZE_ORDER)[number]) <= SIZE_ORDER.indexOf(limit as (typeof SIZE_ORDER)[number]);
 }
 
-function conditionLabel(conditionId: string): string {
-  return conditionId.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-}
-
 type RuleViolation = Readonly<{ rule: string; message: string }>;
 /** How this resolve settles the action economy once it succeeds. */
 type EconomyPlan = Readonly<{
@@ -103,9 +100,6 @@ function componentMap(parent: DefinitionAction): Record<string, number> {
   for (const entry of parent.multiattack ?? []) components[entry.actionId] = (components[entry.actionId] ?? 0) + entry.count;
   return components;
 }
-
-/** Conditions that include Incapacitated (SRD 2024): no actions, bonus actions, or reactions while any is active. */
-const INCAPACITATING_CONDITIONS = ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] as const;
 
 type EconomyEvaluation = Readonly<{
   violations: readonly RuleViolation[];
@@ -210,6 +204,19 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
+  // SRD Charmed: the charmed creature can't attack or target its charmer with harmful effects.
+  // Enforceable only when the condition rides a source-linked effect naming the charmer.
+  if (action.attack !== undefined || action.save !== undefined || action.damage.length > 0) {
+    const charmers = attacker.effects.filter((effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null);
+    for (const targetId of targetIds) {
+      const charmer = charmers.find((effect) => effect.sourceActorId === targetId);
+      if (charmer) {
+        const target = state.actors.find((candidate) => candidate.id === targetId);
+        violations.push({ rule: "condition.charmed-charmer", message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful effects.` });
+      }
+    }
+  }
+
   return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse }, proseMultiattack, notes };
 }
 
@@ -296,6 +303,22 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   if (has(attacker, "restrained")) disadvantage.push({ source: "attacker-restrained", label: "Attacker is Restrained" });
   if (has(attacker, "poisoned")) disadvantage.push({ source: "attacker-poisoned", label: "Attacker is Poisoned" });
   if (has(attacker, "blinded")) disadvantage.push({ source: "attacker-blinded", label: "Attacker is Blinded" });
+  // Frightened: SRD scopes the disadvantage to "while the source is in line of sight" — with no
+  // vision system the engine applies it whenever the condition is active (documented simplification;
+  // the GM's explicit rollMode wins when the source is out of sight).
+  if (has(attacker, "frightened")) disadvantage.push({ source: "attacker-frightened", label: "Attacker is Frightened" });
+  // Invisible as a condition (Hide grants it as a linked effect): unseen attackers get advantage,
+  // attacks against the unseen get disadvantage. Seen-through (e.g. blindsight) is GM adjudication.
+  if (has(attacker, "invisible")) advantage.push({ source: "attacker-invisible", label: "Attacker is Invisible" });
+  if (has(target, "invisible")) disadvantage.push({ source: "target-invisible", label: "Target is Invisible" });
+  // Grappled: disadvantage on attacks against anyone but the grappler. The grappler is known when
+  // the condition rides a source-linked effect; a hand-set Grappled falls back to disadvantage
+  // against everyone (conservative — the GM's rollMode overrides for the grappler).
+  if (has(attacker, "grappled")) {
+    const grapplerId = attacker.effects.find((effect) => effect.linkedConditionIds.includes("grappled"))?.sourceActorId ?? null;
+    if (grapplerId === null) disadvantage.push({ source: "attacker-grappled", label: "Attacker is Grappled (grappler unknown)" });
+    else if (target.id !== grapplerId) disadvantage.push({ source: "attacker-grappled", label: "Attacker is Grappled (target isn't the grappler)" });
+  }
   if (has(target, "restrained")) advantage.push({ source: "target-restrained", label: "Target is Restrained" });
   if (has(target, "blinded")) advantage.push({ source: "target-blinded", label: "Target is Blinded" });
   if (has(target, "stunned")) advantage.push({ source: "target-stunned", label: "Target is Stunned" });
@@ -356,7 +379,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     rollMode = input.rollMode
       ? { mode: input.rollMode, advantage: input.rollMode === "advantage" ? ["GM choice"] : [], disadvantage: input.rollMode === "disadvantage" ? ["GM choice"] : [] }
       : aggregated;
-    const bonus = action.attack.bonus;
+    // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1); explained as a warning line so the wire shape stays unchanged.
+    const bonus = action.attack.bonus + exhaustionPenalty(attacker);
+    if (exhaustionLevel(attacker) > 0) warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
     const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
     const attackResolution = resolveDice(parseDiceFormula(`${die} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), deps.random);
     recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
@@ -368,8 +393,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       : naturalRoll === 1 ? "fumble" as const
       : targetAc === null ? "unknown" as const
       : attackResolution.total >= targetAc ? "hit" as const : "miss" as const;
-    // 2024: hitting an Unconscious creature from within 5 feet is a critical hit.
-    if (outcome === "hit" && target.conditions.some((condition) => condition.id === "unconscious")) {
+    // 2024: hitting an Unconscious OR Paralyzed creature from within 5 feet is a critical hit.
+    if (outcome === "hit" && target.conditions.some((condition) => condition.id === "unconscious" || condition.id === "paralyzed")) {
       const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
       if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
         outcome = "crit";

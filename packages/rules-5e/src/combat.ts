@@ -9,6 +9,8 @@ export type DamageDefenses = Readonly<{
   resistances: readonly string[];
   immunities: readonly string[];
   vulnerabilities: readonly string[];
+  /** Resistance to every damage type (SRD Petrified). Immunities still zero; a same-type vulnerability still cancels. */
+  resistAll?: boolean;
 }>;
 export type AdjustedDamagePart = Readonly<{
   type: string;
@@ -31,7 +33,7 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
   return parts.map((part) => {
     const type = normalizeType(part.type);
     if (immunities.has(type)) return { type: part.type, amount: part.amount, adjusted: 0, adjustment: "immunity" as const };
-    const resistant = resistances.has(type);
+    const resistant = resistances.has(type) || defenses.resistAll === true;
     const vulnerable = vulnerabilities.has(type);
     if (resistant && !vulnerable) return { type: part.type, amount: part.amount, adjusted: Math.floor(part.amount / 2), adjustment: "resistance" as const };
     if (vulnerable && !resistant) return { type: part.type, amount: part.amount, adjusted: part.amount * 2, adjustment: "vulnerability" as const };

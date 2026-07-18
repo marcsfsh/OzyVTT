@@ -1,5 +1,6 @@
 import type { Actor, EffectInstance, GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
 
 /**
  * Rules-engine effect lifecycle (ADR-0020): Rage, Reckless Attack, and source-linked grapples live
@@ -17,12 +18,18 @@ export type EffectNarration = Readonly<{ kind: "effect" | "condition"; text: str
 
 const MAX_EFFECTS = 20;
 
-/** Direct condition write for engine-owned transitions (no scope check — callers are the engine acting as the server). */
-export function applyConditionDirect(actor: Actor, conditionId: string, level?: number) {
+/**
+ * Direct condition write for engine-owned transitions (no scope check — callers are the engine
+ * acting as the server). Returns false when the actor is immune (SRD condition immunity): the
+ * condition is silently skipped and the caller decides whether to narrate.
+ */
+export function applyConditionDirect(actor: Actor, conditionId: string, level?: number): boolean {
+  if (actor.conditionImmunities.includes(conditionId)) return false;
   const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
-  if (remaining.length >= 20) return;
+  if (remaining.length >= 20) return false;
   actor.conditions = [...remaining, { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }]
     .sort((left, right) => left.id.localeCompare(right.id));
+  return true;
 }
 
 export function removeConditionDirect(actor: Actor, conditionId: string) {
@@ -58,15 +65,35 @@ export function addEffect(state: GameState, actorId: string, effect: EffectInsta
 }
 
 /** Exhaustion stacks by level (cap 6); other conditions are simple presence. Engine-owned onEnd path only. */
-function grantConditionOnEnd(actor: Actor, conditionId: string, level: number | undefined): number | undefined {
+function grantConditionOnEnd(actor: Actor, conditionId: string, level: number | undefined): { level: number | undefined; becameFatal: boolean } {
   if (conditionId === "exhaustion") {
     const existing = actor.conditions.find((condition) => condition.id === "exhaustion")?.level ?? 0;
     const next = Math.min(6, existing + (level ?? 1));
-    applyConditionDirect(actor, "exhaustion", next);
-    return next;
+    const applied = applyConditionDirect(actor, "exhaustion", next);
+    return { level: applied ? next : existing, becameFatal: applied && existing < 6 && next >= 6 };
   }
   applyConditionDirect(actor, conditionId, level);
-  return level;
+  return { level, becameFatal: false };
+}
+
+/**
+ * SRD Exhaustion level 6 is death — an engine-owned transition like the zero-HP machine, fired
+ * whenever a level reaches 6 (manual set-condition or an effect's onEnd grant). Player characters
+ * drop to 0 with three death-save failures recorded (dead, not dying); anything else is defeated.
+ * The GM undoes via set-hp/heal if a table rules otherwise.
+ */
+export function applyExhaustionDeath(state: GameState, actor: Actor): EffectNarration[] {
+  if (exhaustionLevel(actor) < 6) return [];
+  const events: EffectNarration[] = [];
+  actor.hp.current = 0;
+  if (actor.kind === "player-character") {
+    actor.deathSaves = { successes: 0, failures: 3, stable: false };
+    applyConditionDirect(actor, "unconscious");
+    applyConditionDirect(actor, "prone");
+  }
+  events.push({ kind: "condition", text: `${actor.name} dies of Exhaustion (level 6).`, actorId: actor.id });
+  events.push(...endEffectsSustainedBy(state, actor.id));
+  return events;
 }
 
 /** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. */
@@ -81,8 +108,9 @@ function endEffectInternal(state: GameState, actor: Actor, effectId: string, eve
     events.push({ kind: "condition", text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`, actorId: actor.id });
   }
   for (const grant of effect.onEnd) {
-    const level = grantConditionOnEnd(actor, grant.conditionId, grant.level);
-    events.push({ kind: "condition", text: `${actor.name} gains ${conditionLabel(grant.conditionId)}${grant.conditionId === "exhaustion" ? ` ${level ?? 1}` : ""} (${effect.name} ended).`, actorId: actor.id });
+    const granted = grantConditionOnEnd(actor, grant.conditionId, grant.level);
+    events.push({ kind: "condition", text: `${actor.name} gains ${conditionLabel(grant.conditionId)}${grant.conditionId === "exhaustion" ? ` ${granted.level ?? 1}` : ""} (${effect.name} ended).`, actorId: actor.id });
+    if (granted.becameFatal) events.push(...applyExhaustionDeath(state, actor));
   }
   // Cascade: effects that only exist while another tag is present end with it (Frenzy's marker ends
   // with the Rage, firing its Exhaustion exactly once).
@@ -104,10 +132,6 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
   const events: EffectNarration[] = [];
   if (!endEffectInternal(state, actor, effectId, events)) throw new CommandRejectedError("That effect already ended.");
   return events;
-}
-
-function conditionLabel(conditionId: string): string {
-  return conditionId.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
 /** A defeated (0 HP) or removed source releases everything it was sustaining (grapples, its own rage). */

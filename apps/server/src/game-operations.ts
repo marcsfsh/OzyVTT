@@ -481,11 +481,17 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!contentLibrary.hasCondition(request.conditionId)) throw new CommandRejectedError("That condition is not in the bundled rules.");
       const scope = actorScopeOf(principal);
       const { commandId, actorId, conditionId, active, level, expectedRevision } = request;
-      const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setCondition(state, actorId, conditionId, active, level, scope));
+      let events: EffectNarration[] = [];
+      const result = await store.execute({ id: commandId, type: "actor.set-condition", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        events = setCondition(state, actorId, conditionId, active, level, scope);
+      });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         const conditionName = contentLibrary.conditionSummaries().find((entry) => entry.id === conditionId)?.name ?? conditionId;
-        context.broadcastTableEvent({ kind: "condition", text: active ? `${actorName(actorId)} is ${conditionName}${conditionId === "exhaustion" && level ? ` ${level}` : ""}.` : `${actorName(actorId)} is no longer ${conditionName}.`, actorIds: [actorId] });
+        // Immunity skips narrate through the events instead of the generic applied line.
+        const immune = events.some((event) => event.text.includes("is immune to"));
+        if (!immune) context.broadcastTableEvent({ kind: "condition", text: active ? `${actorName(actorId)} is ${conditionName}${conditionId === "exhaustion" && level ? ` ${level}` : ""}.` : `${actorName(actorId)} is no longer ${conditionName}.`, actorIds: [actorId] });
+        publishNarrations(events);
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
@@ -606,9 +612,9 @@ export function createGameOperations(context: GameOperationsContext) {
       const sessionId = sessionIdOf(principal);
       const { commandId, saveId, method, total, commit, expectedRevision } = request;
       const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
-      let outcome: ReturnType<typeof answerSave> | undefined;
+      let answered: ReturnType<typeof answerSave> | undefined;
       const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        outcome = answerSave(state, commandId, saveId, method, total, commit, scope, {
+        answered = answerSave(state, commandId, saveId, method, total, commit, scope, {
           random: (sides) => context.random(sides),
           newRollId: context.newId,
           sessionId,
@@ -617,9 +623,11 @@ export function createGameOperations(context: GameOperationsContext) {
           resolveDefinition
         });
       });
+      const outcome = answered?.outcome;
       if (!result.duplicate) {
         await context.publishGameState(result.state);
-        if (outcome && outcome.committed && pending) context.broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+        if (outcome && outcome.committed && pending) context.broadcastTableEvent({ kind: "save", text: `${actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`, actorIds: [pending.targetActorId], gmOnly: actorHidden(pending.targetActorId) });
+        publishNarrations(answered?.events ?? []);
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(outcome && !result.duplicate ? { outcome } : {}) };
     },

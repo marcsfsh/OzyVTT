@@ -42,6 +42,7 @@ const pendingInput = (targetIds: readonly string[], overrides: Partial<Parameter
   newSaveId: () => `60000000-0000-4000-8000-00000000000${saveSeq++}`, createdAt: 0, ...overrides
 });
 const cmd = (n: number) => `50000000-0000-4000-8000-00000000000${n}`;
+const outcomeOf = (result: ReturnType<typeof answerSave>) => result.outcome;
 
 describe("saving-throw prompts", () => {
   it("creates one pending save per target when a save action resolves", () => {
@@ -75,7 +76,7 @@ describe("saving-throw prompts", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
     const saveId = game.combat.pendingSaves[0].id;
-    const outcome = answerSave(game, cmd(2), saveId, "roll", undefined, true, { role: "gm" }, deps([5])); // 5 + 7 = 12 < 15
+    const outcome = outcomeOf(answerSave(game, cmd(2), saveId, "roll", undefined, true, { role: "gm" }, deps([5]))); // 5 + 7 = 12 < 15
     expect(outcome).toMatchObject({ success: false, total: 12, appliedDamage: 12, conditionApplied: true });
     const goblin = game.actors.find((actor) => actor.id === IDS.monster)!;
     expect(goblin.hp.current).toBe(0);
@@ -88,7 +89,7 @@ describe("saving-throw prompts", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
     const saveId = game.combat.pendingSaves[0].id;
-    const preview = answerSave(game, cmd(20), saveId, "roll", undefined, false, { role: "gm" }, deps([5])); // 12 < 15 → would fail
+    const preview = outcomeOf(answerSave(game, cmd(20), saveId, "roll", undefined, false, { role: "gm" }, deps([5]))); // 12 < 15 → would fail
     expect(preview).toMatchObject({ success: false, total: 12, appliedDamage: 12, conditionApplied: true, committed: false });
     const goblin = game.actors.find((actor) => actor.id === IDS.monster)!;
     expect(goblin.hp.current).toBe(12); // untouched
@@ -96,7 +97,7 @@ describe("saving-throw prompts", () => {
     expect(game.combat.pendingSaves).toHaveLength(1); // still owed
     expect(game.rolls.find((roll) => roll.purpose === "save")).toBeTruthy(); // the die is shown to the table
     // Committing with the shown total then applies it and clears the save.
-    const committed = answerSave(game, cmd(21), saveId, "manual", 12, true, { role: "gm" }, deps([]));
+    const committed = outcomeOf(answerSave(game, cmd(21), saveId, "manual", 12, true, { role: "gm" }, deps([])));
     expect(committed).toMatchObject({ committed: true, appliedDamage: 12, conditionApplied: true });
     expect(game.combat.pendingSaves).toHaveLength(0);
   });
@@ -104,12 +105,12 @@ describe("saving-throw prompts", () => {
   it("applies half on success, or nothing when the action says no damage on success", () => {
     const half = state();
     createPendingSaves(half, pendingInput([IDS.monster]));
-    expect(answerSave(half, cmd(3), half.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).appliedDamage).toBe(6); // 10+7 = 17 >= 15
+    expect(answerSave(half, cmd(3), half.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).outcome.appliedDamage).toBe(6); // 10+7 = 17 >= 15
     expect(half.actors.find((actor) => actor.id === IDS.monster)!.hp.current).toBe(6);
 
     const none = state();
     createPendingSaves(none, pendingInput([IDS.monster], { halfOnSuccess: false }));
-    expect(answerSave(none, cmd(4), none.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).appliedDamage).toBe(0);
+    expect(answerSave(none, cmd(4), none.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10])).outcome.appliedDamage).toBe(0);
     expect(none.actors.find((actor) => actor.id === IDS.monster)!.hp.current).toBe(12);
   });
 
@@ -135,7 +136,7 @@ describe("saving-throw prompts", () => {
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId = game.combat.pendingSaves[0].id;
     expect(() => answerSave(game, cmd(7), saveId, "manual", 20, true, { role: "player", sessionId: IDS.otherSession }, deps([]))).toThrow(/own character/);
-    expect(answerSave(game, cmd(8), saveId, "manual", 20, true, { role: "player", sessionId: IDS.pcSession }, deps([])).success).toBe(true);
+    expect(answerSave(game, cmd(8), saveId, "manual", 20, true, { role: "player", sessionId: IDS.pcSession }, deps([])).outcome.success).toBe(true);
 
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId2 = game.combat.pendingSaves[0].id;
@@ -163,5 +164,47 @@ describe("saving-throw prompts", () => {
     expect(JSON.stringify(ownerView.pendingSaves)).not.toContain("sourceActorId");
     expect(JSON.stringify(ownerView.pendingSaves)).not.toContain(IDS.source);
     expect(projectPlayerCombat(game, IDS.otherSession).pendingSaves).toHaveLength(0);
+  });
+});
+
+describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
+  it("a Paralyzed target automatically fails a Dex save — no die is rolled", () => {
+    const game = state();
+    createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
+    game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "paralyzed" }];
+    // Empty dice queue proves no d20 was consumed.
+    const { outcome, events } = answerSave(game, cmd(30), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([]));
+    expect(outcome).toMatchObject({ success: false, autoFailed: "paralyzed", appliedDamage: 12, committed: true });
+    expect(events.some((event) => /automatically fails the DEX save \(Paralyzed\)/.test(event.text))).toBe(true);
+    expect(game.rolls.filter((roll) => roll.purpose === "save")).toHaveLength(0);
+  });
+
+  it("a Restrained target rolls Dex saves at disadvantage with the source named", () => {
+    const game = state();
+    createPendingSaves(game, pendingInput([IDS.monster]));
+    game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "restrained" }];
+    // 2d20kl1: faces 18 then 2 keep the 2 → 2 + 7 = 9 < 15 fails.
+    const { outcome } = answerSave(game, cmd(31), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([18, 2]));
+    expect(outcome.success).toBe(false);
+    expect(outcome.total).toBe(9);
+    expect(outcome.rollMode?.disadvantage).toContain("Restrained (Dex saves)");
+  });
+
+  it("exhaustion subtracts 2 × level from saving throws (SRD Exhaustion)", () => {
+    const game = state();
+    createPendingSaves(game, pendingInput([IDS.monster]));
+    game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "exhaustion", level: 2 }];
+    // 10 + 7 − 4 = 13 < 15: what passed clean now fails.
+    const { outcome } = answerSave(game, cmd(32), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, deps([10]));
+    expect(outcome).toMatchObject({ success: false, total: 13 });
+  });
+
+  it("the manual total deliberately bypasses auto-fail (GM escape hatch)", () => {
+    const game = state();
+    createPendingSaves(game, pendingInput([IDS.monster]));
+    game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "stunned" }];
+    const { outcome } = answerSave(game, cmd(33), game.combat.pendingSaves[0].id, "manual", 20, true, { role: "gm" }, deps([]));
+    expect(outcome.success).toBe(true);
+    expect(outcome.autoFailed).toBeNull();
   });
 });

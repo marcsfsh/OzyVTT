@@ -6,6 +6,7 @@ import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { actionAvailability, resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { answerReaction, dismissReaction } from "../src/reactions.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
+import { setCondition } from "../src/actor-conditions.js";
 import { endEffect, endEncounterEffects, expireEffectsAtTurnStart } from "../src/effects.js";
 import { applyTimelineRestore } from "../src/combat-history.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -565,5 +566,120 @@ describe("available-actions projection (server-computed availability)", () => {
     const snapshot = JSON.stringify(game);
     actionAvailability(game, torva, torvaDefinition);
     expect(JSON.stringify(game)).toBe(snapshot);
+  });
+});
+
+describe("SRD condition modifiers — Tier A completeness (Playing the Game / conditions appendix)", () => {
+  it("frightened imposes attack disadvantage with an explainable source", () => {
+    const game = buildGame();
+    game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "frightened" }];
+    // Disadvantage: two d20 faces, keep the lower (15 → kept 3): 3 + 7 = 10 vs AC 14 misses.
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 3]);
+    expect(swing.rollMode?.mode).toBe("disadvantage");
+    expect(swing.rollMode?.disadvantage).toContain("Attacker is Frightened");
+    expect(swing.attack?.outcome).toBe("miss");
+  });
+
+  it("invisible grants the unseen attacker advantage and its attackers disadvantage", () => {
+    const game = buildGame();
+    game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "invisible" }];
+    const out = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [3, 15, 6]);
+    expect(out.rollMode?.advantage).toContain("Attacker is Invisible");
+    expect(out.attack?.outcome).toBe("hit"); // kept the 15
+
+    const back = buildGame();
+    back.actors.find((actor) => actor.id === IDS.pip)!.conditions = [{ id: "invisible" }];
+    nextInitiativeTurn(back); // croc2's turn (ties: Giant Crocodile 2 before Pip)
+    const bite = resolve(back, crocodileDefinition, "bite", { actorId: IDS.croc2, targetIds: [IDS.pip] }, [18, 4, 6, 6, 6]);
+    expect(bite.rollMode?.disadvantage).toContain("Target is Invisible");
+  });
+
+  it("a grappled attacker has disadvantage against everyone except the grappler (SRD Grappled)", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    torva.conditions = [{ id: "grappled" }];
+    torva.effects = [{
+      id: "grip", name: "Grappled by Giant Crocodile", tags: ["grapple"], sourceActorId: IDS.croc1, sourceName: "Giant Crocodile",
+      sourceActionId: "bite:0", startedRound: 1, duration: { type: "manual" }, endsWhenSourceDefeated: true, endsWithTag: null,
+      modifiers: [], linkedConditionIds: ["grappled"], escapeDc: 15, onEnd: []
+    }];
+    const versusOther = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc2] }, [15, 3]);
+    expect(versusOther.rollMode?.disadvantage).toContain("Attacker is Grappled (target isn't the grappler)");
+    const versusGrappler = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    expect(versusGrappler.rollMode).toBeUndefined(); // plain d20 vs the grappler
+    expect(versusGrappler.attack?.outcome).toBe("hit");
+  });
+
+  it("hitting a Paralyzed creature from within 5 feet is a critical hit (SRD Paralyzed)", () => {
+    const game = buildGame();
+    game.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "paralyzed" }];
+    // Paralyzed target also gives advantage: [3, 12] keeps 12 → 19 vs AC 14 hits → upgraded to crit.
+    // Crit damage: 1d12 doubled + 1 Savage Attacks die = 3d12.
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [3, 12, 6, 6, 6], () => 5);
+    expect(swing.attack?.outcome).toBe("crit");
+    expect(swing.crit).toBe(true);
+    expect(swing.damage[0].total).toBe(6 + 6 + 6 + 4);
+  });
+
+  it("exhaustion subtracts 2 × level from attack rolls with an explanatory note (SRD Exhaustion)", () => {
+    const game = buildGame();
+    game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "exhaustion", level: 2 }];
+    // 11 + 7 − 4 = 14 vs AC 14: still a hit, but only because of equal-or-exceeds.
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [11, 6]);
+    expect(swing.attack?.total).toBe(14);
+    expect(swing.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/Exhaustion 2: −4 to the attack roll/)]));
+  });
+
+  it("exhaustion level 6 is death — engine-owned for PCs and monsters (SRD Exhaustion)", () => {
+    const game = buildGame();
+    const events = setCondition(game, IDS.torva, "exhaustion", true, 6, { role: "gm" });
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    expect(torva.hp.current).toBe(0);
+    expect(torva.deathSaves).toEqual({ successes: 0, failures: 3, stable: false });
+    expect(events.some((event) => /dies of Exhaustion/.test(event.text))).toBe(true);
+
+    setCondition(game, IDS.croc1, "exhaustion", true, 6, { role: "gm" });
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.hp.current).toBe(0);
+  });
+
+  it("petrified grants resistance to all damage and poison immunity (SRD Petrified)", () => {
+    const game = buildGame();
+    game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "petrified" }];
+    const outcome = applyDamageDetailed(game, IDS.torva, { amount: 27, parts: [{ amount: 17, type: "bludgeoning" }, { amount: 10, type: "poison" }] }, { role: "gm" }, { resolveDefinition: (id) => game.definitions.find((entry) => entry.id === id)?.definition });
+    expect(outcome.application.parts).toEqual([
+      { type: "bludgeoning", amount: 17, adjusted: 8, adjustment: "resistance", adjustmentSource: "Petrified" },
+      { type: "poison", amount: 10, adjusted: 0, adjustment: "immunity", adjustmentSource: "Petrified" }
+    ]);
+    expect(outcome.application.totalApplied).toBe(8);
+  });
+
+  it("condition immunity skips with narration instead of applying (SRD Immunity)", () => {
+    const game = buildGame();
+    const croc = game.actors.find((actor) => actor.id === IDS.croc1)!;
+    croc.conditionImmunities = ["prone"];
+    const events = setCondition(game, IDS.croc1, "prone", true, undefined, { role: "gm" });
+    expect(croc.conditions.some((condition) => condition.id === "prone")).toBe(false);
+    expect(events[0].text).toMatch(/immune to Prone — not applied/);
+  });
+
+  it("a charmed creature can't target its charmer with harmful effects (SRD Charmed)", () => {
+    const game = buildGame();
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    torva.conditions = [{ id: "charmed" }];
+    torva.effects = [{
+      id: "charm", name: "Charmed", tags: [], sourceActorId: IDS.croc1, sourceName: "Giant Crocodile",
+      sourceActionId: null, startedRound: 1, duration: { type: "manual" }, endsWhenSourceDefeated: true, endsWithTag: null,
+      modifiers: [], linkedConditionIds: ["charmed"], escapeDc: null, onEnd: []
+    }];
+    try {
+      resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("condition.charmed-charmer");
+    }
+    // Other targets stay legal.
+    const other = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc2] }, [15, 6]);
+    expect(other.attack?.outcome).toBe("hit");
   });
 });
