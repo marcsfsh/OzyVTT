@@ -1,0 +1,26 @@
+.api-reference { margin-top: 2rem; border: 1px solid #403a2c; border-radius: 0.8rem; background: #17140f; }
+.api-reference > summary { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; padding: 1rem 1.25rem; cursor: pointer; list-style-position: inside; }
+.api-reference > summary strong { font-family: Georgia, serif; font-size: 1.15rem; }
+.api-reference > summary span { color: #9f9789; font-size: 0.85rem; }
+.api-reference-body { padding: 0 1.25rem 1.25rem; }
+.api-reference-intro { font-size: 0.9rem; }
+.api-reference-intro a { color: #f6c452; }
+.api-reference-count { color: #9f9789; font-size: 0.8rem; }
+.api-reference-error { color: #f0a0a0; }
+.api-reference-group { margin-top: 1.25rem; }
+.api-reference-group h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #f6c452; }
+.api-reference-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.api-reference-group li { padding: 0.55rem 0.7rem; border: 1px solid #2e2920; border-radius: 0.5rem; background: #1b170f; }
+.api-reference-group li > p { margin: 0.35rem 0 0; font-size: 0.8rem; color: #b7ae9e; }
+.api-reference-route { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.api-method { font-weight: 800; font-size: 0.72rem; letter-spacing: 0.05em; padding: 0.15rem 0.45rem; border-radius: 0.3rem; background: #33405a; color: #bcd3ff; }
+.api-method-post { background: #2e4a33; color: #a9e5b5; }
+.api-method-delete { background: #542a26; color: #f0a9a0; }
+.api-method-put, .api-method-patch { background: #4d3d22; color: #f0d09a; }
+.api-path { font-size: 0.83rem; color: #f5efe3; word-break: break-all; }
+.api-auth { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; margin-left: auto; }
+.api-auth em { font-style: normal; font-size: 0.68rem; padding: 0.1rem 0.4rem; border: 1px solid #6b5e4b; border-radius: 0.3rem; color: #c8c0b1; white-space: nowrap; }
+.api-command-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.api-command-table th, .api-command-table td { text-align: left; padding: 0.4rem 0.55rem; border-bottom: 1px solid #2e2920; vertical-align: top; }
+.api-command-table code { color: #f6c452; }
+@media (max-width: 700px) { .api-auth { margin-left: 0; width: 100%; } }

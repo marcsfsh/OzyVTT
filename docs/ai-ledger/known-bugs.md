@@ -24,7 +24,9 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   non-null `gameId` is permanently unusable (generic 403) and `rotate` can't clear it. Predates
   the game API; harmless while everyone leaves it null (this is a single-game product). Either
   thread a real game id through verification or drop the field in a future contract pass.
-  Found by architecture review 2026-07-18.
+  Found by architecture review 2026-07-18. **Mitigated 2026-07-18:** the VTT Setup credential
+  form no longer offers the field, so the footgun is API-only; the contract keeps accepting it
+  for now.
 
 ## Gotchas that look like bugs (but aren't)
 

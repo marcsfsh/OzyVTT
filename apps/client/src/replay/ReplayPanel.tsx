@@ -28,6 +28,17 @@ async function gmApi(path: string, token: string) {
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "—");
 
+/** Save an archive document as a JSON file — the same machine-readable record the API serves, for spreadsheets, scripts, or archiving outside the host. */
+function exportDocument(id: number, endedAt: string, document: ArchiveDocument) {
+  const stamp = endedAt.slice(0, 16).replace("T", "-").replaceAll(":", "");
+  const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
+  const anchor = window.document.createElement("a");
+  anchor.href = url;
+  anchor.download = `encounter-replay-${id}-${stamp}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * A replay step is one recorded boundary: its state is the table AT that moment, and its log slice
  * is what happened between it and the next boundary. Version-1 archives (no finalState) simply end
@@ -122,6 +133,7 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
         <h2>Encounter replay</h2>
         <p className="replay-meta">{when(document.startedAt)} → {when(document.endedAt)} · {document.turns.length} recorded turns</p>
       </div>
+      <button className="secondary replay-export" onClick={() => exportDocument(summary.id, summary.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks.">⬇ Export JSON</button>
     </div>
     <div className="replay-transport" role="group" aria-label="Replay controls">
       <button onClick={() => move(-1)} disabled={index === 0} aria-label="Previous turn">⏮ Prev</button>
@@ -163,6 +175,7 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   const [archives, setArchives] = useState<readonly ArchiveSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<ArchiveSummary | null>(null);
+  const [exporting, setExporting] = useState<number | null>(null);
 
   const refresh = () => {
     setError(null);
@@ -171,6 +184,15 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       .catch((cause: Error) => { setArchives([]); setError(cause.message); });
   };
   useEffect(refresh, [gmToken]);
+
+  const exportArchive = async (archive: ArchiveSummary) => {
+    setExporting(archive.id); setError(null);
+    try {
+      const body = await gmApi(`/api/v1/encounters/${archive.id}`, gmToken);
+      exportDocument(archive.id, archive.endedAt, body.data.document as ArchiveDocument);
+    } catch (cause) { setError((cause as Error).message); }
+    finally { setExporting(null); }
+  };
 
   if (open) return <ReplayViewer gmToken={gmToken} summary={open} onBack={() => { setOpen(null); refresh(); }} />;
 
@@ -186,7 +208,10 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         <td>{when(archive.startedAt)}</td>
         <td>{when(archive.endedAt)}</td>
         <td>{archive.turnCount}</td>
-        <td><button onClick={() => setOpen(archive)}>▶ Watch</button></td>
+        <td className="replay-row-actions">
+          <button onClick={() => setOpen(archive)}>▶ Watch</button>
+          <button className="secondary" onClick={() => exportArchive(archive)} disabled={exporting === archive.id} title="Download the full machine-readable record as JSON.">{exporting === archive.id ? "Exporting…" : "⬇ Export"}</button>
+        </td>
       </tr>)}</tbody>
     </table>}
   </section>;

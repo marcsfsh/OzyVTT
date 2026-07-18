@@ -3,6 +3,8 @@
 .replay-panel { outline: none; }
 .replay-panel:focus-visible { box-shadow: 0 0 0 2px var(--accent, #58c3ff); }
 .replay-header { display: flex; align-items: flex-start; gap: 1rem; }
+.replay-header .replay-export { margin-left: auto; white-space: nowrap; }
+.replay-row-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
 .replay-header h2 { margin: 0; }
 .replay-meta { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.9rem; }
 .replay-error { color: #ff8f8f; }

@@ -74,6 +74,12 @@ absent from the Time Machine (wanted distance moved + old/new range to each crea
   integration, +1 socket toast); live Playwright smoke drove the real built client end-to-end
   (seed fight via API → Replays tab → watch → step → mobile viewport), 0 console errors,
   screenshots captured. TokenMapGeometry gained optional `scale` so gridless distances work.
+- **Same-day follow-ups (owner):** replay **Export JSON** buttons (viewer header + per list row)
+  download the full archive document verbatim; smoke captures the download and re-parses it
+  (schema 2, turns + journal intact). VTT Setup gains a **collapsible API reference** rendered
+  live from the server's own `/api/v1/openapi.json` + command catalog (77 ops / 72 paths — can't
+  go stale), and the credential form drops the dead `gameId` field (known-bugs mitigation).
+  Smoke asserts the new endpoints (claims/sessions/scene commands) render on the page.
 
 ---
 
