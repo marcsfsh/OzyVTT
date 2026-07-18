@@ -46,6 +46,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   truncate the timeline (snapshots are per-live-fight). A history rewrite (confirmed Next while
   rewound) is the owner-approved exception to normal forward-only play.
 
+- **2026-07-18 — Ended encounters auto-archive to a permanent, machine-readable record.** On
+  `encounter:end` the full turn-by-turn snapshots + the fight's timestamped combat-log slice are
+  written to an uncapped `encounter_archives` table (migration v4) inside the *same transaction* as
+  the live-buffer truncation, so an ended fight's record can never be lost. It's exposed **GM-only**
+  (`GET /api/gm/encounters`, `GET /api/gm/encounters/:id`, `DELETE`) as JSON — the document holds
+  full state (hidden combatants) + GM-only log lines, so it never leaves GM auth. The app never
+  analyzes it; the format (`encounter-archive.ts`, `archiveSchemaVersion` 1: `turns[].state` +
+  `log[]`, joined on `revision`) is a stable substrate for user-built integrations. The rolling
+  turn-snapshot window (250) is the safety net for a fight left un-ended. This is the pull/batch half
+  of the integration story; real-time push (webhooks) is a separate future piece (pairs with PR F).
+
 ## Operating decisions (no ADR)
 
 - **Verification bar:** `check` + `test` + `build` green + live Playwright smoke for UI

@@ -43,9 +43,16 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   players); the GM view carries `turnHistory`, the player view a bare `rewound` flag (no
   labels). Client: GM Previous/Next confirm flow + review banner + contextual "Resume live
   play"; player "GM is reviewing" banner; a Combat log sidebar panel (module store, like the
-  map toasts). `check`/`test` (+8 timeline integration tests)/`build` green; production boot
-  applies migrations 1–3 and both new tables; browser smoke renders the log panel with no
-  console errors.
+  map toasts). Rolling turn-snapshot window is **250** boundaries. On `encounter:end` the fight
+  auto-archives (turns + timestamped log) into a permanent, uncapped `encounter_archives` table
+  (migration v4) atomically with the buffer truncation, exposed **GM-only** as machine-readable
+  JSON (`GET/GET/DELETE /api/gm/encounters[/:id]`; shape in
+  `apps/server/src/encounter-archive.ts`) for user-built integrations — the app never analyzes it.
+  Also on this branch: three level-7 example PCs (full sheets in `state.definitions`), and an
+  action-runner fix so a Multiattack/Extra Attack can be resolved repeatedly (list stays reachable
+  + an "Again" button). `check`/`test` (270, incl. timeline + archive integration tests)/`build`
+  green; production boot applies migrations 1–4; browser smokes render the combat-log panel and
+  full PC sheets with no console errors.
 - **Phase 2 testing-MVP vertical slice** is under active implementation; no phase exit gate
   claimed yet (see `README.md`, `BUILD_PLAN.md`).
 - **SRD combat-content integration (phases A–G).** Phase A (content pipeline) done and

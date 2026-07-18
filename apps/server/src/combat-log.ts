@@ -40,6 +40,14 @@ export class CombatLogStore {
     return { id, at, kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly, revision: entry.revision };
   }
 
+  /** Every retained line at or after a revision, chronological — the commentary slice for an encounter archive (GM export, so GM-only lines are included). */
+  exportSince(minRevision: number): readonly CombatLogEntry[] {
+    const rows = this.requireDatabase()
+      .prepare("SELECT id, at, kind, text, gm_only, revision FROM combat_log WHERE revision >= ? ORDER BY id")
+      .all(minRevision) as LogRow[];
+    return rows.map((row) => ({ id: row.id, at: row.at, kind: row.kind as CombatLogEntry["kind"], text: row.text, gmOnly: row.gm_only === 1, revision: row.revision }));
+  }
+
   /** The recent log in chronological order (oldest first). GM sees everything; a player only public lines. */
   list(includeGmOnly: boolean, limit = 250): readonly CombatLogEntry[] {
     const rows = this.requireDatabase()

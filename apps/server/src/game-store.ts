@@ -45,7 +45,12 @@ export type TimelineOps = Readonly<{
   remove: (index: number) => void;
   /** Delete every entry with idx < index (cap eviction of the oldest turns). */
   prune: (index: number) => void;
+  /** Persist a permanent encounter archive row in this same transaction (used at encounter end, before truncateAll). */
+  archive: (row: EncounterArchiveInput) => void;
 }>;
+
+export type EncounterArchiveInput = Readonly<{ commandId: string; startedAt: string | null; endedAt: string; turnCount: number; documentJson: string }>;
+export type EncounterArchiveSummary = Readonly<{ id: number; archivedAt: string; startedAt: string | null; endedAt: string; turnCount: number }>;
 
 const MIGRATIONS = [{
   version: 1,
@@ -96,6 +101,19 @@ const MIGRATIONS = [{
       revision INTEGER NOT NULL,
       state_json TEXT NOT NULL,
       created_at TEXT NOT NULL
+    ) STRICT;
+  `
+}, {
+  version: 4,
+  sql: `
+    CREATE TABLE encounter_archives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      command_id TEXT NOT NULL UNIQUE,
+      archived_at TEXT NOT NULL,
+      started_at TEXT,
+      ended_at TEXT NOT NULL,
+      turn_count INTEGER NOT NULL,
+      document_json TEXT NOT NULL
     ) STRICT;
   `
 }];
@@ -166,7 +184,8 @@ export class GameStore {
         truncateFrom: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx >= ?", params: [index] }); nextIndex = Math.min(nextIndex, index); },
         truncateAll: () => { pending.push({ sql: "DELETE FROM turn_snapshots", params: [] }); nextIndex = 0; },
         remove: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx = ?", params: [index] }); },
-        prune: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx < ?", params: [index] }); }
+        prune: (index) => { pending.push({ sql: "DELETE FROM turn_snapshots WHERE idx < ?", params: [index] }); },
+        archive: (row) => { pending.push({ sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json) VALUES (?, ?, ?, ?, ?, ?)", params: [row.commandId, new Date().toISOString(), row.startedAt ?? "", row.endedAt, row.turnCount, row.documentJson] }); }
       };
       plan(nextState, timeline);
       return pending;
@@ -177,6 +196,21 @@ export class GameStore {
   listTurnSnapshots(): readonly TurnHistoryEntry[] {
     return (this.requireDatabase().prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx").all() as TurnSnapshotRow[])
       .map((row) => ({ index: row.idx, kind: row.kind, label: row.label, revision: row.revision, at: row.created_at }));
+  }
+
+  /** Permanent, machine-readable records of ended encounters (GM-only; the document holds full state). Newest first. */
+  listEncounterArchives(): readonly EncounterArchiveSummary[] {
+    return (this.requireDatabase().prepare("SELECT id, archived_at, started_at, ended_at, turn_count FROM encounter_archives ORDER BY id DESC").all() as Array<{ id: number; archived_at: string; started_at: string | null; ended_at: string; turn_count: number }>)
+      .map((row) => ({ id: row.id, archivedAt: row.archived_at, startedAt: row.started_at || null, endedAt: row.ended_at, turnCount: row.turn_count }));
+  }
+  /** The full archive document (JSON string) for one encounter, or null if unknown. */
+  getEncounterArchive(id: number): string | null {
+    const row = this.requireDatabase().prepare("SELECT document_json FROM encounter_archives WHERE id = ?").get(id) as { document_json: string } | undefined;
+    return row?.document_json ?? null;
+  }
+  /** Remove one archived encounter (GM housekeeping). */
+  deleteEncounterArchive(id: number): void {
+    this.requireDatabase().prepare("DELETE FROM encounter_archives WHERE id = ?").run(id);
   }
 
   private async enqueue(command: Command, operate: (nextState: GameState) => ReadonlyArray<{ sql: string; params: readonly (string | number)[] }>) {

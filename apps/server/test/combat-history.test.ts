@@ -10,6 +10,8 @@ import { activateScene, createScene } from "../src/scenes.js";
 import { removeActor } from "../src/actor-roster.js";
 import { applyDamage } from "../src/hit-points.js";
 import { planNextTurn, planPreviousTurn, timelineDirtied } from "../src/combat-history.js";
+import { buildEncounterArchive } from "../src/encounter-archive.js";
+import type { CombatLogEntry } from "@vtt/domain";
 
 const PC = "10000000-0000-4000-8000-000000000001";
 const MON = "10000000-0000-4000-8000-000000000002";
@@ -149,5 +151,57 @@ describe("turn time-travel timeline", () => {
       expect(reopened.snapshot.combat.historyCursor).toBe(cursor);
       expect(reopened.listTurnSnapshots().map((entry) => entry.kind)).toEqual(["turn", "return"]);
     } finally { reopened.close(); store = new GameStore(join(directory, "vtt.sqlite")); await store.initialize(); }
+  });
+
+  // The encounter:end handler builds this document and archives it in the same transaction as the
+  // truncate; here we drive that plan directly to prove the archive is atomic, complete, and permanent.
+  const LOG: readonly CombatLogEntry[] = [{ id: 1, at: new Date(0).toISOString(), kind: "damage", text: "Goblin took 6 damage.", gmOnly: false, revision: 2 }];
+  const endAndArchive = (endId: string) => store.executeTimeline({ id: endId, type: "encounter.end" }, (state, timeline) => {
+    endEncounter(state);
+    const entries = timeline.entries();
+    const document = buildEncounterArchive(entries, timeline.read, LOG, new Date(1000).toISOString());
+    timeline.archive({ commandId: endId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
+    timeline.truncateAll();
+  });
+
+  it("archives the whole fight permanently on end, then wipes the live buffer", async () => {
+    await next(); // capture Alpha's turn @0
+    await next(); // capture Goblin's turn @1
+    const captured = store.listTurnSnapshots().length;
+    expect(captured).toBe(2);
+
+    await endAndArchive(randomUUID());
+    expect(store.listTurnSnapshots()).toHaveLength(0); // live buffer gone
+    const archives = store.listEncounterArchives();
+    expect(archives).toHaveLength(1);
+    expect(archives[0].turnCount).toBe(captured);
+
+    const document = JSON.parse(store.getEncounterArchive(archives[0].id)!);
+    expect(document.archiveSchemaVersion).toBe(1);
+    expect(document.turns).toHaveLength(captured);
+    // Each turn carries the FULL machine-readable state captured at that boundary, plus the log slice.
+    expect(document.turns[0].state.actors.find((a: { id: string }) => a.id === PC)).toBeDefined();
+    expect(document.turns[0].revision).toBe(document.turns[0].state.revision);
+    expect(document.log).toEqual(LOG);
+
+    store.deleteEncounterArchive(archives[0].id);
+    expect(store.listEncounterArchives()).toHaveLength(0);
+  });
+
+  it("does not archive — and keeps the buffer — when ending is rejected mid-review", async () => {
+    await next();
+    await previous(); // rewound
+    await expect(endAndArchive(randomUUID())).rejects.toThrow(/reviewing the combat history/i);
+    expect(store.listEncounterArchives()).toHaveLength(0);
+    expect(store.listTurnSnapshots().length).toBeGreaterThan(0); // snapshots intact
+  });
+
+  it("archives an ended fight exactly once even if the command is retried", async () => {
+    await next();
+    const endId = randomUUID();
+    await endAndArchive(endId);
+    const retry = await store.executeTimeline({ id: endId, type: "encounter.end" }, () => { throw new Error("a duplicate end must not run the plan"); });
+    expect(retry.duplicate).toBe(true);
+    expect(store.listEncounterArchives()).toHaveLength(1);
   });
 });

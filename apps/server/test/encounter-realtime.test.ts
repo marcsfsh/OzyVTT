@@ -151,6 +151,67 @@ describe("live authoritative encounter workflow", () => {
     }
   });
 
+  it("auto-archives an ended encounter and serves the machine-readable record over the GM-only API", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-archive-live-"));
+    const options = {
+      authPath: join(directory, "auth.json"),
+      databasePath: join(directory, "vtt.sqlite"),
+      integrationCredentialsPath: join(directory, "integrations.sqlite"),
+      mapAssetsPath: join(directory, "map-assets"),
+      webDist: join(directory, "dist"),
+      useDevelopmentClient: true,
+      developmentClientPort: 5173,
+      initialGameState: initialState()
+    };
+    const running = createServer(options);
+    let gmSocket: ClientSocket | undefined;
+    try {
+      await running.initialize();
+      await running.auth.bootstrap("a sufficiently long GM password");
+      const gmToken = (await running.auth.login("a sufficiently long GM password"))!;
+      const imported = await running.mapAssets.import(png(900, 600), "arena.png");
+      running.mapCatalog.register(imported.metadata.id, "Archive Arena", "battlemap");
+      await new Promise<void>((resolve) => running.httpServer.listen(0, "127.0.0.1", resolve));
+      const address = running.httpServer.address(); if (!address || typeof address === "string") throw new Error("Archive server did not bind.");
+      const base = `http://127.0.0.1:${address.port}`;
+      const gmHeaders = { authorization: `Bearer ${gmToken}` };
+
+      // Empty to begin with, and GM-gated.
+      expect((await fetch(`${base}/api/gm/encounters`)).status).toBe(401);
+      expect(await (await fetch(`${base}/api/gm/encounters`, { headers: gmHeaders })).json()).toEqual({ encounters: [] });
+
+      gmSocket = await joinSocket(base, gmToken);
+      const started = await emitCommand(gmSocket, "encounter:start", { commandId: START_COMMAND_ID, mapAssetId: imported.metadata.id, entries: [{ actorId: HERO_ID, score: 12 }], expectedRevision: 0 });
+      expect(started).toMatchObject({ ok: true, revision: 1 });
+      const advanced = await emitCommand(gmSocket, "initiative:next", { commandId: NEXT_COMMAND_ID, expectedRevision: 1 });
+      expect(advanced).toMatchObject({ ok: true, revision: 2 });
+      const ended = await emitCommand(gmSocket, "encounter:end", { commandId: "30000000-0000-4000-8000-000000000050", expectedRevision: 2 });
+      expect(ended).toMatchObject({ ok: true, revision: 3 });
+
+      // The fight is archived permanently even though the live buffer was wiped.
+      const list = await (await fetch(`${base}/api/gm/encounters`, { headers: gmHeaders })).json();
+      expect(list.encounters).toHaveLength(1);
+      expect(list.encounters[0].turnCount).toBeGreaterThan(0);
+      expect(typeof list.encounters[0].endedAt).toBe("string");
+
+      const document = await (await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { headers: gmHeaders })).json();
+      expect(document.archiveSchemaVersion).toBe(1);
+      expect(document.turns.length).toBe(list.encounters[0].turnCount);
+      expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
+      expect(Array.isArray(document.log)).toBe(true);
+      expect(document.log.length).toBeGreaterThan(0); // timestamped commentary bundled in
+
+      // 404 for an unknown id; delete removes it.
+      expect((await fetch(`${base}/api/gm/encounters/99999`, { headers: gmHeaders })).status).toBe(404);
+      expect((await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { method: "DELETE" })).status).toBe(401);
+      await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { method: "DELETE", headers: gmHeaders });
+      expect(await (await fetch(`${base}/api/gm/encounters`, { headers: gmHeaders })).json()).toEqual({ encounters: [] });
+    } finally {
+      gmSocket?.disconnect(); running.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("authorizes owned-token movement, snaps on the server, hides secret tokens, converges the viewer, and recovers after restart", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-token-live-"));
     const options = {

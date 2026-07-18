@@ -20,6 +20,7 @@ import { developmentClientUrl } from "./client-hosting.js";
 import { addCombatant, endEncounter, setInitiativeScore, startEncounter } from "./encounter.js";
 import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { CombatLogStore } from "./combat-log.js";
+import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, timelineDirtied, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, GameStore, RevisionConflictError, TimelineConfirmationRequired } from "./game-store.js";
 import { applyDamage, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
@@ -290,6 +291,29 @@ export function createServer(options: CreateServerOptions) {
     if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
     const viewerUrls = [...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))];
     return res.json({ viewerUrls });
+  });
+  // Encounter archives (#12): permanent, machine-readable turn-by-turn records auto-saved at encounter
+  // end. GM-only — a document holds full state (hidden combatants) and GM-only log lines. The shape is
+  // documented in encounter-archive.ts; consumers list, fetch, and delete over these endpoints.
+  app.get("/api/gm/encounters", (req, res) => {
+    const token = req.header("authorization")?.replace("Bearer ", "");
+    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+    return res.json({ encounters: store.listEncounterArchives() });
+  });
+  app.get("/api/gm/encounters/:id", (req, res) => {
+    const token = req.header("authorization")?.replace("Bearer ", "");
+    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+    const id = Number(req.params.id);
+    const document = Number.isInteger(id) ? store.getEncounterArchive(id) : null;
+    if (document === null) return res.status(404).json({ message: "No such encounter archive." });
+    return res.type("application/json").send(document); // raw stored JSON — no re-serialization
+  });
+  app.delete("/api/gm/encounters/:id", (req, res) => {
+    const token = req.header("authorization")?.replace("Bearer ", "");
+    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+    const id = Number(req.params.id);
+    if (Number.isInteger(id)) store.deleteEncounterArchive(id);
+    return res.json({ ok: true });
   });
   app.use(createViewerRouter({ access: viewerAccess, presentation: viewerPresentation, coordinator: viewerCoordinator, authorizeGm }));
   app.use(createMapRouter({
@@ -766,9 +790,21 @@ export function createServer(options: CreateServerOptions) {
       const request = CommandIdentitySchema.safeParse(payload);
       if (!request.success) return acknowledge({ ok: false, message: "The encounter command is malformed." });
       try {
-        const result = await store.executeTimeline({ id: request.data.commandId, type: "encounter.end", expectedRevision: request.data.expectedRevision }, (state, timeline) => {
+        const { commandId, expectedRevision } = request.data;
+        // The combat log persists independently; grab the fight's slice (from its first snapshot's
+        // revision) up front so the archive is a self-contained "state per turn + narration" document.
+        const firstRevision = store.listTurnSnapshots()[0]?.revision ?? null;
+        const logSlice = firstRevision === null ? [] : combatLog.exportSince(firstRevision);
+        const result = await store.executeTimeline({ id: commandId, type: "encounter.end", expectedRevision }, (state, timeline) => {
           endEncounter(state); // rejects while rewound
-          timeline.truncateAll(); // the fight is over — its turn snapshots go with it
+          // Auto-archive the whole fight permanently BEFORE wiping the live buffer — same transaction,
+          // so an ended encounter's record can never be lost. Skip a fight that captured no boundaries.
+          const entries = timeline.entries();
+          if (entries.length > 0) {
+            const document = buildEncounterArchive(entries, timeline.read, logSlice, new Date().toISOString());
+            timeline.archive({ commandId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
+          }
+          timeline.truncateAll(); // the fight is over — its live turn snapshots go with it
         });
         if (!result.duplicate) { await publishGameState(result.state); appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false }); }
         acknowledge({ ok: true, revision: result.state.revision, duplicate: result.duplicate });
