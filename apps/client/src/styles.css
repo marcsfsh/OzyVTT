@@ -31,3 +31,7 @@
 .roster-collapsed > summary { padding: .5rem .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; color: #cdbfa6; font-size: .82rem; font-weight: 700; cursor: pointer; }
 .roster-collapsed > summary:hover { border-color: #6b5e4b; color: #f5efe3; }
 .roster-collapsed[open] > summary { margin-bottom: .4rem; }
+.sidebar-collapsed { margin-top: .8rem; }
+.sidebar-collapsed > summary { padding: .5rem .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; color: #cdbfa6; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.sidebar-collapsed > summary:hover { border-color: #6b5e4b; color: #f5efe3; }
+.sidebar-collapsed > .dice-proof, .sidebar-collapsed > section { margin-top: .5rem; }

@@ -1,4 +1,4 @@
-.encounter-panel { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid #514936; border-radius: .9rem; background: #1d1a14; }
+.encounter-panel { margin-top: 2.5rem; padding: 1rem 1.1rem; border: 1px solid #514936; border-radius: .9rem; background: #1d1a14; }
 .encounter-panel.compact { padding-block: 1.1rem; }
 .encounter-panel h2 { margin: .2rem 0 0; }
 .encounter-panel > p { color: #c8c0b1; }
@@ -38,14 +38,14 @@
 .initiative-list li > strong { color: #f6c452; }
 .your-turn { margin-top: 1rem; padding: .85rem 1rem; border-radius: .5rem; border: 1px solid #7bbf5a; background: #24361d; color: #d7f0c4; }
 .your-turn strong { color: #b6e35a; }
-.encounter-place-nudge { margin: .9rem 0 .2rem; padding: .5rem .7rem; border-left: 3px solid #d69442; border-radius: .4rem; background: #2b2115; color: #f3c77d; font-size: .78rem; }
+.encounter-place-nudge { margin: .5rem 0 0; padding: 0; border: 0; background: transparent; color: #b09a6e; font-size: .74rem; }
 .initiative-list.gm { margin-top: .8rem; }
 .initiative-list.gm li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .18rem .2rem; position: relative; }
 .initiative-name { display: flex; align-items: center; gap: .45rem; min-width: 0; }
 .initiative-name > span:not(.initiative-caret):not(.initiative-tag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .initiative-caret { flex: none; color: #ffc34d; font-size: .7rem; }
 .initiative-tag { flex: none; padding: .05rem .4rem; border-radius: 999px; background: #3a2c17; color: #e9b861; font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-.initiative-score-value { flex: none; min-width: 2.3rem; padding: .28rem .4rem; border: 1px solid transparent; border-radius: .45rem; background: #0c0a07; color: #f6c452; font-weight: 800; font-size: .82rem; text-align: center; cursor: pointer; }
+.initiative-score-value { flex: none; min-width: 1.9rem; padding: .2rem .15rem; border: 1px solid transparent; border-radius: .35rem; background: transparent; color: #9f9789; font-weight: 800; font-size: .78rem; text-align: right; cursor: pointer; font-variant-numeric: tabular-nums; }
 .initiative-score-value:hover:not(:disabled) { border-color: #e8a743; }
 .initiative-score-value:disabled { opacity: .7; cursor: default; }
 .initiative-score-edit { flex: none; width: 4.2rem; margin: 0; padding: .45rem; border: 1px solid #ffc34d; border-radius: .45rem; background: #0c0a07; color: #f5efe3; font-size: .95rem; text-align: center; }
@@ -90,7 +90,7 @@
 .menu-add-row button { padding: .25rem .7rem; font-size: .76rem; }
 .encounter-menu .encounter-add-monsters { margin: 0; }
 .encounter-menu .encounter-end { margin-top: 0; }
-.initiative-hp { flex: none; padding: .26rem .45rem; border: 1px solid transparent; border-radius: .45rem; background: #0c0a07; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
+.initiative-hp { flex: none; padding: .2rem .3rem; border: 1px solid transparent; border-radius: .35rem; background: transparent; font-size: .78rem; font-weight: 700; text-align: right; cursor: pointer; font-variant-numeric: tabular-nums; }
 .initiative-hp small { margin-left: .2rem; font-size: .68rem; color: #7fc7e8; }
 .initiative-hp.hp-healthy { color: #8fd69a; }
 .initiative-hp.hp-bloodied { color: #e8a743; }
@@ -343,9 +343,18 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
    stays a pure list. One quiet container; contents are flat. */
 .acting-console { margin-top: .7rem; padding: .55rem .6rem .6rem; border: 1px solid #6e431c; border-left: 3px solid #ffc34d; border-radius: .55rem; background: #211a10; }
 .acting-console-head { display: flex; align-items: baseline; gap: .45rem; margin-bottom: .35rem; }
-.acting-console-head strong { color: #ffd58d; font-size: .95rem; }
+.acting-console-head strong { color: #ffd58d; font-size: .86rem; }
 .acting-console-sub { color: #9f9789; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
 .acting-console-head .economy-movement { margin-left: auto; }
 .acting-console .turn-economy { margin-top: 0; padding: 0; border: 0; background: transparent; }
 .acting-console .action-runner { margin-top: .45rem; }
 .builtin-more { border-style: dashed; color: #9f9789; }
+
+/* Row hover keeps the plain score/HP tappable-looking without permanent chrome. */
+.initiative-score-value:hover:not(:disabled), .initiative-hp:hover:not(:disabled) { background: #241f17; }
+/* Minimal per-row markers: condition dots + a dim R only when the reaction is SPENT. */
+.condition-dots { display: inline-flex; align-items: center; gap: .2rem; margin-left: .1rem; }
+.condition-dot { width: .44rem; height: .44rem; border-radius: 50%; background: #a98ee0; box-shadow: 0 0 0 1px #241f2e; }
+.condition-dot-more { color: #a98ee0; font-size: .62rem; font-weight: 800; }
+.reaction-spent-dot { flex: none; color: #6f6656; font-size: .62rem; font-weight: 800; text-decoration: line-through; }
+.encounter-topbar .encounter-round { align-self: center; font-size: .72rem; padding: .3rem .55rem; }

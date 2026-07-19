@@ -4,7 +4,7 @@ import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { CharacterSheet } from "./CharacterSheet";
-import { ConditionChips, ConditionEditor } from "./conditions";
+import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
@@ -417,8 +417,9 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
-  return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
-    <div className="encounter-heading"><div><span className="eyebrow">{state.combat.active ? "INITIATIVE" : "ENCOUNTER"}</span><h2 id="gm-encounter-title">{state.combat.active ? "Turn order" : "Encounter setup"}</h2></div>{state.combat.active && <strong className="encounter-round">Round {state.combat.round}</strong>}</div>
+  return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order — round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
+    {/* During combat the panel has NO heading block — the round pill rides the one control bar. */}
+    {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
     {!state.combat.active && <DockPicker dock={dock} />}
     {!state.combat.active ? <>
       <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
@@ -457,7 +458,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       {/* One compact control bar: turn navigation is the everything-else-follows action, so it gets
           the space; everything occasional (rules mode, environment, dock, add, end) lives behind ⋯. */}
       <div className="encounter-topbar">
-        <div className="turn-controls"><button disabled={busy} onClick={previous} title="Previous turn">‹ Prev</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}</button></div>
+        <strong className="encounter-round">Round {state.combat.round}</strong>
+        <div className="turn-controls"><button disabled={busy} onClick={previous} title="Previous turn" aria-label="Previous turn">‹</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}</button></div>
         <button type="button" className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Encounter options — rules mode, environment, add combatants, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && <>
           <div className="encounter-overlay-backdrop" onPointerDown={() => setMenuOpen(false)} />
@@ -505,16 +507,14 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             {editing
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
               : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative — click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
-            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} — HP, conditions, effects, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpActorId(null); setHpAmount(""); }}>
+            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} — HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpActorId(null); setHpAmount(""); }}>
               {active && <span className="initiative-caret" aria-hidden="true">▶</span>}
               <strong className="initiative-name-text">{actor?.name ?? "Removed combatant"}</strong>
               {actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}
-              {actor && <ConditionChips conditions={actor.conditions} />}
+              {actor && <ConditionDots conditions={actor.conditions} />}
+              {actor && state.combat.reactionsUsed.includes(actor.id) && <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">R</span>}
             </button>
-            <span className="initiative-row-side">
-              {actor && <button type="button" className="initiative-reaction" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title={state.combat.reactionsUsed.includes(actor.id) ? "Reaction spent — tap to restore" : "Reaction available — tap to spend (usable off-turn)"} aria-label={`Reaction for ${actor.name}`} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>R</button>}
-              {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Adjust hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={expanded} onClick={() => { setExpandedActorId(entry.actorId); setHpActorId(entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
-            </span>
+            {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Adjust hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={expanded} onClick={() => { setExpandedActorId(entry.actorId); setHpActorId(entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
           </div>
           {expanded && actor && <>
             <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); setHpActorId(null); }} />
@@ -531,7 +531,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               </div>
               <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />
               <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />
-              <div className="initiative-row-tools"><button type="button" className="secondary" onClick={() => { setSheetActorId(actor.id); setExpandedActorId(null); }}>Open sheet</button><button type="button" className="secondary" onClick={() => { setExpandedActorId(null); setHpActorId(null); }}>Close</button></div>
+              <div className="initiative-row-tools">
+                <button type="button" className="secondary" disabled={busy} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>{state.combat.reactionsUsed.includes(actor.id) ? "Restore reaction" : "Spend reaction"}</button>
+                <button type="button" className="secondary" onClick={() => { setSheetActorId(actor.id); setExpandedActorId(null); }}>Open sheet</button>
+                <button type="button" className="secondary" onClick={() => { setExpandedActorId(null); setHpActorId(null); }}>Close</button>
+              </div>
             </div>
           </>}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}

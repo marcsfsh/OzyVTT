@@ -252,8 +252,16 @@ function App() {
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} />
             : !showDocked && encounterPanel}
-          <DicePanel role={mode} state={state} />
-          <CombatLogPanel />
+          {/* Mid-fight the column belongs to the tracker; dice and the log sit one tap away. */}
+          {state.combat.active
+            ? <>
+                <details className="sidebar-collapsed"><summary>Dice</summary><DicePanel role={mode} state={state} /></details>
+                <details className="sidebar-collapsed"><summary>Combat log</summary><CombatLogPanel /></details>
+              </>
+            : <>
+                <DicePanel role={mode} state={state} />
+                <CombatLogPanel />
+              </>}
           {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
         </div>
       </div>}
