@@ -1,26 +1,21 @@
 import { useState } from "react";
-import type { GmActor, Scene } from "@vtt/domain";
+import type { GmActor } from "@vtt/domain";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import type { MapSelection } from "../maps/MapManager";
-import { setPreviewScene } from "./scenePreview";
 import "./scene-panel.css";
-
-type Ack = (result: { ok: boolean; message?: string }) => void;
 
 /**
  * GM "Prepared scenes" — build encounters ahead of time on a chosen battlemap, then park-and-resume
  * between them. Switching the live scene preserves the running fight (round, turn, positions) and
  * resumes the target exactly; the server owns the swap. Lives in Map Setup, beside the map library.
  */
-export function ScenePanel({ scenes, activeSceneId, combatActive, combatRound, actors, selectedMap, mapLibrary }: Readonly<{
-  scenes: readonly Scene[];
-  activeSceneId: string | null;
-  combatActive: boolean;
-  combatRound: number;
+export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Readonly<{
   actors: readonly GmActor[];
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
+  /** Called after a successful create — the launcher (scene strip modal) closes itself. */
+  onCreated?: () => void;
 }>) {
   const [name, setName] = useState("");
   const [chosen, setChosen] = useState<readonly string[]>([]);
@@ -35,27 +30,19 @@ export function ScenePanel({ scenes, activeSceneId, combatActive, combatRound, a
     ?? battlemaps[0]
     ?? null;
 
-  const emit = (event: string, payload: Record<string, unknown>, failure: string) => {
-    setBusy(true); setMessage("");
-    (socket.emit as (event: string, payload: unknown, ack: Ack) => void)(event, { commandId: newId(), ...payload }, (result) => {
-      setBusy(false);
-      if (!result.ok) setMessage(result.message ?? failure);
-    });
-  };
   const create = () => {
     if (!sceneMap) { setMessage("Upload a battlemap on the Map Setup tab first."); return; }
     if (!name.trim()) { setMessage("Name the scene."); return; }
     setBusy(true); setMessage("");
     socket.emit("scene:create", { commandId: newId(), name: name.trim(), mapAssetId: sceneMap.id, combatantIds: chosen }, (result) => {
       setBusy(false);
-      if (result.ok) { setName(""); setChosen([]); } else setMessage(result.message ?? "The scene could not be created.");
+      if (result.ok) { setName(""); setChosen([]); onCreated?.(); } else setMessage(result.message ?? "The scene could not be created.");
     });
   };
   const toggle = (actorId: string) => setChosen((current) => current.includes(actorId) ? current.filter((id) => id !== actorId) : [...current, actorId]);
-  const mapName = (mapAssetId: string) => (mapLibrary ?? []).find((map) => map.id === mapAssetId)?.name ?? (selectedMap?.id === mapAssetId ? selectedMap.name : "Battlemap");
 
   return <section className="scene-panel" aria-labelledby="scene-panel-heading">
-    <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepared scenes</h2></div><p>Stage encounters ahead of time, then switch between them mid-session — the running fight is parked and resumes exactly.</p></div>
+    <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>Name it, pick its battlemap and combatants — it appears in the Scenes strip, ready to stage or make live.</p></div>
 
     <form className="scene-create" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <label>Scene name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Goblin ambush" /></label>
@@ -78,23 +65,6 @@ export function ScenePanel({ scenes, activeSceneId, combatActive, combatRound, a
 
     {message && <p className="scene-feedback" role="status">{message}</p>}
 
-    {scenes.length === 0
-      ? <p className="scene-empty">No prepared scenes yet.</p>
-      : <ul className="scene-list">{scenes.map((scene) => {
-        const live = scene.id === activeSceneId;
-        return <li key={scene.id} className={live ? "live" : ""}>
-          <div className="scene-row-main">
-            <strong>{scene.name}</strong>
-            <span>{mapName(scene.mapAssetId)} · {scene.combat.initiative.length} combatant{scene.combat.initiative.length === 1 ? "" : "s"}</span>
-          </div>
-          {live && <span className="scene-badge">{combatActive ? `Live · Round ${combatRound}` : "Live · staged"}</span>}
-          <div className="scene-row-actions">
-            {!live && <button type="button" disabled={busy} onClick={() => setPreviewScene(scene.id)}>Preview / edit</button>}
-            {!live && <button type="button" disabled={busy} onClick={() => { if (!combatActive || window.confirm(`Make “${scene.name}” live? Players and the shared screen switch to it now; the current fight is parked and resumes when you switch back.`)) emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched."); }}>Make live</button>}
-            <button type="button" className="secondary" disabled={busy} onClick={() => { const next = window.prompt("Rename scene:", scene.name)?.trim(); if (next) emit("scene:rename", { sceneId: scene.id, name: next }, "The scene could not be renamed."); }}>Rename</button>
-            {!live && <button type="button" className="secondary" disabled={busy} onClick={() => { if (window.confirm(`Remove “${scene.name}”?`)) emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed."); }}>Remove</button>}
-          </div>
-        </li>;
-      })}</ul>}
+    {/* Managing existing scenes (stage, go live, remove) lives in the Encounter tab's scene strip. */}
   </section>;
 }

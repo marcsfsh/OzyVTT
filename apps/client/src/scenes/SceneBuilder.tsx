@@ -27,7 +27,16 @@ export function SceneBuilder({ scene, actors, revision }: Readonly<{ scene: Scen
   const toggle = (actorId: string) => setCombatants(inScene.has(actorId) ? [...inScene].filter((id) => id !== actorId) : [...inScene, actorId]);
 
   return <section className="scene-builder" aria-labelledby="scene-builder-heading">
-    <div className="scene-builder-head"><span className="eyebrow">STAGING · GM ONLY</span><h2 id="scene-builder-heading">{scene.name}</h2><p>Pick who's in this scene, then drag their tokens onto the map. Players don't see any of this until you make it live.</p></div>
+    <div className="scene-builder-head"><span className="eyebrow">STAGING · GM ONLY</span>
+      <h2 id="scene-builder-heading">{scene.name}
+        <button type="button" className="scene-rename" disabled={busy} title="Rename this scene" aria-label={`Rename ${scene.name}`} onClick={() => {
+          const next = window.prompt("Rename scene:", scene.name)?.trim();
+          if (!next || next === scene.name) return;
+          setBusy(true); setMessage("");
+          socket.emit("scene:rename", { commandId: newId(), sceneId: scene.id, name: next }, (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setMessage(result.message ?? "The scene could not be renamed."); });
+        }}>✎</button>
+      </h2>
+      <p>Pick who's in this scene, then drag their tokens onto the map. Players don't see any of this until you make it live.</p></div>
     {actors.length === 0
       ? <p className="scene-builder-empty">Add monsters below or import characters to build this encounter.</p>
       : <ul className="scene-builder-list">{actors.map((actor) => <li key={actor.id}>
