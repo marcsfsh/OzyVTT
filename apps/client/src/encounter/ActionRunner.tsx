@@ -21,6 +21,7 @@ const summaryOf = (action: ContentActionSummary) => {
   if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()}`);
   for (const part of action.damage) parts.push(`${part.formula} ${part.type}`);
   if (action.usesLimit !== null) parts.push(action.usesPer === "recharge" ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}` : `${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer}`);
+  if (action.legendaryCost !== undefined) parts.push(`Legendary${action.legendaryCost > 1 ? ` ×${action.legendaryCost}` : ""}`);
   return parts.join(" · ");
 };
 
@@ -31,6 +32,11 @@ const summaryOf = (action: ContentActionSummary) => {
  */
 function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSummary): string | null {
   if (action.requiresEffectTag && !actor.effects.some((effect) => effect.tags.includes(action.requiresEffectTag!))) return `Needs ${tagLabel(action.requiresEffectTag)}`;
+  if (action.legendaryCost !== undefined) {
+    if (state.combat.turnActorId === actor.id) return "On another creature's turn";
+    const perRound = actor.legendary?.actionsPerRound ?? 3;
+    if ((state.combat.legendaryUsed[actor.id] ?? 0) + action.legendaryCost > perRound) return "No legendary actions left this round";
+  }
   if (action.usesLimit !== null && action.usesPer !== null) {
     const key = action.usesPool ?? action.id;
     const spent = action.usesPer === "turn" ? (state.combat.turn.turnUses[`${actor.id}:${key}`] ?? 0) : (actor.actionUses[key] ?? 0);

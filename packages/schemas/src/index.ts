@@ -105,7 +105,9 @@ export const ActorSchema = z.object({
   /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge — stripped from player projections. Additive. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown → movement rules skip, the unmeasurable pattern. Additive. */
-  speedFeet: z.number().int().min(0).max(500).optional()
+  speedFeet: z.number().int().min(0).max(500).optional(),
+  /** Legendary resources seeded from the definition (SRD 2024): per-round legendary actions and Legendary Resistance per day. GM knowledge — stripped from player projections. Additive. */
+  legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional()
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
@@ -175,7 +177,9 @@ const ActionSchema = z.object({
     if (uses.per !== "recharge" && uses.recharge !== undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "The recharge threshold only applies when per is \"recharge\"." });
   }).optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
-  reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional()
+  reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional(),
+  /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */
+  legendary: z.object({ cost: z.number().int().min(1).max(5) }).strict().optional()
 });
 export const ActorDefinitionSchema = z.object({
   schemaId: z.enum(["vtt.actor-character", "vtt.actor-monster"]), schemaVersion: z.literal(ACTOR_DEFINITION_SCHEMA_VERSION),
@@ -187,7 +191,9 @@ export const ActorDefinitionSchema = z.object({
   /** Typed defenses by damage-type id; the engine applies them to typed damage (immunity → resistance → vulnerability). Additive; absent = none known. */
   damageResistances: z.array(DamageTypeIdSchema).max(20).optional(), damageImmunities: z.array(DamageTypeIdSchema).max(20).optional(), damageVulnerabilities: z.array(DamageTypeIdSchema).max(20).optional(),
   /** Reference-level for now: displayed, not yet enforced on actor.set-condition. */
-  conditionImmunities: z.array(ConditionIdSchema).max(20).optional()
+  conditionImmunities: z.array(ConditionIdSchema).max(20).optional(),
+  /** Legendary creature resources (SRD 2024): `actionsPerRound` legendary actions per round (spent on other creatures' turns), `resistancesPerDay` Legendary Resistance uses (turn a failed save into a success; re-arms on a long rest — the app's day). Additive. */
+  legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional()
 }).superRefine((actor, context) => {
   if (actor.schemaId === "vtt.actor-character" && actor.token.disposition !== "friendly") context.addIssue({ code: z.ZodIssueCode.custom, path: ["token", "disposition"], message: "Player-character definitions must use the friendly disposition." });
 });

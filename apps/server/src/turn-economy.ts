@@ -46,6 +46,15 @@ export function setReactionUsed(state: GameState, actorId: string, used: boolean
   state.combat = { ...state.combat, reactionsUsed: used ? [...remaining, actorId] : remaining };
 }
 
+/** Legendary actions are monster resources (GM knowledge): only the GM sets the spent count by hand. Zero clears the entry, mirroring the refresh at the creature's own turn start. */
+export function setLegendaryUsed(state: GameState, actorId: string, spent: number, scope: ActorScope) {
+  requireActiveCombat(state);
+  if (scope.role === "player") throw new CommandRejectedError("Only the GM tracks legendary actions.");
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
+  const { [actorId]: _cleared, ...rest } = state.combat.legendaryUsed;
+  state.combat = { ...state.combat, legendaryUsed: spent === 0 ? rest : { ...rest, [actorId]: spent } };
+}
+
 /** Player-facing End Turn: same advance as the GM's Next, gated to the claimed character's own turn. */
 export function endTurn(state: GameState, scope: ActorScope, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   requireActiveCombat(state);

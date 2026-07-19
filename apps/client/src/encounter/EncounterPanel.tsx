@@ -10,7 +10,7 @@ import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
 
-type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:end" | "scene:activate";
+type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:use-legendary" | "turn:end" | "scene:activate";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
 const emitMutation = socket.emit.bind(socket) as unknown as (event: CommandEvent, payload: CommandPayload, acknowledgement: (result: MutationResult) => void) => void;
 
@@ -49,7 +49,7 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  * d20 + its best-known modifier; the typed total covers proficient/situational saves. The outcome
  * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
  */
-function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
+function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; /** Remaining Legendary Resistance uses (GM view of a legendary target only) — offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
   const [manualTotal, setManualTotal] = useState("");
   const [busy, setBusy] = useState(false);
   // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
@@ -57,9 +57,9 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ sav
   const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean } | null>(null);
   // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
   // unmounts before it could show its own result.
-  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean) => {
+  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false) => {
     setBusy(true);
-    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(total !== undefined ? { total } : {}) }, (result: SaveAnswerResult) => {
+    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(legendaryResistance ? { legendaryResistance } : {}), ...(total !== undefined ? { total } : {}) }, (result: SaveAnswerResult) => {
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The saving throw could not be answered."); return; }
       const outcome = result.outcome;
@@ -88,6 +88,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback }: Readonly<{ sav
           <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total} — {rolled.success ? "Success" : "Failure"}</strong>
           <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => send("manual", rolled.total, true)}>Confirm</button>
+          {!rolled.success && (legendaryResistanceLeft ?? 0) > 0 && <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when the creature fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>}
           <button type="button" className="secondary" disabled={busy} onClick={() => setRolled(null)}>Re-roll</button>
         </span>
       : <span className="save-prompt-actions">
@@ -329,6 +330,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  // A legendary creature acting off-turn (SRD Legendary Actions): the acting console temporarily
+  // switches to it; cleared whenever the real turn advances.
+  const [legendaryActingId, setLegendaryActingId] = useState<string | null>(null);
+  useEffect(() => { setLegendaryActingId(null); }, [state.combat.turnActorId]);
   const cancelEditRef = useRef(false);
   const knownActorIdsRef = useRef<ReadonlySet<string>>(new Set(state.actors.map((actor) => actor.id)));
   const actorsById = useMemo(() => new Map(state.actors.map((actor) => [actor.id, actor])), [state.actors]);
@@ -563,7 +568,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           </>}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
           {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} />}
-          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} />)}
+          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage}
+            legendaryResistanceLeft={actor.legendary?.resistancesPerDay !== undefined ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0)) : undefined} />)}
           {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} />)}
         </li>;
       })}</ol>
@@ -571,19 +577,45 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           own labeled surface below it — never interleaved between rows (that read as one giant
           cluttered column). */}
       {(() => {
-        const actor = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
+        const turnActor = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
+        const legendaryActor = legendaryActingId && legendaryActingId !== state.combat.turnActorId ? actorsById.get(legendaryActingId) : undefined;
+        const actor = legendaryActor ?? turnActor;
+        // Legendary creatures act on OTHER creatures' turns (SRD Legendary Actions): offer a one-tap
+        // console switch for each off-turn legendary combatant with pool remaining.
+        const legendaryOffers = state.combat.initiative
+          .flatMap((entry) => { const candidate = actorsById.get(entry.actorId); return candidate?.legendary?.actionsPerRound && candidate.id !== state.combat.turnActorId && candidate.id !== legendaryActingId ? [candidate] : []; })
+          .map((candidate) => ({ candidate, remaining: Math.max(0, (candidate.legendary!.actionsPerRound ?? 0) - (state.combat.legendaryUsed[candidate.id] ?? 0)) }));
         if (!actor) return null;
-        return <section className="acting-console" aria-label={`Acting now: ${actor.name}`}>
-          {/* ONE header line: name + economy pills + movement — no separate strip restating anything. */}
-          <header className="acting-console-head">
-            <strong>{actor.name}</strong>
-            <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
-            <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
-            <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
-            {actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
-          </header>
-          <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
-        </section>;
+        const legendaryPool = legendaryActor?.legendary?.actionsPerRound;
+        const legendarySpent = legendaryActor ? state.combat.legendaryUsed[legendaryActor.id] ?? 0 : 0;
+        return <>
+          {legendaryOffers.length > 0 && <div className="legendary-strip" role="group" aria-label="Legendary actions available">
+            {legendaryOffers.map(({ candidate, remaining }) => <button key={candidate.id} type="button" className="legendary-offer" disabled={busy || remaining === 0}
+              title={remaining === 0 ? `${candidate.name} has no legendary actions left this round (they refill when its turn starts).` : `Take a legendary action with ${candidate.name} (used on other creatures' turns).`}
+              onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
+          </div>}
+          <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
+            {/* ONE header line: name + economy pills + movement — no separate strip restating anything. */}
+            <header className="acting-console-head">
+              <strong>{actor.name}</strong>
+              {legendaryActor
+                // Off-turn legendary console: the turn economy belongs to the turn actor, so show the
+                // legendary pool (with a GM correction toggle) instead of Action/Bonus/movement.
+                ? <>
+                    <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills when this creature's own turn starts.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
+                    <button type="button" className="economy-slot" disabled={busy || legendarySpent === 0} title="Restore one legendary action (GM correction)" onClick={() => void run(() => emitCommand("turn:use-legendary", { commandId: newId(), actorId: actor.id, spent: Math.max(0, legendarySpent - 1), expectedRevision: state.revision }), "Legendary action restored.")}>+1</button>
+                    <button type="button" className="secondary legendary-done" onClick={() => setLegendaryActingId(null)}>Back to {turnActor?.name ?? "the turn"}</button>
+                  </>
+                : <>
+                    <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
+                    <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
+                    <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+                    {actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
+                  </>}
+            </header>
+            <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
+          </section>
+        </>;
       })()}
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}

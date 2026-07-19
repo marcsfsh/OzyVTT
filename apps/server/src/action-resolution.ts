@@ -120,6 +120,8 @@ type EconomyPlan = Readonly<{
   instance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
+  /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
+  spendLegendary: Readonly<{ cost: number }> | null;
 }>;
 
 /** The multiattack parents (sibling actions) that list `action` as a component. */
@@ -241,6 +243,19 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     markReaction = true;
   }
 
+  // SRD Legendary Actions: taken at the end of OTHER creatures' turns, spending from the per-round
+  // pool that refills when the legendary creature's own turn starts. Pool size comes from the
+  // definition (every SRD legendary creature prints 3; imports without one default to 3).
+  let spendLegendary: EconomyPlan["spendLegendary"] = null;
+  if (action.legendary) {
+    const cost = action.legendary.cost;
+    const perRound = definition?.legendary?.actionsPerRound ?? 3;
+    const spent = state.combat.legendaryUsed[attacker.id] ?? 0;
+    if (onOwnTurn) violations.push({ rule: "legendary.own-turn", message: `Legendary actions are taken on other creatures' turns — not on ${attacker.name}'s own.` });
+    if (spent + cost > perRound) violations.push({ rule: "legendary.no-actions-remaining", message: `${attacker.name} has ${Math.max(0, perRound - spent)} of ${perRound} legendary action${perRound === 1 ? "" : "s"} left this round${cost > 1 ? ` and ${action.name} costs ${cost}` : ""}.` });
+    spendLegendary = { cost };
+  }
+
   // Targeting restrictions the definition declares (Tail can't target the creature this crocodile grapples).
   if (action.targetRules?.includes("not-grappled-by-source")) {
     for (const targetId of targetIds) {
@@ -303,7 +318,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
-  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse }, proseMultiattack, notes };
+  return { violations, softViolations, plan: { markAction, markBonus, markReaction, instance, spendUse, spendLegendary }, proseMultiattack, notes };
 }
 
 /**
@@ -810,6 +825,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
   if (plan.markReaction) {
     state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id] };
+  }
+  if (plan.spendLegendary) {
+    state.combat = { ...state.combat, legendaryUsed: { ...state.combat.legendaryUsed, [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost } };
   }
   if (plan.spendUse) {
     if (plan.spendUse.per === "turn") {

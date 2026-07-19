@@ -493,6 +493,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.turnEnd, "post", "turn.end"],
       [GAME_PATHS.turnUse, "post", "turn.use"],
       [GAME_PATHS.turnReaction, "post", "turn.use-reaction"],
+      [GAME_PATHS.turnLegendary, "post", "turn.use-legendary"],
       [GAME_PATHS.tokenMove, "post", "token.move"],
       [GAME_PATHS.actors, "post", "actor.add-from-definition"],
       [GAME_PATHS.actorById, "delete", "actor.remove"],

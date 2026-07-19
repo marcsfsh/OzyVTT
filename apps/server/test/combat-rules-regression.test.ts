@@ -11,7 +11,9 @@ import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
 import { applyRest } from "../src/rests.js";
-import { applyTimelineRestore } from "../src/combat-history.js";
+import { applyTimelineRestore, timelineDirtied } from "../src/combat-history.js";
+import { projectPlayerCombat, projectPlayerView } from "../src/projections.js";
+import { setLegendaryUsed } from "../src/turn-economy.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -1421,5 +1423,140 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     expect(ActorDefinitionSchema.safeParse(base).success).toBe(false);
     base.actions.find((action: { id: string }) => action.id === "cold-breath").uses = { limit: 1, per: "recharge", recharge: 5 };
     expect(ActorDefinitionSchema.safeParse(base).success).toBe(true);
+  });
+});
+
+describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity adoption)", () => {
+  const BOSS = "10000000-0000-4000-8000-000000000007";
+  const bossDefinition = ActorDefinitionSchema.parse({
+    schemaId: "vtt.actor-monster", schemaVersion: 1,
+    source: { name: "Test", version: "1", externalId: "test-boss" },
+    name: "Test Boss", size: "large",
+    abilityScores: { str: 20, dex: 14, con: 18, int: 10, wis: 12, cha: 16 },
+    proficiencyBonus: 4, armorClass: 17, hitPoints: { maximum: 150 }, speedFeet: 40,
+    token: { disposition: "hostile" },
+    legendary: { actionsPerRound: 3, resistancesPerDay: 3 },
+    actions: [
+      { id: "tail-swipe", name: "Tail Swipe", activation: "other", description: "Legendary tail.", attack: { bonus: 9, reachFeet: 10 }, damage: [{ formula: "1d8 + 5", type: "bludgeoning" }], legendary: { cost: 1 } },
+      { id: "wing-storm", name: "Wing Storm", activation: "other", description: "Costs 2 legendary actions.", save: { ability: "dex", dc: 15 }, damage: [], legendary: { cost: 2 } },
+      { id: "dread-word", name: "Dread Word", activation: "action", description: "Wisdom save or take psychic damage.", save: { ability: "wis", dc: 14 }, damage: [{ formula: "2d6", type: "psychic" }] }
+    ]
+  });
+
+  /** Torva (turn 1) vs the boss: the boss is off-turn, exactly when legendary actions are legal. */
+  function buildBossGame(bossActionUses: Record<string, number> = {}): GameState {
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        { id: IDS.torva, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current: 75, maximum: 75 }, armorClass: 15, definitionId: "import-torva", size: "medium", speedFeet: 40 },
+        { id: BOSS, name: "Test Boss", kind: "monster", visibility: "public", hp: { current: 150, maximum: 150 }, armorClass: 17, definitionId: "test-boss", size: "large", speedFeet: 40, actionUses: bossActionUses, legendary: { actionsPerRound: 3, resistancesPerDay: 3 } }
+      ],
+      definitions: [
+        { id: "import-torva", definition: torvaDefinition },
+        { id: "test-boss", definition: bossDefinition }
+      ]
+    });
+    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.torva, score: 16 }, { actorId: BOSS, score: 10 }] }, () => 1, GEOMETRY, (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition);
+    return game;
+  }
+
+  it("spends the per-round pool off-turn, blocks past it and on its own turn, and refills at its turn start", () => {
+    const game = buildBossGame();
+    // Torva's turn: the boss swipes (cost 1; d20 15 + 9 = 24 hits AC 15, 1d8 → 4).
+    resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4]);
+    expect(game.combat.legendaryUsed[BOSS]).toBe(1);
+    // Wing Storm costs 2 → the pool is empty (3/3 spent).
+    resolve(game, bossDefinition, "wing-storm", { actorId: BOSS, targetIds: [IDS.torva] }, []);
+    expect(game.combat.legendaryUsed[BOSS]).toBe(3);
+    expect(() => resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4]))
+      .toThrowError(/0 of 3 legendary actions left/);
+    // The boss's own turn starts: the pool refills — but legendary actions are off-turn only.
+    nextInitiativeTurn(game);
+    expect(game.combat.legendaryUsed[BOSS]).toBeUndefined();
+    expect(() => resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4]))
+      .toThrowError(/other creatures' turns/);
+  });
+
+  it("GM manual pool set works, is GM-only, dirties the timeline, and restores on rewind", () => {
+    const game = buildBossGame();
+    const before = structuredClone(game);
+    setLegendaryUsed(game, BOSS, 2, { role: "gm" });
+    expect(game.combat.legendaryUsed[BOSS]).toBe(2);
+    expect(timelineDirtied(before, game)).toBe(true);
+    expect(() => setLegendaryUsed(game, BOSS, 1, { role: "player", sessionId: IDS.gmSession })).toThrowError(/Only the GM/);
+    setLegendaryUsed(game, BOSS, 0, { role: "gm" });
+    expect(BOSS in game.combat.legendaryUsed).toBe(false);
+    // A timeline restore brings the spent pool back with the rest of the combat slice.
+    const snapshot = structuredClone(game);
+    snapshot.combat = { ...snapshot.combat, legendaryUsed: { [BOSS]: 3 } };
+    applyTimelineRestore(game, snapshot, 0);
+    expect(game.combat.legendaryUsed[BOSS]).toBe(3);
+  });
+
+  it("players never see the legendary pool or the actor's legendary resources", () => {
+    const game = buildBossGame();
+    setLegendaryUsed(game, BOSS, 2, { role: "gm" });
+    expect("legendaryUsed" in projectPlayerCombat(game)).toBe(false);
+    const bossAsSeen = projectPlayerView(game, undefined, () => null).actors.find((actor) => actor.id === BOSS)!;
+    expect("legendary" in bossAsSeen).toBe(false);
+  });
+
+  const saveDeps = (game: GameState, face: number) => ({
+    random: () => face,
+    newRollId: (() => { let n = 900; return () => `40000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; })(),
+    sessionId: IDS.gmSession, role: "gm" as const, now: () => "2026-07-18T00:00:00.000Z",
+    resolveDefinition: (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+  });
+
+  it("Legendary Resistance flips a previewed failure into a committed success and spends the daily pool", () => {
+    const game = buildBossGame();
+    // Torva forces a boss save (Dread Word: DC 14 WIS, 2d6 psychic → 3 + 4 = 7 proposed damage).
+    resolve(game, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
+    const saveId = game.combat.pendingSaves[0].id;
+    // Preview: d20 3 + WIS +1 = 4 < 14 — a failure about to land 7 psychic.
+    const preview = answerSave(game, nextCommandId(), saveId, "roll", undefined, false, { role: "gm" }, saveDeps(game, 3));
+    expect(preview.outcome).toMatchObject({ success: false, committed: false, appliedDamage: 7 });
+    // Commit with Legendary Resistance: forced success — the SUCCESS outcome still applies (this
+    // save halves on success: 3 of 7), one daily use spent, narrated.
+    const committed = answerSave(game, nextCommandId(), saveId, "manual", preview.outcome.total, true, { role: "gm" }, saveDeps(game, 3), true);
+    expect(committed.outcome).toMatchObject({ success: true, committed: true, appliedDamage: 3 });
+    const boss = game.actors.find((actor) => actor.id === BOSS)!;
+    expect(boss.hp.current).toBe(147);
+    expect(boss.actionUses["legendary-resistance"]).toBe(1);
+    expect(committed.events.some((event) => /Legendary Resistance to succeed \(2 of 3 remaining\)/.test(event.text))).toBe(true);
+    expect(game.combat.pendingSaves).toHaveLength(0);
+  });
+
+  it("Legendary Resistance rejects when exhausted, spends nothing on a natural success, and re-arms on a long rest", () => {
+    const exhausted = buildBossGame({ "legendary-resistance": 3 });
+    resolve(exhausted, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
+    expect(() => answerSave(exhausted, nextCommandId(), exhausted.combat.pendingSaves[0].id, "manual", 2, true, { role: "gm" }, saveDeps(exhausted, 3), true))
+      .toThrowError(/no Legendary Resistance left/);
+    // A natural success with the flag set spends nothing — "succeed instead" only matters on a failure.
+    const fresh = buildBossGame();
+    resolve(fresh, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
+    const committed = answerSave(fresh, nextCommandId(), fresh.combat.pendingSaves[0].id, "manual", 20, true, { role: "gm" }, saveDeps(fresh, 3), true);
+    expect(committed.outcome.success).toBe(true);
+    expect(fresh.actors.find((actor) => actor.id === BOSS)!.actionUses["legendary-resistance"]).toBeUndefined();
+    // Long rest re-arms the daily pool (day = long rest, out of combat).
+    const resting = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [{ id: BOSS, name: "Test Boss", kind: "monster", visibility: "public", hp: { current: 150, maximum: 150 }, armorClass: 17, definitionId: "test-boss", actionUses: { "legendary-resistance": 2 } }],
+      definitions: [{ id: "test-boss", definition: bossDefinition }]
+    });
+    applyRest(resting, BOSS, "long", (definitionId) => resting.definitions.find((entry) => entry.id === definitionId)?.definition);
+    expect(resting.actors[0].actionUses["legendary-resistance"]).toBeUndefined();
+  });
+
+  it("the SRD bundle carries legendary resources (adult red dragon golden check + coverage floors)", () => {
+    const monsters = loadMonsterDefinitions();
+    const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
+    expect(dragon.legendary).toEqual({ actionsPerRound: 3, resistancesPerDay: 3 });
+    expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({ cost: 1 });
+    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (the lair bump stays
+    // prose); 32 creatures carry Legendary Resistance; every legendary action row costs 1.
+    expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
+    expect(monsters.filter((monster) => monster.legendary?.resistancesPerDay !== undefined).length).toBe(32);
+    expect(monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary).length).toBe(82);
   });
 });

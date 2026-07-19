@@ -69,7 +69,8 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,
     grants: action.grants !== undefined,
-    reaction: action.reaction ?? null
+    reaction: action.reaction ?? null,
+    ...(action.legendary ? { legendaryCost: action.legendary.cost } : {})
   };
 }
 

@@ -27,7 +27,7 @@ import { narrateTokenMove, type MovementNarration } from "./movement-narration.j
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
-import { endTurn, setReactionUsed, setTurnSlot } from "./turn-economy.js";
+import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
   ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, AddCombatantSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
@@ -35,7 +35,7 @@ import {
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetEnvironmentSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
-  TokenMoveSchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
+  TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
 /**
@@ -179,7 +179,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const builtins = BUILTIN_ACTIONS
         .filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id))
         .map((candidate) => ({ ...actionSummaryOf(candidate), builtin: true, targeting: BUILTIN_TARGETING[candidate.id] ?? "none" as const }));
-      return { actions: [...actions, ...builtins] };
+      return { actions: [...actions, ...builtins], ...(definition?.legendary ? { legendary: definition.legendary } : {}) };
     },
 
     contentMonsterSheet(principal: GamePrincipal, raw: unknown) {
@@ -360,6 +360,16 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, actorId, used, expectedRevision } = request;
       const result = await store.execute({ id: commandId, type: "turn.use-reaction", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setReactionUsed(state, actorId, used, scope));
       if (!result.duplicate) { await context.publishGameState(result.state); if (used) context.broadcastTableEvent({ kind: "reaction", text: `${actorName(actorId)} used its reaction.`, actorIds: [actorId], gmOnly: actorHidden(actorId) }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async turnUseLegendary(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(TurnLegendarySchema, raw, "The legendary-action command is malformed.");
+      const scope = actorScopeOf(principal);
+      const { commandId, actorId, spent, expectedRevision } = request;
+      // Silent GM bookkeeping — the pool is GM knowledge; structured legendary resolves narrate the action itself.
+      const result = await store.execute({ id: commandId, type: "turn.use-legendary", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setLegendaryUsed(state, actorId, spent, scope));
+      if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -681,7 +691,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(SaveAnswerSchema, raw, "The saving-throw answer is malformed.", true);
       const scope = actorScopeOf(principal);
       const sessionId = sessionIdOf(principal);
-      const { commandId, saveId, method, total, commit, expectedRevision } = request;
+      const { commandId, saveId, method, total, commit, legendaryResistance, expectedRevision } = request;
       const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
       let answered: ReturnType<typeof answerSave> | undefined;
       const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
@@ -692,7 +702,7 @@ export function createGameOperations(context: GameOperationsContext) {
           role: scope.role,
           now: () => new Date().toISOString(),
           resolveDefinition
-        });
+        }, legendaryResistance);
       });
       const outcome = answered?.outcome;
       if (!result.duplicate) {
@@ -1192,6 +1202,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["turn.end", "End the current turn (GM anyone; a player only their own turn).", (p, raw) => operations.turnEnd(p, raw)],
     ["turn.use", "Mark the current turn's action or bonus action used/unused.", (p, raw) => operations.turnUse(p, raw)],
     ["turn.use-reaction", "Mark a combatant's reaction used/unused.", (p, raw) => operations.turnUseReaction(p, raw)],
+    ["turn.use-legendary", "Set a legendary creature's spent legendary actions this round.", (p, raw) => operations.turnUseLegendary(p, raw)],
     ["token.move", "Move a combatant's token (server-snapped); position null returns it to the tray.", (p, raw) => operations.tokenMove(p, raw)],
     ["actor.add-from-definition", "Instantiate a bundled SRD monster onto the roster (GM).", (p, raw) => operations.actorAddFromDefinition(p, raw)],
     ["actor.import-definition", "Import a canonical ActorDefinition JSON as a claimable actor (GM).", (p, raw) => operations.actorImportDefinition(p, raw)],

@@ -350,6 +350,19 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .acting-console .action-runner { margin-top: .45rem; }
 .builtin-more { border-style: dashed; color: #9f9789; }
 
+/* Legendary actions (SRD): a one-tap console switch per off-turn legendary creature, and the
+   off-turn console variant showing the per-round pool instead of the turn actor's economy. */
+.legendary-strip { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
+.legendary-offer { padding: .28rem .6rem; border: 1px dashed #8a6a2f; border-radius: 999px; background: #211a10; color: #ffd58d; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.legendary-offer:hover:not(:disabled) { border-color: #ffc34d; border-style: solid; }
+.legendary-offer:disabled { color: #7a7263; border-color: #4a4335; cursor: default; }
+.acting-console.legendary-acting { border-left-color: #b58cff; border-color: #4d3a6e; background: #1c1626; }
+.acting-console.legendary-acting .acting-console-head strong { color: #d4bcff; }
+.legendary-pill { cursor: default; color: #d4bcff; border-color: #4d3a6e; }
+.legendary-done { margin-left: auto; padding: .24rem .55rem; font-size: .78rem; }
+.save-legendary { padding: .3rem .6rem; border: 1px solid #4d3a6e; border-radius: .4rem; background: #2a2138; color: #d4bcff; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.save-legendary:hover:not(:disabled) { border-color: #b58cff; }
+
 /* Row hover keeps the plain score/HP tappable-looking without permanent chrome. */
 .initiative-score-value:hover:not(:disabled), .initiative-hp:hover:not(:disabled) { background: #241f17; }
 /* Minimal per-row markers: condition dots + a dim R only when the reaction is SPENT. */

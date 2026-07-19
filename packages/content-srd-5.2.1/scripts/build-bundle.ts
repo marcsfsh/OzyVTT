@@ -303,7 +303,7 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk)) throw new Error(`Spell correction targets unknown spell ${pk} — check for a typo or an upstream rename.`);
 }
 
-const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, rechargeUses: 0, restUses: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
+const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, rechargeUses: 0, restUses: 0, legendaryCreatures: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
 
 const KNOWN_CONDITION_IDS = new Set(conditions.filter((condition) => condition.fields.document === "srd-2024").map((condition) => condition.fields.describes));
 const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
@@ -378,6 +378,7 @@ const monsters: ActorDefinition[] = creatures
           ...(multiattack ? { multiattack } : {}),
           ...(onHit ? { onHit } : {}),
           ...(uses ? { uses } : {}),
+          ...(legendary ? { legendary: { cost: action.fields.legendary_action_cost ?? 1 } } : {}),
           ...(enrichment ?? {})
         };
       });
@@ -395,6 +396,15 @@ const monsters: ActorDefinition[] = creatures
     const damageVulnerabilities = splitTypedList(fields.damage_vulnerabilities_display, KNOWN_DAMAGE_TYPES);
     const conditionImmunities = splitTypedList(fields.condition_immunities_display, KNOWN_CONDITION_IDS);
     if (damageResistances.length > 0 || damageImmunities.length > 0 || damageVulnerabilities.length > 0) report.typedDefenses += 1;
+    // Legendary resources (SRD 2024): every legendary SRD creature prints "Legendary Action Uses: 3"
+    // (the "(4 in Lair)" bump stays prose — lairs aren't modeled). Legendary Resistance parses the
+    // non-lair N from the trait name; the "(or N+1/Day in Lair)" variant likewise stays prose.
+    const hasLegendaryActions = sortedActions.some((action) => action.fields.action_type === "LEGENDARY_ACTION");
+    const resistanceTrait = (traitsByCreature.get(creature.pk) ?? []).map((trait) => trait.fields.name.match(/^Legendary Resistance \((\d+)\/Day/)).find((match) => match !== null);
+    const legendaryResource = hasLegendaryActions || resistanceTrait
+      ? { ...(hasLegendaryActions ? { actionsPerRound: 3 } : {}), ...(resistanceTrait ? { resistancesPerDay: Number.parseInt(resistanceTrait[1], 10) } : {}) }
+      : null;
+    if (legendaryResource) report.legendaryCreatures += 1;
     return {
       schemaId: "vtt.actor-monster" as const,
       schemaVersion: 1 as const,
@@ -417,6 +427,7 @@ const monsters: ActorDefinition[] = creatures
       ...(damageImmunities.length > 0 ? { damageImmunities } : {}),
       ...(damageVulnerabilities.length > 0 ? { damageVulnerabilities } : {}),
       ...(conditionImmunities.length > 0 ? { conditionImmunities } : {}),
+      ...(legendaryResource ? { legendary: legendaryResource } : {}),
       extensions: {
         "open5e.srd-2024": {
           challengeRating: challenge,
@@ -604,7 +615,7 @@ writeFileSync(join(outDir, "attribution.json"), `${JSON.stringify(attribution, n
 console.log(`monsters: ${report.monsters} (all valid; excluded: ${[...EXCLUSIONS].map(slugOf).join(", ") || "none"})`);
 console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks} (+${report.proseAttacks} prose-parsed), structured saves ${report.structuredSaves}`);
 console.log(`rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, monsters with typed defenses ${report.typedDefenses}`);
-console.log(`limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools`);
+console.log(`limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures}`);
 console.log(`conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`);
 console.log(`skills: ${skillRecords.length} | damage types: ${damageTypeRecords.length} | rules: ${ruleRecords.length}`);
 if (report.corrections.length > 0) console.log(`upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`);

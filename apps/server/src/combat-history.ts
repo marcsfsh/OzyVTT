@@ -37,6 +37,7 @@ function restorableSlice(state: GameState): string {
     combat: { ...combat, annotations: annotations.filter((annotation) => annotation.expiresAt === null) },
     // Rules-engine state (effects, dying, spent uses) restores with hp/conditions — a rewind must
     // undo a Rage grant or a death-save tick, or the strict engine reasons from corrupt state.
+    // legendaryUsed rides the combat spread above for the same reason (spent legendary actions rewind).
     actors: state.actors.map((actor) => ({ id: actor.id, hp: actor.hp, conditions: actor.conditions, effects: actor.effects, deathSaves: actor.deathSaves, actionUses: actor.actionUses }))
   });
 }

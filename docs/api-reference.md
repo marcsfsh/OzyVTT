@@ -63,6 +63,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
+| `turn.use-legendary` | `combat:write` |
 | `token.move` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
@@ -436,6 +437,23 @@ Marks a combatant's reaction used/unused; reactions refresh at the start of thei
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/turn/legendary`
+
+Sets a legendary creature's spent legendary actions this round (GM-grade only; 0 clears). Structured legendary action resolves spend the pool automatically; it refills at the creature's own turn start.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `spent` | integer (0–10) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/tokens/{actorId}/move`
 
 Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. Player sessions may move only their claimed character. `sceneId` targets a prepared (GM-private) scene instead of the live table.
@@ -675,6 +693,7 @@ Answers a pending saving throw by server roll or manual total; on commit the out
 | `method` | `roll` \| `manual` | yes |  |
 | `total` | integer (-20–60) | no | Required for method=manual |
 | `commit` | boolean | no | false previews the outcome without applying damage/conditions Default: `true`. |
+| `legendaryResistance` | boolean | no | GM only, commit only: spend a Legendary Resistance use to turn a failed save into a success (a natural success spends nothing) Default: `false`. |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

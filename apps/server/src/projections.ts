@@ -70,6 +70,8 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     rulesMode: state.combat.rulesMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
+    // legendaryUsed is deliberately absent: a monster's remaining legendary actions are GM knowledge
+    // (same rationale as the stripped actionUses), and the pool never drives player-side UI.
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag
     // (a banner), never the turn labels — those can name hidden combatants.
     rewound: state.combat.historyCursor !== null,
@@ -109,8 +111,8 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
       // actionUses (limited-use spending names stat-block action ids — own claimed character only),
-      // and conditionImmunities (monster defenses are GM knowledge).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, ...actor } = source;
+      // conditionImmunities and legendary resources (monster defenses are GM knowledge).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
       const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;

@@ -470,6 +470,7 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:rest", (payload, acknowledge) => respond(acknowledge, "Only the GM can apply a rest.", "The rest could not be applied.", (principal) => operations.actorRest(principal, payload)));
     socket.on("turn:use", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The turn could not be updated.", (principal) => operations.turnUse(principal, payload)));
     socket.on("turn:use-reaction", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The reaction could not be updated.", (principal) => operations.turnUseReaction(principal, payload)));
+    socket.on("turn:use-legendary", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The legendary actions could not be updated.", (principal) => operations.turnUseLegendary(principal, payload)));
     socket.on("turn:end", (payload, acknowledge) => respond(acknowledge, "Join the table before ending a turn.", "The turn could not end.", (principal) => operations.turnEnd(principal, payload)));
     socket.on("actor:set-hp", (payload, acknowledge) => respond(acknowledge, "Only the GM can set hit points directly.", "The hit points could not be set.", (principal) => operations.actorSetHp(principal, payload)));
     socket.on("dice:roll", (payload, acknowledge) => respond(acknowledge, "Join a session before rolling.", "The roll failed.", (principal) => operations.diceRoll(principal, payload)));

@@ -15,7 +15,8 @@
     "token": { "type": "object", "properties": { "disposition": { "enum": ["friendly", "hostile", "neutral"] }, "footprint": { "type": "object", "required": ["width", "height"], "properties": { "width": { "type": "integer", "minimum": 1, "maximum": 4 }, "height": { "type": "integer", "minimum": 1, "maximum": 4 } }, "additionalProperties": false } }, "additionalProperties": false },
     "extensions": { "type": "object", "additionalProperties": true },
     "damageResistances": { "$ref": "#/$defs/damageTypeList" }, "damageImmunities": { "$ref": "#/$defs/damageTypeList" }, "damageVulnerabilities": { "$ref": "#/$defs/damageTypeList" },
-    "conditionImmunities": { "type": "array", "items": { "$ref": "#/$defs/conditionId" }, "maxItems": 20 }
+    "conditionImmunities": { "type": "array", "items": { "$ref": "#/$defs/conditionId" }, "maxItems": 20 },
+    "legendary": { "type": "object", "properties": { "actionsPerRound": { "type": "integer", "minimum": 1, "maximum": 5 }, "resistancesPerDay": { "type": "integer", "minimum": 1, "maximum": 6 } }, "additionalProperties": false }
   }, "additionalProperties": false,
   "$defs": {
     "ability": { "type": "integer", "minimum": 1, "maximum": 30 },
@@ -49,7 +50,8 @@
         "grants": { "type": "object", "required": ["tags", "duration"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "tags": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/effectTag" } }, "duration": { "oneOf": [{ "type": "object", "required": ["type", "rounds"], "properties": { "type": { "const": "rounds" }, "rounds": { "type": "integer", "minimum": 1, "maximum": 100 } }, "additionalProperties": false }, { "type": "object", "required": ["type"], "properties": { "type": { "enum": ["until-source-next-turn", "encounter", "manual"] } }, "additionalProperties": false }] }, "modifiers": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/effectModifier" } }, "onEnd": { "type": "array", "maxItems": 2, "items": { "type": "object", "required": ["type", "conditionId"], "properties": { "type": { "const": "condition" }, "conditionId": { "$ref": "#/$defs/conditionId" }, "level": { "type": "integer", "minimum": 1, "maximum": 6 } }, "additionalProperties": false } }, "endsWithTag": { "$ref": "#/$defs/effectTag" }, "target": { "enum": ["self", "target"] }, "voidWhileIncapacitated": { "type": "boolean" }, "concentration": { "type": "boolean" } }, "additionalProperties": false },
         "requiresEffectTag": { "$ref": "#/$defs/effectTag" },
         "uses": { "type": "object", "required": ["limit", "per"], "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 20 }, "per": { "enum": ["turn", "encounter", "long-rest", "short-rest", "recharge"] }, "pool": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 60 }, "recharge": { "type": "integer", "minimum": 2, "maximum": 6 } }, "additionalProperties": false },
-        "reaction": { "type": "object", "required": ["trigger", "response"], "properties": { "trigger": { "const": "hit-by-attack" }, "response": { "const": "half-damage" } }, "additionalProperties": false }
+        "reaction": { "type": "object", "required": ["trigger", "response"], "properties": { "trigger": { "const": "hit-by-attack" }, "response": { "const": "half-damage" } }, "additionalProperties": false },
+        "legendary": { "type": "object", "required": ["cost"], "properties": { "cost": { "type": "integer", "minimum": 1, "maximum": 5 } }, "additionalProperties": false }
       },
       "additionalProperties": false
     }

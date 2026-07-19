@@ -32,7 +32,10 @@
     "name": "Lash",
     "activation": "other",
     "description": "Legendary Action. The aboleth makes one Tentacle attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -52,7 +55,10 @@
     "name": "Psychic Drain",
     "activation": "other",
     "description": "Legendary Action. If the aboleth has at least one creature Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) Hit Points.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "tentacle",
@@ -114,6 +120,10 @@
     "width": 2,
     "height": 2
    }
+  },
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -211,7 +221,10 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -231,7 +244,10 @@
     "name": "Frightful Presence",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -274,7 +290,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon can move up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -294,6 +313,10 @@
   "damageImmunities": [
    "acid"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
@@ -375,7 +398,10 @@
     "name": "Cloaked Flight",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -415,7 +441,10 @@
     "name": "Sonic Boom",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "lightning-breath",
@@ -438,7 +467,10 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -458,6 +490,10 @@
   "damageImmunities": [
    "lightning"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -535,7 +571,10 @@
     "name": "Blazing Light",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -555,7 +594,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -602,7 +644,10 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "sleep-breath",
@@ -633,6 +678,10 @@
   "damageImmunities": [
    "fire"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -710,7 +759,10 @@
     "name": "Guiding Light",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Guiding Bolt (level 2 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -730,7 +782,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -777,7 +832,10 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "repulsion-breath",
@@ -808,6 +866,10 @@
   "damageImmunities": [
    "lightning"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -893,7 +955,10 @@
      "ability": "cha",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -913,7 +978,10 @@
     "name": "Mind Jolt",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 4 version). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -956,7 +1024,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "slowing-breath",
@@ -987,6 +1058,10 @@
   "damageImmunities": [
    "acid"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
@@ -1068,7 +1143,10 @@
      "ability": "cha",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -1088,7 +1166,10 @@
     "name": "Guiding Light",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Guiding Bolt (level 2 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -1131,7 +1212,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "weakening-breath",
@@ -1162,6 +1246,10 @@
   "damageImmunities": [
    "fire"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -1243,7 +1331,10 @@
     "name": "Mind Invasion",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 3 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -1267,7 +1358,10 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -1310,7 +1404,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -1333,6 +1430,10 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -1414,7 +1515,10 @@
     "name": "Commanding Presence",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -1434,7 +1538,10 @@
     "name": "Fiery Rays",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -1477,7 +1584,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -1497,6 +1607,10 @@
   "damageImmunities": [
    "fire"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -1574,7 +1688,10 @@
     "name": "Chill",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -1598,7 +1715,10 @@
      "ability": "dex",
      "dc": 19
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -1641,7 +1761,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "paralyzing-breath",
@@ -1672,6 +1795,10 @@
   "damageImmunities": [
    "cold"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -1753,7 +1880,10 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -1773,7 +1903,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -1816,7 +1949,10 @@
     "name": "Frightful Presence",
     "activation": "other",
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    }
   ],
   "token": {
@@ -1829,6 +1965,10 @@
   "damageImmunities": [
    "cold"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -2159,7 +2299,10 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -2179,7 +2322,10 @@
     "name": "Frightful Presence",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -2222,7 +2368,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -2242,6 +2391,10 @@
   "damageImmunities": [
    "acid"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -2323,7 +2476,10 @@
     "name": "Cloaked Flight",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -2363,7 +2519,10 @@
     "name": "Sonic Boom",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter (level 3 version). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "lightning-breath",
@@ -2386,7 +2545,10 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -2406,6 +2568,10 @@
   "damageImmunities": [
    "lightning"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
@@ -2483,7 +2649,10 @@
     "name": "Blazing Light",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray (level 3 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -2503,7 +2672,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -2550,7 +2722,10 @@
      "ability": "dex",
      "dc": 20
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "sleep-breath",
@@ -2581,6 +2756,10 @@
   "damageImmunities": [
    "fire"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -2658,7 +2837,10 @@
     "name": "Guiding Light",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Guiding Bolt (level 2 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -2678,7 +2860,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -2725,7 +2910,10 @@
      "ability": "con",
      "dc": 22
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "repulsion-breath",
@@ -2756,6 +2944,10 @@
   "damageImmunities": [
    "lightning"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 22,
@@ -2841,7 +3033,10 @@
      "ability": "cha",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -2861,7 +3056,10 @@
     "name": "Mind Jolt",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 5 version). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -2904,7 +3102,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "slowing-breath",
@@ -2935,6 +3136,10 @@
   "damageImmunities": [
    "acid"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -3016,7 +3221,10 @@
      "ability": "cha",
      "dc": 24
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -3036,7 +3244,10 @@
     "name": "Guiding Light",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Guiding Bolt (level 4 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -3079,7 +3290,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "weakening-breath",
@@ -3110,6 +3324,10 @@
   "damageImmunities": [
    "fire"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 24,
@@ -3191,7 +3409,10 @@
     "name": "Mind Invasion",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 5 version).",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -3215,7 +3436,10 @@
      "ability": "con",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -3258,7 +3482,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -3281,6 +3508,10 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 22,
@@ -3362,7 +3593,10 @@
     "name": "Commanding Presence",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -3382,7 +3616,10 @@
     "name": "Fiery Rays",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray (level 3 version). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -3425,7 +3662,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "spellcasting",
@@ -3445,6 +3685,10 @@
   "damageImmunities": [
    "fire"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 24,
@@ -3522,7 +3766,10 @@
     "name": "Chill",
     "activation": "other",
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -3546,7 +3793,10 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -3589,7 +3839,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "paralyzing-breath",
@@ -3620,6 +3873,10 @@
   "damageImmunities": [
    "cold"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
@@ -3701,7 +3958,10 @@
      "ability": "con",
      "dc": 20
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -3721,7 +3981,10 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rend",
@@ -3764,7 +4027,10 @@
     "name": "Frightful Presence",
     "activation": "other",
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). The dragon can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    }
   ],
   "token": {
@@ -3777,6 +4043,10 @@
   "damageImmunities": [
    "cold"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -5532,6 +5802,9 @@
    "frightened",
    "poisoned"
   ],
+  "legendary": {
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 19,
@@ -22497,7 +22770,10 @@
     "name": "Storm Bolt",
     "activation": "other",
     "description": "Legendary Action. The kraken uses Lightning Strike.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "tentacle",
@@ -22534,7 +22810,10 @@
      "ability": "con",
      "dc": 23
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "fling",
@@ -22587,6 +22866,10 @@
    "paralyzed",
    "restrained"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
@@ -22906,7 +23189,10 @@
     "name": "Deathly Teleport",
     "activation": "other",
     "description": "Legendary Action. The lich teleports up to 60 feet to an unoccupied space it can see, and each creature within 10 feet of the space it left takes 11 (2d10) Necrotic damage.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -22931,7 +23217,10 @@
      "ability": "con",
      "dc": 20
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "eldritch-burst",
@@ -22955,7 +23244,10 @@
     "name": "Frightening Gaze",
     "activation": "other",
     "description": "Legendary Action. The lich casts Fear, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "paralyzing-touch",
@@ -23003,6 +23295,10 @@
    "paralyzed",
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -25091,7 +25387,10 @@
     "name": "Glare",
     "activation": "other",
     "description": "Legendary Action. The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -25112,7 +25411,10 @@
     "name": "Necrotic Strike",
     "activation": "other",
     "description": "Legendary Action. The mummy makes one Rotting Fist or Channel Negative Energy attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "rotting-fist",
@@ -25151,7 +25453,10 @@
     "name": "Dread Command",
     "activation": "other",
     "description": "Legendary Action. The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "dreadful-glare",
@@ -25190,6 +25495,10 @@
    "paralyzed",
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -27407,6 +27716,9 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "legendary": {
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -31519,7 +31831,10 @@
      "ability": "con",
      "dc": 25
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "divine-aid-3-day",
@@ -31571,7 +31886,10 @@
      "ability": "dex",
      "dc": 25
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "slaying-bow",
@@ -31609,6 +31927,10 @@
    "frightened",
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 4
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -31818,7 +32140,10 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -31858,7 +32183,10 @@
      "ability": "con",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "mind-rending-roar",
@@ -31902,6 +32230,10 @@
    "charmed",
    "frightened"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -31982,7 +32314,10 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -32022,7 +32357,10 @@
      "ability": "con",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "roar",
@@ -32065,6 +32403,10 @@
    "charmed",
    "frightened"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -34210,7 +34552,10 @@
     "name": "Onslaught",
     "activation": "other",
     "description": "Legendary Action. The tarrasque moves up to half its Speed, and it makes one Claw or Tail attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "swallow",
@@ -34254,7 +34599,10 @@
     "name": "World-Shaking Movement",
     "activation": "other",
     "description": "Legendary Action. The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or smaller, have the Prone condition. The tarrasque can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "claw",
@@ -34333,6 +34681,10 @@
    "paralyzed",
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 6
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 30,
@@ -35352,7 +35704,10 @@
     "name": "Charging Horn",
     "activation": "other",
     "description": "Legendary Action. The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -35403,7 +35758,10 @@
     "name": "Shimmering Shield",
     "activation": "other",
     "description": "Legendary Action. The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "radiant-horn",
@@ -35444,6 +35802,10 @@
    "paralyzed",
    "poisoned"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -35524,7 +35886,10 @@
     "name": "Deathless Strike",
     "activation": "other",
     "description": "Legendary Action. The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "multiattack",
@@ -35551,7 +35916,10 @@
     "name": "Beguile",
     "activation": "other",
     "description": "Legendary Action. The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17). The vampire can't take this action again until the start of its next turn.",
-    "damage": []
+    "damage": [],
+    "legendary": {
+     "cost": 1
+    }
    },
    {
     "id": "charm-recharge-5-6",
@@ -35614,6 +35982,10 @@
   "damageResistances": [
    "necrotic"
   ],
+  "legendary": {
+   "actionsPerRound": 3,
+   "resistancesPerDay": 3
+  },
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,

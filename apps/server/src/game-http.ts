@@ -231,6 +231,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.turnEnd), ...command("turn.end"));
   router.post(expressPath(GAME_PATHS.turnUse), ...command("turn.use"));
   router.post(expressPath(GAME_PATHS.turnReaction), ...command("turn.use-reaction"));
+  router.post(expressPath(GAME_PATHS.turnLegendary), ...command("turn.use-legendary"));
   router.post(expressPath(GAME_PATHS.tokenMove), ...command("token.move", actorIdParam));
   router.post(expressPath(GAME_PATHS.actors), ...command("actor.add-from-definition"));
   router.delete(expressPath(GAME_PATHS.actorById), ...command("actor.remove", actorIdParam));

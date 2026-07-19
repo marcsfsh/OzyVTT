@@ -79,6 +79,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     underwater: false,
     reactionsUsed: [],
+    legendaryUsed: {},
     pendingSaves: [],
     pendingReactions: [],
     // A fresh fight starts live on the timeline; the handler wipes any prior fight's snapshots and
@@ -110,7 +111,7 @@ export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {
@@ -166,9 +167,11 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     ...state.combat,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes.
+    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes —
+    // as does its legendary-action pool (SRD: uses regained at the start of the creature's turn).
     turn: { ...EMPTY_TURN },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId)
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    legendaryUsed: Object.fromEntries(Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== nextActorId))
   };
   // The incoming actor's sustained durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
@@ -189,6 +192,7 @@ export function previousInitiativeTurn(state: GameState) {
     // Backing up is a GM correction; treat it like any turn change so the strip starts clean.
     // Effect durations deliberately do NOT rewind here — the Time Machine restore is the real undo.
     turn: { ...EMPTY_TURN },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId)
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
+    legendaryUsed: Object.fromEntries(Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== previousActorId))
   };
 }

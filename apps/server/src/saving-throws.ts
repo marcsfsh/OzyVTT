@@ -150,7 +150,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
  */
-export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies): { outcome: SaveOutcome; events: EffectNarration[] } {
+export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false): { outcome: SaveOutcome; events: EffectNarration[] } {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
@@ -186,7 +186,27 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     total = resolution.total;
   }
 
-  const success = autoFailed === null && total >= pending.dc;
+  let success = autoFailed === null && total >= pending.dc;
+  // SRD Legendary Resistance: "if the creature fails a saving throw, it can choose to succeed
+  // instead" — the die is rolled (usually previewed first), then the GM commits with the flag.
+  // The pool rides actionUses["legendary-resistance"]; a long rest re-arms it (day = long rest).
+  let legendaryNote: string | null = null;
+  if (legendaryResistance) {
+    if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");
+    if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can spend Legendary Resistance.");
+    const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+    const perDay = definition?.legendary?.resistancesPerDay ?? 0;
+    if (perDay === 0) throw new CommandRejectedError(`${target.name} has no Legendary Resistance.`);
+    const spentSoFar = target.actionUses["legendary-resistance"] ?? 0;
+    if (spentSoFar >= perDay) throw new CommandRejectedError(`${target.name} has no Legendary Resistance left (0 of ${perDay} remaining).`);
+    // A natural success spends nothing — the flag means "succeed no matter what", not "waste a use".
+    if (!success) {
+      target.actionUses = { ...target.actionUses, "legendary-resistance": spentSoFar + 1 };
+      success = true;
+      autoFailed = null;
+      legendaryNote = `${target.name} uses Legendary Resistance to succeed (${perDay - spentSoFar - 1} of ${perDay} remaining).`;
+    }
+  }
   // Typed parts (ADR-0020) halve per part on success and run the defense pipeline on application;
   // saves persisted before the field fall back to the untyped total.
   const parts = pending.proposedDamageParts;
@@ -204,6 +224,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   if (!commit) return { outcome: { success, total, dc: pending.dc, appliedDamage: outcomeDamage, conditionApplied: outcomeCondition, committed: false, autoFailed, ...(rollMode ? { rollMode } : {}) }, events: [] };
 
   const events: EffectNarration[] = [];
+  if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
   if (autoFailed !== null) events.push({ kind: "condition", text: `${target.name} automatically fails the ${pending.ability.toUpperCase()} save (${conditionLabel(autoFailed)}).`, actorId: target.id });
   let appliedDamage = 0;
   let conditionApplied = false;
