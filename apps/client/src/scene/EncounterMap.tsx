@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { FogOverlay, footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
@@ -17,13 +17,16 @@ type Actor = GmActor | PlayerActor;
 type Point = EncounterTokenPosition;
 type AnyAnnotation = Annotation | PlayerAnnotation;
 type Camera = Readonly<{ center: Point; zoom: number }>;
-type Tool = "select" | "measure" | "ping" | AnnotationShapeKind;
+type Tool = "select" | "measure" | "ping" | "fog-reveal" | "fog-hide" | AnnotationShapeKind;
 type Gesture =
   | Readonly<{ kind: "token"; actorId: string; point: Point | null; origin: Point | null }>
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
+  | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>;
+
+type FogState = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
@@ -72,6 +75,15 @@ function emitAnnotationPing(payload: Parameters<ClientToServerEvents["annotation
 function emitAnnotationSetColor(payload: Parameters<ClientToServerEvents["annotation:set-color"]>[0]) {
   return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-color", payload, resolve));
 }
+function emitFogSetEnabled(payload: Parameters<ClientToServerEvents["fog:set-enabled"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("fog:set-enabled", payload, resolve));
+}
+function emitFogPaint(payload: Parameters<ClientToServerEvents["fog:paint"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("fog:paint", payload, resolve));
+}
+function emitFogReset(payload: Parameters<ClientToServerEvents["fog:reset"]>[0]) {
+  return new Promise<MutationResult>((resolve) => socket.emit("fog:reset", payload, resolve));
+}
 
 const PLAYER_COLORS = ["#58c3ff", "#ff6b6b", "#8fff9a", "#ffd43f", "#c58cff", "#ff9d5c", "#5cf2e0", "#ff8cc6"];
 
@@ -80,7 +92,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], dock, moveSceneId, onScenePrep, staging
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -92,6 +104,8 @@ export function EncounterMap({
   revision: number;
   activeActorId: string | null;
   reactionsUsed?: readonly string[];
+  /** Manual fog-of-war mask for this map (live table or staged scene). Absent = no fog. */
+  fog?: FogState;
   dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
   /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene, not the live encounter. */
   moveSceneId?: string;
@@ -131,6 +145,9 @@ export function EncounterMap({
   // Combat-first: only Select/Ping/Measure earn permanent icons; the drawing toolkit (shapes,
   // color, visibility, layer, cleanup) sits behind one Draw toggle so the corner isn't icon soup.
   const [drawOpen, setDrawOpen] = useState(false);
+  // Fog tools sit behind their own toggle for the same reason (GM only).
+  const [fogOpen, setFogOpen] = useState(false);
+  const [fogBusy, setFogBusy] = useState(false);
   const [gmLayer, setGmLayer] = useState(false);
   const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ffb52e" : PLAYER_COLORS[0]));
   useEffect(() => { localStorage.setItem("vtt.annotation-color", sessionColor); }, [sessionColor]);
@@ -300,6 +317,18 @@ export function EncounterMap({
   const setMovable = (id: string, movableByOthers: boolean) => runAnnotation(id, () => emitAnnotationSetMovable({ commandId: newId(), id, movableByOthers, expectedRevision: revision }), "Move control could not be changed.");
   const clearAnnotations = (scope: "mine" | "players" | "all") => { setWrenchOpen(false); void runAnnotation("clear", () => emitAnnotationClear({ commandId: newId(), scope, expectedRevision: revision }), "Shapes could not be removed."); };
 
+  // Fog edits target the staged scene while previewing (moveSceneId), else the live table.
+  const fogTarget = moveSceneId !== undefined ? { sceneId: moveSceneId } : {};
+  const runFog = (run: () => Promise<MutationResult>, failure: string) => {
+    setFogBusy(true);
+    void run().then((result) => { setFogBusy(false); if (!result.ok) setMessage(result.message ?? failure); });
+  };
+  const submitFogPaint = (op: "reveal" | "hide", a: Point, b: Point) => {
+    const rect = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
+    if (rect.width < 2 || rect.height < 2) { setMessage(`Drag an area to ${op} it.`); return; }
+    runFog(() => emitFogPaint({ commandId: newId(), op, rect, ...fogTarget, expectedRevision: revision }), "The fog stroke could not be painted.");
+  };
+
   const clearLongPress = () => {
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
     longPressRef.current = null;
@@ -379,10 +408,17 @@ export function EncounterMap({
       }
       return;
     }
+    // Fog painting works on gridless maps too (the server keeps the raw rect there).
+    if ((tool === "fog-reveal" || tool === "fog-hide") && role === "gm") {
+      const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
+      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      setMessage(""); setGesture({ kind: "fog", op: tool === "fog-reveal" ? "reveal" : "hide", origin: point, current: point });
+      return;
+    }
     if (tool !== "select" && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
-      setMessage(""); setGesture({ kind: tool, origin: point, current: point });
+      setMessage(""); setGesture({ kind: tool as "measure" | AnnotationShapeKind, origin: point, current: point });
       return;
     }
     // Empty background in select mode: deselect + pan.
@@ -440,6 +476,7 @@ export function EncounterMap({
     }
     if (gesture.kind === "annotation-resize") { setGesture(null); void submitAnnotationMove(gesture.id, gesture.anchor, gesture.current); return; }
     if (gesture.kind === "annotation-move") { setGesture(null); void submitAnnotationMove(gesture.id, gesture.geometry.origin, gesture.geometry.target); return; }
+    if (gesture.kind === "fog") { const { op, origin, current } = gesture; setGesture(null); submitFogPaint(op, origin, current); return; }
     if (gesture.kind === "measure") { setGesture(null); void submitAnnotationAdd("measurement", undefined, gesture.origin, gesture.current); return; }
     // A shape drawn while placing an area template is stored on the targeting session, not added as a
     // standalone annotation — the server draws the real blast when the action resolves.
@@ -519,7 +556,15 @@ export function EncounterMap({
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools — shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
+          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools — shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war — hide the map from players and reveal it area by area" onClick={() => { setFogOpen((v) => { if (v && (tool === "fog-reveal" || tool === "fog-hide")) setTool("select"); return !v; }); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>🌫</button>}
+          {fogOpen && role === "gm" && <div className="encounter-map-tools" role="group" aria-label="Fog of war">
+            <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON — players see only revealed areas. Turn off." : "Fog is OFF — turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
+            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-reveal"} disabled={fogBusy || !fog?.enabled} title="Reveal — drag the areas players can see" onClick={() => setTool(tool === "fog-reveal" ? "select" : "fog-reveal")}>☀</button>
+            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-hide"} disabled={fogBusy || !fog?.enabled} title="Hide — drag an area to cover it again" onClick={() => setTool(tool === "fog-hide" ? "select" : "fog-hide")}>▩</button>
+            <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Reveal the whole map" onClick={() => { if (size) runFog(() => emitFogPaint({ commandId: newId(), op: "reveal", rect: { x: 0, y: 0, width: size.width, height: size.height }, ...fogTarget, expectedRevision: revision }), "The fog could not be revealed."); }}>⛶</button>
+            <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Hide the whole map again (clears every reveal)" onClick={() => runFog(() => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }), "The fog could not be reset.")}>◼</button>
+          </div>}
           {drawOpen && <>
             <div className="encounter-map-tools">
               {TOOLS.filter((entry) => entry.id === "circle" || entry.id === "cone" || entry.id === "line" || entry.id === "square").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={!calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
@@ -576,6 +621,9 @@ export function EncounterMap({
             return <g className="annotation-shape live"><AnnotationGlyph data={{ kind: "shape", shape: activeTargeting.template.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet }} arrowSize={arrowSize} labelSize={labelSize} color="#ff9d5c" /></g>;
           })()}
 
+          {/* GM fog: dimmed, above the map and shapes but below tokens — the GM always sees everything. */}
+          {fog && role === "gm" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="gm" />}
+
           {visibleTokens.map((encounterToken) => {
             const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
             const movable = tool === "select" && canMove(actor.id);
@@ -600,6 +648,12 @@ export function EncounterMap({
             <line className="encounter-move-line" x1={dragging.origin.x} y1={dragging.origin.y} x2={dragSnappedPoint.x} y2={dragSnappedPoint.y} />
             <text className="encounter-live-distance" style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }} x={dragSnappedPoint.x} y={dragSnappedPoint.y - labelSize * 1.3}>{liveMove.penaltyFeet > 0 ? `${liveMove.baseFeet} ft + ${liveMove.penaltyFeet} ft (occupied)` : `${liveMove.baseFeet} ft`}</text>
           </g>}
+          {/* Live outline of the fog stroke being dragged (the server snaps it to whole cells on commit). */}
+          {gesture?.kind === "fog" && <rect className={`fog-stroke-preview fog-stroke-${gesture.op}`}
+            x={Math.min(gesture.origin.x, gesture.current.x)} y={Math.min(gesture.origin.y, gesture.current.y)}
+            width={Math.abs(gesture.origin.x - gesture.current.x)} height={Math.abs(gesture.origin.y - gesture.current.y)} />}
+          {/* Player fog: solid and above EVERYTHING — whatever sits in fog is visually covered. */}
+          {fog && role === "player" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="player" />}
         </svg>
 
         {selected && selected.kind === "shape" && tool === "select" && (() => {

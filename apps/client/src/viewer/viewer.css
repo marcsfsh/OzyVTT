@@ -58,6 +58,9 @@
 .token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .token-health-bloodied { fill: #e8a743; }
 .token-health-down { fill: #d9605a; }
+/* Fog of war on the shared screen: solid cover — the audience sees only what the GM revealed. */
+.fog-overlay-player { fill: #0b0a08; }
+
 .token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .token-condition-glyph { fill: #e4d7fa; }

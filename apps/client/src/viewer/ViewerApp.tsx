@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { probeImageDimensions, TokenGlyph, TokenStatusBadges } from "../scene/mapImage";
+import { FogOverlay, probeImageDimensions, TokenGlyph, TokenStatusBadges } from "../scene/mapImage";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import "./viewer.css";
 
@@ -14,7 +14,7 @@ export type Presentation = Readonly<{
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
   initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[] }>[] }>;
-  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; conditionIds?: readonly string[]; tokenAssetId?: string }>[]; annotations?: readonly ViewerAnnotation[] }>;
+  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; conditionIds?: readonly string[]; tokenAssetId?: string }>[]; annotations?: readonly ViewerAnnotation[]; fog?: Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }> }>;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -160,6 +160,8 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>
         <circle r={Math.max(8, Math.min(size.width, size.height) / 40)} /><circle r={Math.max(3, Math.min(size.width, size.height) / 100)} />
       </g>)}
+      {/* Fog covers everything on the shared screen — the audience sees only what the GM revealed. */}
+      {onActiveMap && presentation.encounter.fog && <FogOverlay width={size.width} height={size.height} fog={presentation.encounter.fog} variant="player" />}
     </svg>
     {presentation.measurement && <output className="viewer-distance">{presentation.measurement.distanceLabel}</output>}
     {presentation.pings.filter((ping) => ping.label).map((ping) => <div className="viewer-ping-label" key={ping.id}>{ping.label}</div>)}

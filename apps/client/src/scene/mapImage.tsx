@@ -200,6 +200,31 @@ export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ siz
   </>;
 }
 
+/**
+ * Manual fog-of-war mask: one SVG `<mask>` — a white base (fog everywhere), then each stroke in
+ * order paints black (reveal: the fog is cut away there) or white (hide: re-covered). The GM sees
+ * the fog dimmed below tokens (everything stays visible); players and the shared screen get it
+ * solid and above everything — anything inside fog is visually covered even where public data
+ * crossed the wire. Shared by the table client and the viewer.
+ */
+export function FogOverlay({ width, height, fog, variant }: Readonly<{
+  width: number; height: number;
+  fog: Readonly<{ enabled: boolean; shapes: readonly Readonly<{ id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
+  variant: "gm" | "player";
+}>) {
+  const maskId = useId();
+  if (!fog.enabled) return null;
+  return <>
+    <defs>
+      <mask id={maskId}>
+        <rect x={0} y={0} width={width} height={height} fill="white" />
+        {fog.shapes.map((shape) => <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} fill={shape.op === "reveal" ? "black" : "white"} />)}
+      </mask>
+    </defs>
+    <rect className={`fog-overlay fog-overlay-${variant}`} x={0} y={0} width={width} height={height} mask={`url(#${maskId})`} pointerEvents="none" />
+  </>;
+}
+
 export type GridCalibration = Readonly<{ origin: { x: number; y: number }; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
 
 /** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret — the client already receives grid-derived token sizing. */

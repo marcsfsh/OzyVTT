@@ -116,6 +116,13 @@
 .token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .token-health-bloodied { fill: #e8a743; }
 .token-health-down { fill: #d9605a; }
+/* Manual fog of war: the GM sees a dim veil (everything stays workable); players get solid cover. */
+.fog-overlay-gm { fill: #060409; fill-opacity: .45; }
+.fog-overlay-player { fill: #0b0a08; }
+.fog-stroke-preview { fill-opacity: .18; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.fog-stroke-reveal { fill: #ffd76a; stroke: #ffd76a; }
+.fog-stroke-hide { fill: #6a5cff; stroke: #8a7dff; }
+
 .token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
 .token-condition-glyph { fill: #e4d7fa; }
