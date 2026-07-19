@@ -8,6 +8,30 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Player tracker parity + independent UX audit fixes (same branch/PR #38)
+
+A fourth identical owner rejection prompted two moves instead of another blind CSS pass: an
+independent ux-reviewer audit, and a blind-spot check that found the real miss — the PLAYER-side
+initiative list was never overhauled (old fat rows, text chips, banners, standalone economy card).
+If the owner tested from a phone as a player, every "fixed" round looked identical. Shipped:
+
+- **Player tracker parity**: same dense language as the GM list — compact Round bar with a single
+  status flag, 23-24 px one-line rows (score · name · YOU badge · condition dots · band-colored
+  health text), the player's own details grouped under their row, economy in a quiet card below
+  the list. 375 px: 229 px list, 400 px panel.
+- **Audit fixes** (agent findings, ranked): permanent map tutorial caption removed and the token
+  tray now renders only while it has tokens (or during a drag); the 12-icon map toolbar collapsed
+  to Select/Ping/Measure + one ✏ Draw toggle holding shapes/color/visibility/layer/wrench; the
+  duplicate DockPicker dropped from the ⋯ menu (the map's control remains); "+ Add monsters"
+  promoted from the ⋯ menu to the topbar (reinforcements are a combat action, not a setting); the
+  acting console's header merged into ONE line (name + economy pills + movement — no restated
+  caret/"acting"/separate strip); `(pointer: coarse)` media query restores touch-size targets
+  without changing desktop density; narrow viewports cap the docked panel at 62vw.
+- **Deliberately kept** vs the audit: the row-popover reaction toggle stays (it is the only
+  reaction control for NON-acting combatants — the "duplicate" exists only for the acting one).
+- GM panel now 782 px / page 1230 px; all gates green from the repo root (an apps/client-cwd gate
+  run earlier in the session was client-only — noted so future sessions run gates from root).
+
 ## 2026-07-19 — Tracker strip-down, third pass (same branch/PR #38)
 
 Third owner rejection ("still bloated and cluttered") → removed every remaining block and per-row

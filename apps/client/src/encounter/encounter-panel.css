@@ -358,3 +358,27 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .condition-dot-more { color: #a98ee0; font-size: .62rem; font-weight: 800; }
 .reaction-spent-dot { flex: none; color: #6f6656; font-size: .62rem; font-weight: 800; text-decoration: line-through; }
 .encounter-topbar .encounter-round { align-self: center; font-size: .72rem; padding: .3rem .55rem; }
+
+/* Player tracker: identical dense language to the GM list — one 30px line per combatant, the
+   player's own details grouped under their row, economy in its own quiet card below the list. */
+.initiative-list.player { margin-top: .6rem; }
+.initiative-list.player li { flex-direction: column; align-items: stretch; gap: .1rem; padding: .18rem .2rem; }
+.initiative-list.player .initiative-row-main { gap: .5rem; }
+.initiative-score-plain { flex: none; min-width: 1.9rem; color: #9f9789; font-weight: 800; font-size: .78rem; text-align: right; font-variant-numeric: tabular-nums; }
+.initiative-player-name { display: flex; align-items: center; gap: .4rem; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.player-health { flex: none; font-size: .74rem; font-weight: 800; }
+.player-health.hp-bloodied { color: #e8b45a; }
+.player-health.hp-down { color: #e0897f; }
+.encounter-topbar.player { align-items: center; flex-wrap: wrap; }
+.your-turn-flag { color: #b6e35a; font-size: .8rem; font-weight: 800; }
+.encounter-quiet-note { color: #b09a6e; font-size: .74rem; }
+.acting-console.player { margin-top: .6rem; }
+
+/* Touch devices: the dense desktop metrics gain back tap height without changing the layout. */
+@media (pointer: coarse) {
+  .initiative-list.gm li, .initiative-list.player li { padding-top: .42rem; padding-bottom: .42rem; }
+  .initiative-expand { padding-top: .4rem; padding-bottom: .4rem; }
+  .initiative-hp, .initiative-score-value { padding-top: .4rem; padding-bottom: .4rem; }
+  .builtin-chip, .economy-slot { padding-top: .4rem; padding-bottom: .4rem; }
+  .action-row { padding-top: .5rem; padding-bottom: .5rem; }
+}

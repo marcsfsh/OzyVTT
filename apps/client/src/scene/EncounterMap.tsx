@@ -128,6 +128,9 @@ export function EncounterMap({
   const [eyeOpen, setEyeOpen] = useState(false);
   const [wrenchOpen, setWrenchOpen] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
+  // Combat-first: only Select/Ping/Measure earn permanent icons; the drawing toolkit (shapes,
+  // color, visibility, layer, cleanup) sits behind one Draw toggle so the corner isn't icon soup.
+  const [drawOpen, setDrawOpen] = useState(false);
   const [gmLayer, setGmLayer] = useState(false);
   const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ffb52e" : PLAYER_COLORS[0]));
   useEffect(() => { localStorage.setItem("vtt.annotation-color", sessionColor); }, [sessionColor]);
@@ -503,45 +506,50 @@ export function EncounterMap({
     : [{ scope: "mine", label: "Remove all my shapes" }];
 
   return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onContextMenu={onContextMenu}>
-    <div className="encounter-map-help"><strong>{role === "gm" ? "Drag any token to move it" : "Drag your highlighted character"}</strong><span>{role === "gm" ? "Calibrated maps snap automatically. Drop a token back in the tray to remove it from the map." : "Other tokens are view-only. Your moves snap automatically when the map has a grid."} Scroll or pinch to zoom; drag empty map space to pan.</span></div>
-    <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Unplaced token tray">
+    {/* No permanent tutorial captions (ux-principles: if it needs a banner, redesign it) — the tray
+        appears only while it has tokens to place or a drag could drop one back in. */}
+    {(unplaced.length > 0 || dragging) && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Unplaced token tray">
       <div><strong>Token tray</strong><span>{unplaced.length ? "Drag onto the map, click to place near its center, or press Enter." : "Drag a token here to take it off the map."}</span></div>
       <div className="encounter-token-tray-list">{unplaced.map((encounterToken) => {
         const actor = actorsById.get(encounterToken.actorId); if (!actor) return null;
         return <button key={encounterToken.actorId} data-token-id={encounterToken.actorId} className={`tray-token ${actor.kind}${actor.visibility === "gm-only" ? " hidden" : ""}`} disabled={busyActorId !== null} onClick={() => placeAtCenter(encounterToken.actorId)}><span>{initialsOf(actor.name)}</span><strong>{actor.name}</strong></button>;
       })}</div>
-    </div>
+    </div>}
     <div className={`encounter-map-stage${dock?.node ? ` has-dock has-dock-${dock.position}` : ""}`} ref={stageRef} style={dock?.node ? ({ "--dock-side-width": `${dock.width}px` } as React.CSSProperties) : undefined} aria-busy={image.status !== "ready"}>
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
-          <div className="encounter-map-eye">
-            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={eyeOpen} title={`New drawings visible to: ${VISIBILITY_SHORT[defaultVisibility]}`} onClick={() => { setEyeOpen((v) => !v); setWrenchOpen(false); }}>👁</button>
-            {eyeOpen && <div className="encounter-map-menu" role="menu">
-              <p className="encounter-map-menu-title">New drawings visible to</p>
-              {visibilityOptions.map((option) => <button key={option.value} type="button" role="menuitemradio" aria-checked={defaultVisibility === option.value} className={defaultVisibility === option.value ? "selected" : ""} onClick={() => { setDefaultVisibility(option.value); if (option.value !== "gm-actor") setEyeOpen(false); }}>{option.label}</button>)}
-              {defaultVisibility === "gm-actor" && <label className="encounter-map-menu-select">Character<select value={defaultActorId ?? ""} onChange={(event) => setDefaultActorId(event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
-            </div>}
-          </div>
-          <div className="encounter-map-color">
-            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={colorOpen} title={`Your drawing color: ${sessionColor}`} style={{ color: sessionColor }} onClick={() => { setColorOpen((v) => !v); setEyeOpen(false); setWrenchOpen(false); }}>🎨</button>
-            {colorOpen && <div className="encounter-map-menu" role="menu">
-              <p className="encounter-map-menu-title">Your color</p>
-              <div className="encounter-map-swatches">{PLAYER_COLORS.map((swatch) => <button key={swatch} type="button" aria-label={swatch} className={sessionColor.toLowerCase() === swatch ? "selected" : ""} style={{ background: swatch }} onClick={() => { setSessionColor(swatch); setColorOpen(false); }} />)}</div>
-              <label className="encounter-map-menu-select">Custom<input type="color" value={sessionColor} onChange={(event) => setSessionColor(event.target.value)} /></label>
-            </div>}
-          </div>
-          <div className="encounter-map-tools">
-            {TOOLS.map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id !== "select" && entry.id !== "ping" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-          </div>
-          <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on — extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active — new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
-          <div className="encounter-map-wrench">
-            <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
-            {wrenchOpen && <div className="encounter-map-menu" role="menu">
-              {wrenchScopes.map((entry) => <button key={entry.scope} type="button" role="menuitem" onClick={() => clearAnnotations(entry.scope)}>{entry.label}</button>)}
-            </div>}
-          </div>
+          {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools — shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
+          {drawOpen && <>
+            <div className="encounter-map-tools">
+              {TOOLS.filter((entry) => entry.id === "circle" || entry.id === "cone" || entry.id === "line" || entry.id === "square").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={!calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+            </div>
+            <div className="encounter-map-eye">
+              <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={eyeOpen} title={`New drawings visible to: ${VISIBILITY_SHORT[defaultVisibility]}`} onClick={() => { setEyeOpen((v) => !v); setWrenchOpen(false); }}>👁</button>
+              {eyeOpen && <div className="encounter-map-menu" role="menu">
+                <p className="encounter-map-menu-title">New drawings visible to</p>
+                {visibilityOptions.map((option) => <button key={option.value} type="button" role="menuitemradio" aria-checked={defaultVisibility === option.value} className={defaultVisibility === option.value ? "selected" : ""} onClick={() => { setDefaultVisibility(option.value); if (option.value !== "gm-actor") setEyeOpen(false); }}>{option.label}</button>)}
+                {defaultVisibility === "gm-actor" && <label className="encounter-map-menu-select">Character<select value={defaultActorId ?? ""} onChange={(event) => setDefaultActorId(event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
+              </div>}
+            </div>
+            <div className="encounter-map-color">
+              <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={colorOpen} title={`Your drawing color: ${sessionColor}`} style={{ color: sessionColor }} onClick={() => { setColorOpen((v) => !v); setEyeOpen(false); setWrenchOpen(false); }}>🎨</button>
+              {colorOpen && <div className="encounter-map-menu" role="menu">
+                <p className="encounter-map-menu-title">Your color</p>
+                <div className="encounter-map-swatches">{PLAYER_COLORS.map((swatch) => <button key={swatch} type="button" aria-label={swatch} className={sessionColor.toLowerCase() === swatch ? "selected" : ""} style={{ background: swatch }} onClick={() => { setSessionColor(swatch); setColorOpen(false); }} />)}</div>
+                <label className="encounter-map-menu-select">Custom<input type="color" value={sessionColor} onChange={(event) => setSessionColor(event.target.value)} /></label>
+              </div>}
+            </div>
+            <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
+            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on — extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
+            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active — new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
+            <div className="encounter-map-wrench">
+              <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
+              {wrenchOpen && <div className="encounter-map-menu" role="menu">
+                {wrenchScopes.map((entry) => <button key={entry.scope} type="button" role="menuitem" onClick={() => clearAnnotations(entry.scope)}>{entry.label}</button>)}
+              </div>}
+            </div>
+          </>}
         </div>
 
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>

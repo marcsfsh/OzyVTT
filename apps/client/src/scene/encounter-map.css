@@ -160,3 +160,8 @@
 
 .encounter-map-scene-live { display: inline-flex; gap: .35rem; }
 .encounter-map-scene-live .scene-golive { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+
+/* Narrow viewports: a saved left/right dock must never squeeze the map to a sliver. */
+@media (max-width: 700px) {
+  .encounter-map-dock.dock-right, .encounter-map-dock.dock-left { width: min(var(--dock-side-width), 62vw); }
+}
