@@ -60,4 +60,5 @@
 .token-health-down { fill: #d9605a; }
 .token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.token-condition-glyph { fill: #e4d7fa; }
 .token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }

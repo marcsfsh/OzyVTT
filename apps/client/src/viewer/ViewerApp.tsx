@@ -14,7 +14,7 @@ export type Presentation = Readonly<{
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
   initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[] }>[] }>;
-  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; tokenAssetId?: string }>[]; annotations?: readonly ViewerAnnotation[] }>;
+  encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; conditionIds?: readonly string[]; tokenAssetId?: string }>[]; annotations?: readonly ViewerAnnotation[] }>;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -154,7 +154,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
       })}
       {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
         <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} imageUrl={token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
-        <TokenStatusBadges sizePx={token.sizePx} health={token.health ?? "healthy"} conditions={token.conditions ?? []} />
+        <TokenStatusBadges sizePx={token.sizePx} health={token.health ?? "healthy"} conditions={(token.conditions ?? []).map((label, index) => ({ id: token.conditionIds?.[index] ?? null, label }))} />
       </g>)}
       {measurementPoints && <polyline className="viewer-measurement" points={measurementPoints} />}
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>

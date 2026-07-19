@@ -46,6 +46,8 @@ export type ViewerEncounterToken = Readonly<{
   active: boolean;
   health: "healthy" | "bloodied" | "down";
   conditions: readonly string[];
+  /** Content-bundle condition ids parallel to `conditions` — the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
+  conditionIds?: readonly string[];
   tokenAssetId?: string;
 }>;
 
@@ -170,6 +172,15 @@ function conditionList(value: unknown): readonly string[] {
   return value.slice(0, 20).map((label) => safeText(String(label), "Condition label", 60));
 }
 
+function conditionIdList(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 20).map((id) => {
+    const text = String(id);
+    if (!/^[a-z0-9-]{1,60}$/.test(text)) throw new Error("Condition ids must be lowercase content-bundle slugs.");
+    return text;
+  });
+}
+
 function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   const mapAssetId = value.mapAssetId === null ? null : safeText(value.mapAssetId, "Encounter map asset ID", 128);
   if (value.tokens.length > 200) throw new Error("Viewer encounter cannot exceed 200 tokens.");
@@ -182,7 +193,7 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     if (token.active) activeTokens++;
     if (token.kind !== "player-character" && token.kind !== "monster" && token.kind !== "npc") throw new Error("Viewer token kind is invalid.");
     if (!Number.isFinite(token.sizePx) || token.sizePx <= 0 || token.sizePx > 4096) throw new Error("Viewer token size is invalid.");
-    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions) };
+    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions), ...(token.conditionIds ? { conditionIds: conditionIdList(token.conditionIds) } : {}) };
   });
   if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
   if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");

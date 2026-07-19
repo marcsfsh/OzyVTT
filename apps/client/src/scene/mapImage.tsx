@@ -112,27 +112,59 @@ export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, body
 }
 
 /**
+ * Original minimal glyphs (16×16 box) for the SRD conditions, so a token reads "poisoned, prone"
+ * at a glance instead of "P, P". Unknown ids fall back to the initial letter. Shared by the table
+ * client and the viewer; drawn as single filled paths (fill-rule evenodd carves the cutouts).
+ */
+const CONDITION_GLYPHS: Record<string, string> = {
+  blinded: "M8 4.6C4.9 4.6 2.6 8 2.6 8s2.3 3.4 5.4 3.4S13.4 8 13.4 8 11.1 4.6 8 4.6zm0 1.9A1.5 1.5 0 1 1 8 9.5 1.5 1.5 0 0 1 8 6.5zM3.9 2.8l9.3 9.3-1.1 1.1L2.8 3.9z",
+  charmed: "M8 13.4 3.4 8.8a3 3 0 0 1 4.2-4.2l.4.4.4-.4a3 3 0 0 1 4.2 4.2z",
+  deafened: "M3 6.2v3.6h2.4L9 12.8V3.2L5.4 6.2H3zM12.1 3l1.1 1.1-8.2 8.2-1.1-1.1z",
+  exhaustion: "M3.2 3.6h5.6v1.6L5.6 8.4h3.2V10H3.2V8.4l3.2-3.2H3.2zM9.4 9.4h4v1.3l-2.1 2.1h2.1V14h-4v-1.3l2.1-2.1H9.4z",
+  frightened: "M6.9 2.6h2.2v6.8H6.9zM6.9 11h2.2v2.4H6.9z",
+  grappled: "M5.4 4.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm0 1.7a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4zM10.6 4.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm0 1.7a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4z",
+  incapacitated: "M7.1 2.2h1.8v4l3.5-2 .9 1.5-3.5 2 3.5 2-.9 1.6-3.5-2v4H7.1v-4l-3.5 2-.9-1.6 3.5-2-3.5-2 .9-1.5 3.5 2z",
+  invisible: "M8 2.8a4.2 4.2 0 0 0-4.2 4.2v6.2l1.7-1.4 1.25 1.4L8 11.8l1.25 1.4 1.25-1.4 1.7 1.4V7A4.2 4.2 0 0 0 8 2.8z",
+  paralyzed: "M9.2 2 3.8 9h3l-1.2 5 5.6-7.2h-3z",
+  petrified: "M5.2 3.2h5.6l2.8 4.8-2.8 4.8H5.2L2.4 8z",
+  poisoned: "M8 2.2S4.2 7 4.2 9.8a3.8 3.8 0 0 0 7.6 0C11.8 7 8 2.2 8 2.2z",
+  prone: "M2.2 9.4h8.6v2.6H2.2zM13 12.4a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8z",
+  restrained: "M3.2 3h1.8v10H3.2zM7.1 3h1.8v10H7.1zM11 3h1.8v10H11z",
+  stunned: "M8 2.2l1.5 3.6 3.9.3-3 2.6.9 3.8L8 10.4l-3.3 2.1.9-3.8-3-2.6 3.9-.3z",
+  unconscious: "M10.5 2.5A6 6 0 1 0 13.5 12 7 7 0 0 1 10.5 2.5z"
+};
+
+export type TokenConditionBadge = Readonly<{ id: string | null; label: string }>;
+
+/**
  * Health/condition badges layered over a token: a bloodied/down dot at the top-right and up
- * to three condition initials beneath the body (with a +N overflow). Shared by the table
+ * to three condition glyphs beneath the body (with a +N overflow). Shared by the table
  * client and the viewer so both read the same at a glance.
  */
-export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly string[] }>) {
+export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[] }>) {
   const radius = Math.max(4, sizePx * 0.11);
   const shown = conditions.slice(0, 3);
   const overflow = conditions.length - shown.length;
   const badgeY = sizePx * 0.5 + radius * 1.15;
   const startX = -((shown.length + (overflow > 0 ? 1 : 0)) - 1) * radius * 1.1;
+  const names = conditions.map((condition) => condition.label).join(", ");
   return <>
     {health !== "healthy" && <circle className={`token-health token-health-${health}`} cx={sizePx * 0.38} cy={-sizePx * 0.38} r={radius}>
       <title>{health === "down" ? "Down" : "Bloodied"}</title>
     </circle>}
-    {shown.map((label, index) => <g key={label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>
-      <title>{conditions.join(", ")}</title>
-      <circle r={radius} />
-      <text style={{ fontSize: radius * 1.25 }}>{label[0]?.toUpperCase() ?? "?"}</text>
-    </g>)}
+    {shown.map((condition, index) => {
+      const glyph = condition.id !== null ? CONDITION_GLYPHS[condition.id] : undefined;
+      return <g key={condition.label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>
+        <title>{names}</title>
+        <circle r={radius} />
+        {glyph
+          // The 16×16 glyph box scales onto the badge's inscribed square, centered on the circle.
+          ? <path className="token-condition-glyph" d={glyph} fillRule="evenodd" transform={`translate(${-radius * 0.82} ${-radius * 0.82}) scale(${(radius * 1.64) / 16})`} />
+          : <text style={{ fontSize: radius * 1.25 }}>{condition.label[0]?.toUpperCase() ?? "?"}</text>}
+      </g>;
+    })}
     {overflow > 0 && <g className="token-condition token-condition-more" transform={`translate(${startX + shown.length * radius * 2.2} ${badgeY})`}>
-      <title>{conditions.join(", ")}</title>
+      <title>{names}</title>
       <circle r={radius} />
       <text style={{ fontSize: radius * 1.1 }}>+{overflow}</text>
     </g>}

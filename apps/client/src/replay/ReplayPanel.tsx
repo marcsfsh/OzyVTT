@@ -80,7 +80,7 @@ function ReplayStage({ state, gmToken }: Readonly<{ state: GameState; gmToken: s
         const active = state.combat.turnActorId === actor.id;
         return <g key={token.actorId} className={`replay-token${actor.visibility === "gm-only" ? " replay-token-hidden" : ""}`} transform={`translate(${token.position.x} ${token.position.y})`}>
           <AuthorizedTokenGlyph assetId={actor.tokenAssetId ?? null} token={gmToken} sizePx={token.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={token.sizePx * 0.72} initialsStyle={{ fontSize: Math.max(10, token.sizePx * 0.34) }} nameStyle={{ fontSize: Math.max(9, token.sizePx * 0.23) }} />
-          <TokenStatusBadges sizePx={token.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map(conditionBadgeLabel)} />
+          <TokenStatusBadges sizePx={token.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map((condition) => ({ id: condition.id, label: conditionBadgeLabel(condition) }))} />
         </g>;
       })}
     </svg>

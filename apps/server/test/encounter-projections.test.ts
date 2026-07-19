@@ -40,7 +40,15 @@ describe("recipient-safe encounter projections", () => {
     const state = game(PUBLIC);
     expect(projectPlayerCombat(state)).toMatchObject({ turnActorId: PUBLIC, hiddenTurn: false, initiative: [{ actorId: PUBLIC, active: true }] });
     expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true, health: "healthy", conditions: [] }] });
-    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [] }], annotations: [] });
+    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [], conditionIds: [] }], annotations: [] });
+  });
+
+  it("sends condition ids parallel to the display labels so the viewer picks matching glyphs", () => {
+    const state = game(PUBLIC);
+    state.actors = state.actors.map((actor) => actor.id === PUBLIC ? { ...actor, conditions: [{ id: "poisoned" }, { id: "exhaustion", level: 3 }] } : actor);
+    const token = projectViewerEncounterScene(state).tokens[0];
+    expect(token.conditions).toEqual(["Poisoned", "Exhaustion 3"]);
+    expect(token.conditionIds).toEqual(["poisoned", "exhaustion"]);
   });
 
   it("hides the Initiative list after combat ends", () => {

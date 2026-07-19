@@ -40,6 +40,8 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
         active: state.combat.turnActorId === actor.id,
         health: healthBandOf(actor.hp),
         conditions: conditionLabels(actor),
+        // Ids parallel the labels so the shared screen picks the same glyphs as the table; public actors only.
+        conditionIds: actor.conditions.map((condition) => condition.id),
         ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {})
       }] : [];
     }),
