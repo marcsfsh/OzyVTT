@@ -211,12 +211,21 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       instance = components ? { actorId: attacker.id, components } : null;
     } else if (active) {
       const components = { ...active.components };
-      if ((components[action.id] ?? 0) > 0) {
+      const componentName = (id: string) => id === "attack" ? "attack" : definition?.actions.find((candidate) => candidate.id === id)?.name ?? id;
+      const leftovers = () => Object.entries(components).filter(([, count]) => count > 0).map(([id, count]) => `${count}× ${componentName(id)}`);
+      if (action.multiattack) {
+        // Tapping the Multiattack plan mid-instance is a continue, not a violation — a fresh
+        // component resolve already opened the plan, so the GM never has to select it first.
+        if (leftovers().length === 0) (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: `${attacker.name} has no attacks remaining in this action.` });
+      } else if ((components[action.id] ?? 0) > 0) {
         components[action.id] -= 1;
       } else if (action.attack && (components["attack"] ?? 0) > 0) {
         components["attack"] -= 1;
       } else {
-        (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: `${attacker.name} has no attacks remaining in this action.` });
+        const named = leftovers();
+        (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: named.length > 0
+          ? `${attacker.name} has no ${action.name} left in this action — remaining: ${named.join(", ")}.`
+          : `${attacker.name} has no attacks remaining in this action.` });
       }
       instance = { actorId: attacker.id, components };
     } else {

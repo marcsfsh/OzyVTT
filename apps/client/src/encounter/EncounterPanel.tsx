@@ -22,7 +22,7 @@ const validInitiativeScore = (value: string | undefined) => value !== undefined 
 export const DOCK_POSITIONS = ["sidebar", "left", "right"] as const;
 export type DockPosition = (typeof DOCK_POSITIONS)[number];
 type DockControl = Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;
-type GmProps = Readonly<{ role: "gm"; state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>;
+type GmProps = Readonly<{ role: "gm"; state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>;
 type PlayerProps = Readonly<{ role: "player"; state: PlayerView; dock?: DockControl }>;
 
 // The glyph is a square with the shaded half showing which edge the panel lands on (left/right),
@@ -291,10 +291,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     </section>;
   }
 
-  return <GmEncounterPanel state={props.state} selectedMap={props.selectedMap} dock={props.dock} />;
+  return <GmEncounterPanel state={props.state} selectedMap={props.selectedMap} mapLibrary={props.mapLibrary} onSelectMap={props.onSelectMap} dock={props.dock} />;
 }
 
-function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; dock?: DockControl }>) {
+function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>) {
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
@@ -306,6 +306,9 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
+  // Accordion: rows are one line by default; at most one row's tools (HP editor, condition/effect
+  // editors, sheet) are open at a time. hpActorId additionally focuses the HP amount input.
+  const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
   const [hpActorId, setHpActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
   const cancelEditRef = useRef(false);
@@ -418,7 +421,17 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
     <DockPicker dock={dock} />
     {!state.combat.active ? <>
       <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
-      <div className="encounter-map"><span>Encounter map</span><strong>{selectedMap?.name ?? "Pick a map on the Maps tab"}</strong></div>
+      {/* The battlemap is picked right here — starting a fight never requires a Maps-tab visit
+          (upload/calibration still live there). */}
+      <label className="encounter-map">
+        <span>Encounter map</span>
+        {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").length > 0 && onSelectMap
+          ? <select value={selectedMap?.kind === "battlemap" ? selectedMap.id : ""} disabled={busy} onChange={(event) => { const map = (mapLibrary ?? []).find((candidate) => candidate.id === event.target.value); if (map) onSelectMap(map); }}>
+              {selectedMap?.kind !== "battlemap" && <option value="" disabled>Choose a battlemap…</option>}
+              {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
+            </select>
+          : <strong>{selectedMap?.name ?? "Upload a battlemap on the Map Setup tab first"}</strong>}
+      </label>
       <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
         <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
         <div className="combatant-tools">
@@ -467,27 +480,41 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
         const active = state.combat.turnActorId === entry.actorId;
         const editing = editingActorId === entry.actorId;
         const down = actor !== undefined && actor.hp.current <= 0;
-        return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}`.trim()} aria-current={active ? "step" : undefined}>
+        const expanded = expandedActorId === entry.actorId;
+        return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}${expanded ? " expanded" : ""}`.trim()} aria-current={active ? "step" : undefined}>
           <div className="initiative-row-main">
-            <span className="initiative-name">{active && <span className="initiative-caret" aria-hidden="true">▶</span>}{actor ? <button type="button" className="initiative-sheet-link" title={`Open ${actor.name}'s sheet`} onClick={() => setSheetActorId(actor.id)}>{actor.name}</button> : <span>Removed combatant</span>}{actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}</span>
+            {/* One line by default: the name button expands this row's tools (HP editor, conditions,
+                effects, sheet); condition badges stay visible inline so nothing important hides. */}
+            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Collapse" : `Manage ${actor?.name ?? "combatant"} — HP, conditions, effects, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpActorId(null); setHpAmount(""); }}>
+              {active && <span className="initiative-caret" aria-hidden="true">▶</span>}
+              <strong className="initiative-name-text">{actor?.name ?? "Removed combatant"}</strong>
+              {actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}
+              {actor && <ConditionChips conditions={actor.conditions} />}
+            </button>
             <span className="initiative-row-side">
               {actor && <button type="button" className="initiative-reaction" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title={state.combat.reactionsUsed.includes(actor.id) ? "Reaction spent — tap to restore" : "Reaction available — tap to spend (usable off-turn)"} aria-label={`Reaction for ${actor.name}`} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>R</button>}
-              {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Track hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={hpActorId === entry.actorId} onClick={() => { setHpActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
+              {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Adjust hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={expanded} onClick={() => { setExpandedActorId(entry.actorId); setHpActorId(entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
               {editing
                 ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
                 : <button type="button" className="initiative-score-value" disabled={busy} title="Click to edit initiative" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
             </span>
           </div>
-          {hpActorId === entry.actorId && actor && <div className="hp-editor" role="group" aria-label={`Adjust hit points for ${actor.name}`}>
-            <input type="number" min="0" max="1000" placeholder="0" autoFocus aria-label="Amount" value={hpAmount} onChange={(event) => setHpAmount(event.target.value)} />
-            <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
-            <button type="button" disabled={busy} title="Nonlethal damage — a drop to 0 knocks out (Unconscious and stable) instead of dying" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name, { nonlethal: true })}>KO</button>
-            <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
-            <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
-            <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
-          </div>}
-          {actor && <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />}
-          {actor && <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />}
+          {expanded && actor && <>
+            <div className="hp-editor" role="group" aria-label={`Adjust hit points for ${actor.name}`}>
+              <input type="number" min="0" max="1000" placeholder="0" autoFocus={hpActorId === entry.actorId} aria-label="Amount" value={hpAmount}
+                onChange={(event) => setHpAmount(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") adjustHp("actor:apply-damage", entry.actorId, actor.name); else if (event.key === "Escape") { setExpandedActorId(null); setHpActorId(null); } }} />
+              <button type="button" disabled={busy} title="Apply as damage (or press Enter)" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
+              <button type="button" disabled={busy} title="Nonlethal damage — a drop to 0 knocks out (Unconscious and stable) instead of dying" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name, { nonlethal: true })}>KO</button>
+              <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
+              <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
+              <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
+            </div>
+            <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />
+            <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />
+            <div className="initiative-row-tools"><button type="button" className="secondary" onClick={() => setSheetActorId(actor.id)}>Open sheet</button></div>
+          </>}
+          {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
           {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} />}
           {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} />)}
           {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} />)}

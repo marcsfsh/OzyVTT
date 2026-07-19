@@ -13,6 +13,7 @@ import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, ha
 import { applyRest } from "../src/rests.js";
 import { applyTimelineRestore } from "../src/combat-history.js";
 import { applyMovementRules } from "../src/movement-rules.js";
+import { creatureDistance, mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
 
@@ -1252,5 +1253,90 @@ describe("knocking out a creature (SRD) — nonlethal damage", () => {
     const outcome = applyDamageDetailed(game, IDS.croc1, { amount: 85, nonlethal: true, sourceName: "Pommel strike" }, { role: "gm" }, { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition });
     expect(outcome.application.defeated).toBe(false);
     expect(game.actors.find((actor) => actor.id === IDS.croc1)!.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
+  });
+});
+
+describe("multiattack ergonomics — no pre-selection needed (report bug 5)", () => {
+  it("tapping Multiattack mid-instance continues the plan instead of blocking; a spent plan still rejects", () => {
+    const game = buildGame([{ actorId: IDS.croc1, score: 20 }, { actorId: IDS.torva, score: 8 }]);
+    // Bite straight away (no Multiattack tap first): the plan opens with the Tail still owed.
+    // (Face 2 misses AC 15 so the grapple rider doesn't block the Tail's later targeting.)
+    resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [2, 6, 6, 6]);
+    expect(game.combat.turn.actionInstance).toEqual({ actorId: IDS.croc1, components: { bite: 0, tail: 1 } });
+    // Tapping the Multiattack row now is a continue (reports the remaining plan), not an override dialog.
+    const plan = resolve(game, crocodileDefinition, "multiattack", { actorId: IDS.croc1 }, []);
+    expect(plan.componentsRemaining).toEqual({ bite: 0, tail: 1 });
+    // A second Bite names what IS left instead of a dead-end message.
+    expect(() => resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [2, 6, 6, 6]))
+      .toThrow(/no Bite left in this action — remaining: 1× Tail/);
+    // Spend the Tail; with the plan empty, Multiattack rejects like any exhausted action.
+    resolve(game, crocodileDefinition, "tail", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [10, 6, 6, 6, 6]);
+    expect(() => resolve(game, crocodileDefinition, "multiattack", { actorId: IDS.croc1 }, []))
+      .toThrow(/no attacks remaining/);
+  });
+});
+
+describe("creature size and distance — footprint-aware, edge-to-edge (SRD Creature Size / Space)", () => {
+  // 50 px cells at 5 ft, no rotation: cell centers at 25+50k, intersections at 50k.
+  const CALIBRATION = { kind: "square" as const, origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 };
+  const CALIBRATED = { width: 900, height: 600, calibration: CALIBRATION } as const;
+  const medium = (x: number, y: number) => ({ position: { x, y }, sizeCells: 1, sizePx: 41 });
+  const large = (x: number, y: number) => ({ position: { x, y }, sizeCells: 2, sizePx: 96 });
+  const huge = (x: number, y: number) => ({ position: { x, y }, sizeCells: 3, sizePx: 146 });
+
+  it("a Medium creature adjacent to a Large or Huge one is 5 ft away, not its center-to-center 7.5-10 ft", () => {
+    // Large 2x2 centers on an intersection: center-to-center reads 1.5 cells; edge-to-edge is 1 cell.
+    expect(creatureDistance(CALIBRATED, medium(25, 75), large(100, 100))!.value).toBe(5);
+    // Huge 3x3 centers on a cell: center-to-center reads 2 cells (10 ft); edge-to-edge is 5 ft.
+    expect(creatureDistance(CALIBRATED, medium(25, 125), huge(125, 125))!.value).toBe(5);
+    // Two Medium neighbors stay 5 ft; a genuinely distant Large reads its true gap.
+    expect(creatureDistance(CALIBRATED, medium(25, 75), medium(75, 75))!.value).toBe(5);
+    expect(creatureDistance(CALIBRATED, medium(25, 75), large(300, 100))!.value).toBe(25);
+  });
+
+  it("an adjacent Medium attacker can melee a Huge creature (report bug: 'reportedly 10 ft away when in fact 5 ft')", () => {
+    const game = buildGame();
+    game.combat = { ...game.combat, tokens: game.combat.tokens.map((token) =>
+      token.actorId === IDS.torva ? { ...token, position: { x: 75, y: 125 } }
+      : token.actorId === IDS.croc1 ? { ...token, position: { x: 175, y: 125 }, sizeCells: 3, sizePx: 146 }
+      : token) };
+    const distanceFeet = (a: string, b: string) => tokenCreatureDistance(game, CALIBRATED, a, b)?.value ?? null;
+    expect(distanceFeet(IDS.torva, IDS.croc1)).toBe(5); // center-to-center would read 10
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6], distanceFeet);
+    expect(swing.attack).not.toBeNull(); // no range.out-of-reach throw
+  });
+
+  it("a Large/Huge creature moving out of reach still provokes the opportunity attack (report bug 3)", () => {
+    const game = buildGame([{ actorId: IDS.croc1, score: 20 }, { actorId: IDS.torva, score: 8 }]); // croc's turn
+    game.combat = { ...game.combat, tokens: game.combat.tokens.map((token) =>
+      token.actorId === IDS.torva ? { ...token, position: { x: 75, y: 125 } }
+      : token.actorId === IDS.croc1 ? { ...token, position: { x: 175, y: 125 }, sizeCells: 3, sizePx: 146 }
+      : token) };
+    const crocToken = game.combat.tokens.find((token) => token.actorId === IDS.croc1)!;
+    const outcome = applyMovementRules(game, {
+      actorId: IDS.croc1,
+      from: { x: 175, y: 125 },
+      to: { x: 425, y: 125 },
+      distance: (a, b) => mapDistance(CALIBRATED, a, b)?.value ?? null,
+      creatureDistance: (enemy, moverPoint) => {
+        const enemyToken = game.combat.tokens.find((token) => token.actorId === enemy.actorId)!;
+        return creatureDistance(CALIBRATED, { position: enemy.position, sizeCells: enemyToken.sizeCells, sizePx: enemyToken.sizePx }, { position: moverPoint, sizeCells: crocToken.sizeCells, sizePx: crocToken.sizePx })?.value ?? null;
+      },
+      override: { reason: "test: ignore the budget" },
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+      newPromptId: () => "70000000-0000-4000-8000-000000000f01",
+      now: () => 0,
+      commandId: nextCommandId()
+    });
+    // Center-to-center the croc's from-position read 10 ft from Torva (beyond his 5 ft reach), so the
+    // old math thought it was never in reach and no prompt fired. Edge-to-edge it starts at 5 ft.
+    expect(outcome.prompts).toEqual([{ actorId: IDS.torva, name: "Torva Grimtusk" }]);
+  });
+
+  it("gridless maps with a saved scale subtract each token's radius beyond its central cell", () => {
+    const scaled = { width: 900, height: 600, calibration: null, scale: { distancePerPixel: 0.1, unit: "ft" } } as const;
+    // Centers 100 px apart -> 10 ft raw; the huge token's extra radius (146 - 146/3)/2 ≈ 48.7 px trims it to ~5.1 ft.
+    const value = creatureDistance(scaled, medium(100, 100), { position: { x: 200, y: 100 }, sizeCells: 3, sizePx: 146 })!.value;
+    expect(value).toBeCloseTo(5.13, 1);
   });
 });

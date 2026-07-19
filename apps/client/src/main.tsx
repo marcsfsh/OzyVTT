@@ -47,6 +47,7 @@ function App() {
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
   const [gmToken, setGmToken] = useState<string | null>(null);
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
+  const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const previewSceneId = usePreviewScene();
@@ -90,6 +91,23 @@ function App() {
   }, []);
   useEffect(() => { localStorage.setItem("vtt.dock-position", dockPosition); }, [dockPosition]);
   useEffect(() => { localStorage.setItem("vtt.dock-width", String(dockWidth)); }, [dockWidth]);
+  // The map library loads with the GM session (refreshed on returning to the Encounter tab) so
+  // encounter setup can pick a battlemap directly — starting a fight never requires a Maps-tab visit.
+  useEffect(() => {
+    if (!gmToken || (gmTab !== "table" && gmTab !== "maps")) return;
+    let cancelled = false;
+    fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${gmToken}` } })
+      .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error?.message ?? "Couldn't load the map library."); return body.data.assets as ReadonlyArray<MapSelection & { kind: MapSelection["kind"] }>; })
+      .then((assets) => {
+        if (cancelled) return;
+        const library = assets.map((asset) => ({ id: asset.id, name: asset.name, kind: asset.kind, width: asset.width, height: asset.height, calibration: asset.calibration, scale: asset.scale }));
+        setMapLibrary(library);
+        // Default the selection to the newest battlemap so Start is one click away on first login.
+        setSelectedMap((current) => current && library.some((map) => map.id === current.id) ? current : library.find((map) => map.kind === "battlemap") ?? null);
+      })
+      .catch(() => { /* the Maps tab surfaces library errors; setup just stays pickable-empty */ });
+    return () => { cancelled = true; };
+  }, [gmToken, gmTab]);
 
   const joinPlayer = () => {
     setBusy(true);
@@ -155,7 +173,7 @@ function App() {
   const encounterDock = combatMapActive ? { position: dockPosition, onChange: setDockPosition } : undefined;
   const encounterPanel = state
     ? (mode === "gm"
-      ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} dock={encounterDock} />
+      ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} mapLibrary={mapLibrary} onSelectMap={setSelectedMap} dock={encounterDock} />
       : <EncounterPanel role="player" state={state as PlayerView} dock={encounterDock} />)
     : null;
   // The map dock is present whenever combat is running (even in sidebar mode) so its in-map dock
@@ -236,7 +254,7 @@ function App() {
       </div>}
 
       {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
-      {mode === "gm" && gmToken && gmTab === "maps" && <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} />}
+      {mode === "gm" && gmToken && gmTab === "maps" && <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} />}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
 
@@ -247,7 +265,7 @@ function App() {
       {mode === "gm" && gmToken && scenePrepOpen && state && <div className="scene-prep-backdrop" role="dialog" aria-modal="true" aria-label="Scene prep" onPointerDown={(event) => { if (event.target === event.currentTarget) setScenePrepOpen(false); }}>
         <div className="scene-prep-modal">
           <button type="button" className="scene-prep-close" aria-label="Close scene prep" onClick={() => setScenePrepOpen(false)}>✕</button>
-          <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} />
+          <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} />
         </div>
       </div>}
 

@@ -1,4 +1,5 @@
 import type { EncounterTokenPosition, GameState } from "@vtt/domain";
+import { imageToGrid } from "./grid-calibration.js";
 import { measureGridPath } from "./map-measurement.js";
 import type { TokenMapGeometry } from "./token-placement.js";
 
@@ -32,6 +33,39 @@ export function mapDistance(geometry: TokenMapGeometry, from: Point, to: Point):
   return null;
 }
 
+export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; sizePx: number }>;
+
+/**
+ * Rules-facing distance between two creatures: edge-to-edge, footprint-aware. The SRD measures from
+ * the nearest point of each creature's space, so a Medium creature adjacent to a Large (2x2) one is
+ * 5 ft away — not the 10 ft its center-to-center line reads (a 2x2 token centers on a grid
+ * intersection). Grid maps subtract each footprint's half-width in cells; scaled gridless maps
+ * subtract each token's radius beyond its central cell. Null when the map is unmeasurable.
+ */
+export function creatureDistance(geometry: TokenMapGeometry, a: CreatureFootprint, b: CreatureFootprint): Readonly<{ value: number; unit: string }> | null {
+  if (geometry.calibration) {
+    const gridA = imageToGrid(geometry.calibration, a.position);
+    const gridB = imageToGrid(geometry.calibration, b.position);
+    const centerCells = Math.max(Math.abs(gridA.column - gridB.column), Math.abs(gridA.row - gridB.row));
+    const edgeCells = Math.max(0, centerCells - (Math.max(1, a.sizeCells) - 1) / 2 - (Math.max(1, b.sizeCells) - 1) / 2);
+    return { value: edgeCells * geometry.calibration.distancePerCell, unit: "ft" };
+  }
+  if (geometry.scale) {
+    const beyondCentralCell = (footprint: CreatureFootprint) => (footprint.sizePx - footprint.sizePx / Math.max(1, footprint.sizeCells)) / 2;
+    const centerPx = Math.hypot(b.position.x - a.position.x, b.position.y - a.position.y);
+    return { value: Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel, unit: geometry.scale.unit };
+  }
+  return null;
+}
+
+/** creatureDistance from encounter-token lookups: null when either combatant is unplaced. */
+export function tokenCreatureDistance(state: GameState, geometry: TokenMapGeometry, actorIdA: string, actorIdB: string): Readonly<{ value: number; unit: string }> | null {
+  const tokenA = state.combat.tokens.find((token) => token.actorId === actorIdA);
+  const tokenB = state.combat.tokens.find((token) => token.actorId === actorIdB);
+  if (!tokenA?.position || !tokenB?.position) return null;
+  return creatureDistance(geometry, { position: tokenA.position, sizeCells: tokenA.sizeCells ?? 1, sizePx: tokenA.sizePx }, { position: tokenB.position, sizeCells: tokenB.sizeCells ?? 1, sizePx: tokenB.sizePx });
+}
+
 function formatDistance(distance: Readonly<{ value: number; unit: string }>): string {
   const rounded = distance.value >= 100 ? Math.round(distance.value) : Math.round(distance.value * 10) / 10;
   return `${rounded} ${distance.unit}`;
@@ -60,17 +94,21 @@ export function narrateTokenMove(input: Readonly<{
   const moved = from === null ? null : mapDistance(geometry, from, to);
   if (from !== null && moved !== null && Math.round(moved.value * 10) === 0) return null; // snapped back to the same spot
 
-  // Old → new range to every other placed combatant, in initiative order.
+  // Old → new range to every other placed combatant, in initiative order — footprint-aware, so the
+  // narrated range matches what the rules engine will enforce (a Large neighbor reads 5 ft, not 10).
+  const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  const moverAt = (point: Point) => ({ position: point, sizeCells: moverToken?.sizeCells ?? 1, sizePx: moverToken?.sizePx ?? 0 });
   type Range = Readonly<{ name: string; hidden: boolean; label: string }>;
   const ranges: Range[] = [];
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId) continue;
     const other = state.actors.find((actor) => actor.id === entry.actorId);
-    const position = state.combat.tokens.find((token) => token.actorId === entry.actorId)?.position ?? null;
-    if (!other || position === null) continue;
-    const now = mapDistance(geometry, to, position);
+    const otherToken = state.combat.tokens.find((token) => token.actorId === entry.actorId);
+    if (!other || !otherToken?.position) continue;
+    const footprint = { position: otherToken.position, sizeCells: otherToken.sizeCells ?? 1, sizePx: otherToken.sizePx };
+    const now = creatureDistance(geometry, moverAt(to), footprint);
     if (now === null) continue; // no measurable map: narrate the move without numbers
-    const before = from === null ? null : mapDistance(geometry, from, position);
+    const before = from === null ? null : creatureDistance(geometry, moverAt(from), footprint);
     const label = before === null ? `${other.name} ${formatDistance(now)}` : `${other.name} ${formatDistance(before)} → ${formatDistance(now)}`;
     ranges.push({ name: other.name, hidden: other.visibility === "gm-only", label });
   }

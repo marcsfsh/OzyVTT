@@ -11,8 +11,10 @@ export type MovementRulesInput = Readonly<{
   from: EncounterTokenPosition | null;
   /** Authoritative snapped position after the move; null = returned to the tray (free). */
   to: EncounterTokenPosition | null;
-  /** Map distance in feet between two image points; null when unmeasurable. */
+  /** Map distance in feet between two image points; null when unmeasurable. Used for the mover's own budget (how far it traveled). */
   distance: (a: Point, b: Point) => number | null;
+  /** Footprint-aware feet between an enemy combatant and the mover standing at `point` (SRD: measure from the nearest point of each creature's space); falls back to center-to-center when absent. Used for reach checks. */
+  creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
   override: Readonly<{ reason: string }> | null;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   newPromptId: () => string;
@@ -79,8 +81,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       if (!enemyPosition) continue;
       const enemyDefinition = enemy.definitionId ? input.resolveDefinition(enemy.definitionId) : undefined;
       const reach = Math.max(5, ...(enemyDefinition?.actions.flatMap((candidate) => candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []) ?? []));
-      const wasIn = input.distance(enemyPosition, from);
-      const nowOut = input.distance(enemyPosition, to);
+      const measure = input.creatureDistance ?? ((target: Readonly<{ actorId: string; position: Point }>, point: Point) => input.distance(target.position, point));
+      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, from);
+      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, to);
       if (wasIn === null || nowOut === null || wasIn > reach + 1e-6 || nowOut <= reach + 1e-6) continue;
       if (state.combat.pendingReactions.some((prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId)) continue;
       state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, {

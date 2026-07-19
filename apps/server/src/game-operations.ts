@@ -15,7 +15,7 @@ import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
 import { addCombatant, endEncounter, nextInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { resolveDeathSave } from "@vtt/rules-5e";
-import { mapDistance } from "./movement-narration.js";
+import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
 import { activateScene, createScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
@@ -393,11 +393,19 @@ export function createGameOperations(context: GameOperationsContext) {
         movement = narrateTokenMove({ state, actorId, from, geometry });
         // Movement budget + opportunity attacks (SRD) — see movement-rules.ts; runs after the snap
         // so measured distances are authoritative, and a strict rejection discards the draft.
+        const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
         const outcome = applyMovementRules(state, {
           actorId,
           from,
-          to: state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null,
+          to: moverToken?.position ?? null,
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
+          creatureDistance: (enemy, moverPoint) => {
+            const enemyToken = state.combat.tokens.find((token) => token.actorId === enemy.actorId);
+            if (!enemyToken || !moverToken) return null;
+            return creatureDistance(geometry,
+              { position: enemy.position, sizeCells: enemyToken.sizeCells ?? 1, sizePx: enemyToken.sizePx },
+              { position: moverPoint, sizeCells: moverToken.sizeCells ?? 1, sizePx: moverToken.sizePx })?.value ?? null;
+          },
           override: request.override ?? null,
           resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId),
           newPromptId: context.newId,
@@ -617,12 +625,11 @@ export function createGameOperations(context: GameOperationsContext) {
         } else {
           resolvedTargetIds = targetIds ?? [];
         }
+        // Footprint-aware (SRD Creature Size): a Medium attacker adjacent to a Large creature is
+        // 5 ft away — center-to-center would read 10 and wrongly block the melee swing.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null => {
           if (!geometry) return null;
-          const positionA = state.combat.tokens.find((token) => token.actorId === actorIdA)?.position ?? null;
-          const positionB = state.combat.tokens.find((token) => token.actorId === actorIdB)?.position ?? null;
-          if (!positionA || !positionB) return null;
-          return mapDistance(geometry, positionA, positionB)?.value ?? null;
+          return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
         resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null, cover: request.cover ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.

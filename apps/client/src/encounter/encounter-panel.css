@@ -13,6 +13,7 @@
 .encounter-dock-choice[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .encounter-map { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; margin: 1rem 0; padding: .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; }
 .encounter-map span { color: #a69e91; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.encounter-map select { flex: 1 1 12rem; margin: 0; font-size: .85rem; color: #e7dfd0; }
 .combatant-setup { list-style: none; margin: 0; padding: 0; border-top: 1px solid #403a2c; }
 .combatant-setup li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .75rem 0; border-bottom: 1px solid #403a2c; }
 .combatant-tools { display: flex; align-items: center; gap: .5rem; }
@@ -64,6 +65,17 @@
 .initiative-reaction:hover:not(:disabled) { border-color: #e8a743; }
 .initiative-reaction[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; text-decoration: line-through; }
 .initiative-list.gm li.down .initiative-name { opacity: .55; text-decoration: line-through; }
+/* Collapsed-by-default rows: the name button is the expander; condition badges ride inline so
+   nothing important hides behind the click. */
+.initiative-expand { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; min-width: 0; flex: 1 1 auto; padding: .15rem .3rem; margin: -.15rem -.3rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.initiative-expand:hover { background: #241f17; }
+.initiative-expand[aria-expanded="true"] { background: #241f17; }
+.initiative-name-text { color: #f6c452; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.initiative-list.gm li.down .initiative-name-text { opacity: .55; text-decoration: line-through; }
+.initiative-expand .condition-chips { margin-left: .1rem; }
+.initiative-list.gm li.expanded { background: #1b1710; border-radius: .45rem; }
+.initiative-row-tools { display: flex; justify-content: flex-end; margin: .3rem 0 .1rem; }
+.initiative-row-tools .secondary { padding: .3rem .7rem; font-size: .74rem; }
 .initiative-hp { flex: none; padding: .4rem .55rem; border: 1px solid transparent; border-radius: .45rem; background: #0c0a07; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
 .initiative-hp small { margin-left: .2rem; font-size: .68rem; color: #7fc7e8; }
 .initiative-hp.hp-healthy { color: #8fd69a; }

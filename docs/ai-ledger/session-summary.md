@@ -8,6 +8,36 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Round-2 live-testing fixes: footprint distance, tab-free encounter start, multiattack flow, collapsed tracker (same branch/PR #38)
+
+Owner's first live-testing round reported five issues; four fixed fully, one partially (the
+maps/scenes IA got its worst frictions removed; the full redesign is queued):
+
+- **Footprint-aware distance (bugs 1+3, engine).** All rules-facing distances were center-to-center,
+  so a Medium attacker adjacent to a Large/Huge creature read 7.5–10 ft ("out of reach") and a big
+  mover's OA never triggered. New `creatureDistance`/`tokenCreatureDistance`
+  (movement-narration.ts): edge-to-edge per the SRD (grid: Chebyshev cells minus each footprint's
+  half-width; scaled gridless: minus token radius beyond its central cell). Wired through action
+  resolve range checks + advantage sources, OA reach checks (`applyMovementRules` gains a
+  `creatureDistance` input), and movement narration. 4 regression tests.
+- **Encounter start needed a Maps-tab visit (bug 4a).** `selectedMap` only hydrated when MapManager
+  mounted. The App now fetches the map library at GM login (and on returning to the Encounter tab),
+  defaults to the newest battlemap, and encounter setup carries its own battlemap `<select>`.
+- **Multiattack ergonomics (bug 5).** Tapping Multiattack mid-instance was a violation ("no attacks
+  remaining" → override). Now it's a continue (reports the remaining plan); blocked component
+  messages name what's left ("no Bite left — remaining: 1× Tail"); client instance notes/hints name
+  components; the Multiattack row hints "In progress — pick the next attack". Regression test.
+- **Combat tracker collapse-by-default (bug 2).** GM initiative rows are one line (name +
+  inline condition badges + R/HP/score); an accordion expands one row's tools (HP editor,
+  condition/effect editors, Open sheet). Enter in the HP amount applies damage. Save/reaction
+  prompts and the dying tracker stay always-visible. Active row keeps economy + ActionRunner.
+- **Scenes flow (bug 4b, partial).** ScenePanel gets its own battlemap picker (same library), so
+  preparing a scene works from the Encounter tab's Scene-prep modal without tab bouncing. The
+  fuller maps/upload/browse IA redesign is deliberately deferred (needs a design pass).
+- **Verification**: check green; 347 server + 61 package tests; build green; live Playwright smoke
+  13/14 checks + narration line "Torva entered the map — Giant Crocodile 5 ft" proving edge-to-edge
+  (the one "failure" was a smoke regex expecting "moved" for a tray entry); desktop + 375 px shots.
+
 ## 2026-07-19 — SRD gap closure tiers A–D (ADR-0020 second amendment, same branch/PR #38)
 
 Owner asked for a comprehensive review of the SRD 5e combat rules (an external SRD-mirror repo —

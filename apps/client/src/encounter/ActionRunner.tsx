@@ -42,6 +42,8 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus action used";
   if (action.activation === "action" && turn.actionUsed) {
     const instance = turn.actionInstance?.actorId === actor.id ? turn.actionInstance.components : null;
+    // The Multiattack plan row stays a live "continue" while any component remains.
+    if (action.multiattack && instance && Object.values(instance).some((count) => count > 0)) return "In progress — pick the next attack";
     const remaining = instance ? (instance[action.id] ?? 0) + (action.attackBonus !== null ? instance["attack"] ?? 0 : 0) : 0;
     if (remaining > 0) return `${remaining} attack${remaining === 1 ? "" : "s"} left`;
     return "Action used";
@@ -121,6 +123,11 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
 
   const instance = state.combat.turn.actionInstance?.actorId === actor.id ? state.combat.turn.actionInstance.components : null;
   const attacksLeft = instance ? Object.values(instance).reduce((sum, remaining) => sum + remaining, 0) : 0;
+  // Name what's left ("1× Tail") so the GM picks the next attack instead of re-tapping the last one.
+  const componentLabel = (components: Record<string, number>) => Object.entries(components)
+    .filter(([, remaining]) => remaining > 0)
+    .map(([id, remaining]) => `${remaining}× ${id === "attack" ? "any attack" : actions?.find((candidate) => candidate.id === id)?.name ?? id}`)
+    .join(", ");
 
   return <div className="action-runner">
     {actions === null && <p className="action-runner-status">Loading stat block…</p>}
@@ -131,7 +138,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         <button type="button" className="encounter-primary" onClick={() => { const pending = blockedPrompt; clearBlockedPrompt(); pending.retry({ reason: window.prompt("Override reason (logged for the table):", "GM override")?.trim() || "GM override" }); }}>Override</button>
       </div>
     </div>}
-    {attacksLeft > 0 && !picking && <p className="action-instance-note" role="status">{attacksLeft} attack{attacksLeft === 1 ? "" : "s"} remaining in this action.</p>}
+    {attacksLeft > 0 && !picking && instance && <p className="action-instance-note" role="status">Remaining in this action: {componentLabel(instance)}.</p>}
     {actions && !picking && <ul className="action-list">
       {actions.map((action) => {
         const hint = isResolvable(action) ? availabilityHint(state, actor, action) : null;
@@ -214,7 +221,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order — roll or enter each result there, then confirm to apply.</p>
           : <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>;
       })()}
-      {result.componentsRemaining && <p className="action-result-hint">{Object.values(result.componentsRemaining).reduce((sum, remaining) => sum + remaining, 0)} attack(s) remaining — tap <strong>↻ Again</strong> or pick the next attack above.</p>}
+      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} — tap <strong>↻ Again</strong> or pick the next attack above.</p>}
     </div>}
   </div>;
 }
