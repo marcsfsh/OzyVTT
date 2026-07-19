@@ -139,23 +139,45 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       </div>
     </div>}
     {attacksLeft > 0 && !picking && instance && <p className="action-instance-note" role="status">Remaining in this action: {componentLabel(instance)}.</p>}
-    {actions && !picking && <ul className="action-list">
-      {actions.map((action) => {
-        const hint = isResolvable(action) ? availabilityHint(state, actor, action) : null;
-        return <li key={action.id}>
-          {isResolvable(action)
-            ? <button type="button" className={`action-row${hint ? " action-row-hinted" : ""}`} disabled={busy} title={action.description} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>
+    {actions && !picking && (() => {
+      // Three tiers of prominence: the stat block's own rollable actions are the working surface
+      // (full rows); the shared builtin catalog (Dodge, Dash, Unarmed Strike, ...) is one wrapped
+      // cluster of small chips — the same 16 actions on every creature don't earn 16 rows; prose
+      // traits collapse behind one line (the sheet always has the full text).
+      const own = actions.filter((action) => isResolvable(action) && action.builtin !== true);
+      const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
+      const reference = actions.filter((action) => !isResolvable(action));
+      return <>
+        <ul className="action-list">
+          {own.map((action) => {
+            const hint = availabilityHint(state, actor, action);
+            return <li key={action.id}>
+              <button type="button" className={`action-row${hint ? " action-row-hinted" : ""}`} disabled={busy} title={action.description} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>
                 <strong>{action.name}</strong><small>{summaryOf(action) || (action.grants ? "Use — grants an effect" : "Use")}{hint ? <span className="action-hint"> · {hint}</span> : null}</small>
               </button>
-            : <>
-                <button type="button" className="action-row action-row-static" aria-expanded={openReference === action.id} onClick={() => setOpenReference((current) => current === action.id ? null : action.id)}>
-                  <strong>{action.name}</strong><small>{action.activation === "other" ? "Reference — tap to read" : `${action.activation} · tap to read`}</small>
-                </button>
-                {openReference === action.id && <p className="action-reference-text"><RichText text={action.description} /></p>}
-              </>}
-        </li>;
-      })}
-    </ul>}
+            </li>;
+          })}
+        </ul>
+        {builtins.length > 0 && <div className="builtin-actions" role="group" aria-label="Common actions">
+          <span className="builtin-actions-label">Common</span>
+          {builtins.map((action) => {
+            const hint = availabilityHint(state, actor, action);
+            return <button key={action.id} type="button" className={`builtin-chip${hint ? " hinted" : ""}`} disabled={busy} title={`${action.description}${hint ? `\n\n${hint}` : ""}`} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>{action.name}</button>;
+          })}
+        </div>}
+        {reference.length > 0 && <details className="action-reference-group">
+          <summary>Traits &amp; reference ({reference.length})</summary>
+          <ul className="action-list">
+            {reference.map((action) => <li key={action.id}>
+              <button type="button" className="action-row action-row-static" aria-expanded={openReference === action.id} onClick={() => setOpenReference((current) => current === action.id ? null : action.id)}>
+                <strong>{action.name}</strong><small>{action.activation === "other" ? "tap to read" : `${action.activation} · tap to read`}</small>
+              </button>
+              {openReference === action.id && <p className="action-reference-text"><RichText text={action.description} /></p>}
+            </li>)}
+          </ul>
+        </details>}
+      </>;
+    })()}
     {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       {picking.mode === "template"
         ? <p className="action-targeting-head"><strong>{picking.action.name}</strong> — drag the {picking.action.area?.sizeFeet}-ft {picking.action.area?.shape} on the map{picking.template?.placed ? " (placed — Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.</p>

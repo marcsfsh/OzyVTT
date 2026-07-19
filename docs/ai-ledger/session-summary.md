@@ -8,6 +8,23 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Tracker density overhaul (owner rejected the accordion pass; same branch/PR #38)
+
+The accordion pass still produced a paint-roller of a panel (~1822 px for 10 combatants). The real
+structural fixes, measured with Playwright bounding boxes:
+
+- **Floating popovers, not inline expanders**: a row's tools (HP editor with Enter-to-damage,
+  condition/effect editors, Open sheet) open OVER the list (`.row-tools-popover` + click-away
+  backdrop) — other rows provably don't move.
+- **Controls behind ⋯**: rules mode, underwater, dock position, add-combatant, and End encounter
+  all moved into one topbar menu next to compact Prev/Next. Nothing occasional is inline anymore.
+- **Dense one-line rows**: `[initiative | name + condition badges | R | HP]` at **33 px** (was ~3×).
+- **The real bloat culprit — the builtin catalog**: milestone 3's 16 generic actions (Dodge, Dash,
+  Unarmed Strike…) rendered as full rows on every active combatant (~900 px). They're now one
+  wrapped chip cluster ("Common"); prose traits collapse behind "Traits & reference (n)".
+- **Result**: tracker for 10 combatants incl. the active runner 1468 → ~700 px; whole panel
+  1822 → ~1100 px; verified at 1440 and 375 px, Enter-damage + menu + popover all exercised live.
+
 ## 2026-07-19 — Round-2 live-testing fixes: footprint distance, tab-free encounter start, multiattack flow, collapsed tracker (same branch/PR #38)
 
 Owner's first live-testing round reported five issues; four fixed fully, one partially (the
