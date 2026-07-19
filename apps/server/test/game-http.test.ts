@@ -534,7 +534,10 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.sceneById, "delete", "scene.remove"],
       [GAME_PATHS.sceneRename, "post", "scene.rename"],
       [GAME_PATHS.sceneActivate, "post", "scene.activate"],
-      [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"]
+      [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"],
+      [GAME_PATHS.fogEnabled, "post", "fog.set-enabled"],
+      [GAME_PATHS.fogPaint, "post", "fog.paint"],
+      [GAME_PATHS.fogReset, "post", "fog.reset"]
     ];
     // Every cataloged command has exactly one typed route in this table...
     expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMAND_SCOPES).sort());

@@ -22,6 +22,7 @@ import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from 
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
 import { applyMovementRules } from "./movement-rules.js";
 import { applyRest, spendHitDice } from "./rests.js";
+import { paintFog, resetFog, setFogEnabled } from "./fog.js";
 import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
@@ -34,6 +35,7 @@ import {
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
+  FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
   SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetEnvironmentSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
@@ -982,6 +984,45 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    // ---------- Fog of war ----------
+
+    async fogSetEnabled(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM controls the fog of war.");
+      const request = parse(FogSetEnabledSchema, raw, "The fog command is malformed.");
+      const { commandId, enabled, sceneId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "fog.set-enabled", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setFogEnabled(state, sceneId, enabled));
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        if (sceneId === undefined) context.appendLog({ kind: "scene", text: enabled ? "Fog of war enabled — unrevealed ground is hidden from players." : "Fog of war disabled.", gmOnly: true });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async fogPaint(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM controls the fog of war.");
+      const request = parse(FogPaintSchema, raw, "The fog stroke is malformed.");
+      const { commandId, op, rect, sceneId, expectedRevision } = request;
+      // Geometry comes from whichever map the stroke targets: the live table's, or the parked scene's own.
+      const mapAssetId = sceneId === undefined
+        ? store.snapshot.combat.mapAssetId
+        : store.snapshot.combat.scenes.find((scene) => scene.id === sceneId)?.mapAssetId ?? null;
+      if (!mapAssetId) throw new CommandRejectedError("Pick a map before painting fog.");
+      const geometry = await context.tokenGeometryFor(mapAssetId);
+      const shapeId = context.newId();
+      const result = await store.execute({ id: commandId, type: "fog.paint", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => paintFog(state, sceneId, geometry, { id: shapeId, op, rect }));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async fogReset(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM controls the fog of war.");
+      const request = parse(FogResetSchema, raw, "The fog command is malformed.");
+      const { commandId, sceneId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "fog.reset", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => resetFog(state, sceneId));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Annotations ----------
 
     async annotationAdd(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1283,7 +1324,10 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],
     ["scene.remove", "Remove a prepared scene (GM).", (p, raw) => operations.sceneRemove(p, raw)],
     ["scene.activate", "Switch the live table to a prepared scene, parking the current one (GM).", (p, raw) => operations.sceneActivate(p, raw)],
-    ["scene.set-combatants", "Replace a prepared scene's combatant list (GM).", (p, raw) => operations.sceneSetCombatants(p, raw)]
+    ["scene.set-combatants", "Replace a prepared scene's combatant list (GM).", (p, raw) => operations.sceneSetCombatants(p, raw)],
+    ["fog.set-enabled", "Turn manual fog of war on/off for the live table or a prepared scene (GM).", (p, raw) => operations.fogSetEnabled(p, raw)],
+    ["fog.paint", "Paint a reveal/hide fog rect, grid-snapped and clamped to the map (GM).", (p, raw) => operations.fogPaint(p, raw)],
+    ["fog.reset", "Hide the whole map again (clear every fog stroke) (GM).", (p, raw) => operations.fogReset(p, raw)]
   ];
   return new Map<string, GameCommandDescriptor>(entries.map(([type, summary, run]) => [type, { type, scope: GAME_COMMAND_SCOPES[type], summary, run }]));
 }

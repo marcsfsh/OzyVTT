@@ -115,6 +115,16 @@ export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId:
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetEnvironmentSchema = z.object({ commandId: z.string().uuid(), underwater: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Manual fog of war (GM-only). `sceneId` targets a parked scene's GM-private prep instead of the live table (the token-move pattern). */
+export const FogSetEnabledSchema = z.object({ commandId: z.string().uuid(), enabled: z.boolean(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const FogPaintSchema = z.object({
+  commandId: z.string().uuid(),
+  op: z.enum(["reveal", "hide"]),
+  rect: z.object({ x: z.number().finite().min(-100000).max(1_000_000), y: z.number().finite().min(-100000).max(1_000_000), width: z.number().finite().positive().max(1_000_000), height: z.number().finite().positive().max(1_000_000) }).strict(),
+  sceneId: z.string().uuid().optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+export const FogResetSchema = z.object({ commandId: z.string().uuid(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.enum(["long", "short"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), count: z.number().int().min(1).max(40), expectedRevision: z.number().int().nonnegative().optional() }).strict();

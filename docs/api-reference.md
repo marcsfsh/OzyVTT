@@ -105,6 +105,9 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `scene.remove` | `scene:write` |
 | `scene.activate` | `scene:write` |
 | `scene.set-combatants` | `scene:write` |
+| `fog.set-enabled` | `scene:write` |
+| `fog.paint` | `scene:write` |
+| `fog.reset` | `scene:write` |
 
 ## Encounter archive document (`archiveSchemaVersion` 2)
 
@@ -1218,6 +1221,61 @@ Replaces a prepared scene's combatant list (GM-grade only).
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `combatantIds` | string (uuid)[] | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/fog/enabled`
+
+Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `enabled` | boolean | yes |  |
+| `sceneId` | string (uuid) | no | Target a prepared (parked) scene's private prep instead of the live table |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/fog/paint`
+
+Paints one reveal/hide fog rect (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a stroke covering the whole map replaces all prior strokes. `sceneId` targets a prepared scene.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `op` | `reveal` \| `hide` | yes |  |
+| `rect` | object | yes | Image-pixel rect; snapped to whole grid cells on calibrated unrotated maps and clamped to the map |
+| `rect.x` | number | yes |  |
+| `rect.y` | number | yes |  |
+| `rect.width` | number | yes |  |
+| `rect.height` | number | yes |  |
+| `sceneId` | string (uuid) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/fog/reset`
+
+Clears every fog stroke — with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `sceneId` | string (uuid) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

@@ -70,6 +70,9 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     rulesMode: state.combat.rulesMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
+    // The fog mask travels verbatim — it IS what players render, and it carries geometry only.
+    // Fog is never the security boundary: hidden actors/annotations are stripped above regardless.
+    fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // legendaryUsed is deliberately absent: a monster's remaining legendary actions are GM knowledge
     // (same rationale as the stripped actionUses), and the pool never drives player-side UI.
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag

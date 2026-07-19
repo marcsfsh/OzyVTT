@@ -274,6 +274,9 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.sceneRename), ...command("scene.rename", (req) => ({ sceneId: req.params.sceneId })));
   router.post(expressPath(GAME_PATHS.sceneActivate), ...command("scene.activate", (req) => ({ sceneId: req.params.sceneId })));
   router.post(expressPath(GAME_PATHS.sceneCombatants), ...command("scene.set-combatants", (req) => ({ sceneId: req.params.sceneId })));
+  router.post(expressPath(GAME_PATHS.fogEnabled), ...command("fog.set-enabled"));
+  router.post(expressPath(GAME_PATHS.fogPaint), ...command("fog.paint"));
+  router.post(expressPath(GAME_PATHS.fogReset), ...command("fog.reset"));
 
   // ---------- Player sessions (headless / alternate player clients) ----------
 

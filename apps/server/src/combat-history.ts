@@ -32,7 +32,9 @@ export type TimelineOutcome =
  * dirties the timeline, so "nothing changed" resumes stay free of confirmation prompts.
  */
 function restorableSlice(state: GameState): string {
-  const { scenes: _scenes, activeSceneId: _activeSceneId, historyCursor: _cursor, historyDirty: _dirty, annotations, ...combat } = state.combat;
+  // fog is scene dressing, not combat state: revealing a corridor mid-review must neither dirty the
+  // timeline ("discard changes?") nor re-black the players' map on a rewind.
+  const { scenes: _scenes, activeSceneId: _activeSceneId, historyCursor: _cursor, historyDirty: _dirty, fog: _fog, annotations, ...combat } = state.combat;
   return JSON.stringify({
     combat: { ...combat, annotations: annotations.filter((annotation) => annotation.expiresAt === null) },
     // Rules-engine state (effects, dying, spent uses) restores with hp/conditions — a rewind must
@@ -77,6 +79,8 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
     tokens: snapshot.combat.tokens.filter((token) => currentActorIds.has(token.actorId)),
     scenes: state.combat.scenes,
     activeSceneId: state.combat.activeSceneId,
+    // Live fog survives the restore (it's excluded from the restorable slice for the same reason).
+    fog: state.combat.fog,
     historyCursor: cursor,
     historyDirty: false
   };

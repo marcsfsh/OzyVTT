@@ -239,6 +239,26 @@ const sceneCombatShape = {
   reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
   /** Legendary actions spent since each legendary creature's last turn start (actorId → count); the entry clears when that creature's own turn begins (SRD Legendary Actions refresh). Additive; GM knowledge — stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /**
+   * Manual fog of war, per scene: an ordered painter's list folded from "all hidden" — a reveal
+   * punches visibility, a hide re-covers it (AboveVTT-style manual reveal; no vision/lighting).
+   * `enabled: false` = no fog (the default and the pre-fog behavior); enabled with no shapes = a
+   * fully hidden map. Rects live in image-pixel space like annotations. Fog is presentation, never
+   * the security boundary: hidden actors/annotations are stripped by their own projection filters,
+   * so players receive this verbatim — the mask IS what they must render. Additive.
+   */
+  fog: z.object({
+    enabled: z.boolean().default(false),
+    shapes: z.array(z.object({
+      kind: z.literal("rect"),
+      id: z.string().uuid(),
+      op: z.enum(["reveal", "hide"]),
+      x: z.number().min(0).max(100000),
+      y: z.number().min(0).max(100000),
+      width: z.number().positive().max(100000),
+      height: z.number().positive().max(100000)
+    }).strict()).max(200).default([])
+  }).strict().default({ enabled: false, shapes: [] }),
   /** Saving throws still owed by targets (see PendingSaveSchema). */
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   /** Reaction prompts still owed an answer (see PendingReactionSchema). */
@@ -281,7 +301,7 @@ export const CombatStateSchema = z.object({
   }
   if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["activeSceneId"], message: "The active scene must be one of the prepared scenes." });
   const active = combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
-  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0)) {
+  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.fog.enabled || active.combat.fog.shapes.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty — its live copy is the top-level combat." });
   }
 });
@@ -316,7 +336,7 @@ export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: bool
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
 /** A player's own pending reaction prompts only; same masking rules as saves. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; underwater: boolean; reactionsUsed: readonly string[]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only — hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
@@ -476,6 +496,9 @@ export interface ClientToServerEvents {
   "scene:remove": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:activate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:set-combatants": (payload: { commandId: string; sceneId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "fog:set-enabled": (payload: { commandId: string; enabled: boolean; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "fog:paint": (payload: { commandId: string; op: "reveal" | "hide"; rect: { x: number; y: number; width: number; height: number }; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "fog:reset": (payload: { commandId: string; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "annotation:add": (payload: { commandId: string; kind: "measurement" | "shape"; shape?: AnnotationShapeKind; geometry: AnnotationGeometryInput; visibility?: AnnotationVisibility; visibleToActorId?: string | null; movableByOthers?: boolean; color?: string; expectedRevision?: number }, acknowledgement: (result: AnnotationAddResult) => void) => void;
   "annotation:ping": (payload: { commandId: string; point: AnnotationPoint; color?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "annotation:set-color": (payload: { commandId: string; id: string; color: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

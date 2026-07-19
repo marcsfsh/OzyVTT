@@ -108,7 +108,10 @@ export const GAME_PATHS = {
   sceneById: `${API_NAMESPACE}/game/scenes/{sceneId}`,
   sceneRename: `${API_NAMESPACE}/game/scenes/{sceneId}/rename`,
   sceneActivate: `${API_NAMESPACE}/game/scenes/{sceneId}/activate`,
-  sceneCombatants: `${API_NAMESPACE}/game/scenes/{sceneId}/combatants`
+  sceneCombatants: `${API_NAMESPACE}/game/scenes/{sceneId}/combatants`,
+  fogEnabled: `${API_NAMESPACE}/game/fog/enabled`,
+  fogPaint: `${API_NAMESPACE}/game/fog/paint`,
+  fogReset: `${API_NAMESPACE}/game/fog/reset`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -336,7 +339,10 @@ export const GAME_COMMAND_SCOPES = {
   "scene.rename": "scene:write",
   "scene.remove": "scene:write",
   "scene.activate": "scene:write",
-  "scene.set-combatants": "scene:write"
+  "scene.set-combatants": "scene:write",
+  "fog.set-enabled": "scene:write",
+  "fog.paint": "scene:write",
+  "fog.reset": "scene:write"
 } as const satisfies Record<string, z.infer<typeof IntegrationScopeSchema>>;
 export type GameCommandType = keyof typeof GAME_COMMAND_SCOPES;
 
@@ -565,6 +571,9 @@ export const openApiDocument = {
     [GAME_PATHS.sceneRename]: { post: gameCommandOperation("renameScene", "scene:write", "Renames a prepared scene (GM-grade only).", "SceneRenameRequest", [uuidParam("sceneId")]) },
     [GAME_PATHS.sceneActivate]: { post: gameCommandOperation("activateScene", "scene:write", "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.", "CommandControlRequest", [uuidParam("sceneId")], false) },
     [GAME_PATHS.sceneCombatants]: { post: gameCommandOperation("setSceneCombatants", "scene:write", "Replaces a prepared scene's combatant list (GM-grade only).", "SceneCombatantsRequest", [uuidParam("sceneId")]) },
+    [GAME_PATHS.fogEnabled]: { post: gameCommandOperation("setFogEnabled", "scene:write", "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.", "FogEnabledRequest") },
+    [GAME_PATHS.fogPaint]: { post: gameCommandOperation("paintFog", "scene:write", "Paints one reveal/hide fog rect (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a stroke covering the whole map replaces all prior strokes. `sceneId` targets a prepared scene.", "FogPaintRequest") },
+    [GAME_PATHS.fogReset]: { post: gameCommandOperation("resetFog", "scene:write", "Clears every fog stroke — with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.", "FogResetRequest") },
     [SESSION_PATHS.player]: { post: { operationId: "issuePlayerSession", security: [], description: "Issues a player session token — the HTTP mirror of the socket's open join, for headless or custom player clients. LAN-trust by design: no credentials required, but the host must have completed GM setup. The token then authenticates player-limited calls across this API.", responses: { "201": { description: "Player session issued", content: { "application/json": { schema: { $ref: "#/components/schemas/PlayerSessionIssuedResponse" } } } }, "409": apiError } } },
     [CONTENT_PATHS.monsters]: { get: { operationId: "listContentMonsters", security: gameSecurity("game:read"), description: "Browse the bundled SRD bestiary (GM-grade only). Includes the CC BY 4.0 attribution line.", responses: { "200": { description: "Monster summaries + attribution", content: { "application/json": { schema: { $ref: "#/components/schemas/ContentMonstersResponse" } } } }, "401": apiError, "403": apiError } } },
     [CONTENT_PATHS.monsterById]: { get: { operationId: "getContentMonster", security: gameSecurity("game:read"), description: "One full stat block (GM-grade only). Imported definitions shadow bundled ids, matching the live server's resolution.", parameters: [{ name: "definitionId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 200 } }], responses: { "200": { description: "The full ActorDefinition", content: { "application/json": { schema: { $ref: "#/components/schemas/ContentMonsterSheetResponse" } } } }, "401": apiError, "403": apiError, "404": apiError } } },
@@ -686,6 +695,9 @@ export const openApiDocument = {
       SceneCreateRequest: { type: "object", additionalProperties: false, required: ["name", "mapAssetId", "combatantIds"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, name: { type: "string", minLength: 1, maxLength: 120 }, mapAssetId: { type: "string", format: "uuid" }, combatantIds: { type: "array", maxItems: 200, items: { type: "string", format: "uuid" } } } },
       SceneRenameRequest: { type: "object", additionalProperties: false, required: ["name"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, name: { type: "string", minLength: 1, maxLength: 120 } } },
       SceneCombatantsRequest: { type: "object", additionalProperties: false, required: ["combatantIds"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, combatantIds: { type: "array", maxItems: 200, items: { type: "string", format: "uuid" } } } },
+      FogEnabledRequest: { type: "object", additionalProperties: false, required: ["enabled"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, enabled: { type: "boolean" }, sceneId: { type: "string", format: "uuid", description: "Target a prepared (parked) scene's private prep instead of the live table" } } },
+      FogPaintRequest: { type: "object", additionalProperties: false, required: ["op", "rect"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, op: { type: "string", enum: ["reveal", "hide"] }, rect: { type: "object", additionalProperties: false, required: ["x", "y", "width", "height"], properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number", exclusiveMinimum: 0 }, height: { type: "number", exclusiveMinimum: 0 } }, description: "Image-pixel rect; snapped to whole grid cells on calibrated unrotated maps and clamped to the map" }, sceneId: { type: "string", format: "uuid" } } },
+      FogResetRequest: { type: "object", additionalProperties: false, properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, sceneId: { type: "string", format: "uuid" } } },
       PlayerSessionIssuedData: { type: "object", additionalProperties: false, required: ["token", "sessionId"], properties: { token: { type: "string", minLength: 1, description: "Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust)." }, sessionId: { type: "string", format: "uuid" } } },
       PlayerSessionIssuedResponse: envelopeSchema("#/components/schemas/PlayerSessionIssuedData")
     }

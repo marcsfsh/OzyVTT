@@ -64,7 +64,8 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
   });
   const sorted = ordered(state, initiative);
   // Spread, never a fresh literal: CombatState grows fields over time (pendingSaves today; scenes
-  // next) and a wholesale replacement here would silently drop them.
+  // next) and a wholesale replacement here would silently drop them. Fog deliberately rides the
+  // spread untouched — it's scene dressing prepped before the fight and persisting after it.
   state.combat = {
     ...state.combat,
     active: true,
@@ -111,6 +112,7 @@ export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
+  // Fog persists through the spread below: what the party has revealed stays revealed after the fight.
   state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
 }
 

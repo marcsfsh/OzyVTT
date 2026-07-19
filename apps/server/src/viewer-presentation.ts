@@ -30,6 +30,9 @@ export type ViewerInitiativeEntry = Readonly<{
   conditions: readonly string[];
 }>;
 
+/** The fog mask exactly as the table renders it (geometry only; hidden tokens never reach the viewer anyway). */
+export type ViewerFog = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
+
 export type ViewerInitiative = Readonly<{
   visible: boolean;
   round: number;
@@ -67,6 +70,8 @@ export type ViewerEncounterScene = Readonly<{
   mapAssetId: string | null;
   tokens: readonly ViewerEncounterToken[];
   annotations: readonly ViewerAnnotation[];
+  /** Absent = no fog (older servers); the viewer renders the mask above everything. */
+  fog?: ViewerFog;
 }>;
 
 export type ViewerPresentationState = Readonly<{
@@ -212,7 +217,20 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     return { id, kind: annotation.kind, shape: annotation.shape, origin: point(annotation.origin, "Viewer annotation origin"), target: point(annotation.target, "Viewer annotation target"), sizeFeet: annotation.sizeFeet, color: annotation.color, label };
   });
   if (mapAssetId === null && annotations.length) throw new Error("Viewer annotations require an active encounter map.");
-  return { mapAssetId, tokens, annotations };
+  const fog = value.fog === undefined ? undefined : sanitizedFog(value.fog);
+  return { mapAssetId, tokens, annotations, ...(fog ? { fog } : {}) };
+}
+
+function sanitizedFog(value: ViewerFog): ViewerFog {
+  if (typeof value.enabled !== "boolean") throw new Error("Viewer fog enabled flag is invalid.");
+  const rawShapes = value.shapes ?? [];
+  if (rawShapes.length > 200) throw new Error("Viewer fog cannot exceed 200 shapes.");
+  const shapes = rawShapes.map((shape) => {
+    if (shape.kind !== "rect" || shape.op !== "reveal" && shape.op !== "hide") throw new Error("Viewer fog shape is invalid.");
+    for (const bound of [shape.x, shape.y, shape.width, shape.height]) if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000) throw new Error("Viewer fog geometry is invalid.");
+    return { kind: "rect" as const, id: safeText(shape.id, "Viewer fog shape ID", 128), op: shape.op, x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+  });
+  return { enabled: value.enabled, shapes };
 }
 
 export function createViewerPresentationState(): ViewerPresentationState {
