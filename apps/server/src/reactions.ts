@@ -14,7 +14,6 @@ export type ReactionAnswerDependencies = Readonly<{
   newRollId: () => string;
   gmSessionId: string;
   now: () => string;
-  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 export type ReactionOutcome = Readonly<{
   used: boolean;
@@ -70,9 +69,12 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     const isBuiltin = declared === undefined && fallbackMelee === undefined;
     clearPrompt(true);
     // One melee attack against the mover, off-turn (economy stays ungated; the reaction is spent above).
+    // No distance function on purpose: the SRD opportunity attack happens right before the target
+    // leaves reach, but the engine moves the token first (documented arrival-timing approximation) —
+    // range-checking the mover's ARRIVAL position would wrongly block the swing it already provoked.
     const resolution = resolveDefinitionAction(state, chosen, { actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin, rollMode: null, override: null }, {
       random: deps.random, newRollId: deps.newRollId, gmSessionId: deps.gmSessionId, now: deps.now,
-      definition, distanceFeet: deps.distanceFeet, resolveDefinition: deps.resolveDefinition
+      definition, resolveDefinition: deps.resolveDefinition
     });
     let appliedDamage = 0;
     let events: readonly EffectNarration[] = [];

@@ -21,10 +21,25 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   (`condition.incapacitated`), a server-computed `available-actions` read (shared evaluation with
   enforcement), and archive v3 `postEncounterState` (47 commands total); SRD bundle enriched
   (126/178 structured Multiattacks, 47 on-hit riders, 146 typed-defense monsters); enriched
-  replay-party fixtures + a 35-test regression suite derived from the two archived encounter runs.
-  Unsupported items are listed in ADR-0020's amended list; the remaining-work roadmap is
-  `docs/product/rules-engine-followup-assessment.md` (triggered features, more reaction triggers,
-  movement legality, concentration, import compatibility states).
+  replay-party fixtures + a regression suite derived from the two archived encounter runs.
+- **SRD combat-rules gap closure, tiers A–D (ADR-0020 second amendment, 2026-07-19, same PR #38).**
+  Full SRD 5.2.1 cross-audit implemented in four tiers: every condition's modifiers (frightened,
+  invisible, grappled-vs-grappler, charmed-charmer, paralyzed auto-crit, physical-save auto-fail,
+  restrained Dex-save disadvantage, exhaustion −2×level with level-6 death, petrified defenses,
+  condition immunities — GM-only, stripped from player views); the eleven 2024 generic actions +
+  Unarmed Strike/Grapple/Shove/Escape as a frozen-id builtin catalog for any combatant (Dodge/Help/
+  Hide/Ready with real effect mechanics); movement budgets (`speedFeet`, `movementUsedFeet`, Dash,
+  exhaustion, prone stand cost, `actor.set-speed`, GM-only overrides) and opportunity attacks as
+  `leaves-reach` prompts answered by a real off-turn melee attack (hidden movers prompt no one);
+  range/reach/long-range/close-combat validation with normal/max range bands in the ETL;
+  GM-adjudicated cover (±AC and Dex saves, total-cover block); concentration (one-at-a-time,
+  damage-prompted CON saves, incapacitation/0-HP breaks); 2024 surprise (initiative disadvantage);
+  short rests (per-short-rest pools only, no hit dice); underwater fights
+  (`encounter.set-environment`); nonlethal knock-out; a falling-damage dice helper. 81-test
+  regression suite with SRD citations. Deferred (documented in the amendment): two-weapon
+  fighting, weapon mastery, mounted, jumping, burn/suffocation timers, breaking objects, hit
+  dice, vision/LoS/auto-cover, difficult terrain. Roadmap:
+  `docs/product/rules-engine-followup-assessment.md` §4.
 
 - TypeScript monorepo: React/Vite client (`@vtt/web`) + authoritative Express + Socket.IO
   server (`@vtt/server`); packages `domain`, `rules-5e`, `schemas`, `api-contract`, `ui`,

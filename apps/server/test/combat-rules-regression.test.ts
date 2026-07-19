@@ -957,6 +957,24 @@ describe("movement rules — speed budget and opportunity attacks (SRD Movement 
     expect(game.combat.pendingReactions).toHaveLength(0);
   });
 
+  it("the opportunity swing never range-checks the mover's arrival position (SRD: the attack lands before they leave reach)", () => {
+    // Live-smoke regression: the mover has ARRIVED far away by answer time (arrival-timing
+    // approximation), and on a measurable map a strict range check would wrongly block the swing.
+    const game = buildGame();
+    place(game, IDS.croc1, 0, 0);
+    place(game, IDS.torva, 5, 0);
+    moveRules(game, IDS.torva, { x: 5, y: 0 }, { x: 45, y: 0 }); // 40 ft — well past the 10 ft reach
+    const outcome = answerReaction(game, nextCommandId(), game.combat.pendingReactions[0].id, true, "bite", { role: "gm" }, {
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+      random: (() => { const faces = [15, 6, 6, 6]; return () => faces.shift()!; })(),
+      newRollId: (() => { let n = 810; return () => `40000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; })(),
+      gmSessionId: IDS.gmSession,
+      now: () => "2026-07-18T00:00:00.000Z"
+    });
+    expect(outcome.used).toBe(true);
+    expect(outcome.resolution?.attack?.outcome).toBe("hit");
+  });
+
   it("standing from Prone costs half Speed and blocks when the budget is short (SRD Prone)", () => {
     const game = buildGame();
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;

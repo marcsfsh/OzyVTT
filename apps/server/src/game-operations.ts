@@ -705,25 +705,15 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(ReactionAnswerSchema, raw, "The reaction answer is malformed.");
       const scope = actorScopeOf(principal);
       const gmSessionId = sessionIdOf(principal);
-      const mapAssetId = store.snapshot.combat.mapAssetId;
-      const geometry = mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
       const { commandId, reactionId, use, actionId: chosenActionId, expectedRevision } = request;
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const result = await store.execute({ id: commandId, type: "reaction.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        const distanceFeet = (actorIdA: string, actorIdB: string): number | null => {
-          if (!geometry) return null;
-          const positionA = state.combat.tokens.find((token) => token.actorId === actorIdA)?.position ?? null;
-          const positionB = state.combat.tokens.find((token) => token.actorId === actorIdB)?.position ?? null;
-          if (!positionA || !positionB) return null;
-          return mapDistance(geometry, positionA, positionB)?.value ?? null;
-        };
         outcome = answerReaction(state, commandId, reactionId, use, chosenActionId, scope, {
           resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId),
           random: (sides) => context.random(sides),
           newRollId: context.newId,
           gmSessionId,
-          now: () => new Date().toISOString(),
-          distanceFeet
+          now: () => new Date().toISOString()
         });
       });
       if (!result.duplicate && outcome) {

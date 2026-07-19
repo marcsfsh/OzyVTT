@@ -8,6 +8,39 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — SRD gap closure tiers A–D (ADR-0020 second amendment, same branch/PR #38)
+
+Owner asked for a comprehensive review of the SRD 5e combat rules (an external SRD-mirror repo —
+verified identical to the in-repo SRD 5.2.1, which served as the citation source) and full
+implementation. A rule-by-rule inventory vs the engine produced four tiers, all approved
+(all-tiers scope; GM-adjudicated inputs where vision/terrain/inventory subsystems are deliberately
+absent; only the cheap niche trio):
+
+- **Tier A — conditions**: frightened/invisible/grappled-vs-grappler/charmed-charmer modifiers,
+  paralyzed auto-crit, physical-save auto-fail (manual total = GM escape hatch), restrained
+  Dex-save disadvantage, exhaustion teeth (−2×level, level 6 = death, −5 ft/level), petrified
+  resist-all + poison immunity, `conditionImmunities` skip-with-narration (stripped from players).
+- **Tier B — builtins**: the eleven 2024 generic actions + Unarmed Strike/Grapple/Shove/Escape as
+  a frozen-id catalog (`builtin-actions.ts`) usable by any combatant; Dodge/Disengage/Dash/Help/
+  Ready grant typed effects (`voidWhileIncapacitated`); Hide → Stealth vs DC 15 → Invisible-linked
+  reveal-on-attack; grapples as escapable source-linked effects (DC 8+Str+PB, one-size cap,
+  incapacitated grappler releases).
+- **Tier C — movement/OA/range**: `speedFeet` + `turn.movementUsedFeet` budgets (Dash ×2, speed-0
+  conditions, prone stand cost, `actor.set-speed`, GM-only override), opportunity attacks as
+  `leaves-reach` reaction prompts answered by a real off-turn melee resolve with auto-applied
+  damage (hidden movers prompt no one — viewer safety), range/reach/long-range/close-combat
+  checks, ETL normal/max range bands.
+- **Tier D — cover/concentration/surprise/rests/niche**: GM-selected cover (+2/+5 AC and Dex
+  saves, overridable `cover.total`), concentration (one-at-a-time, CON save DC
+  min(30, max(10, ⌊dmg/2⌋)) on damage, incapacitation/0-HP breaks), surprise = min of two d20s,
+  short rest re-arms per-short-rest pools only, underwater toggle (`encounter.set-environment`),
+  nonlethal knock-out (KO button), falling-damage dice helper. Rest logic extracted to `rests.ts`.
+- **Verification**: regression suite 35 → 81 tests (SRD-cited per block); suites 341 server / 16
+  contract / 23 rules / 7 schema / 15 content; check + build green; api-reference regenerated.
+  ADR-0020 second amendment (items 13–17 + new deferred list); assessment §3b/§4 refreshed;
+  BUILD_PLAN MVP-022. Follow-up: Parry/damage-taken triggers, triggered features, difficult
+  terrain, spell slots, import compatibility states.
+
 ## 2026-07-18 — Rules engine slice 2: reactions, incapacitation, availability API, archive v3 (same branch/PR #38)
 
 Owner sent a follow-up milestone prompt written without baseline knowledge; per instruction it was
