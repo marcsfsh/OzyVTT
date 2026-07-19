@@ -209,7 +209,12 @@ function App() {
       <button className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</button>
     </section>}
     {mode !== "home" && state && <>
-      <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />
+      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
+          encounter it duplicates the combat tracker at several times the size, so it collapses to
+          one quiet line — still one tap away for a player joining mid-fight. */}
+      {state.combat.active
+        ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
+        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
 
       {mode === "gm" && <nav className="gm-tabs" aria-label="GM sections">
         {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}

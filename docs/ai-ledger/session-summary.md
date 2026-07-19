@@ -8,6 +8,25 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Tracker COMPOSITION redesign (owner re-rejected density-only pass; same branch/PR #38)
+
+Shrinking paddings wasn't the problem — the composition was. Fixes, following how real combat
+trackers are structured:
+
+- **The initiative order is now a pure list.** The acting creature's console (economy chips +
+  action runner) moved OUT of the `<li>` into its own labeled card below the list
+  (`.acting-console`, "▶ Name ACTING · Move x/y ft"). Tracker for 10 combatants: **339 px**;
+  console: **~230 px**. No more action UI interleaved between initiative rows.
+- **Flat visual language**: action rows are borderless one-liners ("Greataxe  +7 to hit, reach
+  5 ft · 1d12 + 4 slashing", summary truncates) with hover/left-accent affordance — no more
+  boxes-in-boxes.
+- **Common actions curated**: 5 primary chips (Dodge/Dash/Disengage/Help/Hide) + "More ▾" for
+  the other 11 builtins, one line instead of five.
+- **Roster collapse**: the lobby ActorRoster (huge per-character cards) collapses to one
+  "Characters & claims" line while combat is active — it duplicated the tracker at ~5× size.
+- Verified live at 1440/375 px: 33 px rows, popover no-shift, Enter-damage, menu contents, page
+  height accounting. Full check/tests/build green.
+
 ## 2026-07-19 — Tracker density overhaul (owner rejected the accordion pass; same branch/PR #38)
 
 The accordion pass still produced a paint-roller of a panel (~1822 px for 10 combatants). The real

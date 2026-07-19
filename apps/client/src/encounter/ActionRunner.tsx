@@ -58,10 +58,14 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
  * server, then apply the proposed typed damage with explicit taps. Strict-mode rejections come back
  * as a one-tap override confirmation, never a dead end (ADR-0020).
  */
+/** The handful of generic actions a table actually reaches for mid-fight; the rest sit behind "More". */
+const PRIMARY_BUILTINS = ["dodge", "dash", "disengage", "help", "hide"] as const;
+
 export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmView; actor: GmActor; onFeedback: (text: string) => void }>) {
   const [actions, setActions] = useState<readonly ContentActionSummary[] | null>(actionCache.get(actor.definitionId ?? "") ?? null);
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   const [openReference, setOpenReference] = useState<string | null>(null);
+  const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
   // A strict-mode rejection awaiting the GM's call — store state, so a resolve rolled from the
   // map's confirm bar surfaces the same override dialog here (ADR-0020).
@@ -158,13 +162,19 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             </li>;
           })}
         </ul>
-        {builtins.length > 0 && <div className="builtin-actions" role="group" aria-label="Common actions">
-          <span className="builtin-actions-label">Common</span>
-          {builtins.map((action) => {
-            const hint = availabilityHint(state, actor, action);
-            return <button key={action.id} type="button" className={`builtin-chip${hint ? " hinted" : ""}`} disabled={busy} title={`${action.description}${hint ? `\n\n${hint}` : ""}`} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>{action.name}</button>;
-          })}
-        </div>}
+        {builtins.length > 0 && (() => {
+          const primary = PRIMARY_BUILTINS.flatMap((id) => builtins.filter((action) => action.id === id));
+          const rest = builtins.filter((action) => !(PRIMARY_BUILTINS as readonly string[]).includes(action.id));
+          const shown = moreBuiltins ? [...primary, ...rest] : primary.length > 0 ? primary : builtins;
+          return <div className="builtin-actions" role="group" aria-label="Common actions">
+            <span className="builtin-actions-label">Common</span>
+            {shown.map((action) => {
+              const hint = availabilityHint(state, actor, action);
+              return <button key={action.id} type="button" className={`builtin-chip${hint ? " hinted" : ""}`} disabled={busy} title={`${action.description}${hint ? `\n\n${hint}` : ""}`} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>{action.name}</button>;
+            })}
+            {rest.length > 0 && primary.length > 0 && <button type="button" className="builtin-chip builtin-more" aria-expanded={moreBuiltins} onClick={() => setMoreBuiltins((current) => !current)}>{moreBuiltins ? "Less ▴" : `More ▾`}</button>}
+          </div>;
+        })()}
         {reference.length > 0 && <details className="action-reference-group">
           <summary>Traits &amp; reference ({reference.length})</summary>
           <ul className="action-list">

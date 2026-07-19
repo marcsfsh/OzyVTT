@@ -25,3 +25,9 @@
 .scene-prep-modal .scene-panel { margin-top: 0; }
 .scene-prep-close { position: absolute; top: 1rem; right: 1rem; z-index: 1; width: 2rem; height: 2rem; padding: 0; display: grid; place-items: center; border: 1px solid #6b5e4b; border-radius: .5rem; background: #17140f; color: #f5efe3; cursor: pointer; }
 .empty-scene-prep { margin-top: 1rem; padding: .6rem 1.1rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: #17140f; color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
+
+/* Live-combat roster collapse: one quiet line instead of a wall of duplicate character cards. */
+.roster-collapsed { margin: 1.2rem 0 0; }
+.roster-collapsed > summary { padding: .5rem .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; color: #cdbfa6; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.roster-collapsed > summary:hover { border-color: #6b5e4b; color: #f5efe3; }
+.roster-collapsed[open] > summary { margin-bottom: .4rem; }
