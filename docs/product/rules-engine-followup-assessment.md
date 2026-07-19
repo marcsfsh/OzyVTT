@@ -131,8 +131,11 @@ appendix, weapon properties) drove four implementation tiers; see the ADR-0020
    role-boundary design.
 8. **Deliberately deferred SRD rules** (documented in the ADR amendment): two-weapon
    fighting/Light property (no hands model), weapon mastery, mounted combat,
-   jumping, burning/suffocation timers, breaking objects, hit dice, vision/light/
-   line-of-sight and auto-derived cover.
+   jumping, burning/suffocation timers, breaking objects, vision/light/
+   line-of-sight and auto-derived cover. *Hit dice shipped 2026-07-19* (ADR-0020
+   third amendment: seeded pools, `actor.spend-hit-dice`, long-rest refill, rest UI) —
+   removed from this list. Recharge pools and legendary actions/resistance shipped in
+   the same adoption pack.
 
 Non-goals reaffirmed: no atomic multi-roll execute-action engine, no removal of
 rules modes, no external SRD dependency, no 2014-ruleset declarations this phase.

@@ -42,6 +42,20 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 
 ## Feature-architecture decisions (no ADR)
 
+- **2026-07-19 — Other VTTs are design studies, never code sources.** AboveVTT (AGPL-3.0) and
+  Foundry's dnd5e (MIT) were researched for the adoption pack: read their *behavior and docs*,
+  design original implementations in this repo's idioms, never port code. AGPL makes this a
+  license requirement for AboveVTT; for everything else it's this repo's convention (ADR-0008's
+  no-imported-code posture generalized). Rejected from that research as out of scope: D&D Beyond
+  integration, voice/video, a generic Active-Effects engine (our `effects.ts` covers it — extend,
+  never replace), full Foundry Activities generality, and dynamic lighting/vision fog.
+- **2026-07-19 — "Per day" = per long rest.** The app has no calendar; every N/Day pool
+  (ETL `PER_DAY`, Legendary Resistance) maps to the long-rest scope. Documented in the ADR-0020
+  third amendment; revisit only if a real in-game clock ever ships.
+- **2026-07-19 — Fog of war is presentation, never the security boundary** (ADR-0021). Players
+  receive the mask verbatim; hiding a combatant's existence still requires `gm-only` visibility.
+  Fog is also NOT combat state: excluded from the timeline's restorable slice, preserved across
+  encounter start/end, carried per scene through park/resume.
 - **2026-07-18 — Turn time-travel snapshots live OUTSIDE `GameState`.** Per-turn-boundary
   snapshots go in a dedicated `turn_snapshots` SQLite table, not embedded in `GameState`, so
   the player/viewer projections stay byte-compatible and persisted state doesn't bloat. Only a

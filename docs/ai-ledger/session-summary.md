@@ -8,6 +8,38 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Foundry/AboveVTT research → six-slice adoption pack (owner-directed; same branch/PR #38)
+
+Owner: "thoroughly research github.com/cyruzzo/AboveVTT and github.com/foundryvtt/dnd5e — see what
+can be learned from and implemented." Researched both (web-only; **AGPL = design study only, no
+code read for reuse** — now a decision-log rule), planned six ranked slices, shipped all six as
+independent green commits:
+
+1. **Recharge abilities** — `uses.per: "recharge"` + d6 threshold; ETL emits 86 structured pools
+   (and fixed 13 upstream `RECHARGE`+param rows that are really die-range recharges — basilisk/
+   medusa gaze, blink dog Teleport…); auto-rolled at the owner's turn start via `nextInitiativeTurn`
+   deps; rests/encounter-start re-arm.
+2. **Legendary actions + Resistance** — per-round `legendaryUsed` pool (reactionsUsed pattern),
+   economy blocks, `turn.use-legendary`, ⭐ off-turn console switch, LR commit flag on `save.answer`
+   after a previewed failure (success outcome still applies — e.g. half damage). Pools are GM
+   knowledge (stripped, leak-tested).
+3. **Condition glyphs** — original 16×16 SVG icons for all 15 SRD conditions in the token badges;
+   viewer gets parallel `conditionIds`. Catalog render + live smoke verified legibility.
+4. **Scene thumbnails** — cached one-fetch-per-asset map previews in the Scenes strip chips.
+5. **Hit dice** — pool seeded from HP formulas; `actor.spend-hit-dice` (pre-rolled faces, min 1/die,
+   heals via `healActor`, shared roll record); long-rest refill; the roster's missing rest UI
+   (GM Short/Long buttons + stepper; player's own card too).
+6. **Manual fog of war v1 (ADR-0021; BUILD_PLAN Phase-2 gate item)** — per-scene reveal/hide rect
+   strokes over "all hidden"; `fog.set-enabled/paint/reset` (GM, `sceneId` preps parked scenes);
+   server snaps/clamps/compacts/caps; GM-dim-below-tokens vs player/viewer-solid-above-everything
+   mask; timeline-neutral (never dirties, survives rewinds); fog ≠ security boundary (documented +
+   pinned). Smoke: real drags — grid-snapped stroke, covered player map, re-hide, reveal-all
+   compaction, 375 px tools.
+
+Rejected as out of scope (decision log): D&D Beyond integration, voice/video, generic
+Active-Effects engine, full Activities generality, dynamic lighting/vision fog. Suite: 104
+regression + 7 fog tests; all gates from root; five live Playwright smokes with screenshots.
+
 ## 2026-07-19 — Foundry-style tracker + Scene IA strip (owner-directed; same branch/PR #38)
 
 Owner's messages finally came through ("responses weren't going through" explains four identical

@@ -40,6 +40,24 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   fighting, weapon mastery, mounted, jumping, burn/suffocation timers, breaking objects, hit
   dice, vision/LoS/auto-cover, difficult terrain. Roadmap:
   `docs/product/rules-engine-followup-assessment.md` §4.
+- **Foundry/AboveVTT adoption pack (2026-07-19, same PR #38; ADR-0020 third amendment +
+  ADR-0021).** Design-study adoption (no code copied; AGPL/convention): **recharge abilities**
+  (structured `uses.per: "recharge"` pools from the ETL — 86 across the bundle incl. 13
+  upstream-mislabeled die-range recharges — auto-rolled d6 at the owner's turn start with narrated
+  dice, re-armed by encounter start and rests); **legendary actions + Legendary Resistance**
+  (`combat.legendaryUsed` per-round pool refreshing at the creature's own turn start, economy
+  blocks for own-turn/over-pool, GM `turn.use-legendary`, LR as a GM commit flag on `save.answer`
+  that flips a previewed failure into the success outcome from an N/day `actionUses` pool; ⭐
+  off-turn console switch in the tracker; pools stripped from player views); **hit dice**
+  (`Actor.hitDice` seeded from hit-point formulas, `actor.spend-hit-dice` heals roll+Con min 1
+  per die through `healActor` with the dice in the shared roll history, long rest refills, roster
+  gains the missing Short/Long rest buttons + stepper, pool owner-only in projections);
+  **condition glyphs** (original SVG icons for all 15 SRD conditions on map tokens, shared
+  table/replay/viewer via `conditionIds`); **scene thumbnails** (cached one-fetch-per-asset map
+  previews in the Scenes strip chips); **manual fog of war v1** (ADR-0021 — per-scene reveal/hide
+  rect strokes, three GM-only commands with parked-scene `sceneId` prep, GM-dim/player-solid
+  mask, timeline-neutral, presentation-not-security-boundary; the BUILD_PLAN Phase-2 gate item).
+  Regression suite now 104 tests + 7 fog tests; hit dice moved OFF the unsupported list above.
 
 - TypeScript monorepo: React/Vite client (`@vtt/web`) + authoritative Express + Socket.IO
   server (`@vtt/server`); packages `domain`, `rules-5e`, `schemas`, `api-contract`, `ui`,
