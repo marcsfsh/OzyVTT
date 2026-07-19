@@ -1,7 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { adjustableActor, type ActorScope } from "./hit-points.js";
-import { applyExhaustionDeath, releaseGrapplesHeldBy, type EffectNarration } from "./effects.js";
+import { applyExhaustionDeath, endConcentrationSustainedBy, releaseGrapplesHeldBy, type EffectNarration } from "./effects.js";
 import { conditionLabel, effectiveSpeedFeet, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 
 /**
@@ -48,9 +48,10 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
   if (conditionId === "exhaustion" && previousExhaustion < 6 && (level ?? 1) >= 6) {
     return applyExhaustionDeath(state, actor);
   }
-  // SRD Grappling: an incapacitated grappler releases its holds (0 HP separately releases everything).
+  // SRD: an incapacitated creature releases its grapples (Grappling) and its concentration breaks
+  // (Concentration). 0 HP separately releases everything it sustains.
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
-    return releaseGrapplesHeldBy(state, actor.id);
+    return [...releaseGrapplesHeldBy(state, actor.id), ...endConcentrationSustainedBy(state, actor.id)];
   }
   return [];
 }

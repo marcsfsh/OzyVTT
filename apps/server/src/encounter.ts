@@ -55,7 +55,10 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
     const tieBreaker = actor.initiative ?? 0;
-    const rolled = entry.score === undefined ? rollD20() + tieBreaker : entry.score;
+    // 2024 Surprise: a surprised combatant rolls initiative with disadvantage (two d20s, keep lower).
+    const rolled = entry.score === undefined
+      ? (entry.surprised === true ? Math.min(rollD20(), rollD20()) : rollD20()) + tieBreaker
+      : entry.score;
     if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
     return { actorId: actor.id, score: rolled, tieBreaker };
   });
@@ -74,6 +77,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     annotations: [],
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
+    underwater: false,
     reactionsUsed: [],
     pendingSaves: [],
     pendingReactions: [],
@@ -106,7 +110,7 @@ export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, reactionsUsed: [], pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {

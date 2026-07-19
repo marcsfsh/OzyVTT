@@ -286,6 +286,8 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .own-dying { margin-top: .25rem; }
 .rules-mode-control { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 0; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .rules-mode-control select { width: auto; flex: 1 1 auto; margin: 0; text-transform: none; letter-spacing: normal; font-size: .8rem; color: #c8c0b1; }
+.environment-control { display: flex; align-items: center; gap: .5rem; margin: .35rem 0 0; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.environment-control input { width: auto; margin: 0; }
 .action-hint { color: #e9b861; font-weight: 700; }
 .action-row-hinted { border-color: #6e5a34; }
 .action-instance-note { margin: .3rem 0; color: #ffdca0; font-size: .8rem; font-weight: 700; }

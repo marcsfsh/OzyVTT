@@ -21,6 +21,7 @@ import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
 import { applyMovementRules } from "./movement-rules.js";
+import { applyRest } from "./rests.js";
 import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
@@ -33,7 +34,7 @@ import {
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
-  SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetEnvironmentSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -207,7 +208,14 @@ export function createGameOperations(context: GameOperationsContext) {
         timeline.clearJournal(commandId);
         timeline.capture("turn", `Combat begins — ${turnLabel(state)}`, state);
       });
-      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: "The encounter began.", gmOnly: false }); context.logTurnBegin(result.state); }
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: "The encounter began.", gmOnly: false });
+        for (const entry of entries) {
+          if (entry.surprised === true) context.appendLog({ kind: "encounter", text: `${actorName(entry.actorId)} is surprised — initiative rolled at disadvantage.`, actorIds: [entry.actorId], gmOnly: actorHidden(entry.actorId) });
+        }
+        context.logTurnBegin(result.state);
+      }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -457,10 +465,10 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorApplyDamage(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ApplyDamageSchema, raw, "The damage command is malformed.");
       const scope = actorScopeOf(principal);
-      const { commandId, actorId, amount, parts, sourceName, critical, expectedRevision } = request;
+      const { commandId, actorId, amount, parts, sourceName, critical, nonlethal, expectedRevision } = request;
       let outcome: ReturnType<typeof applyDamageDetailed> | undefined;
       const result = await store.execute({ id: commandId, type: "actor.apply-damage", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        outcome = applyDamageDetailed(state, actorId, { amount, parts, critical, sourceName: sourceName ?? null }, scope, { resolveDefinition });
+        outcome = applyDamageDetailed(state, actorId, { amount, parts, critical, sourceName: sourceName ?? null, nonlethal }, scope, { resolveDefinition, newId: context.newId, now: () => new Date().toISOString() });
       });
       if (!result.duplicate && outcome) {
         await context.publishGameState(result.state);
@@ -616,7 +624,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!positionA || !positionB) return null;
           return mapDistance(geometry, positionA, positionB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null, cover: request.cover ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
@@ -781,30 +789,35 @@ export function createGameOperations(context: GameOperationsContext) {
     async effectAdd(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can add effects.");
       const request = parse(EffectAddSchema, raw, "The effect command is malformed.");
-      const { commandId, actorId, name, tags, duration, modifiers, expectedRevision } = request;
+      const { commandId, actorId, name, tags, duration, modifiers, concentration, expectedRevision } = request;
+      let events: EffectNarration[] = [];
       const result = await store.execute({ id: commandId, type: "effect.add", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        events = [];
         addEffect(state, actorId, {
           id: commandId,
           name,
           tags: tags ? [...tags] : [],
-          sourceActorId: null,
+          // A GM-added concentration effect is sustained by its bearer (damage to them prompts the CON save).
+          sourceActorId: concentration ? actorId : null,
           sourceName: null,
           sourceActionId: null,
           startedRound: state.combat.round,
           duration: duration === undefined ? { type: "manual" } : duration.type === "rounds" ? { type: "rounds", remaining: duration.rounds } : duration,
           endsWhenSourceDefeated: false,
           voidWhileIncapacitated: false,
+          concentration: concentration ?? false,
           modifiers: modifiers ? [...modifiers] : [],
           linkedConditionIds: [],
           escapeDc: null,
           onEnd: [],
           endsWithTag: null
-        });
+        }, events);
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         context.appendLog({ kind: "effect", text: `${actorName(actorId)} gains ${name}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
         context.broadcastTableEvent({ kind: "effect", text: `${actorName(actorId)} gains ${name}.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
+        publishNarrations(events);
       }
       return { revision: result.state.revision, duplicate: result.duplicate, effectId: commandId };
     },
@@ -886,32 +899,31 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
-    async actorRest(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
-      requireGmGrade(principal, "Only the GM can apply a rest.");
-      const request = parse(ActorRestSchema, raw, "The rest command is malformed.");
-      const { commandId, actorId, expectedRevision } = request;
-      let events: EffectNarration[] = [];
-      const result = await store.execute({ id: commandId, type: "actor.rest", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        const actor = state.actors.find((candidate) => candidate.id === actorId);
-        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-        if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("End the encounter before resting a combatant who is in it.");
-        // Long rest (ADR-0020): remaining effects end first (their onEnd lands — Frenzy's Exhaustion),
-        // then HP to max, temp HP gone, dying cleared, limited-use pools refreshed, Exhaustion −1.
-        for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
-        actor.hp.current = actor.hp.maximum;
-        actor.hp.temporary = 0;
-        actor.deathSaves = null;
-        removeConditionDirect(actor, "unconscious");
-        actor.actionUses = {};
-        const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
-        if (exhaustion) {
-          if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
-          else actor.conditions = actor.conditions.map((condition) => condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition);
-        }
+    async encounterSetEnvironment(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can change the encounter environment.");
+      const request = parse(SetEnvironmentSchema, raw, "The environment command is malformed.");
+      const { commandId, underwater, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "encounter.set-environment", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.combat = { ...state.combat, underwater };
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
-        context.appendLog({ kind: "heal", text: `${actorName(actorId)} completed a long rest.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
+        context.appendLog({ kind: "encounter", text: underwater ? "The fight is now underwater: melee has Disadvantage unless it deals piercing damage, ranged attacks miss beyond normal range, and everyone resists fire." : "The fight is no longer underwater.", gmOnly: false });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async actorRest(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can apply a rest.");
+      const request = parse(ActorRestSchema, raw, "The rest command is malformed.");
+      const { commandId, actorId, kind, expectedRevision } = request;
+      let events: EffectNarration[] = [];
+      const result = await store.execute({ id: commandId, type: "actor.rest", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        events = applyRest(state, actorId, kind, resolveDefinition);
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "heal", text: `${actorName(actorId)} completed a ${kind} rest.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
         publishNarrations(events);
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -1196,6 +1208,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["effect.end", "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.", (p, raw) => operations.effectEnd(p, raw)],
     ["death-save.roll", "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).", (p, raw) => operations.deathSaveRoll(p, raw)],
     ["encounter.set-rules-mode", "Set the rules-engine enforcement mode: strict, assisted, or freeform (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
+    ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
     ["actor.rest", "Apply a long rest: full HP, cleared dying state, refreshed limited uses, one less Exhaustion level (GM).", (p, raw) => operations.actorRest(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],

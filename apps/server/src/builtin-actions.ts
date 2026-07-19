@@ -22,7 +22,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description: "When you take the Dash action, you gain extra movement for the current turn equal to your Speed after modifiers. (SRD 5.2.1, Dash [Action])",
     damage: [],
-    grants: { name: "Dashing", tags: ["dashing"], duration: { type: "until-source-next-turn" }, modifiers: [], onEnd: [], target: "self", voidWhileIncapacitated: false }
+    grants: { name: "Dashing", tags: ["dashing"], duration: { type: "until-source-next-turn" }, modifiers: [], onEnd: [], target: "self", voidWhileIncapacitated: false, concentration: false }
   },
   {
     id: "disengage",
@@ -30,7 +30,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description: "If you take the Disengage action, your movement doesn't provoke Opportunity Attacks for the rest of the current turn. (SRD 5.2.1, Disengage [Action])",
     damage: [],
-    grants: { name: "Disengaged", tags: ["disengaged"], duration: { type: "until-source-next-turn" }, modifiers: [], onEnd: [], target: "self", voidWhileIncapacitated: false }
+    grants: { name: "Disengaged", tags: ["disengaged"], duration: { type: "until-source-next-turn" }, modifiers: [], onEnd: [], target: "self", voidWhileIncapacitated: false, concentration: false }
   },
   {
     id: "dodge",
@@ -38,7 +38,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description: "Until the start of your next turn, attack rolls against you have Disadvantage if you can see the attacker, and you make Dexterity saving throws with Advantage. You lose these benefits if you have the Incapacitated condition or if your Speed is 0. (SRD 5.2.1, Dodge [Action])",
     damage: [],
-    grants: { name: "Dodging", tags: ["dodging"], duration: { type: "until-source-next-turn" }, modifiers: [{ type: "incoming-attack-disadvantage" }, { type: "save-advantage", ability: "dex" }], onEnd: [], target: "self", voidWhileIncapacitated: true }
+    grants: { name: "Dodging", tags: ["dodging"], duration: { type: "until-source-next-turn" }, modifiers: [{ type: "incoming-attack-disadvantage" }, { type: "save-advantage", ability: "dex" }], onEnd: [], target: "self", voidWhileIncapacitated: true, concentration: false }
   },
   {
     id: "help",
@@ -46,7 +46,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description: "Choose one ally: they gain Advantage on their attack rolls until the start of your next turn (the SRD's distract variant, simplified from next-attack-only — documented). The Help action also covers assisting a check or stabilizing a dying creature; adjudicate those narratively. (SRD 5.2.1, Help [Action])",
     damage: [],
-    grants: { name: "Helped", tags: ["helped"], duration: { type: "until-source-next-turn" }, modifiers: [{ type: "attack-advantage" }], onEnd: [], target: "target", voidWhileIncapacitated: false }
+    grants: { name: "Helped", tags: ["helped"], duration: { type: "until-source-next-turn" }, modifiers: [{ type: "attack-advantage" }], onEnd: [], target: "target", voidWhileIncapacitated: false, concentration: false }
   },
   {
     id: "hide",
@@ -75,7 +75,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description: "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready. (SRD 5.2.1, Ready [Action])",
     damage: [],
-    grants: { name: "Readied", tags: ["readied"], duration: { type: "until-source-next-turn" }, modifiers: [], onEnd: [], target: "self", voidWhileIncapacitated: false }
+    grants: { name: "Readied", tags: ["readied"], duration: { type: "until-source-next-turn" }, modifiers: [], onEnd: [], target: "self", voidWhileIncapacitated: false, concentration: false }
   },
   {
     id: "search",

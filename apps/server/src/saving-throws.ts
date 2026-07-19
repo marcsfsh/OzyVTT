@@ -5,7 +5,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
-import { addEffect, type EffectNarration } from "./effects.js";
+import { addEffect, endEffectIfPresent, type EffectNarration } from "./effects.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -90,6 +90,7 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 export function createPendingSaves(state: GameState, input: Readonly<{
   sourceActorId: string; sourceName: string; actionName: string; ability: AbilityId; dc: number;
   targetIds: readonly string[]; proposedDamage: number; proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>; halfOnSuccess: boolean; conditionId: string | null;
+  saveBonus?: number;
   onFailEffect?: PendingSave["onFailEffect"];
   newSaveId: () => string; createdAt: number;
 }>) {
@@ -105,6 +106,7 @@ export function createPendingSaves(state: GameState, input: Readonly<{
     ...(input.proposedDamageParts && input.proposedDamageParts.length > 0 ? { proposedDamageParts: [...input.proposedDamageParts] } : {}),
     halfOnSuccess: input.halfOnSuccess,
     conditionId: input.conditionId,
+    saveBonus: input.saveBonus ?? 0,
     ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
     createdAt: input.createdAt
   }));
@@ -169,8 +171,8 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     total = 0;
   } else {
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
-    // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1), saving throws included.
-    const modifier = saveModifierFor(definition, pending.ability) + exhaustionPenalty(target);
+    // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1); cover's saveBonus adds (SRD Cover).
+    const modifier = saveModifierFor(definition, pending.ability) + exhaustionPenalty(target) + pending.saveBonus;
     const sources = saveRollSources(target, pending.ability);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     const die = aggregated.mode === "advantage" ? "2d20kh1" : aggregated.mode === "disadvantage" ? "2d20kl1" : "1d20";
@@ -206,7 +208,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   let appliedDamage = 0;
   let conditionApplied = false;
   if (outcomeDamage > 0) {
-    const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId) });
+    const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), newId: deps.newRollId, now: deps.now });
     appliedDamage = outcome.application.totalApplied;
     events.push(...outcome.events);
   }
@@ -214,6 +216,11 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     // setCondition narrates immunity skips; whether the condition actually landed is read back.
     events.push(...setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }));
     conditionApplied = target.conditions.some((condition) => condition.id === pending.conditionId);
+  }
+  // A committed FAILED concentration check ends the sustained effects (SRD Concentration);
+  // tolerant of effects already gone (timeline rewinds, earlier breaks).
+  if (!success && pending.endsEffects) {
+    for (const reference of pending.endsEffects) events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
   }
   // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple —
   // the same carve-out class as on-hit riders, ADR-0020).
@@ -229,6 +236,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
       duration: { type: "manual" },
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: false,
+      concentration: false,
       modifiers: [],
       linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
       escapeDc: pending.onFailEffect.escapeDc,

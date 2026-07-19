@@ -9,7 +9,8 @@ import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { builtinAction } from "../src/builtin-actions.js";
-import { endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
+import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
+import { applyRest } from "../src/rests.js";
 import { applyTimelineRestore } from "../src/combat-history.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -1004,5 +1005,234 @@ describe("range and reach validation (SRD Making an Attack / Range)", () => {
     const distances: Record<string, number> = { [IDS.croc1]: 40, [IDS.croc2]: 5 };
     const jostled = resolve(crowded, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [18, 3], (_a, b) => distances[b] ?? null);
     expect(jostled.rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
+  });
+});
+
+describe("cover — GM-adjudicated, server math (SRD Cover)", () => {
+  const resolveCover = (game: GameState, definition: ActorDefinition, actionId: string, input: { actorId: string; targetIds?: readonly string[]; cover?: "half" | "three-quarters" | "total"; override?: { reason: string } }, faces: number[]) =>
+    resolveDefinitionAction(game, actionOf(definition, actionId), { actorId: input.actorId, targetIds: input.targetIds ?? [], commandId: nextCommandId(), rollMode: null, override: input.override ?? null, cover: input.cover ?? null }, deps(faces, definition));
+
+  it("half cover adds +2 AC: a 15 vs AC 14 now misses, with the bonus shown on the result", () => {
+    const game = buildGame();
+    // Torva +7: face 8 → 15, a hit against the croc's bare AC 14 — but not against 16 behind half cover.
+    const swing = resolveCover(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1], cover: "half" }, [8, 6]);
+    expect(swing.attack).toMatchObject({ total: 15, targetAc: 16, outcome: "miss", coverBonus: 2 });
+  });
+
+  it("three-quarters cover adds +5 to the Dexterity save it forces", () => {
+    const game = buildGame([{ actorId: IDS.sable, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    resolveCover(game, sableDefinition, "fireball", { actorId: IDS.sable, targetIds: [IDS.croc1], cover: "three-quarters" }, [4, 4, 4, 4, 4, 4, 4, 4, 4]);
+    expect(game.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, saveBonus: 5 });
+    // Croc Dex −1: face 10 → 10 − 1 + 5 (cover) = 14, still a failure against DC 15 — but the +5 landed.
+    const answered = answerSave(game, nextCommandId(), game.combat.pendingSaves[0].id, "roll", undefined, true, { role: "gm" }, {
+      random: () => 10, newRollId: () => "40000000-0000-4000-8000-000000000d10", sessionId: IDS.gmSession, role: "gm", now: () => "2026-07-18T00:00:00.000Z",
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+    });
+    expect(answered.outcome).toMatchObject({ total: 14, success: false });
+  });
+
+  it("total cover blocks targeting in strict mode; an audited override lets the corner-case shot through", () => {
+    const game = buildGame();
+    try {
+      resolveCover(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1], cover: "total" }, [18, 6]);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("cover.total");
+    }
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    const overridden = resolveCover(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1], cover: "total", override: { reason: "firing through the arrow slit" } }, [18, 6]);
+    expect(overridden.overridden).toEqual({ rule: "cover.total", reason: "firing through the arrow slit" });
+    expect(overridden.attack?.outcome).toBe("hit");
+  });
+});
+
+describe("concentration (SRD Concentration)", () => {
+  const sustained = (id: string, name: string, sourceActorId: string, sourceName: string) => ({
+    id, name, tags: [], sourceActorId, sourceName, sourceActionId: null, startedRound: 1,
+    duration: { type: "manual" as const }, endsWhenSourceDefeated: true, voidWhileIncapacitated: false,
+    concentration: true, modifiers: [], linkedConditionIds: [], escapeDc: null, onEnd: [], endsWithTag: null
+  });
+  const gameDeps = (game: GameState) => ({ resolveDefinition: (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition, newId: () => nextCommandId(), now: () => "2026-07-18T00:00:00.000Z" });
+
+  it("starting a second concentration effect ends the first (one at a time)", () => {
+    const game = buildGame();
+    const events: Parameters<typeof addEffect>[3] = [];
+    addEffect(game, IDS.torva, sustained("conc-hex-1", "Hexed", IDS.sable, "Sable Vex"), events);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects.some((effect) => effect.id === "conc-hex-1")).toBe(true);
+    addEffect(game, IDS.croc1, sustained("conc-hex-2", "Hexed", IDS.sable, "Sable Vex"), events);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects.some((effect) => effect.id === "conc-hex-1")).toBe(false);
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.effects.some((effect) => effect.id === "conc-hex-2")).toBe(true);
+    expect(events.some((event) => /Hexed ended/.test(event.text))).toBe(true);
+  });
+
+  it("damage prompts a CON save at DC max(10, half damage) that ends the sustained effects on a committed failure", () => {
+    const game = buildGame();
+    addEffect(game, IDS.torva, sustained("conc-hex", "Hexed", IDS.sable, "Sable Vex"));
+    const outcome = applyDamageDetailed(game, IDS.sable, { amount: 44, sourceName: "Crocodile bite" }, { role: "gm" }, gameDeps(game));
+    expect(outcome.events.some((event) => /DC 22 Constitution save to keep concentrating/.test(event.text))).toBe(true);
+    expect(game.combat.pendingSaves[0]).toMatchObject({ targetActorId: IDS.sable, ability: "con", dc: 22, actionName: "Concentration check", endsEffects: [{ actorId: IDS.torva, effectId: "conc-hex" }] });
+    // Manual total (GM escape hatch) keeps the test independent of Sable's CON modifier: 3 < 22 fails.
+    const answered = answerSave(game, nextCommandId(), game.combat.pendingSaves[0].id, "manual", 3, true, { role: "gm" }, {
+      random: () => 1, newRollId: () => "40000000-0000-4000-8000-000000000d20", sessionId: IDS.gmSession, role: "gm", now: () => "2026-07-18T00:00:00.000Z",
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+    });
+    expect(answered.outcome.success).toBe(false);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toHaveLength(0);
+  });
+
+  it("caps the concentration DC at 30; small hits still prompt at the DC 10 floor", () => {
+    const game = buildGame();
+    addEffect(game, IDS.pip, sustained("conc-big", "Warded", IDS.torva, "Torva Grimtusk"));
+    applyDamageDetailed(game, IDS.torva, { amount: 70, sourceName: "Cave-in" }, { role: "gm" }, gameDeps(game));
+    expect(game.combat.pendingSaves[0].dc).toBe(30);
+
+    const small = buildGame();
+    addEffect(small, IDS.pip, sustained("conc-small", "Warded", IDS.torva, "Torva Grimtusk"));
+    applyDamageDetailed(small, IDS.torva, { amount: 4, sourceName: "Dart" }, { role: "gm" }, gameDeps(small));
+    expect(small.combat.pendingSaves[0].dc).toBe(10);
+  });
+
+  it("an incapacitating condition breaks concentration immediately", () => {
+    const game = buildGame();
+    addEffect(game, IDS.torva, sustained("conc-stun", "Hexed", IDS.sable, "Sable Vex"));
+    const events = setCondition(game, IDS.sable, "stunned", true, undefined, { role: "gm" });
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toHaveLength(0);
+    expect(events.some((event) => /Hexed ended/.test(event.text))).toBe(true);
+  });
+
+  it("dropping to 0 HP breaks concentration and does not prompt a save", () => {
+    const game = buildGame();
+    addEffect(game, IDS.torva, sustained("conc-zero", "Hexed", IDS.sable, "Sable Vex"));
+    applyDamageDetailed(game, IDS.sable, { amount: 52, sourceName: "Crocodile death roll" }, { role: "gm" }, gameDeps(game));
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toHaveLength(0);
+    expect(game.combat.pendingSaves).toHaveLength(0);
+  });
+});
+
+describe("surprise — initiative Disadvantage (SRD 2024 Surprise)", () => {
+  it("a surprised combatant with no explicit score rolls two d20s and keeps the lower", () => {
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        { id: IDS.torva, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current: 75, maximum: 75 } },
+        { id: IDS.pip, name: "Pip Underbough", kind: "player-character", visibility: "public", hp: { current: 52, maximum: 52 } },
+        { id: IDS.croc1, name: "Giant Crocodile", kind: "monster", visibility: "public", hp: { current: 85, maximum: 85 } }
+      ]
+    });
+    const faces = [15, 3, 10];
+    startEncounter(game, { mapAssetId: IDS.map, entries: [
+      { actorId: IDS.torva, surprised: true },
+      { actorId: IDS.pip },
+      { actorId: IDS.croc1, score: 12 }
+    ] }, () => { const face = faces.shift(); if (face === undefined) throw new Error("d20 queue empty"); return face; }, GEOMETRY, () => undefined);
+    // Torva (surprised): min(15, 3) = 3. Pip: single roll 10. Croc: explicit 12. Order: croc, pip, torva.
+    expect(game.combat.initiative.map((entry) => ({ actorId: entry.actorId, score: entry.score }))).toEqual([
+      { actorId: IDS.croc1, score: 12 }, { actorId: IDS.pip, score: 10 }, { actorId: IDS.torva, score: 3 }
+    ]);
+    expect(faces).toHaveLength(0);
+  });
+});
+
+describe("rests (SRD Resting) — short rests re-arm only per-short-rest pools", () => {
+  const FIGHTER_ID = "10000000-0000-4000-8000-00000000000f";
+  const withSecondWind: ActorDefinition = {
+    ...pipDefinition,
+    actions: [...pipDefinition.actions, { ...actionOf(pipDefinition, "cunning-action"), id: "second-wind", name: "Second Wind", uses: { limit: 1, per: "short-rest" } }]
+  };
+  const buildResting = () => {
+    const game = buildGame();
+    game.definitions.push({ id: "import-fighter", definition: withSecondWind });
+    game.actors.push({
+      id: FIGHTER_ID, name: "Hired Fighter", kind: "player-character", visibility: "public",
+      hp: { current: 6, maximum: 20, temporary: 0 }, ownerSessionId: null, conditions: [], effects: [],
+      deathSaves: null, actionUses: { "second-wind": 1, "action-surge": 1 }, conditionImmunities: [], definitionId: "import-fighter"
+    });
+    return game;
+  };
+  const resolveDef = (game: GameState) => (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition;
+
+  it("a short rest clears per-short-rest pools, leaves other pools and hit points alone", () => {
+    const game = buildResting();
+    applyRest(game, FIGHTER_ID, "short", resolveDef(game));
+    const fighter = game.actors.find((actor) => actor.id === FIGHTER_ID)!;
+    expect(fighter.actionUses).toEqual({ "action-surge": 1 });
+    expect(fighter.hp.current).toBe(6);
+  });
+
+  it("a long rest still clears everything and restores hit points", () => {
+    const game = buildResting();
+    applyRest(game, FIGHTER_ID, "long", resolveDef(game));
+    const fighter = game.actors.find((actor) => actor.id === FIGHTER_ID)!;
+    expect(fighter.actionUses).toEqual({});
+    expect(fighter.hp.current).toBe(20);
+  });
+
+  it("rests are blocked for a combatant in the live encounter", () => {
+    const game = buildResting();
+    expect(() => applyRest(game, IDS.torva, "short", resolveDef(game))).toThrow(/End the encounter/);
+  });
+});
+
+describe("underwater combat (SRD Underwater Combat) — GM environment toggle", () => {
+  it("melee attacks take Disadvantage unless they deal piercing damage", () => {
+    const game = buildGame();
+    game.combat = { ...game.combat, underwater: true };
+    const axe = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 3, 6]);
+    expect(axe.rollMode?.disadvantage).toContain("Underwater (non-piercing melee)");
+
+    const stab = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    stab.combat = { ...stab.combat, underwater: true };
+    const rapier = resolve(stab, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 5]);
+    expect(rapier.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
+  });
+
+  it("ranged attacks automatically miss beyond normal range (strict violation range.underwater)", () => {
+    const game = buildGame([{ actorId: IDS.pip, score: 20 }, { actorId: IDS.croc1, score: 8 }]);
+    game.combat = { ...game.combat, underwater: true };
+    // Shortbow 80/320: 100 ft is legal on dry land (long range, Disadvantage) but an auto-miss underwater.
+    try {
+      resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [18, 3], () => 100);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      expect((error as RulesBlockedError).rule).toBe("range.underwater");
+    }
+    const close = resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [18, 3], () => 60);
+    expect(close.attack?.outcome).toBe("hit");
+  });
+
+  it("everyone underwater resists fire damage, attributed to the environment", () => {
+    const game = buildGame();
+    game.combat = { ...game.combat, underwater: true };
+    const outcome = applyDamageDetailed(game, IDS.pip, { amount: 10, parts: [{ amount: 10, type: "fire" }], sourceName: "Flame jet" }, { role: "gm" }, { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition });
+    expect(outcome.application.totalApplied).toBe(5);
+    expect(outcome.application.parts[0]).toMatchObject({ adjustment: "resistance", adjustmentSource: "Underwater" });
+  });
+
+  it("a fresh encounter starts dry, and pre-underwater snapshots parse to underwater: false", () => {
+    expect(buildGame().combat.underwater).toBe(false);
+    const legacy = GameStateSchema.parse({ schemaVersion: 1 });
+    expect(legacy.combat.underwater).toBe(false);
+  });
+});
+
+describe("knocking out a creature (SRD) — nonlethal damage", () => {
+  it("a nonlethal drop to 0 leaves a character Unconscious and stable instead of dying", () => {
+    const game = buildGame();
+    const outcome = applyDamageDetailed(game, IDS.pip, { amount: 52, nonlethal: true, sourceName: "Pommel strike" }, { role: "gm" }, { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition });
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.hp.current).toBe(0);
+    expect(pip.deathSaves).toEqual({ successes: 0, failures: 0, stable: true });
+    expect(pip.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
+    expect(outcome.application.instantDeath).toBe(false);
+    expect(outcome.events.some((event) => /knocked out/.test(event.text))).toBe(true);
+  });
+
+  it("a nonlethal drop to 0 leaves a monster Unconscious, not defeated", () => {
+    const game = buildGame();
+    const outcome = applyDamageDetailed(game, IDS.croc1, { amount: 85, nonlethal: true, sourceName: "Pommel strike" }, { role: "gm" }, { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition });
+    expect(outcome.application.defeated).toBe(false);
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
   });
 });

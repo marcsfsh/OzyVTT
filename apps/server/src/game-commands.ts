@@ -19,7 +19,7 @@ export const InitiativePreviousSchema = z.object({ commandId: z.string().uuid(),
 export const EncounterStartSchema = z.object({
   commandId: z.string().uuid(),
   mapAssetId: z.string().uuid(),
-  entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional() }).strict()).min(1).max(200),
+  entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), /** 2024 surprise: the combatant rolls initiative with disadvantage (SRD Surprise). */ surprised: z.boolean().optional() }).strict()).min(1).max(200),
   /** Rules-engine enforcement for this fight (ADR-0020); omitted keeps the table's current mode. */
   rulesMode: z.enum(["strict", "assisted", "freeform"]).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
@@ -46,6 +46,8 @@ export const ApplyDamageSchema = z.object({
   sourceActionId: z.string().regex(/^[a-z0-9-]+$/).max(120).optional(),
   sourceName: z.string().min(1).max(120).optional(),
   critical: z.boolean().optional(),
+  /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable instead of dying/defeated. */
+  nonlethal: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 export const TempHpSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(0).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -65,6 +67,8 @@ export const ActionResolveSchema = z.object({
   override: z.object({ reason: z.string().trim().min(1).max(300) }).strict().optional(),
   /** The escapable effect to break (Escape a Grapple builtin); defaults to the actor's first effect with an escape DC. */
   effectId: z.string().min(1).max(120).optional(),
+  /** GM-adjudicated cover for the target (no line-of-sight engine): half +2, three-quarters +5 to AC and Dex saves; total can't be targeted (SRD Cover). */
+  cover: z.enum(["half", "three-quarters", "total"]).optional(),
   /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
   note: z.string().trim().min(1).max(100).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
@@ -101,12 +105,15 @@ export const EffectAddSchema = z.object({
     z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
     z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict()
   ])).max(8).optional(),
+  /** The granter concentrates to sustain this effect (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
+  concentration: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), effectId: z.string().min(1).max(120), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.literal("long"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const SetEnvironmentSchema = z.object({ commandId: z.string().uuid(), underwater: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.enum(["long", "short"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TokenMoveSchema = z.object({
   commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),

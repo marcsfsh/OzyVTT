@@ -68,6 +68,7 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
       // Hidden turn: movement spent would narrate a hidden combatant's activity — reset with the rest.
       : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
+    underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag
     // (a banner), never the turn labels — those can name hidden combatants.
@@ -76,10 +77,11 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // crosses the wire, and a hidden source's name is masked so gm-only attackers stay unnarrated.
     pendingSaves: state.combat.pendingSaves
       .filter((entry) => { const target = state.actors.find((actor) => actor.id === entry.targetActorId); return target !== undefined && target.ownerSessionId !== null && target.ownerSessionId === playerSessionId; })
-      .map(({ sourceActorId, ...entry }) => ({
+      .map(({ sourceActorId, endsEffects: _endsEffects, ...entry }) => ({
         ...entry,
         sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName,
-        // The on-fail effect's source ids never cross the wire either (same masking as effects).
+        // The on-fail effect's source ids never cross the wire either (same masking as effects);
+        // concentration effect references (endsEffects) are server bookkeeping and are stripped.
         ...(entry.onFailEffect ? { onFailEffect: { ...entry.onFailEffect, sourceActorId: null, sourceName: entry.onFailEffect.sourceActorId !== null && !publicActorIds.has(entry.onFailEffect.sourceActorId) ? "A hidden threat" : entry.onFailEffect.sourceName } } : {})
       })),
     // Same boundary as saves: a player sees only their own claimed character's reaction prompts,

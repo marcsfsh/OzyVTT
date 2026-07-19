@@ -56,6 +56,8 @@ export const EffectInstanceSchema = z.object({
   endsWhenSourceDefeated: z.boolean().default(false),
   /** Dodge: the effect's modifiers stop applying while the bearer is incapacitated (SRD). Additive. */
   voidWhileIncapacitated: z.boolean().default(false),
+  /** The SOURCE actor concentrates to sustain this (SRD Concentration): one at a time; damage to the source prompts a CON save; incapacitation breaks it. Additive. */
+  concentration: z.boolean().default(false),
   /** Cascade: this effect ends when the actor no longer has any other effect carrying this tag (Frenzy's marker ends with the Rage). */
   endsWithTag: z.string().regex(/^[a-z0-9-]+$/).max(40).nullable().default(null),
   modifiers: z.array(EffectModifierSchema).max(8).default([]),
@@ -129,7 +131,9 @@ const EffectGrantSchema = z.object({
   /** Who receives the effect: the acting creature (default) or the action's single chosen target (Help). */
   target: z.enum(["self", "target"]).default("self"),
   /** Dodge: benefits lapse while the bearer is incapacitated (SRD). */
-  voidWhileIncapacitated: z.boolean().default(false)
+  voidWhileIncapacitated: z.boolean().default(false),
+  /** The granter concentrates to sustain the effect (SRD Concentration). */
+  concentration: z.boolean().default(false)
 }).strict();
 
 /**
@@ -166,7 +170,7 @@ const ActionSchema = z.object({
   /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
   requiresEffectTag: EffectTagSchema.optional(),
   /** Limited uses; "turn" resets every turn, "encounter" at encounter start, "long-rest" via a rest. `pool` shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon). */
-  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional() }).strict().optional(),
+  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest", "short-rest"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional() }).strict().optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional()
 });

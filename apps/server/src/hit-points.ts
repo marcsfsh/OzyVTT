@@ -2,7 +2,7 @@ import type { Actor, DamageApplication, GameState, HealthBand } from "@vtt/domai
 import { adjustDamageParts, damageWhileDying, droppedToZero, type DamagePart } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { applyConditionDirect, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { applyConditionDirect, endConcentrationSustainedBy, endEffectsSustainedBy, effectDamageDefenses, removeConditionDirect, type EffectNarration } from "./effects.js";
 
 /** Who is asking: the GM may adjust anyone; a player only their own claimed character. */
 export type ActorScope = { role: "gm" } | { role: "player"; sessionId: string };
@@ -27,8 +27,16 @@ export type DamageInput = Readonly<{
   parts?: readonly DamagePart[];
   critical?: boolean;
   sourceName?: string | null;
+  /** Knocking out a creature (SRD): a nonlethal drop to 0 leaves it Unconscious and stable instead of dying/defeated. */
+  nonlethal?: boolean;
 }>;
-export type DamageDeps = Readonly<{ resolveDefinition: (definitionId: string) => ActorDefinition | undefined }>;
+export type DamageDeps = Readonly<{
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  /** Mints ids for the concentration-check prompt; when absent the check is skipped (legacy direct paths). */
+  newId?: () => string;
+  /** Injected clock (ISO string) for the prompt's createdAt; falls back to wall time. */
+  now?: () => string;
+}>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
 function definitionDefenses(definition: ActorDefinition | undefined) {
@@ -59,8 +67,10 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     const fromEffects = effectDamageDefenses(actor);
     // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
+    // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
+    const underwater = state.combat.active && state.combat.underwater;
     const adjusted = adjustDamageParts(input.parts, {
-      resistances: [...innate.resistances, ...fromEffects.resistances],
+      resistances: [...innate.resistances, ...fromEffects.resistances, ...(underwater ? ["fire"] : [])],
       immunities: petrified ? [...innate.immunities, "poison"] : innate.immunities,
       vulnerabilities: innate.vulnerabilities,
       resistAll: petrified
@@ -72,7 +82,10 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
         && ((part.adjustment === "resistance" && !innate.resistances.map((entry) => entry.toLowerCase()).includes(type) && effectSource === null)
           || (part.adjustment === "immunity" && type === "poison" && !innate.immunities.map((entry) => entry.toLowerCase()).includes(type)))
         ? "Petrified" : null;
-      return { ...part, adjustmentSource: effectSource ?? petrifiedSource };
+      const underwaterSource = underwater && part.adjustment === "resistance" && type === "fire"
+        && !innate.resistances.map((entry) => entry.toLowerCase()).includes(type) && effectSource === null && petrifiedSource === null
+        ? "Underwater" : null;
+      return { ...part, adjustmentSource: effectSource ?? petrifiedSource ?? underwaterSource };
     });
     totalRequested = input.parts.reduce((sum, part) => sum + part.amount, 0);
     totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
@@ -103,7 +116,14 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     applyConditionDirect(actor, "unconscious");
     applyConditionDirect(actor, "prone");
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    if (isPlayerCharacter) {
+    if (input.nonlethal === true) {
+      // Knocking out a creature (SRD): the attacker chooses to knock out instead of kill — the
+      // target drops to 0, Unconscious and stable (no death saves, no defeat, no massive-damage death).
+      if (isPlayerCharacter) actor.deathSaves = { successes: 0, failures: 0, stable: true };
+      applyConditionDirect(actor, "unconscious");
+      applyConditionDirect(actor, "prone");
+      events.push({ kind: "condition", text: `${actor.name} was knocked out — Unconscious and stable at 0 HP.`, actorId });
+    } else if (isPlayerCharacter) {
       const overflow = damageToHp - hpBefore;
       const outcome = droppedToZero(overflow, actor.hp.maximum);
       actor.deathSaves = outcome.state;
@@ -114,8 +134,41 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     } else {
       defeated = true;
     }
-    // Anyone at 0 can no longer sustain a grapple (or a rage): release sustained effects.
+    // Anyone at 0 can no longer sustain a grapple (or a rage): release sustained effects —
+    // including concentration, which incapacitation always breaks (SRD Concentration).
     events.push(...endEffectsSustainedBy(state, actor.id));
+    events.push(...endConcentrationSustainedBy(state, actor.id));
+  }
+
+  // SRD Concentration: taking damage while sustaining a concentration effect prompts a CON save,
+  // DC = max(10, half the damage taken) capped at 30. The prompt carries the effects it would end
+  // on a committed failure. Skipped when no id-minter is available (legacy direct callers).
+  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId && state.combat.active) {
+    const sustained: Array<{ actorId: string; effectId: string }> = [];
+    for (const bearer of state.actors) {
+      for (const effect of bearer.effects) {
+        if (effect.concentration && effect.sourceActorId === actor.id) sustained.push({ actorId: bearer.id, effectId: effect.id });
+      }
+    }
+    if (sustained.length > 0 && state.combat.pendingSaves.length < 100) {
+      const dc = Math.min(30, Math.max(10, Math.floor(totalAdjusted / 2)));
+      state.combat = { ...state.combat, pendingSaves: [...state.combat.pendingSaves, {
+        id: deps.newId(),
+        targetActorId: actor.id,
+        ability: "con" as const,
+        dc,
+        sourceActorId: null,
+        sourceName: input.sourceName ?? "Damage",
+        actionName: "Concentration check",
+        proposedDamage: 0,
+        halfOnSuccess: false,
+        conditionId: null,
+        saveBonus: 0,
+        endsEffects: sustained,
+        createdAt: deps.now ? Date.parse(deps.now()) : Date.now()
+      }] };
+      events.push({ kind: "condition", text: `${actor.name} must make a DC ${dc} Constitution save to keep concentrating.`, actorId: actor.id });
+    }
   }
 
   return {

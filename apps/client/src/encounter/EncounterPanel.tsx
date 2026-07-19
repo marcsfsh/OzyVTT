@@ -402,15 +402,15 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
     if (!window.confirm(`Remove ${name} from the roster?`)) return;
     void run(() => emitCommand("actor:remove", { commandId: newId(), actorId, expectedRevision: state.revision }), `Removed ${name}.`);
   };
-  const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string) => {
+  const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string, options?: { nonlethal?: boolean }) => {
     const value = Number(hpAmount.trim());
     const minimum = event === "actor:apply-damage" || event === "actor:heal" ? 1 : 0;
     if (!Number.isInteger(value) || value < minimum || value > 1000) { setMessage(`Enter a whole number (${minimum}-1000).`); return; }
-    const verbs = { "actor:apply-damage": `${name} took ${value} damage.`, "actor:heal": `${name} healed ${value}.`, "actor:set-temp-hp": `${name} has ${value} temporary HP.`, "actor:set-hp": `${name} set to ${value} HP.` } as const;
+    const verbs = { "actor:apply-damage": options?.nonlethal ? `${name} took ${value} nonlethal damage.` : `${name} took ${value} damage.`, "actor:heal": `${name} healed ${value}.`, "actor:set-temp-hp": `${name} has ${value} temporary HP.`, "actor:set-hp": `${name} set to ${value} HP.` } as const;
     setHpAmount("");
     void run(() => event === "actor:set-hp"
       ? emitCommand(event, { commandId: newId(), actorId, current: value, expectedRevision: state.revision })
-      : emitCommand(event, { commandId: newId(), actorId, amount: value, expectedRevision: state.revision }), verbs[event]);
+      : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
   return <section className="encounter-panel" aria-labelledby="gm-encounter-title">
@@ -450,6 +450,11 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
           <option value="freeform">Freeform — no checks</option>
         </select>
       </label>
+      {/* SRD Underwater Combat: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all. */}
+      <label className="environment-control">
+        <input type="checkbox" checked={state.combat.underwater} disabled={busy} onChange={(event) => { const underwater = event.target.checked; socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed.")); }} />
+        Underwater fight
+      </label>
       {confirm && <div className="turn-confirm" role="alertdialog" aria-label="Confirm history change">
         <span>{confirm.message}</span>
         <div className="turn-confirm-actions">
@@ -476,6 +481,7 @@ function GmEncounterPanel({ state, selectedMap, dock }: Readonly<{ state: GmView
           {hpActorId === entry.actorId && actor && <div className="hp-editor" role="group" aria-label={`Adjust hit points for ${actor.name}`}>
             <input type="number" min="0" max="1000" placeholder="0" autoFocus aria-label="Amount" value={hpAmount} onChange={(event) => setHpAmount(event.target.value)} />
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
+            <button type="button" disabled={busy} title="Nonlethal damage — a drop to 0 knocks out (Unconscious and stable) instead of dying" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name, { nonlethal: true })}>KO</button>
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
             <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>

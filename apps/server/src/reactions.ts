@@ -84,7 +84,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
         ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
         ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
       ].filter((part) => part.amount > 0);
-      const outcome = applyDamageDetailed(state, mover.id, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: `${reactor.name}'s ${chosen.name} (opportunity attack)` }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition });
+      const outcome = applyDamageDetailed(state, mover.id, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: `${reactor.name}'s ${chosen.name} (opportunity attack)` }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newRollId, now: deps.now });
       appliedDamage = outcome.application.totalApplied;
       events = outcome.events;
     }
@@ -99,7 +99,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
   let appliedDamage = 0;
   let events: readonly EffectNarration[] = [];
   if (total > 0) {
-    const outcome = applyDamageDetailed(state, reactor.id, { amount: total, parts, critical: pending.critical, sourceName: pending.sourceName }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition });
+    const outcome = applyDamageDetailed(state, reactor.id, { amount: total, parts, critical: pending.critical, sourceName: pending.sourceName }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newRollId, now: deps.now });
     appliedDamage = outcome.application.totalApplied;
     events = outcome.events;
   }

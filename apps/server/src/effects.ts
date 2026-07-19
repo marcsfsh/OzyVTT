@@ -45,11 +45,16 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
  * actor + source action REPLACES the older instance (duration refresh — a re-declared Rage or a
  * per-turn Frenzy marker never stacks). Applies linked conditions.
  */
-export function addEffect(state: GameState, actorId: string, effect: EffectInstance): EffectInstance {
+export function addEffect(state: GameState, actorId: string, effect: EffectInstance, events?: EffectNarration[]): EffectInstance {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
+  // SRD Concentration: one sustained effect at a time — starting a new one ends the source's others.
+  if (effect.concentration && effect.sourceActorId !== null) {
+    const ended = endConcentrationSustainedBy(state, effect.sourceActorId);
+    events?.push(...ended);
+  }
   const replaced = effect.sourceActionId !== null
     ? actor.effects.find((candidate) => candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId)
     : undefined;
@@ -148,6 +153,28 @@ export function releaseGrapplesHeldBy(state: GameState, grapplerActorId: string)
       }
     }
   }
+  return events;
+}
+
+/** SRD Concentration: end every concentration effect this source sustains (broken by damage-save failure, incapacitation, or starting another). */
+export function endConcentrationSustainedBy(state: GameState, sourceActorId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors) {
+    for (const effect of [...actor.effects]) {
+      if (effect.concentration && effect.sourceActorId === sourceActorId) {
+        endEffectInternal(state, actor, effect.id, events);
+      }
+    }
+  }
+  return events;
+}
+
+/** Tolerant end-by-reference for deferred consequences (a failed concentration save after a rewind): a missing effect is a no-op. */
+export function endEffectIfPresent(state: GameState, actorId: string, effectId: string): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  const events: EffectNarration[] = [];
+  endEffectInternal(state, actor, effectId, events);
   return events;
 }
 

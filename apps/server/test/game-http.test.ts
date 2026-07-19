@@ -512,6 +512,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.effectEnd, "post", "effect.end"],
       [GAME_PATHS.deathSaveRoll, "post", "death-save.roll"],
       [GAME_PATHS.rulesMode, "post", "encounter.set-rules-mode"],
+      [GAME_PATHS.environment, "post", "encounter.set-environment"],
       [GAME_PATHS.actorRest, "post", "actor.rest"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],

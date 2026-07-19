@@ -82,6 +82,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `effect.end` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
+| `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
@@ -301,6 +302,7 @@ Starts an encounter on a calibrated battlemap with initial combatants (GM-grade 
 | `entries` | object[] | yes |  |
 | `entries[].actorId` | string (uuid) | yes |  |
 | `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
+| `entries[].surprised` | boolean | no | 2024 surprise: the server rolls this combatant's initiative with disadvantage |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -511,6 +513,7 @@ Applies damage (temporary hit points absorb first). Optional typed `parts` run t
 | `sourceActionId` | string (pattern) | no |  |
 | `sourceName` | string | no |  |
 | `critical` | boolean | no | Adds two death-save failures instead of one when the target is already dying |
+| `nonlethal` | boolean | no | Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable instead of dying/defeated |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -651,6 +654,7 @@ Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit dou
 | `override.reason` | string | yes |  |
 | `effectId` | string | no | For the escape-grapple builtin: which escapable effect to break (defaults to the first with an escape DC) |
 | `note` | string | no | Free-text annotation (the Ready builtin's trigger), shown in the granted effect's name |
+| `cover` | `half` \| `three-quarters` \| `total` | no | GM-adjudicated cover for the target: +2/+5 to AC and Dex saves; total blocks targeting (overridable) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -756,6 +760,7 @@ Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state
 | `duration.type` | `rounds` \| `until-source-next-turn` \| `encounter` \| `manual` | yes |  |
 | `duration.rounds` | integer (1–100) | no |  |
 | `modifiers` | object (free-form)[] | no |  |
+| `concentration` | boolean | no | the bearer concentrates to sustain this effect: one at a time, damage prompts a CON save, incapacitation breaks it |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -809,9 +814,25 @@ Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/encounter/environment`
+
+Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `underwater` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/actors/{actorId}/rest`
 
-Applies a long rest to a rostered actor outside combat (GM-grade only): remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, and Exhaustion drops one level.
+Applies a rest to a rostered actor outside combat (GM-grade only). Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, and Exhaustion drops one level. Short: only per-short-rest pools re-arm (hit dice are not modeled — no HP change).
 
 **Auth:** Integration credential with `actor:write` · GM session
 
@@ -823,7 +844,7 @@ Applies a long rest to a rostered actor outside combat (GM-grade only): remainin
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
-| `kind` | `long` | yes |  |
+| `kind` | `long` \| `short` | yes | short re-arms per-short-rest pools only (hit dice unmodeled — no HP change); long is the full reset |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

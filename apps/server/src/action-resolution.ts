@@ -23,6 +23,8 @@ export type ResolveInput = Readonly<{
   note?: string | null;
   /** The escapable effect to break (Escape a Grapple); defaults to the actor's first effect with an escape DC. */
   effectId?: string | null;
+  /** GM-adjudicated cover for the target (SRD Cover): half +2 / three-quarters +5 to AC and Dex saves; total blocks targeting. */
+  cover?: "half" | "three-quarters" | "total" | null;
 }>;
 export type ResolveDependencies = Readonly<{
   random: RandomSource;
@@ -117,7 +119,7 @@ type EconomyPlan = Readonly<{
   /** The compound-action components remaining AFTER this resolve (null clears/leaves no instance). */
   instance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
-  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" }> | null;
+  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" }> | null;
 }>;
 
 /** The multiattack parents (sibling actions) that list `action` as a component. */
@@ -173,7 +175,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     const key = action.uses.pool ?? action.id;
     const spent = action.uses.per === "turn" ? (turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
     if (spent >= action.uses.limit) {
-      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.limit}/${action.uses.per === "turn" ? "turn" : action.uses.per === "encounter" ? "encounter" : "long rest"}).` });
+      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.limit}/${action.uses.per === "turn" ? "turn" : action.uses.per === "encounter" ? "encounter" : action.uses.per === "short-rest" ? "short rest" : "long rest"}).` });
     }
     spendUse = { key, per: action.uses.per };
   }
@@ -251,6 +253,11 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       if (withinReach) continue;
       if (attackRange !== undefined) {
         if (distance > attackRange + 1e-6) violations.push({ rule: "range.out-of-range", message: `${targetName} is ${rounded} ft away — beyond the ${attackRange} ft maximum range.` });
+        // SRD Underwater Combat: a ranged attack automatically misses beyond normal range.
+        else if (state.combat.underwater) {
+          const normal = action.attack.rangeNormalFeet ?? attackRange;
+          if (distance > normal + 1e-6) violations.push({ rule: "range.underwater", message: `${targetName} is ${rounded} ft away — underwater, ranged attacks automatically miss beyond normal range (${normal} ft).` });
+        }
       } else if (attackReach !== undefined || attackRange === undefined) {
         const reach = attackReach ?? 5;
         if (distance > reach + 1e-6) violations.push({ rule: "range.out-of-reach", message: `${targetName} is ${rounded} ft away — beyond ${attacker.name}'s ${reach} ft reach.` });
@@ -401,6 +408,15 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
     else if (distance !== null) disadvantage.push({ source: "target-prone", label: "Target is Prone (beyond 5 ft)" });
   }
 
+  // SRD Underwater Combat: melee attacks take Disadvantage unless the weapon deals piercing damage
+  // (the SRD's dagger/javelin/shortsword/spear/trident list, generalized to its shared damage type).
+  if (state.combat.underwater && action.attack?.reachFeet !== undefined) {
+    const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
+    const usedAsRanged = action.attack.rangeFeet !== undefined && distance !== null && distance > action.attack.reachFeet + 1e-6;
+    const piercing = action.damage.some((part) => part.type === "piercing");
+    if (!usedAsRanged && !piercing) disadvantage.push({ source: "underwater-melee", label: "Underwater (non-piercing melee)" });
+  }
+
   // Ranged-attack penalties (SRD Range / Ranged Attacks in Close Combat), only when this shot is
   // actually ranged (a thrown weapon used within its reach stays melee) and distance is measurable.
   if (action.attack?.rangeFeet !== undefined && deps.distanceFeet) {
@@ -460,7 +476,17 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   const warnings: string[] = [];
-  const { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet);
+  let { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet);
+
+  // GM-adjudicated cover (SRD Cover — no line-of-sight engine, so the GM supplies the call and the
+  // server applies the math): total cover can't be targeted directly; half/three-quarters add to AC
+  // and Dexterity saves below.
+  const coverBonus = input.cover === "half" ? 2 : input.cover === "three-quarters" ? 5 : 0;
+  if (input.cover === "total" && state.combat.rulesMode !== "freeform") {
+    if (state.combat.rulesMode === "strict" && !input.override) throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
+    if (input.override && overridden === null) overridden = { rule: "cover.total", reason: input.override.reason };
+    else warnings.push("The target has Total Cover — allowed per the rules mode.");
+  }
 
   // Builtin Unarmed Strike: the attack math is actor-derived (SRD: Str modifier + Proficiency Bonus),
   // so the concrete attack is materialized at resolve time rather than declared in the catalog.
@@ -505,6 +531,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
         duration: { type: "manual" },
         endsWhenSourceDefeated: false,
         voidWhileIncapacitated: false,
+        concentration: false,
         modifiers: [],
         linkedConditionIds: ["invisible"],
         escapeDc: null,
@@ -554,7 +581,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
     const diceTerm = attackResolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
     const naturalRoll = (diceTerm.dice.find((dieResult) => dieResult.kept) ?? diceTerm.dice[0]).face;
-    const targetAc = target.armorClass ?? null;
+    // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), shown in the result.
+    const targetAc = target.armorClass !== undefined ? target.armorClass + coverBonus : null;
     crit = naturalRoll === 20;
     let outcome = naturalRoll === 20 ? "crit" as const
       : naturalRoll === 1 ? "fumble" as const
@@ -568,7 +596,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
         crit = true;
       }
     }
-    attack = { targetId: target.id, targetName: target.name, total: attackResolution.total, naturalRoll, targetAc, outcome };
+    attack = { targetId: target.id, targetName: target.name, total: attackResolution.total, naturalRoll, targetAc, outcome, ...(coverBonus > 0 ? { coverBonus } : {}) };
   }
 
   // Damage is rolled unless the attack already whiffed outright.
@@ -624,6 +652,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
         duration: { type: "manual" },
         endsWhenSourceDefeated: true,
         voidWhileIncapacitated: false,
+        concentration: false,
         modifiers: [],
         linkedConditionIds: conditionIds,
         escapeDc: rider.escapeDc ?? null,
@@ -642,6 +671,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const recipient = grant.target === "target" ? targets[0] : attacker;
     // The Ready action's free-text trigger travels in the effect name so the table sees it.
     const readyNote = input.builtin && action.id === "ready" && input.note ? `Readied: ${input.note.slice(0, 100)}` : null;
+    // A concentration grant may end the granter's previous concentration; surface that as a warning line.
+    const replaced: { kind: "effect" | "condition"; text: string; actorId: string }[] = [];
     const effect = addEffect(state, recipient.id, {
       id: `${input.commandId}:grant`,
       name: readyNote ?? grant.name ?? action.name,
@@ -657,8 +688,10 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       linkedConditionIds: [],
       escapeDc: null,
       onEnd: grant.onEnd,
-      endsWithTag: grant.endsWithTag ?? null
-    });
+      endsWithTag: grant.endsWithTag ?? null,
+      concentration: grant.concentration
+    }, replaced);
+    warnings.push(...replaced.map((event) => event.text));
     if (grant.target === "target") effectsApplied.push({ targetId: recipient.id, targetName: recipient.name, name: effect.name, conditionIds: [] });
     else effectGranted = { name: effect.name, tags: effect.tags };
   }
@@ -744,6 +777,8 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       targetIds: targets.map((target) => target.id),
       proposedDamage: damage.reduce((sum, part) => sum + part.total, 0),
       proposedDamageParts: damage.map((part) => ({ amount: part.total, type: part.type })),
+      // Cover adds to Dexterity saving throws (SRD Cover) — carried on the prompt.
+      saveBonus: action.save.ability === "dex" ? coverBonus : 0,
       halfOnSuccess: halfOnSuccessFrom(action.description),
       // GM's explicit choice wins; otherwise auto-detect a condition from the action prose (only if the
       // bundle actually has it), so "…or be Poisoned" applies on a failed save without manual tagging.
