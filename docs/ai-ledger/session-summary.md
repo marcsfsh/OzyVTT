@@ -8,6 +8,19 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Tracker strip-down, third pass (same branch/PR #38)
+
+Third owner rejection ("still bloated and cluttered") → removed every remaining block and per-row
+ornament: no heading block during combat (Round pill rides the single control bar with ‹/Next/⋯);
+the placement nudge is one unboxed line; rows lose all chrome (dim right-aligned initiative
+number, plain band-colored HP text, condition dots instead of text chips, per-row R button moved
+into the row-tools popover with only a dim struck-R marker when spent); Dice and Combat log
+collapse behind one-line disclosures during combat. Measured: 30 px rows, 301 px list (10
+combatants), 819 px whole panel (from 1822 two passes ago), 1279 px full page (from 1958).
+Screenshots now CROPPED to the tracker column — full-page captures were making every iteration
+look like a wall regardless of changes. Awaiting owner calibration: is this composition right, or
+rebuild against a named reference (Foundry-style portraits/HP bars vs more minimal)?
+
 ## 2026-07-19 — Tracker COMPOSITION redesign (owner re-rejected density-only pass; same branch/PR #38)
 
 Shrinking paddings wasn't the problem — the composition was. Fixes, following how real combat
