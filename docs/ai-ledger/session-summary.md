@@ -8,6 +8,29 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-19 — Foundry-style tracker + Scene IA strip (owner-directed; same branch/PR #38)
+
+Owner's messages finally came through ("responses weren't going through" explains four identical
+rejections): (1) make the initiative like Foundry, simplified; (2) next task = the scene IA.
+
+- **Foundry-anatomy rows, GM + player**: `[avatar disc | name + condition dots + HP text | 3px HP
+  bar underneath | initiative right]`. Avatars are kind-colored initials (PC blue / monster red /
+  npc green; dashed ring = GM-only); player rows show band-filled bars (full/45%/sliver). GM rows
+  49px (Foundry ≈48), player rows 34px. The per-row HP button is gone — the whole row opens the
+  tools popover (HP input autofocuses on fine pointers only).
+- **Scene IA — the owner's named next task**: new `SceneSwitcher` strip at the top of the
+  Encounter tab: every prepared scene is a chip (name + combatant count; LIVE / staging badges);
+  tap = private staging preview, ▶ = make live (one click; confirm only when a fight is running —
+  the fight parks and its auto-created "Current encounter" chip resumes it), ✕ = remove,
+  "+ New scene" opens the prep modal. ScenePanel removed from the Maps tab — Map Setup is purely
+  library management now. Verified live end-to-end: create → stage → go live → map switched → LIVE
+  badge → parked fight resumed with combat intact.
+- **Crash caught by smoke**: the strip initially read `combat.scenes` unguarded and the first
+  post-login state can be player-projected (no scenes) → boundary crash. Guard on the field, not
+  the mode. (Pattern for future: any GM-only combat field used in the shared table view needs a
+  field-presence guard.)
+- Gates green from repo root; smokes: 9/9 foundry+scene checks, 6/6 player checks.
+
 ## 2026-07-19 — Player tracker parity + independent UX audit fixes (same branch/PR #38)
 
 A fourth identical owner rejection prompted two moves instead of another blind CSS pass: an

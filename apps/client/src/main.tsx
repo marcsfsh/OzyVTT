@@ -12,6 +12,7 @@ import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
+import { SceneSwitcher } from "./scenes/SceneSwitcher";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { SceneBuilder } from "./scenes/SceneBuilder";
 import { EncounterMap } from "./scene/EncounterMap";
@@ -222,6 +223,10 @@ function App() {
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
         <section className="table">
+          {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
+              Guarded on the field, not just the mode — the first state after login can still be
+              player-projected (no scenes) until the session join lands. */}
+          {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <SceneSwitcher scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} onNewScene={() => setScenePrepOpen(true)} onFeedback={(text) => setNotice({ tone: "error", text })} />}
           {previewScene ? <>
             <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> — only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
             <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} />
@@ -267,7 +272,7 @@ function App() {
       </div>}
 
       {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
-      {mode === "gm" && gmToken && gmTab === "maps" && <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} />}
+      {/* Scenes moved to the Encounter tab's switcher strip; Map Setup is purely library management. */}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
 

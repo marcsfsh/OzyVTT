@@ -382,3 +382,22 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
   .builtin-chip, .economy-slot { padding-top: .4rem; padding-bottom: .4rem; }
   .action-row { padding-top: .5rem; padding-bottom: .5rem; }
 }
+
+/* Foundry-style rows: [avatar | name + HP bar | initiative]. */
+.initiative-avatar { flex: none; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; border-radius: 50%; background: #2d4a70; color: #dbe7f5; font-size: .58rem; font-weight: 800; letter-spacing: .02em; }
+.initiative-avatar.monster { background: #7e302a; color: #f5d9d5; }
+.initiative-avatar.npc { background: #52623d; color: #e2ecd4; }
+.initiative-avatar.gm-hidden { outline: 2px dashed #6b5e4b; outline-offset: 1px; opacity: .8; }
+.initiative-main-col { display: grid; gap: .2rem; min-width: 0; flex: 1 1 auto; }
+.initiative-name-line { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+.initiative-hp-text { margin-left: auto; flex: none; font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.initiative-hp-text small { font-size: .62rem; color: #7fc7e8; margin-left: .12rem; }
+.initiative-hp-text.hp-healthy { color: #8fd69a; }
+.initiative-hp-text.hp-bloodied { color: #e8a743; }
+.initiative-hp-text.hp-down { color: #e0897f; }
+.initiative-hpbar { display: block; height: 3px; border-radius: 2px; background: #241f17; overflow: hidden; }
+.initiative-hpbar-fill { display: block; height: 100%; border-radius: 2px; transition: width .25s ease; }
+.initiative-hpbar-fill.hp-healthy { background: #4f9e5c; }
+.initiative-hpbar-fill.hp-bloodied { background: #d69442; }
+.initiative-hpbar-fill.hp-down { background: #a03f39; }
+.initiative-avatar.player-known { background: #3a4a5c; color: #d7e2ee; }

@@ -5,6 +5,7 @@ import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
+import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
@@ -282,14 +283,20 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
         return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
           <div className="initiative-row-main">
-            <span className="initiative-score-plain">{entry.score}</span>
-            <span className="initiative-player-name">
-              {entry.active && <span className="initiative-caret" aria-hidden="true">▶</span>}
-              <strong className="initiative-name-text">{entry.name}</strong>
-              {isMe && <span className="you-badge">YOU</span>}
-              <ConditionDots conditions={rowActor?.conditions ?? []} />
+            {/* Foundry-style row for players too: avatar | name + band HP bar | initiative. Players
+                only know the health band, so the bar fills full/half/sliver. */}
+            <span className="initiative-avatar player-known" aria-hidden="true">{initialsOf(entry.name)}</span>
+            <span className="initiative-main-col">
+              <span className="initiative-name-line">
+                {entry.active && <span className="initiative-caret" aria-hidden="true">▶</span>}
+                <strong className="initiative-name-text">{entry.name}</strong>
+                {isMe && <span className="you-badge">YOU</span>}
+                <ConditionDots conditions={rowActor?.conditions ?? []} />
+                {entry.health !== "healthy" && <span className={`player-health hp-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}
+              </span>
+              <span className="initiative-hpbar" aria-hidden="true"><span className={`initiative-hpbar-fill hp-${entry.health}`} style={{ width: entry.health === "healthy" ? "100%" : entry.health === "bloodied" ? "45%" : "6%" }} /></span>
             </span>
-            {entry.health !== "healthy" && <span className={`player-health hp-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}
+            <span className="initiative-score-plain">{entry.score}</span>
           </div>
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} />}
@@ -318,9 +325,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [browsing, setBrowsing] = useState(false);
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   // Accordion: rows are one line by default; at most one row's tools (HP editor, condition/effect
-  // editors, sheet) are open at a time. hpActorId additionally focuses the HP amount input.
+  // editors, sheet) are open at a time.
   const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
-  const [hpActorId, setHpActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const cancelEditRef = useRef(false);
@@ -514,27 +520,32 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         const expanded = expandedActorId === entry.actorId;
         return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}${expanded ? " expanded" : ""}`.trim()} aria-current={active ? "step" : undefined}>
           <div className="initiative-row-main">
-            {/* Dense one-line row (initiative | name + badges | R | HP): tapping the name or HP
-                opens a floating tools card OVER the list — rows never shift while you work. */}
+            {/* Foundry-style row: [avatar | name + HP bar | initiative]. The whole row opens a
+                floating tools card OVER the list — rows never shift while you work. */}
+            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} — HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
+              <span className={`initiative-avatar ${actor?.kind ?? "npc"}${actor?.visibility === "gm-only" ? " gm-hidden" : ""}`} aria-hidden="true">{initialsOf(actor?.name ?? "?")}</span>
+              <span className="initiative-main-col">
+                <span className="initiative-name-line">
+                  {active && <span className="initiative-caret" aria-hidden="true">▶</span>}
+                  <strong className="initiative-name-text">{actor?.name ?? "Removed combatant"}</strong>
+                  {actor && <ConditionDots conditions={actor.conditions} />}
+                  {actor && state.combat.reactionsUsed.includes(actor.id) && <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">R</span>}
+                  {actor && <span className={`initiative-hp-text hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</span>}
+                </span>
+                {actor && <span className="initiative-hpbar" aria-hidden="true"><span className={`initiative-hpbar-fill hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} style={{ width: `${Math.max(0, Math.min(100, (actor.hp.current / Math.max(1, actor.hp.maximum)) * 100))}%` }} /></span>}
+              </span>
+            </button>
             {editing
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
               : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative — click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
-            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} — HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpActorId(null); setHpAmount(""); }}>
-              {active && <span className="initiative-caret" aria-hidden="true">▶</span>}
-              <strong className="initiative-name-text">{actor?.name ?? "Removed combatant"}</strong>
-              {actor?.visibility === "gm-only" && <span className="initiative-tag">GM-only</span>}
-              {actor && <ConditionDots conditions={actor.conditions} />}
-              {actor && state.combat.reactionsUsed.includes(actor.id) && <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">R</span>}
-            </button>
-            {actor && <button type="button" className={`initiative-hp hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`} disabled={busy} title="Adjust hit points" aria-label={`Hit points for ${actor.name}`} aria-expanded={expanded} onClick={() => { setExpandedActorId(entry.actorId); setHpActorId(entry.actorId); setHpAmount(""); }}>{actor.hp.current}/{actor.hp.maximum}{actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}</button>}
           </div>
           {expanded && actor && <>
-            <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); setHpActorId(null); }} />
+            <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); }} />
             <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
               <div className="hp-editor" role="group" aria-label={`Adjust hit points for ${actor.name}`}>
-                <input type="number" min="0" max="1000" placeholder="0" autoFocus={hpActorId === entry.actorId} aria-label="Amount" value={hpAmount}
+                <input type="number" min="0" max="1000" placeholder="0" autoFocus={typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches} aria-label="Amount" value={hpAmount}
                   onChange={(event) => setHpAmount(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") adjustHp("actor:apply-damage", entry.actorId, actor.name); else if (event.key === "Escape") { setExpandedActorId(null); setHpActorId(null); } }} />
+                  onKeyDown={(event) => { if (event.key === "Enter") adjustHp("actor:apply-damage", entry.actorId, actor.name); else if (event.key === "Escape") { setExpandedActorId(null); } }} />
                 <button type="button" disabled={busy} title="Apply as damage (or press Enter)" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
                 <button type="button" disabled={busy} title="Nonlethal damage — a drop to 0 knocks out (Unconscious and stable) instead of dying" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name, { nonlethal: true })}>KO</button>
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
@@ -546,7 +557,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               <div className="initiative-row-tools">
                 <button type="button" className="secondary" disabled={busy} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>{state.combat.reactionsUsed.includes(actor.id) ? "Restore reaction" : "Spend reaction"}</button>
                 <button type="button" className="secondary" onClick={() => { setSheetActorId(actor.id); setExpandedActorId(null); }}>Open sheet</button>
-                <button type="button" className="secondary" onClick={() => { setExpandedActorId(null); setHpActorId(null); }}>Close</button>
+                <button type="button" className="secondary" onClick={() => { setExpandedActorId(null); }}>Close</button>
               </div>
             </div>
           </>}
