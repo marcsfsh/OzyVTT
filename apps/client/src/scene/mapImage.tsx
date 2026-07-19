@@ -45,6 +45,35 @@ export function useAuthorizedMapImage(assetId: string | null, token: string | nu
 }
 
 /**
+ * Session-lifetime thumbnail cache: one authorized fetch per map asset, shared by every chip that
+ * shows the same map (the scene switcher), object URLs deliberately never revoked (bounded by the
+ * ≤20-scene library). Distinct from `useAuthorizedMapImage`, which is per-mount and revocable —
+ * a strip of chips re-rendering on every state broadcast must not refetch or churn URLs.
+ */
+const thumbnailCache = new Map<string, Promise<string>>();
+export function useCachedMapThumbnail(assetId: string | null, token: string | null | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!assetId || !token) { setUrl(null); return; }
+    let cancelled = false;
+    let promise = thumbnailCache.get(assetId);
+    if (!promise) {
+      promise = fetch(`/api/v1/map-assets/${encodeURIComponent(assetId)}/content`, { headers: { authorization: `Bearer ${token}` } })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("thumbnail unavailable");
+          return URL.createObjectURL(await response.blob());
+        });
+      thumbnailCache.set(assetId, promise);
+      // A failed fetch must not poison the cache — the next mount retries.
+      promise.catch(() => thumbnailCache.delete(assetId));
+    }
+    promise.then((objectUrl) => { if (!cancelled) setUrl(objectUrl); }).catch(() => { if (!cancelled) setUrl(null); });
+    return () => { cancelled = true; };
+  }, [assetId, token]);
+  return url;
+}
+
+/**
  * Converts a pointer/mouse event's client coordinates into image-pixel coordinates using the
  * SVG element's own screen transform. This is robust to `preserveAspectRatio`, panning, and
  * zooming, unlike a manual `getBoundingClientRect` + linear-scale calculation (which silently

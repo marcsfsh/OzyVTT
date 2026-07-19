@@ -3,8 +3,9 @@
 .scene-chip { display: inline-flex; align-items: stretch; border: 1px solid #403a2c; border-radius: .5rem; background: #17140f; overflow: hidden; }
 .scene-chip.live { border-color: #6e431c; box-shadow: inset 0 0 0 1px #6e431c; }
 .scene-chip.staging { border-color: #58c3ff; }
-.scene-chip-main { display: flex; align-items: baseline; gap: .4rem; padding: .3rem .55rem; border: 0; background: transparent; color: #e7dfd0; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.scene-chip-main { display: flex; align-items: center; gap: .4rem; padding: .3rem .55rem; border: 0; background: transparent; color: #e7dfd0; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .scene-chip-main:hover { background: #241f17; }
+.scene-chip-thumb { width: 2.4rem; height: 1.6rem; margin: -0.3rem 0 -0.3rem -0.55rem; object-fit: cover; border-right: 1px solid #403a2c; flex: none; }
 .scene-chip-main small { color: #9f9789; font-size: .64rem; font-weight: 800; }
 .scene-chip.live .scene-chip-main { cursor: pointer; }
 .scene-chip.live .scene-chip-main small { color: #ffc34d; }
