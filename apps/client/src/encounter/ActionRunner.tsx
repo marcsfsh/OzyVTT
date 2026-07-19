@@ -20,7 +20,7 @@ const summaryOf = (action: ContentActionSummary) => {
   if (action.multiattack) parts.push(action.multiattack.map((component) => `${component.count}× ${component.actionId}`).join(" + "));
   if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()}`);
   for (const part of action.damage) parts.push(`${part.formula} ${part.type}`);
-  if (action.usesLimit !== null) parts.push(`${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer}`);
+  if (action.usesLimit !== null) parts.push(action.usesPer === "recharge" ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}` : `${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer}`);
   return parts.join(" · ");
 };
 
@@ -34,7 +34,7 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   if (action.usesLimit !== null && action.usesPer !== null) {
     const key = action.usesPool ?? action.id;
     const spent = action.usesPer === "turn" ? (state.combat.turn.turnUses[`${actor.id}:${key}`] ?? 0) : (actor.actionUses[key] ?? 0);
-    if (spent >= action.usesLimit) return "No uses left";
+    if (spent >= action.usesLimit) return action.usesPer === "recharge" ? `Spent — recharges on ${action.usesRecharge}+ at its turn start` : "No uses left";
   }
   const myTurn = state.combat.turnActorId === actor.id;
   if (!myTurn) return null;

@@ -101,7 +101,11 @@
      "ability": "wis",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 2,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -258,7 +262,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -417,7 +426,12 @@
      "ability": "dex",
      "dc": 19
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "tail-swipe",
@@ -572,7 +586,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "scorching-sands",
@@ -742,7 +761,12 @@
      "ability": "dex",
      "dc": 19
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "thunderclap",
@@ -920,7 +944,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -1090,7 +1119,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -1264,7 +1298,12 @@
      "ability": "con",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -1426,7 +1465,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -1585,7 +1629,12 @@
      "ability": "con",
      "dc": 20
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -1755,7 +1804,12 @@
      "ability": "con",
      "dc": 19
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "frightful-presence",
@@ -1889,7 +1943,12 @@
      "ability": "str",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 4
+    }
    }
   ],
   "token": {
@@ -2151,7 +2210,12 @@
      "ability": "dex",
      "dc": 22
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -2310,7 +2374,12 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "tail-swipe",
@@ -2465,7 +2534,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "scorching-sands",
@@ -2635,7 +2709,12 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "thunderclap",
@@ -2813,7 +2892,12 @@
      "ability": "dex",
      "dc": 22
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -2983,7 +3067,12 @@
      "ability": "dex",
      "dc": 24
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -3157,7 +3246,12 @@
      "ability": "con",
      "dc": 22
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -3319,7 +3413,12 @@
      "ability": "dex",
      "dc": 24
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -3478,7 +3577,12 @@
      "ability": "con",
      "dc": 24
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pounce",
@@ -3648,7 +3752,12 @@
      "ability": "con",
      "dc": 22
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "frightful-presence",
@@ -4106,7 +4215,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -4343,7 +4457,12 @@
       "formula": "2d6 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -4528,7 +4647,11 @@
     "name": "Misty Step (3/Day)",
     "activation": "bonus-action",
     "description": "The mage casts Misty Step, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "multiattack",
@@ -4548,7 +4671,11 @@
     "name": "Protective Magic (3/Day)",
     "activation": "reaction",
     "description": "The archmage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "arcane-burst",
@@ -5903,14 +6030,19 @@
    },
    {
     "id": "petrifying-gaze-recharge-4-6",
-    "name": "Petrifying Gaze (Recharge 4-6) (Recharge after a Short or Long Rest)",
+    "name": "Petrifying Gaze (Recharge 4-6)",
     "activation": "bonus-action",
     "description": "Constitution Saving Throw: DC 12, each creature in a 30-foot Cone. If the basilisk sees its reflection within the Cone, the basilisk must make this save. First Failure The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure The target has the Petrified condition instead of the Restrained condition.",
     "save": {
      "ability": "con",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 4
+    }
    }
   ],
   "token": {
@@ -6268,7 +6400,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -6585,7 +6722,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -6812,10 +6954,15 @@
    },
    {
     "id": "teleport-recharge-4-6",
-    "name": "Teleport (Recharge 4-6) (Recharge after a Short or Long Rest)",
+    "name": "Teleport (Recharge 4-6)",
     "activation": "bonus-action",
     "description": "The dog teleports up to 40 feet to an unoccupied space it can see.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 4
+    }
    }
   ],
   "token": {
@@ -7026,7 +7173,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -7362,7 +7514,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "sleep-breath",
@@ -7491,7 +7648,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "repulsion-breath",
@@ -8286,14 +8448,19 @@
    },
    {
     "id": "trampling-charge-recharge-5-6",
-    "name": "Trampling Charge (Recharge after a Short or Long Rest)",
+    "name": "Trampling Charge (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The centaur moves up to its Speed without provoking Opportunity Attacks and can move through the spaces of Medium or smaller creatures. Each creature whose space the centaur enters is targeted once by the following effect. Strength Saving Throw: DC 14. Failure: 7 (1d6 + 4) Bludgeoning damage, and the target has the Prone condition.",
     "save": {
      "ability": "str",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pike",
@@ -8625,7 +8792,12 @@
      "ability": "dex",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -8843,10 +9015,15 @@
   "actions": [
    {
     "id": "hasten-recharge-5-6",
-    "name": "Hasten (Recharge after a Short or Long Rest)",
+    "name": "Hasten (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The golem takes the Dash and Disengage actions.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "multiattack",
@@ -9017,10 +9194,14 @@
    },
    {
     "id": "phantasms-recharge-after-a-short-or-long-rest",
-    "name": "Phantasms (Recharge after a Short or Long Rest) (Recharge after a Short or Long Rest)",
+    "name": "Phantasms (Recharge after a Short or Long Rest)",
     "activation": "bonus-action",
     "description": "The cloaker casts the Mirror Image spell, requiring no spell components and using Wisdom as the spellcasting ability. The spell ends early if the cloaker starts or ends its turn in Bright Light.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "short-rest"
+    }
    },
    {
     "id": "tail",
@@ -9555,7 +9736,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "slowing-breath",
@@ -9667,7 +9853,11 @@
     "name": "Divine Aid (2/Day)",
     "activation": "bonus-action",
     "description": "The couatl casts Bless, Lesser Restoration, or Sanctuary, requiring no spell components and using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 2,
+     "per": "long-rest"
+    }
    },
    {
     "id": "constrict",
@@ -10076,7 +10266,11 @@
     "name": "Spiritual Weapon (2/Day)",
     "activation": "bonus-action",
     "description": "The cultist casts the Spiritual Weapon spell, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 2,
+     "per": "long-rest"
+    }
    },
    {
     "id": "spellcasting",
@@ -10178,7 +10372,11 @@
     "name": "Darkness Aura (1/Day)",
     "activation": "action",
     "description": "Magical darkness fills a 15-foot Emanation originating from the darkmantle. This effect lasts while the darkmantle maintains Concentration on it, up to 10 minutes. Darkvision can't penetrate this area, and no light can illuminate it.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -10461,7 +10659,11 @@
     "name": "Divine Aid (2/Day)",
     "activation": "bonus-action",
     "description": "The deva casts Cure Wounds, Lesser Restoration, or Remove Curse, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 2,
+     "per": "long-rest"
+    }
    },
    {
     "id": "multiattack",
@@ -10897,7 +11099,12 @@
      "ability": "wis",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    },
    {
     "id": "read-thoughts",
@@ -11132,7 +11339,12 @@
      "ability": "con",
      "dc": 19
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -11241,7 +11453,11 @@
      "ability": "con",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -11330,10 +11546,15 @@
   "actions": [
    {
     "id": "magic-of-the-spider-queen-recharge-5-6",
-    "name": "Magic of the Spider Queen (Recharge after a Short or Long Rest)",
+    "name": "Magic of the Spider Queen (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The drider casts Darkness, Faerie Fire, or Web, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 14).",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "multiattack",
@@ -11740,14 +11961,23 @@
      "ability": "dex",
      "dc": 10
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    },
    {
     "id": "sleep-1-day",
     "name": "Sleep (1/Day)",
     "activation": "action",
     "description": "The mephit casts the Sleep spell, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 10).",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -12613,7 +12843,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -13409,10 +13644,15 @@
    },
    {
     "id": "war-cry-recharge-5-6",
-    "name": "War Cry (Recharge after a Short or Long Rest)",
+    "name": "War Cry (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The giant or one creature of its choice that can see or hear it gains 16 (2d10 + 5) Temporary Hit Points and has Advantage on attack rolls until the start of the giant's next turn.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "frost-axe",
@@ -13934,7 +14174,12 @@
      "ability": "cha",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    },
    {
     "id": "etherealness",
@@ -14224,7 +14469,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -15551,7 +15801,11 @@
     "name": "Rampage (1/Day)",
     "activation": "bonus-action",
     "description": "Immediately after dealing damage to a creature that was already Bloodied, the hyena can move up to half its Speed, and it makes one Bite attack.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -15727,7 +15981,11 @@
     "name": "Ink Cloud (1/Day)",
     "activation": "reaction",
     "description": "_Trigger:_ The octopus takes damage while underwater. _Response:_ The octopus releases ink that fills a 10-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    },
    {
     "id": "tentacles",
@@ -16402,7 +16660,12 @@
      "ability": "dex",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -17106,7 +17369,12 @@
      "ability": "dex",
      "dc": 10
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -17469,7 +17737,11 @@
     "name": "Rampage (1/Day)",
     "activation": "bonus-action",
     "description": "Immediately after dealing damage to a creature that is already Bloodied, the gnoll moves up to half its Speed, and it makes one Rend attack.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    },
    {
     "id": "rend",
@@ -18042,7 +18314,12 @@
      "ability": "dex",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "weakening-breath",
@@ -18174,7 +18451,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -18396,7 +18678,12 @@
      "ability": "con",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -19324,7 +19611,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -19626,7 +19918,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -21002,7 +21299,12 @@
     "name": "Ice Wall (Recharge 6)",
     "activation": "action",
     "description": "The devil casts Wall of Ice (level 8 version), requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 17).\n\n- **At Will:**",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -21120,14 +21422,23 @@
      "ability": "con",
      "dc": 10
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    },
    {
     "id": "fog-cloud",
     "name": "Fog Cloud (1/Day)",
     "activation": "action",
     "description": "The mephit casts Fog Cloud, requiring no spell components and using Charisma as the spellcasting ability.\n\n- **At Will:**\n- **1/Day Each:** Fog Cloud",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -21350,14 +21661,19 @@
    },
    {
     "id": "nightmare-recharge-6",
-    "name": "Nightmare (Recharge after a Short or Long Rest)",
+    "name": "Nightmare (Recharge 6)",
     "activation": "bonus-action",
     "description": "Wisdom Saving Throw: DC 15, one creature the incubus can see within 60 feet. Failure: If the target has 20 Hit Points or fewer, it has the Unconscious condition for 1 hour, until it takes damage, or until a creature within 5 feet of it takes an action to wake it. Otherwise, the target takes 18 (4d8) Psychic damage.",
     "save": {
      "ability": "wis",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    },
    {
     "id": "restless-touch",
@@ -21651,7 +21967,12 @@
      "ability": "con",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -22975,7 +23296,11 @@
     "name": "Misty Step (3/Day)",
     "activation": "bonus-action",
     "description": "The mage casts Misty Step, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "multiattack",
@@ -22995,7 +23320,11 @@
     "name": "Protective Magic (3/Day)",
     "activation": "reaction",
     "description": "The mage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "arcane-burst",
@@ -23118,7 +23447,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -23554,10 +23888,15 @@
    },
    {
     "id": "teleport-recharge-5-6",
-    "name": "Teleport (Recharge after a Short or Long Rest)",
+    "name": "Teleport (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The marilith teleports up to 120 feet to an unoccupied space it can see.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "pact-blade",
@@ -23799,14 +24138,19 @@
    },
    {
     "id": "petrifying-gaze-recharge-5-6",
-    "name": "Petrifying Gaze (Recharge after a Short or Long Rest)",
+    "name": "Petrifying Gaze (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "Constitution Saving Throw: DC 13, each creature in a 30-foot Cone. If the medusa sees its reflection in the Cone, the medusa must make this save. First Failure The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure The target has the Petrified condition instead of the Restrained condition.",
     "save": {
      "ability": "con",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "claw",
@@ -24330,7 +24674,12 @@
       "formula": "4d6 + 4",
       "type": "piercing"
      }
-    ]
+    ],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -24922,14 +25271,19 @@
   "actions": [
    {
     "id": "horror-nimbus-recharge-5-6",
-    "name": "Horror Nimbus (Recharge after a Short or Long Rest)",
+    "name": "Horror Nimbus (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "Wisdom Saving Throw: DC 15, each creature in a 15-foot Emanation originating from the nalfeshnee. Failure: 28 (8d6) Psychic damage, and the target has the Frightened condition for 1 minute, until it takes damage, or until it ends its turn with the nalfeshnee out of line of sight. Success: The target is immune to this nalfeshnee's Horror Nimbus for 24 hours.",
     "save": {
      "ability": "wis",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "multiattack",
@@ -25117,7 +25471,11 @@
     "name": "Nightmare Haunting (1/Day)",
     "activation": "action",
     "description": "While on the Ethereal Plane, the hag casts Dream, using the same spellcasting ability as Spellcasting. Only the hag can serve as the spell's messenger, and the target must be a creature the hag can see on the Material Plane. The spell fails and is wasted if the target is under the effect of the Protection from Evil and Good spell or within a Magic Circle spell. If the target takes damage from the Dream spell, the target's Hit Point maximum decreases by an amount equal to that damage. If the spell kills the target, its soul is trapped in the hag's soul bag, and the target can't be raised from the dead until its soul is released.\n\n- **At Will:**\n- **1/Day Each:** Dream, Protection from Evil and Good, Magic Circle",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -25534,7 +25892,11 @@
     "name": "Ink Cloud (1/Day)",
     "activation": "reaction",
     "description": "_Trigger:_ A creature ends its turn within 5 feet of the octopus while underwater. Response: The octopus releases ink that fills a 5-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    },
    {
     "id": "tentacles",
@@ -27020,7 +27382,12 @@
     "name": "Hellfire Spellcasting (Recharge 4-6)",
     "activation": "action",
     "description": "The pit fiend casts Fireball (level 5 version) twice, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21). It can replace one Fireball with Hold Monster (level 7 version) or Wall of Fire.\n\n- **At Will:**",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 4
+    }
    }
   ],
   "token": {
@@ -27128,7 +27495,11 @@
     "name": "Divine Aid (2/Day)",
     "activation": "bonus-action",
     "description": "The planetar casts Cure Wounds, Invisibility, Lesser Restoration, or Remove Curse, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 2,
+     "per": "long-rest"
+    }
    },
    {
     "id": "multiattack",
@@ -27559,7 +27930,11 @@
     "name": "Divine Aid (3/Day)",
     "activation": "bonus-action",
     "description": "The priest casts Bless, Dispel Magic, Healing Word, or Lesser Restoration, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "multiattack",
@@ -27684,7 +28059,11 @@
     "name": "Divine Aid (1/Day)",
     "activation": "bonus-action",
     "description": "The priest casts Bless, Healing Word, or Sanctuary, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    },
    {
     "id": "mace",
@@ -28186,7 +28565,11 @@
      "ability": "wis",
      "dc": 10
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    },
    {
     "id": "shape-shift",
@@ -28330,7 +28713,12 @@
      "ability": "wis",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "spellcasting",
@@ -28642,7 +29030,12 @@
      "ability": "dex",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -29134,10 +29527,15 @@
    },
    {
     "id": "swoop-recharge-5-6",
-    "name": "Swoop (Recharge after a Short or Long Rest)",
+    "name": "Swoop (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "If the roc has a creature Grappled, the roc flies up to half its Fly Speed without provoking Opportunity Attacks and drops that creature.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "beak",
@@ -30209,7 +30607,12 @@
      "ability": "wis",
      "dc": 11
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "illusory-appearance",
@@ -30897,7 +31300,12 @@
      "ability": "con",
      "dc": 13
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "paralyzing-breath",
@@ -31118,7 +31526,11 @@
     "name": "Divine Aid (3/Day)",
     "activation": "bonus-action",
     "description": "The solar casts Cure Wounds (level 2 version), Lesser Restoration, or Remove Curse, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "multiattack",
@@ -31457,7 +31869,12 @@
      "ability": "wis",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "spellcasting",
@@ -31616,7 +32033,11 @@
      "ability": "wis",
      "dc": 20
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "spellcasting",
@@ -31724,7 +32145,11 @@
     "name": "Burst of Ingenuity (2/Day)",
     "activation": "reaction",
     "description": "_Trigger:_ The sphinx or another creature within 30 feet makes an ability check or a saving throw. _Response:_ The sphinx adds 2 to the roll.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 2,
+     "per": "long-rest"
+    }
    },
    {
     "id": "rend",
@@ -32307,7 +32732,12 @@
      "ability": "con",
      "dc": 10
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -32495,7 +32925,12 @@
     "name": "Deflect Missile (Recharge 5-6)",
     "activation": "reaction",
     "description": "_Trigger:_ The giant is hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it. _Response:_ The giant reduces the damage it takes from the attack by 11 (1d10 + 6), and if that damage is reduced to 0, the giant can redirect some of the attack’s force. _Dexterity Saving Throw:_ DC 17, one creature the giant can see within 60 feet. Failure: 11 (1d10 + 6) Force damage.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "multiattack",
@@ -32630,10 +33065,15 @@
    },
    {
     "id": "slow-recharge-5-6",
-    "name": "Slow (Recharge after a Short or Long Rest)",
+    "name": "Slow (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The golem casts the Slow spell, requiring no spell components and using Constitution as the spellcasting ability (spell save DC 17).",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "slam",
@@ -32810,7 +33250,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "spellcasting",
@@ -33574,7 +34019,12 @@
      "ability": "wis",
      "dc": 10
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    }
   ],
   "token": {
@@ -33857,7 +34307,12 @@
      "ability": "con",
      "dc": 27
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -34345,7 +34800,11 @@
     "name": "Animate Trees (1/Day)",
     "activation": "action",
     "description": "The treant magically animates up to two trees it can see within 60 feet of itself. Each tree uses the Treant stat block, except it has Intelligence and Charisma scores of 1, it can't speak, and it lacks this action. The tree takes its turn immediately after the treant on the same Initiative count, and it obeys the treant. A tree remains animate for 1 day or until it dies, the treant dies, or it is more than 120 feet from the treant. The tree then takes root if possible.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -34917,7 +35376,11 @@
     "name": "Unicorn's Blessing (3/Day)",
     "activation": "bonus-action",
     "description": "The unicorn touches another creature with its horn and casts Cure Wounds or Lesser Restoration on that creature, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest"
+    }
    },
    {
     "id": "hooves",
@@ -35092,10 +35555,15 @@
    },
    {
     "id": "charm-recharge-5-6",
-    "name": "Charm (Recharge after a Short or Long Rest)",
+    "name": "Charm (Recharge 5-6)",
     "activation": "bonus-action",
     "description": "The vampire casts Charm Person, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17), and the duration is 24 hours. The Charmed target is a willing recipient of the vampire's Bite, the damage of which doesn't end the spell. When the spell ends, the target is unaware it was Charmed by the vampire.",
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "grave-strike",
@@ -35724,7 +36192,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 6
+    }
    },
    {
     "id": "stunning-screech",
@@ -35735,7 +36208,11 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
    }
   ],
   "token": {
@@ -36371,7 +36848,12 @@
      "ability": "str",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 4
+    }
    }
   ],
   "token": {
@@ -37317,7 +37799,12 @@
      "ability": "con",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -37718,7 +38205,12 @@
      "ability": "con",
      "dc": 12
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -38424,7 +38916,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -38551,7 +39048,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -38669,7 +39171,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "sleep-breath",
@@ -38798,7 +39305,12 @@
      "ability": "dex",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "repulsion-breath",
@@ -38932,7 +39444,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "slowing-breath",
@@ -39061,7 +39578,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "weakening-breath",
@@ -39199,7 +39721,12 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -39329,7 +39856,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {
@@ -39447,7 +39979,12 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    },
    {
     "id": "paralyzing-breath",
@@ -39580,7 +40117,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": []
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "recharge",
+     "recharge": 5
+    }
    }
   ],
   "token": {

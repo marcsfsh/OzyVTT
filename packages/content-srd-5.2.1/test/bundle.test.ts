@@ -59,6 +59,23 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(tail.targetRules).toEqual(["not-grappled-by-source"]);
   });
 
+  it("carries structured limited-use pools (recharge and rest scopes)", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    expect(byId("white-dragon-wyrmling").actions.find((action) => action.id === "cold-breath")!.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
+    // Upstream marks these RECHARGE (rest) but the SRD prints a die range; the param carries it.
+    expect(byId("basilisk").actions.find((action) => action.id === "petrifying-gaze-recharge-4-6")!.uses).toEqual({ limit: 1, per: "recharge", recharge: 4 });
+    const medusaGaze = byId("medusa").actions.find((action) => action.id === "petrifying-gaze-recharge-5-6")!;
+    expect(medusaGaze.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
+    expect(medusaGaze.name).toBe("Petrifying Gaze (Recharge 5-6)");
+    // The one true rest-recharge, and a per-day pool mapped to the long-rest scope.
+    expect(byId("cloaker").actions.find((action) => action.uses?.per === "short-rest")!.name).toBe("Phantasms (Recharge after a Short or Long Rest)");
+    expect(byId("aboleth").actions.find((action) => action.id === "dominate-mind")!.uses).toEqual({ limit: 2, per: "long-rest" });
+    // Coverage floor + no double-printed recharge notes on names.
+    const withUses = monsters.flatMap((monster) => monster.actions).filter((action) => action.uses);
+    expect(withUses.filter((action) => action.uses!.per === "recharge").length).toBeGreaterThanOrEqual(80);
+    for (const action of withUses) expect((action.name.match(/\(Recharge /g) ?? []).length, action.name).toBeLessThanOrEqual(1);
+  });
+
   it("splits typed defense lists from the display strings (adult red dragon golden check)", () => {
     const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
     expect(dragon.damageImmunities).toEqual(["fire"]);

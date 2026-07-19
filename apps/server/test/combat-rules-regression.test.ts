@@ -1340,3 +1340,86 @@ describe("creature size and distance — footprint-aware, edge-to-edge (SRD Crea
     expect(value).toBeCloseTo(5.13, 1);
   });
 });
+
+describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () => {
+  const wyrmlingDefinition = loadMonsterDefinitions().find((monster) => monster.source.externalId === "white-dragon-wyrmling")!;
+  const DRAGON = "10000000-0000-4000-8000-000000000006";
+
+  /** Torva vs a white dragon wyrmling, optionally with the breath already spent before the fight starts. */
+  function buildDragonGame(preSpent = false): GameState {
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        { id: IDS.torva, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current: 75, maximum: 75 }, armorClass: 15, definitionId: "import-torva", size: "medium", speedFeet: 40 },
+        { id: DRAGON, name: "White Dragon Wyrmling", kind: "monster", visibility: "public", hp: { current: 32, maximum: 32 }, armorClass: 16, definitionId: "white-dragon-wyrmling", size: "medium", speedFeet: 30, actionUses: preSpent ? { "cold-breath": 1 } : {} }
+      ],
+      definitions: [
+        { id: "import-torva", definition: torvaDefinition },
+        { id: "white-dragon-wyrmling", definition: wyrmlingDefinition }
+      ]
+    });
+    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: IDS.torva, score: 16 }, { actorId: DRAGON, score: 10 }] }, () => 1, GEOMETRY, (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition);
+    return game;
+  }
+  const dragonDeps = (game: GameState, die: number) => ({
+    resolveDefinition: (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+    rollDie: () => die
+  });
+
+  it("blocks a spent breath, keeps it spent on a low start-of-turn roll, and re-arms on the threshold", () => {
+    const game = buildDragonGame();
+    nextInitiativeTurn(game); // the dragon's turn
+    resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, []);
+    expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
+    // Round 2, low roll (2 < 5): the pool stays spent and the table sees why.
+    const lowEvents: { text: string; actorId: string }[] = [];
+    nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // Torva (no dragon pools roll)
+    nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // dragon's turn start: d6 = 2
+    expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
+    expect(lowEvents.some((event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text))).toBe(true);
+    expect(() => resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, []))
+      .toThrowError(/recharges on 5\+ at the start of its turn/);
+    // Round 3, threshold roll (5): re-armed, and the breath resolves again.
+    const highEvents: { text: string; actorId: string }[] = [];
+    nextInitiativeTurn(game, highEvents as never, dragonDeps(game, 5));
+    nextInitiativeTurn(game, highEvents as never, dragonDeps(game, 5));
+    expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBeUndefined();
+    expect(highEvents.some((event) => event.actorId === DRAGON && /recharges \(rolled 5\)/.test(event.text))).toBe(true);
+    const again = resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, []);
+    expect(again.save?.dc).toBe(12);
+  });
+
+  it("does not roll for an armed pool, and paths without deps skip recharge entirely", () => {
+    const game = buildDragonGame();
+    // Armed pool: advancing to the dragon's turn must not consume the (empty) die queue.
+    expect(() => nextInitiativeTurn(game, [], { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition, rollDie: () => { throw new Error("rolled for an armed pool"); } })).not.toThrow();
+  });
+
+  it("a fresh encounter starts recharge pools armed", () => {
+    const game = buildDragonGame(true);
+    // startEncounter (inside the builder) cleared the pre-spent pool alongside per-encounter uses.
+    expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBeUndefined();
+  });
+
+  it("short and long rests re-arm recharge pools out of combat", () => {
+    for (const kind of ["short", "long"] as const) {
+      const game = GameStateSchema.parse({
+        schemaVersion: 1,
+        actors: [{ id: DRAGON, name: "White Dragon Wyrmling", kind: "monster", visibility: "public", hp: { current: 32, maximum: 32 }, armorClass: 16, definitionId: "white-dragon-wyrmling", size: "medium", actionUses: { "cold-breath": 1 } }],
+        definitions: [{ id: "white-dragon-wyrmling", definition: wyrmlingDefinition }]
+      });
+      applyRest(game, DRAGON, kind, (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition);
+      expect(game.actors[0].actionUses["cold-breath"], kind).toBeUndefined();
+    }
+  });
+
+  it("the definition schema pins recharge uses to a threshold (and only recharge uses)", () => {
+    const base = JSON.parse(JSON.stringify(wyrmlingDefinition));
+    base.actions.find((action: { id: string }) => action.id === "cold-breath").uses = { limit: 1, per: "recharge" };
+    expect(ActorDefinitionSchema.safeParse(base).success).toBe(false);
+    base.actions.find((action: { id: string }) => action.id === "cold-breath").uses = { limit: 1, per: "long-rest", recharge: 5 };
+    expect(ActorDefinitionSchema.safeParse(base).success).toBe(false);
+    base.actions.find((action: { id: string }) => action.id === "cold-breath").uses = { limit: 1, per: "recharge", recharge: 5 };
+    expect(ActorDefinitionSchema.safeParse(base).success).toBe(true);
+  });
+});

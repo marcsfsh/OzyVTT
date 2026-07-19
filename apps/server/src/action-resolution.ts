@@ -119,7 +119,7 @@ type EconomyPlan = Readonly<{
   /** The compound-action components remaining AFTER this resolve (null clears/leaves no instance). */
   instance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
-  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" }> | null;
+  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
 }>;
 
 /** The multiattack parents (sibling actions) that list `action` as a component. */
@@ -175,7 +175,12 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     const key = action.uses.pool ?? action.id;
     const spent = action.uses.per === "turn" ? (turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
     if (spent >= action.uses.limit) {
-      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.limit}/${action.uses.per === "turn" ? "turn" : action.uses.per === "encounter" ? "encounter" : action.uses.per === "short-rest" ? "short rest" : "long rest"}).` });
+      const scopeLabel = action.uses.per === "turn" ? "turn"
+        : action.uses.per === "encounter" ? "encounter"
+        : action.uses.per === "short-rest" ? "short rest"
+        : action.uses.per === "recharge" ? `spent — recharges on ${action.uses.recharge}+ at the start of its turn`
+        : "long rest";
+      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.per === "recharge" ? scopeLabel : `${action.uses.limit}/${scopeLabel}`}).` });
     }
     spendUse = { key, per: action.uses.per };
   }

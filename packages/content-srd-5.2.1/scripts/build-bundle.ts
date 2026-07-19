@@ -197,10 +197,26 @@ const ACTION_ENRICHMENTS: Record<string, { targetRules: ["not-grappled-by-source
 };
 
 const usesSuffix = (action: ActionFields): string => {
+  if (/\(Recharge /i.test(action.name)) return ""; // upstream already printed the recharge note in the name (basilisk, blink dog, cloaker)
   if (action.uses_type === "PER_DAY" && action.uses_param) return ` (${action.uses_param}/Day)`;
-  if (action.uses_type === "RECHARGE_ON_ROLL" && action.uses_param) return ` (Recharge ${action.uses_param}${action.uses_param < 6 ? "-6" : ""})`;
+  if ((action.uses_type === "RECHARGE_ON_ROLL" || action.uses_type === "RECHARGE") && action.uses_param) return ` (Recharge ${action.uses_param}${action.uses_param < 6 ? "-6" : ""})`;
   if (action.uses_type === "RECHARGE") return " (Recharge after a Short or Long Rest)";
   return "";
+};
+
+/**
+ * Structured limited-use pool from the upstream uses fields (ADR-0020): "Recharge X-Y" becomes a
+ * start-of-turn d6 pool the engine re-arms; "Recharge after a Short or Long Rest" maps to the
+ * short-rest scope (a long rest re-arms those too); "N/Day" maps to long-rest (the app has no
+ * calendar — a day is a long rest; documented simplification). The display suffix stays on the name.
+ * Upstream quirk: RECHARGE with a numeric param IS a roll recharge (basilisk/medusa "Petrifying
+ * Gaze (Recharge 4-6/5-6)", blink dog Teleport) — the SRD statblocks print the die range.
+ */
+const usesOf = (action: ActionFields): { limit: number; per: "recharge" | "short-rest" | "long-rest"; recharge?: number } | null => {
+  if ((action.uses_type === "RECHARGE_ON_ROLL" || action.uses_type === "RECHARGE") && action.uses_param) return { limit: 1, per: "recharge", recharge: action.uses_param };
+  if (action.uses_type === "RECHARGE") return { limit: 1, per: "short-rest" };
+  if (action.uses_type === "PER_DAY" && action.uses_param) return { limit: action.uses_param, per: "long-rest" };
+  return null;
 };
 
 /**
@@ -287,7 +303,7 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk)) throw new Error(`Spell correction targets unknown spell ${pk} — check for a typo or an upstream rename.`);
 }
 
-const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
+const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, rechargeUses: 0, restUses: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
 
 const KNOWN_CONDITION_IDS = new Set(conditions.filter((condition) => condition.fields.document === "srd-2024").map((condition) => condition.fields.describes));
 const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
@@ -339,6 +355,7 @@ const monsters: ActorDefinition[] = creatures
           ? parseMultiattack(action.fields.desc, siblingIdByName)
           : null;
         const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
+        const uses = usesOf(action.fields);
         const enrichment = ACTION_ENRICHMENTS[`${slug}/${actionId}`];
         report.actionsTotal += 1;
         if (row) report.structuredAttacks += 1;
@@ -347,6 +364,8 @@ const monsters: ActorDefinition[] = creatures
         if (multiattack) report.structuredMultiattacks += 1;
         else if (/multiattack/i.test(action.fields.name)) report.proseMultiattacks += 1;
         if (onHit) report.onHitRiders += 1;
+        if (uses?.per === "recharge") report.rechargeUses += 1;
+        else if (uses) report.restUses += 1;
         for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
         return {
           id: actionId,
@@ -358,6 +377,7 @@ const monsters: ActorDefinition[] = creatures
           damage,
           ...(multiattack ? { multiattack } : {}),
           ...(onHit ? { onHit } : {}),
+          ...(uses ? { uses } : {}),
           ...(enrichment ?? {})
         };
       });
@@ -584,6 +604,7 @@ writeFileSync(join(outDir, "attribution.json"), `${JSON.stringify(attribution, n
 console.log(`monsters: ${report.monsters} (all valid; excluded: ${[...EXCLUSIONS].map(slugOf).join(", ") || "none"})`);
 console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks} (+${report.proseAttacks} prose-parsed), structured saves ${report.structuredSaves}`);
 console.log(`rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, monsters with typed defenses ${report.typedDefenses}`);
+console.log(`limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools`);
 console.log(`conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`);
 console.log(`skills: ${skillRecords.length} | damage types: ${damageTypeRecords.length} | rules: ${ruleRecords.length}`);
 if (report.corrections.length > 0) console.log(`upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`);

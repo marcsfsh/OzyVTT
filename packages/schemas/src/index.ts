@@ -169,8 +169,11 @@ const ActionSchema = z.object({
   grants: EffectGrantSchema.optional(),
   /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
   requiresEffectTag: EffectTagSchema.optional(),
-  /** Limited uses; "turn" resets every turn, "encounter" at encounter start, "long-rest" via a rest. `pool` shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon). */
-  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest", "short-rest"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional() }).strict().optional(),
+  /** Limited uses; "turn" resets every turn, "encounter" at encounter start, "long-rest" via a rest, "recharge" on a start-of-turn d6 ≥ `recharge` (and on any rest). `pool` shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon). */
+  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(), recharge: z.number().int().min(2).max(6).optional() }).strict().superRefine((uses, context) => {
+    if (uses.per === "recharge" && uses.recharge === undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "Recharge uses need the d6 threshold (e.g. 5 for \"Recharge 5-6\")." });
+    if (uses.per !== "recharge" && uses.recharge !== undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "The recharge threshold only applies when per is \"recharge\"." });
+  }).optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional()
 });

@@ -300,7 +300,10 @@ export function createGameOperations(context: GameOperationsContext) {
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
       const result = await store.executeTimeline({ id: request.commandId, type: "initiative.next", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
-        outcome = planNextTurn(state, timeline, request.confirmRewrite === true, (advancing) => nextInitiativeTurn(advancing, effectEvents));
+        outcome = planNextTurn(state, timeline, request.confirmRewrite === true, (advancing) => nextInitiativeTurn(advancing, effectEvents, {
+          resolveDefinition: (definitionId) => storedDefinition(advancing, definitionId) ?? contentLibrary.monster(definitionId),
+          rollDie: (sides) => context.random(sides)
+        }));
       });
       if (!result.duplicate) { await context.publishGameState(result.state); if (outcome) context.logTimelineOutcome(outcome, result.state); publishNarrations(effectEvents); }
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -327,7 +330,10 @@ export function createGameOperations(context: GameOperationsContext) {
       const effectEvents: EffectNarration[] = [];
       const result = await store.executeTimeline({ id: request.commandId, type: "turn.end", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         if (state.combat.historyCursor !== null) throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
-        planNextTurn(state, timeline, false, (advancing) => endTurn(advancing, scope, effectEvents));
+        planNextTurn(state, timeline, false, (advancing) => endTurn(advancing, scope, effectEvents, {
+          resolveDefinition: (definitionId) => storedDefinition(advancing, definitionId) ?? contentLibrary.monster(definitionId),
+          rollDie: (sides) => context.random(sides)
+        }));
       });
       if (!result.duplicate) { await context.publishGameState(result.state); context.logTurnBegin(result.state); publishNarrations(effectEvents); }
       return { revision: result.state.revision, duplicate: result.duplicate };

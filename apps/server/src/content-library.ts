@@ -64,6 +64,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     attackCount: action.attack?.count ?? null,
     usesLimit: action.uses?.limit ?? null,
     usesPer: action.uses?.per ?? null,
+    usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,

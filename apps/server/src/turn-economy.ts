@@ -1,6 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
-import { nextInitiativeTurn } from "./encounter.js";
+import { nextInitiativeTurn, type TurnAdvanceDeps } from "./encounter.js";
 import type { EffectNarration } from "./effects.js";
 import type { ActorScope } from "./hit-points.js";
 
@@ -47,8 +47,8 @@ export function setReactionUsed(state: GameState, actorId: string, used: boolean
 }
 
 /** Player-facing End Turn: same advance as the GM's Next, gated to the claimed character's own turn. */
-export function endTurn(state: GameState, scope: ActorScope, events?: EffectNarration[]) {
+export function endTurn(state: GameState, scope: ActorScope, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   requireActiveCombat(state);
   if (scope.role === "player" && state.combat.turnActorId !== claimedActorId(state, scope.sessionId)) throw new CommandRejectedError("It isn't your character's turn.");
-  nextInitiativeTurn(state, events);
+  nextInitiativeTurn(state, events, deps);
 }

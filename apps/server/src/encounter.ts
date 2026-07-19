@@ -11,14 +11,14 @@ type StartEncounterInput = Readonly<{
 
 const EMPTY_TURN = { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 } as const;
 
-/** A fresh fight refreshes per-encounter limited-use pools (Frenzy next fight); long-rest pools persist until a rest. */
+/** A fresh fight refreshes per-encounter limited-use pools (Frenzy next fight) and recharge pools (a dragon opens with its breath ready); long-rest pools persist until a rest. */
 function clearPerEncounterUses(state: GameState, combatantIds: ReadonlySet<string>, resolveDefinition: (definitionId: string) => ActorDefinition | undefined) {
   for (const actor of state.actors) {
     if (!combatantIds.has(actor.id) || !actor.definitionId) continue;
     const definition = resolveDefinition(actor.definitionId);
     if (!definition) continue;
     for (const action of definition.actions) {
-      if (action.uses?.per !== "encounter") continue;
+      if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge") continue;
       const key = action.uses.pool ?? action.id;
       if (actor.actionUses[key] !== undefined) {
         const { [key]: _cleared, ...rest } = actor.actionUses;
@@ -123,7 +123,40 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
   };
 }
 
-export function nextInitiativeTurn(state: GameState, events?: EffectNarration[]) {
+/** Dependencies for start-of-turn recharge rolls; optional so scene bookkeeping paths can advance turns without them. */
+export type TurnAdvanceDeps = Readonly<{
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  rollDie: (sides: number) => number;
+}>;
+
+/**
+ * SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the
+ * spent pool. Rolled here (not offered as a prompt) because the SRD makes it automatic; the
+ * narration shows the die so the table sees why the breath is back. One roll per shared pool.
+ */
+function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps, events?: EffectNarration[]) {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId) return;
+  const definition = deps.resolveDefinition(actor.definitionId);
+  if (!definition) return;
+  const rolledPools = new Set<string>();
+  for (const action of definition.actions) {
+    if (action.uses?.per !== "recharge" || action.uses.recharge === undefined) continue;
+    const key = action.uses.pool ?? action.id;
+    if (rolledPools.has(key) || (actor.actionUses[key] ?? 0) === 0) continue;
+    rolledPools.add(key);
+    const die = deps.rollDie(6);
+    if (die >= action.uses.recharge) {
+      const { [key]: _spent, ...rest } = actor.actionUses;
+      actor.actionUses = rest;
+      events?.push({ kind: "effect", text: `${actor.name}'s ${action.name} recharges (rolled ${die}).`, actorId: actor.id });
+    } else {
+      events?.push({ kind: "effect", text: `${actor.name}'s ${action.name} stays spent (rolled ${die}, needs ${action.uses.recharge}+).`, actorId: actor.id });
+    }
+  }
+}
+
+export function nextInitiativeTurn(state: GameState, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   if (!state.combat.active || !state.combat.turnActorId || state.combat.initiative.length === 0) throw new CommandRejectedError("Start an encounter before advancing Initiative.");
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
@@ -140,6 +173,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[])
   // The incoming actor's sustained durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
+  if (deps) rollRecharges(state, nextActorId, deps, events);
 }
 
 export function previousInitiativeTurn(state: GameState) {

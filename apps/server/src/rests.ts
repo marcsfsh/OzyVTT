@@ -6,7 +6,8 @@ import { endEffect, removeConditionDirect, type EffectNarration } from "./effect
 /**
  * Apply a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
  *
- * Short: only per-short-rest limited-use pools re-arm — hit dice aren't modeled, so no HP changes
+ * Short: per-short-rest and recharge limited-use pools re-arm (SRD: "Recharge after a Short or
+ * Long Rest", and any rest re-arms Recharge X-Y) — hit dice aren't modeled, so no HP changes
  * (the GM heals manually if the table spends dice; documented simplification).
  * Long: remaining effects end first (their onEnd grants land — Frenzy's Exhaustion), then HP to
  * max, temp HP gone, dying cleared, all limited-use pools refreshed, Exhaustion drops one level.
@@ -19,7 +20,7 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     for (const action of definition?.actions ?? []) {
-      if (action.uses?.per !== "short-rest") continue;
+      if (action.uses?.per !== "short-rest" && action.uses?.per !== "recharge") continue;
       const key = action.uses.pool ?? action.id;
       if (actor.actionUses[key] !== undefined) {
         const { [key]: _cleared, ...rest } = actor.actionUses;
