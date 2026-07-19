@@ -85,6 +85,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
+| `actor.spend-hit-dice` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
 | `annotation.move` | `combat:write` |
@@ -851,7 +852,7 @@ Toggles the underwater environment on the live encounter (GM-grade only; SRD Und
 
 ### `POST /api/v1/game/actors/{actorId}/rest`
 
-Applies a rest to a rostered actor outside combat (GM-grade only). Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, and Exhaustion drops one level. Short: only per-short-rest pools re-arm (hit dice are not modeled — no HP change).
+Applies a rest to a rostered actor outside combat (GM-grade only). Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.
 
 **Auth:** Integration credential with `actor:write` · GM session
 
@@ -863,7 +864,25 @@ Applies a rest to a rostered actor outside combat (GM-grade only). Long: remaini
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
-| `kind` | `long` \| `short` | yes | short re-arms per-short-rest pools only (hit dice unmodeled — no HP change); long is the full reset |
+| `kind` | `long` \| `short` | yes | short re-arms per-short-rest and recharge pools (heal by spending Hit Point Dice separately); long is the full reset |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/spend-hit-dice`
+
+Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter. Player sessions may target only their claimed character; the dice land in the shared roll history.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) — string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `count` | integer (1–40) | yes | How many Hit Point Dice to spend; each heals its roll + Con modifier (minimum 1) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed — envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

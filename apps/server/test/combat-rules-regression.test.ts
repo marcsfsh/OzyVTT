@@ -10,7 +10,8 @@ import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
-import { applyRest } from "../src/rests.js";
+import { applyRest, spendHitDice } from "../src/rests.js";
+import { hitDiceFromDefinition } from "../src/actor-roster.js";
 import { applyTimelineRestore, timelineDirtied } from "../src/combat-history.js";
 import { projectPlayerCombat, projectPlayerView } from "../src/projections.js";
 import { setLegendaryUsed } from "../src/turn-economy.js";
@@ -1558,5 +1559,83 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
     expect(monsters.filter((monster) => monster.legendary?.resistancesPerDay !== undefined).length).toBe(32);
     expect(monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary).length).toBe(82);
+  });
+});
+
+describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
+  const HERO = "10000000-0000-4000-8000-000000000008";
+  function buildRestingGame(remaining = 7, current = 30): GameState {
+    return GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [{ id: HERO, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current, maximum: 75 }, armorClass: 15, definitionId: "import-torva", hitDice: { die: "d12", maximum: 7, remaining } }],
+      definitions: [{ id: "import-torva", definition: torvaDefinition }]
+    });
+  }
+  const resolveTorva = (game: GameState) => (definitionId: string) => game.definitions.find((entry) => entry.id === definitionId)?.definition;
+
+  it("seeds the pool from the definition's hit-point formula, or leaves it unmodeled", () => {
+    expect(hitDiceFromDefinition(torvaDefinition)).toEqual(torvaDefinition.hitPoints.formula
+      ? { die: `d${torvaDefinition.hitPoints.formula.match(/d(\d+)/)![1]}`, maximum: Number.parseInt(torvaDefinition.hitPoints.formula, 10), remaining: Number.parseInt(torvaDefinition.hitPoints.formula, 10) }
+      : null);
+    const formulaless = ActorDefinitionSchema.parse({ ...JSON.parse(JSON.stringify(torvaDefinition)), hitPoints: { maximum: 20 } });
+    expect(hitDiceFromDefinition(formulaless)).toBeNull();
+    const crocodile = loadMonsterDefinitions().find((monster) => monster.source.externalId === "giant-crocodile")!;
+    expect(hitDiceFromDefinition(crocodile)).toMatchObject({ die: "d12", remaining: 9 });
+  });
+
+  it("each spent die heals its face + Con modifier (minimum 1) through healActor and decrements the pool", () => {
+    const game = buildRestingGame();
+    // Torva's Con modifier from the fixture; faces 1 and 8.
+    const conModifier = Math.floor((torvaDefinition.abilityScores.con - 10) / 2);
+    const outcome = spendHitDice(game, HERO, [1, 8], { role: "gm" }, resolveTorva(game));
+    expect(outcome.conModifier).toBe(conModifier);
+    expect(outcome.healed).toBe(Math.max(1, 1 + conModifier) + Math.max(1, 8 + conModifier));
+    expect(game.actors[0].hp.current).toBe(30 + outcome.healed);
+    expect(game.actors[0].hitDice).toMatchObject({ remaining: 5 });
+  });
+
+  it("clamps each die to a minimum of 1 HP even with a negative Con modifier", () => {
+    const frail = ActorDefinitionSchema.parse({ ...JSON.parse(JSON.stringify(torvaDefinition)), abilityScores: { ...torvaDefinition.abilityScores, con: 6 } });
+    const game = buildRestingGame();
+    game.definitions = [{ id: "import-torva", definition: frail }];
+    const outcome = spendHitDice(game, HERO, [1, 1], { role: "gm" }, resolveTorva(game));
+    expect(outcome.conModifier).toBe(-2);
+    expect(outcome.healed).toBe(2); // two dice, both clamped to 1
+  });
+
+  it("rejects spending past the pool, without a pool, or while in an active encounter", () => {
+    const empty = buildRestingGame(1);
+    expect(() => spendHitDice(empty, HERO, [4, 4], { role: "gm" }, resolveTorva(empty))).toThrowError(/1 Hit Die left/);
+    const unmodeled = buildRestingGame();
+    unmodeled.actors[0].hitDice = null;
+    expect(() => spendHitDice(unmodeled, HERO, [4], { role: "gm" }, resolveTorva(unmodeled))).toThrowError(/no Hit Dice pool/);
+    const fighting = buildDiceGameInCombat();
+    expect(() => spendHitDice(fighting, IDS.torva, [4], { role: "gm" }, (definitionId) => fighting.definitions.find((entry) => entry.id === definitionId)?.definition)).toThrowError(/end the encounter/i);
+  });
+
+  function buildDiceGameInCombat(): GameState {
+    const game = buildGame();
+    game.actors = game.actors.map((actor) => actor.id === IDS.torva ? { ...actor, hitDice: { die: "d12" as const, maximum: 7, remaining: 7 } } : actor);
+    return game;
+  }
+
+  it("a long rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
+    const game = buildRestingGame(2, 10);
+    applyRest(game, HERO, "long", resolveTorva(game));
+    expect(game.actors[0].hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7 });
+    expect(game.actors[0].hp.current).toBe(75);
+  });
+
+  it("hit dice reach only the owning player; other players and old saves stay safe", () => {
+    const game = buildRestingGame();
+    const OWNER = "30000000-0000-4000-8000-00000000000b";
+    game.actors[0].ownerSessionId = OWNER;
+    const ownView = projectPlayerView(game, OWNER, () => null).actors[0];
+    expect(ownView.hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7 });
+    const strangerView = projectPlayerView(game, "30000000-0000-4000-8000-00000000000c", () => null).actors[0];
+    expect("hitDice" in strangerView).toBe(false);
+    // Pre-hit-dice saves parse with the null default (additive-state pattern).
+    const legacy = GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: HERO, name: "Old Save", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } }] });
+    expect(legacy.actors[0].hitDice).toBeNull();
   });
 });

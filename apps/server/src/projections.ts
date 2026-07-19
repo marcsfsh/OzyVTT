@@ -111,8 +111,9 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
       // actionUses (limited-use spending names stat-block action ids — own claimed character only),
-      // conditionImmunities and legendary resources (monster defenses are GM knowledge).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, ...actor } = source;
+      // conditionImmunities and legendary resources (monster defenses are GM knowledge), and
+      // hitDice (a healing resource that tracks with exact HP — own claimed character only).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
       const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
@@ -123,7 +124,8 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
         ...(ownDefinition ? { definition: ownDefinition } : {}),
-        ...(mine ? { actionUses: { ...actionUses } } : {})
+        ...(mine ? { actionUses: { ...actionUses } } : {}),
+        ...(mine && hitDice ? { hitDice: { ...hitDice } } : {})
       };
     }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)

@@ -21,7 +21,7 @@ import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
 import { applyMovementRules } from "./movement-rules.js";
-import { applyRest } from "./rests.js";
+import { applyRest, spendHitDice } from "./rests.js";
 import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
@@ -29,7 +29,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, AddCombatantSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -942,6 +942,46 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async actorSpendHitDice(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(ActorSpendHitDiceSchema, raw, "The hit-dice command is malformed.");
+      const scope = actorScopeOf(principal);
+      const initiatorSessionId = sessionIdOf(principal);
+      const { commandId, actorId, count, expectedRevision } = request;
+      // Roll BEFORE the store executes (the dice.roll pattern): a duplicate retry replays the stored
+      // outcome and must not consume fresh randomness. Sides come from the snapshot; the execute
+      // callback re-validates against live state.
+      const snapshotActor = store.snapshot.actors.find((candidate) => candidate.id === actorId);
+      const sides = snapshotActor?.hitDice ? Number.parseInt(snapshotActor.hitDice.die.slice(1), 10) : 8;
+      const faces = Array.from({ length: count }, () => context.random(sides));
+      const rollId = context.newId();
+      let healed = 0;
+      let events: EffectNarration[] = [];
+      const result = await store.execute({ id: commandId, type: "actor.spend-hit-dice", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const outcome = spendHitDice(state, actorId, faces, scope, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        healed = outcome.healed;
+        events = outcome.events;
+        const actor = state.actors.find((candidate) => candidate.id === actorId)!;
+        // The dice land in the shared roll history so the table sees the heal happen; hidden actors stay GM-only.
+        const record: RollRecord = {
+          id: rollId, commandId, initiatorSessionId, initiatorRole: scope.role, initiatorLabel: actor.name, actorId,
+          purpose: "manual", visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
+          formula: `${count}${actor.hitDice!.die}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${Math.abs(outcome.conModifier * count)}` : ""}`,
+          normalizedFormula: `${count}${actor.hitDice!.die}`,
+          dice: faces.map((face) => ({ group: 0, sides, face, kept: true, sign: 1 as const })),
+          modifiers: outcome.conModifier !== 0 ? [{ value: Math.abs(outcome.conModifier * count), sign: (outcome.conModifier < 0 ? -1 : 1) as -1 | 1 }] : [],
+          total: outcome.healed, createdAt: new Date().toISOString()
+        };
+        state.rolls.push(record);
+        if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "heal", text: `${actorName(actorId)} spends ${count} Hit ${count === 1 ? "Die" : "Dice"} and regains ${healed} HP.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
+        publishNarrations(events);
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Annotations ----------
 
     async annotationAdd(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1224,6 +1264,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.set-rules-mode", "Set the rules-engine enforcement mode: strict, assisted, or freeform (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
     ["actor.rest", "Apply a long rest: full HP, cleared dying state, refreshed limited uses, one less Exhaustion level (GM).", (p, raw) => operations.actorRest(p, raw)],
+    ["actor.spend-hit-dice", "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).", (p, raw) => operations.actorSpendHitDice(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
     ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],

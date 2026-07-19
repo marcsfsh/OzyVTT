@@ -515,6 +515,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.rulesMode, "post", "encounter.set-rules-mode"],
       [GAME_PATHS.environment, "post", "encounter.set-environment"],
       [GAME_PATHS.actorRest, "post", "actor.rest"],
+      [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
       [GAME_PATHS.annotationsClear, "post", "annotation.clear"],

@@ -3,7 +3,18 @@
 .own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
 .own-hp-tracker button { padding: .5rem .7rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #17140f; color: #f5efe3; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
-.own-hp-tracker button:hover:not(:disabled) { border-color: #e8a743; } .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; } .table-sidebar > .dice-proof { margin-top: auto; } .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; } .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; } @media (min-width: 980px) { .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); align-items: start; }
+.own-hp-tracker button:hover:not(:disabled) { border-color: #e8a743; }
+/* Hit Point Dice (SRD short-rest healing): pool readout + stepper + one roll button. */
+.hit-dice-spender { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
+.hit-dice-pool { color: #c8c0b1; font-size: .8rem; font-weight: 700; }
+.hit-dice-spender button { padding: .4rem .65rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #17140f; color: #f5efe3; font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
+.hit-dice-spender button:hover:not(:disabled) { border-color: #e8a743; }
+.hit-dice-spender strong { min-width: 1.4rem; text-align: center; color: #f6c452; }
+.hit-dice-roll { background: #392d1d; }
+.hit-dice-empty { margin: .6rem 0 0; color: #9f9789; font-size: .78rem; }
+.actor-rest { display: flex; gap: .5rem; margin: .6rem 0; }
+.actor-rest button { flex: 1; padding: .5rem .6rem; font-size: .78rem; font-weight: 700; text-align: center; }
+.table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; } .table-sidebar > .dice-proof { margin-top: auto; } .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; } .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; } @media (min-width: 980px) { .table-layout { grid-template-columns: minmax(0, 1.7fr) minmax(21rem, 27rem); align-items: start; }
 /* When the tracker is docked into the map, the sidebar is just the dice panel — stretch it to the
    map's height and let the dice sit at the bottom so its lower edge lines up with the battlemap. */
 .table-layout.docked { align-items: stretch; } .table-layout.docked .table-sidebar { min-height: 100%; }

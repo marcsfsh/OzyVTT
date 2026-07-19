@@ -15,6 +15,15 @@ function dedupedName(state: GameState, base: string): string {
   }
 }
 
+/** SRD Hit Point Dice pool from a definition's hit-point formula ("7d8 + 14" → 7 × d8); no parseable formula = unmodeled (null, the fail-open pattern). */
+export function hitDiceFromDefinition(definition: ActorDefinition): { die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number } | null {
+  const match = definition.hitPoints.formula?.match(/^(\d+)d(4|6|8|10|12|20)\b/i);
+  if (!match) return null;
+  const count = Math.min(40, Number.parseInt(match[1], 10));
+  if (count < 1) return null;
+  return { die: `d${match[2]}` as "d4" | "d6" | "d8" | "d10" | "d12" | "d20", maximum: count, remaining: count };
+}
+
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full — remove unused combatants first.");
   state.actors.push({
@@ -33,6 +42,7 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     conditionImmunities: definition.conditionImmunities ? [...definition.conditionImmunities] : [],
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
+    hitDice: hitDiceFromDefinition(definition),
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,
