@@ -5,6 +5,7 @@ import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, INCAPACITATING_CONDITIONS, isIncapacitated } from "./condition-rules.js";
+import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 type LiveActor = GameState["actors"][number];
@@ -277,19 +278,19 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       const distance = distanceFeet(attacker.id, targetId);
       if (distance === null) continue;
       const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
-      const withinReach = attackReach !== undefined && distance <= attackReach + 1e-6;
+      const withinReach = attackReach !== undefined && distance <= attackReach + DISTANCE_TOLERANCE_FEET;
       const rounded = Math.round(distance * 10) / 10;
       if (withinReach) continue;
       if (attackRange !== undefined) {
-        if (distance > attackRange + 1e-6) violations.push({ rule: "range.out-of-range", message: `${targetName} is ${rounded} ft away — beyond the ${attackRange} ft maximum range.` });
+        if (distance > attackRange + DISTANCE_TOLERANCE_FEET) violations.push({ rule: "range.out-of-range", message: `${targetName} is ${rounded} ft away, beyond the ${attackRange} ft maximum range.` });
         // SRD Underwater Combat: a ranged attack automatically misses beyond normal range.
         else if (state.combat.underwater) {
           const normal = action.attack.rangeNormalFeet ?? attackRange;
-          if (distance > normal + 1e-6) violations.push({ rule: "range.underwater", message: `${targetName} is ${rounded} ft away — underwater, ranged attacks automatically miss beyond normal range (${normal} ft).` });
+          if (distance > normal + DISTANCE_TOLERANCE_FEET) violations.push({ rule: "range.underwater", message: `${targetName} is ${rounded} ft away; underwater, ranged attacks automatically miss beyond normal range (${normal} ft).` });
         }
       } else if (attackReach !== undefined || attackRange === undefined) {
         const reach = attackReach ?? 5;
-        if (distance > reach + 1e-6) violations.push({ rule: "range.out-of-reach", message: `${targetName} is ${rounded} ft away — beyond ${attacker.name}'s ${reach} ft reach.` });
+        if (distance > reach + DISTANCE_TOLERANCE_FEET) violations.push({ rule: "range.out-of-reach", message: `${targetName} is ${rounded} ft away, beyond ${attacker.name}'s ${reach} ft reach.` });
       }
     }
   }

@@ -85,6 +85,18 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(monsters.filter((monster) => (monster.damageResistances?.length ?? 0) + (monster.damageImmunities?.length ?? 0) + (monster.damageVulnerabilities?.length ?? 0) > 0).length).toBeGreaterThanOrEqual(140);
   });
 
+  it("parses save-for-damage from the 'Failure:' clause so failed saves apply damage", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    // Fire Breath: "Failure: 45 (10d8) Fire damage. Success: Half damage." → structured 10d8 fire.
+    expect(byId("adult-brass-dragon").actions.find((action) => action.id === "fire-breath")!.damage).toEqual([{ formula: "10d8", type: "fire" }]);
+    expect(byId("adult-red-dragon").actions.find((action) => action.id === "fire-breath")!.damage).toEqual([{ formula: "17d6", type: "fire" }]);
+    // A condition-only breath (no dice in its Failure clause) stays prose-only.
+    expect(byId("adult-brass-dragon").actions.find((action) => action.id === "sleep-breath")!.damage).toEqual([]);
+    // Coverage floor: most save-for-damage actions are now structured (was 12 before the fix).
+    const saveActions = monsters.flatMap((monster) => monster.actions).filter((action) => action.save);
+    expect(saveActions.filter((action) => action.damage.length > 0).length).toBeGreaterThanOrEqual(100);
+  });
+
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
     // rat: flat "1 Piercing damage" — attack is structured, damage stays prose-only.

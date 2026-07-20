@@ -17,6 +17,7 @@ import { projectPlayerCombat, projectPlayerView } from "../src/projections.js";
 import { setLegendaryUsed } from "../src/turn-economy.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
+import { gridToImage } from "../src/grid-calibration.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
 
@@ -1342,6 +1343,71 @@ describe("creature size and distance — footprint-aware, edge-to-edge (SRD Crea
     const value = creatureDistance(scaled, medium(100, 100), { position: { x: 200, y: 100 }, sizeCells: 3, sizePx: 146 })!.value;
     expect(value).toBeCloseTo(5.13, 1);
   });
+
+  it("washes out snapping dust so a truly-adjacent creature reads exactly 5 ft (report bug: '5 ft away but out of reach')", () => {
+    // A realistic wizard-drawn grid: off-origin, a hair of rotation, and positions that went through
+    // the 0.001-px position rounding. Center-to-edge here lands at 5.0001-ish ft raw; the fix rounds it.
+    const skewed = { width: 900, height: 600, calibration: { kind: "square" as const, origin: { x: 0.333, y: 0.777 }, cellSizePx: 50, rotationRadians: 0.0009, distancePerCell: 5 } } as const;
+    const round3 = (value: number) => Math.round(value * 1000) / 1000; // mimic the token-placement 0.001-px snap
+    const at = (col: number, row: number) => {
+      const raw = gridToImage(skewed.calibration, { column: col, row });
+      return { x: round3(raw.x), y: round3(raw.y) };
+    };
+    // Medium at a cell center (col 2.5), Large 2x2 centered on the adjacent intersection (col 4) — edge-to-edge 1 cell.
+    const mediumAt = { position: at(2.5, 3.5), sizeCells: 1, sizePx: 41 };
+    const largeAt = { position: at(4, 3), sizeCells: 2, sizePx: 96 };
+    expect(creatureDistance(skewed, mediumAt, largeAt)!.value).toBe(5); // not 5.0001
+
+    // And the reach check forgives sub-foot slack directly: a 5.08 ft read is still within a 5 ft reach.
+    const game = buildGame();
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6], () => 5.08);
+    expect(swing.attack).not.toBeNull();
+    // A genuine step out (a full cell beyond) still blocks.
+    expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6], () => 10)).toThrowError(/out of reach|beyond/i);
+  });
+});
+
+describe("save-for-damage applies on a failed save (report bug: breath weapons dealt no damage)", () => {
+  const brassDragon = loadMonsterDefinitions().find((monster) => monster.source.externalId === "adult-brass-dragon")!;
+  const DRAGON = "10000000-0000-4000-8000-000000000009";
+
+  function buildBreathGame(): GameState {
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        { id: IDS.torva, name: "Torva Grimtusk", kind: "player-character", visibility: "public", hp: { current: 75, maximum: 75 }, armorClass: 15, definitionId: "import-torva", size: "medium" },
+        { id: DRAGON, name: "Adult Brass Dragon", kind: "monster", visibility: "public", hp: { current: 172, maximum: 172 }, armorClass: 18, definitionId: "adult-brass-dragon", size: "huge" }
+      ],
+      definitions: [
+        { id: "import-torva", definition: torvaDefinition },
+        { id: "adult-brass-dragon", definition: brassDragon }
+      ]
+    });
+    startEncounter(game, { mapAssetId: IDS.map, entries: [{ actorId: DRAGON, score: 20 }, { actorId: IDS.torva, score: 8 }] }, () => 1, GEOMETRY, (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition);
+    return game;
+  }
+
+  it("rolls the breath damage at resolve and applies it on a committed failure (half on success)", () => {
+    const game = buildBreathGame();
+    // Fire Breath: DC 18 DEX, Failure 10d8 fire, Success half. Roll all 1s → 10 fire proposed.
+    resolve(game, brassDragon, "fire-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(10).fill(1));
+    const pending = game.combat.pendingSaves.find((save) => save.targetActorId === IDS.torva)!;
+    expect(pending).toMatchObject({ ability: "dex", dc: 18, halfOnSuccess: true });
+    expect(pending.proposedDamageParts).toEqual([{ amount: 10, type: "fire" }]);
+
+    // Torva fails the save → full 10 fire applied (this is the bug: previously proposedDamage was 0).
+    const saveDeps = { random: () => 3, newRollId: (() => { let n = 700; return () => `40000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; })(), sessionId: IDS.gmSession, role: "gm" as const, now: () => "2026-07-18T00:00:00.000Z", resolveDefinition: (id: string) => game.definitions.find((entry) => entry.id === id)?.definition };
+    const answered = answerSave(game, nextCommandId(), pending.id, "manual", 5, true, { role: "gm" }, saveDeps);
+    expect(answered.outcome).toMatchObject({ success: false, committed: true, appliedDamage: 10 });
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBe(65);
+
+    // A success halves it (SRD "Success: Half damage") — 5 fire.
+    const game2 = buildBreathGame();
+    resolve(game2, brassDragon, "fire-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(10).fill(1));
+    const pending2 = game2.combat.pendingSaves[0];
+    answerSave(game2, nextCommandId(), pending2.id, "manual", 25, true, { role: "gm" }, { ...saveDeps, resolveDefinition: (id: string) => game2.definitions.find((entry) => entry.id === id)?.definition });
+    expect(game2.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBe(70);
+  });
 });
 
 describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () => {
@@ -1372,7 +1438,7 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
   it("blocks a spent breath, keeps it spent on a low start-of-turn roll, and re-arms on the threshold", () => {
     const game = buildDragonGame();
     nextInitiativeTurn(game); // the dragon's turn
-    resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, []);
+    resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(5).fill(1)); // 5d8 cold
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
     // Round 2, low roll (2 < 5): the pool stays spent and the table sees why.
     const lowEvents: { text: string; actorId: string }[] = [];
@@ -1388,7 +1454,7 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     nextInitiativeTurn(game, highEvents as never, dragonDeps(game, 5));
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBeUndefined();
     expect(highEvents.some((event) => event.actorId === DRAGON && /recharges \(rolled 5\)/.test(event.text))).toBe(true);
-    const again = resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, []);
+    const again = resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(5).fill(1));
     expect(again.save?.dc).toBe(12);
   });
 

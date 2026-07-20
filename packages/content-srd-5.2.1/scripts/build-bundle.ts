@@ -252,6 +252,25 @@ const parseProseAttack = (desc: string): ProseAttack | null => {
 };
 
 /**
+ * Damage a saving-throw action deals on a failed save, from the 2024 statblock's "Failure:" clause —
+ * "Failure: 45 (10d8) Fire damage." (+ "plus N (XdY) Type damage"). Without this, breath weapons and
+ * other save-for-damage abilities parsed a `save` but an empty `damage`, so answering the save
+ * applied nothing (the engine reads "Success: Half damage" from the description separately). A
+ * flat-only failure ("Failure: 3 Fire damage", no dice) stays prose-only per ADR-0008. The half-on-
+ * success / condition riders are read from the description at resolve time and are unaffected.
+ */
+const parseSaveDamage = (desc: string): { formula: string; type: string }[] => {
+  const failure = desc.match(/Failure:\s*(.+?)(?:\s*Success:|$)/s);
+  const segment = failure ? failure[1] : desc;
+  const damage: { formula: string; type: string }[] = [];
+  for (const match of segment.matchAll(/\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)\s+([A-Za-z]+) damage/g)) {
+    const type = match[2].toLowerCase();
+    if ((DAMAGE_TYPES as readonly string[]).includes(type)) damage.push({ formula: match[1].replace(/\s*([+-])\s*/, " $1 "), type });
+  }
+  return damage;
+};
+
+/**
  * Reviewed exclusions: fixtures open5e labels `srd-2024` that are not actually SRD 5.2.1
  * content. Verified against the SRD 5.2.1 text (repo root `5.2.1 SRD.md`).
  * - giant-fly: the SRD mentions a giant fly only inside the Figurine of Wondrous Power item;
@@ -303,7 +322,7 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk)) throw new Error(`Spell correction targets unknown spell ${pk} — check for a typo or an upstream rename.`);
 }
 
-const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, rechargeUses: 0, restUses: 0, legendaryCreatures: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
+const report = { monsters: 0, actionsTotal: 0, structuredAttacks: 0, proseAttacks: 0, structuredSaves: 0, saveDamage: 0, structuredMultiattacks: 0, proseMultiattacks: 0, onHitRiders: 0, rechargeUses: 0, restUses: 0, legendaryCreatures: 0, typedDefenses: 0, corrections: [] as string[], untypedDamage: [] as string[], skipped: [] as string[] };
 
 const KNOWN_CONDITION_IDS = new Set(conditions.filter((condition) => condition.fields.document === "srd-2024").map((condition) => condition.fields.describes));
 const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
@@ -341,7 +360,9 @@ const monsters: ActorDefinition[] = creatures
                 ? [{ formula: formulaOf(row.extra_damage_die_count, row.extra_damage_die_type, row.extra_damage_bonus), type: row.extra_damage_type ?? "untyped" }]
                 : [])
             ]
-          : prose?.damage ?? [];
+          // A save-for-damage action (Fire Breath) has no attack row; pull its damage from the
+          // "Failure:" clause so answering a failed save actually applies it.
+          : prose?.damage ?? (save ? parseSaveDamage(action.fields.desc) : []);
         // rangeFeet is the MAXIMUM attackable range; rangeNormalFeet the normal band when the
         // weapon has two ranges (disadvantage between them — SRD Range).
         const attack = row
@@ -361,6 +382,7 @@ const monsters: ActorDefinition[] = creatures
         if (row) report.structuredAttacks += 1;
         if (prose) report.proseAttacks += 1;
         if (save) report.structuredSaves += 1;
+        if (save && !row && !prose && damage.length > 0) report.saveDamage += 1;
         if (multiattack) report.structuredMultiattacks += 1;
         else if (/multiattack/i.test(action.fields.name)) report.proseMultiattacks += 1;
         if (onHit) report.onHitRiders += 1;
@@ -614,7 +636,7 @@ writeFileSync(join(outDir, "attribution.json"), `${JSON.stringify(attribution, n
 
 console.log(`monsters: ${report.monsters} (all valid; excluded: ${[...EXCLUSIONS].map(slugOf).join(", ") || "none"})`);
 console.log(`actions: ${report.actionsTotal} — structured attacks ${report.structuredAttacks} (+${report.proseAttacks} prose-parsed), structured saves ${report.structuredSaves}`);
-console.log(`rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, monsters with typed defenses ${report.typedDefenses}`);
+console.log(`rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, save-for-damage actions ${report.saveDamage}, monsters with typed defenses ${report.typedDefenses}`);
 console.log(`limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures}`);
 console.log(`conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`);
 console.log(`skills: ${skillRecords.length} | damage types: ${damageTypeRecords.length} | rules: ${ruleRecords.length}`);

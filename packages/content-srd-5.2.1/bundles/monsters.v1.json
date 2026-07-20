@@ -96,7 +96,12 @@
      "ability": "int",
      "dc": 16
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "psychic"
+     }
+    ]
    },
    {
     "id": "dominate-mind",
@@ -221,7 +226,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d10",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -278,7 +288,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -455,7 +470,12 @@
      "ability": "dex",
      "dc": 19
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "11d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -628,7 +648,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d8",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -644,7 +669,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -816,7 +846,12 @@
      "ability": "dex",
      "dc": 19
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -832,7 +867,12 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "thunder"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -955,7 +995,12 @@
      "ability": "cha",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "7d6",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -1012,7 +1057,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -1143,7 +1193,12 @@
      "ability": "cha",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "force"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -1200,7 +1255,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d10",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -1358,7 +1418,12 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -1392,7 +1457,12 @@
      "ability": "con",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "16d6",
+      "type": "poison"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -1572,7 +1642,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "17d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -1715,7 +1790,12 @@
      "ability": "dex",
      "dc": 19
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -1749,7 +1829,12 @@
      "ability": "con",
      "dc": 20
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -1880,7 +1965,12 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -1937,7 +2027,12 @@
      "ability": "con",
      "dc": 19
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -2083,7 +2178,12 @@
      "ability": "str",
      "dc": 13
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d10 + 2",
+      "type": "thunder"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -2299,7 +2399,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d10",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -2356,7 +2461,12 @@
      "ability": "dex",
      "dc": 22
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "15d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -2533,7 +2643,12 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "16d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -2706,7 +2821,12 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "13d8",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -2722,7 +2842,12 @@
      "ability": "dex",
      "dc": 20
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "8d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -2894,7 +3019,12 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "15d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -2910,7 +3040,12 @@
      "ability": "con",
      "dc": 22
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "thunder"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -3033,7 +3168,12 @@
      "ability": "cha",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "9d6",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -3090,7 +3230,12 @@
      "ability": "dex",
      "dc": 22
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "14d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3221,7 +3366,12 @@
      "ability": "cha",
      "dc": 24
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "7d6",
+      "type": "force"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -3278,7 +3428,12 @@
      "ability": "dex",
      "dc": 24
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "13d10",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3436,7 +3591,12 @@
      "ability": "con",
      "dc": 21
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "5d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -3470,7 +3630,12 @@
      "ability": "con",
      "dc": 22
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "22d6",
+      "type": "poison"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3650,7 +3815,12 @@
      "ability": "dex",
      "dc": 24
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "26d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3793,7 +3963,12 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -3827,7 +4002,12 @@
      "ability": "con",
      "dc": 24
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "15d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3958,7 +4138,12 @@
      "ability": "con",
      "dc": 20
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -4015,7 +4200,12 @@
      "ability": "con",
      "dc": 22
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "14d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -4485,7 +4675,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -6635,7 +6830,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "6d6",
+      "type": "acid"
+     }
+    ]
    },
    {
     "id": "bite",
@@ -6662,7 +6862,12 @@
      "ability": "str",
      "dc": 18
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "5d8 + 6",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "lightning-breath",
@@ -6673,7 +6878,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -6995,7 +7205,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "5d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -7446,7 +7661,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d6",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -7787,7 +8007,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -7921,7 +8146,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -8455,7 +8685,12 @@
      "ability": "dex",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d12",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -8728,7 +8963,12 @@
      "ability": "str",
      "dc": 14
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d6 + 4",
+      "type": "bludgeoning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -8896,7 +9136,12 @@
      "ability": "dex",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d4 + 4",
+      "type": "fire"
+     }
+    ]
    }
   ],
   "token": {
@@ -9065,7 +9310,12 @@
      "ability": "dex",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "7d8",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -9908,7 +10158,12 @@
      "ability": "str",
      "dc": 12
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d4",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -10009,7 +10264,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -10141,7 +10401,12 @@
      "ability": "str",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d6 + 5",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -11227,7 +11492,12 @@
      "ability": "str",
      "dc": 17
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "6d6",
+      "type": "thunder"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -11612,7 +11882,12 @@
      "ability": "con",
      "dc": 19
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "16d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -12727,7 +13002,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "gore",
@@ -12952,7 +13232,12 @@
      "ability": "str",
      "dc": 16
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "force"
+     }
+    ]
    }
   ],
   "token": {
@@ -14176,7 +14461,16 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "acid"
+     },
+     {
+      "formula": "3d6",
+      "type": "acid"
+     }
+    ]
    }
   ],
   "token": {
@@ -14436,7 +14730,12 @@
      "ability": "wis",
      "dc": 13
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d6 + 3",
+      "type": "psychic"
+     }
+    ]
    },
    {
     "id": "possession",
@@ -14742,7 +15041,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "7d6",
+      "type": "bludgeoning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -15219,7 +15523,12 @@
      "ability": "str",
      "dc": 14
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d8 + 4",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -17642,7 +17951,12 @@
      "ability": "dex",
      "dc": 10
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "radiant"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -17781,7 +18095,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d6 + 5",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -17931,7 +18250,12 @@
      "ability": "str",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d4 + 4",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -18587,7 +18911,12 @@
      "ability": "dex",
      "dc": 13
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d10",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -18713,7 +19042,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d10 + 5",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "petrifying-breath",
@@ -18951,7 +19285,12 @@
      "ability": "con",
      "dc": 11
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d6",
+      "type": "poison"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -19742,7 +20081,12 @@
      "ability": "con",
      "dc": 16
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "7d8",
+      "type": "poison"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -20191,7 +20535,12 @@
      "ability": "dex",
      "dc": 12
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "5d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -21128,7 +21477,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d8 + 6",
+      "type": "necrotic"
+     }
+    ]
    }
   ],
   "token": {
@@ -21695,7 +22049,12 @@
      "ability": "con",
      "dc": 10
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d4",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -21941,7 +22300,12 @@
      "ability": "wis",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "psychic"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -22094,7 +22458,16 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d8 + 3",
+      "type": "thunder"
+     },
+     {
+      "formula": "2d6",
+      "type": "thunder"
+     }
+    ]
    }
   ],
   "token": {
@@ -22240,7 +22613,12 @@
      "ability": "con",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d10",
+      "type": "poison"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -22824,7 +23202,12 @@
      "ability": "dex",
      "dc": 25
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "lightning-strike",
@@ -22835,7 +23218,12 @@
      "ability": "dex",
      "dc": 23
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "6d10",
+      "type": "lightning"
+     }
+    ]
    },
    {
     "id": "swallow",
@@ -22846,7 +23234,16 @@
      "ability": "dex",
      "dc": 25
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d8 + 10",
+      "type": "piercing"
+     },
+     {
+      "formula": "7d6",
+      "type": "acid"
+     }
+    ]
    }
   ],
   "token": {
@@ -22994,7 +23391,12 @@
      "ability": "wis",
      "dc": 13
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "psychic"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -23217,7 +23619,12 @@
      "ability": "con",
      "dc": 20
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "9d6",
+      "type": "necrotic"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -23743,7 +24150,12 @@
      "ability": "dex",
      "dc": 11
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -23964,7 +24376,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "4d10 + 7",
+      "type": "bludgeoning"
+     }
+    ]
    },
    {
     "id": "gore",
@@ -24219,7 +24636,12 @@
      "ability": "str",
      "dc": 17
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d10 + 4",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -25467,7 +25889,12 @@
      "ability": "wis",
      "dc": 17
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "6d6 + 4",
+      "type": "psychic"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -25587,7 +26014,12 @@
      "ability": "wis",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "8d6",
+      "type": "psychic"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -26716,7 +27148,12 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d8 + 3",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -27851,7 +28288,12 @@
      "ability": "dex",
      "dc": 20
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "7d6",
+      "type": "radiant"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -28526,7 +28968,12 @@
      "ability": "con",
      "dc": 12
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "poison"
+     }
+    ]
    }
   ],
   "token": {
@@ -28727,7 +29174,12 @@
      "ability": "str",
      "dc": 19
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "5d6",
+      "type": "acid"
+     }
+    ]
    },
    {
     "id": "bite",
@@ -29025,7 +29477,12 @@
      "ability": "wis",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "8d6",
+      "type": "psychic"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -29342,7 +29799,12 @@
      "ability": "dex",
      "dc": 13
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "7d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -29562,7 +30024,16 @@
      "ability": "str",
      "dc": 19
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "acid"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
+     }
+    ]
    }
   ],
   "token": {
@@ -30509,7 +30980,16 @@
      "ability": "str",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "2d6 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
    }
   ],
   "token": {
@@ -30618,7 +31098,12 @@
      "ability": "wis",
      "dc": 12
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d6 + 2",
+      "type": "psychic"
+     }
+    ]
    }
   ],
   "token": {
@@ -30919,7 +31404,12 @@
      "ability": "wis",
      "dc": 11
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "psychic"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -31266,7 +31756,12 @@
      "ability": "str",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "lightning"
+     }
+    ]
    }
   ],
   "token": {
@@ -31612,7 +32107,12 @@
      "ability": "con",
      "dc": 13
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -31886,7 +32386,12 @@
      "ability": "dex",
      "dc": 25
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10",
+      "type": "radiant"
+     }
+    ],
     "legendary": {
      "cost": 1
     }
@@ -31900,7 +32405,16 @@
      "ability": "dex",
      "dc": 21
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "4d8 + 6",
+      "type": "piercing"
+     },
+     {
+      "formula": "8d8",
+      "type": "radiant"
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -32197,7 +32711,12 @@
      "ability": "wis",
      "dc": 16
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d6",
+      "type": "psychic"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -32371,7 +32890,12 @@
      "ability": "wis",
      "dc": 20
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "8d10",
+      "type": "thunder"
+     }
+    ],
     "uses": {
      "limit": 3,
      "per": "long-rest"
@@ -33074,7 +33598,12 @@
      "ability": "con",
      "dc": 10
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -33592,7 +34121,12 @@
      "ability": "dex",
      "dc": 18
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -33739,7 +34273,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "psychic"
+     }
+    ]
    }
   ],
   "token": {
@@ -34566,7 +35105,12 @@
      "ability": "str",
      "dc": 27
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "16d6",
+      "type": "acid"
+     }
+    ]
    },
    {
     "id": "bite",
@@ -34655,7 +35199,12 @@
      "ability": "con",
      "dc": 27
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d12",
+      "type": "thunder"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -35969,7 +36518,16 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d4 + 4",
+      "type": "piercing"
+     },
+     {
+      "formula": "3d8",
+      "type": "necrotic"
+     }
+    ]
    }
   ],
   "token": {
@@ -36245,7 +36803,16 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d4 + 3",
+      "type": "piercing"
+     },
+     {
+      "formula": "3d6",
+      "type": "necrotic"
+     }
+    ]
    }
   ],
   "token": {
@@ -36564,7 +37131,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "poison"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -36580,7 +37152,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "thunder"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "long-rest"
@@ -37220,7 +37797,16 @@
      "ability": "str",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d8 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "2d8",
+      "type": "bludgeoning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -38171,7 +38757,12 @@
      "ability": "con",
      "dc": 12
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "5d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -38310,7 +38901,12 @@
      "ability": "con",
      "dc": 13
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1d8 + 2",
+      "type": "necrotic"
+     }
+    ]
    }
   ],
   "token": {
@@ -38577,7 +39173,12 @@
      "ability": "con",
      "dc": 12
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39288,7 +39889,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "14d6",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39420,7 +40026,12 @@
      "ability": "dex",
      "dc": 16
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39543,7 +40154,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "11d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39677,7 +40293,12 @@
      "ability": "dex",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "9d10",
+      "type": "lightning"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39816,7 +40437,12 @@
      "ability": "dex",
      "dc": 14
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "9d8",
+      "type": "acid"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39950,7 +40576,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "10d10",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -40093,7 +40724,12 @@
      "ability": "con",
      "dc": 14
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "12d6",
+      "type": "poison"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -40228,7 +40864,12 @@
      "ability": "dex",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "16d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -40351,7 +40992,12 @@
      "ability": "con",
      "dc": 17
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "11d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -40489,7 +41135,12 @@
      "ability": "con",
      "dc": 15
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "9d8",
+      "type": "cold"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",

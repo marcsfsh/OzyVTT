@@ -2,6 +2,7 @@ import type { EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { RulesBlockedError } from "./game-store.js";
 import { effectiveSpeedFeet, isIncapacitated } from "./condition-rules.js";
+import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 
 type Point = Readonly<{ x: number; y: number }>;
 
@@ -84,7 +85,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       const measure = input.creatureDistance ?? ((target: Readonly<{ actorId: string; position: Point }>, point: Point) => input.distance(target.position, point));
       const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, from);
       const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, to);
-      if (wasIn === null || nowOut === null || wasIn > reach + 1e-6 || nowOut <= reach + 1e-6) continue;
+      // Tolerance both ways: "was in reach" forgives snapping dust at exactly reach, and "now out"
+      // fires only on a real step past it (≥ one cell on a grid) rather than sub-foot float drift.
+      if (wasIn === null || nowOut === null || wasIn > reach + DISTANCE_TOLERANCE_FEET || nowOut <= reach + DISTANCE_TOLERANCE_FEET) continue;
       if (state.combat.pendingReactions.some((prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId)) continue;
       state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, {
         id: input.newPromptId(), kind: "leaves-reach" as const, actorId: enemy.id, actionId: "opportunity-attack", actionName: "Opportunity Attack",

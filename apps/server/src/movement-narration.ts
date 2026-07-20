@@ -19,6 +19,16 @@ type Point = Readonly<{ x: number; y: number }>;
 
 export type MovementNarration = Readonly<{ publicText: string | null; gmText: string | null }>;
 
+/**
+ * Tolerance (feet) for reach/range/opportunity-attack comparisons. Token positions are stored
+ * rounded to 0.001 px and grid coordinates come back through a cos/sin round-trip, so a
+ * genuinely-adjacent creature can measure a hair over its true distance (e.g. 5.0001 ft). On a grid
+ * the smallest real gap beyond reach is a whole cell (≥ 2.5 ft), so a 0.1 ft slack never masks a
+ * real step out of range but does swallow that snapping dust — the fix for "5 ft away but out of
+ * reach" and for opportunity attacks that didn't fire between differently-sized creatures.
+ */
+export const DISTANCE_TOLERANCE_FEET = 0.1;
+
 /** Distance between two image points in map units, or null when the map has no calibration and no scale. */
 export function mapDistance(geometry: TokenMapGeometry, from: Point, to: Point): Readonly<{ value: number; unit: string }> | null {
   if (geometry.calibration) {
@@ -43,17 +53,21 @@ export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; s
  * subtract each token's radius beyond its central cell. Null when the map is unmeasurable.
  */
 export function creatureDistance(geometry: TokenMapGeometry, a: CreatureFootprint, b: CreatureFootprint): Readonly<{ value: number; unit: string }> | null {
+  // Snap the result to 0.01 ft: positions are stored rounded to 0.001 px and grid coordinates come
+  // back through a cos/sin round-trip, so a truly-adjacent creature can read 5.0001 ft — dust that
+  // would otherwise put it "out of reach" against a whole-foot reach value.
+  const clean = (value: number, unit: string) => ({ value: Math.round(value * 100) / 100, unit });
   if (geometry.calibration) {
     const gridA = imageToGrid(geometry.calibration, a.position);
     const gridB = imageToGrid(geometry.calibration, b.position);
     const centerCells = Math.max(Math.abs(gridA.column - gridB.column), Math.abs(gridA.row - gridB.row));
     const edgeCells = Math.max(0, centerCells - (Math.max(1, a.sizeCells) - 1) / 2 - (Math.max(1, b.sizeCells) - 1) / 2);
-    return { value: edgeCells * geometry.calibration.distancePerCell, unit: "ft" };
+    return clean(edgeCells * geometry.calibration.distancePerCell, "ft");
   }
   if (geometry.scale) {
     const beyondCentralCell = (footprint: CreatureFootprint) => (footprint.sizePx - footprint.sizePx / Math.max(1, footprint.sizeCells)) / 2;
     const centerPx = Math.hypot(b.position.x - a.position.x, b.position.y - a.position.y);
-    return { value: Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel, unit: geometry.scale.unit };
+    return clean(Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel, geometry.scale.unit);
   }
   return null;
 }

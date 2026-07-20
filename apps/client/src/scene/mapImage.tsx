@@ -212,8 +212,14 @@ export function FogOverlay({ width, height, fog, variant }: Readonly<{
   fog: Readonly<{ enabled: boolean; shapes: readonly Readonly<{ id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
   variant: "gm" | "player";
 }>) {
-  const maskId = useId();
+  const base = useId();
   if (!fog.enabled) return null;
+  // Chromium caches an SVG <mask>'s raster keyed on the element and does NOT re-evaluate it when
+  // only the mask's child <rect>s change (e.g. Hide-all removes every reveal) — the stale holes stay
+  // until an unrelated repaint (a pan/zoom). Suffix the mask id with a hash of the fog so any change
+  // yields a new id → a new url() reference → a guaranteed re-resolve. (Bug: hide-all didn't render.)
+  const signature = `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`;
+  const maskId = `${base}${signature}`;
   return <>
     <defs>
       <mask id={maskId}>
