@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
 import { RichText } from "./RichText";
+import { SpellcastingText } from "./spells";
 import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBlocked, useTargetingBusy, useTargetingResult } from "./targeting";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -194,7 +195,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         })()}
         {spellcasting && <div className="action-spellcasting" role="group" aria-label="Spellcasting">
           <div className="action-spellcasting-head"><span aria-hidden="true">✦</span> <strong>{spellcasting.name}</strong></div>
-          <p className="action-reference-text"><RichText text={spellcasting.description} /></p>
+          <SpellcastingText text={spellcasting.description} />
         </div>}
         {otherReference.length > 0 && <details className="action-reference-group">
           <summary>Traits &amp; reference ({otherReference.length})</summary>

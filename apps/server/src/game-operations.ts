@@ -167,6 +167,11 @@ export function createGameOperations(context: GameOperationsContext) {
       return { conditions: contentLibrary.conditionSummaries() };
     },
 
+    contentSpells(_principal: GamePrincipal) {
+      // Spell rules are public reference text (the CC-BY SRD), like conditions - any joined session may read them.
+      return { spells: contentLibrary.spellSummaries() };
+    },
+
     contentMonsterActions(principal: GamePrincipal, raw: unknown) {
       requireGmGrade(principal, "Only the GM can browse stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The action lookup is malformed.");
