@@ -452,7 +452,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
-    {!state.combat.active && <DockPicker dock={dock} />}
+    {/* Docking the tracker to the map is available before AND during combat (report #9). */}
+    <DockPicker dock={dock} />
     {!state.combat.active ? <>
       <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically - drag them from the tray onto the map.</p>
       {/* The battlemap is picked right here - starting a fight never requires a Maps-tab visit
