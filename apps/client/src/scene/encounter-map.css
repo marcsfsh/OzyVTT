@@ -63,8 +63,13 @@
 
 /* Top-left overlaid tool cluster (eye ▾ · tools · ruler toggle · wrench ▾). Visible in normal,
    enlarged, and OS-fullscreen modes since it lives inside the stage. */
-.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; max-width: calc(100% - 1.4rem); }
+/* align-items: center keeps every control - bar icons and the slide-out group - on one vertical plane. */
+.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; max-width: calc(100% - 1.4rem); }
 .encounter-map-tools { display: flex; gap: .3rem; }
+/* The ✏ drawing tools open as one grouped tab that slides out to the right of the bar (report #11):
+   a bordered panel so the shape/style/cleanup controls read as a set, distinct from the always-on icons. */
+.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; padding: .2rem .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); transform-origin: left center; animation: encounter-map-slideout .16s ease-out; }
+@keyframes encounter-map-slideout { from { opacity: 0; transform: translateX(-.5rem); } to { opacity: 1; transform: translateX(0); } }
 .encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
 .encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
 .encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }

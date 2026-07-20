@@ -556,7 +556,6 @@ export function EncounterMap({
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools - shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
           {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war - hide the map from players and reveal it area by area" onClick={() => { setFogOpen((v) => { if (v && (tool === "fog-reveal" || tool === "fog-hide")) setTool("select"); return !v; }); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>🌫</button>}
           {fogOpen && role === "gm" && <div className="encounter-map-tools" role="group" aria-label="Fog of war">
             <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON - players see only revealed areas. Turn off." : "Fog is OFF - turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
@@ -565,7 +564,11 @@ export function EncounterMap({
             <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Reveal the whole map" onClick={() => { if (size) runFog(() => emitFogPaint({ commandId: newId(), op: "reveal", rect: { x: 0, y: 0, width: size.width, height: size.height }, ...fogTarget, expectedRevision: revision }), "The fog could not be revealed."); }}>⛶</button>
             <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Hide the whole map again (clears every reveal)" onClick={() => runFog(() => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }), "The fog could not be reset.")}>◼</button>
           </div>}
-          {drawOpen && <>
+          {/* ✏ sits directly left of the shape bar it toggles; the tools slide out to its right as one
+              grouped tab (report #11). Only shape/style/cleanup controls live in here - movement and
+              layer aids stayed on the bar. */}
+          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools - shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
+          {drawOpen && <div className="encounter-map-slideout" role="group" aria-label="Drawing tools">
             <div className="encounter-map-tools">
               {TOOLS.filter((entry) => entry.id === "circle" || entry.id === "cone" || entry.id === "line" || entry.id === "square").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={!calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
             </div>
@@ -585,16 +588,18 @@ export function EncounterMap({
                 <label className="encounter-map-menu-select">Custom<input type="color" value={sessionColor} onChange={(event) => setSessionColor(event.target.value)} /></label>
               </div>}
             </div>
-            <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
-            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on - extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
-            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active - new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
             <div className="encounter-map-wrench">
               <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
               {wrenchOpen && <div className="encounter-map-menu" role="menu">
                 {wrenchScopes.map((entry) => <button key={entry.scope} type="button" role="menuitem" onClick={() => clearAnnotations(entry.scope)}>{entry.label}</button>)}
               </div>}
             </div>
-          </>}
+          </div>}
+          {/* Movement + layer aids are always on the bar - they are not drawing tools and were wrongly
+              hidden behind ✏ (report #11): distance-while-moving, occupied-cell cost, and the GM layer. */}
+          <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on - extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active - new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
         </div>
 
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>
