@@ -63,20 +63,24 @@
 
 /* Top-left overlaid tool cluster (eye ▾ · tools · ruler toggle · wrench ▾). Visible in normal,
    enlarged, and OS-fullscreen modes since it lives inside the stage. */
-/* align-items: center keeps every control - bar icons and the slide-out group - on one vertical plane. */
-.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; max-width: calc(100% - 1.4rem); }
+/* align-items: center keeps every control on one vertical plane; min-height reserves the slide-out's
+   height so opening a tab never nudges the whole row down (report #8). */
+.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 2.25rem; max-width: calc(100% - 1.4rem); }
 .encounter-map-tools { display: flex; gap: .3rem; }
-/* The ✏ drawing tools open as one grouped tab that slides out to the right of the bar (report #11):
-   a bordered panel so the shape/style/cleanup controls read as a set, distinct from the always-on icons. */
-.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; padding: .2rem .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); transform-origin: left center; animation: encounter-map-slideout .16s ease-out; }
-@keyframes encounter-map-slideout { from { opacity: 0; transform: translateX(-.5rem); } to { opacity: 1; transform: translateX(0); } }
+/* Drawing and fog tools open as one grouped tab that slides out to the right of their toggle (reports
+   #11, #13): a bordered panel that reads as a set. It grows in from the left on open and fades out on
+   close (via .closing) rather than snapping (report #8). */
+.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; padding: 0 .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); transform-origin: left center; animation: encounter-map-slideout .16s ease-out; }
+.encounter-map-slideout.closing { pointer-events: none; animation: encounter-map-slideout-close .16s ease-in forwards; }
+@keyframes encounter-map-slideout { from { opacity: 0; transform: translateX(-.4rem) scaleX(.94); } to { opacity: 1; transform: translateX(0) scaleX(1); } }
+@keyframes encounter-map-slideout-close { from { opacity: 1; transform: translateX(0) scaleX(1); } to { opacity: 0; transform: translateX(-.4rem) scaleX(.94); } }
 .encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
 .encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
 .encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }
 .encounter-map-swatches button.selected { outline: 2px solid #fff; outline-offset: 1px; }
 .encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
 .encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
-.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; }
+.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
 .encounter-map-icon:hover { border-color: #e8a743; }
 .encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .encounter-map-icon:disabled { opacity: .4; cursor: not-allowed; }
