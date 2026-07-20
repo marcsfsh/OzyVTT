@@ -93,7 +93,7 @@ function App() {
   useEffect(() => { localStorage.setItem("vtt.dock-position", dockPosition); }, [dockPosition]);
   useEffect(() => { localStorage.setItem("vtt.dock-width", String(dockWidth)); }, [dockWidth]);
   // The map library loads with the GM session (refreshed on returning to the Encounter tab) so
-  // encounter setup can pick a battlemap directly — starting a fight never requires a Maps-tab visit.
+  // encounter setup can pick a battlemap directly - starting a fight never requires a Maps-tab visit.
   useEffect(() => {
     if (!gmToken || (gmTab !== "table" && gmTab !== "maps")) return;
     let cancelled = false;
@@ -183,14 +183,14 @@ function App() {
     ? { position: dockPosition, onChange: setDockPosition, width: dockWidth, onWidthChange: setDockWidth, node: showDocked ? encounterPanel : null }
     : undefined;
   // GM-private scene staging: when the GM is previewing a prepared scene, the table map renders THAT
-  // scene (its map + staged tokens) for arranging — players and the shared screen are unaffected.
+  // scene (its map + staged tokens) for arranging - players and the shared screen are unaffected.
   const previewScene = mode === "gm" && previewSceneId ? (state as GmView | null)?.combat.scenes.find((scene) => scene.id === previewSceneId) ?? null : null;
   useEffect(() => {
     // Drop the preview if its scene was removed or went live (it's the live map then, not a private one).
     if (previewSceneId && !(mode === "gm" && (state as GmView | null)?.combat.scenes.some((scene) => scene.id === previewSceneId && scene.id !== (state as GmView).combat.activeSceneId))) setPreviewScene(null);
   }, [previewSceneId, state, mode]);
   useEffect(() => {
-    // Staging renders on the table map — make sure the GM is looking at it, and close the picker.
+    // Staging renders on the table map - make sure the GM is looking at it, and close the picker.
     if (previewScene) { setGmTab("table"); setScenePrepOpen(false); }
   }, [previewScene]);
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
@@ -212,7 +212,7 @@ function App() {
     {mode !== "home" && state && <>
       {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
           encounter it duplicates the combat tracker at several times the size, so it collapses to
-          one quiet line — still one tap away for a player joining mid-fight. */}
+          one quiet line - still one tap away for a player joining mid-fight. */}
       {state.combat.active
         ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
         : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
@@ -224,14 +224,14 @@ function App() {
       {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
         <section className="table">
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
-              Guarded on the field, not just the mode — the first state after login can still be
+              Guarded on the field, not just the mode - the first state after login can still be
               player-projected (no scenes) until the session join lands. */}
           {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <SceneSwitcher scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onFeedback={(text) => setNotice({ tone: "error", text })} />}
           {previewScene ? <>
-            <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> — only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
+            <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> - only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
             <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} fog={previewScene.combat.fog} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} />
           </> : <>
-          {!state.combat.active && state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "Scene is live — add combatants and start the encounter from the panel below." : "Waiting for the GM to start combat."}</p>}
+          {!state.combat.active && state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "Scene is live - add combatants and start the encounter from the panel below." : "Waiting for the GM to start combat."}</p>}
           {!state.combat.active && !state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
           {/* Render the map once a scene is live (has a map) even before combat starts, so making a
               prepared scene live shows it instead of a blank "no map" page. Players still only get the
@@ -250,7 +250,7 @@ function App() {
             fog={state.combat.fog}
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
-          /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter — or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
+          /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
           {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>

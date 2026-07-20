@@ -65,18 +65,18 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     // per-turn uses, which name stat-block action ids) reset to idle rather than narrating its activity.
     turn: currentIsPublic
       ? { actionUsed: state.combat.turn.actionUsed, bonusActionUsed: state.combat.turn.bonusActionUsed, actionInstance: state.combat.turn.actionInstance ? { actorId: state.combat.turn.actionInstance.actorId, components: { ...state.combat.turn.actionInstance.components } } : null, turnUses: { ...state.combat.turn.turnUses }, movementUsedFeet: state.combat.turn.movementUsedFeet }
-      // Hidden turn: movement spent would narrate a hidden combatant's activity — reset with the rest.
+      // Hidden turn: movement spent would narrate a hidden combatant's activity - reset with the rest.
       : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
-    // The fog mask travels verbatim — it IS what players render, and it carries geometry only.
+    // The fog mask travels verbatim - it IS what players render, and it carries geometry only.
     // Fog is never the security boundary: hidden actors/annotations are stripped above regardless.
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // legendaryUsed is deliberately absent: a monster's remaining legendary actions are GM knowledge
     // (same rationale as the stripped actionUses), and the pool never drives player-side UI.
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag
-    // (a banner), never the turn labels — those can name hidden combatants.
+    // (a banner), never the turn labels - those can name hidden combatants.
     rewound: state.combat.historyCursor !== null,
     // A player sees only the saves their own claimed character owes. The source actor id never
     // crosses the wire, and a hidden source's name is masked so gm-only attackers stay unnarrated.
@@ -99,7 +99,7 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
 
 /**
  * An effect as players see it (viewer safety): source ids never cross the wire, and a hidden
- * source's name is masked — a player learns "Grappled by A hidden threat", never who.
+ * source's name is masked - a player learns "Grappled by A hidden threat", never who.
  */
 function playerEffect(effect: GameState["actors"][number]["effects"][number], publicActorIds: ReadonlySet<string>): PlayerEffect {
   const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
@@ -113,9 +113,9 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
-      // actionUses (limited-use spending names stat-block action ids — own claimed character only),
+      // actionUses (limited-use spending names stat-block action ids - own claimed character only),
       // conditionImmunities and legendary resources (monster defenses are GM knowledge), and
-      // hitDice (a healing resource that tracks with exact HP — own claimed character only).
+      // hitDice (a healing resource that tracks with exact HP - own claimed character only).
       const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
@@ -139,7 +139,7 @@ export function projectGmView(state: GameState, presenceFor: PresenceLookup, now
   return {
     ...state,
     // Ephemeral annotations (measurements ~5s, pings ~4s) must drop off the GM's own screen when
-    // they expire, not only when the next add prunes state — the scheduled expiry re-broadcast
+    // they expire, not only when the next add prunes state - the scheduled expiry re-broadcast
     // relies on this filter (the player/viewer projections already do the same).
     combat: { ...state.combat, annotations: state.combat.annotations.filter((annotation) => annotation.expiresAt === null || annotation.expiresAt > now) },
     actors: state.actors.map((actor) => ({ ...actor, presence: actor.ownerSessionId === null ? null : presenceFor(actor.ownerSessionId) }))

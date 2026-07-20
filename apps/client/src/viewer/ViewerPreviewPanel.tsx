@@ -10,7 +10,7 @@ const MIN_HEIGHT = 220;
 /**
  * The GM's in-tab preview of the shared screen. Rather than re-implement the live sync, it mints a
  * short-lived read-only viewer cookie (POST /api/v1/viewer/preview-session) and renders the real
- * `/viewer.html` in an iframe — guaranteeing it matches the TV exactly and stays in sync via the
+ * `/viewer.html` in an iframe - guaranteeing it matches the TV exactly and stays in sync via the
  * same EventSource path the paired display uses. "Pop out" opens the same viewer in its own window.
  */
 export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: string; onClose: () => void }>) {

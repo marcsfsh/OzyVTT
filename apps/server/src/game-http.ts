@@ -15,8 +15,8 @@ import { GameAccessDeniedError, GameInputError, isGmGrade, type GameCommandDescr
 
 /**
  * The public HTTP adapter over the shared game operations (ADR-0016). Every write here runs the
- * exact operation the Socket.IO handlers run — same validation, same role checks, same store
- * dispatch, same side effects — so the REST surface can never fork from the table's behavior.
+ * exact operation the Socket.IO handlers run - same validation, same role checks, same store
+ * dispatch, same side effects - so the REST surface can never fork from the table's behavior.
  *
  * Principals: a GM session token, a player session token, or a GM-minted integration credential,
  * all as `Authorization: Bearer`. Integration credentials are checked against each route's scope
@@ -25,7 +25,7 @@ import { GameAccessDeniedError, GameInputError, isGmGrade, type GameCommandDescr
  *
  * Error contract: 400 validation_failed (malformed request), 401 unauthenticated (no token),
  * 403 forbidden (bad/revoked/underscoped token, or a role denial), 404 not_found, and
- * 409 conflict for everything the game itself refuses — domain rejections, stale
+ * 409 conflict for everything the game itself refuses - domain rejections, stale
  * `expectedRevision` (with `error.currentRevision`), and timeline navigations awaiting GM
  * confirmation (with `error.details.needsConfirm`).
  */
@@ -336,7 +336,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     if (id === null) return;
     const document = options.archives.get(id);
     if (document === null) return sendError(res, 404, "not_found", "No such encounter archive.");
-    // The stored JSON is spliced in verbatim — no parse/re-serialize round trip on a potentially large document.
+    // The stored JSON is spliced in verbatim - no parse/re-serialize round trip on a potentially large document.
     return res.type("application/json").send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
 

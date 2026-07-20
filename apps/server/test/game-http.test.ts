@@ -11,7 +11,7 @@ import { createServer } from "../src/server.js";
 /**
  * ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
  * credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
- * commands, hits stale-revision and confirmation conflicts, and loses access on revocation — while
+ * commands, hits stale-revision and confirmation conflicts, and loses access on revocation - while
  * the hidden combatant never leaks through any player-safe response.
  */
 
@@ -69,7 +69,7 @@ async function bootWithBattlemap() {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
 const post = (base: string, path: string, token: string, body: unknown = {}) =>
   fetch(base + path, { method: "POST", headers: bearer(token), body: JSON.stringify(body) });
-/** Issue an integration credential over the documented GM endpoint — the same door an external tool uses. */
+/** Issue an integration credential over the documented GM endpoint - the same door an external tool uses. */
 async function issueCredential(base: string, gmToken: string, name: string, scopes: readonly string[]) {
   const response = await post(base, "/api/v1/gm/integration-credentials", gmToken, { name, scopes });
   expect(response.status).toBe(201);
@@ -140,7 +140,7 @@ describe("public game API over /api/v1", () => {
     expect(staleBody.error.code).toBe("conflict");
     expect(staleBody.error.currentRevision).toBe(1);
 
-    // Damage, heal, temp HP, set HP, condition — the actor routes.
+    // Damage, heal, temp HP, set HP, condition - the actor routes.
     const damaged = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.actorDamage.replace("{actorId}", HERO_ID), writer.token, { amount: 7 })).json());
     expect(damaged.data.duplicate).toBe(false);
     await post(base, GAME_PATHS.actorHeal.replace("{actorId}", HERO_ID), writer.token, { amount: 2 });
@@ -325,7 +325,7 @@ describe("public game API over /api/v1", () => {
     expect(document.rolls.length).toBe(1);
     expect(document.rolls[0].formula).toBe("1d20+5");
 
-    // Deletion needs the admin scope (or a GM session) — combat:read cannot destroy the record.
+    // Deletion needs the admin scope (or a GM session) - combat:read cannot destroy the record.
     expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { method: "DELETE", headers: bearer(reader.token) })).status).toBe(403);
     const deleted = await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { method: "DELETE", headers: bearer(admin.token) });
     expect(deleted.status).toBe(200);
@@ -339,7 +339,7 @@ describe("public game API over /api/v1", () => {
     const { base, gmToken } = await boot();
     const integration = await issueCredential(base, gmToken, "seat manager", ["game:read", "actor:write"]);
 
-    // Two players join over pure HTTP — the socketless mirror of the open LAN join.
+    // Two players join over pure HTTP - the socketless mirror of the open LAN join.
     const seatA = PlayerSessionIssuedResponseSchema.parse(await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json());
     const seatB = PlayerSessionIssuedResponseSchema.parse(await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json());
     expect(seatA.data.sessionId).not.toBe(seatB.data.sessionId);
@@ -417,7 +417,7 @@ describe("public game API over /api/v1", () => {
     const movement = gmLog.data.entries.filter((entry) => entry.kind === "movement");
     // The studied move: 4 cells = 20 ft, with the hidden Tyrant's ranges split into a GM-only line.
     expect(movement.map((entry) => entry.text)).toContain("Public Hero moved 20 ft.");
-    expect(movement.map((entry) => entry.text)).toContain("Hidden ranges for Public Hero — Unrevealed Tyrant 10 ft → 20 ft.");
+    expect(movement.map((entry) => entry.text)).toContain("Hidden ranges for Public Hero - Unrevealed Tyrant 10 ft → 20 ft.");
     expect(movement.find((entry) => entry.text.startsWith("Hidden ranges"))?.gmOnly).toBe(true);
 
     // Players get the public movement lines but never the hidden ranges.
@@ -433,7 +433,7 @@ describe("public game API over /api/v1", () => {
     expect(JSON.stringify(archived.data.document.log)).toContain("Public Hero moved 20 ft.");
   });
 
-  it("answers CORS preflights for /api/v1 only — never for the legacy session/login endpoints", async () => {
+  it("answers CORS preflights for /api/v1 only - never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, { method: "OPTIONS", headers: { origin: "https://overlay.example", "access-control-request-method": "GET", "access-control-request-headers": "authorization" } });
     expect(preflight.status).toBe(204);
@@ -465,7 +465,7 @@ describe("public game API over /api/v1", () => {
 
     const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
     expect((await fetch(base + path)).status).toBe(401);
-    // A player who hasn't claimed this actor is refused — availability names stat-block internals.
+    // A player who hasn't claimed this actor is refused - availability names stat-block internals.
     expect((await fetch(base + path, { headers: bearer(playerToken) })).status).toBe(403);
     expect((await fetch(base + GAME_PATHS.actorAvailableActions.replace("{actorId}", randomUUID()), { headers: bearer(gmToken) })).status).toBe(404);
 

@@ -15,7 +15,7 @@ export const RollRecordSchema = z.object({
   initiatorSessionId: z.string().uuid(),
   initiatorRole: z.enum(["gm", "player"]),
   /**
-   * Human-readable "who rolled this" — the GM, or the player's claimed character's name at roll
+   * Human-readable "who rolled this" - the GM, or the player's claimed character's name at roll
    * time. Optional so rolls persisted before this field existed still parse; the server always
    * supplies a real value for every new roll.
    */
@@ -73,7 +73,7 @@ export type AnnotationPoint = z.infer<typeof AnnotationPointSchema>;
 /**
  * `origin` anchors the shape (center for circle, apex for cone, start point for line, an anchor
  * corner for square); `target` is the resize-handle point that determines direction/size. The
- * server derives and snaps `sizeFeet` from `origin`/`target` against the map's grid calibration —
+ * server derives and snaps `sizeFeet` from `origin`/`target` against the map's grid calibration -
  * both points are re-snapped on every add/move so geometry never drifts off-grid client-side.
  */
 export const AnnotationGeometrySchema = z.object({
@@ -101,7 +101,7 @@ export const AnnotationSchema = z.object({
   movableByOthers: z.boolean().default(false),
   /** Stroke/fill color chosen by whoever drew it (per-session). */
   color: AnnotationColorSchema.default("#58c3ff"),
-  /** Display label — currently the pinger's name for `ping` annotations; null otherwise. */
+  /** Display label - currently the pinger's name for `ping` annotations; null otherwise. */
   label: z.string().max(60).nullable().default(null),
   createdAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().nonnegative().nullable().default(null)
@@ -117,7 +117,7 @@ export const AbilityIdSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]
 export type AbilityId = z.infer<typeof AbilityIdSchema>;
 /**
  * A saving throw a target still owes: created when a save action resolves, answered by rolling or
- * typing a total (GM anyone; a player their own character). On answer the outcome AUTO-APPLIES —
+ * typing a total (GM anyone; a player their own character). On answer the outcome AUTO-APPLIES -
  * fail: full proposed damage + condition; success: half (or none). This is the owner-approved
  * documented exception to the propose→apply ladder for structured saves (ADR-0008 carve-out).
  */
@@ -131,17 +131,17 @@ export const PendingSaveSchema = z.object({
   sourceName: z.string().min(1).max(120),
   actionName: z.string().min(1).max(120),
   proposedDamage: z.number().int().nonnegative().max(10000).default(0),
-  /** Typed components of the proposed damage (additive — absent on saves created before ADR-0020); when present, application runs the typed-defense pipeline. */
+  /** Typed components of the proposed damage (additive - absent on saves created before ADR-0020); when present, application runs the typed-defense pipeline. */
   proposedDamageParts: z.array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict()).max(9).optional(),
   halfOnSuccess: z.boolean().default(true),
   conditionId: z.string().regex(/^[a-z0-9-]+$/).max(60).nullable().default(null),
-  /** Flat bonus to the save roll (GM-adjudicated cover: +2/+5 on Dex saves — SRD Cover). Additive. */
+  /** Flat bonus to the save roll (GM-adjudicated cover: +2/+5 on Dex saves - SRD Cover). Additive. */
   saveBonus: z.number().int().min(0).max(10).default(0),
   /** Concentration check (SRD): effects ended when this save is FAILED on commit. Stripped from player projections. Additive. */
   endsEffects: z.array(z.object({ actorId: z.string().uuid(), effectId: z.string().min(1).max(120) }).strict()).max(8).optional(),
   /**
    * A source-linked effect applied on a committed failure (Unarmed Strike Grapple: the Grappled
-   * effect with its escape DC). Additive — absent on saves created before this field existed.
+   * effect with its escape DC). Additive - absent on saves created before this field existed.
    */
   onFailEffect: z.object({
     name: z.string().min(1).max(120),
@@ -186,7 +186,7 @@ export const PendingReactionSchema = z.object({
 export type PendingReaction = z.infer<typeof PendingReactionSchema>;
 
 /**
- * Shared invariants for a combat context — the live top-level combat AND each parked scene's frozen
+ * Shared invariants for a combat context - the live top-level combat AND each parked scene's frozen
  * copy. Extracted so a scene's stored combat is validated with exactly the same rules as the active
  * one. Paths are relative to whichever combat object owns the refine, so Zod nests them correctly
  * under `scenes[i].combat.*` for parked scenes.
@@ -208,7 +208,7 @@ function refineCombatContext(combat: { active: boolean; turnActorId: string | nu
   }
 }
 
-/** Combat fields shared by the live top-level combat and each parked scene — everything except the map (a Scene carries its own) and the scene bookkeeping (only the top level carries that). */
+/** Combat fields shared by the live top-level combat and each parked scene - everything except the map (a Scene carries its own) and the scene bookkeeping (only the top level carries that). */
 const sceneCombatShape = {
   active: z.boolean().default(false),
   round: z.number().int().positive().default(1),
@@ -237,15 +237,15 @@ const sceneCombatShape = {
   underwater: z.boolean().default(false),
   /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
   reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
-  /** Legendary actions spent since each legendary creature's last turn start (actorId → count); the entry clears when that creature's own turn begins (SRD Legendary Actions refresh). Additive; GM knowledge — stripped from the player projection. */
+  /** Legendary actions spent since each legendary creature's last turn start (actorId → count); the entry clears when that creature's own turn begins (SRD Legendary Actions refresh). Additive; GM knowledge - stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /**
-   * Manual fog of war, per scene: an ordered painter's list folded from "all hidden" — a reveal
+   * Manual fog of war, per scene: an ordered painter's list folded from "all hidden" - a reveal
    * punches visibility, a hide re-covers it (AboveVTT-style manual reveal; no vision/lighting).
    * `enabled: false` = no fog (the default and the pre-fog behavior); enabled with no shapes = a
    * fully hidden map. Rects live in image-pixel space like annotations. Fog is presentation, never
    * the security boundary: hidden actors/annotations are stripped by their own projection filters,
-   * so players receive this verbatim — the mask IS what they must render. Additive.
+   * so players receive this verbatim - the mask IS what they must render. Additive.
    */
   fog: z.object({
     enabled: z.boolean().default(false),
@@ -265,7 +265,7 @@ const sceneCombatShape = {
   pendingReactions: z.array(PendingReactionSchema).max(20).default([])
 };
 
-/** A parked scene's frozen combat — same fields and invariants as the live combat, minus the map (the Scene owns that). */
+/** A parked scene's frozen combat - same fields and invariants as the live combat, minus the map (the Scene owns that). */
 export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCombatContext);
 export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 
@@ -281,11 +281,11 @@ export type Scene = z.infer<typeof SceneSchema>;
 export const CombatStateSchema = z.object({
   ...sceneCombatShape,
   mapAssetId: z.string().uuid().nullable().default(null),
-  /** Prepared scenes the GM parks-and-resumes between. The active scene's own `combat` slot stays empty — its live copy is these top-level fields (single source of truth). */
+  /** Prepared scenes the GM parks-and-resumes between. The active scene's own `combat` slot stays empty - its live copy is these top-level fields (single source of truth). */
   scenes: z.array(SceneSchema).max(20).default([]),
   activeSceneId: z.string().uuid().nullable().default(null),
   /**
-   * Turn time-travel bookkeeping (live fight only — parked scenes never carry these). `historyCursor`
+   * Turn time-travel bookkeeping (live fight only - parked scenes never carry these). `historyCursor`
    * is the turn-snapshot index the whole table is currently viewing (null = live); `historyDirty`
    * marks that the restorable state changed while rewound, so moving on requires GM confirmation.
    * The snapshots themselves live outside GameState in the store's turn_snapshots table.
@@ -302,7 +302,7 @@ export const CombatStateSchema = z.object({
   if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["activeSceneId"], message: "The active scene must be one of the prepared scenes." });
   const active = combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
   if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.fog.enabled || active.combat.fog.shapes.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0)) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty — its live copy is the top-level combat." });
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty - its live copy is the top-level combat." });
   }
 });
 export type CombatState = z.infer<typeof CombatStateSchema>;
@@ -329,14 +329,14 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts — only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool — only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool - only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
 /** A player's own pending reaction prompts only; same masking rules as saves. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only — hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels — those can name hidden combatants). */ rewound: boolean }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
@@ -345,7 +345,7 @@ export type GmView = Omit<GameState, "actors"> & { actors: GmActor[]; turnHistor
 /** A persisted combat-log line. Players only ever receive gmOnly=false entries; the GM sees all. */
 export type CombatLogEntry = Readonly<{ id: number; at: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "turn" | "encounter" | "scene" | "history" | "roll" | "movement" | "effect" | "death-save" | "override"; text: string; gmOnly: boolean; revision: number }>;
 
-/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState — presentation only; the roll history is the durable record. */
+/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
 export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save"; text: string; actorIds: readonly string[]; at: number }>;
 export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
@@ -371,7 +371,7 @@ export type ContentActionsResult = { ok: boolean; message?: string; actions?: re
 export type ContentSheetResult = { ok: boolean; message?: string; definition?: import("@vtt/schemas").ActorDefinition };
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
 export type ActionResolutionAttack = Readonly<{ targetId: string; targetName: string; total: number; naturalRoll: number; targetAc: number | null; outcome: "crit" | "hit" | "miss" | "fumble" | "unknown"; /** Cover's AC bonus folded into targetAc (SRD Cover: +2 half, +5 three-quarters). */ coverBonus?: number }>;
-/** Why an attack rolled with advantage/disadvantage — every contributing source, so the table can see the math (ADR-0020 explainability). */
+/** Why an attack rolled with advantage/disadvantage - every contributing source, so the table can see the math (ADR-0020 explainability). */
 export type ActionRollMode = Readonly<{ mode: "advantage" | "disadvantage" | "normal"; advantage: readonly string[]; disadvantage: readonly string[] }>;
 export type ActionResolution = Readonly<{
   actionName: string;
@@ -397,7 +397,7 @@ export type ActionResolution = Readonly<{
   overridden?: Readonly<{ rule: string; reason: string }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
   reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
-  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null — GM adjudicates). */
+  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null - GM adjudicates). */
   check?: Readonly<{ skill: string; total: number; naturalRoll: number; dc: number | null; success: boolean | null }> | null;
   /** Effects this resolve ended as a rule consequence (attacking revealed Hiding; an off-turn action released a Ready). */
   effectsEnded?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; name: string }>>;
@@ -407,7 +407,7 @@ export type RulesBlocked = Readonly<{ rule: string; message: string; overridable
 export type ActionResolveResult = MutationResult & { resolution?: ActionResolution };
 /**
  * Server-computed application of typed damage: per-part defense adjustments (immunity → resistance →
- * vulnerability), temp-HP absorption, and any zero-HP transition — the explainable "17 → 8" record.
+ * vulnerability), temp-HP absorption, and any zero-HP transition - the explainable "17 → 8" record.
  */
 export type DamageApplication = Readonly<{
   totalRequested: number;
@@ -441,7 +441,7 @@ export type ActionAvailability = Readonly<{
   usesRemaining: number | null;
   /** Rolls left in the open compound-action instance for this action; null when no instance applies. */
   componentsRemaining: number | null;
-  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) — not on the stat block. */
+  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
   builtin?: boolean;
 }>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[] };

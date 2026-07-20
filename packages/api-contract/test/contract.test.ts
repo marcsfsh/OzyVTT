@@ -136,7 +136,7 @@ describe("public API contracts", () => {
         expect(operation.security?.some((entry) => "gmAuth" in entry), `${path} must accept a GM session`).toBe(true);
       }
     }
-    // playerAuth marks exactly the operations a player session can genuinely use — never GM-only or archive ones.
+    // playerAuth marks exactly the operations a player session can genuinely use - never GM-only or archive ones.
     const acceptsPlayer = (path: string, method: string) => paths[path][method].security?.some((entry) => "playerAuth" in entry) === true;
     expect(acceptsPlayer(GAME_PATHS.snapshot, "get")).toBe(true);
     expect(acceptsPlayer(GAME_PATHS.actorDamage, "post")).toBe(true);

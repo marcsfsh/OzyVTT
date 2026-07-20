@@ -3,10 +3,10 @@ import { CommandRejectedError } from "./game-store.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
 /**
- * Scenes — prepared encounters the GM parks-and-resumes between. The model: the top-level
+ * Scenes - prepared encounters the GM parks-and-resumes between. The model: the top-level
  * `state.combat.*` fields ARE the live copy of the active scene; parked scenes hold a frozen full
  * combat snapshot. Activating a scene parks the current live combat into its scene slot and resumes
- * the target's frozen copy verbatim — round, turn, token positions, annotations, reactions, pending
+ * the target's frozen copy verbatim - round, turn, token positions, annotations, reactions, pending
  * saves all intact. HP/conditions/token images live on `state.actors` (global), so damage carries
  * across scene swaps, which is the correct 5e reading. Only the GM issues these commands.
  */
@@ -76,7 +76,7 @@ export function removeScene(state: GameState, sceneId: string) {
 export function setSceneCombatants(state: GameState, sceneId: string, combatantIds: readonly string[], geometry: TokenMapGeometry) {
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live — change its combatants from the encounter instead.");
+  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live - change its combatants from the encounter instead.");
   // Preserve where already-staged combatants stand so adding/removing one doesn't reset the layout.
   const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
@@ -109,7 +109,7 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   // Resume the target (read its stored combat before we blank its slot) and reset its own slot to empty.
   const resumed = target.combat;
   scenes = scenes.map((scene) => scene.id === sceneId ? { ...scene, combat: emptySceneCombat() } : scene);
-  // `resumed` is a SceneCombat and carries no timeline bookkeeping — set it explicitly so the rebuilt
+  // `resumed` is a SceneCombat and carries no timeline bookkeeping - set it explicitly so the rebuilt
   // combat starts live (a bare spread would leave historyCursor/historyDirty undefined, not null/false).
   state.combat = { ...resumed, mapAssetId: target.mapAssetId, scenes, activeSceneId: sceneId, historyCursor: null, historyDirty: false };
 }
@@ -117,7 +117,7 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
 /**
  * One-shot startup migration for states created before scenes existed: if an encounter/map is present
  * but no scenes are, bind the current live combat to a single implicit active scene (whose own slot
- * stays empty — the live copy remains the top-level combat). Additive, so players/viewer are unaffected.
+ * stays empty - the live copy remains the top-level combat). Additive, so players/viewer are unaffected.
  */
 export function migrateToScene(state: GameState, sceneId: string) {
   if (state.combat.scenes.length > 0 || state.combat.mapAssetId === null) return;

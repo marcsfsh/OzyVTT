@@ -6,7 +6,7 @@ import { parseAreaProse } from "./area-targeting.js";
 /**
  * Read-only access to the bundled SRD content for command handlers. Loaded once per process;
  * the bundle is validated by the content package's own loaders. Clients never import the
- * content package — they receive these wire shapes from the server (ADR-0001/0015).
+ * content package - they receive these wire shapes from the server (ADR-0001/0015).
  */
 export class ContentLibrary {
   private readonly byId = new Map<string, ActorDefinition>();

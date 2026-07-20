@@ -65,7 +65,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
   const sorted = ordered(state, initiative);
   // Spread, never a fresh literal: CombatState grows fields over time (pendingSaves today; scenes
   // next) and a wholesale replacement here would silently drop them. Fog deliberately rides the
-  // spread untouched — it's scene dressing prepped before the fight and persisting after it.
+  // spread untouched - it's scene dressing prepped before the fight and persisting after it.
   state.combat = {
     ...state.combat,
     active: true,
@@ -169,7 +169,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     ...state.combat,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes —
+    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes -
     // as does its legendary-action pool (SRD: uses regained at the start of the creature's turn).
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
@@ -192,7 +192,7 @@ export function previousInitiativeTurn(state: GameState) {
     round: wraps && state.combat.round > 1 ? state.combat.round - 1 : state.combat.round,
     turnActorId: previousActorId,
     // Backing up is a GM correction; treat it like any turn change so the strip starts clean.
-    // Effect durations deliberately do NOT rewind here — the Time Machine restore is the real undo.
+    // Effect durations deliberately do NOT rewind here - the Time Machine restore is the real undo.
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
     legendaryUsed: Object.fromEntries(Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== previousActorId))

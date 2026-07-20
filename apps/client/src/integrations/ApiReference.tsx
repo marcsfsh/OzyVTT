@@ -3,8 +3,8 @@ import "./api-reference.css";
 
 /**
  * Collapsible, always-current API reference for the VTT Setup page. Everything shown is fetched
- * from the running server itself — the byte-identical OpenAPI document at /api/v1/openapi.json and
- * the live command catalog — so this section can never drift from what the server actually exposes.
+ * from the running server itself - the byte-identical OpenAPI document at /api/v1/openapi.json and
+ * the live command catalog - so this section can never drift from what the server actually exposes.
  * Each endpoint expands to its full spec (auth, parameters, request body fields, an example
  * request, and response shapes), resolved from the document's own component schemas.
  */
@@ -50,7 +50,7 @@ function toPythonLiteral(value: unknown, indent = 0): string {
   return entries.length === 0 ? "{}" : `{\n${entries.map(([key, entry]) => `${inner}${JSON.stringify(key)}: ${toPythonLiteral(entry, indent + 1)}`).join(",\n")}\n${pad}}`;
 }
 
-/** Build a runnable request sample for one endpoint in the chosen language. Synthetic — a real token and ids replace the placeholders. */
+/** Build a runnable request sample for one endpoint in the chosen language. Synthetic - a real token and ids replace the placeholders. */
 function codeSample(language: Language, method: string, url: string, needsAuth: boolean, body: Record<string, unknown> | null, rawBodyTypes: readonly string[]): string {
   const upper = method.toUpperCase();
   const bodyJson = body ? JSON.stringify(body) : null;
@@ -118,7 +118,7 @@ const resolveRef = (ref: string, components: Components): Schema | undefined => 
 
 function authOptions(operation: Operation): readonly string[] {
   const security = operation.security;
-  if (!security || security.length === 0) return ["public — no credentials"];
+  if (!security || security.length === 0) return ["public - no credentials"];
   return security.map((entry) => {
     if ("bearerAuth" in entry) return entry.bearerAuth.length > 0 ? `integration (${entry.bearerAuth.join(", ")})` : "integration (scope per command type)";
     if ("gmAuth" in entry) return "GM session";
@@ -197,7 +197,7 @@ function fieldRows(schema: Schema, components: Components): FieldRow[] {
   return rows;
 }
 
-/** A synthetic example value for a schema — enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
+/** A synthetic example value for a schema - enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
 function exampleValue(schema: Schema | undefined, components: Components, depth = 0, seen: ReadonlySet<string> = new Set()): unknown {
   if (!schema || depth > 6) return null;
   if (typeof schema.$ref === "string") {
@@ -249,7 +249,7 @@ function FieldTable({ rows }: Readonly<{ rows: readonly FieldRow[] }>) {
   if (rows.length === 0) return <p className="api-detail-empty">No fields.</p>;
   return <table className="api-field-table">
     <thead><tr><th>Field</th><th>Type</th><th>Req</th><th>Notes</th></tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.name}><td><code>{row.name}</code></td><td>{row.type}</td><td>{row.required ? "yes" : "—"}</td><td>{row.note}</td></tr>)}</tbody>
+    <tbody>{rows.map((row) => <tr key={row.name}><td><code>{row.name}</code></td><td>{row.type}</td><td>{row.required ? "yes" : "-"}</td><td>{row.note}</td></tr>)}</tbody>
   </table>;
 }
 
@@ -283,7 +283,7 @@ function EndpointDetails({ method, path, operation, components, origin, language
         <h4>Parameters</h4>
         <table className="api-field-table">
           <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Req</th></tr></thead>
-          <tbody>{parameters.map((parameter) => <tr key={`${parameter.in}-${parameter.name}`}><td><code>{parameter.name}</code></td><td>{parameter.in}</td><td>{typeLabel(parameter.schema, components)}</td><td>{parameter.required ? "yes" : "—"}</td></tr>)}</tbody>
+          <tbody>{parameters.map((parameter) => <tr key={`${parameter.in}-${parameter.name}`}><td><code>{parameter.name}</code></td><td>{parameter.in}</td><td>{typeLabel(parameter.schema, components)}</td><td>{parameter.required ? "yes" : "-"}</td></tr>)}</tbody>
         </table>
       </div>}
 
@@ -305,7 +305,7 @@ function EndpointDetails({ method, path, operation, components, origin, language
           const schemaRef = response.content?.["application/json"]?.schema;
           const dataSchema = responseDataSchema(schemaRef, components);
           return <div key={code} className={`api-response ${isError ? "api-response-error" : "api-response-ok"}`}>
-            <p><code className="api-response-code">{code}</code> {response.description ?? (typeof response.$ref === "string" ? "Stable API error" : "")}{schemaRef && typeof schemaRef.$ref === "string" ? <em className="api-response-schema"> — {refName(schemaRef.$ref)}</em> : null}</p>
+            <p><code className="api-response-code">{code}</code> {response.description ?? (typeof response.$ref === "string" ? "Stable API error" : "")}{schemaRef && typeof schemaRef.$ref === "string" ? <em className="api-response-schema"> - {refName(schemaRef.$ref)}</em> : null}</p>
             {dataSchema && <FieldTable rows={fieldRows(dataSchema, components)} />}
           </div>;
         })}
@@ -314,7 +314,7 @@ function EndpointDetails({ method, path, operation, components, origin, language
   </details>;
 }
 
-/** Download the full OpenAPI 3.1 spec — the complete machine-readable contract, ready for Postman/openapi-generator/etc. */
+/** Download the full OpenAPI 3.1 spec - the complete machine-readable contract, ready for Postman/openapi-generator/etc. */
 function exportSpec(document: OpenApiDocument) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
   const anchor = window.document.createElement("a");
@@ -345,10 +345,10 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
   const operationCount = document ? Object.values(document.paths).reduce((total, operations) => total + Object.keys(operations).length, 0) : 0;
 
   return <details className="api-reference" onToggle={(event) => { if ((event.target as HTMLDetailsElement).open) load(); }}>
-    <summary><strong>API reference</strong><span>Every endpoint this server exposes, straight from its own contract — click one for its full spec.</span></summary>
+    <summary><strong>API reference</strong><span>Every endpoint this server exposes, straight from its own contract - click one for its full spec.</span></summary>
     <div className="api-reference-body">
       <p className="api-reference-intro">
-        Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> — a credential from above, your GM session, or a player session.
+        Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> - a credential from above, your GM session, or a player session.
         Writes accept an optional <code>commandId</code> (resend it to retry safely) and <code>expectedRevision</code>.
         The machine-readable contract lives at <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>; a full generated write-up ships in the repo at <code>docs/api-reference.md</code>.
       </p>
@@ -360,9 +360,9 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
             <span className="api-lang-label">Language</span>
             {LANGUAGES.map((entry) => <button key={entry.id} type="button" aria-pressed={language === entry.id} onClick={() => setLanguage(entry.id)}>{entry.label}</button>)}
           </div>
-          <button type="button" className="secondary api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document — import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</button>
+          <button type="button" className="secondary api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</button>
         </div>
-        <p className="api-reference-count">{operationCount} operations across {Object.keys(document.paths).length} paths. Example values are synthetic — real ids come from the game state.</p>
+        <p className="api-reference-count">{operationCount} operations across {Object.keys(document.paths).length} paths. Example values are synthetic - real ids come from the game state.</p>
         {GROUPS.map((group) => {
           const paths = Object.entries(document.paths).filter(([path]) => group.match(path));
           if (paths.length === 0) return null;

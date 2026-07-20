@@ -76,14 +76,14 @@ export const ActionResolveSchema = z.object({
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-/** Answer a pending reaction prompt: use (spend the reaction — halve the parked damage, or swing the opportunity attack) or decline. `actionId` picks the melee action for a leaves-reach answer (default: first melee attack, else Unarmed Strike). */
+/** Answer a pending reaction prompt: use (spend the reaction - halve the parked damage, or swing the opportunity attack) or decline. `actionId` picks the melee action for a leaves-reach answer (default: first melee attack, else Unarmed Strike). */
 export const ReactionAnswerSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), use: z.boolean(), actionId: z.string().regex(/^[a-z0-9-]+$/).max(120).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ReactionDismissSchema = z.object({ commandId: z.string().uuid(), reactionId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-/** Read-only availability lookup (no commandId — nothing mutates). */
+/** Read-only availability lookup (no commandId - nothing mutates). */
 export const ActorAvailableActionsSchema = z.object({ actorId: z.string().uuid() }).strict();
 export const ContentActionsSchema = z.object({ definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200) }).strict();
 export const TurnReactionSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), used: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-/** GM absolute set of a legendary creature's spent legendary actions this round (manual escape hatch — structured legendary resolves spend automatically; the pool refills at the creature's own turn start). */
+/** GM absolute set of a legendary creature's spent legendary actions this round (manual escape hatch - structured legendary resolves spend automatically; the pool refills at the creature's own turn start). */
 export const TurnLegendarySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), spent: z.number().int().min(0).max(10), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** GM-added house effect (ADR-0020); structured actions create richer instances via their `grants`/`onHit` declarations. */
 export const EffectAddSchema = z.object({

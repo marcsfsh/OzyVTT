@@ -10,7 +10,7 @@ const EffectTagSchema = z.string().regex(/^[a-z0-9-]+$/).max(40);
 
 /**
  * Typed modifiers an active effect contributes to the rules engine (ADR-0020). The vocabulary is
- * deliberately small and grows additively — unmodeled mechanics stay prose per ADR-0008.
+ * deliberately small and grows additively - unmodeled mechanics stay prose per ADR-0008.
  * `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics).
  */
 export const EffectModifierSchema = z.discriminatedUnion("type", [
@@ -34,7 +34,7 @@ export const EffectOnEndSchema = z.object({ type: z.literal("condition"), condit
 /**
  * A live rules-engine effect on an actor (Rage, Reckless Attack, a crocodile's grapple). Distinct
  * from display conditions: effects carry source links, durations, and typed modifiers, and the
- * engine ends them (turn boundaries, source defeat, encounter end) — clearing linked conditions and
+ * engine ends them (turn boundaries, source defeat, encounter end) - clearing linked conditions and
  * firing onEnd. Ids are commandId-derived strings so idempotent retries mint the same effect.
  */
 export const EffectInstanceSchema = z.object({
@@ -86,7 +86,7 @@ export const ActorSchema = z.object({
   initiative: z.number().int().optional(),
   ownerSessionId: z.string().uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
-  /** Provenance: slug of the definition this actor was instantiated from — a content-bundle id or an imported definition id (additive; absent for seeded actors). */
+  /** Provenance: slug of the definition this actor was instantiated from - a content-bundle id or an imported definition id (additive; absent for seeded actors). */
   definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200).optional(),
   /** Token footprint in grid cells per side (large 2, huge 3, gargantuan 4); absent means 1. */
   sizeCells: z.number().int().min(1).max(4).optional(),
@@ -94,7 +94,7 @@ export const ActorSchema = z.object({
   size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
   /** Custom uploaded token image (a token-asset id); absent means the initials glyph. Additive. */
   tokenAssetId: z.string().uuid().optional(),
-  /** Active conditions by content-bundle id; `level` is only meaningful for exhaustion (1-6). Set manually or applied by the rules engine (failed saves, on-hit riders, the zero-HP machine — ADR-0020); still never silently mutated outside those documented paths. */
+  /** Active conditions by content-bundle id; `level` is only meaningful for exhaustion (1-6). Set manually or applied by the rules engine (failed saves, on-hit riders, the zero-HP machine - ADR-0020); still never silently mutated outside those documented paths. */
   conditions: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), level: z.number().int().min(1).max(6).optional() }).strict()).max(20).default([]),
   /** Live rules-engine effects (Rage, a grapple holding this actor). Additive per ADR-0007/0019. */
   effects: z.array(EffectInstanceSchema).max(20).default([]),
@@ -102,11 +102,11 @@ export const ActorSchema = z.object({
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id (per-encounter and per-long-rest pools). Additive. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
-  /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge — stripped from player projections. Additive. */
+  /** Conditions this actor is immune to (seeded from its definition; enforced skip-with-narration). GM knowledge - stripped from player projections. Additive. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown → movement rules skip, the unmeasurable pattern. Additive. */
   speedFeet: z.number().int().min(0).max(500).optional(),
-  /** Legendary resources seeded from the definition (SRD 2024): per-round legendary actions and Legendary Resistance per day. GM knowledge — stripped from player projections. Additive. */
+  /** Legendary resources seeded from the definition (SRD 2024): per-round legendary actions and Legendary Resistance per day. GM knowledge - stripped from player projections. Additive. */
   legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional(),
   /** Short-rest healing pool (SRD Hit Point Dice), seeded from the definition's hit-point formula; null = not modeled (rests behave as before). Reaches players only on their own claimed character. Additive. */
   hitDice: z.object({ die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]), maximum: z.number().int().min(1).max(40), remaining: z.number().int().min(0).max(40) }).strict().nullable().default(null)
@@ -194,7 +194,7 @@ export const ActorDefinitionSchema = z.object({
   damageResistances: z.array(DamageTypeIdSchema).max(20).optional(), damageImmunities: z.array(DamageTypeIdSchema).max(20).optional(), damageVulnerabilities: z.array(DamageTypeIdSchema).max(20).optional(),
   /** Reference-level for now: displayed, not yet enforced on actor.set-condition. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).optional(),
-  /** Legendary creature resources (SRD 2024): `actionsPerRound` legendary actions per round (spent on other creatures' turns), `resistancesPerDay` Legendary Resistance uses (turn a failed save into a success; re-arms on a long rest — the app's day). Additive. */
+  /** Legendary creature resources (SRD 2024): `actionsPerRound` legendary actions per round (spent on other creatures' turns), `resistancesPerDay` Legendary Resistance uses (turn a failed save into a success; re-arms on a long rest - the app's day). Additive. */
   legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional()
 }).superRefine((actor, context) => {
   if (actor.schemaId === "vtt.actor-character" && actor.token.disposition !== "friendly") context.addIssue({ code: z.ZodIssueCode.custom, path: ["token", "disposition"], message: "Player-character definitions must use the friendly disposition." });

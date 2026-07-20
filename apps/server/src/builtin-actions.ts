@@ -4,7 +4,7 @@ type BuiltinAction = ActorDefinition["actions"][number];
 
 /**
  * The SRD 5.2.1 generic actions every combatant can take (rules glossary "[Action]" entries), plus
- * the Unarmed Strike options — engine behavior, not licensed content data, so they live in code and
+ * the Unarmed Strike options - engine behavior, not licensed content data, so they live in code and
  * ride the exact same ActionSchema vocabulary and resolution path as stat-block actions. A test pins
  * every entry against ActionSchema so the catalog can never drift from the schema.
  *
@@ -44,7 +44,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     id: "help",
     name: "Help",
     activation: "action",
-    description: "Choose one ally: they gain Advantage on their attack rolls until the start of your next turn (the SRD's distract variant, simplified from next-attack-only — documented). The Help action also covers assisting a check or stabilizing a dying creature; adjudicate those narratively. (SRD 5.2.1, Help [Action])",
+    description: "Choose one ally: they gain Advantage on their attack rolls until the start of your next turn (the SRD's distract variant, simplified from next-attack-only - documented). The Help action also covers assisting a check or stabilizing a dying creature; adjudicate those narratively. (SRD 5.2.1, Help [Action])",
     damage: [],
     grants: { name: "Helped", tags: ["helped"], duration: { type: "until-source-next-turn" }, modifiers: [{ type: "attack-advantage" }], onEnd: [], target: "target", voidWhileIncapacitated: false, concentration: false }
   },
@@ -52,14 +52,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     id: "hide",
     name: "Hide",
     activation: "action",
-    description: "Make a DC 15 Dexterity (Stealth) check while Heavily Obscured or behind Three-Quarters or Total Cover, out of any enemy's line of sight (the GM adjudicates eligibility — the engine can't see sight lines). On a success you have the Invisible condition while hidden; making an attack roll ends it. (SRD 5.2.1, Hide [Action])",
+    description: "Make a DC 15 Dexterity (Stealth) check while Heavily Obscured or behind Three-Quarters or Total Cover, out of any enemy's line of sight (the GM adjudicates eligibility - the engine can't see sight lines). On a success you have the Invisible condition while hidden; making an attack roll ends it. (SRD 5.2.1, Hide [Action])",
     damage: []
   },
   {
     id: "influence",
     name: "Influence",
     activation: "action",
-    description: "Urge a monster to do something: make a Charisma check (Deception, Intimidation, Performance, or Persuasion — or Wisdom/Animal Handling) against DC 15 or the monster's Intelligence score, whichever is higher; the GM adjudicates attitude and outcome. (SRD 5.2.1, Influence [Action])",
+    description: "Urge a monster to do something: make a Charisma check (Deception, Intimidation, Performance, or Persuasion - or Wisdom/Animal Handling) against DC 15 or the monster's Intelligence score, whichever is higher; the GM adjudicates attitude and outcome. (SRD 5.2.1, Influence [Action])",
     damage: []
   },
   {
@@ -109,7 +109,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     id: "unarmed-grapple",
     name: "Unarmed Strike (Grapple)",
     activation: "action",
-    description: "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Grappled condition (that DC is also the escape DC). Only targets no more than one size larger, and you need a hand free — the GM adjudicates the hand. (SRD 5.2.1, Unarmed Strike / Grappling)",
+    description: "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Grappled condition (that DC is also the escape DC). Only targets no more than one size larger, and you need a hand free - the GM adjudicates the hand. (SRD 5.2.1, Unarmed Strike / Grappling)",
     damage: []
   },
   {
@@ -123,7 +123,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     id: "unarmed-shove-push",
     name: "Unarmed Strike (Shove Push)",
     activation: "action",
-    description: "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away — on a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
+    description: "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away - on a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
     damage: []
   },
   {

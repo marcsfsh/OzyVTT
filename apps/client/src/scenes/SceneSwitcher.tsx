@@ -16,7 +16,7 @@ function SceneThumb({ mapAssetId, token }: Readonly<{ mapAssetId: string; token:
 
 /**
  * The scene IA in one strip, where the GM already lives (the Encounter tab): every prepared scene
- * is a chip — tap to stage/edit it privately, ▶ to make it live for the whole table (one click;
+ * is a chip - tap to stage/edit it privately, ▶ to make it live for the whole table (one click;
  * a running fight is parked and resumes on switch-back), ✕ to remove, "+ New scene" to prepare
  * another. No Maps-tab visits, no modal digging just to change scenes.
  */
@@ -44,7 +44,7 @@ export function SceneSwitcher({ scenes, activeSceneId, combatActive, mapLibrary,
       const live = scene.id === activeSceneId;
       const staging = scene.id === previewingSceneId;
       return <div key={scene.id} className={`scene-chip${live ? " live" : ""}${staging ? " staging" : ""}`}>
-        <button type="button" className="scene-chip-main" title={`${scene.name} — ${mapName(scene.mapAssetId)} · ${scene.combat.initiative.length} combatant${scene.combat.initiative.length === 1 ? "" : "s"}${live ? " · LIVE" : staging ? " · staging (only you see it)" : ". Tap to stage and edit privately."}`}
+        <button type="button" className="scene-chip-main" title={`${scene.name} - ${mapName(scene.mapAssetId)} · ${scene.combat.initiative.length} combatant${scene.combat.initiative.length === 1 ? "" : "s"}${live ? " · LIVE" : staging ? " · staging (only you see it)" : ". Tap to stage and edit privately."}`}
           onClick={() => setPreviewScene(staging || live ? null : scene.id)} aria-pressed={staging}>
           <SceneThumb mapAssetId={scene.mapAssetId} token={token} />
           <strong>{scene.name}</strong>

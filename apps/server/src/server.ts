@@ -77,10 +77,10 @@ export function createServer(options: CreateServerOptions) {
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
   const annotationExpiryTimers = new Set<ReturnType<typeof setTimeout>>();
-  /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry — same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
+  /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry - same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
   function scheduleAnnotationExpiry() {
     // Keep exactly one pending timer: clear any prior one, arm the soonest expiry, then re-arm from
-    // inside the callback so every staggered annotation drops at its own expiry — not just the first.
+    // inside the callback so every staggered annotation drops at its own expiry - not just the first.
     // Without the re-arm, a second ping placed after the first would linger until unrelated activity
     // re-broadcast the state (the reported "extra pings don't disappear" bug).
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
@@ -111,7 +111,7 @@ export function createServer(options: CreateServerOptions) {
   }
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
-   * GM-only AND every referenced actor is public — so a hidden combatant is never narrated to players.
+   * GM-only AND every referenced actor is public - so a hidden combatant is never narrated to players.
    * Not stored in GameState (ephemeral presentation); the viewer channel gets nothing.
    */
   function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
@@ -142,17 +142,17 @@ export function createServer(options: CreateServerOptions) {
       else if (!gmOnly && auth.verifyPlayer(token)) socket.emit("log:entry", record);
     }
   }
-  /** "Round 3 — Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
+  /** "Round 3 - Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
   function logTurnBegin(state: GameState) {
     if (state.combat.turnActorId === null) return;
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
-    appendLog({ kind: "turn", text: `Round ${state.combat.round} — ${name}'s turn.`, actorIds: [state.combat.turnActorId] });
+    appendLog({ kind: "turn", text: `Round ${state.combat.round} - ${name}'s turn.`, actorIds: [state.combat.turnActorId] });
   }
-  /** Translate a timeline navigation outcome into log lines — plain turns for forward play, GM-only history notes for rewinds. */
+  /** Translate a timeline navigation outcome into log lines - plain turns for forward play, GM-only history notes for rewinds. */
   function logTimelineOutcome(outcome: TimelineOutcome, state: GameState) {
     switch (outcome.kind) {
       case "advanced": case "legacy": logTurnBegin(state); break;
-      case "rewrote": appendLog({ kind: "history", text: "The GM rewrote history from this turn — every later turn was undone.", gmOnly: true }); logTurnBegin(state); break;
+      case "rewrote": appendLog({ kind: "history", text: "The GM rewrote history from this turn - every later turn was undone.", gmOnly: true }); logTurnBegin(state); break;
       case "rewound": appendLog({ kind: "history", text: `The GM rewound to ${outcome.label}.`, gmOnly: true }); break;
       case "stepped": appendLog({ kind: "history", text: `The GM moved to ${outcome.label}.`, gmOnly: true }); break;
       case "discarded": appendLog({ kind: "history", text: `The GM discarded the changes at ${outcome.label}.`, gmOnly: true }); break;
@@ -173,7 +173,7 @@ export function createServer(options: CreateServerOptions) {
   }
 
   // The shared game capabilities: the Socket.IO handlers below and the public HTTP API both run
-  // these exact operations — same validation, authorization, dispatch, and narration (ADR-0016).
+  // these exact operations - same validation, authorization, dispatch, and narration (ADR-0016).
   const operations = createGameOperations({
     store,
     combatLog,
@@ -199,9 +199,9 @@ export function createServer(options: CreateServerOptions) {
   app.use(express.json({ limit: "512kb" }));
   // Open CORS for the VERSIONED integration surface only: every /api/v1 credential travels as a
   // bearer header (or a SameSite=Strict cookie the browser refuses to send cross-origin anyway),
-  // so a wildcard origin grants nothing a token doesn't already grant — and it lets browser-based
+  // so a wildcard origin grants nothing a token doesn't already grant - and it lets browser-based
   // integrations (overlays, dashboards) call the documented surface directly. The legacy
-  // /api/gm/* session endpoints — password login above all — deliberately stay same-origin:
+  // /api/gm/* session endpoints - password login above all - deliberately stay same-origin:
   // wildcard CORS there would let any web page relay password guesses through a LAN browser.
   app.use((req, res, next) => {
     if (req.path !== "/api/v1" && !req.path.startsWith("/api/v1/")) return next();
@@ -271,7 +271,7 @@ export function createServer(options: CreateServerOptions) {
     return res.json({ viewerUrls });
   });
   // Encounter archives (#12): permanent, machine-readable turn-by-turn records auto-saved at encounter
-  // end. GM-only — a document holds full state (hidden combatants) and GM-only log lines. The shape is
+  // end. GM-only - a document holds full state (hidden combatants) and GM-only log lines. The shape is
   // documented in encounter-archive.ts; consumers list, fetch, and delete over these endpoints.
   app.get("/api/gm/encounters", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
@@ -284,7 +284,7 @@ export function createServer(options: CreateServerOptions) {
     const id = Number(req.params.id);
     const document = Number.isInteger(id) ? store.getEncounterArchive(id) : null;
     if (document === null) return res.status(404).json({ message: "No such encounter archive." });
-    return res.type("application/json").send(document); // raw stored JSON — no re-serialization
+    return res.type("application/json").send(document); // raw stored JSON - no re-serialization
   });
   app.delete("/api/gm/encounters/:id", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
@@ -335,7 +335,7 @@ export function createServer(options: CreateServerOptions) {
     },
     sessions: {
       // The HTTP mirror of the socket's open LAN-trust join: anyone who can reach the host may
-      // take a player seat once GM setup is complete — same rule as session:join below.
+      // take a player seat once GM setup is complete - same rule as session:join below.
       issuePlayer: () => {
         if (!auth.isBootstrapped) return null;
         const token = auth.issuePlayerSession();
@@ -363,7 +363,7 @@ export function createServer(options: CreateServerOptions) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
     // `dotfiles: "allow"` and serving index.html root-relative both matter on hosts whose install
     // path contains a dot-segment (e.g. OneDrive's `.DesktopOneDrive`): `send` defaults to
-    // `dotfiles: "ignore"`, which 404s any *absolute* path containing a dot-segment — so the SPA
+    // `dotfiles: "ignore"`, which 404s any *absolute* path containing a dot-segment - so the SPA
     // fallback below must pass a root and a clean relative filename, not the full absolute path.
     app.use(express.static(options.webDist, { dotfiles: "allow" }));
     app.get("/{*path}", (_req, res) => res.sendFile("index.html", { root: options.webDist, dotfiles: "allow" }));
@@ -419,7 +419,7 @@ export function createServer(options: CreateServerOptions) {
     /**
      * Socket adapter over the shared operations: resolve the principal (or refuse with this
      * command's historical join/role message), run the operation, and translate outcomes back to
-     * the ack wire shape — including the timeline-confirmation bounce, which is an ok:true ack.
+     * the ack wire shape - including the timeline-confirmation bounce, which is an ok:true ack.
      */
     const respond = async <Result extends { ok: boolean }>(
       acknowledge: (result: Result) => void,

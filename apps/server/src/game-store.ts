@@ -13,7 +13,7 @@ export class RulesBlockedError extends CommandRejectedError {
   constructor(public readonly rule: string, message: string, public readonly overridable: boolean = true) { super(message); }
 }
 export class RevisionConflictError extends Error {}
-/** A timeline navigation needs an explicit GM confirmation first. Thrown from a timeline plan BEFORE any transaction, so it burns no receipt, no revision, and no domain event — the client re-sends with the confirm flag and a fresh commandId. */
+/** A timeline navigation needs an explicit GM confirmation first. Thrown from a timeline plan BEFORE any transaction, so it burns no receipt, no revision, and no domain event - the client re-sends with the confirm flag and a fresh commandId. */
 export class TimelineConfirmationRequired extends Error {
   constructor(public readonly confirm: "rewrite-history" | "discard-changes", message: string) { super(message); }
 }
@@ -42,7 +42,7 @@ export type GameStoreOptions = Readonly<{
    * Domain-aware comparator: did this mutation change state a turn-snapshot restore would roll back?
    * Consulted only while the table is rewound (historyCursor != null); a true result marks
    * historyDirty so forward navigation demands GM confirmation. Kept as an injected option so the
-   * store stays ignorant of which fields are "restorable" — that judgment lives with the domain.
+   * store stays ignorant of which fields are "restorable" - that judgment lives with the domain.
    */
   timelineDirtied?: (before: GameState, after: GameState) => boolean;
 }>;
@@ -193,7 +193,7 @@ export class GameStore {
     return this.enqueue(command, (nextState) => {
       mutate(nextState);
       // While the table is rewound, any change a restore would roll back needs GM confirmation
-      // before history can move — mark it here so every command is covered without per-handler code.
+      // before history can move - mark it here so every command is covered without per-handler code.
       if (nextState.combat.historyCursor !== null && !nextState.combat.historyDirty && this.options.timelineDirtied?.(this.state, nextState)) {
         nextState.combat.historyDirty = true;
       }
@@ -240,7 +240,7 @@ export class GameStore {
     });
   }
 
-  /** Timeline metadata for the GM view (labels can name hidden combatants — never send to players). */
+  /** Timeline metadata for the GM view (labels can name hidden combatants - never send to players). */
   listTurnSnapshots(): readonly TurnHistoryEntry[] {
     return (this.requireDatabase().prepare("SELECT idx, kind, label, revision, created_at FROM turn_snapshots ORDER BY idx").all() as TurnSnapshotRow[])
       .map((row) => ({ index: row.idx, kind: row.kind, label: row.label, revision: row.revision, at: row.created_at }));
@@ -289,7 +289,7 @@ export class GameStore {
         database.prepare("UPDATE game_state SET schema_version = ?, revision = ?, state_json = ?, updated_at = ? WHERE id = 1").run(nextState.schemaVersion, nextState.revision, JSON.stringify(nextState), acceptedAt);
         if (nextState.revision % 50 === 0) database.prepare("INSERT INTO snapshots (revision, state_json, reason, created_at) VALUES (?, ?, ?, ?)").run(nextState.revision, JSON.stringify(nextState), "periodic", acceptedAt);
         // Time Machine v2: journal every accepted command while an encounter is live (including the
-        // start/end commands themselves — before-or-after active covers both edges). Runs BEFORE the
+        // start/end commands themselves - before-or-after active covers both edges). Runs BEFORE the
         // plan's queued writes so an encounter-lifecycle clearJournal can supersede it in the same
         // transaction (start keeps its own row via the except clause; end wipes its own too, and the
         // archive document carries the end command instead).

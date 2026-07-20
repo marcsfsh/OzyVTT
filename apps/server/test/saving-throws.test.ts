@@ -168,7 +168,7 @@ describe("saving-throw prompts", () => {
 });
 
 describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
-  it("a Paralyzed target automatically fails a Dex save — no die is rolled", () => {
+  it("a Paralyzed target automatically fails a Dex save - no die is rolled", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
     game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "paralyzed" }];

@@ -17,7 +17,7 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
   const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
   if (!active) {
     const events: EffectNarration[] = [];
-    // SRD Prone: standing up costs half your Speed — charged when the current combatant stands on
+    // SRD Prone: standing up costs half your Speed - charged when the current combatant stands on
     // its own turn during a live fight. Off-turn/GM housekeeping stays free; Speed 0 can't stand.
     const standingUp = conditionId === "prone" && actor.conditions.some((condition) => condition.id === "prone");
     if (standingUp && state.combat.active && state.combat.turnActorId === actor.id && state.combat.rulesMode !== "freeform" && actor.speedFeet !== undefined) {
@@ -26,8 +26,8 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
       const budgetLeft = effective - state.combat.turn.movementUsedFeet;
       if (cost > budgetLeft && !options?.override && state.combat.rulesMode === "strict") {
         throw new RulesBlockedError("movement.stand-up-cost", effective === 0
-          ? `${actor.name} can't stand up — its Speed is 0.`
-          : `Standing up costs ${cost} ft of movement — ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`);
+          ? `${actor.name} can't stand up - its Speed is 0.`
+          : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`);
       }
       state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: state.combat.turn.movementUsedFeet + cost } };
       events.push({ kind: "condition", text: `${actor.name} stood up (${cost} ft of movement).`, actorId: actor.id });
@@ -35,16 +35,16 @@ export function setCondition(state: GameState, actorId: string, conditionId: str
     actor.conditions = remaining;
     return events;
   }
-  // Immunity: skip-with-narration rather than blocking — this is a manual GM command, and telling
+  // Immunity: skip-with-narration rather than blocking - this is a manual GM command, and telling
   // the table WHY nothing happened beats a rejection dialog (SRD condition immunity).
   if (actor.conditionImmunities.includes(conditionId)) {
-    return [{ kind: "condition", text: `${actor.name} is immune to ${conditionLabel(conditionId)} — not applied.`, actorId: actor.id }];
+    return [{ kind: "condition", text: `${actor.name} is immune to ${conditionLabel(conditionId)} - not applied.`, actorId: actor.id }];
   }
   if (remaining.length >= 20) throw new CommandRejectedError("That combatant already has too many conditions.");
   const previousExhaustion = exhaustionLevel(actor);
   actor.conditions = [...remaining, { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }]
     .sort((left, right) => left.id.localeCompare(right.id));
-  // SRD: Exhaustion level 6 is death — same engine-owned transition the onEnd grant path fires.
+  // SRD: Exhaustion level 6 is death - same engine-owned transition the onEnd grant path fires.
   if (conditionId === "exhaustion" && previousExhaustion < 6 && (level ?? 1) >= 6) {
     return applyExhaustionDeath(state, actor);
   }

@@ -24,7 +24,7 @@ export type ViewerInitiativeEntry = Readonly<{
   name: string;
   initiative: number;
   active: boolean;
-  /** Coarse band only — exact hit points never reach the shared screen. */
+  /** Coarse band only - exact hit points never reach the shared screen. */
   health: "healthy" | "bloodied" | "down";
   /** Display labels ("Prone", "Exhaustion 3") for public combatants. */
   conditions: readonly string[];
@@ -49,12 +49,12 @@ export type ViewerEncounterToken = Readonly<{
   active: boolean;
   health: "healthy" | "bloodied" | "down";
   conditions: readonly string[];
-  /** Content-bundle condition ids parallel to `conditions` — the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
+  /** Content-bundle condition ids parallel to `conditions` - the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
   conditionIds?: readonly string[];
   tokenAssetId?: string;
 }>;
 
-/** Player-safe drawing shown on the shared screen — only `public` annotations are ever projected here. */
+/** Player-safe drawing shown on the shared screen - only `public` annotations are ever projected here. */
 export type ViewerAnnotation = Readonly<{
   id: string;
   kind: "measurement" | "shape" | "ping";

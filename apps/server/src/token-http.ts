@@ -44,7 +44,7 @@ function publicToken(metadata: MapAssetMetadata, entry: TokenCatalogEntry) {
 }
 
 /**
- * HTTP for uploaded token images — mirrors the map router. GM uploads/manages; content is readable by
+ * HTTP for uploaded token images - mirrors the map router. GM uploads/manages; content is readable by
  * anyone who can already see a token referencing it (a public actor for a player; a presented token
  * for a viewer). Mounted BEFORE the /api/v1 catch-all so its routes resolve.
  */

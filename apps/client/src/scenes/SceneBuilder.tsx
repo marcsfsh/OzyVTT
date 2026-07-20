@@ -7,7 +7,7 @@ import "./scene-panel.css";
 
 /**
  * The encounter-builder shown in the sidebar while the GM stages a scene privately. It's the same
- * kind of tool as the live setup — choose who's in this scene, add SRD monsters to the roster — but
+ * kind of tool as the live setup - choose who's in this scene, add SRD monsters to the roster - but
  * it edits THIS scene's own combatant list (scene:set-combatants), never the live table. Token
  * placement happens on the staged map; initiative is rolled when the scene is started after going live.
  */

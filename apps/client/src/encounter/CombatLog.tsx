@@ -4,11 +4,11 @@ import { socket } from "../socket";
 import "./combat-log.css";
 
 /**
- * The persistent combat log (#12): a durable, scrollable record of what happened this fight — damage,
+ * The persistent combat log (#12): a durable, scrollable record of what happened this fight - damage,
  * saves, actions, conditions, turn transitions, encounter/scene changes, and GM history rewinds. Fed
  * by the server's role-filtered `log:entry` broadcast (a player never receives a GM-only line) plus a
  * `log:read` backfill on every (re)connect, so a late joiner or a GM who just logged in sees the story
- * so far. A module store — like the map toasts — so a single subscription survives component remounts.
+ * so far. A module store - like the map toasts - so a single subscription survives component remounts.
  */
 let entries: readonly CombatLogEntry[] = [];
 const listeners = new Set<() => void>();

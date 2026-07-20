@@ -21,7 +21,7 @@ export function adjustableActor(state: GameState, actorId: string, scope: ActorS
 }
 
 export type DamageInput = Readonly<{
-  /** Untyped total — the manual path (no defense math). Ignored when `parts` is present. */
+  /** Untyped total - the manual path (no defense math). Ignored when `parts` is present. */
   amount: number;
   /** Typed components from a resolved action; the engine applies immunity → resistance → vulnerability. */
   parts?: readonly DamagePart[];
@@ -50,7 +50,7 @@ function definitionDefenses(definition: ActorDefinition | undefined) {
 /**
  * The single damage entry point (ADR-0020): typed parts get defense adjustments (definition RVI +
  * active-effect resistances like Rage); the untyped amount stays exact for manual corrections. Both
- * paths run the same zero-HP machine — player characters drop dying (Unconscious + Prone + death
+ * paths run the same zero-HP machine - player characters drop dying (Unconscious + Prone + death
  * saves, instant death on massive overflow, failure ticks while dying), and any combatant reaching
  * 0 releases the effects it was sustaining (grapples). 5e order: temp HP absorbs first.
  */
@@ -117,12 +117,12 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     applyConditionDirect(actor, "prone");
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     if (input.nonlethal === true) {
-      // Knocking out a creature (SRD): the attacker chooses to knock out instead of kill — the
+      // Knocking out a creature (SRD): the attacker chooses to knock out instead of kill - the
       // target drops to 0, Unconscious and stable (no death saves, no defeat, no massive-damage death).
       if (isPlayerCharacter) actor.deathSaves = { successes: 0, failures: 0, stable: true };
       applyConditionDirect(actor, "unconscious");
       applyConditionDirect(actor, "prone");
-      events.push({ kind: "condition", text: `${actor.name} was knocked out — Unconscious and stable at 0 HP.`, actorId });
+      events.push({ kind: "condition", text: `${actor.name} was knocked out - Unconscious and stable at 0 HP.`, actorId });
     } else if (isPlayerCharacter) {
       const overflow = damageToHp - hpBefore;
       const outcome = droppedToZero(overflow, actor.hp.maximum);
@@ -134,7 +134,7 @@ export function applyDamageDetailed(state: GameState, actorId: string, input: Da
     } else {
       defeated = true;
     }
-    // Anyone at 0 can no longer sustain a grapple (or a rage): release sustained effects —
+    // Anyone at 0 can no longer sustain a grapple (or a rage): release sustained effects -
     // including concentration, which incapacitation always breaks (SRD Concentration).
     events.push(...endEffectsSustainedBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
@@ -195,7 +195,7 @@ export function applyDamage(state: GameState, actorId: string, amount: number, s
 
 /**
  * Healing caps at maximum and never restores temporary hit points. Healing a dying character from 0
- * clears the dying state and Unconscious (Prone stays until they stand — clear it manually).
+ * clears the dying state and Unconscious (Prone stays until they stand - clear it manually).
  */
 export function healActor(state: GameState, actorId: string, amount: number, scope: ActorScope): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);

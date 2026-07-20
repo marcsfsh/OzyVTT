@@ -7,7 +7,7 @@ import type { ActorScope } from "./hit-points.js";
 /**
  * Manual economy toggles stay free (ADR-0020): marking a slot is bookkeeping the GM may always
  * correct. Enforcement lives in structured action resolution, which validates against this state per
- * the encounter's rulesMode — so these toggles double as the documented manual escape hatch.
+ * the encounter's rulesMode - so these toggles double as the documented manual escape hatch.
  */
 
 function claimedActorId(state: GameState, sessionId: string): string | null {
@@ -20,7 +20,7 @@ function requireActiveCombat(state: GameState) {
 
 /**
  * Action/bonus belong to the current turn; a player may mark them only on their own character's turn.
- * Un-marking the action slot also clears the open compound-action instance — the manual toggle is a
+ * Un-marking the action slot also clears the open compound-action instance - the manual toggle is a
  * full reset of the structured state it bypasses, never a way to strand "attack 2 of 2".
  */
 export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", used: boolean, scope: ActorScope) {

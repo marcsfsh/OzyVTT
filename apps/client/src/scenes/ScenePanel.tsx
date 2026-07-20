@@ -6,7 +6,7 @@ import type { MapSelection } from "../maps/MapManager";
 import "./scene-panel.css";
 
 /**
- * GM "Prepared scenes" — build encounters ahead of time on a chosen battlemap, then park-and-resume
+ * GM "Prepared scenes" - build encounters ahead of time on a chosen battlemap, then park-and-resume
  * between them. Switching the live scene preserves the running fight (round, turn, positions) and
  * resumes the target exactly; the server owns the swap. Lives in Map Setup, beside the map library.
  */
@@ -14,14 +14,14 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Reado
   actors: readonly GmActor[];
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
-  /** Called after a successful create — the launcher (scene strip modal) closes itself. */
+  /** Called after a successful create - the launcher (scene strip modal) closes itself. */
   onCreated?: () => void;
 }>) {
   const [name, setName] = useState("");
   const [chosen, setChosen] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  // The scene's map is picked right here (defaulting to the library selection) — preparing a scene
+  // The scene's map is picked right here (defaulting to the library selection) - preparing a scene
   // never requires a Maps-tab visit.
   const battlemaps = (mapLibrary ?? []).filter((map) => map.kind === "battlemap");
   const [sceneMapId, setSceneMapId] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Reado
   const toggle = (actorId: string) => setChosen((current) => current.includes(actorId) ? current.filter((id) => id !== actorId) : [...current, actorId]);
 
   return <section className="scene-panel" aria-labelledby="scene-panel-heading">
-    <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>Name it, pick its battlemap and combatants — it appears in the Scenes strip, ready to stage or make live.</p></div>
+    <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>Name it, pick its battlemap and combatants - it appears in the Scenes strip, ready to stage or make live.</p></div>
 
     <form className="scene-create" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <label>Scene name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Goblin ambush" /></label>

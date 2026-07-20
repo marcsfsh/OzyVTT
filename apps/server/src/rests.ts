@@ -10,7 +10,7 @@ import { healActor, type ActorScope } from "./hit-points.js";
  * Short: per-short-rest and recharge limited-use pools re-arm (SRD: "Recharge after a Short or
  * Long Rest", and any rest re-arms Recharge X-Y); healing happens by spending Hit Point Dice
  * (the separate actor.spend-hit-dice command), never automatically.
- * Long: remaining effects end first (their onEnd grants land — Frenzy's Exhaustion), then HP to
+ * Long: remaining effects end first (their onEnd grants land - Frenzy's Exhaustion), then HP to
  * max, temp HP gone, dying cleared, all limited-use pools refreshed, all spent Hit Point Dice
  * restored (SRD 5.2.1 "Regain All HP"), Exhaustion drops one level.
  */
@@ -23,7 +23,7 @@ import { healActor, type ActorScope } from "./hit-points.js";
 export function spendHitDice(state: GameState, actorId: string, faces: readonly number[], scope: ActorScope, resolveDefinition: (definitionId: string) => ActorDefinition | undefined): { healed: number; events: EffectNarration[]; conModifier: number } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Hit Dice are spent on a rest — end the encounter first.");
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
   if (!actor.hitDice) throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
   if (actor.hitDice.remaining < faces.length) throw new CommandRejectedError(`${actor.name} has ${actor.hitDice.remaining} Hit ${actor.hitDice.remaining === 1 ? "Die" : "Dice"} left.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;

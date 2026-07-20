@@ -49,7 +49,7 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  * d20 + its best-known modifier; the typed total covers proficient/situational saves. The outcome
  * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
  */
-function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; /** Remaining Legendary Resistance uses (GM view of a legendary target only) — offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
+function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
   const [manualTotal, setManualTotal] = useState("");
   const [busy, setBusy] = useState(false);
   // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
@@ -65,7 +65,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResista
       const outcome = result.outcome;
       if (!outcome) return;
       if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied }); return; }
-      onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " — condition applied" : ""}.`);
+      onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`);
     });
   };
   const submitManual = () => {
@@ -85,7 +85,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResista
     {rolled
       // Reveal the rolled total and what it will do, and require an explicit Confirm before applying.
       ? <span className="save-prompt-confirm">
-          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total} — {rolled.success ? "Success" : "Failure"}</strong>
+          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total} - {rolled.success ? "Success" : "Failure"}</strong>
           <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => send("manual", rolled.total, true)}>Confirm</button>
           {!rolled.success && (legendaryResistanceLeft ?? 0) > 0 && <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when the creature fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>}
@@ -101,7 +101,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResista
 
 /**
  * A reaction window awaiting an answer (Uncanny Dodge): the triggering hit's damage is parked on the
- * prompt, so BOTH buttons apply it — Use spends the reaction and halves each part, Decline applies it
+ * prompt, so BOTH buttons apply it - Use spends the reaction and halves each part, Decline applies it
  * in full. The shown numbers are before resistances; the server reports the final applied total. The
  * GM's ✕ dismisses without applying, for damage already entered by hand.
  */
@@ -119,10 +119,10 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonl
       if (opportunity) {
         const attack = outcome.resolution?.attack;
         onFeedback(use
-          ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` — ${outcome.appliedDamage} damage` : ""}.`
+          ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
           : `${actorName} let ${reaction.sourceName} go.`);
       } else {
-        onFeedback(use ? `${actorName} used ${reaction.actionName} — ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.` : `${actorName} took ${outcome.appliedDamage} damage.`);
+        onFeedback(use ? `${actorName} used ${reaction.actionName} - ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.` : `${actorName} took ${outcome.appliedDamage} damage.`);
       }
     });
   };
@@ -130,13 +130,13 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonl
     setBusy(true);
     socket.emit("reaction:dismiss", { commandId: newId(), reactionId: reaction.id }, (result: MutationResult) => {
       setBusy(false);
-      onFeedback(result.ok ? "Reaction prompt dismissed — nothing applied." : result.message ?? "The prompt could not be dismissed.");
+      onFeedback(result.ok ? "Reaction prompt dismissed - nothing applied." : result.message ?? "The prompt could not be dismissed.");
     });
   };
   return <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
     <span className="save-prompt-label">
       {opportunity
-        ? <><strong>Opportunity Attack</strong> — {reaction.sourceName} is leaving reach</>
+        ? <><strong>Opportunity Attack</strong> - {reaction.sourceName} is leaving reach</>
         : <><strong>{reaction.actionName}</strong> vs {reaction.sourceName}{reaction.critical ? " (crit)" : ""} · {reaction.proposedDamage} dmg incoming</>}
     </span>
     <span className="save-prompt-actions">
@@ -146,8 +146,8 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonl
             <button type="button" disabled={busy} title="Keep the reaction; the mover leaves freely" onClick={() => answer(false)}>Let them go</button>
           </>
         : <>
-            <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use — take {halved}</button>
-            <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline — take {reaction.proposedDamage}</button>
+            <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use - take {halved}</button>
+            <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline - take {reaction.proposedDamage}</button>
           </>}
       {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying anything" onClick={dismiss}>✕</button>}
     </span>
@@ -166,7 +166,7 @@ function OwnReactionPrompts({ reactions, actorName }: Readonly<{ reactions: read
 
 /**
  * Active rules-engine effects (Rage, a grapple) as chips beside the condition chips. Ending one is
- * a real engine transition — linked conditions clear and on-end grants fire server-side (ADR-0020).
+ * a real engine transition - linked conditions clear and on-end grants fire server-side (ADR-0020).
  */
 function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorId: string; effects: ReadonlyArray<PlayerEffect & { escapeDc?: number | null }>; canEnd: boolean; onFeedback: (text: string) => void }>) {
   const [busy, setBusy] = useState(false);
@@ -180,7 +180,7 @@ function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorI
     });
   };
   return <span className="effect-chips">
-    {effects.map((effect) => <span key={effect.id} className="effect-chip" title={`${effect.name}${effect.sourceName ? ` — from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`}>
+    {effects.map((effect) => <span key={effect.id} className="effect-chip" title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`}>
       {effect.name}{effect.escapeDc ? <small> DC {effect.escapeDc}</small> : null}
       {canEnd && <button type="button" className="effect-chip-end" disabled={busy} aria-label={`End ${effect.name}`} onClick={() => end(effect.id, effect.name)}>✕</button>}
     </span>)}
@@ -188,7 +188,7 @@ function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorI
 }
 
 /**
- * A dying player character's death-save tracker (ADR-0020): success/failure pips plus the roll —
+ * A dying player character's death-save tracker (ADR-0020): success/failure pips plus the roll -
  * the replay's "heal 1 HP so the turn isn't skipped" workaround, replaced by the real state machine.
  */
 function DyingTracker({ actorId, name, deathSaves, canRoll, onFeedback }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves; canRoll: boolean; onFeedback: (text: string) => void }>) {
@@ -266,15 +266,21 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
     const myId = props.state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
+    // Bring the active combatant's row into view when the turn advances (report #2). This player
+    // branch is a stable early-return per mount, so its hooks run consistently.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const activeRowRef = useRef<HTMLLIElement | null>(null);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [combat.turnActorId]);
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
     // Same visual language as the GM tracker: one compact bar, dense one-line rows (score · name ·
     // condition dots · health), and the player's OWN details (effects, dying, prompts, economy)
-    // grouped under their row — other combatants stay one glanceable line each.
-    return <section className="encounter-panel" aria-label={`Turn order — round ${combat.round}`}>
+    // grouped under their row - other combatants stay one glanceable line each.
+    return <section className="encounter-panel" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
-        {myTurn && <span className="your-turn-flag" role="status">Your turn — act, then end it below</span>}
+        {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
@@ -282,7 +288,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
-        return <li key={entry.actorId} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
+        return <li key={entry.actorId} ref={entry.active ? activeRowRef : undefined} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
           <div className="initiative-row-main">
             {/* Foundry-style row for players too: avatar | name + band HP bar | initiative. Players
                 only know the health band, so the bar fills full/half/sliver. */}
@@ -337,6 +343,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const cancelEditRef = useRef(false);
   const knownActorIdsRef = useRef<ReadonlySet<string>>(new Set(state.actors.map((actor) => actor.id)));
   const actorsById = useMemo(() => new Map(state.actors.map((actor) => [actor.id, actor])), [state.actors]);
+  // Advancing the turn brings the newly-active combatant's row into view so the GM never has to hunt
+  // for it (report #2). block:"nearest" keeps the scroll minimal; guarded to real turn changes.
+  const activeRowRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [state.combat.turnActorId]);
 
   useEffect(() => {
     if (state.combat.active) setScores(Object.fromEntries(state.combat.initiative.map((entry) => [entry.actorId, String(entry.score)])));
@@ -352,7 +362,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   useEffect(() => {
     if (state.combat.active) return;
     setSelectedActors((current) => {
-      // Prune removed actors, and auto-check actors that appear while setting up — a GM
+      // Prune removed actors, and auto-check actors that appear while setting up - a GM
       // adding a monster from the browser intends it to fight.
       const known = knownActorIdsRef.current;
       const valid = new Set([...current].filter((id) => actorsById.has(id)));
@@ -391,8 +401,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   };
   // Turn time-travel (#12). Previous rewinds the whole table to the end of the prior turn; Next steps
   // forward (undoing nothing) or, once the return-point is reached, resumes live play. If the GM changed
-  // things while rewound, the server asks to confirm — Next rewrites history from here, Previous discards
-  // the change in place — and we re-send the command with the matching confirm flag once the GM agrees.
+  // things while rewound, the server asks to confirm - Next rewrites history from here, Previous discards
+  // the change in place - and we re-send the command with the matching confirm flag once the GM agrees.
   const cursor = state.combat.historyCursor;
   const dirty = state.combat.historyDirty;
   const reviewing = cursor === null ? null : {
@@ -439,13 +449,13 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
-  return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order — round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
-    {/* During combat the panel has NO heading block — the round pill rides the one control bar. */}
+  return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
+    {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
     {!state.combat.active && <DockPicker dock={dock} />}
     {!state.combat.active ? <>
-      <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically — drag them from the tray onto the map.</p>
-      {/* The battlemap is picked right here — starting a fight never requires a Maps-tab visit
+      <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically - drag them from the tray onto the map.</p>
+      {/* The battlemap is picked right here - starting a fight never requires a Maps-tab visit
           (upload/calibration still live there). */}
       <label className="encounter-map">
         <span>Encounter map</span>
@@ -469,30 +479,30 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       {(() => {
         const placed = state.combat.tokens.filter((token) => token.position !== null).length;
         const total = state.combat.initiative.length;
-        return placed < total ? <p className="encounter-place-nudge">{placed} of {total} tokens placed — drag the rest from the tray above.</p> : null;
+        return placed < total ? <p className="encounter-place-nudge">{placed} of {total} tokens placed - drag the rest from the tray above.</p> : null;
       })()}
       {reviewing && <div className={`turn-review${dirty ? " dirty" : ""}`} role="status">
         <strong>Reviewing {reviewing.label ?? "an earlier turn"}</strong>
         <span>{dirty
           ? "You changed this turn. Next turn rewrites history from here (undoing everything after it); Previous discards the change."
-          : "The whole table is paused here. Step forward to resume live play — nothing is undone until you change something."}</span>
+          : "The whole table is paused here. Step forward to resume live play - nothing is undone until you change something."}</span>
       </div>}
       {/* One compact control bar: turn navigation is the everything-else-follows action, so it gets
           the space; everything occasional (rules mode, environment, dock, add, end) lives behind ⋯. */}
       <div className="encounter-topbar">
         <strong className="encounter-round">Round {state.combat.round}</strong>
         <div className="turn-controls"><button disabled={busy} onClick={previous} title="Previous turn" aria-label="Previous turn">‹</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}</button></div>
-        {/* Mid-fight reinforcements are a combat action, not a setting — one visible tap. */}
+        {/* Mid-fight reinforcements are a combat action, not a setting - one visible tap. */}
         <button type="button" className="encounter-menu-toggle" disabled={busy} title="Add monsters to this fight (SRD)" aria-label="Add monsters to this fight" onClick={() => setBrowsing(true)}>+</button>
-        <button type="button" className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Encounter options — rules mode, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
+        <button type="button" className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Encounter options - rules mode, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && <>
           <div className="encounter-overlay-backdrop" onPointerDown={() => setMenuOpen(false)} />
           <div className="encounter-menu" role="menu" aria-label="Encounter options">
             <label className="rules-mode-control">Rules
               <select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules mode: ${mode}.` : result.message ?? "The rules mode could not be changed.")); }}>
-                <option value="strict">Strict — block invalid actions (override available)</option>
-                <option value="assisted">Assisted — allow with warnings</option>
-                <option value="freeform">Freeform — no checks</option>
+                <option value="strict">Strict - block invalid actions (override available)</option>
+                <option value="assisted">Assisted - allow with warnings</option>
+                <option value="freeform">Freeform - no checks</option>
               </select>
             </label>
             <label className="environment-control">
@@ -523,11 +533,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         const editing = editingActorId === entry.actorId;
         const down = actor !== undefined && actor.hp.current <= 0;
         const expanded = expandedActorId === entry.actorId;
-        return <li key={entry.actorId} className={`${active ? "active" : ""}${down ? " down" : ""}${expanded ? " expanded" : ""}`.trim()} aria-current={active ? "step" : undefined}>
+        return <li key={entry.actorId} ref={active ? activeRowRef : undefined} className={`${active ? "active" : ""}${down ? " down" : ""}${expanded ? " expanded" : ""}`.trim()} aria-current={active ? "step" : undefined}>
           <div className="initiative-row-main">
             {/* Foundry-style row: [avatar | name + HP bar | initiative]. The whole row opens a
-                floating tools card OVER the list — rows never shift while you work. */}
-            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} — HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
+                floating tools card OVER the list - rows never shift while you work. */}
+            <button type="button" className="initiative-expand" aria-expanded={expanded} title={expanded ? "Close" : `Manage ${actor?.name ?? "combatant"} - HP, conditions, effects, reaction, sheet`} onClick={() => { setExpandedActorId((current) => current === entry.actorId ? null : entry.actorId); setHpAmount(""); }}>
               <span className={`initiative-avatar ${actor?.kind ?? "npc"}${actor?.visibility === "gm-only" ? " gm-hidden" : ""}`} aria-hidden="true">{initialsOf(actor?.name ?? "?")}</span>
               <span className="initiative-main-col">
                 <span className="initiative-name-line">
@@ -542,7 +552,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </button>
             {editing
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
-              : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative — click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
+              : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
           </div>
           {expanded && actor && <>
             <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); }} />
@@ -552,7 +562,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                   onChange={(event) => setHpAmount(event.target.value)}
                   onKeyDown={(event) => { if (event.key === "Enter") adjustHp("actor:apply-damage", entry.actorId, actor.name); else if (event.key === "Escape") { setExpandedActorId(null); } }} />
                 <button type="button" disabled={busy} title="Apply as damage (or press Enter)" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name)}>Dmg</button>
-                <button type="button" disabled={busy} title="Nonlethal damage — a drop to 0 knocks out (Unconscious and stable) instead of dying" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name, { nonlethal: true })}>KO</button>
+                <button type="button" disabled={busy} title="Nonlethal damage - a drop to 0 knocks out (Unconscious and stable) instead of dying" onClick={() => adjustHp("actor:apply-damage", entry.actorId, actor.name, { nonlethal: true })}>KO</button>
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", entry.actorId, actor.name)}>Heal</button>
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-temp-hp", entry.actorId, actor.name)}>Temp</button>
                 <button type="button" disabled={busy} onClick={() => adjustHp("actor:set-hp", entry.actorId, actor.name)}>Set</button>
@@ -574,7 +584,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         </li>;
       })}</ol>
       {/* The initiative order stays a pure, glanceable list; the acting creature's console is its
-          own labeled surface below it — never interleaved between rows (that read as one giant
+          own labeled surface below it - never interleaved between rows (that read as one giant
           cluttered column). */}
       {(() => {
         const turnActor = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
@@ -595,7 +605,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
           </div>}
           <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
-            {/* ONE header line: name + economy pills + movement — no separate strip restating anything. */}
+            {/* ONE header line: name + economy pills + movement - no separate strip restating anything. */}
             <header className="acting-console-head">
               <strong>{actor.name}</strong>
               {legendaryActor

@@ -17,7 +17,7 @@ export function probeImageDimensions(url: string): Promise<{ width: number; heig
 /**
  * Fetches an authorized map image as a revocable blob URL and probes its natural pixel
  * dimensions. Shared by every renderer that needs a bearer-authorized map (the encounter
- * canvas and the GM's map/viewer-tool previews). The shared-screen viewer does not use this —
+ * canvas and the GM's map/viewer-tool previews). The shared-screen viewer does not use this -
  * it embeds the content URL directly (cookie-authorized, no bearer header available inside
  * an SVG `<image>`), but still uses `probeImageDimensions` for its own dimension probe.
  */
@@ -47,7 +47,7 @@ export function useAuthorizedMapImage(assetId: string | null, token: string | nu
 /**
  * Session-lifetime thumbnail cache: one authorized fetch per map asset, shared by every chip that
  * shows the same map (the scene switcher), object URLs deliberately never revoked (bounded by the
- * ≤20-scene library). Distinct from `useAuthorizedMapImage`, which is per-mount and revocable —
+ * ≤20-scene library). Distinct from `useAuthorizedMapImage`, which is per-mount and revocable -
  * a strip of chips re-rendering on every state broadcast must not refetch or churn URLs.
  */
 const thumbnailCache = new Map<string, Promise<string>>();
@@ -64,7 +64,7 @@ export function useCachedMapThumbnail(assetId: string | null, token: string | nu
           return URL.createObjectURL(await response.blob());
         });
       thumbnailCache.set(assetId, promise);
-      // A failed fetch must not poison the cache — the next mount retries.
+      // A failed fetch must not poison the cache - the next mount retries.
       promise.catch(() => thumbnailCache.delete(assetId));
     }
     promise.then((objectUrl) => { if (!cancelled) setUrl(objectUrl); }).catch(() => { if (!cancelled) setUrl(null); });
@@ -115,7 +115,7 @@ export type TokenGlyphProps = Readonly<{
 /**
  * The visual content of a map token (turn ring, body, portrait-or-initials, name) shared by the
  * interactive encounter canvas and the read-only shared-screen viewer. Each caller supplies its own
- * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs —
+ * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs -
  * this component owns only the repeated drawing, not the per-app interaction semantics.
  */
 export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
@@ -201,10 +201,10 @@ export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ siz
 }
 
 /**
- * Manual fog-of-war mask: one SVG `<mask>` — a white base (fog everywhere), then each stroke in
+ * Manual fog-of-war mask: one SVG `<mask>` - a white base (fog everywhere), then each stroke in
  * order paints black (reveal: the fog is cut away there) or white (hide: re-covered). The GM sees
  * the fog dimmed below tokens (everything stays visible); players and the shared screen get it
- * solid and above everything — anything inside fog is visually covered even where public data
+ * solid and above everything - anything inside fog is visually covered even where public data
  * crossed the wire. Shared by the table client and the viewer.
  */
 export function FogOverlay({ width, height, fog, variant }: Readonly<{
@@ -215,7 +215,7 @@ export function FogOverlay({ width, height, fog, variant }: Readonly<{
   const base = useId();
   if (!fog.enabled) return null;
   // Chromium caches an SVG <mask>'s raster keyed on the element and does NOT re-evaluate it when
-  // only the mask's child <rect>s change (e.g. Hide-all removes every reveal) — the stale holes stay
+  // only the mask's child <rect>s change (e.g. Hide-all removes every reveal) - the stale holes stay
   // until an unrelated repaint (a pan/zoom). Suffix the mask id with a hash of the fog so any change
   // yields a new id → a new url() reference → a guaranteed re-resolve. (Bug: hide-all didn't render.)
   const signature = `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`;
@@ -233,7 +233,7 @@ export function FogOverlay({ width, height, fog, variant }: Readonly<{
 
 export type GridCalibration = Readonly<{ origin: { x: number; y: number }; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
 
-/** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret — the client already receives grid-derived token sizing. */
+/** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret - the client already receives grid-derived token sizing. */
 export function useMapCalibration(assetId: string | null, token: string | null | undefined): Readonly<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }> {
   const [state, setState] = useState<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }>({ status: "loading", calibration: null });
   useEffect(() => {
@@ -254,7 +254,7 @@ export function useMapCalibration(assetId: string | null, token: string | null |
 
 /**
  * Preview-only grid math mirroring the server's authoritative snapping (`grid-calibration.ts`,
- * `map-measurement.ts`). Used only to show a live number/snap while the pointer is still moving —
+ * `map-measurement.ts`). Used only to show a live number/snap while the pointer is still moving -
  * the server always re-derives and persists the real geometry when a drag ends (`annotation:add`/
  * `annotation:move`), so any drift here affects only what's shown for a moment, never what's saved.
  */
@@ -278,13 +278,13 @@ export function snapCellCenterPreview(calibration: GridCalibration, point: { x: 
   const grid = imageToGridPreview(calibration, point);
   return gridToImagePreview(calibration, { column: Math.floor(grid.column) + centerOffset, row: Math.floor(grid.row) + centerOffset });
 }
-/** Whole-cell Chebyshev distance in feet between two image points — every cell (including diagonals) costs one step, matching the server's default measurement rule. */
+/** Whole-cell Chebyshev distance in feet between two image points - every cell (including diagonals) costs one step, matching the server's default measurement rule. */
 export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: number; y: number }, b: { x: number; y: number }) {
   const gridA = imageToGridPreview(calibration, a);
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
 }
-/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection — mirrors the server). Preview-only. */
+/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection - mirrors the server). Preview-only. */
 export function footprintCells(calibration: GridCalibration, position: { x: number; y: number }, sizeCells = 1): Set<string> {
   const grid = imageToGridPreview(calibration, position);
   const odd = sizeCells % 2 === 1;
@@ -298,7 +298,7 @@ export function footprintCells(calibration: GridCalibration, position: { x: numb
  * Every grid cell the straight segment (grid-space) from `a` to `b` passes through, via an
  * Amanatides–Woo voxel/DDA traversal. Unlike a Chebyshev "diagonal-first" walk, this visits exactly
  * the cells the drawn line crosses, so the occupied-cell count matches what the ruler visibly passes
- * over. At an exact lattice corner it steps diagonally (skips the two side cells) — the standard choice.
+ * over. At an exact lattice corner it steps diagonally (skips the two side cells) - the standard choice.
  */
 function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): string[] {
   let column = Math.floor(ax), row = Math.floor(ay);
@@ -321,9 +321,9 @@ function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): str
 
 /**
  * 5e movement-through-occupied-cells cost, display-only. Base distance is the whole-cell Chebyshev
- * count (diagonals cost one). The penalty is every cell the straight path crosses — excluding the
- * start and destination cells — that another token occupies, each adding one cell (+distancePerCell).
- * Preview-only — the client only ever has the tokens it may see, so nothing hidden leaks into the count.
+ * count (diagonals cost one). The penalty is every cell the straight path crosses - excluding the
+ * start and destination cells - that another token occupies, each adding one cell (+distancePerCell).
+ * Preview-only - the client only ever has the tokens it may see, so nothing hidden leaks into the count.
  */
 export function occupiedPathCost(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }, occupied: ReadonlySet<string>): { baseFeet: number; penaltyFeet: number } {
   const from = imageToGridPreview(calibration, origin);
@@ -332,7 +332,7 @@ export function occupiedPathCost(calibration: GridCalibration, origin: { x: numb
   const destCell = `${Math.floor(to.column)},${Math.floor(to.row)}`;
   // Chebyshev distance from the raw center-to-center grid delta (matches chebyshevFeetPreview). Using
   // floor-differences here is unstable for even footprints (Large/Huge/Gargantuan center on integer
-  // grid intersections, where floating-point noise flips the floor) — that caused the 10→20 ft skips.
+  // grid intersections, where floating-point noise flips the floor) - that caused the 10→20 ft skips.
   const steps = Math.round(Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row)));
   let penaltyCells = 0;
   for (const cell of cellsOnGridSegment(from.column, from.row, to.column, to.row)) {
@@ -346,7 +346,7 @@ export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; targe
 /**
  * Client mirrors of the server's `measurementGeometry`/`squareGeometry`/`radialGeometry`
  * (`apps/server/src/annotations.ts`) so the live drag preview snaps to the grid exactly as the saved
- * result will — the server still re-derives and persists the authoritative geometry on release.
+ * result will - the server still re-derives and persists the authoritative geometry on release.
  */
 export function snapMeasurementPreview(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }): SnappedGeometry {
   const from = snapCellCenterPreview(calibration, origin);

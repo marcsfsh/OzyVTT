@@ -48,7 +48,7 @@ export function saveRollSources(target: Actor, ability: AbilityId): { advantage:
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
-/** SRD 2024 stat blocks phrase the success line as "Success: Half damage." — absence of an explicit "no damage/effect" success keeps the safer half-damage default. */
+/** SRD 2024 stat blocks phrase the success line as "Success: Half damage." - absence of an explicit "no damage/effect" success keeps the safer half-damage default. */
 export function halfOnSuccessFrom(description: string): boolean {
   return !/success:?\s*(the target )?(takes? )?no\b/i.test(description);
 }
@@ -73,7 +73,7 @@ export function conditionFrom(description: string): string | null {
  * Best-known save modifier for a target. Monsters carry final per-ability save bonuses in the
  * (untyped) open5e extension; anything else falls back to the ability modifier from the definition's
  * scores. Imported PCs don't encode save proficiencies (not in ActorDefinitionSchema), so a proficient
- * PC save is the manual-total path's job — documented limitation, not a bug.
+ * PC save is the manual-total path's job - documented limitation, not a bug.
  */
 export function saveModifierFor(definition: ActorDefinition | undefined, ability: AbilityId): number {
   if (!definition) return 0;
@@ -145,7 +145,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
 
 /**
  * Answer a pending save: roll d20 + best-known modifier (or take a typed total), then AUTO-APPLY the
- * outcome — fail: full proposed damage + condition; success: half damage if the action says so, no
+ * outcome - fail: full proposed damage + condition; success: half damage if the action says so, no
  * condition. The owner-approved exception to the propose→apply ladder for structured saves
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
@@ -166,7 +166,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     if (manualTotal === undefined || !Number.isInteger(manualTotal) || manualTotal < -20 || manualTotal > 60) throw new CommandRejectedError("Enter the rolled save total (a whole number from -20 to 60).");
     total = manualTotal;
   } else if ((pending.ability === "str" || pending.ability === "dex") && autoFailsPhysicalSaves(target) !== null) {
-    // SRD conditions appendix: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves — no die is rolled.
+    // SRD conditions appendix: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves - no die is rolled.
     autoFailed = autoFailsPhysicalSaves(target);
     total = 0;
   } else {
@@ -188,7 +188,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
 
   let success = autoFailed === null && total >= pending.dc;
   // SRD Legendary Resistance: "if the creature fails a saving throw, it can choose to succeed
-  // instead" — the die is rolled (usually previewed first), then the GM commits with the flag.
+  // instead" - the die is rolled (usually previewed first), then the GM commits with the flag.
   // The pool rides actionUses["legendary-resistance"]; a long rest re-arms it (day = long rest).
   let legendaryNote: string | null = null;
   if (legendaryResistance) {
@@ -199,7 +199,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     if (perDay === 0) throw new CommandRejectedError(`${target.name} has no Legendary Resistance.`);
     const spentSoFar = target.actionUses["legendary-resistance"] ?? 0;
     if (spentSoFar >= perDay) throw new CommandRejectedError(`${target.name} has no Legendary Resistance left (0 of ${perDay} remaining).`);
-    // A natural success spends nothing — the flag means "succeed no matter what", not "waste a use".
+    // A natural success spends nothing - the flag means "succeed no matter what", not "waste a use".
     if (!success) {
       target.actionUses = { ...target.actionUses, "legendary-resistance": spentSoFar + 1 };
       success = true;
@@ -220,7 +220,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
 
   // Preview (commit=false): the die roll is still recorded for the table so everyone sees it, but the
   // outcome is NOT applied and the save stays open until the answerer confirms. This makes "Roll" a
-  // reveal, not an auto-resolve — the answerer then commits (manual with the rolled total).
+  // reveal, not an auto-resolve - the answerer then commits (manual with the rolled total).
   if (!commit) return { outcome: { success, total, dc: pending.dc, appliedDamage: outcomeDamage, conditionApplied: outcomeCondition, committed: false, autoFailed, ...(rollMode ? { rollMode } : {}) }, events: [] };
 
   const events: EffectNarration[] = [];
@@ -243,7 +243,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   if (!success && pending.endsEffects) {
     for (const reference of pending.endsEffects) events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
   }
-  // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple —
+  // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple -
   // the same carve-out class as on-hit riders, ADR-0020).
   if (!success && pending.onFailEffect) {
     const applied = addEffect(state, target.id, {
@@ -270,7 +270,7 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}) }, events };
 }
 
-/** Drop a pending save without resolving it (GM housekeeping — e.g. the effect ended). */
+/** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
 export function dismissSave(state: GameState, saveId: string, scope: ActorScope) {
   if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can dismiss a saving throw.");
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId)) throw new CommandRejectedError("That saving throw was already answered or dismissed.");

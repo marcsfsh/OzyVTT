@@ -8,7 +8,7 @@
    "externalId": "aboleth"
   },
   "name": "Aboleth",
-  "summary": "Large aberration, lawful evil — CR 10",
+  "summary": "Large aberration, lawful evil - CR 10",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -198,7 +198,7 @@
    "externalId": "adult-black-dragon"
   },
   "name": "Adult Black Dragon",
-  "summary": "Huge dragon, chaotic evil — CR 14",
+  "summary": "Huge dragon, chaotic evil - CR 14",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -389,7 +389,7 @@
    "externalId": "adult-blue-dragon"
   },
   "name": "Adult Blue Dragon",
-  "summary": "Huge dragon, lawful evil — CR 16",
+  "summary": "Huge dragon, lawful evil - CR 16",
   "size": "huge",
   "abilityScores": {
    "str": 25,
@@ -567,7 +567,7 @@
    "externalId": "adult-brass-dragon"
   },
   "name": "Adult Brass Dragon",
-  "summary": "Huge dragon, chaotic good — CR 13",
+  "summary": "Huge dragon, chaotic good - CR 13",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -765,7 +765,7 @@
    "externalId": "adult-bronze-dragon"
   },
   "name": "Adult Bronze Dragon",
-  "summary": "Huge dragon, lawful good — CR 15",
+  "summary": "Huge dragon, lawful good - CR 15",
   "size": "huge",
   "abilityScores": {
    "str": 25,
@@ -967,7 +967,7 @@
    "externalId": "adult-copper-dragon"
   },
   "name": "Adult Copper Dragon",
-  "summary": "Huge dragon, chaotic good — CR 14",
+  "summary": "Huge dragon, chaotic good - CR 14",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -1165,7 +1165,7 @@
    "externalId": "adult-gold-dragon"
   },
   "name": "Adult Gold Dragon",
-  "summary": "Huge dragon, lawful good — CR 17",
+  "summary": "Huge dragon, lawful good - CR 17",
   "size": "huge",
   "abilityScores": {
    "str": 27,
@@ -1367,7 +1367,7 @@
    "externalId": "adult-green-dragon"
   },
   "name": "Adult Green Dragon",
-  "summary": "Huge dragon, lawful evil — CR 15",
+  "summary": "Huge dragon, lawful evil - CR 15",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -1561,7 +1561,7 @@
    "externalId": "adult-red-dragon"
   },
   "name": "Adult Red Dragon",
-  "summary": "Huge dragon, chaotic evil — CR 17",
+  "summary": "Huge dragon, chaotic evil - CR 17",
   "size": "huge",
   "abilityScores": {
    "str": 27,
@@ -1739,7 +1739,7 @@
    "externalId": "adult-silver-dragon"
   },
   "name": "Adult Silver Dragon",
-  "summary": "Huge dragon, lawful good — CR 16",
+  "summary": "Huge dragon, lawful good - CR 16",
   "size": "huge",
   "abilityScores": {
    "str": 27,
@@ -1937,7 +1937,7 @@
    "externalId": "adult-white-dragon"
   },
   "name": "Adult White Dragon",
-  "summary": "Huge dragon, chaotic evil — CR 13",
+  "summary": "Huge dragon, chaotic evil - CR 13",
   "size": "huge",
   "abilityScores": {
    "str": 22,
@@ -2121,7 +2121,7 @@
    "externalId": "air-elemental"
   },
   "name": "Air Elemental",
-  "summary": "Large elemental, neutral — CR 5",
+  "summary": "Large elemental, neutral - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 14,
@@ -2267,7 +2267,7 @@
    "externalId": "allosaurus"
   },
   "name": "Allosaurus",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -2371,7 +2371,7 @@
    "externalId": "ancient-black-dragon"
   },
   "name": "Ancient Black Dragon",
-  "summary": "Gargantuan dragon, chaotic evil — CR 21",
+  "summary": "Gargantuan dragon, chaotic evil - CR 21",
   "size": "gargantuan",
   "abilityScores": {
    "str": 27,
@@ -2562,7 +2562,7 @@
    "externalId": "ancient-blue-dragon"
   },
   "name": "Ancient Blue Dragon",
-  "summary": "Gargantuan dragon, lawful evil — CR 23",
+  "summary": "Gargantuan dragon, lawful evil - CR 23",
   "size": "gargantuan",
   "abilityScores": {
    "str": 29,
@@ -2740,7 +2740,7 @@
    "externalId": "ancient-brass-dragon"
   },
   "name": "Ancient Brass Dragon",
-  "summary": "Gargantuan dragon, chaotic good — CR 20",
+  "summary": "Gargantuan dragon, chaotic good - CR 20",
   "size": "gargantuan",
   "abilityScores": {
    "str": 27,
@@ -2938,7 +2938,7 @@
    "externalId": "ancient-bronze-dragon"
   },
   "name": "Ancient Bronze Dragon",
-  "summary": "Gargantuan dragon, lawful good — CR 22",
+  "summary": "Gargantuan dragon, lawful good - CR 22",
   "size": "gargantuan",
   "abilityScores": {
    "str": 29,
@@ -3140,7 +3140,7 @@
    "externalId": "ancient-copper-dragon"
   },
   "name": "Ancient Copper Dragon",
-  "summary": "Gargantuan dragon, chaotic good — CR 21",
+  "summary": "Gargantuan dragon, chaotic good - CR 21",
   "size": "gargantuan",
   "abilityScores": {
    "str": 27,
@@ -3338,7 +3338,7 @@
    "externalId": "ancient-gold-dragon"
   },
   "name": "Ancient Gold Dragon",
-  "summary": "Gargantuan dragon, lawful good — CR 24",
+  "summary": "Gargantuan dragon, lawful good - CR 24",
   "size": "gargantuan",
   "abilityScores": {
    "str": 30,
@@ -3540,7 +3540,7 @@
    "externalId": "ancient-green-dragon"
   },
   "name": "Ancient Green Dragon",
-  "summary": "Gargantuan dragon, lawful evil — CR 22",
+  "summary": "Gargantuan dragon, lawful evil - CR 22",
   "size": "gargantuan",
   "abilityScores": {
    "str": 27,
@@ -3734,7 +3734,7 @@
    "externalId": "ancient-red-dragon"
   },
   "name": "Ancient Red Dragon",
-  "summary": "Gargantuan dragon, chaotic evil — CR 24",
+  "summary": "Gargantuan dragon, chaotic evil - CR 24",
   "size": "gargantuan",
   "abilityScores": {
    "str": 30,
@@ -3912,7 +3912,7 @@
    "externalId": "ancient-silver-dragon"
   },
   "name": "Ancient Silver Dragon",
-  "summary": "Gargantuan dragon, lawful good — CR 23",
+  "summary": "Gargantuan dragon, lawful good - CR 23",
   "size": "gargantuan",
   "abilityScores": {
    "str": 30,
@@ -4110,7 +4110,7 @@
    "externalId": "ancient-white-dragon"
   },
   "name": "Ancient White Dragon",
-  "summary": "Gargantuan dragon, chaotic evil — CR 20",
+  "summary": "Gargantuan dragon, chaotic evil - CR 20",
   "size": "gargantuan",
   "abilityScores": {
    "str": 26,
@@ -4294,7 +4294,7 @@
    "externalId": "animated-armor"
   },
   "name": "Animated Armor",
-  "summary": "Medium construct, unaligned — CR 1",
+  "summary": "Medium construct, unaligned - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -4410,7 +4410,7 @@
    "externalId": "animated-flying-sword"
   },
   "name": "Animated Flying Sword",
-  "summary": "Small construct, unaligned — CR 0.25",
+  "summary": "Small construct, unaligned - CR 0.25",
   "size": "small",
   "abilityScores": {
    "str": 12,
@@ -4513,7 +4513,7 @@
    "externalId": "animated-rug-of-smothering"
   },
   "name": "Animated Rug of Smothering",
-  "summary": "Large construct, unaligned — CR 2",
+  "summary": "Large construct, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -4616,7 +4616,7 @@
    "externalId": "ankheg"
   },
   "name": "Ankheg",
-  "summary": "Large monstrosity, unaligned — CR 2",
+  "summary": "Large monstrosity, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -4748,7 +4748,7 @@
    "externalId": "ankylosaurus"
   },
   "name": "Ankylosaurus",
-  "summary": "Huge beast, unaligned — CR 3",
+  "summary": "Huge beast, unaligned - CR 3",
   "size": "huge",
   "abilityScores": {
    "str": 19,
@@ -4859,7 +4859,7 @@
    "externalId": "ape"
   },
   "name": "Ape",
-  "summary": "Medium beast, unaligned — CR 0.5",
+  "summary": "Medium beast, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -4982,7 +4982,7 @@
    "externalId": "archelon"
   },
   "name": "Archelon",
-  "summary": "Huge beast, unaligned — CR 4",
+  "summary": "Huge beast, unaligned - CR 4",
   "size": "huge",
   "abilityScores": {
    "str": 18,
@@ -5088,7 +5088,7 @@
    "externalId": "archmage"
   },
   "name": "Archmage",
-  "summary": "Small humanoid, neutral — CR 12",
+  "summary": "Small humanoid, neutral - CR 12",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -5230,7 +5230,7 @@
    "externalId": "assassin"
   },
   "name": "Assassin",
-  "summary": "Small humanoid, neutral — CR 8",
+  "summary": "Small humanoid, neutral - CR 8",
   "size": "small",
   "abilityScores": {
    "str": 11,
@@ -5357,7 +5357,7 @@
    "externalId": "awakened-shrub"
   },
   "name": "Awakened Shrub",
-  "summary": "Small plant, neutral — CR 0",
+  "summary": "Small plant, neutral - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 3,
@@ -5440,7 +5440,7 @@
    "externalId": "awakened-tree"
   },
   "name": "Awakened Tree",
-  "summary": "Huge plant, neutral — CR 2",
+  "summary": "Huge plant, neutral - CR 2",
   "size": "huge",
   "abilityScores": {
    "str": 19,
@@ -5528,7 +5528,7 @@
    "externalId": "axe-beak"
   },
   "name": "Axe Beak",
-  "summary": "Large monstrosity, unaligned — CR 0.25",
+  "summary": "Large monstrosity, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 14,
@@ -5616,7 +5616,7 @@
    "externalId": "azer-sentinel"
   },
   "name": "Azer Sentinel",
-  "summary": "Medium elemental, lawful neutral — CR 2",
+  "summary": "Medium elemental, lawful neutral - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -5720,7 +5720,7 @@
    "externalId": "baboon"
   },
   "name": "Baboon",
-  "summary": "Small beast, unaligned — CR 0",
+  "summary": "Small beast, unaligned - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 8,
@@ -5813,7 +5813,7 @@
    "externalId": "badger"
   },
   "name": "Badger",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 10,
@@ -5901,7 +5901,7 @@
    "externalId": "balor"
   },
   "name": "Balor",
-  "summary": "Huge fiend, chaotic evil — CR 19",
+  "summary": "Huge fiend, chaotic evil - CR 19",
   "size": "huge",
   "abilityScores": {
    "str": 26,
@@ -6064,7 +6064,7 @@
    "externalId": "bandit"
   },
   "name": "Bandit",
-  "summary": "Small humanoid, neutral — CR 0.125",
+  "summary": "Small humanoid, neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 11,
@@ -6169,7 +6169,7 @@
    "externalId": "bandit-captain"
   },
   "name": "Bandit Captain",
-  "summary": "Small humanoid, neutral — CR 2",
+  "summary": "Small humanoid, neutral - CR 2",
   "size": "small",
   "abilityScores": {
    "str": 15,
@@ -6288,7 +6288,7 @@
    "externalId": "barbed-devil"
   },
   "name": "Barbed Devil",
-  "summary": "Medium fiend, lawful evil — CR 5",
+  "summary": "Medium fiend, lawful evil - CR 5",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -6461,7 +6461,7 @@
    "externalId": "basilisk"
   },
   "name": "Basilisk",
-  "summary": "Medium monstrosity, unaligned — CR 3",
+  "summary": "Medium monstrosity, unaligned - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -6567,7 +6567,7 @@
    "externalId": "bat"
   },
   "name": "Bat",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -6652,7 +6652,7 @@
    "externalId": "bearded-devil"
   },
   "name": "Bearded Devil",
-  "summary": "Medium fiend, lawful evil — CR 3",
+  "summary": "Medium fiend, lawful evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -6795,7 +6795,7 @@
    "externalId": "behir"
   },
   "name": "Behir",
-  "summary": "Huge monstrosity, neutral evil — CR 11",
+  "summary": "Huge monstrosity, neutral evil - CR 11",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -6948,7 +6948,7 @@
    "externalId": "berserker"
   },
   "name": "Berserker",
-  "summary": "Small humanoid, neutral — CR 2",
+  "summary": "Small humanoid, neutral - CR 2",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -7041,7 +7041,7 @@
    "externalId": "black-bear"
   },
   "name": "Black Bear",
-  "summary": "Medium beast, unaligned — CR 0.5",
+  "summary": "Medium beast, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -7144,7 +7144,7 @@
    "externalId": "black-dragon-wyrmling"
   },
   "name": "Black Dragon Wyrmling",
-  "summary": "Medium dragon, chaotic evil — CR 2",
+  "summary": "Medium dragon, chaotic evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -7281,7 +7281,7 @@
    "externalId": "black-pudding"
   },
   "name": "Black Pudding",
-  "summary": "Large ooze, unaligned — CR 4",
+  "summary": "Large ooze, unaligned - CR 4",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -7405,7 +7405,7 @@
    "externalId": "blink-dog"
   },
   "name": "Blink Dog",
-  "summary": "Medium fey, lawful good — CR 0.25",
+  "summary": "Medium fey, lawful good - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -7507,7 +7507,7 @@
    "externalId": "blood-hawk"
   },
   "name": "Blood Hawk",
-  "summary": "Small beast, unaligned — CR 0.125",
+  "summary": "Small beast, unaligned - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 6,
@@ -7600,7 +7600,7 @@
    "externalId": "blue-dragon-wyrmling"
   },
   "name": "Blue Dragon Wyrmling",
-  "summary": "Medium dragon, lawful evil — CR 3",
+  "summary": "Medium dragon, lawful evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -7732,7 +7732,7 @@
    "externalId": "boar"
   },
   "name": "Boar",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -7825,7 +7825,7 @@
    "externalId": "bone-devil"
   },
   "name": "Bone Devil",
-  "summary": "Large fiend, lawful evil — CR 9",
+  "summary": "Large fiend, lawful evil - CR 9",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -7963,7 +7963,7 @@
    "externalId": "brass-dragon-wyrmling"
   },
   "name": "Brass Dragon Wyrmling",
-  "summary": "Medium dragon, chaotic good — CR 1",
+  "summary": "Medium dragon, chaotic good - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -8089,7 +8089,7 @@
    "externalId": "bronze-dragon-wyrmling"
   },
   "name": "Bronze Dragon Wyrmling",
-  "summary": "Medium dragon, lawful good — CR 2",
+  "summary": "Medium dragon, lawful good - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -8233,7 +8233,7 @@
    "externalId": "brown-bear"
   },
   "name": "Brown Bear",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -8366,7 +8366,7 @@
    "externalId": "bugbear-stalker"
   },
   "name": "Bugbear Stalker",
-  "summary": "Medium fey, chaotic evil — CR 3",
+  "summary": "Medium fey, chaotic evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -8497,7 +8497,7 @@
    "externalId": "bugbear-warrior"
   },
   "name": "Bugbear Warrior",
-  "summary": "Medium fey, chaotic evil — CR 1",
+  "summary": "Medium fey, chaotic evil - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -8621,7 +8621,7 @@
    "externalId": "bulette"
   },
   "name": "Bulette",
-  "summary": "Large monstrosity, unaligned — CR 5",
+  "summary": "Large monstrosity, unaligned - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -8748,7 +8748,7 @@
    "externalId": "camel"
   },
   "name": "Camel",
-  "summary": "Large beast, unaligned — CR 0.125",
+  "summary": "Large beast, unaligned - CR 0.125",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -8838,7 +8838,7 @@
    "externalId": "cat"
   },
   "name": "Cat",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 3,
@@ -8928,7 +8928,7 @@
    "externalId": "centaur-trooper"
   },
   "name": "Centaur Trooper",
-  "summary": "Large fey, neutral good — CR 2",
+  "summary": "Large fey, neutral good - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -9061,7 +9061,7 @@
    "externalId": "chain-devil"
   },
   "name": "Chain Devil",
-  "summary": "Medium fiend, lawful evil — CR 8",
+  "summary": "Medium fiend, lawful evil - CR 8",
   "size": "medium",
   "abilityScores": {
    "str": 18,
@@ -9217,7 +9217,7 @@
    "externalId": "chimera"
   },
   "name": "Chimera",
-  "summary": "Large monstrosity, chaotic evil — CR 6",
+  "summary": "Large monstrosity, chaotic evil - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -9377,7 +9377,7 @@
    "externalId": "chuul"
   },
   "name": "Chuul",
-  "summary": "Large aberration, chaotic evil — CR 4",
+  "summary": "Large aberration, chaotic evil - CR 4",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -9517,7 +9517,7 @@
    "externalId": "clay-golem"
   },
   "name": "Clay Golem",
-  "summary": "Large construct, unaligned — CR 9",
+  "summary": "Large construct, unaligned - CR 9",
   "size": "large",
   "abilityScores": {
    "str": 20,
@@ -9662,7 +9662,7 @@
    "externalId": "cloaker"
   },
   "name": "Cloaker",
-  "summary": "Large aberration, chaotic neutral — CR 8",
+  "summary": "Large aberration, chaotic neutral - CR 8",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -9802,7 +9802,7 @@
    "externalId": "cloud-giant"
   },
   "name": "Cloud Giant",
-  "summary": "Huge giant, neutral — CR 9",
+  "summary": "Huge giant, neutral - CR 9",
   "size": "huge",
   "abilityScores": {
    "str": 27,
@@ -9927,7 +9927,7 @@
    "externalId": "cockatrice"
   },
   "name": "Cockatrice",
-  "summary": "Small monstrosity, unaligned — CR 0.5",
+  "summary": "Small monstrosity, unaligned - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 6,
@@ -10021,7 +10021,7 @@
    "externalId": "commoner"
   },
   "name": "Commoner",
-  "summary": "Small humanoid, neutral — CR 0",
+  "summary": "Small humanoid, neutral - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -10114,7 +10114,7 @@
    "externalId": "constrictor-snake"
   },
   "name": "Constrictor Snake",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -10220,7 +10220,7 @@
    "externalId": "copper-dragon-wyrmling"
   },
   "name": "Copper Dragon Wyrmling",
-  "summary": "Medium dragon, chaotic good — CR 1",
+  "summary": "Medium dragon, chaotic good - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -10346,7 +10346,7 @@
    "externalId": "couatl"
   },
   "name": "Couatl",
-  "summary": "Medium celestial, lawful good — CR 4",
+  "summary": "Medium celestial, lawful good - CR 4",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -10479,7 +10479,7 @@
    "externalId": "crab"
   },
   "name": "Crab",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 6,
@@ -10569,7 +10569,7 @@
    "externalId": "crocodile"
   },
   "name": "Crocodile",
-  "summary": "Large beast, unaligned — CR 0.5",
+  "summary": "Large beast, unaligned - CR 0.5",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -10676,7 +10676,7 @@
    "externalId": "cultist"
   },
   "name": "Cultist",
-  "summary": "Small humanoid, neutral — CR 0.125",
+  "summary": "Small humanoid, neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 11,
@@ -10764,7 +10764,7 @@
    "externalId": "cultist-fanatic"
   },
   "name": "Cultist Fanatic",
-  "summary": "Small humanoid, neutral — CR 2",
+  "summary": "Small humanoid, neutral - CR 2",
   "size": "small",
   "abilityScores": {
    "str": 11,
@@ -10870,7 +10870,7 @@
    "externalId": "darkmantle"
   },
   "name": "Darkmantle",
-  "summary": "Small aberration, unaligned — CR 0.5",
+  "summary": "Small aberration, unaligned - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -10971,7 +10971,7 @@
    "externalId": "death-dog"
   },
   "name": "Death Dog",
-  "summary": "Medium monstrosity, neutral evil — CR 1",
+  "summary": "Medium monstrosity, neutral evil - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -11078,7 +11078,7 @@
    "externalId": "deer"
   },
   "name": "Deer",
-  "summary": "Medium beast, unaligned — CR 0",
+  "summary": "Medium beast, unaligned - CR 0",
   "size": "medium",
   "abilityScores": {
    "str": 11,
@@ -11173,7 +11173,7 @@
    "externalId": "deva"
   },
   "name": "Deva",
-  "summary": "Medium celestial, lawful good — CR 10",
+  "summary": "Medium celestial, lawful good - CR 10",
   "size": "medium",
   "abilityScores": {
    "str": 18,
@@ -11306,7 +11306,7 @@
    "externalId": "dire-wolf"
   },
   "name": "Dire Wolf",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -11411,7 +11411,7 @@
    "externalId": "djinni"
   },
   "name": "Djinni",
-  "summary": "Large elemental, chaotic good — CR 11",
+  "summary": "Large elemental, chaotic good - CR 11",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -11578,7 +11578,7 @@
    "externalId": "doppelganger"
   },
   "name": "Doppelganger",
-  "summary": "Medium monstrosity, neutral — CR 3",
+  "summary": "Medium monstrosity, neutral - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 11,
@@ -11711,7 +11711,7 @@
    "externalId": "draft-horse"
   },
   "name": "Draft Horse",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -11799,7 +11799,7 @@
    "externalId": "dragon-turtle"
   },
   "name": "Dragon Turtle",
-  "summary": "Gargantuan dragon, neutral — CR 17",
+  "summary": "Gargantuan dragon, neutral - CR 17",
   "size": "gargantuan",
   "abilityScores": {
    "str": 25,
@@ -11957,7 +11957,7 @@
    "externalId": "dretch"
   },
   "name": "Dretch",
-  "summary": "Small fiend, chaotic evil — CR 0.25",
+  "summary": "Small fiend, chaotic evil - CR 0.25",
   "size": "small",
   "abilityScores": {
    "str": 12,
@@ -12073,7 +12073,7 @@
    "externalId": "drider"
   },
   "name": "Drider",
-  "summary": "Large monstrosity, chaotic evil — CR 6",
+  "summary": "Large monstrosity, chaotic evil - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -12211,7 +12211,7 @@
    "externalId": "druid"
   },
   "name": "Druid",
-  "summary": "Small humanoid, neutral — CR 2",
+  "summary": "Small humanoid, neutral - CR 2",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -12329,7 +12329,7 @@
    "externalId": "dryad"
   },
   "name": "Dryad",
-  "summary": "Medium fey, neutral — CR 1",
+  "summary": "Medium fey, neutral - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -12465,7 +12465,7 @@
    "externalId": "dust-mephit"
   },
   "name": "Dust Mephit",
-  "summary": "Small elemental, neutral evil — CR 0.5",
+  "summary": "Small elemental, neutral evil - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 5,
@@ -12594,7 +12594,7 @@
    "externalId": "eagle"
   },
   "name": "Eagle",
-  "summary": "Small beast, unaligned — CR 0",
+  "summary": "Small beast, unaligned - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 6,
@@ -12682,7 +12682,7 @@
    "externalId": "earth-elemental"
   },
   "name": "Earth Elemental",
-  "summary": "Large elemental, neutral — CR 5",
+  "summary": "Large elemental, neutral - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 20,
@@ -12825,7 +12825,7 @@
    "externalId": "efreeti"
   },
   "name": "Efreeti",
-  "summary": "Large elemental, neutral — CR 11",
+  "summary": "Large elemental, neutral - CR 11",
   "size": "large",
   "abilityScores": {
    "str": 22,
@@ -12961,7 +12961,7 @@
    "externalId": "elephant"
   },
   "name": "Elephant",
-  "summary": "Huge beast, unaligned — CR 4",
+  "summary": "Huge beast, unaligned - CR 4",
   "size": "huge",
   "abilityScores": {
    "str": 22,
@@ -13078,7 +13078,7 @@
    "externalId": "elk"
   },
   "name": "Elk",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -13168,7 +13168,7 @@
    "externalId": "erinyes"
   },
   "name": "Erinyes",
-  "summary": "Medium fiend, lawful evil — CR 12",
+  "summary": "Medium fiend, lawful evil - CR 12",
   "size": "medium",
   "abilityScores": {
    "str": 18,
@@ -13317,7 +13317,7 @@
    "externalId": "ettercap"
   },
   "name": "Ettercap",
-  "summary": "Medium monstrosity, neutral evil — CR 2",
+  "summary": "Medium monstrosity, neutral evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -13472,7 +13472,7 @@
    "externalId": "ettin"
   },
   "name": "Ettin",
-  "summary": "Large giant, chaotic evil — CR 4",
+  "summary": "Large giant, chaotic evil - CR 4",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -13605,7 +13605,7 @@
    "externalId": "fire-elemental"
   },
   "name": "Fire Elemental",
-  "summary": "Large elemental, neutral — CR 5",
+  "summary": "Large elemental, neutral - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 10,
@@ -13739,7 +13739,7 @@
    "externalId": "fire-giant"
   },
   "name": "Fire Giant",
-  "summary": "Huge giant, lawful evil — CR 9",
+  "summary": "Huge giant, lawful evil - CR 9",
   "size": "huge",
   "abilityScores": {
    "str": 25,
@@ -13854,7 +13854,7 @@
    "externalId": "flesh-golem"
   },
   "name": "Flesh Golem",
-  "summary": "Medium construct, neutral — CR 5",
+  "summary": "Medium construct, neutral - CR 5",
   "size": "medium",
   "abilityScores": {
    "str": 19,
@@ -13990,7 +13990,7 @@
    "externalId": "flying-snake"
   },
   "name": "Flying Snake",
-  "summary": "Tiny monstrosity, unaligned — CR 0.125",
+  "summary": "Tiny monstrosity, unaligned - CR 0.125",
   "size": "tiny",
   "abilityScores": {
    "str": 4,
@@ -14080,7 +14080,7 @@
    "externalId": "frog"
   },
   "name": "Frog",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 1,
@@ -14174,7 +14174,7 @@
    "externalId": "frost-giant"
   },
   "name": "Frost Giant",
-  "summary": "Huge giant, neutral evil — CR 8",
+  "summary": "Huge giant, neutral evil - CR 8",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -14301,7 +14301,7 @@
    "externalId": "gargoyle"
   },
   "name": "Gargoyle",
-  "summary": "Medium elemental, chaotic evil — CR 2",
+  "summary": "Medium elemental, chaotic evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -14417,7 +14417,7 @@
    "externalId": "gelatinous-cube"
   },
   "name": "Gelatinous Cube",
-  "summary": "Large ooze, unaligned — CR 2",
+  "summary": "Large ooze, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 14,
@@ -14547,7 +14547,7 @@
    "externalId": "ghast"
   },
   "name": "Ghast",
-  "summary": "Medium undead, chaotic evil — CR 2",
+  "summary": "Medium undead, chaotic evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -14673,7 +14673,7 @@
    "externalId": "ghost"
   },
   "name": "Ghost",
-  "summary": "Medium undead, neutral — CR 4",
+  "summary": "Medium undead, neutral - CR 4",
   "size": "medium",
   "abilityScores": {
    "str": 7,
@@ -14846,7 +14846,7 @@
    "externalId": "ghoul"
   },
   "name": "Ghoul",
-  "summary": "Medium undead, chaotic evil — CR 1",
+  "summary": "Medium undead, chaotic evil - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -14977,7 +14977,7 @@
    "externalId": "giant-ape"
   },
   "name": "Giant Ape",
-  "summary": "Huge beast, unaligned — CR 7",
+  "summary": "Huge beast, unaligned - CR 7",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -15106,7 +15106,7 @@
    "externalId": "giant-badger"
   },
   "name": "Giant Badger",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -15199,7 +15199,7 @@
    "externalId": "giant-bat"
   },
   "name": "Giant Bat",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -15289,7 +15289,7 @@
    "externalId": "giant-boar"
   },
   "name": "Giant Boar",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -15382,7 +15382,7 @@
    "externalId": "giant-centipede"
   },
   "name": "Giant Centipede",
-  "summary": "Small beast, unaligned — CR 0.25",
+  "summary": "Small beast, unaligned - CR 0.25",
   "size": "small",
   "abilityScores": {
    "str": 5,
@@ -15472,7 +15472,7 @@
    "externalId": "giant-constrictor-snake"
   },
   "name": "Giant Constrictor Snake",
-  "summary": "Huge beast, unaligned — CR 2",
+  "summary": "Huge beast, unaligned - CR 2",
   "size": "huge",
   "abilityScores": {
    "str": 19,
@@ -15585,7 +15585,7 @@
    "externalId": "giant-crab"
   },
   "name": "Giant Crab",
-  "summary": "Medium beast, unaligned — CR 0.125",
+  "summary": "Medium beast, unaligned - CR 0.125",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -15691,7 +15691,7 @@
    "externalId": "giant-crocodile"
   },
   "name": "Giant Crocodile",
-  "summary": "Huge beast, unaligned — CR 5",
+  "summary": "Huge beast, unaligned - CR 5",
   "size": "huge",
   "abilityScores": {
    "str": 21,
@@ -15844,7 +15844,7 @@
    "externalId": "giant-eagle"
   },
   "name": "Giant Eagle",
-  "summary": "Large celestial, neutral good — CR 1",
+  "summary": "Large celestial, neutral good - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -15949,7 +15949,7 @@
    "externalId": "giant-elk"
   },
   "name": "Giant Elk",
-  "summary": "Huge celestial, neutral good — CR 2",
+  "summary": "Huge celestial, neutral good - CR 2",
   "size": "huge",
   "abilityScores": {
    "str": 19,
@@ -16043,7 +16043,7 @@
    "externalId": "giant-fire-beetle"
   },
   "name": "Giant Fire Beetle",
-  "summary": "Small beast, unaligned — CR 0",
+  "summary": "Small beast, unaligned - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 8,
@@ -16136,7 +16136,7 @@
    "externalId": "giant-frog"
   },
   "name": "Giant Frog",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -16253,7 +16253,7 @@
    "externalId": "giant-goat"
   },
   "name": "Giant Goat",
-  "summary": "Large beast, unaligned — CR 0.5",
+  "summary": "Large beast, unaligned - CR 0.5",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -16343,7 +16343,7 @@
    "externalId": "giant-hyena"
   },
   "name": "Giant Hyena",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -16444,7 +16444,7 @@
    "externalId": "giant-lizard"
   },
   "name": "Giant Lizard",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -16539,7 +16539,7 @@
    "externalId": "giant-octopus"
   },
   "name": "Giant Octopus",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -16659,7 +16659,7 @@
    "externalId": "giant-owl"
   },
   "name": "Giant Owl",
-  "summary": "Large celestial, neutral — CR 0.25",
+  "summary": "Large celestial, neutral - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 13,
@@ -16765,7 +16765,7 @@
    "externalId": "giant-rat"
   },
   "name": "Giant Rat",
-  "summary": "Small beast, unaligned — CR 0.125",
+  "summary": "Small beast, unaligned - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 7,
@@ -16860,7 +16860,7 @@
    "externalId": "giant-scorpion"
   },
   "name": "Giant Scorpion",
-  "summary": "Large beast, unaligned — CR 3",
+  "summary": "Large beast, unaligned - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -16990,7 +16990,7 @@
    "externalId": "giant-seahorse"
   },
   "name": "Giant Seahorse",
-  "summary": "Large beast, unaligned — CR 0.5",
+  "summary": "Large beast, unaligned - CR 0.5",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -17090,7 +17090,7 @@
    "externalId": "giant-shark"
   },
   "name": "Giant Shark",
-  "summary": "Huge beast, unaligned — CR 5",
+  "summary": "Huge beast, unaligned - CR 5",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -17198,7 +17198,7 @@
    "externalId": "giant-spider"
   },
   "name": "Giant Spider",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 14,
@@ -17313,7 +17313,7 @@
    "externalId": "giant-toad"
   },
   "name": "Giant Toad",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -17430,7 +17430,7 @@
    "externalId": "giant-venomous-snake"
   },
   "name": "Giant Venomous Snake",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -17520,7 +17520,7 @@
    "externalId": "giant-vulture"
   },
   "name": "Giant Vulture",
-  "summary": "Large monstrosity, neutral evil — CR 1",
+  "summary": "Large monstrosity, neutral evil - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -17618,7 +17618,7 @@
    "externalId": "giant-wasp"
   },
   "name": "Giant Wasp",
-  "summary": "Medium beast, unaligned — CR 0.5",
+  "summary": "Medium beast, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -17711,7 +17711,7 @@
    "externalId": "giant-weasel"
   },
   "name": "Giant Weasel",
-  "summary": "Medium beast, unaligned — CR 0.125",
+  "summary": "Medium beast, unaligned - CR 0.125",
   "size": "medium",
   "abilityScores": {
    "str": 11,
@@ -17801,7 +17801,7 @@
    "externalId": "giant-wolf-spider"
   },
   "name": "Giant Wolf Spider",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -17897,7 +17897,7 @@
    "externalId": "gibbering-mouther"
   },
   "name": "Gibbering Mouther",
-  "summary": "Medium aberration, chaotic neutral — CR 2",
+  "summary": "Medium aberration, chaotic neutral - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -18027,7 +18027,7 @@
    "externalId": "glabrezu"
   },
   "name": "Glabrezu",
-  "summary": "Large fiend, chaotic evil — CR 9",
+  "summary": "Large fiend, chaotic evil - CR 9",
   "size": "large",
   "abilityScores": {
    "str": 20,
@@ -18184,7 +18184,7 @@
    "externalId": "gladiator"
   },
   "name": "Gladiator",
-  "summary": "Small humanoid, neutral — CR 5",
+  "summary": "Small humanoid, neutral - CR 5",
   "size": "small",
   "abilityScores": {
    "str": 18,
@@ -18310,7 +18310,7 @@
    "externalId": "gnoll-warrior"
   },
   "name": "Gnoll Warrior",
-  "summary": "Medium fiend, chaotic evil — CR 0.5",
+  "summary": "Medium fiend, chaotic evil - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -18428,7 +18428,7 @@
    "externalId": "goat"
   },
   "name": "Goat",
-  "summary": "Medium beast, unaligned — CR 0",
+  "summary": "Medium beast, unaligned - CR 0",
   "size": "medium",
   "abilityScores": {
    "str": 11,
@@ -18513,7 +18513,7 @@
    "externalId": "goblin-boss"
   },
   "name": "Goblin Boss",
-  "summary": "Small fey, chaotic neutral — CR 1",
+  "summary": "Small fey, chaotic neutral - CR 1",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -18641,7 +18641,7 @@
    "externalId": "goblin-minion"
   },
   "name": "Goblin Minion",
-  "summary": "Small fey, chaotic neutral — CR 0.125",
+  "summary": "Small fey, chaotic neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 8,
@@ -18740,7 +18740,7 @@
    "externalId": "goblin-warrior"
   },
   "name": "Goblin Warrior",
-  "summary": "Small fey, chaotic neutral — CR 0.25",
+  "summary": "Small fey, chaotic neutral - CR 0.25",
   "size": "small",
   "abilityScores": {
    "str": 8,
@@ -18854,7 +18854,7 @@
    "externalId": "gold-dragon-wyrmling"
   },
   "name": "Gold Dragon Wyrmling",
-  "summary": "Medium dragon, lawful good — CR 3",
+  "summary": "Medium dragon, lawful good - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 19,
@@ -18998,7 +18998,7 @@
    "externalId": "gorgon"
   },
   "name": "Gorgon",
-  "summary": "Large construct, unaligned — CR 5",
+  "summary": "Large construct, unaligned - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 20,
@@ -19120,7 +19120,7 @@
    "externalId": "gray-ooze"
   },
   "name": "Gray Ooze",
-  "summary": "Medium ooze, unaligned — CR 0.5",
+  "summary": "Medium ooze, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -19224,7 +19224,7 @@
    "externalId": "green-dragon-wyrmling"
   },
   "name": "Green Dragon Wyrmling",
-  "summary": "Medium dragon, lawful evil — CR 2",
+  "summary": "Medium dragon, lawful evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -19364,7 +19364,7 @@
    "externalId": "green-hag"
   },
   "name": "Green Hag",
-  "summary": "Medium fey, neutral evil — CR 3",
+  "summary": "Medium fey, neutral evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 18,
@@ -19483,7 +19483,7 @@
    "externalId": "grick"
   },
   "name": "Grick",
-  "summary": "Medium aberration, unaligned — CR 2",
+  "summary": "Medium aberration, unaligned - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -19617,7 +19617,7 @@
    "externalId": "griffon"
   },
   "name": "Griffon",
-  "summary": "Large monstrosity, unaligned — CR 2",
+  "summary": "Large monstrosity, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -19731,7 +19731,7 @@
    "externalId": "grimlock"
   },
   "name": "Grimlock",
-  "summary": "Medium aberration, neutral evil — CR 0.25",
+  "summary": "Medium aberration, neutral evil - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -19821,7 +19821,7 @@
    "externalId": "guard"
   },
   "name": "Guard",
-  "summary": "Small humanoid, neutral — CR 0.125",
+  "summary": "Small humanoid, neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 13,
@@ -19911,7 +19911,7 @@
    "externalId": "guard-captain"
   },
   "name": "Guard Captain",
-  "summary": "Small humanoid, neutral — CR 4",
+  "summary": "Small humanoid, neutral - CR 4",
   "size": "small",
   "abilityScores": {
    "str": 18,
@@ -20024,7 +20024,7 @@
    "externalId": "guardian-naga"
   },
   "name": "Guardian Naga",
-  "summary": "Large celestial, lawful good — CR 10",
+  "summary": "Large celestial, lawful good - CR 10",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -20164,7 +20164,7 @@
    "externalId": "half-dragon"
   },
   "name": "Half-Dragon",
-  "summary": "Medium dragon, neutral — CR 5",
+  "summary": "Medium dragon, neutral - CR 5",
   "size": "medium",
   "abilityScores": {
    "str": 19,
@@ -20296,7 +20296,7 @@
    "externalId": "harpy"
   },
   "name": "Harpy",
-  "summary": "Medium monstrosity, chaotic evil — CR 1",
+  "summary": "Medium monstrosity, chaotic evil - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -20395,7 +20395,7 @@
    "externalId": "hawk"
   },
   "name": "Hawk",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 5,
@@ -20478,7 +20478,7 @@
    "externalId": "hell-hound"
   },
   "name": "Hell Hound",
-  "summary": "Medium fiend, lawful evil — CR 3",
+  "summary": "Medium fiend, lawful evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -20610,7 +20610,7 @@
    "externalId": "hezrou"
   },
   "name": "Hezrou",
-  "summary": "Large fiend, chaotic evil — CR 8",
+  "summary": "Large fiend, chaotic evil - CR 8",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -20744,7 +20744,7 @@
    "externalId": "hill-giant"
   },
   "name": "Hill Giant",
-  "summary": "Huge giant, chaotic evil — CR 5",
+  "summary": "Huge giant, chaotic evil - CR 5",
   "size": "huge",
   "abilityScores": {
    "str": 21,
@@ -20866,7 +20866,7 @@
    "externalId": "hippogriff"
   },
   "name": "Hippogriff",
-  "summary": "Large monstrosity, unaligned — CR 1",
+  "summary": "Large monstrosity, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -20972,7 +20972,7 @@
    "externalId": "hippopotamus"
   },
   "name": "Hippopotamus",
-  "summary": "Large beast, unaligned — CR 4",
+  "summary": "Large beast, unaligned - CR 4",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -21078,7 +21078,7 @@
    "externalId": "hobgoblin-captain"
   },
   "name": "Hobgoblin Captain",
-  "summary": "Medium fey, lawful evil — CR 3",
+  "summary": "Medium fey, lawful evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -21197,7 +21197,7 @@
    "externalId": "hobgoblin-warrior"
   },
   "name": "Hobgoblin Warrior",
-  "summary": "Medium fey, lawful evil — CR 0.5",
+  "summary": "Medium fey, lawful evil - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -21309,7 +21309,7 @@
    "externalId": "homunculus"
   },
   "name": "Homunculus",
-  "summary": "Tiny construct, neutral — CR 0",
+  "summary": "Tiny construct, neutral - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 4,
@@ -21410,7 +21410,7 @@
    "externalId": "horned-devil"
   },
   "name": "Horned Devil",
-  "summary": "Large fiend, lawful evil — CR 11",
+  "summary": "Large fiend, lawful evil - CR 11",
   "size": "large",
   "abilityScores": {
    "str": 22,
@@ -21555,7 +21555,7 @@
    "externalId": "hunter-shark"
   },
   "name": "Hunter Shark",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -21650,7 +21650,7 @@
    "externalId": "hydra"
   },
   "name": "Hydra",
-  "summary": "Huge monstrosity, unaligned — CR 8",
+  "summary": "Huge monstrosity, unaligned - CR 8",
   "size": "huge",
   "abilityScores": {
    "str": 20,
@@ -21760,7 +21760,7 @@
    "externalId": "hyena"
   },
   "name": "Hyena",
-  "summary": "Medium beast, unaligned — CR 0",
+  "summary": "Medium beast, unaligned - CR 0",
   "size": "medium",
   "abilityScores": {
    "str": 11,
@@ -21855,7 +21855,7 @@
    "externalId": "ice-devil"
   },
   "name": "Ice Devil",
-  "summary": "Large fiend, lawful evil — CR 14",
+  "summary": "Large fiend, lawful evil - CR 14",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -22005,7 +22005,7 @@
    "externalId": "ice-mephit"
   },
   "name": "Ice Mephit",
-  "summary": "Small elemental, neutral evil — CR 0.5",
+  "summary": "Small elemental, neutral evil - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 7,
@@ -22140,7 +22140,7 @@
    "externalId": "imp"
   },
   "name": "Imp",
-  "summary": "Tiny fiend, lawful evil — CR 1",
+  "summary": "Tiny fiend, lawful evil - CR 1",
   "size": "tiny",
   "abilityScores": {
    "str": 6,
@@ -22259,7 +22259,7 @@
    "externalId": "incubus"
   },
   "name": "Incubus",
-  "summary": "Medium fiend, neutral evil — CR 4",
+  "summary": "Medium fiend, neutral evil - CR 4",
   "size": "medium",
   "abilityScores": {
    "str": 8,
@@ -22401,7 +22401,7 @@
    "externalId": "invisible-stalker"
   },
   "name": "Invisible Stalker",
-  "summary": "Large elemental, neutral — CR 6",
+  "summary": "Large elemental, neutral - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -22546,7 +22546,7 @@
    "externalId": "iron-golem"
   },
   "name": "Iron Golem",
-  "summary": "Large construct, unaligned — CR 16",
+  "summary": "Large construct, unaligned - CR 16",
   "size": "large",
   "abilityScores": {
    "str": 24,
@@ -22706,7 +22706,7 @@
    "externalId": "jackal"
   },
   "name": "Jackal",
-  "summary": "Small beast, unaligned — CR 0",
+  "summary": "Small beast, unaligned - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 8,
@@ -22796,7 +22796,7 @@
    "externalId": "killer-whale"
   },
   "name": "Killer Whale",
-  "summary": "Huge beast, unaligned — CR 3",
+  "summary": "Huge beast, unaligned - CR 3",
   "size": "huge",
   "abilityScores": {
    "str": 19,
@@ -22891,7 +22891,7 @@
    "externalId": "knight"
   },
   "name": "Knight",
-  "summary": "Small humanoid, neutral — CR 3",
+  "summary": "Small humanoid, neutral - CR 3",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -23010,7 +23010,7 @@
    "externalId": "kobold-warrior"
   },
   "name": "Kobold Warrior",
-  "summary": "Small dragon, neutral — CR 0.125",
+  "summary": "Small dragon, neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 7,
@@ -23111,7 +23111,7 @@
    "externalId": "kraken"
   },
   "name": "Kraken",
-  "summary": "Gargantuan monstrosity, chaotic evil — CR 23",
+  "summary": "Gargantuan monstrosity, chaotic evil - CR 23",
   "size": "gargantuan",
   "abilityScores": {
    "str": 30,
@@ -23327,7 +23327,7 @@
    "externalId": "lamia"
   },
   "name": "Lamia",
-  "summary": "Large fiend, chaotic evil — CR 4",
+  "summary": "Large fiend, chaotic evil - CR 4",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -23460,7 +23460,7 @@
    "externalId": "lemure"
   },
   "name": "Lemure",
-  "summary": "Medium fiend, lawful evil — CR 0",
+  "summary": "Medium fiend, lawful evil - CR 0",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -23567,7 +23567,7 @@
    "externalId": "lich"
   },
   "name": "Lich",
-  "summary": "Medium undead, neutral evil — CR 21",
+  "summary": "Medium undead, neutral evil - CR 21",
   "size": "medium",
   "abilityScores": {
    "str": 11,
@@ -23762,7 +23762,7 @@
    "externalId": "lion"
   },
   "name": "Lion",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -23885,7 +23885,7 @@
    "externalId": "lizard"
   },
   "name": "Lizard",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -23975,7 +23975,7 @@
    "externalId": "mage"
   },
   "name": "Mage",
-  "summary": "Small humanoid, neutral — CR 6",
+  "summary": "Small humanoid, neutral - CR 6",
   "size": "small",
   "abilityScores": {
    "str": 9,
@@ -24106,7 +24106,7 @@
    "externalId": "magma-mephit"
   },
   "name": "Magma Mephit",
-  "summary": "Small elemental, neutral evil — CR 0.5",
+  "summary": "Small elemental, neutral evil - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 8,
@@ -24230,7 +24230,7 @@
    "externalId": "magmin"
   },
   "name": "Magmin",
-  "summary": "Small elemental, chaotic neutral — CR 0.5",
+  "summary": "Small elemental, chaotic neutral - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 7,
@@ -24335,7 +24335,7 @@
    "externalId": "mammoth"
   },
   "name": "Mammoth",
-  "summary": "Huge beast, unaligned — CR 6",
+  "summary": "Huge beast, unaligned - CR 6",
   "size": "huge",
   "abilityScores": {
    "str": 24,
@@ -24452,7 +24452,7 @@
    "externalId": "manticore"
   },
   "name": "Manticore",
-  "summary": "Large monstrosity, lawful evil — CR 3",
+  "summary": "Large monstrosity, lawful evil - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -24566,7 +24566,7 @@
    "externalId": "marilith"
   },
   "name": "Marilith",
-  "summary": "Large fiend, chaotic evil — CR 16",
+  "summary": "Large fiend, chaotic evil - CR 16",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -24722,7 +24722,7 @@
    "externalId": "mastiff"
   },
   "name": "Mastiff",
-  "summary": "Medium beast, unaligned — CR 0.125",
+  "summary": "Medium beast, unaligned - CR 0.125",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -24822,7 +24822,7 @@
    "externalId": "medusa"
   },
   "name": "Medusa",
-  "summary": "Medium monstrosity, lawful evil — CR 6",
+  "summary": "Medium monstrosity, lawful evil - CR 6",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -24973,7 +24973,7 @@
    "externalId": "merfolk-skirmisher"
   },
   "name": "Merfolk Skirmisher",
-  "summary": "Medium elemental, neutral — CR 0.125",
+  "summary": "Medium elemental, neutral - CR 0.125",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -25068,7 +25068,7 @@
    "externalId": "merrow"
   },
   "name": "Merrow",
-  "summary": "Large monstrosity, chaotic evil — CR 2",
+  "summary": "Large monstrosity, chaotic evil - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -25204,7 +25204,7 @@
    "externalId": "mimic"
   },
   "name": "Mimic",
-  "summary": "Medium monstrosity, neutral — CR 2",
+  "summary": "Medium monstrosity, neutral - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -25343,7 +25343,7 @@
    "externalId": "minotaur-of-baphomet"
   },
   "name": "Minotaur of Baphomet",
-  "summary": "Large monstrosity, chaotic evil — CR 3",
+  "summary": "Large monstrosity, chaotic evil - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -25454,7 +25454,7 @@
    "externalId": "minotaur-skeleton"
   },
   "name": "Minotaur Skeleton",
-  "summary": "Large undead, lawful evil — CR 2",
+  "summary": "Large undead, lawful evil - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -25567,7 +25567,7 @@
    "externalId": "mule"
   },
   "name": "Mule",
-  "summary": "Medium beast, unaligned — CR 0.125",
+  "summary": "Medium beast, unaligned - CR 0.125",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -25660,7 +25660,7 @@
    "externalId": "mummy"
   },
   "name": "Mummy",
-  "summary": "Small undead, lawful evil — CR 3",
+  "summary": "Small undead, lawful evil - CR 3",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -25785,7 +25785,7 @@
    "externalId": "mummy-lord"
   },
   "name": "Mummy Lord",
-  "summary": "Small undead, lawful evil — CR 15",
+  "summary": "Small undead, lawful evil - CR 15",
   "size": "small",
   "abilityScores": {
    "str": 18,
@@ -25986,7 +25986,7 @@
    "externalId": "nalfeshnee"
   },
   "name": "Nalfeshnee",
-  "summary": "Large fiend, chaotic evil — CR 13",
+  "summary": "Large fiend, chaotic evil - CR 13",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -26145,7 +26145,7 @@
    "externalId": "night-hag"
   },
   "name": "Night Hag",
-  "summary": "Medium fiend, neutral evil — CR 5",
+  "summary": "Medium fiend, neutral evil - CR 5",
   "size": "medium",
   "abilityScores": {
    "str": 18,
@@ -26286,7 +26286,7 @@
    "externalId": "nightmare"
   },
   "name": "Nightmare",
-  "summary": "Large fiend, neutral evil — CR 3",
+  "summary": "Large fiend, neutral evil - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -26393,7 +26393,7 @@
    "externalId": "noble"
   },
   "name": "Noble",
-  "summary": "Small humanoid, neutral — CR 0.125",
+  "summary": "Small humanoid, neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 11,
@@ -26488,7 +26488,7 @@
    "externalId": "ochre-jelly"
   },
   "name": "Ochre Jelly",
-  "summary": "Large ooze, unaligned — CR 2",
+  "summary": "Large ooze, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -26609,7 +26609,7 @@
    "externalId": "octopus"
   },
   "name": "Octopus",
-  "summary": "Small beast, unaligned — CR 0",
+  "summary": "Small beast, unaligned - CR 0",
   "size": "small",
   "abilityScores": {
    "str": 4,
@@ -26714,7 +26714,7 @@
    "externalId": "ogre"
   },
   "name": "Ogre",
-  "summary": "Large giant, chaotic evil — CR 2",
+  "summary": "Large giant, chaotic evil - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -26822,7 +26822,7 @@
    "externalId": "ogre-zombie"
   },
   "name": "Ogre Zombie",
-  "summary": "Large undead, neutral evil — CR 2",
+  "summary": "Large undead, neutral evil - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -26924,7 +26924,7 @@
    "externalId": "oni"
   },
   "name": "Oni",
-  "summary": "Large fiend, lawful evil — CR 7",
+  "summary": "Large fiend, lawful evil - CR 7",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -27066,7 +27066,7 @@
    "externalId": "otyugh"
   },
   "name": "Otyugh",
-  "summary": "Large aberration, neutral — CR 5",
+  "summary": "Large aberration, neutral - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -27210,7 +27210,7 @@
    "externalId": "owl"
   },
   "name": "Owl",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 3,
@@ -27300,7 +27300,7 @@
    "externalId": "owlbear"
   },
   "name": "Owlbear",
-  "summary": "Large monstrosity, unaligned — CR 3",
+  "summary": "Large monstrosity, unaligned - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 20,
@@ -27403,7 +27403,7 @@
    "externalId": "panther"
   },
   "name": "Panther",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -27500,7 +27500,7 @@
    "externalId": "pegasus"
   },
   "name": "Pegasus",
-  "summary": "Large celestial, chaotic good — CR 2",
+  "summary": "Large celestial, chaotic good - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -27588,7 +27588,7 @@
    "externalId": "phase-spider"
   },
   "name": "Phase Spider",
-  "summary": "Large monstrosity, unaligned — CR 3",
+  "summary": "Large monstrosity, unaligned - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 15,
@@ -27711,7 +27711,7 @@
    "externalId": "piranha"
   },
   "name": "Piranha",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -27801,7 +27801,7 @@
    "externalId": "pirate"
   },
   "name": "Pirate",
-  "summary": "Small humanoid, neutral — CR 1",
+  "summary": "Small humanoid, neutral - CR 1",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -27915,7 +27915,7 @@
    "externalId": "pirate-captain"
   },
   "name": "Pirate Captain",
-  "summary": "Small humanoid, neutral — CR 6",
+  "summary": "Small humanoid, neutral - CR 6",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -28045,7 +28045,7 @@
    "externalId": "pit-fiend"
   },
   "name": "Pit Fiend",
-  "summary": "Large fiend, lawful evil — CR 20",
+  "summary": "Large fiend, lawful evil - CR 20",
   "size": "large",
   "abilityScores": {
    "str": 26,
@@ -28220,7 +28220,7 @@
    "externalId": "planetar"
   },
   "name": "Planetar",
-  "summary": "Large celestial, lawful good — CR 16",
+  "summary": "Large celestial, lawful good - CR 16",
   "size": "large",
   "abilityScores": {
    "str": 24,
@@ -28373,7 +28373,7 @@
    "externalId": "plesiosaurus"
   },
   "name": "Plesiosaurus",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -28466,7 +28466,7 @@
    "externalId": "polar-bear"
   },
   "name": "Polar Bear",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 20,
@@ -28572,7 +28572,7 @@
    "externalId": "pony"
   },
   "name": "Pony",
-  "summary": "Medium beast, unaligned — CR 0.125",
+  "summary": "Medium beast, unaligned - CR 0.125",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -28660,7 +28660,7 @@
    "externalId": "priest"
   },
   "name": "Priest",
-  "summary": "Small humanoid, neutral — CR 2",
+  "summary": "Small humanoid, neutral - CR 2",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -28789,7 +28789,7 @@
    "externalId": "priest-acolyte"
   },
   "name": "Priest Acolyte",
-  "summary": "Small humanoid, neutral — CR 0.25",
+  "summary": "Small humanoid, neutral - CR 0.25",
   "size": "small",
   "abilityScores": {
    "str": 14,
@@ -28911,7 +28911,7 @@
    "externalId": "pseudodragon"
   },
   "name": "Pseudodragon",
-  "summary": "Tiny dragon, neutral good — CR 0.25",
+  "summary": "Tiny dragon, neutral good - CR 0.25",
   "size": "tiny",
   "abilityScores": {
    "str": 6,
@@ -29036,7 +29036,7 @@
    "externalId": "pteranodon"
   },
   "name": "Pteranodon",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -29129,7 +29129,7 @@
    "externalId": "purple-worm"
   },
   "name": "Purple Worm",
-  "summary": "Gargantuan monstrosity, unaligned — CR 15",
+  "summary": "Gargantuan monstrosity, unaligned - CR 15",
   "size": "gargantuan",
   "abilityScores": {
    "str": 28,
@@ -29285,7 +29285,7 @@
    "externalId": "quasit"
   },
   "name": "Quasit",
-  "summary": "Tiny fiend, chaotic evil — CR 1",
+  "summary": "Tiny fiend, chaotic evil - CR 1",
   "size": "tiny",
   "abilityScores": {
    "str": 5,
@@ -29420,7 +29420,7 @@
    "externalId": "rakshasa"
   },
   "name": "Rakshasa",
-  "summary": "Medium fiend, lawful evil — CR 13",
+  "summary": "Medium fiend, lawful evil - CR 13",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -29560,7 +29560,7 @@
    "externalId": "rat"
   },
   "name": "Rat",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -29650,7 +29650,7 @@
    "externalId": "raven"
   },
   "name": "Raven",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -29738,7 +29738,7 @@
    "externalId": "red-dragon-wyrmling"
   },
   "name": "Red Dragon Wyrmling",
-  "summary": "Medium dragon, chaotic evil — CR 4",
+  "summary": "Medium dragon, chaotic evil - CR 4",
   "size": "medium",
   "abilityScores": {
    "str": 19,
@@ -29870,7 +29870,7 @@
    "externalId": "reef-shark"
   },
   "name": "Reef Shark",
-  "summary": "Medium beast, unaligned — CR 0.5",
+  "summary": "Medium beast, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -29969,7 +29969,7 @@
    "externalId": "remorhaz"
   },
   "name": "Remorhaz",
-  "summary": "Huge monstrosity, unaligned — CR 11",
+  "summary": "Huge monstrosity, unaligned - CR 11",
   "size": "huge",
   "abilityScores": {
    "str": 24,
@@ -30100,7 +30100,7 @@
    "externalId": "rhinoceros"
   },
   "name": "Rhinoceros",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -30188,7 +30188,7 @@
    "externalId": "riding-horse"
   },
   "name": "Riding Horse",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -30276,7 +30276,7 @@
    "externalId": "roc"
   },
   "name": "Roc",
-  "summary": "Gargantuan monstrosity, unaligned — CR 11",
+  "summary": "Gargantuan monstrosity, unaligned - CR 11",
   "size": "gargantuan",
   "abilityScores": {
    "str": 28,
@@ -30416,7 +30416,7 @@
    "externalId": "roper"
   },
   "name": "Roper",
-  "summary": "Large aberration, neutral evil — CR 5",
+  "summary": "Large aberration, neutral evil - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -30552,7 +30552,7 @@
    "externalId": "rust-monster"
   },
   "name": "Rust Monster",
-  "summary": "Medium monstrosity, unaligned — CR 0.5",
+  "summary": "Medium monstrosity, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -30679,7 +30679,7 @@
    "externalId": "saber-toothed-tiger"
   },
   "name": "Saber-Toothed Tiger",
-  "summary": "Large beast, unaligned — CR 2",
+  "summary": "Large beast, unaligned - CR 2",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -30794,7 +30794,7 @@
    "externalId": "sahuagin-warrior"
   },
   "name": "Sahuagin Warrior",
-  "summary": "Medium fiend, lawful evil — CR 0.5",
+  "summary": "Medium fiend, lawful evil - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -30921,7 +30921,7 @@
    "externalId": "salamander"
   },
   "name": "Salamander",
-  "summary": "Large elemental, neutral evil — CR 5",
+  "summary": "Large elemental, neutral evil - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -31054,7 +31054,7 @@
    "externalId": "satyr"
   },
   "name": "Satyr",
-  "summary": "Medium fey, chaotic neutral — CR 0.5",
+  "summary": "Medium fey, chaotic neutral - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 12,
@@ -31163,7 +31163,7 @@
    "externalId": "scorpion"
   },
   "name": "Scorpion",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -31248,7 +31248,7 @@
    "externalId": "scout"
   },
   "name": "Scout",
-  "summary": "Small humanoid, neutral — CR 0.5",
+  "summary": "Small humanoid, neutral - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 11,
@@ -31360,7 +31360,7 @@
    "externalId": "sea-hag"
   },
   "name": "Sea Hag",
-  "summary": "Medium fey, chaotic evil — CR 2",
+  "summary": "Medium fey, chaotic evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 16,
@@ -31487,7 +31487,7 @@
    "externalId": "seahorse"
   },
   "name": "Seahorse",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 1,
@@ -31571,7 +31571,7 @@
    "externalId": "shadow"
   },
   "name": "Shadow",
-  "summary": "Medium undead, chaotic evil — CR 0.5",
+  "summary": "Medium undead, chaotic evil - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 6,
@@ -31699,7 +31699,7 @@
    "externalId": "shambling-mound"
   },
   "name": "Shambling Mound",
-  "summary": "Large plant, unaligned — CR 5",
+  "summary": "Large plant, unaligned - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -31834,7 +31834,7 @@
    "externalId": "shield-guardian"
   },
   "name": "Shield Guardian",
-  "summary": "Large construct, unaligned — CR 7",
+  "summary": "Large construct, unaligned - CR 7",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -31969,7 +31969,7 @@
    "externalId": "shrieker-fungus"
   },
   "name": "Shrieker Fungus",
-  "summary": "Medium plant, unaligned — CR 0",
+  "summary": "Medium plant, unaligned - CR 0",
   "size": "medium",
   "abilityScores": {
    "str": 1,
@@ -32050,7 +32050,7 @@
    "externalId": "silver-dragon-wyrmling"
   },
   "name": "Silver Dragon Wyrmling",
-  "summary": "Medium dragon, lawful good — CR 2",
+  "summary": "Medium dragon, lawful good - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 19,
@@ -32189,7 +32189,7 @@
    "externalId": "skeleton"
   },
   "name": "Skeleton",
-  "summary": "Medium undead, lawful evil — CR 0.25",
+  "summary": "Medium undead, lawful evil - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 10,
@@ -32303,7 +32303,7 @@
    "externalId": "solar"
   },
   "name": "Solar",
-  "summary": "Large celestial, lawful good — CR 21",
+  "summary": "Large celestial, lawful good - CR 21",
   "size": "large",
   "abilityScores": {
    "str": 26,
@@ -32509,7 +32509,7 @@
    "externalId": "specter"
   },
   "name": "Specter",
-  "summary": "Medium undead, chaotic evil — CR 1",
+  "summary": "Medium undead, chaotic evil - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 1,
@@ -32630,7 +32630,7 @@
    "externalId": "sphinx-of-lore"
   },
   "name": "Sphinx of Lore",
-  "summary": "Large celestial, lawful neutral — CR 11",
+  "summary": "Large celestial, lawful neutral - CR 11",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -32809,7 +32809,7 @@
    "externalId": "sphinx-of-valor"
   },
   "name": "Sphinx of Valor",
-  "summary": "Large celestial, lawful neutral — CR 17",
+  "summary": "Large celestial, lawful neutral - CR 17",
   "size": "large",
   "abilityScores": {
    "str": 22,
@@ -32987,7 +32987,7 @@
    "externalId": "sphinx-of-wonder"
   },
   "name": "Sphinx of Wonder",
-  "summary": "Tiny celestial, lawful good — CR 1",
+  "summary": "Tiny celestial, lawful good - CR 1",
   "size": "tiny",
   "abilityScores": {
    "str": 6,
@@ -33098,7 +33098,7 @@
    "externalId": "spider"
   },
   "name": "Spider",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -33192,7 +33192,7 @@
    "externalId": "spirit-naga"
   },
   "name": "Spirit Naga",
-  "summary": "Large fiend, chaotic evil — CR 8",
+  "summary": "Large fiend, chaotic evil - CR 8",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -33324,7 +33324,7 @@
    "externalId": "sprite"
   },
   "name": "Sprite",
-  "summary": "Tiny fey, neutral good — CR 0.25",
+  "summary": "Tiny fey, neutral good - CR 0.25",
   "size": "tiny",
   "abilityScores": {
    "str": 3,
@@ -33442,7 +33442,7 @@
    "externalId": "spy"
   },
   "name": "Spy",
-  "summary": "Small humanoid, neutral — CR 1",
+  "summary": "Small humanoid, neutral - CR 1",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -33554,7 +33554,7 @@
    "externalId": "steam-mephit"
   },
   "name": "Steam Mephit",
-  "summary": "Small elemental, neutral evil — CR 0.25",
+  "summary": "Small elemental, neutral evil - CR 0.25",
   "size": "small",
   "abilityScores": {
    "str": 5,
@@ -33682,7 +33682,7 @@
    "externalId": "stirge"
   },
   "name": "Stirge",
-  "summary": "Tiny monstrosity, unaligned — CR 0.125",
+  "summary": "Tiny monstrosity, unaligned - CR 0.125",
   "size": "tiny",
   "abilityScores": {
    "str": 4,
@@ -33772,7 +33772,7 @@
    "externalId": "stone-giant"
   },
   "name": "Stone Giant",
-  "summary": "Huge giant, neutral — CR 7",
+  "summary": "Huge giant, neutral - CR 7",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -33908,7 +33908,7 @@
    "externalId": "stone-golem"
   },
   "name": "Stone Golem",
-  "summary": "Large construct, unaligned — CR 10",
+  "summary": "Large construct, unaligned - CR 10",
   "size": "large",
   "abilityScores": {
    "str": 22,
@@ -34054,7 +34054,7 @@
    "externalId": "storm-giant"
   },
   "name": "Storm Giant",
-  "summary": "Huge giant, chaotic good — CR 13",
+  "summary": "Huge giant, chaotic good - CR 13",
   "size": "huge",
   "abilityScores": {
    "str": 29,
@@ -34208,7 +34208,7 @@
    "externalId": "succubus"
   },
   "name": "Succubus",
-  "summary": "Medium fiend, neutral evil — CR 4",
+  "summary": "Medium fiend, neutral evil - CR 4",
   "size": "medium",
   "abilityScores": {
    "str": 8,
@@ -34346,7 +34346,7 @@
    "externalId": "swarm-of-bats"
   },
   "name": "Swarm of Bats",
-  "summary": "Large beast, unaligned — CR 0.25",
+  "summary": "Large beast, unaligned - CR 0.25",
   "size": "large",
   "abilityScores": {
    "str": 5,
@@ -34441,7 +34441,7 @@
    "externalId": "swarm-of-crawling-claws"
   },
   "name": "Swarm of Crawling Claws",
-  "summary": "Medium undead, neutral evil — CR 3",
+  "summary": "Medium undead, neutral evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -34563,7 +34563,7 @@
    "externalId": "swarm-of-insects"
   },
   "name": "Swarm of Insects",
-  "summary": "Medium beast, unaligned — CR 0.5",
+  "summary": "Medium beast, unaligned - CR 0.5",
   "size": "medium",
   "abilityScores": {
    "str": 3,
@@ -34662,7 +34662,7 @@
    "externalId": "swarm-of-piranhas"
   },
   "name": "Swarm of Piranhas",
-  "summary": "Medium beast, unaligned — CR 1",
+  "summary": "Medium beast, unaligned - CR 1",
   "size": "medium",
   "abilityScores": {
    "str": 13,
@@ -34761,7 +34761,7 @@
    "externalId": "swarm-of-rats"
   },
   "name": "Swarm of Rats",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 9,
@@ -34856,7 +34856,7 @@
    "externalId": "swarm-of-ravens"
   },
   "name": "Swarm of Ravens",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 6,
@@ -34965,7 +34965,7 @@
    "externalId": "swarm-of-venomous-snakes"
   },
   "name": "Swarm of Venomous Snakes",
-  "summary": "Medium beast, unaligned — CR 2",
+  "summary": "Medium beast, unaligned - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 8,
@@ -35060,7 +35060,7 @@
    "externalId": "tarrasque"
   },
   "name": "Tarrasque",
-  "summary": "Gargantuan monstrosity, unaligned — CR 30",
+  "summary": "Gargantuan monstrosity, unaligned - CR 30",
   "size": "gargantuan",
   "abilityScores": {
    "str": 30,
@@ -35298,7 +35298,7 @@
    "externalId": "tiger"
   },
   "name": "Tiger",
-  "summary": "Large beast, unaligned — CR 1",
+  "summary": "Large beast, unaligned - CR 1",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -35405,7 +35405,7 @@
    "externalId": "tough"
   },
   "name": "Tough",
-  "summary": "Small humanoid, neutral — CR 0.5",
+  "summary": "Small humanoid, neutral - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 15,
@@ -35515,7 +35515,7 @@
    "externalId": "tough-boss"
   },
   "name": "Tough Boss",
-  "summary": "Small humanoid, neutral — CR 4",
+  "summary": "Small humanoid, neutral - CR 4",
   "size": "small",
   "abilityScores": {
    "str": 17,
@@ -35632,7 +35632,7 @@
    "externalId": "treant"
   },
   "name": "Treant",
-  "summary": "Huge plant, chaotic good — CR 9",
+  "summary": "Huge plant, chaotic good - CR 9",
   "size": "huge",
   "abilityScores": {
    "str": 23,
@@ -35765,7 +35765,7 @@
    "externalId": "triceratops"
   },
   "name": "Triceratops",
-  "summary": "Huge beast, unaligned — CR 5",
+  "summary": "Huge beast, unaligned - CR 5",
   "size": "huge",
   "abilityScores": {
    "str": 22,
@@ -35866,7 +35866,7 @@
    "externalId": "troll"
   },
   "name": "Troll",
-  "summary": "Large giant, chaotic evil — CR 5",
+  "summary": "Large giant, chaotic evil - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -35985,7 +35985,7 @@
    "externalId": "troll-limb"
   },
   "name": "Troll Limb",
-  "summary": "Small giant, chaotic evil — CR 0.5",
+  "summary": "Small giant, chaotic evil - CR 0.5",
   "size": "small",
   "abilityScores": {
    "str": 18,
@@ -36084,7 +36084,7 @@
    "externalId": "tyrannosaurus-rex"
   },
   "name": "Tyrannosaurus Rex",
-  "summary": "Huge beast, unaligned — CR 8",
+  "summary": "Huge beast, unaligned - CR 8",
   "size": "huge",
   "abilityScores": {
    "str": 25,
@@ -36229,7 +36229,7 @@
    "externalId": "unicorn"
   },
   "name": "Unicorn",
-  "summary": "Large celestial, lawful good — CR 5",
+  "summary": "Large celestial, lawful good - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -36411,7 +36411,7 @@
    "externalId": "vampire"
   },
   "name": "Vampire",
-  "summary": "Small undead, lawful evil — CR 13",
+  "summary": "Small undead, lawful evil - CR 13",
   "size": "small",
   "abilityScores": {
    "str": 18,
@@ -36608,7 +36608,7 @@
    "externalId": "vampire-familiar"
   },
   "name": "Vampire Familiar",
-  "summary": "Small humanoid, neutral evil — CR 3",
+  "summary": "Small humanoid, neutral evil - CR 3",
   "size": "small",
   "abilityScores": {
    "str": 17,
@@ -36728,7 +36728,7 @@
    "externalId": "vampire-spawn"
   },
   "name": "Vampire Spawn",
-  "summary": "Small undead, neutral evil — CR 5",
+  "summary": "Small undead, neutral evil - CR 5",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -36881,7 +36881,7 @@
    "externalId": "venomous-snake"
   },
   "name": "Venomous Snake",
-  "summary": "Tiny beast, unaligned — CR 0.125",
+  "summary": "Tiny beast, unaligned - CR 0.125",
   "size": "tiny",
   "abilityScores": {
    "str": 2,
@@ -36971,7 +36971,7 @@
    "externalId": "violet-fungus"
   },
   "name": "Violet Fungus",
-  "summary": "Medium plant, unaligned — CR 0.25",
+  "summary": "Medium plant, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 3,
@@ -37074,7 +37074,7 @@
    "externalId": "vrock"
   },
   "name": "Vrock",
-  "summary": "Large fiend, chaotic evil — CR 6",
+  "summary": "Large fiend, chaotic evil - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 17,
@@ -37238,7 +37238,7 @@
    "externalId": "vulture"
   },
   "name": "Vulture",
-  "summary": "Medium beast, unaligned — CR 0",
+  "summary": "Medium beast, unaligned - CR 0",
   "size": "medium",
   "abilityScores": {
    "str": 7,
@@ -37331,7 +37331,7 @@
    "externalId": "warhorse"
   },
   "name": "Warhorse",
-  "summary": "Large beast, unaligned — CR 0.5",
+  "summary": "Large beast, unaligned - CR 0.5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -37419,7 +37419,7 @@
    "externalId": "warhorse-skeleton"
   },
   "name": "Warhorse Skeleton",
-  "summary": "Large undead, lawful evil — CR 0.5",
+  "summary": "Large undead, lawful evil - CR 0.5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -37516,7 +37516,7 @@
    "externalId": "warrior-infantry"
   },
   "name": "Warrior Infantry",
-  "summary": "Small humanoid, neutral — CR 0.125",
+  "summary": "Small humanoid, neutral - CR 0.125",
   "size": "small",
   "abilityScores": {
    "str": 13,
@@ -37611,7 +37611,7 @@
    "externalId": "warrior-veteran"
   },
   "name": "Warrior Veteran",
-  "summary": "Small humanoid, neutral — CR 3",
+  "summary": "Small humanoid, neutral - CR 3",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -37730,7 +37730,7 @@
    "externalId": "water-elemental"
   },
   "name": "Water Elemental",
-  "summary": "Large elemental, neutral — CR 5",
+  "summary": "Large elemental, neutral - CR 5",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -37894,7 +37894,7 @@
    "externalId": "weasel"
   },
   "name": "Weasel",
-  "summary": "Tiny beast, unaligned — CR 0",
+  "summary": "Tiny beast, unaligned - CR 0",
   "size": "tiny",
   "abilityScores": {
    "str": 3,
@@ -37979,7 +37979,7 @@
    "externalId": "werebear"
   },
   "name": "Werebear",
-  "summary": "Small monstrosity, neutral good — CR 5",
+  "summary": "Small monstrosity, neutral good - CR 5",
   "size": "small",
   "abilityScores": {
    "str": 19,
@@ -38121,7 +38121,7 @@
    "externalId": "wereboar"
   },
   "name": "Wereboar",
-  "summary": "Small monstrosity, neutral evil — CR 4",
+  "summary": "Small monstrosity, neutral evil - CR 4",
   "size": "small",
   "abilityScores": {
    "str": 17,
@@ -38261,7 +38261,7 @@
    "externalId": "wererat"
   },
   "name": "Wererat",
-  "summary": "Small monstrosity, lawful evil — CR 2",
+  "summary": "Small monstrosity, lawful evil - CR 2",
   "size": "small",
   "abilityScores": {
    "str": 10,
@@ -38402,7 +38402,7 @@
    "externalId": "weretiger"
   },
   "name": "Weretiger",
-  "summary": "Small monstrosity, neutral — CR 4",
+  "summary": "Small monstrosity, neutral - CR 4",
   "size": "small",
   "abilityScores": {
    "str": 17,
@@ -38550,7 +38550,7 @@
    "externalId": "werewolf"
   },
   "name": "Werewolf",
-  "summary": "Small monstrosity, chaotic evil — CR 3",
+  "summary": "Small monstrosity, chaotic evil - CR 3",
   "size": "small",
   "abilityScores": {
    "str": 16,
@@ -38696,7 +38696,7 @@
    "externalId": "white-dragon-wyrmling"
   },
   "name": "White Dragon Wyrmling",
-  "summary": "Medium dragon, chaotic evil — CR 2",
+  "summary": "Medium dragon, chaotic evil - CR 2",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -38833,7 +38833,7 @@
    "externalId": "wight"
   },
   "name": "Wight",
-  "summary": "Medium undead, neutral evil — CR 3",
+  "summary": "Medium undead, neutral evil - CR 3",
   "size": "medium",
   "abilityScores": {
    "str": 15,
@@ -38978,7 +38978,7 @@
    "externalId": "will-o-wisp"
   },
   "name": "Will-o'-Wisp",
-  "summary": "Tiny undead, chaotic evil — CR 2",
+  "summary": "Tiny undead, chaotic evil - CR 2",
   "size": "tiny",
   "abilityScores": {
    "str": 1,
@@ -39119,7 +39119,7 @@
    "externalId": "winter-wolf"
   },
   "name": "Winter Wolf",
-  "summary": "Large monstrosity, neutral evil — CR 3",
+  "summary": "Large monstrosity, neutral evil - CR 3",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -39246,7 +39246,7 @@
    "externalId": "wolf"
   },
   "name": "Wolf",
-  "summary": "Medium beast, unaligned — CR 0.25",
+  "summary": "Medium beast, unaligned - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 14,
@@ -39351,7 +39351,7 @@
    "externalId": "worg"
   },
   "name": "Worg",
-  "summary": "Large fey, neutral evil — CR 0.5",
+  "summary": "Large fey, neutral evil - CR 0.5",
   "size": "large",
   "abilityScores": {
    "str": 16,
@@ -39441,7 +39441,7 @@
    "externalId": "wraith"
   },
   "name": "Wraith",
-  "summary": "Small undead, neutral evil — CR 5",
+  "summary": "Small undead, neutral evil - CR 5",
   "size": "small",
   "abilityScores": {
    "str": 6,
@@ -39567,7 +39567,7 @@
    "externalId": "wyvern"
   },
   "name": "Wyvern",
-  "summary": "Large dragon, unaligned — CR 6",
+  "summary": "Large dragon, unaligned - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -39690,7 +39690,7 @@
    "externalId": "xorn"
   },
   "name": "Xorn",
-  "summary": "Medium elemental, neutral — CR 5",
+  "summary": "Medium elemental, neutral - CR 5",
   "size": "medium",
   "abilityScores": {
    "str": 17,
@@ -39828,7 +39828,7 @@
    "externalId": "young-black-dragon"
   },
   "name": "Young Black Dragon",
-  "summary": "Large dragon, chaotic evil — CR 7",
+  "summary": "Large dragon, chaotic evil - CR 7",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -39965,7 +39965,7 @@
    "externalId": "young-blue-dragon"
   },
   "name": "Young Blue Dragon",
-  "summary": "Large dragon, lawful evil — CR 9",
+  "summary": "Large dragon, lawful evil - CR 9",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -40097,7 +40097,7 @@
    "externalId": "young-brass-dragon"
   },
   "name": "Young Brass Dragon",
-  "summary": "Large dragon, chaotic good — CR 6",
+  "summary": "Large dragon, chaotic good - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -40236,7 +40236,7 @@
    "externalId": "young-bronze-dragon"
   },
   "name": "Young Bronze Dragon",
-  "summary": "Large dragon, lawful good — CR 8",
+  "summary": "Large dragon, lawful good - CR 8",
   "size": "large",
   "abilityScores": {
    "str": 21,
@@ -40380,7 +40380,7 @@
    "externalId": "young-copper-dragon"
   },
   "name": "Young Copper Dragon",
-  "summary": "Large dragon, chaotic good — CR 7",
+  "summary": "Large dragon, chaotic good - CR 7",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -40519,7 +40519,7 @@
    "externalId": "young-gold-dragon"
   },
   "name": "Young Gold Dragon",
-  "summary": "Large dragon, lawful good — CR 10",
+  "summary": "Large dragon, lawful good - CR 10",
   "size": "large",
   "abilityScores": {
    "str": 23,
@@ -40663,7 +40663,7 @@
    "externalId": "young-green-dragon"
   },
   "name": "Young Green Dragon",
-  "summary": "Large dragon, lawful evil — CR 8",
+  "summary": "Large dragon, lawful evil - CR 8",
   "size": "large",
   "abilityScores": {
    "str": 19,
@@ -40803,7 +40803,7 @@
    "externalId": "young-red-dragon"
   },
   "name": "Young Red Dragon",
-  "summary": "Large dragon, chaotic evil — CR 10",
+  "summary": "Large dragon, chaotic evil - CR 10",
   "size": "large",
   "abilityScores": {
    "str": 23,
@@ -40935,7 +40935,7 @@
    "externalId": "young-silver-dragon"
   },
   "name": "Young Silver Dragon",
-  "summary": "Large dragon, lawful good — CR 9",
+  "summary": "Large dragon, lawful good - CR 9",
   "size": "large",
   "abilityScores": {
    "str": 23,
@@ -41074,7 +41074,7 @@
    "externalId": "young-white-dragon"
   },
   "name": "Young White Dragon",
-  "summary": "Large dragon, chaotic evil — CR 6",
+  "summary": "Large dragon, chaotic evil - CR 6",
   "size": "large",
   "abilityScores": {
    "str": 18,
@@ -41211,7 +41211,7 @@
    "externalId": "zombie"
   },
   "name": "Zombie",
-  "summary": "Medium undead, neutral evil — CR 0.25",
+  "summary": "Medium undead, neutral evil - CR 0.25",
   "size": "medium",
   "abilityScores": {
    "str": 13,

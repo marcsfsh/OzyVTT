@@ -26,8 +26,8 @@ const summaryOf = (action: ContentActionSummary) => {
 };
 
 /**
- * Client-side availability HINT (ADR-0020): the server is the authority — rows stay tappable and a
- * strict-mode rejection opens the audited override — but the obvious cases annotate up front so the
+ * Client-side availability HINT (ADR-0020): the server is the authority - rows stay tappable and a
+ * strict-mode rejection opens the audited override - but the obvious cases annotate up front so the
  * legal action is visibly the easiest path.
  */
 function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSummary): string | null {
@@ -40,7 +40,7 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   if (action.usesLimit !== null && action.usesPer !== null) {
     const key = action.usesPool ?? action.id;
     const spent = action.usesPer === "turn" ? (state.combat.turn.turnUses[`${actor.id}:${key}`] ?? 0) : (actor.actionUses[key] ?? 0);
-    if (spent >= action.usesLimit) return action.usesPer === "recharge" ? `Spent — recharges on ${action.usesRecharge}+ at its turn start` : "No uses left";
+    if (spent >= action.usesLimit) return action.usesPer === "recharge" ? `Spent - recharges on ${action.usesRecharge}+ at its turn start` : "No uses left";
   }
   const myTurn = state.combat.turnActorId === actor.id;
   if (!myTurn) return null;
@@ -49,7 +49,7 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   if (action.activation === "action" && turn.actionUsed) {
     const instance = turn.actionInstance?.actorId === actor.id ? turn.actionInstance.components : null;
     // The Multiattack plan row stays a live "continue" while any component remains.
-    if (action.multiattack && instance && Object.values(instance).some((count) => count > 0)) return "In progress — pick the next attack";
+    if (action.multiattack && instance && Object.values(instance).some((count) => count > 0)) return "In progress - pick the next attack";
     const remaining = instance ? (instance[action.id] ?? 0) + (action.attackBonus !== null ? instance["attack"] ?? 0 : 0) : 0;
     if (remaining > 0) return `${remaining} attack${remaining === 1 ? "" : "s"} left`;
     return "Action used";
@@ -60,7 +60,7 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
 
 /**
  * The GM's action runner for the current stat-block combatant: pick an action, pick targets (in the
- * list here or by clicking tokens on the map — both drive the shared targeting store), resolve on the
+ * list here or by clicking tokens on the map - both drive the shared targeting store), resolve on the
  * server, then apply the proposed typed damage with explicit taps. Strict-mode rejections come back
  * as a one-tap override confirmation, never a dead end (ADR-0020).
  */
@@ -73,7 +73,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
-  // A strict-mode rejection awaiting the GM's call — store state, so a resolve rolled from the
+  // A strict-mode rejection awaiting the GM's call - store state, so a resolve rolled from the
   // map's confirm bar surfaces the same override dialog here (ADR-0020).
   const blockedPrompt = useTargetingBlocked();
   const session = useTargeting();
@@ -124,7 +124,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       const application = response.applied;
       if (application && application.totalApplied !== application.totalRequested) {
         const adjusted = application.parts.filter((part) => part.adjustment !== null).map((part) => `${part.amount} ${part.type} → ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`).join("; ");
-        onFeedback(`${targetName} took ${application.totalApplied} damage — ${adjusted}.`);
+        onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);
       } else {
         onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
       }
@@ -152,18 +152,22 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
     {actions && !picking && (() => {
       // Three tiers of prominence: the stat block's own rollable actions are the working surface
       // (full rows); the shared builtin catalog (Dodge, Dash, Unarmed Strike, ...) is one wrapped
-      // cluster of small chips — the same 16 actions on every creature don't earn 16 rows; prose
+      // cluster of small chips - the same 16 actions on every creature don't earn 16 rows; prose
       // traits collapse behind one line (the sheet always has the full text).
       const own = actions.filter((action) => isResolvable(action) && action.builtin !== true);
       const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
       const reference = actions.filter((action) => !isResolvable(action));
+      // Spellcasting is the reference entry the GM actually reads mid-fight - hoist it out of the
+      // collapsed "Traits & reference" group and show it open by default (report #10).
+      const spellcasting = reference.find((action) => action.id === "spellcasting" || /spellcasting/i.test(action.name));
+      const otherReference = reference.filter((action) => action !== spellcasting);
       return <>
         <ul className="action-list">
           {own.map((action) => {
             const hint = availabilityHint(state, actor, action);
             return <li key={action.id}>
               <button type="button" className={`action-row${hint ? " action-row-hinted" : ""}`} disabled={busy} title={action.description} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>
-                <strong>{action.name}</strong><small>{summaryOf(action) || (action.grants ? "Use — grants an effect" : "Use")}{hint ? <span className="action-hint"> · {hint}</span> : null}</small>
+                <strong>{action.name}</strong><small>{summaryOf(action) || (action.grants ? "Use - grants an effect" : "Use")}{hint ? <span className="action-hint"> · {hint}</span> : null}</small>
               </button>
             </li>;
           })}
@@ -181,10 +185,14 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             {rest.length > 0 && primary.length > 0 && <button type="button" className="builtin-chip builtin-more" aria-expanded={moreBuiltins} onClick={() => setMoreBuiltins((current) => !current)}>{moreBuiltins ? "Less ▴" : `More ▾`}</button>}
           </div>;
         })()}
-        {reference.length > 0 && <details className="action-reference-group">
-          <summary>Traits &amp; reference ({reference.length})</summary>
+        {spellcasting && <div className="action-spellcasting" role="group" aria-label="Spellcasting">
+          <div className="action-spellcasting-head"><span aria-hidden="true">✦</span> <strong>{spellcasting.name}</strong></div>
+          <p className="action-reference-text"><RichText text={spellcasting.description} /></p>
+        </div>}
+        {otherReference.length > 0 && <details className="action-reference-group">
+          <summary>Traits &amp; reference ({otherReference.length})</summary>
           <ul className="action-list">
-            {reference.map((action) => <li key={action.id}>
+            {otherReference.map((action) => <li key={action.id}>
               <button type="button" className="action-row action-row-static" aria-expanded={openReference === action.id} onClick={() => setOpenReference((current) => current === action.id ? null : action.id)}>
                 <strong>{action.name}</strong><small>{action.activation === "other" ? "tap to read" : `${action.activation} · tap to read`}</small>
               </button>
@@ -196,9 +204,9 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
     })()}
     {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       {picking.mode === "template"
-        ? <p className="action-targeting-head"><strong>{picking.action.name}</strong> — drag the {picking.action.area?.sizeFeet}-ft {picking.action.area?.shape} on the map{picking.template?.placed ? " (placed — Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.</p>
+        ? <p className="action-targeting-head"><strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft {picking.action.area?.shape} on the map{picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.</p>
         : <>
-            <p className="action-targeting-head"><strong>{picking.action.name}</strong> — {picking.mode === "single" ? "choose one target (or click a token)" : "choose targets (or click tokens)"}</p>
+            <p className="action-targeting-head"><strong>{picking.action.name}</strong> - {picking.mode === "single" ? "choose one target (or click a token)" : "choose targets (or click tokens)"}</p>
             <ul className="action-target-list">{combatants.filter((target) => target.id !== actor.id).map((target) => {
               const checked = picking.selected.includes(target.id);
               return <li key={target.id}>
@@ -227,7 +235,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.overridden && <p className="action-overridden">Override ({result.overridden.rule}): {result.overridden.reason}</p>}
       {result.rollMode && <p className="action-rollmode">{result.rollMode.mode === "normal" ? "Advantage and disadvantage cancel" : result.rollMode.mode === "advantage" ? "Advantage" : "Disadvantage"}: {[...result.rollMode.advantage, ...result.rollMode.disadvantage].join(", ")}</p>}
       {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
-        {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} — {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "no AC on record" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
+        {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} - {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "no AC on record" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
       </p>}
       {result.save && <p className="action-outcome">Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save</p>}
       {result.effectGranted && <p className="action-effect-granted">{actor.name} gains <strong>{result.effectGranted.name}</strong>.</p>}
@@ -235,16 +243,16 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.damage.length > 0 && <p className="action-damage">Damage: <strong>{result.damageTotal}</strong> ({[
         ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
         ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-      ].join(" + ")}){result.crit ? " — crit dice doubled" : ""}</p>}
+      ].join(" + ")}){result.crit ? " - crit dice doubled" : ""}</p>}
       {result.attack && (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
         // A reaction window (Uncanny Dodge) parked this damage on a prompt: the answer applies it
-        // server-side, so the apply button never shows for this target — that would double-apply.
+        // server-side, so the apply button never shows for this target - that would double-apply.
         const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
         if (prompt) {
           const waiting = state.combat.pendingReactions.some((reaction) => reaction.actorId === result.attack!.targetId && reaction.sourceActorId === actor.id);
           return waiting
-            ? <p className="action-save-note">Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong> — answer it in the turn order; the damage applies there.</p>
-            : <p className="action-applied">{prompt.actionName} answered — damage handled in the turn order.</p>;
+            ? <p className="action-save-note">Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong> - answer it in the turn order; the damage applies there.</p>
+            : <p className="action-applied">{prompt.actionName} answered - damage handled in the turn order.</p>;
         }
         return applied.has(result.attack.targetId)
           ? <p className="action-applied">Applied to {result.attack.targetName}.</p>
@@ -253,13 +261,13 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.warnings?.map((warning) => <p key={warning} className="action-warning">⚠ {warning}</p>)}
       {result.save && (() => {
         // Reflect the LIVE count of unanswered saves for this action (matched by attacker + action),
-        // not the frozen resolve-time count — so the note clears as each save is answered in the tracker.
+        // not the frozen resolve-time count - so the note clears as each save is answered in the tracker.
         const waiting = state.combat.pendingSaves.filter((save) => save.sourceActorId === actor.id && save.actionName === result.actionName).length;
         return waiting > 0
-          ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order — roll or enter each result there, then confirm to apply.</p>
+          ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then confirm to apply.</p>
           : <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>;
       })()}
-      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} — tap <strong>↻ Again</strong> or pick the next attack above.</p>}
+      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next attack above.</p>}
     </div>}
   </div>;
 }

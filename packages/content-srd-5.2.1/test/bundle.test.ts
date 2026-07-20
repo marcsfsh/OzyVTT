@@ -99,7 +99,7 @@ describe("SRD 5.2.1 monster bundle", () => {
 
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
-    // rat: flat "1 Piercing damage" — attack is structured, damage stays prose-only.
+    // rat: flat "1 Piercing damage" - attack is structured, damage stays prose-only.
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
     expect(ratBite?.damage).toEqual([]);

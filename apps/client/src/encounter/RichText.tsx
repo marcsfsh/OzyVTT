@@ -1,8 +1,8 @@
 import { Fragment, type ReactNode } from "react";
 
 /**
- * Renders the small markdown subset the SRD reference text uses — **bold**, newlines, and "- "/"* "
- * bullets — as inline-safe JSX (only <strong>, <br>, and text), so it drops straight into the
+ * Renders the small markdown subset the SRD reference text uses - **bold**, newlines, and "- "/"* "
+ * bullets - as inline-safe JSX (only <strong>, <br>, and text), so it drops straight into the
  * existing <p> entries. Display only: it never executes or trusts the content, it just formats the
  * bundled reference prose that would otherwise show raw "**At Will:**" markers.
  */
@@ -14,7 +14,9 @@ function inline(text: string): ReactNode[] {
 }
 
 export function RichText({ text }: Readonly<{ text: string }>) {
-  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  // Normalize em-dashes to " - " at render so bundled SRD prose never shows one in the UI, without
+  // mutating the licensed content in storage (house style: no em-dashes anywhere on screen).
+  const lines = text.replace(/\s*—\s*/g, " - ").split("\n").map((line) => line.trim()).filter(Boolean);
   return <>{lines.map((line, index) => {
     const bullet = line.startsWith("- ") || line.startsWith("* ");
     return <Fragment key={index}>

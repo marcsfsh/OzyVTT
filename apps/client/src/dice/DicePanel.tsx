@@ -34,7 +34,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
   };
   // Advantage/disadvantage are toggles that arm the *next* d20 roll only; rolling a d20 consumes
   // and clears them. Core 5e rules never allow both at once, so turning one on while the other is
-  // already armed cancels both rather than silently overriding — the player has to choose again.
+  // already armed cancels both rather than silently overriding - the player has to choose again.
   const toggleAdvantage = () => { if (advantage) return setAdvantage(false); if (disadvantage) { setAdvantage(false); setDisadvantage(false); return; } setAdvantage(true); };
   const toggleDisadvantage = () => { if (disadvantage) return setDisadvantage(false); if (advantage) { setAdvantage(false); setDisadvantage(false); return; } setDisadvantage(true); };
   const quickRoll = (sides: number) => {
@@ -54,14 +54,14 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     submit(formula, purpose);
   };
   // SRD Falling: 1d6 bludgeoning per 10 feet fallen, max 20d6; the faller lands Prone. The server
-  // rolls (dice authority) — this just builds the formula and reminds about the apply/Prone steps.
+  // rolls (dice authority) - this just builds the formula and reminds about the apply/Prone steps.
   const fallDice = Math.min(Math.floor((Number.parseInt(fallFeet, 10) || 0) / 10), 20);
   const rollFall = () => {
     if (fallDice < 1) return setFeedback("Falls under 10 feet deal no damage.");
     setFeedback("Rolling…");
     socket.emit("dice:roll", { commandId: newId(), formula: `${fallDice}d6`, purpose: "damage", visibility }, (result) => {
       if (!result.ok) return setFeedback(result.message ?? "That roll didn't work.");
-      setFeedback(`Fall damage rolled (${fallDice}d6 bludgeoning) — apply the total as damage; the faller lands Prone.`);
+      setFeedback(`Fall damage rolled (${fallDice}d6 bludgeoning) - apply the total as damage; the faller lands Prone.`);
     });
   };
 

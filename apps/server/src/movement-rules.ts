@@ -34,7 +34,7 @@ export type MovementRulesOutcome = Readonly<{
 
 /**
  * Movement rules for one completed token move (SRD Movement and Position / Opportunity Attacks),
- * run INSIDE the token.move mutation after the snap so the measured distance is authoritative — a
+ * run INSIDE the token.move mutation after the snap so the measured distance is authoritative - a
  * strict rejection throws and discards the whole draft.
  *
  * Budget: applies only to the current combatant's own willing move with a known speed on a
@@ -63,7 +63,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     const overrun = used + moved > effective + 1e-6;
     if (overrun && !input.override) {
       const message = effective === 0
-        ? `${mover.name} can't move — its Speed is 0.`
+        ? `${mover.name} can't move - its Speed is 0.`
         : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft).`;
       if (state.combat.rulesMode === "strict") throw new RulesBlockedError(effective === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed", message);
       warning = message;

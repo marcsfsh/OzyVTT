@@ -18,7 +18,7 @@ export type ResolveInput = Readonly<{
   rollMode?: "advantage" | "disadvantage" | "normal" | null;
   /** GM override of a rules-mode rejection; audited in the log and journal (ADR-0020). */
   override?: Readonly<{ reason: string }> | null;
-  /** The action came from the builtin catalog (not the stat block) — enables the builtin special cases. */
+  /** The action came from the builtin catalog (not the stat block) - enables the builtin special cases. */
   builtin?: boolean;
   /** Free-text annotation (the Ready action's trigger); folded into the granted effect's name. */
   note?: string | null;
@@ -33,11 +33,11 @@ export type ResolveDependencies = Readonly<{
   gmSessionId: string;
   now: () => string;
   hasCondition?: (id: string) => boolean;
-  /** The attacker's full definition — multiattack composition and limited-use lookups need sibling actions. */
+  /** The attacker's full definition - multiattack composition and limited-use lookups need sibling actions. */
   definition?: ActorDefinition;
   /** Authoritative map distance in feet between two combatants' tokens; null when unmeasurable (no positions / no calibration). */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
-  /** Resolves ANY combatant's definition (imported over bundled) — needed to offer the TARGET's declared reactions. */
+  /** Resolves ANY combatant's definition (imported over bundled) - needed to offer the TARGET's declared reactions. */
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
 }>;
 
@@ -150,7 +150,7 @@ type EconomyEvaluation = Readonly<{
  * Pure rules evaluation for one action: every violated rule (never throws) plus the economy plan a
  * successful resolve would commit. Shared by the resolve path (which applies the rules mode) and the
  * read-only availability projection, so what the API reports as blocked and what resolution rejects
- * can never drift. Economy/instance gating applies only on the attacker's own turn — off-turn
+ * can never drift. Economy/instance gating applies only on the attacker's own turn - off-turn
  * resolves (opportunity attacks, GM improvisation) stay ungated.
  */
 export function evaluateActionEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, targetIds: readonly string[], definition: ActorDefinition | undefined, distanceFeet?: (actorIdA: string, actorIdB: string) => number | null): EconomyEvaluation {
@@ -181,7 +181,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       const scopeLabel = action.uses.per === "turn" ? "turn"
         : action.uses.per === "encounter" ? "encounter"
         : action.uses.per === "short-rest" ? "short rest"
-        : action.uses.per === "recharge" ? `spent — recharges on ${action.uses.recharge}+ at the start of its turn`
+        : action.uses.per === "recharge" ? `spent - recharges on ${action.uses.recharge}+ at the start of its turn`
         : "long rest";
       violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.per === "recharge" ? scopeLabel : `${action.uses.limit}/${scopeLabel}`}).` });
     }
@@ -208,7 +208,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
         components[action.id] = (components[action.id] ?? 1) - 1;
       } else if (parents.length > 1) {
         if (action.attack && (action.attack.count ?? 1) > 1) components = { attack: (action.attack.count ?? 1) - 1 };
-        notes.push(`${action.name} belongs to more than one Multiattack — tracking it standalone.`);
+        notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
       } else if (action.attack && (action.attack.count ?? 1) > 1) {
         // Count-based attacks open a generic pool so Extra Attack can mix weapons legally.
         components = { attack: (action.attack.count ?? 1) - 1 };
@@ -222,7 +222,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       const componentName = (id: string) => id === "attack" ? "attack" : definition?.actions.find((candidate) => candidate.id === id)?.name ?? id;
       const leftovers = () => Object.entries(components).filter(([, count]) => count > 0).map(([id, count]) => `${count}× ${componentName(id)}`);
       if (action.multiattack) {
-        // Tapping the Multiattack plan mid-instance is a continue, not a violation — a fresh
+        // Tapping the Multiattack plan mid-instance is a continue, not a violation - a fresh
         // component resolve already opened the plan, so the GM never has to select it first.
         if (leftovers().length === 0) (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: `${attacker.name} has no attacks remaining in this action.` });
       } else if ((components[action.id] ?? 0) > 0) {
@@ -232,7 +232,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       } else {
         const named = leftovers();
         (proseMultiattack ? softViolations : violations).push({ rule: "economy.action-used", message: named.length > 0
-          ? `${attacker.name} has no ${action.name} left in this action — remaining: ${named.join(", ")}.`
+          ? `${attacker.name} has no ${action.name} left in this action - remaining: ${named.join(", ")}.`
           : `${attacker.name} has no attacks remaining in this action.` });
       }
       instance = { actorId: attacker.id, components };
@@ -252,7 +252,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     const cost = action.legendary.cost;
     const perRound = definition?.legendary?.actionsPerRound ?? 3;
     const spent = state.combat.legendaryUsed[attacker.id] ?? 0;
-    if (onOwnTurn) violations.push({ rule: "legendary.own-turn", message: `Legendary actions are taken on other creatures' turns — not on ${attacker.name}'s own.` });
+    if (onOwnTurn) violations.push({ rule: "legendary.own-turn", message: `Legendary actions are taken on other creatures' turns - not on ${attacker.name}'s own.` });
     if (spent + cost > perRound) violations.push({ rule: "legendary.no-actions-remaining", message: `${attacker.name} has ${Math.max(0, perRound - spent)} of ${perRound} legendary action${perRound === 1 ? "" : "s"} left this round${cost > 1 ? ` and ${action.name} costs ${cost}` : ""}.` });
     spendLegendary = { cost };
   }
@@ -267,7 +267,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     }
   }
 
-  // Range/reach (SRD Making an Attack / Range): checked only when the distance is measurable —
+  // Range/reach (SRD Making an Attack / Range): checked only when the distance is measurable -
   // unplaced tokens or an uncalibrated map skip entirely (the unmeasurable pattern). A weapon with
   // both reach and range (thrown) is legal in either envelope; long-range disadvantage lives in
   // attackRollSources, not here.
@@ -378,7 +378,7 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
       throw new RulesBlockedError(violations[0].rule, violations[0].message);
     } else {
       warnings.push(...allViolations.map((violation) => violation.message));
-      if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only — extra attacks aren't validated.`);
+      if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
     }
   }
 
@@ -408,7 +408,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   if (has(attacker, "restrained")) disadvantage.push({ source: "attacker-restrained", label: "Attacker is Restrained" });
   if (has(attacker, "poisoned")) disadvantage.push({ source: "attacker-poisoned", label: "Attacker is Poisoned" });
   if (has(attacker, "blinded")) disadvantage.push({ source: "attacker-blinded", label: "Attacker is Blinded" });
-  // Frightened: SRD scopes the disadvantage to "while the source is in line of sight" — with no
+  // Frightened: SRD scopes the disadvantage to "while the source is in line of sight" - with no
   // vision system the engine applies it whenever the condition is active (documented simplification;
   // the GM's explicit rollMode wins when the source is out of sight).
   if (has(attacker, "frightened")) disadvantage.push({ source: "attacker-frightened", label: "Attacker is Frightened" });
@@ -418,7 +418,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   if (has(target, "invisible")) disadvantage.push({ source: "target-invisible", label: "Target is Invisible" });
   // Grappled: disadvantage on attacks against anyone but the grappler. The grappler is known when
   // the condition rides a source-linked effect; a hand-set Grappled falls back to disadvantage
-  // against everyone (conservative — the GM's rollMode overrides for the grappler).
+  // against everyone (conservative - the GM's rollMode overrides for the grappler).
   if (has(attacker, "grappled")) {
     const grapplerId = attacker.effects.find((effect) => effect.linkedConditionIds.includes("grappled"))?.sourceActorId ?? null;
     if (grapplerId === null) disadvantage.push({ source: "attacker-grappled", label: "Attacker is Grappled (grappler unknown)" });
@@ -431,7 +431,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
   if (has(target, "petrified")) advantage.push({ source: "target-petrified", label: "Target is Petrified" });
   if (has(target, "unconscious")) advantage.push({ source: "target-unconscious", label: "Target is Unconscious" });
   if (has(target, "prone")) {
-    // 2024 rule: the incoming modifier is distance-based for every attack — advantage within 5 feet,
+    // 2024 rule: the incoming modifier is distance-based for every attack - advantage within 5 feet,
     // disadvantage beyond. Unknown distance (unplaced tokens, uncalibrated map) contributes nothing.
     const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
     if (distance !== null && distance <= 5) advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });
@@ -483,7 +483,7 @@ function attackRollSources(state: GameState, attacker: LiveActor, target: LiveAc
  * surface the save DC); roll typed damage with 2024 crit doubling plus declared critical bonus dice
  * and active damage-bonus effects; apply declared on-hit riders as source-linked effects; create
  * granted self effects (Rage); record every roll in the shared history; and commit the economy.
- * Damage is still PROPOSED to the GM — application stays an explicit actor:apply-damage carrying the
+ * Damage is still PROPOSED to the GM - application stays an explicit actor:apply-damage carrying the
  * typed parts (propose→apply ladder), while conditions ride the save/rider carve-outs.
  */
 export function resolveDefinitionAction(state: GameState, action: DefinitionAction, input: ResolveInput, deps: ResolveDependencies): ActionResolution {
@@ -502,20 +502,20 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   const structuredWithoutTargets = (action.grants !== undefined && action.grants.target !== "target") || action.multiattack !== undefined || input.builtin === true;
   if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target") throw new CommandRejectedError("Choose at least one target.");
   if (!action.attack && !action.save && action.damage.length === 0 && action.grants === undefined && input.builtin !== true) {
-    if (action.multiattack === undefined) throw new CommandRejectedError("That action has no structured effect to resolve — run it from its description.");
+    if (action.multiattack === undefined) throw new CommandRejectedError("That action has no structured effect to resolve - run it from its description.");
   }
 
   const warnings: string[] = [];
   let { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet);
 
-  // GM-adjudicated cover (SRD Cover — no line-of-sight engine, so the GM supplies the call and the
+  // GM-adjudicated cover (SRD Cover - no line-of-sight engine, so the GM supplies the call and the
   // server applies the math): total cover can't be targeted directly; half/three-quarters add to AC
   // and Dexterity saves below.
   const coverBonus = input.cover === "half" ? 2 : input.cover === "three-quarters" ? 5 : 0;
   if (input.cover === "total" && state.combat.rulesMode !== "freeform") {
     if (state.combat.rulesMode === "strict" && !input.override) throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
     if (input.override && overridden === null) overridden = { rule: "cover.total", reason: input.override.reason };
-    else warnings.push("The target has Total Cover — allowed per the rules mode.");
+    else warnings.push("The target has Total Cover - allowed per the rules mode.");
   }
 
   // Builtin Unarmed Strike: the attack math is actor-derived (SRD: Str modifier + Proficiency Bonus),
@@ -654,14 +654,14 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       }
     }
   }
-  // Builtin Unarmed Strike damage is flat (SRD: 1 + Str modifier Bludgeoning, no dice) — it rides
+  // Builtin Unarmed Strike damage is flat (SRD: 1 + Str modifier Bludgeoning, no dice) - it rides
   // the explainable bonus-damage channel since the dice grammar has no zero-die formula.
   if (input.builtin && action.id === "unarmed-strike" && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
     bonusDamage.push({ amount: Math.max(0, 1 + abilityModifier(deps.definition, "str")), type: "bludgeoning", source: "Unarmed Strike" });
   }
 
   // Declared on-hit riders (Bite: Grappled + Restrained, escape DC 15) apply as ONE source-linked
-  // effect per rider — the condition carve-out class shared with save auto-apply (ADR-0020).
+  // effect per rider - the condition carve-out class shared with save auto-apply (ADR-0020).
   const effectsApplied: Array<{ targetId: string; targetName: string; name: string; conditionIds: readonly string[] }> = [];
   if (action.onHit && attack !== null && (attack.outcome === "crit" || attack.outcome === "hit")) {
     const target = targets[0];
@@ -693,7 +693,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     });
   }
 
-  // Granted effects (Rage, Reckless Attack — self; Help — the chosen ally): replace-on-refresh,
+  // Granted effects (Rage, Reckless Attack - self; Help - the chosen ally): replace-on-refresh,
   // end at 0 HP of the granter (can't be sustained while down).
   let effectGranted: ActionResolution["effectGranted"] = hiddenGranted;
   if (action.grants) {
@@ -729,7 +729,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   // A hit against a combatant whose stat block declares a matching reaction (Uncanny Dodge) parks
   // the rolled damage in a pending prompt instead of the runner's apply button: answering "use"
   // spends the reaction and applies half, "decline" applies it in full (see reactions.ts). Freeform
-  // mode stays prompt-free — reference-level play keeps the manual damage flow.
+  // mode stays prompt-free - reference-level play keeps the manual damage flow.
   const reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }> = [];
   if (attack !== null && (attack.outcome === "crit" || attack.outcome === "hit") && state.combat.rulesMode !== "freeform" && deps.resolveDefinition) {
     const target = targets[0];
@@ -766,7 +766,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
   }
 
-  // Builtin Unarmed Strike grapple/shove (SRD): no attack roll — the target makes a Str or Dex save
+  // Builtin Unarmed Strike grapple/shove (SRD): no attack roll - the target makes a Str or Dex save
   // (its better modifier, standing in for "its choice") vs DC 8 + Str modifier + Proficiency Bonus.
   // Failure applies the Grappled effect (with that DC as the escape DC) or Prone; a failed shove-push
   // is narrated for the GM to move the token 5 feet.
@@ -791,7 +791,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    if (action.id === "unarmed-shove-push") warnings.push(`On a failed save, ${target.name} is pushed 5 feet — move the token.`);
+    if (action.id === "unarmed-shove-push") warnings.push(`On a failed save, ${target.name} is pushed 5 feet - move the token.`);
     builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   }
 
@@ -807,7 +807,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
       targetIds: targets.map((target) => target.id),
       proposedDamage: damage.reduce((sum, part) => sum + part.total, 0),
       proposedDamageParts: damage.map((part) => ({ amount: part.total, type: part.type })),
-      // Cover adds to Dexterity saving throws (SRD Cover) — carried on the prompt.
+      // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
       saveBonus: action.save.ability === "dex" ? coverBonus : 0,
       halfOnSuccess: halfOnSuccessFrom(action.description),
       // GM's explicit choice wins; otherwise auto-detect a condition from the action prose (only if the
@@ -839,7 +839,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
   }
 
-  // Attacking reveals you (SRD Hide): a resolved attack or save action ends the hidden effect —
+  // Attacking reveals you (SRD Hide): a resolved attack or save action ends the hidden effect -
   // the attack itself still enjoyed the Invisible advantage, which is the SRD's exact sequencing.
   if ((action.attack !== undefined || action.save !== undefined) && hasEffectTag(attacker, "hidden")) {
     const hiddenEffect = attacker.effects.find((effect) => effect.tags.includes("hidden"))!;
@@ -855,7 +855,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     if (!state.combat.reactionsUsed.includes(attacker.id)) {
       state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed, attacker.id] };
     } else {
-      warnings.push(`${attacker.name}'s reaction was already spent — the readied action released without one.`);
+      warnings.push(`${attacker.name}'s reaction was already spent - the readied action released without one.`);
     }
   }
 

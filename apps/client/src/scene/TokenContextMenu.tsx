@@ -11,7 +11,7 @@ type Actor = GmActor | PlayerActor;
 /**
  * Right-click / long-press actions on a token. GM acts on any token; a player only ever opens it on
  * their own claimed token (the caller gates that). Portaled to <body> so it clears the docked panel
- * and enlarged-map stacking contexts. Uses only existing commands — the server stays authoritative.
+ * and enlarged-map stacking contexts. Uses only existing commands - the server stays authoritative.
  */
 export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, placed, onOpenSheet, onReturnToTray, onClose }: Readonly<{
   actor: Actor;
@@ -74,7 +74,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   // Clamp so the menu stays on-screen near the pointer.
   const style: React.CSSProperties = { left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.max(8, Math.min(y, window.innerHeight - 340)) };
 
-  // In fullscreen, only the fullscreen element's subtree renders — portal into it (not document.body,
+  // In fullscreen, only the fullscreen element's subtree renders - portal into it (not document.body,
   // which is hidden) so the menu is visible. Falls back to body when not in fullscreen.
   return createPortal(
     <div ref={ref} className="token-context-menu" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
@@ -91,7 +91,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       </label>}
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
       {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}
-      <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent — restore" : "Use reaction"}</button>
+      <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent - restore" : "Use reaction"}</button>
       {role === "gm" && placed && <button type="button" className="token-context-item" onClick={() => { onReturnToTray(); onClose(); }}>Return to tray</button>}
       <div className="token-context-conditions"><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
       {feedback && <p className="token-context-feedback" role="status">{feedback}</p>}

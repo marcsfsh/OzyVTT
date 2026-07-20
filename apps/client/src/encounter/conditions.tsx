@@ -6,7 +6,7 @@ import { socket } from "../socket";
 type ConditionInstance = Actor["conditions"][number];
 
 /**
- * One shared fetch of the 15 SRD condition names/texts. Failures are never cached — a
+ * One shared fetch of the 15 SRD condition names/texts. Failures are never cached - a
  * transient miss (e.g. an ack racing the join) retries on the next mount or picker open,
  * and a late success propagates to every mounted chip/editor via the listener set.
  */

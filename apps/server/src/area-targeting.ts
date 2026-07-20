@@ -6,7 +6,7 @@ const EPSILON = 1e-6;
 /**
  * Parse an area of effect out of a stat block's prose. SRD 2024 phrasing is consistent enough to
  * pattern-match ("60-foot Cone", "60-foot-long, 5-foot-wide Line", "20-foot-radius Sphere",
- * "15-foot Emanation", "10-foot Cube"). Returns null when the action names no area — the GM then
+ * "15-foot Emanation", "10-foot Cube"). Returns null when the action names no area - the GM then
  * targets tokens directly. Line wording occasionally omits the width; default to a 5-ft (one-cell) line.
  */
 export function parseAreaProse(description: string): ContentActionArea | null {
@@ -21,7 +21,7 @@ export function parseAreaProse(description: string): ContentActionArea | null {
   return null;
 }
 
-/** The grid-space centers of every cell a token's footprint covers (odd footprints center on a cell, even on an intersection — mirrors token-placement). */
+/** The grid-space centers of every cell a token's footprint covers (odd footprints center on a cell, even on an intersection - mirrors token-placement). */
 function footprintCellCenters(calibration: SquareGridCalibration, position: AnnotationPoint, sizeCells: number): GridPoint[] {
   const grid = imageToGrid(calibration, position);
   const odd = sizeCells % 2 === 1;

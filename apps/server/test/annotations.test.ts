@@ -144,7 +144,7 @@ describe("authoritative annotation geometry", () => {
 
   it("points a cone in any direction: both ends snap to cell centers, not to fixed angles", () => {
     const state = activeState();
-    // Drag ~3 cells right and 1 cell down — a ~18° angle that must survive (not snap to 0/45°).
+    // Drag ~3 cells right and 1 cell down - a ~18° angle that must survive (not snap to 0/45°).
     const cone = addAnnotation(state, { id: "a0000000-0000-4000-8000-000000000001", kind: "shape", shape: "cone", origin: { x: 25, y: 25 }, target: { x: 175, y: 75 }, visibility: "public", actor: gmActor, now: 0 }, geometry);
     expect(cone.geometry.origin).toEqual({ x: 25, y: 25 }); // apex snapped to its cell center
     expect(cone.geometry.target).toEqual({ x: 175, y: 75 }); // base center snapped to a cell center (3 right, 1 down)

@@ -46,7 +46,7 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
  * Snaps a raw drag point to an axis-aligned square from the start corner: equal side length on
  * both axes (side = the larger of the two deltas), sign preserved so it follows the drag
  * direction, clamped so the square stays inside the map. This makes the calibration drag a true
- * square (0°/90° aligned) — dragging a corner grows/shrinks both sides at the same rate — which is
+ * square (0°/90° aligned) - dragging a corner grows/shrinks both sides at the same rate - which is
  * what the server's `deriveSquareGridFromArea` expects (it reads start/end as opposite corners of
  * an axis-aligned box and locks rotation to 0).
  */
@@ -425,7 +425,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
                 <div className="verification-card">
                   {!verifying ? <button onClick={() => setVerifying(true)}>Check alignment at a distant point</button> : <div><strong>{points.length < 3 ? "Click a distant grid intersection" : "Check point V"}</strong><p>{points.length < 3 ? "Choose one far from the 3 × 3 sample to catch spacing errors." : "Verify whether V lands close enough to an intersection on the blue overlay."}</p><button className="wizard-primary" disabled={busy || points.length < 3} onClick={() => wizardAction({ action: "verify", imagePoint: points[2] })}>Verify selected point</button></div>}
                 </div>
-                {wizard.verification && <p className={wizard.verification.accepted ? "verification accepted" : "verification rejected"}>{wizard.verification.accepted ? `Aligned — V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid.` : `Not aligned — V misses by ${wizard.verification.errorPx.toFixed(2)} px. This does not block Confirm.`}</p>}
+                {wizard.verification && <p className={wizard.verification.accepted ? "verification accepted" : "verification rejected"}>{wizard.verification.accepted ? `Aligned - V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid.` : `Not aligned - V misses by ${wizard.verification.errorPx.toFixed(2)} px. This does not block Confirm.`}</p>}
               </details>
             </>}
           </div> : <div className="grid-wizard"><h3>{selected.kind === "battlemap" ? "Gridless movement scale" : "Real-world scale"}</h3><p>{selected.kind === "battlemap" ? "Measure a known span so rulers can display feet without drawing a grid." : "Measure a known span so markers and rulers can use real-world distance."}</p><div className="wizard-fields"><label>Distance between the points<input type="number" min="0.01" value={knownDistance} onChange={(event) => setKnownDistance(Number(event.target.value))} /></label><label>Unit<input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={32} placeholder={selected.kind === "battlemap" ? "feet" : "miles"} /></label></div><button className="wizard-primary" disabled={busy || points.length < 2} onClick={saveScale}>Save map scale</button></div>}

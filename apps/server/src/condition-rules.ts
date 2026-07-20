@@ -2,7 +2,7 @@ import type { Actor } from "@vtt/domain";
 
 /**
  * Shared condition math (SRD 5.2.1 rules glossary). Pure actor-level lookups used by action
- * resolution, saving throws, and the effect lifecycle — kept dependency-free so any engine module
+ * resolution, saving throws, and the effect lifecycle - kept dependency-free so any engine module
  * can import it without cycles.
  */
 
@@ -38,7 +38,7 @@ export const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "
 
 /**
  * Effective speed in feet for the current turn: base − 5 × exhaustion level (floored at 0),
- * zeroed by Speed-0 conditions, doubled while Dashing. Null when the base speed is unknown —
+ * zeroed by Speed-0 conditions, doubled while Dashing. Null when the base speed is unknown -
  * the movement rules then skip entirely (the unmeasurable pattern).
  */
 export function effectiveSpeedFeet(actor: Actor): number | null {

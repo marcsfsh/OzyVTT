@@ -7,7 +7,7 @@ export type TokenMapGeometry = Readonly<{
   width: number;
   height: number;
   calibration: SquareGridCalibration | null;
-  /** Gridless real-world scale from the map catalog, when saved — lets movement narration measure distances on uncalibrated maps. Optional so geometry literals in tests stay small. */
+  /** Gridless real-world scale from the map catalog, when saved - lets movement narration measure distances on uncalibrated maps. Optional so geometry literals in tests stay small. */
   scale?: MapDistanceScale | null;
 }>;
 
@@ -111,14 +111,14 @@ export function setActorSize(state: GameState, actorId: string, size: CreatureSi
 }
 
 /**
- * Moves a token within a PREPARED (non-live) scene while the GM stages it privately — players and the
+ * Moves a token within a PREPARED (non-live) scene while the GM stages it privately - players and the
  * viewer never see this scene until it goes live. Snaps against that scene's own map. Rejects the
  * active scene (that one is edited through the normal live token move). GM-only at the command layer.
  */
 export function moveSceneToken(state: GameState, sceneId: string, actorId: string, position: EncounterTokenPosition | null, geometry: TokenMapGeometry) {
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live — move its tokens on the encounter map instead.");
+  if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("This scene is live - move its tokens on the encounter map instead.");
   const token = scene.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant is not staged in this scene.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y))) throw new CommandRejectedError("Token position must contain finite coordinates.");

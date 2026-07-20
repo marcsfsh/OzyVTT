@@ -20,8 +20,8 @@ function fogSlice(state: GameState, sceneId: string | undefined): { fog: SceneCo
   }
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
-  // The active scene's stored combat must stay empty (single source of truth) — edit the live fog instead.
-  if (scene.id === state.combat.activeSceneId) throw new CommandRejectedError("That scene is live — edit its fog on the table.");
+  // The active scene's stored combat must stay empty (single source of truth) - edit the live fog instead.
+  if (scene.id === state.combat.activeSceneId) throw new CommandRejectedError("That scene is live - edit its fog on the table.");
   return {
     fog: scene.combat.fog,
     write: (fog) => { state.combat = { ...state.combat, scenes: state.combat.scenes.map((candidate) => candidate.id === sceneId ? { ...candidate, combat: { ...candidate.combat, fog } } : candidate) }; }
@@ -41,7 +41,7 @@ export function resetFog(state: GameState, sceneId: string | undefined) {
 
 /**
  * Snap a dragged rect to whole grid cells on a calibrated, unrotated map (rotated grids keep the
- * raw pixel rect — axis-aligned snapping would distort against a rotated lattice; documented
+ * raw pixel rect - axis-aligned snapping would distort against a rotated lattice; documented
  * simplification), then clamp to the map bounds. Gridless maps always keep raw pixels.
  */
 function normalizedRect(geometry: FogMapGeometry, rect: FogRectInput): { x: number; y: number; width: number; height: number } {
@@ -70,9 +70,9 @@ export function paintFog(state: GameState, sceneId: string | undefined, geometry
   const slice = fogSlice(state, sceneId);
   const rect = normalizedRect(geometry, input.rect);
   // A stroke covering the whole map supersedes everything before it ("Reveal all" / re-covering
-  // from scratch) — compact instead of accumulating toward the cap.
+  // from scratch) - compact instead of accumulating toward the cap.
   const coversMap = rect.x <= 0 && rect.y <= 0 && rect.x + rect.width >= geometry.width && rect.y + rect.height >= geometry.height;
   const kept = coversMap ? [] : slice.fog.shapes;
-  if (kept.length >= MAX_FOG_SHAPES) throw new CommandRejectedError("The fog has too many strokes — Reset it and reveal again.");
+  if (kept.length >= MAX_FOG_SHAPES) throw new CommandRejectedError("The fog has too many strokes - Reset it and reveal again.");
   slice.write({ ...slice.fog, shapes: [...kept, { kind: "rect", id: input.id, op: input.op, ...rect }] });
 }

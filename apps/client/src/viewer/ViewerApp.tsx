@@ -73,8 +73,8 @@ const LOCAL_MIN_ZOOM = 0.5;
 const LOCAL_MAX_ZOOM = 8;
 
 /**
- * This screen's own zoom/pan, layered on top of whatever the GM presents. It is purely local —
- * nothing here is sent back to the server — so each paired display (or the GM's in-tab preview of
+ * This screen's own zoom/pan, layered on top of whatever the GM presents. It is purely local -
+ * nothing here is sent back to the server - so each paired display (or the GM's in-tab preview of
  * it) can be framed independently without affecting what anyone else sees. Resets to follow the
  * GM's camera again whenever the presented map changes, or when "Follow GM view" is pressed.
  */
@@ -160,7 +160,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>
         <circle r={Math.max(8, Math.min(size.width, size.height) / 40)} /><circle r={Math.max(3, Math.min(size.width, size.height) / 100)} />
       </g>)}
-      {/* Fog covers everything on the shared screen — the audience sees only what the GM revealed. */}
+      {/* Fog covers everything on the shared screen - the audience sees only what the GM revealed. */}
       {onActiveMap && presentation.encounter.fog && <FogOverlay width={size.width} height={size.height} fog={presentation.encounter.fog} variant="player" />}
     </svg>
     {presentation.measurement && <output className="viewer-distance">{presentation.measurement.distanceLabel}</output>}

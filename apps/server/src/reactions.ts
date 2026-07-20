@@ -33,12 +33,12 @@ export type ReactionOutcome = Readonly<{
  * Answer a pending reaction prompt (ADR-0020 amendment).
  *
  * hit-by-attack (Uncanny Dodge): the triggering attack's damage was parked on the prompt, so BOTH
- * answers apply it here — "use" spends the reaction and halves each typed part first (floor, per
+ * answers apply it here - "use" spends the reaction and halves each typed part first (floor, per
  * part, before defenses). GM answers any prompt; a player only their own claimed character's.
  *
  * leaves-reach (opportunity attack): "use" spends the reaction and resolves one melee attack
  * (chosen actionId, else the reactor's first melee attack, else Unarmed Strike) against the mover,
- * auto-applying rolled damage on a hit — the reaction carve-out class. "decline" just clears.
+ * auto-applying rolled damage on a hit - the reaction carve-out class. "decline" just clears.
  */
 export function answerReaction(state: GameState, commandId: string, reactionId: string, use: boolean, actionId: string | undefined, scope: ActorScope, deps: ReactionAnswerDependencies): ReactionOutcome {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
@@ -70,7 +70,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     clearPrompt(true);
     // One melee attack against the mover, off-turn (economy stays ungated; the reaction is spent above).
     // No distance function on purpose: the SRD opportunity attack happens right before the target
-    // leaves reach, but the engine moves the token first (documented arrival-timing approximation) —
+    // leaves reach, but the engine moves the token first (documented arrival-timing approximation) -
     // range-checking the mover's ARRIVAL position would wrongly block the swing it already provoked.
     const resolution = resolveDefinitionAction(state, chosen, { actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin, rollMode: null, override: null }, {
       random: deps.random, newRollId: deps.newRollId, gmSessionId: deps.gmSessionId, now: deps.now,
@@ -78,7 +78,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     });
     let appliedDamage = 0;
     let events: readonly EffectNarration[] = [];
-    // Auto-apply the hit's damage — unless the resolve itself parked it on a NEW prompt (the mover's
+    // Auto-apply the hit's damage - unless the resolve itself parked it on a NEW prompt (the mover's
     // own Uncanny Dodge answers opportunity attacks too).
     const parked = (resolution.reactionPrompts?.length ?? 0) > 0;
     if (!parked && resolution.attack && (resolution.attack.outcome === "hit" || resolution.attack.outcome === "crit") && resolution.damageTotal > 0) {
@@ -109,7 +109,7 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
   return { ...base, used: use, appliedDamage, events };
 }
 
-/** Drop a reaction prompt without applying its damage (GM housekeeping — e.g. the damage was applied manually). */
+/** Drop a reaction prompt without applying its damage (GM housekeeping - e.g. the damage was applied manually). */
 export function dismissReaction(state: GameState, reactionId: string, scope: ActorScope) {
   if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can dismiss a reaction prompt.");
   if (!state.combat.pendingReactions.some((entry) => entry.id === reactionId)) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");

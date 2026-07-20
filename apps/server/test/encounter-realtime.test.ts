@@ -185,7 +185,7 @@ describe("live authoritative encounter workflow", () => {
       await emitCommand(gmSocket, "encounter:start", { commandId: START_COMMAND_ID, mapAssetId: imported.metadata.id, entries: [{ actorId: HERO_ID, score: 18 }] });
       await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000060", slot: "bonus-action", used: true });
       await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000061", slot: "action", used: true });
-      // Un-marking is a correction, not an event — it must stay silent.
+      // Un-marking is a correction, not an event - it must stay silent.
       await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000062", slot: "action", used: false });
       await new Promise((resolve) => setTimeout(resolve, 150));
 
@@ -252,7 +252,7 @@ describe("live authoritative encounter workflow", () => {
       expect(document.journal[0].principal).toMatch(/^gm:/);
       expect(document.journal[0].payload.mapAssetId).toBe(imported.metadata.id);
       expect(document.finalState.combat.active).toBe(true);
-      // v3: the post-encounter aftermath — combat cleared, end-of-fight sweeps landed.
+      // v3: the post-encounter aftermath - combat cleared, end-of-fight sweeps landed.
       expect(document.postEncounterState.combat.active).toBe(false);
       expect(Array.isArray(document.rolls)).toBe(true);
       expect(Array.isArray(document.definitions)).toBe(true);

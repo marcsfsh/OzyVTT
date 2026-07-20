@@ -6,12 +6,12 @@ import type { TokenMapGeometry } from "./token-placement.js";
 /**
  * Turns a token move into combat-log narration for the Time Machine: how far the mover went and its
  * old → new distance to every other placed combatant. Distances use the same authority as the
- * measurement tool — Chebyshev cells x distancePerCell on a calibrated grid, distancePerPixel on a
+ * measurement tool - Chebyshev cells x distancePerCell on a calibrated grid, distancePerPixel on a
  * gridless map with a saved scale; a map with neither still narrates the move, just without numbers.
  *
  * Viewer safety is structural: the result splits into a player-visible line (only when the mover is
  * public, mentioning only public combatants) and a GM-only line that carries the hidden combatants'
- * distances — or the whole narration when the mover itself is hidden. Callers append each line with
+ * distances - or the whole narration when the mover itself is hidden. Callers append each line with
  * the matching gmOnly flag; a player can never learn a hidden token's range from the log.
  */
 
@@ -24,7 +24,7 @@ export type MovementNarration = Readonly<{ publicText: string | null; gmText: st
  * rounded to 0.001 px and grid coordinates come back through a cos/sin round-trip, so a
  * genuinely-adjacent creature can measure a hair over its true distance (e.g. 5.0001 ft). On a grid
  * the smallest real gap beyond reach is a whole cell (≥ 2.5 ft), so a 0.1 ft slack never masks a
- * real step out of range but does swallow that snapping dust — the fix for "5 ft away but out of
+ * real step out of range but does swallow that snapping dust - the fix for "5 ft away but out of
  * reach" and for opportunity attacks that didn't fire between differently-sized creatures.
  */
 export const DISTANCE_TOLERANCE_FEET = 0.1;
@@ -48,13 +48,13 @@ export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; s
 /**
  * Rules-facing distance between two creatures: edge-to-edge, footprint-aware. The SRD measures from
  * the nearest point of each creature's space, so a Medium creature adjacent to a Large (2x2) one is
- * 5 ft away — not the 10 ft its center-to-center line reads (a 2x2 token centers on a grid
+ * 5 ft away - not the 10 ft its center-to-center line reads (a 2x2 token centers on a grid
  * intersection). Grid maps subtract each footprint's half-width in cells; scaled gridless maps
  * subtract each token's radius beyond its central cell. Null when the map is unmeasurable.
  */
 export function creatureDistance(geometry: TokenMapGeometry, a: CreatureFootprint, b: CreatureFootprint): Readonly<{ value: number; unit: string }> | null {
   // Snap the result to 0.01 ft: positions are stored rounded to 0.001 px and grid coordinates come
-  // back through a cos/sin round-trip, so a truly-adjacent creature can read 5.0001 ft — dust that
+  // back through a cos/sin round-trip, so a truly-adjacent creature can read 5.0001 ft - dust that
   // would otherwise put it "out of reach" against a whole-foot reach value.
   const clean = (value: number, unit: string) => ({ value: Math.round(value * 100) / 100, unit });
   if (geometry.calibration) {
@@ -108,7 +108,7 @@ export function narrateTokenMove(input: Readonly<{
   const moved = from === null ? null : mapDistance(geometry, from, to);
   if (from !== null && moved !== null && Math.round(moved.value * 10) === 0) return null; // snapped back to the same spot
 
-  // Old → new range to every other placed combatant, in initiative order — footprint-aware, so the
+  // Old → new range to every other placed combatant, in initiative order - footprint-aware, so the
   // narrated range matches what the rules engine will enforce (a Large neighbor reads 5 ft, not 10).
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
   const moverAt = (point: Point) => ({ position: point, sizeCells: moverToken?.sizeCells ?? 1, sizePx: moverToken?.sizePx ?? 0 });
@@ -130,13 +130,13 @@ export function narrateTokenMove(input: Readonly<{
   const verb = from === null
     ? `${mover.name} entered the map`
     : moved === null ? `${mover.name} moved` : `${mover.name} moved ${formatDistance(moved)}`;
-  const withRanges = (list: readonly Range[]) => (list.length > 0 ? `${verb} — ${list.map((range) => range.label).join(", ")}.` : `${verb}.`);
+  const withRanges = (list: readonly Range[]) => (list.length > 0 ? `${verb} - ${list.map((range) => range.label).join(", ")}.` : `${verb}.`);
 
   if (moverHidden) return { publicText: null, gmText: withRanges(ranges) };
   const visible = ranges.filter((range) => !range.hidden);
   const concealed = ranges.filter((range) => range.hidden);
   return {
     publicText: withRanges(visible),
-    gmText: concealed.length > 0 ? `Hidden ranges for ${mover.name} — ${concealed.map((range) => range.label).join(", ")}.` : null
+    gmText: concealed.length > 0 ? `Hidden ranges for ${mover.name} - ${concealed.map((range) => range.label).join(", ")}.` : null
   };
 }

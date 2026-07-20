@@ -25,7 +25,7 @@ export function hitDiceFromDefinition(definition: ActorDefinition): { die: "d4" 
 }
 
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
-  if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full — remove unused combatants first.");
+  if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   state.actors.push({
     id,
     name: dedupedName(state, definition.name),
@@ -62,7 +62,7 @@ export function addActorFromDefinition(state: GameState, definition: ActorDefini
  * become claimable player-characters; the ActorDefinitionSchema already forces them friendly.
  */
 export function importActorDefinition(state: GameState, definition: ActorDefinition, actorId: string, visibility: "public" | "gm-only") {
-  if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS) throw new CommandRejectedError("The imported-sheet library is full — remove unused combatants first.");
+  if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS) throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? "player-character" as const : "monster" as const;
   instantiate(state, definition, actorId, visibility, kind, definitionId);

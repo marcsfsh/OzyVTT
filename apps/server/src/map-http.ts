@@ -202,7 +202,7 @@ export function createMapRouter(options: MapRouterOptions) {
     return response.send(part);
   });
 
-  // Calibration numbers are not secret — the client already receives grid-derived token sizing —
+  // Calibration numbers are not secret - the client already receives grid-derived token sizing -
   // and exposing them (read-only) to anyone who can already read the map's image lets the battle
   // map show a live preview while measuring or resizing a shape. The server still computes and
   // snaps the authoritative geometry on every annotation:add/move command; this is presentation only.

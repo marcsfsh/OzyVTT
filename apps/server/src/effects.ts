@@ -4,7 +4,7 @@ import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
 
 /**
  * Rules-engine effect lifecycle (ADR-0020): Rage, Reckless Attack, and source-linked grapples live
- * as EffectInstances on actors. The engine — not the GM's memory — ends them: turn boundaries expire
+ * as EffectInstances on actors. The engine - not the GM's memory - ends them: turn boundaries expire
  * durations, a defeated source releases its grapples, and ending an effect removes its linked
  * conditions and fires its onEnd grants (Frenzy's Exhaustion). Every transition returns narration
  * events so the caller can log them; nothing here writes to the log directly.
@@ -19,7 +19,7 @@ export type EffectNarration = Readonly<{ kind: "effect" | "condition"; text: str
 const MAX_EFFECTS = 20;
 
 /**
- * Direct condition write for engine-owned transitions (no scope check — callers are the engine
+ * Direct condition write for engine-owned transitions (no scope check - callers are the engine
  * acting as the server). Returns false when the actor is immune (SRD condition immunity): the
  * condition is silently skipped and the caller decides whether to narrate.
  */
@@ -42,7 +42,7 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
 
 /**
  * Add an effect (idempotent by id: a retried command re-adds nothing). A grant from the same source
- * actor + source action REPLACES the older instance (duration refresh — a re-declared Rage or a
+ * actor + source action REPLACES the older instance (duration refresh - a re-declared Rage or a
  * per-turn Frenzy marker never stacks). Applies linked conditions.
  */
 export function addEffect(state: GameState, actorId: string, effect: EffectInstance, events?: EffectNarration[]): EffectInstance {
@@ -50,7 +50,7 @@ export function addEffect(state: GameState, actorId: string, effect: EffectInsta
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
-  // SRD Concentration: one sustained effect at a time — starting a new one ends the source's others.
+  // SRD Concentration: one sustained effect at a time - starting a new one ends the source's others.
   if (effect.concentration && effect.sourceActorId !== null) {
     const ended = endConcentrationSustainedBy(state, effect.sourceActorId);
     events?.push(...ended);
@@ -82,7 +82,7 @@ function grantConditionOnEnd(actor: Actor, conditionId: string, level: number | 
 }
 
 /**
- * SRD Exhaustion level 6 is death — an engine-owned transition like the zero-HP machine, fired
+ * SRD Exhaustion level 6 is death - an engine-owned transition like the zero-HP machine, fired
  * whenever a level reaches 6 (manual set-condition or an effect's onEnd grant). Player characters
  * drop to 0 with three death-save failures recorded (dead, not dying); anything else is defeated.
  * The GM undoes via set-hp/heal if a table rules otherwise.
@@ -141,7 +141,7 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
 
 /**
  * SRD Grappling: the grapple ends if the grappler is incapacitated. Scoped to grapple-tagged effects
- * (a stunned barbarian keeps their Rage — only their holds release); 0 HP still releases everything
+ * (a stunned barbarian keeps their Rage - only their holds release); 0 HP still releases everything
  * via endEffectsSustainedBy.
  */
 export function releaseGrapplesHeldBy(state: GameState, grapplerActorId: string): EffectNarration[] {
@@ -220,7 +220,7 @@ export function expireEffectsAtTurnStart(state: GameState, incomingActorId: stri
   return events;
 }
 
-/** Encounter end: every effect on this fight's combatants ends (onEnd fires — a documented simplification; the log says why). */
+/** Encounter end: every effect on this fight's combatants ends (onEnd fires - a documented simplification; the log says why). */
 export function endEncounterEffects(state: GameState, combatantIds: readonly string[]): EffectNarration[] {
   const events: EffectNarration[] = [];
   const inFight = new Set(combatantIds);

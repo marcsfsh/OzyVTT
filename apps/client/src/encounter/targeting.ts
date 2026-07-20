@@ -5,7 +5,7 @@ import { socket } from "../socket";
 
 /**
  * Shared targeting state for the GM action runner. The runner may render in the sidebar OR inside the
- * docked panel, and the map is a third surface — a module store (not component state) is the only way
+ * docked panel, and the map is a third surface - a module store (not component state) is the only way
  * all three agree on the in-progress action, its selected targets, or its placed area template.
  * Resolution stays on the server-authoritative GM-gated action:resolve; this only coordinates UX.
  */
@@ -22,8 +22,8 @@ let session: TargetingSession | null = null;
 let result: ActionResolution | null = null;
 let busy = false;
 /**
- * A strict-mode rejection awaiting the GM's call (ADR-0020). Lives in the store — not component
- * state — because the resolve may come from the sidebar runner, the docked runner, OR the map's
+ * A strict-mode rejection awaiting the GM's call (ADR-0020). Lives in the store - not component
+ * state - because the resolve may come from the sidebar runner, the docked runner, OR the map's
  * confirm bar, and the override dialog must appear regardless of which surface rolled.
  */
 let blockedPrompt: { blocked: RulesBlocked; retry: (override: { reason: string }) => void } | null = null;
@@ -62,7 +62,7 @@ export function clearBlockedPrompt() { if (blockedPrompt !== null) { blockedProm
 /**
  * Resolve the current session through the authoritative action:resolve; both the runner's Roll
  * button and the map's confirm bar call this. A rules-mode rejection (ADR-0020) surfaces its
- * machine-readable `blocked` details so the caller can offer the one-tap audited override —
+ * machine-readable `blocked` details so the caller can offer the one-tap audited override -
  * re-calling with `override` keeps the same targets.
  */
 export function resolveTargeting(revision: number | undefined, onResult: (ok: boolean, message?: string) => void, override?: { reason: string }) {

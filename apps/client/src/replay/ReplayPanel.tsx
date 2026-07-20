@@ -8,7 +8,7 @@ import "./replay.css";
 
 /**
  * GM-only encounter replay (the Time Machine's study mode): pick an archived fight and step through
- * it turn by turn — the map and tokens exactly as they stood at each boundary, the initiative order
+ * it turn by turn - the map and tokens exactly as they stood at each boundary, the initiative order
  * with hit points and conditions, and everything that was narrated during that turn (movement,
  * damage, saves, GM-only lines included). Data comes from the GM-gated archive endpoints; nothing
  * here is reachable by players or the shared viewer.
@@ -26,9 +26,9 @@ async function gmApi(path: string, token: string) {
   return body;
 }
 
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "—");
+const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "-");
 
-/** Save an archive document as a JSON file — the same machine-readable record the API serves, for spreadsheets, scripts, or archiving outside the host. */
+/** Save an archive document as a JSON file - the same machine-readable record the API serves, for spreadsheets, scripts, or archiving outside the host. */
 function exportDocument(id: number, endedAt: string, document: ArchiveDocument) {
   const stamp = endedAt.slice(0, 16).replace("T", "-").replaceAll(":", "");
   const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
@@ -56,7 +56,7 @@ function stepsOf(document: ArchiveDocument): readonly Step[] {
   if (document.finalState && steps.length > 0) {
     const last = steps[steps.length - 1];
     steps[steps.length - 1] = { ...last, to: document.finalState.revision };
-    steps.push({ label: "Aftermath — how the fight ended", at: document.endedAt, state: document.finalState, from: document.finalState.revision, to: Number.MAX_SAFE_INTEGER });
+    steps.push({ label: "Aftermath - how the fight ended", at: document.endedAt, state: document.finalState, from: document.finalState.revision, to: Number.MAX_SAFE_INTEGER });
   }
   return steps;
 }
@@ -198,10 +198,10 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
 
   return <section className="card replay-panel">
     <h2>Encounter replays</h2>
-    <p>Every finished encounter is recorded automatically. Open one to step through it turn by turn and study how the fight unfolded — positions, hit points, and everything that was narrated, including GM-only lines.</p>
+    <p>Every finished encounter is recorded automatically. Open one to step through it turn by turn and study how the fight unfolded - positions, hit points, and everything that was narrated, including GM-only lines.</p>
     {error && <p className="replay-error">{error}</p>}
     {archives === null && <p>Loading recordings…</p>}
-    {archives !== null && archives.length === 0 && !error && <p className="replay-log-empty">No recordings yet — end an encounter and it will appear here.</p>}
+    {archives !== null && archives.length === 0 && !error && <p className="replay-log-empty">No recordings yet - end an encounter and it will appear here.</p>}
     {archives !== null && archives.length > 0 && <table className="replay-list">
       <thead><tr><th>Fought</th><th>Ended</th><th>Turns</th><th aria-label="Actions" /></tr></thead>
       <tbody>{archives.map((archive) => <tr key={archive.id}>

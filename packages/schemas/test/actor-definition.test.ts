@@ -11,7 +11,7 @@ import { ActorDefinitionSchema } from "../src/index.js";
 describe("actor definition v1", () => {
   const jsonValidate = new Ajv2020({ strict: false }).compile(jsonSchema);
   // The replay party carries every ADR-0020 mechanics field (grants, multiattack pools, uses,
-  // criticalBonusDice) — validating them against BOTH schemas keeps the JSON twin from drifting.
+  // criticalBonusDice) - validating them against BOTH schemas keeps the JSON twin from drifting.
   it.each([character, monster, torva, pip, sable])("accepts a representative fixture", (fixture) => {
     const parsed = ActorDefinitionSchema.safeParse(fixture);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);

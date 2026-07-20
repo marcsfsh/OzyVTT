@@ -1,6 +1,6 @@
 /**
  * Pure 5e combat math (ADR-0019): typed damage against defenses, advantage aggregation, and the
- * death-save state machine. No game-state knowledge — the server passes plain values in and applies
+ * death-save state machine. No game-state knowledge - the server passes plain values in and applies
  * the returned transitions, so every rule here is unit-testable against the SRD text it implements.
  */
 
@@ -24,7 +24,7 @@ const normalizeType = (type: string) => type.trim().toLowerCase();
 /**
  * SRD order per part: immunity zeroes, resistance halves rounding down, vulnerability doubles.
  * Immunity wins outright; resistance and vulnerability on the same type cancel (SRD 5.2.1: they
- * don't stack — a creature with both takes normal damage).
+ * don't stack - a creature with both takes normal damage).
  */
 export function adjustDamageParts(parts: readonly DamagePart[], defenses: DamageDefenses): AdjustedDamagePart[] {
   const resistances = new Set(defenses.resistances.map(normalizeType));
@@ -58,7 +58,7 @@ export type DeathSaveState = Readonly<{ successes: number; failures: number; sta
 export type DeathSaveRoll = Readonly<{
   state: DeathSaveState;
   outcome: "success" | "failure" | "critical-success" | "critical-failure";
-  /** Natural 20: the character regains 1 hit point and consciousness — the caller applies the heal. */
+  /** Natural 20: the character regains 1 hit point and consciousness - the caller applies the heal. */
   regainsOneHitPoint: boolean;
   dead: boolean;
 }>;
@@ -74,7 +74,7 @@ export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): 
   }
   if (naturalRoll >= 10) {
     const successes = Math.min(3, current.successes + 1);
-    // Becoming stable resets both counters (SRD 5.2.1) — dying later starts from a clean slate.
+    // Becoming stable resets both counters (SRD 5.2.1) - dying later starts from a clean slate.
     if (successes >= 3) return { state: { successes: 0, failures: 0, stable: true }, outcome: "success", regainsOneHitPoint: false, dead: false };
     return { state: { ...current, successes }, outcome: "success", regainsOneHitPoint: false, dead: false };
   }

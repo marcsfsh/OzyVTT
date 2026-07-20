@@ -109,9 +109,9 @@ export function EncounterMap({
   dock?: Readonly<{ node: React.ReactNode; position: DockPosition; width: number; onWidthChange: (width: number) => void; onChange: (position: DockPosition) => void }>;
   /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene, not the live encounter. */
   moveSceneId?: string;
-  /** GM scene-prep entry (map button) — opens the scene picker. */
+  /** GM scene-prep entry (map button) - opens the scene picker. */
   onScenePrep?: () => void;
-  /** Present while staging a prepared scene privately — adds "back to live" / "make live" controls to the map. */
+  /** Present while staging a prepared scene privately - adds "back to live" / "make live" controls to the map. */
   staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
@@ -196,7 +196,7 @@ export function EncounterMap({
     const onWheel = (event: WheelEvent) => {
       if (!svgRef.current || !size) return;
       // Wheeling over an overlaid panel (a docked initiative tracker, an open menu, the shape editor)
-      // must scroll that panel, not zoom the map behind it — mirror the pointer-down guard below.
+      // must scroll that panel, not zoom the map behind it - mirror the pointer-down guard below.
       if (event.target instanceof Element && event.target.closest(".encounter-map-dock, .encounter-map-dock-resize, .encounter-map-overlay, .encounter-map-menu, .encounter-shape-editor, .encounter-target-bar")) return;
       event.preventDefault();
       zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
@@ -223,7 +223,7 @@ export function EncounterMap({
     // Frame the whole map in the area the dock leaves visible: treat the dock's inner edge as the new
     // edge of the canvas, fit the map into that rectangle, and center it there. `baseScale` is the
     // zoom-1 meet-scale (image px -> screen px), read from the SVG's actual box so letterboxing and
-    // the stage's max-height are accounted for — the earlier stage-width ratio got this wrong.
+    // the stage's max-height are accounted for - the earlier stage-width ratio got this wrong.
     const svgRect = svgRef.current?.getBoundingClientRect();
     const dockRect = stageRef.current?.querySelector<HTMLElement>(".encounter-map-dock")?.getBoundingClientRect();
     let center = { x: size.width / 2, y: size.height / 2 };
@@ -358,7 +358,7 @@ export function EncounterMap({
       return;
     }
     // Placing an area template takes over the drag (GM only): draw the template's shape anywhere,
-    // even starting on a token — the server computes who is caught.
+    // even starting on a token - the server computes who is caught.
     if (activeTargeting?.mode === "template" && activeTargeting.template && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY); if (!point) return;
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
@@ -479,7 +479,7 @@ export function EncounterMap({
     if (gesture.kind === "fog") { const { op, origin, current } = gesture; setGesture(null); submitFogPaint(op, origin, current); return; }
     if (gesture.kind === "measure") { setGesture(null); void submitAnnotationAdd("measurement", undefined, gesture.origin, gesture.current); return; }
     // A shape drawn while placing an area template is stored on the targeting session, not added as a
-    // standalone annotation — the server draws the real blast when the action resolves.
+    // standalone annotation - the server draws the real blast when the action resolves.
     if (activeTargeting?.mode === "template") { const { origin, current } = gesture; setGesture(null); setTemplatePlacement(origin, current); return; }
     setGesture(null); void submitAnnotationAdd("shape", gesture.kind, gesture.origin, gesture.current);
   };
@@ -543,7 +543,7 @@ export function EncounterMap({
     : [{ scope: "mine", label: "Remove all my shapes" }];
 
   return <div className={`encounter-map-interaction ${enlarged ? "enlarged" : ""}`} onPointerDown={beginGesture} onPointerMove={continueGesture} onPointerUp={finishGesture} onPointerCancel={cancelGesture} onContextMenu={onContextMenu}>
-    {/* No permanent tutorial captions (ux-principles: if it needs a banner, redesign it) — the tray
+    {/* No permanent tutorial captions (ux-principles: if it needs a banner, redesign it) - the tray
         appears only while it has tokens to place or a drag could drop one back in. */}
     {(unplaced.length > 0 || dragging) && <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Unplaced token tray">
       <div><strong>Token tray</strong><span>{unplaced.length ? "Drag onto the map, click to place near its center, or press Enter." : "Drag a token here to take it off the map."}</span></div>
@@ -556,12 +556,12 @@ export function EncounterMap({
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools — shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war — hide the map from players and reveal it area by area" onClick={() => { setFogOpen((v) => { if (v && (tool === "fog-reveal" || tool === "fog-hide")) setTool("select"); return !v; }); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>🌫</button>}
+          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools - shapes, color, visibility, cleanup" onClick={() => { setDrawOpen((v) => { if (v && (tool === "circle" || tool === "cone" || tool === "line" || tool === "square")) setTool("select"); return !v; }); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>✏</button>
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war - hide the map from players and reveal it area by area" onClick={() => { setFogOpen((v) => { if (v && (tool === "fog-reveal" || tool === "fog-hide")) setTool("select"); return !v; }); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); }}>🌫</button>}
           {fogOpen && role === "gm" && <div className="encounter-map-tools" role="group" aria-label="Fog of war">
-            <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON — players see only revealed areas. Turn off." : "Fog is OFF — turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
-            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-reveal"} disabled={fogBusy || !fog?.enabled} title="Reveal — drag the areas players can see" onClick={() => setTool(tool === "fog-reveal" ? "select" : "fog-reveal")}>☀</button>
-            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-hide"} disabled={fogBusy || !fog?.enabled} title="Hide — drag an area to cover it again" onClick={() => setTool(tool === "fog-hide" ? "select" : "fog-hide")}>▩</button>
+            <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON - players see only revealed areas. Turn off." : "Fog is OFF - turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
+            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-reveal"} disabled={fogBusy || !fog?.enabled} title="Reveal - drag the areas players can see" onClick={() => setTool(tool === "fog-reveal" ? "select" : "fog-reveal")}>☀</button>
+            <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-hide"} disabled={fogBusy || !fog?.enabled} title="Hide - drag an area to cover it again" onClick={() => setTool(tool === "fog-hide" ? "select" : "fog-hide")}>▩</button>
             <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Reveal the whole map" onClick={() => { if (size) runFog(() => emitFogPaint({ commandId: newId(), op: "reveal", rect: { x: 0, y: 0, width: size.width, height: size.height }, ...fogTarget, expectedRevision: revision }), "The fog could not be revealed."); }}>⛶</button>
             <button type="button" className="encounter-map-icon" disabled={fogBusy || !fog?.enabled} title="Hide the whole map again (clears every reveal)" onClick={() => runFog(() => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }), "The fog could not be reset.")}>◼</button>
           </div>}
@@ -586,8 +586,8 @@ export function EncounterMap({
               </div>}
             </div>
             <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
-            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on — extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
-            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active — new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
+            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on - extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
+            {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active - new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
             <div className="encounter-map-wrench">
               <button type="button" className="encounter-map-icon" aria-haspopup="menu" aria-expanded={wrenchOpen} title="Remove shapes" onClick={() => { setWrenchOpen((v) => !v); setEyeOpen(false); }}>🛠</button>
               {wrenchOpen && <div className="encounter-map-menu" role="menu">
@@ -621,7 +621,7 @@ export function EncounterMap({
             return <g className="annotation-shape live"><AnnotationGlyph data={{ kind: "shape", shape: activeTargeting.template.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet }} arrowSize={arrowSize} labelSize={labelSize} color="#ff9d5c" /></g>;
           })()}
 
-          {/* GM fog: dimmed, above the map and shapes but below tokens — the GM always sees everything. */}
+          {/* GM fog: dimmed, above the map and shapes but below tokens - the GM always sees everything. */}
           {fog && role === "gm" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="gm" />}
 
           {visibleTokens.map((encounterToken) => {
@@ -652,7 +652,7 @@ export function EncounterMap({
           {gesture?.kind === "fog" && <rect className={`fog-stroke-preview fog-stroke-${gesture.op}`}
             x={Math.min(gesture.origin.x, gesture.current.x)} y={Math.min(gesture.origin.y, gesture.current.y)}
             width={Math.abs(gesture.origin.x - gesture.current.x)} height={Math.abs(gesture.origin.y - gesture.current.y)} />}
-          {/* Player fog: solid and above EVERYTHING — whatever sits in fog is visually covered. */}
+          {/* Player fog: solid and above EVERYTHING - whatever sits in fog is visually covered. */}
           {fog && role === "player" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="player" />}
         </svg>
 
@@ -681,8 +681,8 @@ export function EncounterMap({
           const isTemplate = activeTargeting.mode === "template";
           const names = activeTargeting.selected.map((id) => actorsById.get(id)?.name ?? "?");
           const label = isTemplate
-            ? (activeTargeting.template?.placed ? " — placed; Roll to catch everyone under it" : ` — drag the ${activeTargeting.action.area?.sizeFeet}-ft ${activeTargeting.action.area?.shape} on the map`)
-            : names.length ? ` → ${names.join(", ")}` : activeTargeting.mode === "single" ? " — click a token to target it" : " — click tokens to target them";
+            ? (activeTargeting.template?.placed ? " - placed; Roll to catch everyone under it" : ` - drag the ${activeTargeting.action.area?.sizeFeet}-ft ${activeTargeting.action.area?.shape} on the map`)
+            : names.length ? ` → ${names.join(", ")}` : activeTargeting.mode === "single" ? " - click a token to target it" : " - click tokens to target them";
           const ready = isTemplate ? Boolean(activeTargeting.template?.placed) : activeTargeting.selected.length > 0;
           return <div className="encounter-target-bar" role="group" aria-label={`Targets for ${activeTargeting.action.name}`}>
             <span><strong>{activeTargeting.action.name}</strong>{label}</span>
@@ -701,7 +701,7 @@ export function EncounterMap({
                 <button type="button" className="scene-back" onClick={staging.onBackToLive} title="Return to the scene players see">◀ Live</button>
                 <button type="button" className="scene-golive" onClick={staging.onMakeLive} title="Make this the scene players see">Make live ⬆</button>
               </span>
-            : onScenePrep && <button type="button" aria-label="Scene prep" title="Scene prep — stage and switch scenes (GM only)" onClick={onScenePrep}>🎬 Scenes</button>}
+            : onScenePrep && <button type="button" aria-label="Scene prep" title="Scene prep - stage and switch scenes (GM only)" onClick={onScenePrep}>🎬 Scenes</button>}
           {dock && <span className="encounter-map-dock-control" role="group" aria-label="Dock the tracker">
             <button type="button" aria-label="Dock tracker left" aria-pressed={dock.position === "left"} title="Dock tracker left" onClick={() => dock.onChange("left")}>◧</button>
             <button type="button" aria-label="Dock tracker right" aria-pressed={dock.position === "right"} title="Dock tracker right" onClick={() => dock.onChange("right")}>◨</button>
