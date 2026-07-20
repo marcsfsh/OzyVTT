@@ -93,7 +93,7 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResista
         </span>
       : <span className="save-prompt-actions">
           <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => send("roll", undefined, false)}>Roll</button>
-          <span className="save-prompt-manual"><input type="number" min="-20" max="60" placeholder="or type total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
+          <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="-?[0-9]*" placeholder="or type the total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && manualTotal.trim() !== "") submitManual(); }} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
           {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
         </span>}
   </div>;
@@ -510,10 +510,16 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               Underwater fight
             </label>
             <div className="menu-section" role="group" aria-label="Add combatants">
-              {state.actors.filter((actor) => !state.combat.initiative.some((entry) => entry.actorId === actor.id)).map((actor) => <div key={actor.id} className="menu-add-row">
-                <span>{actor.name}{actor.visibility === "gm-only" ? " · GM-only" : ""}</span>
-                <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight.`)}>Add</button>
-              </div>)}
+              <p className="menu-section-title">Add to the fight</p>
+              {(() => {
+                const available = state.actors.filter((actor) => !state.combat.initiative.some((entry) => entry.actorId === actor.id));
+                return available.length > 0
+                  ? <div className="menu-add-list">{available.map((actor) => <div key={actor.id} className="menu-add-row">
+                      <span>{actor.name}{actor.visibility === "gm-only" ? " · GM-only" : ""}</span>
+                      <button type="button" disabled={busy} onClick={() => void run(() => emitCommand("encounter:add-combatant", { commandId: newId(), actorId: actor.id, expectedRevision: state.revision }), `${actor.name} joined the fight.`)}>Add</button>
+                    </div>)}</div>
+                  : <p className="menu-empty-note">Everyone on the roster is already in this fight.</p>;
+              })()}
               <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => { setBrowsing(true); setMenuOpen(false); }}>+ Add monsters (SRD)</button>
             </div>
             <button type="button" className="encounter-end" disabled={busy} onClick={() => { setMenuOpen(false); end(); }}>End encounter</button>

@@ -202,9 +202,9 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           <ul className="action-list">
             {otherReference.map((action) => <li key={action.id}>
               <button type="button" className="action-row action-row-static" aria-expanded={openReference === action.id} onClick={() => setOpenReference((current) => current === action.id ? null : action.id)}>
-                <strong>{action.name}</strong><small>{action.activation === "other" ? "tap to read" : `${action.activation} · tap to read`}</small>
+                <strong>{action.name}</strong><small>{action.activation === "other" ? "click to read" : `${action.activation} · click to read`}</small>
               </button>
-              {openReference === action.id && <p className="action-reference-text"><RichText text={action.description} /></p>}
+              {openReference === action.id && <div className="action-reference-text"><RichText text={action.description} /></div>}
             </li>)}
           </ul>
         </details>}

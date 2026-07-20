@@ -126,7 +126,7 @@ function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSummary; on
         <div><dt>Duration</dt><dd>{spell.concentration ? `Concentration, ${spell.duration}` : spell.duration}</dd></div>
       </dl>
       <div className="spell-card-desc"><RichText text={spell.description} /></div>
-      {spell.higherLevel && <p className="spell-card-higher"><strong>At Higher Levels. </strong><RichText text={spell.higherLevel} /></p>}
+      {spell.higherLevel && <div className="spell-card-higher"><RichText text={`**At Higher Levels.** ${spell.higherLevel}`} /></div>}
       <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
     </div>
   </div>, document.body);

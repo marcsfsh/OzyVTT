@@ -87,11 +87,19 @@
 .encounter-topbar .turn-controls button:first-child { padding: 0; font-size: 1.25rem; } /* the ‹ chevron is a centered square */
 .encounter-menu-toggle { flex: none; width: var(--control-h); height: var(--control-h); display: inline-flex; align-items: center; justify-content: center; border: 1px solid #6b5e4b; border-radius: .5rem; background: #241f17; color: #d9d2c4; font-size: 1.15rem; font-weight: 800; line-height: 1; cursor: pointer; }
 .encounter-menu-toggle:hover, .encounter-menu-toggle[aria-expanded="true"] { border-color: #e8a743; color: #ffdca0; }
-.encounter-menu { position: absolute; z-index: 41; top: calc(100% + .3rem); right: 0; width: min(21rem, 92vw); display: grid; gap: .6rem; padding: .7rem; border: 1px solid #6b5e4b; border-radius: .55rem; background: #1f1a12; box-shadow: 0 12px 28px rgba(0, 0, 0, .55); }
-.encounter-menu .rules-mode-control, .encounter-menu .environment-control { margin: 0; }
-.menu-section { display: grid; gap: .35rem; padding-top: .5rem; border-top: 1px solid #403a2c; }
+.encounter-menu { position: absolute; z-index: 41; top: calc(100% + .3rem); right: 0; width: min(21rem, 92vw); max-height: min(80vh, 40rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid #6b5e4b; border-radius: .55rem; background: #1f1a12; box-shadow: 0 12px 28px rgba(0, 0, 0, .55); }
+/* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
+.encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
+.encounter-menu .rules-mode-control select { width: 100%; }
+.encounter-menu .environment-control { margin: 0; }
+.menu-section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid #403a2c; }
+.menu-section-title { margin: 0; color: #9f9789; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.menu-add-list { display: grid; gap: .3rem; max-height: 11rem; overflow-y: auto; padding-right: .2rem; }
+.menu-empty-note { margin: 0; color: #8f8579; font-size: .78rem; }
 .menu-add-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .82rem; color: #c8c0b1; }
-.menu-add-row button { padding: .25rem .7rem; font-size: .76rem; }
+.menu-add-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-add-row button { flex: none; padding: .3rem .8rem; border: 1px solid #6b5e4b; border-radius: .4rem; background: #241f17; color: #f5efe3; font-size: .76rem; font-weight: 700; text-align: center; cursor: pointer; }
+.menu-add-row button:hover:not(:disabled) { border-color: #e8a743; color: #ffdca0; }
 .encounter-menu .encounter-add-monsters { margin: 0; }
 .encounter-menu .encounter-end { margin-top: 0; }
 .initiative-hp { flex: none; padding: .2rem .3rem; border: 1px solid transparent; border-radius: .35rem; background: transparent; font-size: .78rem; font-weight: 700; text-align: right; cursor: pointer; font-variant-numeric: tabular-nums; }
@@ -192,8 +200,8 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .save-prompt-label strong { color: #ffd58d; }
 .save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .save-prompt-roll { flex: 0 0 auto; }
-.save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; }
-.save-prompt-actions input { width: 6.5rem; margin: 0; padding: .4rem .5rem; text-align: left; }
+.save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; flex: 1 1 12rem; }
+.save-prompt-actions input { flex: 1 1 auto; min-width: 7rem; width: auto; margin: 0; padding: .4rem .6rem; text-align: left; }
 .save-prompt-actions button, .save-prompt-confirm button { padding: .4rem .8rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #282117; color: #fff; font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
 .save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: #e8a743; }
 .save-prompt-dismiss { margin-left: auto; padding: .4rem .55rem !important; background: transparent !important; color: #c8988f !important; }
@@ -376,6 +384,17 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .spell-card-higher strong { color: #e4d7fa; }
 .spell-card-attribution { margin: 1rem 0 0; color: #79715f; font-size: .66rem; }
 @media (max-width: 560px) { .spell-card-meta { grid-template-columns: 1fr; } }
+/* Shared RichText blocks (spell cards + trait "click to read"): spaced paragraphs, bullets, and the
+   flattened pipe tables a few spells carry (report #6). Callers wrap RichText in a block element. */
+.rt-line { margin: 0; }
+.rt-line + .rt-line, .rt-line + .rt-table-wrap, .rt-table-wrap + .rt-line, .rt-table-wrap + .rt-table-wrap { margin-top: .5rem; }
+.rt-bullet { padding-left: .4rem; }
+.rt-line em { font-style: italic; }
+.rt-table-wrap { margin-top: .5rem; overflow-x: auto; }
+.rt-table { border-collapse: collapse; font-size: .78rem; }
+.rt-table caption { text-align: left; font-weight: 800; color: #e8c98a; padding: .1rem .1rem .3rem; }
+.rt-table th, .rt-table td { border: 1px solid #4a4335; padding: .22rem .55rem; text-align: left; vertical-align: top; }
+.rt-table th { background: #241f17; color: #e8c98a; white-space: nowrap; }
 .action-reference-group { margin-top: .35rem; }
 .action-reference-group > summary { padding: .25rem .2rem; color: #9f9789; font-size: .74rem; font-weight: 700; cursor: pointer; }
 .action-reference-group > summary:hover { color: #cdbfa6; }
