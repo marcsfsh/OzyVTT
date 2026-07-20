@@ -8,6 +8,23 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-20 — Nightly PR F increment: `GET /api/v1/game/events` SSE stream (`claude/nightly-openapi-2026-07-20`)
+
+Closed the last documented PR-F gap ("realtime for integrators"): a Server-Sent Events mirror of
+`GET /api/v1/game`, aligned with the existing `/api/v1/viewer/events` pattern. Sends an immediate
+`event: game` frame (current `{view, revision, game}` projection) then a fresh one on every state
+change; keepalive every 15s; new `events:read` scope (already reserved in the contract) gates
+integration credentials, GM/player sessions use their own bearer as usual. Reuses the exact same
+`GameOperations.view()` projection every other read uses — no second projection path (ADR-0016).
+Server wiring: a small subscriber registry in `server.ts`, notified from the same `broadcast()` that
+already pushes to sockets, so a stream can never drift from the sockets or from `GET /game`.
+Capabilities gains `gameEventStream: true`. `docs/api-reference.md` regenerated.
+Verified: `npm run check`/`npm test` (294 total, incl. a new leak-tested SSE integration test:
+GM-grade stream sees the hidden actor, a player's stream never does, a live command push a fresh
+frame with the bumped revision)/`npm run build` green.
+**Next suggested increment:** webhooks (deferred by design, still the largest remaining PR-F gap) or
+the dead credential `gameId` plumbing cleanup (known-bugs) — both are safe, PR-E-independent slices.
+
 ## 2026-07-18 — Public Open API v1 core (PR F) + Time Machine v2 (`claude/open-api-core-m75t9d`)
 
 Owner-directed: RESTful API foundation with core endpoints working, maximum integration openness;

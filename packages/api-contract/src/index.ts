@@ -56,6 +56,7 @@ export const VIEWER_PATHS = {
 export const GAME_PATHS = {
   snapshot: `${API_NAMESPACE}/game`,
   log: `${API_NAMESPACE}/game/log`,
+  events: `${API_NAMESPACE}/game/events`,
   commands: `${API_NAMESPACE}/game/commands`,
   encounterStart: `${API_NAMESPACE}/game/encounter/start`,
   encounterEnd: `${API_NAMESPACE}/game/encounter/end`,
@@ -191,7 +192,9 @@ export const SystemCapabilitiesSchema = z.object({
     /** The generic POST /game/commands tunnel + its GET catalog. */
     commandTunnel: z.boolean(),
     /** Permanent archives of ended encounters (Time Machine v2 documents). */
-    encounterArchives: z.boolean()
+    encounterArchives: z.boolean(),
+    /** GET /game/events: a Server-Sent Events mirror of the same recipient-safe projection GET /game returns, pushed on every state change. */
+    gameEventStream: z.boolean()
   }).strict()
 }).strict();
 
@@ -486,6 +489,7 @@ export const openApiDocument = {
     [VIEWER_PATHS.events]: { get: { operationId: "streamViewerPresentation", security: [{ viewerCookieAuth: [] }], description: "Server-Sent Events stream of presentation updates for a paired viewer session; not a normal JSON response.", responses: { "200": { description: "text/event-stream of `presentation` events" }, "401": { $ref: "#/components/responses/ApiError" } } } },
     [GAME_PATHS.snapshot]: { get: { operationId: "getGameSnapshot", security: gameSecurityWithPlayer("game:read"), description: "The authoritative game state, projected for the caller: GM sessions and integration credentials get the full GM view (hidden combatants, notes, turn-history metadata) unless `view=player` asks for the player-safe projection; player session tokens always get the player-safe view. Sends a weak ETag derived from the revision — poll with If-None-Match for cheap 304s (presence and timed-annotation expiry do not bump the revision, so re-fetch when you need those fresh).", parameters: [{ name: "view", in: "query", required: false, schema: { type: "string", enum: ["gm", "player"] } }], responses: { "200": { description: "The projected game state, with `revision` for optimistic concurrency and polling", headers: { ETag: { schema: { type: "string" } } }, content: { "application/json": { schema: { $ref: "#/components/schemas/GameSnapshotResponse" } } } }, "304": { description: "Unchanged since the revision in If-None-Match" }, "401": apiError, "403": apiError } } },
     [GAME_PATHS.log]: { get: { operationId: "getCombatLog", security: gameSecurityWithPlayer("combat:read"), description: "The persistent combat log, oldest first. GM sessions and integration credentials receive GM-only lines; player sessions only public ones.", parameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 1000, default: 250 } }], responses: { "200": { description: "Chronological log entries", content: { "application/json": { schema: { $ref: "#/components/schemas/GameLogResponse" } } } }, "400": apiError, "401": apiError, "403": apiError } } },
+    [GAME_PATHS.events]: { get: { operationId: "streamGameEvents", security: gameSecurityWithPlayer("events:read"), description: "Server-Sent Events mirror of GET /game: sends an immediate `event: game` frame with the current projection, then one more on every subsequent state change, each shaped exactly like the GameSnapshot response body (`view`, `revision`, `game`) and projected for the caller the same way (GM sessions and integration credentials get the GM view, player sessions the player-safe view). A `: keepalive` comment is sent every 15s. Not a normal JSON response; there is no Last-Event-ID resume — reconnect and re-fetch GET /game to resynchronize.", responses: { "200": { description: "text/event-stream of `game` events, each carrying a GameSnapshot" }, "401": apiError, "403": apiError } } },
     [GAME_PATHS.commands]: {
       get: { operationId: "listGameCommands", security: gameSecurityWithPlayer("system:read"), description: "The full catalog of command types accepted by the tunnel, each with the credential scope it requires.", responses: { "200": { description: "Supported command types", content: { "application/json": { schema: { $ref: "#/components/schemas/GameCommandCatalogResponse" } } } }, "401": apiError, "403": apiError } },
       post: { operationId: "submitGameCommand", security: [{ bearerAuth: [] }, { gmAuth: [] }, { playerAuth: [] }], description: "Generic command tunnel: submits any cataloged command type with its Socket.IO payload shape, dispatched through the exact same validation/authorization/execution path as the built-in UI. The required credential scope depends on the type (see the GET catalog). Omit `commandId` to have one minted; resend the same `commandId` to retry idempotently.", requestBody: jsonBody("GameCommandEnvelope"), responses: { ...mutationResponses, "404": apiError } }

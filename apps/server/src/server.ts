@@ -77,6 +77,13 @@ export function createServer(options: CreateServerOptions) {
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
   const annotationExpiryTimers = new Set<ReturnType<typeof setTimeout>>();
+  /** Live GET /game/events subscribers (game-http.ts), notified alongside the sockets on every broadcast(). */
+  const gameEventSubscribers = new Map<string, { principal: GamePrincipal; send: (snapshot: { view: "gm" | "player"; game: unknown }) => void }>();
+  function subscribeGameEvents(principal: GamePrincipal, send: (snapshot: { view: "gm" | "player"; game: unknown }) => void): () => void {
+    const id = randomUUID();
+    gameEventSubscribers.set(id, { principal, send });
+    return () => { gameEventSubscribers.delete(id); };
+  }
   /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry — same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
   function scheduleAnnotationExpiry() {
     // Keep exactly one pending timer: clear any prior one, arm the soonest expiry, then re-arm from
@@ -107,6 +114,11 @@ export function createServer(options: CreateServerOptions) {
       const player = auth.verifyPlayer(token);
       if (token && !gm && !player) { socket.disconnect(true); continue; }
       socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
+    }
+    // Same projection the socket loop above just used, run through the shared operations layer
+    // (ADR-0016) so a GET /game/events subscriber can never drift from GET /game or the sockets.
+    for (const { principal, send } of gameEventSubscribers.values()) {
+      try { send(operations.view(principal)); } catch { /* the request's close handler unsubscribes a dead stream */ }
     }
   }
   /**
@@ -343,7 +355,8 @@ export function createServer(options: CreateServerOptions) {
       }
     },
     revision: () => store.revision,
-    newId: randomUUID
+    newId: randomUUID,
+    subscribeEvents: subscribeGameEvents
   });
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",

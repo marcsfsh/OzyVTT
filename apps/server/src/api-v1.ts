@@ -96,7 +96,7 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
         api: { version: API_VERSION, namespace: `/api/v${API_VERSION}` },
         realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" },
         supportedScopes: IntegrationScopeSchema.options,
-        features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true }
+        features: { webhooks: false, viewer: true, battlemapGridCalibration: true, gameApi: true, commandTunnel: true, encounterArchives: true, gameEventStream: true }
       }
     });
   });

@@ -118,6 +118,43 @@ describe("public game API over /api/v1", () => {
     expect(player.headers.get("etag")).toMatch(/^W\/"game-r\d+-player"$/);
   });
 
+  it("streams GM-full and player-safe projections over SSE (GET /game/events), pushing a fresh frame on every state change", async () => {
+    const { base, server, gmToken } = await boot();
+    const integration = await issueCredential(base, gmToken, "watcher", ["events:read"]);
+    const playerToken = server.auth.issuePlayerSession();
+    const decoder = new TextDecoder();
+
+    const unauthenticated = await fetch(base + GAME_PATHS.events);
+    expect(unauthenticated.status).toBe(401);
+
+    // A GM-grade integration's stream opens with the full GM projection (hidden actor included).
+    const controller = new AbortController();
+    const live = await fetch(base + GAME_PATHS.events, { headers: bearer(integration.token), signal: controller.signal });
+    expect(live.status).toBe(200);
+    expect(live.headers.get("content-type")).toContain("text/event-stream");
+    const reader = live.body!.getReader();
+    const firstFrame = decoder.decode((await reader.read()).value);
+    expect(firstFrame).toContain("event: game");
+    expect(firstFrame).toContain(SECRET_ID);
+
+    // A player's own stream never receives the hidden actor — same recipient-safe projection as GET /game.
+    const playerController = new AbortController();
+    const playerLive = await fetch(base + GAME_PATHS.events, { headers: bearer(playerToken), signal: playerController.signal });
+    const playerReader = playerLive.body!.getReader();
+    const playerFrame = decoder.decode((await playerReader.read()).value);
+    expect(playerFrame).not.toContain(SECRET_ID);
+    playerController.abort();
+
+    // A state change (over the ordinary typed route) pushes a fresh frame down the still-open stream.
+    const damage = await post(base, `/api/v1/game/actors/${HERO_ID}/damage`, gmToken, { amount: 3 });
+    expect(damage.status).toBe(200);
+    const nextFrame = decoder.decode((await reader.read()).value);
+    expect(nextFrame).toContain("event: game");
+    expect(nextFrame).toContain("\"revision\":");
+
+    controller.abort();
+  });
+
   it("runs the whole combat loop over typed REST routes with idempotent retries and revision conflicts", async () => {
     const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
     const writer = await issueCredential(base, gmToken, "combat bot", ["game:read", "combat:write", "actor:write", "roll:create"]);

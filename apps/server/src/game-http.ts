@@ -47,6 +47,12 @@ export type GameApiRouterOptions = Readonly<{
   }>;
   revision: () => number;
   newId?: () => string;
+  /**
+   * Registers a live subscriber for GET /game/events: `send` is invoked with a fresh
+   * `ops.view`-shaped projection on every state change, projected for the given principal exactly
+   * like the socket handlers' broadcast. Returns an unsubscribe function.
+   */
+  subscribeEvents: (principal: GamePrincipal, send: (snapshot: { view: "gm" | "player"; game: unknown }) => void) => () => void;
 }>;
 
 const expressPath = (openApiPath: string) => openApiPath.replace(/\{([a-zA-Z]+)\}/g, ":$1");
@@ -173,6 +179,32 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return sendError(res, 400, "validation_failed", "limit must be an integer between 1 and 1000.");
     }
     return sendData(res, { entries: ops.logEntries(res.locals.principal as GamePrincipal, limit) });
+  });
+
+  /**
+   * SSE mirror of GET /game (aligned with the existing /api/v1/viewer/events pattern): an immediate
+   * `game` frame with the current projection, then one more on every subsequent state change, both
+   * shaped exactly like the GameSnapshot response body and produced by the same `ops.view` a plain
+   * GET call would use — never a second projection path.
+   */
+  router.get(expressPath(GAME_PATHS.events), authorize("events:read"), (req, res) => {
+    const principal = res.locals.principal as GamePrincipal;
+    try {
+      const initial = ops.view(principal);
+      res.setHeader("content-type", "text/event-stream");
+      res.setHeader("connection", "keep-alive");
+      res.flushHeaders();
+      const write = (snapshot: { view: "gm" | "player"; game: unknown }) => {
+        const revision = (snapshot.game as { revision: number }).revision;
+        res.write(`event: game\ndata: ${JSON.stringify({ view: snapshot.view, revision, game: snapshot.game })}\n\n`);
+      };
+      write(initial);
+      const unsubscribe = options.subscribeEvents(principal, write);
+      const keepAlive = setInterval(() => res.write(": keepalive\n\n"), 15_000);
+      req.on("close", () => { clearInterval(keepAlive); unsubscribe(); });
+    } catch (error) {
+      sendOperationError(res, error);
+    }
   });
 
   // ---------- Generic command tunnel + catalog ----------

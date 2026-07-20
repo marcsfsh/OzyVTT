@@ -251,6 +251,14 @@ The persistent combat log, oldest first. GM sessions and integration credentials
 
 **Responses:** `200` Chronological log entries — envelope of `GameLogData` · errors `400` `401` `403`
 
+### `GET /api/v1/game/events`
+
+Server-Sent Events mirror of GET /game: sends an immediate `event: game` frame with the current projection, then one more on every subsequent state change, each shaped exactly like the GameSnapshot response body (`view`, `revision`, `game`) and projected for the caller the same way (GM sessions and integration credentials get the GM view, player sessions the player-safe view). A `: keepalive` comment is sent every 15s. Not a normal JSON response; there is no Last-Event-ID resume — reconnect and re-fetch GET /game to resynchronize.
+
+**Auth:** Integration credential with `events:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` text/event-stream of `game` events, each carrying a GameSnapshot · errors `401` `403`
+
 ### `GET /api/v1/game/commands`
 
 The full catalog of command types accepted by the tunnel, each with the credential scope it requires.
