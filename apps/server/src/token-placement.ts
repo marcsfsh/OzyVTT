@@ -18,26 +18,35 @@ function positiveDimension(value: number, label: string) {
 
 const rounded = (value: number) => Math.round(value * 1_000) / 1_000;
 
-export function encounterTokenAppearance(geometry: TokenMapGeometry, sizeCells = 1) {
+/** Within a single cell, Tiny and Small draw smaller than Medium (both still centered on the cell). */
+const SINGLE_CELL_DIAMETER: Readonly<Record<"tiny" | "small" | "medium", number>> = { tiny: 0.5, small: 0.66, medium: 0.82 };
+
+export function encounterTokenAppearance(geometry: TokenMapGeometry, sizeCells = 1, size?: CreatureSize) {
   const width = positiveDimension(geometry.width, "Map width");
   const height = positiveDimension(geometry.height, "Map height");
   const shortestSide = Math.min(width, height);
   if (geometry.calibration) {
     const gridSizePx = geometry.calibration.cellSizePx;
-    // A multi-cell creature fills its footprint: 2 cells across for large, 3 for huge, ...
-    const diameter = sizeCells === 1 ? gridSizePx * 0.82 : gridSizePx * (sizeCells - 0.08);
+    // One-cell creatures scale by size (Tiny 50% / Small 66% / Medium 82% of the cell, centered);
+    // multi-cell creatures fill their footprint (2 across for Large, 3 for Huge, ...).
+    const singleCellFactor = SINGLE_CELL_DIAMETER[(size === "tiny" || size === "small") ? size : "medium"];
+    const diameter = sizeCells === 1 ? gridSizePx * singleCellFactor : gridSizePx * (sizeCells - 0.08);
     return { sizePx: rounded(Math.min(shortestSide, diameter)), gridSizePx, gridRotationRadians: geometry.calibration.rotationRadians, sizeCells };
   }
   const base = Math.min(shortestSide, Math.max(12, Math.min(72, shortestSide / 18)));
-  return { sizePx: rounded(Math.min(shortestSide, base * sizeCells)), gridSizePx: null, gridRotationRadians: null, sizeCells };
+  const gridlessFactor = sizeCells === 1 && (size === "tiny" || size === "small") ? SINGLE_CELL_DIAMETER[size] / 0.82 : 1;
+  return { sizePx: rounded(Math.min(shortestSide, base * sizeCells * gridlessFactor)), gridSizePx: null, gridRotationRadians: null, sizeCells };
 }
 
 function actorSizeCells(state: GameState, actorId: string) {
   return state.actors.find((actor) => actor.id === actorId)?.sizeCells ?? 1;
 }
+function actorSize(state: GameState, actorId: string): CreatureSize | undefined {
+  return state.actors.find((actor) => actor.id === actorId)?.size as CreatureSize | undefined;
+}
 
-export function createEncounterTokens(entries: ReadonlyArray<{ actorId: string; sizeCells?: number }>, geometry: TokenMapGeometry): EncounterToken[] {
-  return entries.map(({ actorId, sizeCells }) => ({ actorId, position: null, ...encounterTokenAppearance(geometry, sizeCells ?? 1) }));
+export function createEncounterTokens(entries: ReadonlyArray<{ actorId: string; sizeCells?: number; size?: CreatureSize }>, geometry: TokenMapGeometry): EncounterToken[] {
+  return entries.map(({ actorId, sizeCells, size }) => ({ actorId, position: null, ...encounterTokenAppearance(geometry, sizeCells ?? 1, size) }));
 }
 
 /** Adds tokens when upgrading a persisted active encounter created before tokens existed. */
@@ -46,7 +55,7 @@ export function ensureEncounterTokens(state: GameState, geometry: TokenMapGeomet
   const existing = new Set(state.combat.tokens.map((token) => token.actorId));
   const missing = state.combat.initiative.map((entry) => entry.actorId).filter((actorId) => !existing.has(actorId));
   if (!missing.length) return false;
-  state.combat = { ...state.combat, tokens: [...state.combat.tokens, ...createEncounterTokens(missing.map((actorId) => ({ actorId, sizeCells: actorSizeCells(state, actorId) })), geometry)] };
+  state.combat = { ...state.combat, tokens: [...state.combat.tokens, ...createEncounterTokens(missing.map((actorId) => ({ actorId, sizeCells: actorSizeCells(state, actorId), size: actorSize(state, actorId) })), geometry)] };
   return true;
 }
 
@@ -104,7 +113,7 @@ export function setActorSize(state: GameState, actorId: string, size: CreatureSi
   state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, size, sizeCells } : candidate);
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (token && geometry) {
-    const appearance = encounterTokenAppearance(geometry, sizeCells);
+    const appearance = encounterTokenAppearance(geometry, sizeCells, size);
     const position = token.position ? snappedPosition(token.position, appearance.sizePx / 2, geometry, sizeCells) : null;
     state.combat = { ...state.combat, tokens: state.combat.tokens.map((candidate) => candidate.actorId === actorId ? { ...candidate, ...appearance, position } : candidate) };
   }

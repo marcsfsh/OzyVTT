@@ -49,7 +49,7 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     if (!actor) throw new CommandRejectedError("One of the chosen combatants no longer exists.");
     return { actorId, score: 0, tieBreaker: actor.initiative ?? 0 };
   });
-  const tokens = createEncounterTokens(initiative.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), geometry);
+  const tokens = createEncounterTokens(initiative.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), geometry);
   // A newly prepared scene inherits the table's current rules mode rather than resetting to the default.
   return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, initiative, tokens };
 }

@@ -73,7 +73,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     turnActorId: sorted[0].actorId,
     mapAssetId: input.mapAssetId,
     initiative: sorted,
-    tokens: createEncounterTokens(sorted.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), tokenGeometry)
+    tokens: createEncounterTokens(sorted.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), tokenGeometry)
       .map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
     annotations: [],
     turn: { ...EMPTY_TURN },
@@ -104,7 +104,7 @@ export function addCombatant(state: GameState, actorId: string, score: number | 
   state.combat = {
     ...state.combat,
     initiative: ordered(state, [...state.combat.initiative, { actorId, score: rolled, tieBreaker }]),
-    tokens: [...state.combat.tokens, ...createEncounterTokens([{ actorId, sizeCells: actor.sizeCells ?? 1 }], tokenGeometry)]
+    tokens: [...state.combat.tokens, ...createEncounterTokens([{ actorId, sizeCells: actor.sizeCells ?? 1, size: actor.size }], tokenGeometry)]
   };
 }
 
