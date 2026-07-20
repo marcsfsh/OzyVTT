@@ -1,4 +1,7 @@
-.encounter-map-interaction { margin-top: .5rem; }
+.encounter-map-interaction { margin-top: .5rem; position: relative; }
+/* The tray floats over the map's top edge rather than reflowing the whole map when it appears (for a
+   drag or unplaced tokens), so grabbing a token no longer shoves the map down (report #5). */
+.encounter-map-interaction:not(.enlarged) .encounter-token-tray { position: absolute; z-index: 4; top: 0; left: 0; right: 0; margin-bottom: 0; }
 .encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; font-size: .82rem; }
 .encounter-map-help strong { color: #fff0d2; }
 .encounter-map-help span { color: #cfc5b4; font-size: .78rem; text-align: right; }
@@ -70,10 +73,13 @@
 /* Drawing and fog tools open as one grouped tab that slides out to the right of their toggle (reports
    #11, #13): a bordered panel that reads as a set. It grows in from the left on open and fades out on
    close (via .closing) rather than snapping (report #8). */
-.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; padding: 0 .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); transform-origin: left center; animation: encounter-map-slideout .16s ease-out; }
-.encounter-map-slideout.closing { pointer-events: none; animation: encounter-map-slideout-close .16s ease-in forwards; }
-@keyframes encounter-map-slideout { from { opacity: 0; transform: translateX(-.4rem) scaleX(.94); } to { opacity: 1; transform: translateX(0) scaleX(1); } }
-@keyframes encounter-map-slideout-close { from { opacity: 1; transform: translateX(0) scaleX(1); } to { opacity: 0; transform: translateX(-.4rem) scaleX(.94); } }
+.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; min-width: 0; padding: 0 .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); overflow: visible; white-space: nowrap; }
+/* Opening/closing animate the tab's own width (clipped) so the buttons it pushes aside slide with it,
+   not snap (report #4); once settled the class drops so the eye/color/wrench dropdowns can overflow. */
+.encounter-map-slideout.opening { overflow: hidden; animation: encounter-map-slideout .18s ease-out; }
+.encounter-map-slideout.closing { overflow: hidden; pointer-events: none; animation: encounter-map-slideout-close .18s ease-in forwards; }
+@keyframes encounter-map-slideout { from { opacity: 0; max-width: 0; } to { opacity: 1; max-width: 24rem; } }
+@keyframes encounter-map-slideout-close { from { opacity: 1; max-width: 24rem; } to { opacity: 0; max-width: 0; } }
 .encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
 .encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
 .encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }

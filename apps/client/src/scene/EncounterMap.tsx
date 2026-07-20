@@ -151,11 +151,19 @@ export function EncounterMap({
   // A slide-out that's mid-collapse stays mounted for one animation frame so it fades out instead of
   // vanishing (report #8). Which tab is animating closed, cleared when the exit animation finishes.
   const [closingTab, setClosingTab] = useState<"draw" | "fog" | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // While opening, the tab animates its width so the buttons it pushes aside slide too (report #4);
+  // once settled the class drops so its dropdown menus can overflow. Same idea, reversed, for closing.
+  const [openingTab, setOpeningTab] = useState<"draw" | "fog" | null>(null);
+  const tabTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const beginOpen = (tab: "draw" | "fog") => {
+    setOpeningTab(tab); setClosingTab(null);
+    if (tabTimer.current) clearTimeout(tabTimer.current);
+    tabTimer.current = setTimeout(() => setOpeningTab(null), 190);
+  };
   const beginClose = (tab: "draw" | "fog") => {
-    setClosingTab(tab);
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setClosingTab(null), 160);
+    setClosingTab(tab); setOpeningTab(null);
+    if (tabTimer.current) clearTimeout(tabTimer.current);
+    tabTimer.current = setTimeout(() => setClosingTab(null), 190);
   };
   const [gmLayer, setGmLayer] = useState(false);
   const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ffb52e" : PLAYER_COLORS[0]));
@@ -359,6 +367,9 @@ export function EncounterMap({
 
   const beginGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (busyActorId) return;
+    // A secondary (right/middle) press opens the context menu via onContextMenu - it must not start a
+    // token/pan gesture, which flashed the tray on every right-click (report #5).
+    if (event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest(".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize, .encounter-target-bar")) return;
     if (tool === "ping") {
@@ -565,8 +576,8 @@ export function EncounterMap({
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
-          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war - hide the map from players and reveal it area by area" onClick={() => { if (fogOpen) { if (tool === "fog-reveal" || tool === "fog-hide") setTool("select"); setFogOpen(false); beginClose("fog"); } else { setFogOpen(true); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); setClosingTab(null); } }}>🌫</button>}
-          {(fogOpen || closingTab === "fog") && role === "gm" && <div className={`encounter-map-slideout${fogOpen ? "" : " closing"}`} role="group" aria-label="Fog of war">
+          {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war - hide the map from players and reveal it area by area" onClick={() => { if (fogOpen) { if (tool === "fog-reveal" || tool === "fog-hide") setTool("select"); setFogOpen(false); beginClose("fog"); } else { setFogOpen(true); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); beginOpen("fog"); } }}>🌫</button>}
+          {(fogOpen || closingTab === "fog") && role === "gm" && <div className={`encounter-map-slideout${fogOpen ? (openingTab === "fog" ? " opening" : "") : " closing"}`} role="group" aria-label="Fog of war">
             <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON - players see only revealed areas. Turn off." : "Fog is OFF - turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
             <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-reveal"} disabled={fogBusy || !fog?.enabled} title="Reveal - drag the areas players can see" onClick={() => setTool(tool === "fog-reveal" ? "select" : "fog-reveal")}>☀</button>
             <button type="button" className="encounter-map-icon" aria-pressed={tool === "fog-hide"} disabled={fogBusy || !fog?.enabled} title="Hide - drag an area to cover it again" onClick={() => setTool(tool === "fog-hide" ? "select" : "fog-hide")}>▩</button>
@@ -576,8 +587,8 @@ export function EncounterMap({
           {/* ✏ sits directly left of the shape bar it toggles; the tools slide out to its right as one
               grouped tab (report #11). Only shape/style/cleanup controls live in here - movement and
               layer aids stayed on the bar. */}
-          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools - shapes, color, visibility, cleanup" onClick={() => { if (drawOpen) { if (tool === "circle" || tool === "cone" || tool === "line" || tool === "square") setTool("select"); setDrawOpen(false); beginClose("draw"); } else { setDrawOpen(true); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); setClosingTab(null); } }}>✏</button>
-          {(drawOpen || closingTab === "draw") && <div className={`encounter-map-slideout${drawOpen ? "" : " closing"}`} role="group" aria-label="Drawing tools">
+          <button type="button" className="encounter-map-icon" aria-pressed={drawOpen} aria-expanded={drawOpen} title="Drawing tools - shapes, color, visibility, cleanup" onClick={() => { if (drawOpen) { if (tool === "circle" || tool === "cone" || tool === "line" || tool === "square") setTool("select"); setDrawOpen(false); beginClose("draw"); } else { setDrawOpen(true); setFogOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); beginOpen("draw"); } }}>✏</button>
+          {(drawOpen || closingTab === "draw") && <div className={`encounter-map-slideout${drawOpen ? (openingTab === "draw" ? " opening" : "") : " closing"}`} role="group" aria-label="Drawing tools">
             <div className="encounter-map-tools">
               {TOOLS.filter((entry) => entry.id === "circle" || entry.id === "cone" || entry.id === "line" || entry.id === "square").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={!calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
             </div>
