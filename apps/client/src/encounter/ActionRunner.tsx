@@ -13,16 +13,18 @@ const isResolvable = (action: ContentActionSummary) => action.attackBonus !== nu
 const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.builtin === true);
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const tagLabel = (tag: string) => tag.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-const summaryOf = (action: ContentActionSummary) => {
+/** The action's mechanics as discrete lines - each renders as its own bullet beneath the name. */
+const summaryParts = (action: ContentActionSummary, all: readonly ContentActionSummary[]): string[] => {
   const parts: string[] = [];
+  const componentName = (id: string) => all.find((candidate) => candidate.id === id)?.name ?? tagLabel(id);
   if (action.attackBonus !== null) parts.push(`${signed(action.attackBonus)} to hit${action.reachFeet ? `, reach ${action.reachFeet} ft` : action.rangeFeet ? `, range ${action.rangeFeet} ft` : ""}`);
   if (action.attackCount !== null && action.attackCount > 1) parts.push(`${action.attackCount} attacks`);
-  if (action.multiattack) parts.push(action.multiattack.map((component) => `${component.count}× ${component.actionId}`).join(" + "));
-  if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()}`);
-  for (const part of action.damage) parts.push(`${part.formula} ${part.type}`);
+  if (action.multiattack) parts.push(action.multiattack.map((component) => `${component.count}× ${componentName(component.actionId)}`).join(" + "));
+  if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
+  for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
   if (action.usesLimit !== null) parts.push(action.usesPer === "recharge" ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}` : `${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer}`);
   if (action.legendaryCost !== undefined) parts.push(`Legendary${action.legendaryCost > 1 ? ` ×${action.legendaryCost}` : ""}`);
-  return parts.join(" · ");
+  return parts;
 };
 
 /**
@@ -165,9 +167,14 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         <ul className="action-list">
           {own.map((action) => {
             const hint = availabilityHint(state, actor, action);
+            const parts = summaryParts(action, actions);
             return <li key={action.id}>
               <button type="button" className={`action-row${hint ? " action-row-hinted" : ""}`} disabled={busy} title={action.description} onClick={() => isTargetless(action) ? useDirect(action) : beginTargeting(action, actor.id)}>
-                <strong>{action.name}</strong><small>{summaryOf(action) || (action.grants ? "Use - grants an effect" : "Use")}{hint ? <span className="action-hint"> · {hint}</span> : null}</small>
+                <strong className="action-row-name">{action.name}</strong>
+                {parts.length > 0
+                  ? <ul className="action-row-summary">{parts.map((part) => <li key={part}>{part}</li>)}</ul>
+                  : <span className="action-row-summary-note">{action.grants ? "Grants an effect" : "Tap to use"}</span>}
+                {hint ? <span className="action-hint">{hint}</span> : null}
               </button>
             </li>;
           })}

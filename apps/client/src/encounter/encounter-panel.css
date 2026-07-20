@@ -135,19 +135,25 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 /* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
 .action-runner { margin-top: .6rem; }
 .action-runner-status { color: #a69e91; font-size: .8rem; margin: .4rem 0; }
-.action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
-/* Rollable stat-block actions read as real buttons (report #6): a border + raised fill + left
-   accent so it's obvious they're tappable, distinct from the quiet "tap to read" reference rows. */
-.action-row { width: 100%; display: flex; align-items: baseline; gap: .5rem; padding: .34rem .5rem; border: 1px solid #4d4534; border-left: 3px solid #9e6121; border-radius: .4rem; background: #221d15; color: #f5efe3; text-align: left; cursor: pointer; }
+.action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+/* Rollable stat-block actions read as real buttons (report #6): a border + raised fill + left accent
+   so it's obvious they're tappable. The name sits on its own line with the mechanics stacked as
+   bullets beneath it, so nothing is crammed onto one truncated line (owner feedback). */
+.action-row { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid #4d4534; border-left: 3px solid #9e6121; border-radius: .5rem; background: #221d15; color: #f5efe3; text-align: left; cursor: pointer; }
 .action-row:hover:not(:disabled) { background: #2b241a; border-color: #e8a743; border-left-color: #e8a743; }
-.action-row strong { flex: none; font-size: .82rem; }
-.action-row small { flex: 1 1 auto; min-width: 0; margin: 0; color: #c9a869; font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Reference-only actions (no structured attack/save/damage): dashed, and tap to reveal the rules text. */
-/* Reference/trait rows are NOT rollable — keep them flat and quiet so the button-styled actions stand out. */
-.action-row-static { border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
+.action-row-name { font-size: .88rem; font-weight: 800; color: #f5efe3; }
+.action-row-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: .18rem; }
+.action-row-summary li { position: relative; padding-left: .85rem; color: #c9a869; font-size: .74rem; line-height: 1.35; }
+.action-row-summary li::before { content: "•"; position: absolute; left: .1rem; color: #cf8a3c; font-weight: 800; }
+.action-row-summary-note { color: #9f9789; font-size: .74rem; font-style: italic; }
+.action-row .action-hint { display: block; margin-top: .05rem; font-size: .73rem; }
+/* Reference-only actions (no structured attack/save/damage): flat, quiet, and single-line so the
+   button-styled rollable actions above stand out. Tap to reveal the rules text. */
+.action-row-static { flex-direction: row; align-items: baseline; gap: .5rem; border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
 .action-row-static:hover:not(:disabled) { background: #201c15; border-color: transparent; border-left-color: #6b5e4b; }
 .action-row-static[aria-expanded="true"] { background: #241f17; opacity: 1; }
-.action-row-static small { color: #8f8579; }
+.action-row-static strong { flex: none; font-size: .82rem; }
+.action-row-static small { flex: 1 1 auto; min-width: 0; color: #8f8579; font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .action-reference-text { margin: .35rem 0 .1rem; padding: .5rem .65rem; border-left: 2px solid #6b5e4b; border-radius: .3rem; background: #17140f; color: #c9c0b1; font-size: .78rem; line-height: 1.45; }
 .action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; }
 .action-targeting-head { margin: 0 0 .45rem; font-size: .82rem; color: #c8c0b1; }
@@ -353,8 +359,8 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 
 /* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
    stays a pure list. One quiet container; contents are flat. */
-.acting-console { margin-top: .7rem; padding: .55rem .6rem .6rem; border: 1px solid #6e431c; border-left: 3px solid #ffc34d; border-radius: .55rem; background: #211a10; }
-.acting-console-head { display: flex; align-items: baseline; gap: .45rem; margin-bottom: .35rem; }
+.acting-console { margin-top: .7rem; padding: .75rem .8rem .85rem; border: 1px solid #6e431c; border-left: 3px solid #ffc34d; border-radius: .6rem; background: #211a10; }
+.acting-console-head { display: flex; align-items: baseline; gap: .45rem; margin-bottom: .5rem; }
 .acting-console-head strong { color: #ffd58d; font-size: .86rem; }
 .acting-console-sub { color: #9f9789; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
 .acting-console-head .economy-movement { margin-left: auto; }
@@ -405,7 +411,7 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
   .initiative-expand { padding-top: .4rem; padding-bottom: .4rem; }
   .initiative-hp, .initiative-score-value { padding-top: .4rem; padding-bottom: .4rem; }
   .builtin-chip, .economy-slot { padding-top: .4rem; padding-bottom: .4rem; }
-  .action-row { padding-top: .5rem; padding-bottom: .5rem; }
+  .action-row { padding-top: .6rem; padding-bottom: .6rem; }
 }
 
 /* Foundry-style rows: [avatar | name + HP bar | initiative]. */
