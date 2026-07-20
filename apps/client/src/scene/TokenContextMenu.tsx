@@ -103,7 +103,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       {role === "gm" && <button type="button" className="token-context-item" disabled={busy} title={onGmLayer ? "Reveal this token to players and the shared screen" : "Hide this token from players and the shared screen"} onClick={toggleLayer}>{onGmLayer ? "Move to shared layer" : "Move to GM layer"}</button>}
       <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent - restore" : "Use reaction"}</button>
       {role === "gm" && placed && <button type="button" className="token-context-item" onClick={() => { onReturnToTray(); onClose(); }}>Return to tray</button>}
-      <div className="token-context-conditions"><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
+      <div className="token-context-conditions"><span className="token-context-conditions-label">Conditions</span><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
       {feedback && <p className="token-context-feedback" role="status">{feedback}</p>}
     </div>,
     document.fullscreenElement ?? document.body

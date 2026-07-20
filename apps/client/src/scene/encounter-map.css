@@ -179,6 +179,7 @@
 .token-context-size select { flex: 1; margin: 0; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
 .token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
 .token-context-conditions { margin-top: .1rem; }
+.token-context-conditions-label { display: block; margin-bottom: .3rem; color: #9f9789; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .token-context-feedback { margin: .1rem 0 0; color: #e9b861; font-size: .75rem; }
 
 .encounter-map-scene-live { display: inline-flex; gap: .35rem; }
