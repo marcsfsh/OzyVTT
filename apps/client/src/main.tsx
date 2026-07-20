@@ -169,7 +169,10 @@ function App() {
   };
 
   const mapToken = mode === "gm" ? gmToken : localStorage.getItem(PLAYER_TOKEN_KEY);
-  const combatMapActive = !!state && state.combat.active && !!state.combat.mapAssetId;
+  // Docking is available whenever a map is loaded (a live scene), not only once combat starts, so the
+  // GM can position the tracker during encounter setup too (report #9/#6). Players' projection nulls
+  // mapAssetId until combat is active, so this stays GM-side and never affects the viewer.
+  const combatMapActive = !!state && !!state.combat.mapAssetId;
   const showDocked = combatMapActive && dockPosition !== "sidebar";
   const encounterDock = combatMapActive ? { position: dockPosition, onChange: setDockPosition } : undefined;
   const encounterPanel = state
