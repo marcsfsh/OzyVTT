@@ -25,7 +25,7 @@ import { applyRest, spendHitDice } from "./rests.js";
 import { paintFog, resetFog, setFogEnabled } from "./fog.js";
 import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
-import { moveEncounterToken, moveSceneToken, setActorSize, type TokenMapGeometry } from "./token-placement.js";
+import { moveEncounterToken, moveSceneToken, setActorSize, setActorVisibility, type TokenMapGeometry } from "./token-placement.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
@@ -36,7 +36,7 @@ import {
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneSetCombatantsSchema, SetActorSizeSchema, SetConditionSchema, SetEnvironmentSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneSetCombatantsSchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHpSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -1201,6 +1201,15 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async actorSetVisibility(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can change token visibility.");
+      const request = parse(SetActorVisibilitySchema, raw, "The token visibility command is malformed.");
+      const { commandId, actorId, visibility, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "actor.set-visibility", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setActorVisibility(state, actorId, visibility));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Scenes ----------
 
     async sceneCreate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1324,6 +1333,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["character.force-release", "Force-release a claimed character (GM).", (p, raw) => operations.characterForceRelease(p, raw)],
     ["actor.set-token-image", "Set or clear a combatant's token image from the token library (GM).", (p, raw) => operations.actorSetTokenImage(p, raw)],
     ["actor.set-size", "Set a combatant's creature size; the token re-snaps to its footprint (GM).", (p, raw) => operations.actorSetSize(p, raw)],
+    ["actor.set-visibility", "Move a combatant between the shared layer and the GM-only layer (GM).", (p, raw) => operations.actorSetVisibility(p, raw)],
     ["actor.set-speed", "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).", (p, raw) => operations.actorSetSpeed(p, raw)],
     ["scene.create", "Prepare a staged scene on a battlemap without touching the live table (GM).", (p, raw) => operations.sceneCreate(p, raw)],
     ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],

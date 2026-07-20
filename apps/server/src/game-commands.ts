@@ -31,6 +31,7 @@ export const ActorImportDefinitionSchema = z.object({ commandId: z.string().uuid
 export const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const SetActorVisibilitySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), visibility: z.enum(["public", "gm-only"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /**
  * Damage keeps the legacy untyped `amount` for manual adjustments; the ADR-0020 typed path adds

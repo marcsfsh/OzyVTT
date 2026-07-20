@@ -268,6 +268,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.claimForceRelease), ...command("character.force-release", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorTokenImage), ...command("actor.set-token-image", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorVisibility), ...command("actor.set-visibility", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
   router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
   router.delete(expressPath(GAME_PATHS.sceneById), ...command("scene.remove", (req) => ({ sceneId: req.params.sceneId })));

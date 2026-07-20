@@ -120,6 +120,18 @@ export function setActorSize(state: GameState, actorId: string, size: CreatureSi
 }
 
 /**
+ * Moves a combatant between the shared layer (public) and the GM-only layer. On the GM layer the actor,
+ * its token, and its rolls stay hidden from players and the viewer - the projections already filter by
+ * this flag, so flipping it is all that's needed. GM-only at the command layer.
+ */
+export function setActorVisibility(state: GameState, actorId: string, visibility: "public" | "gm-only") {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  if (actor.visibility === visibility) return;
+  state.actors = state.actors.map((candidate) => candidate.id === actorId ? { ...candidate, visibility } : candidate);
+}
+
+/**
  * Moves a token within a PREPARED (non-live) scene while the GM stages it privately - players and the
  * viewer never see this scene until it goes live. Snaps against that scene's own map. Rejects the
  * active scene (that one is edited through the normal live token move). GM-only at the command layer.

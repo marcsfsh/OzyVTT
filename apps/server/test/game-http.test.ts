@@ -397,6 +397,9 @@ describe("public game API over /api/v1", () => {
     const cosmetics = await issueCredential(base, gmToken, "cosmetics", ["actor:write"]);
     expect((await post(base, GAME_PATHS.actorSize.replace("{actorId}", HERO_ID), cosmetics.token, { size: "large" })).status).toBe(200);
     expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)?.sizeCells).toBe(2);
+    expect((await post(base, GAME_PATHS.actorVisibility.replace("{actorId}", HERO_ID), cosmetics.token, { visibility: "gm-only" })).status).toBe(200);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)?.visibility).toBe("gm-only");
+    expect((await post(base, GAME_PATHS.actorVisibility.replace("{actorId}", HERO_ID), cosmetics.token, { visibility: "public" })).status).toBe(200);
     expect((await post(base, GAME_PATHS.actorTokenImage.replace("{actorId}", HERO_ID), cosmetics.token, { tokenAssetId: null })).status).toBe(200);
   });
 
@@ -529,6 +532,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.claimForceRelease, "post", "character.force-release"],
       [GAME_PATHS.actorTokenImage, "post", "actor.set-token-image"],
       [GAME_PATHS.actorSize, "post", "actor.set-size"],
+      [GAME_PATHS.actorVisibility, "post", "actor.set-visibility"],
       [GAME_PATHS.actorSpeed, "post", "actor.set-speed"],
       [GAME_PATHS.scenes, "post", "scene.create"],
       [GAME_PATHS.sceneById, "delete", "scene.remove"],

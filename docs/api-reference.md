@@ -99,6 +99,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.force-release` | `actor:write` |
 | `actor.set-token-image` | `actor:write` |
 | `actor.set-size` | `actor:write` |
+| `actor.set-visibility` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
 | `scene.rename` | `scene:write` |
@@ -1115,6 +1116,24 @@ Sets a combatant's creature size; large+ tokens size to their grid footprint and
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `size` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/visibility`
+
+Moves a combatant between the shared layer (public) and the GM-only layer (GM-grade only).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `visibility` | `public` \| `gm-only` | yes |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
