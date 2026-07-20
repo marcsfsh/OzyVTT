@@ -219,6 +219,11 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .reaction-prompt { border-color: #4e6a8a; background: #131c26; }
 .reaction-prompt .save-prompt-label { color: #9ec7ef; }
 .reaction-prompt .save-prompt-label strong { color: #c2ddf7; }
+/* Adv/disadv re-roll buttons on a rolled save (and, later, other d20 prompts): a cool accent, pressed
+   when that mode produced the shown roll. */
+.save-die-mode { padding: .35rem .6rem; border: 1px solid #4d5e6b; border-radius: .4rem; background: #17140f; color: #a8cbe0; font-size: .74rem; font-weight: 700; cursor: pointer; }
+.save-die-mode:hover:not(:disabled) { border-color: #7fb0d8; color: #d0e6f7; }
+.save-die-mode.active { background: #1c2a34; border-color: #7fb0d8; color: #d0e6f7; }
 .save-prompt-confirm .save-pass { color: #a7e8b0; }
 .save-prompt-confirm .save-fail { color: #ffb4ab; }
 .save-prompt-effect { color: #c8c0b1; font-size: .76rem; }

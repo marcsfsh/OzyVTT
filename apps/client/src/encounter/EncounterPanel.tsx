@@ -55,17 +55,17 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
   const autoRolled = useRef(false);
   // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
   // so we can show it and let the answerer confirm rather than auto-resolving on the Roll click.
-  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean } | null>(null);
+  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean; mode?: "advantage" | "disadvantage" | "normal" } | null>(null);
   // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
-  // unmounts before it could show its own result.
-  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false) => {
+  // unmounts before it could show its own result. `dieMode` is the answerer's explicit adv/disadv.
+  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false, dieMode?: "advantage" | "disadvantage" | "normal") => {
     setBusy(true);
-    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(legendaryResistance ? { legendaryResistance } : {}), ...(total !== undefined ? { total } : {}) }, (result: SaveAnswerResult) => {
+    socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(legendaryResistance ? { legendaryResistance } : {}), ...(total !== undefined ? { total } : {}), ...(dieMode ? { rollMode: dieMode } : {}) }, (result: SaveAnswerResult) => {
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The saving throw could not be answered."); return; }
       const outcome = result.outcome;
       if (!outcome) return;
-      if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied }); return; }
+      if (!outcome.committed) { setRolled({ total: outcome.total, success: outcome.success, damage: outcome.appliedDamage, condition: outcome.conditionApplied, mode: outcome.rollMode?.mode }); return; }
       onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`);
     });
   };
@@ -92,8 +92,11 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
     {rolled
       // Reveal the rolled total and what it will do, and require an explicit Confirm before applying.
       ? <span className="save-prompt-confirm">
-          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total} - {rolled.success ? "Success" : "Failure"}</strong>
+          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.success ? "Success" : "Failure"}</strong>
           <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
+          {/* Adv/disadv re-roll the d20 keeping the higher/lower (2d20kh1 / kl1), applied after the roll. */}
+          <button type="button" className={`save-die-mode${rolled.mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => send("roll", undefined, false, false, "advantage")}>Adv</button>
+          <button type="button" className={`save-die-mode${rolled.mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => send("roll", undefined, false, false, "disadvantage")}>Disadv</button>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => send("manual", rolled.total, true)}>Confirm</button>
           {!rolled.success && (legendaryResistanceLeft ?? 0) > 0 && <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when the creature fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>}
           <button type="button" className="secondary" disabled={busy} onClick={() => setRolled(null)}>Re-roll</button>

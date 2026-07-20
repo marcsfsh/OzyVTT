@@ -698,7 +698,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(SaveAnswerSchema, raw, "The saving-throw answer is malformed.", true);
       const scope = actorScopeOf(principal);
       const sessionId = sessionIdOf(principal);
-      const { commandId, saveId, method, total, commit, legendaryResistance, expectedRevision } = request;
+      const { commandId, saveId, method, total, rollMode, commit, legendaryResistance, expectedRevision } = request;
       const pending = store.snapshot.combat.pendingSaves.find((entry) => entry.id === saveId);
       let answered: ReturnType<typeof answerSave> | undefined;
       const result = await store.execute({ id: commandId, type: "save.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
@@ -709,7 +709,7 @@ export function createGameOperations(context: GameOperationsContext) {
           role: scope.role,
           now: () => new Date().toISOString(),
           resolveDefinition
-        }, legendaryResistance);
+        }, legendaryResistance, rollMode);
       });
       const outcome = answered?.outcome;
       if (!result.duplicate) {

@@ -150,7 +150,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
  */
-export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false): { outcome: SaveOutcome; events: EffectNarration[] } {
+export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false, explicitRollMode?: "advantage" | "disadvantage" | "normal"): { outcome: SaveOutcome; events: EffectNarration[] } {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
@@ -175,9 +175,12 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     const modifier = saveModifierFor(definition, pending.ability) + exhaustionPenalty(target) + pending.saveBonus;
     const sources = saveRollSources(target, pending.ability);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
-    const die = aggregated.mode === "advantage" ? "2d20kh1" : aggregated.mode === "disadvantage" ? "2d20kl1" : "1d20";
+    // An explicit choice (the answerer's adv/disadv button, or a forced "normal") wins over the
+    // engine-detected sources, mirroring how attacks let the GM override the aggregation.
+    const mode = explicitRollMode ?? aggregated.mode;
+    const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
     const resolution = resolveDice(parseDiceFormula(`${die} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
-    if (aggregated.advantage.length > 0 || aggregated.disadvantage.length > 0) rollMode = aggregated;
+    if (mode !== "normal") rollMode = { mode, advantage: mode === "advantage" ? (aggregated.advantage.length > 0 ? aggregated.advantage : ["Chosen"]) : [], disadvantage: mode === "disadvantage" ? (aggregated.disadvantage.length > 0 ? aggregated.disadvantage : ["Chosen"]) : [] };
     // The save roll lands in the shared history attributed to the target; hidden targets stay GM-only.
     recordSaveRoll(state, resolution, {
       id: deps.newRollId(), commandId, sessionId: deps.sessionId, role: deps.role, label: target.name, actorId: target.id,

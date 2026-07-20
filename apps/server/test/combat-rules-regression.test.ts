@@ -1594,6 +1594,22 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     expect(game.combat.pendingSaves).toHaveLength(0);
   });
 
+  it("save adv/disadv: the answerer's explicit choice rolls 2d20 keeping higher/lower (#5/#7)", () => {
+    const queue = (faces: number[]) => { const q = [...faces]; return () => q.shift() ?? 1; };
+    // Advantage keeps the higher of two d20s (5, 15 -> 15) + WIS +1 = 16 >= DC 14 -> success.
+    const advGame = buildBossGame();
+    resolve(advGame, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
+    const adv = answerSave(advGame, nextCommandId(), advGame.combat.pendingSaves[0].id, "roll", undefined, false, { role: "gm" }, { ...saveDeps(advGame, 0), random: queue([5, 15]) }, false, "advantage");
+    expect(adv.outcome).toMatchObject({ total: 16, success: true, committed: false });
+    expect(adv.outcome.rollMode?.mode).toBe("advantage");
+    // Disadvantage keeps the lower (5, 15 -> 5) + 1 = 6 < 14 -> failure.
+    const disGame = buildBossGame();
+    resolve(disGame, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
+    const dis = answerSave(disGame, nextCommandId(), disGame.combat.pendingSaves[0].id, "roll", undefined, false, { role: "gm" }, { ...saveDeps(disGame, 0), random: queue([5, 15]) }, false, "disadvantage");
+    expect(dis.outcome).toMatchObject({ total: 6, success: false, committed: false });
+    expect(dis.outcome.rollMode?.mode).toBe("disadvantage");
+  });
+
   it("Legendary Resistance rejects when exhausted, spends nothing on a natural success, and re-arms on a long rest", () => {
     const exhausted = buildBossGame({ "legendary-resistance": 3 });
     resolve(exhausted, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);

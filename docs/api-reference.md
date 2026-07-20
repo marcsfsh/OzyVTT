@@ -698,6 +698,7 @@ Answers a pending saving throw by server roll or manual total; on commit the out
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `method` | `roll` \| `manual` | yes |  |
 | `total` | integer (-20–60) | no | Required for method=manual |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | For method=roll: the answerer's explicit advantage/disadvantage choice; wins over the engine's aggregated sources (2d20kh1 / 2d20kl1) |
 | `commit` | boolean | no | false previews the outcome without applying damage/conditions Default: `true`. |
 | `legendaryResistance` | boolean | no | GM only, commit only: spend a Legendary Resistance use to turn a failed save into a success (a natural success spends nothing) Default: `false`. |
 

@@ -481,7 +481,7 @@ export interface ClientToServerEvents {
   "encounter:set-environment": (payload: { commandId: string; underwater: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:rest": (payload: { commandId: string; actorId: string; kind: "long" | "short"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:spend-hit-dice": (payload: { commandId: string; actorId: string; count: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; commit?: boolean; legendaryResistance?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
+  "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; rollMode?: "advantage" | "disadvantage" | "normal"; commit?: boolean; legendaryResistance?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "reaction:answer": (payload: { commandId: string; reactionId: string; use: boolean; actionId?: string; expectedRevision?: number }, acknowledgement: (result: ReactionAnswerResult) => void) => void;
   "reaction:dismiss": (payload: { commandId: string; reactionId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
