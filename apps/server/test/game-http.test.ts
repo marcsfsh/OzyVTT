@@ -401,6 +401,10 @@ describe("public game API over /api/v1", () => {
     expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)?.visibility).toBe("gm-only");
     expect((await post(base, GAME_PATHS.actorVisibility.replace("{actorId}", HERO_ID), cosmetics.token, { visibility: "public" })).status).toBe(200);
     expect((await post(base, GAME_PATHS.actorTokenImage.replace("{actorId}", HERO_ID), cosmetics.token, { tokenAssetId: null })).status).toBe(200);
+    // Table roll preference is a combat:write command.
+    const combatPref = await issueCredential(base, gmToken, "roll pref", ["combat:write"]);
+    expect((await post(base, GAME_PATHS.rollMode, combatPref.token, { mode: "manual" })).status).toBe(200);
+    expect(server.store.snapshot.combat.rollMode).toBe("manual");
   });
 
   it("narrates token movement into the combat log with distances, keeping hidden ranges GM-only", async () => {
@@ -516,6 +520,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.effectEnd, "post", "effect.end"],
       [GAME_PATHS.deathSaveRoll, "post", "death-save.roll"],
       [GAME_PATHS.rulesMode, "post", "encounter.set-rules-mode"],
+      [GAME_PATHS.rollMode, "post", "encounter.set-roll-mode"],
       [GAME_PATHS.environment, "post", "encounter.set-environment"],
       [GAME_PATHS.actorRest, "post", "actor.rest"],
       [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],

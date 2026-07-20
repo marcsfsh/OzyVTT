@@ -24,6 +24,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     annotations: combat.annotations,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
+    rollMode: combat.rollMode,
     underwater: combat.underwater,
     reactionsUsed: combat.reactionsUsed,
     legendaryUsed: combat.legendaryUsed,
@@ -35,7 +36,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [] };
 }
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */
@@ -51,7 +52,7 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
   });
   const tokens = createEncounterTokens(initiative.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), geometry);
   // A newly prepared scene inherits the table's current rules mode rather than resetting to the default.
-  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, initiative, tokens };
+  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, rollMode: state.combat.rollMode, initiative, tokens };
 }
 
 export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry): Scene {

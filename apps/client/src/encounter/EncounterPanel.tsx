@@ -49,9 +49,10 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  * d20 + its best-known modifier; the typed total covers proficient/situational saves. The outcome
  * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
  */
-function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
+function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
   const [manualTotal, setManualTotal] = useState("");
   const [busy, setBusy] = useState(false);
+  const autoRolled = useRef(false);
   // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
   // so we can show it and let the answerer confirm rather than auto-resolving on the Roll click.
   const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean } | null>(null);
@@ -73,6 +74,12 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, legendaryResista
     if (!Number.isInteger(total) || total < -20 || total > 60) { onFeedback("Enter the rolled total (-20 to 60)."); return; }
     send("manual", total, true);
   };
+  // Auto mode rolls the save the moment it is owed (still a preview, so the answerer confirms or types
+  // an override); manual mode waits for the answerer to roll or type. One roll per prompt.
+  useEffect(() => {
+    if (rollMode === "auto" && !rolled && !autoRolled.current) { autoRolled.current = true; send("roll", undefined, false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rollMode, rolled]);
   const dismiss = () => {
     setBusy(true);
     socket.emit("save:dismiss", { commandId: newId(), saveId: save.id }, (result: MutationResult) => {
@@ -215,11 +222,11 @@ function DyingTracker({ actorId, name, deathSaves, canRoll, onFeedback }: Readon
 }
 
 /** A player's own pending saves with a local feedback line (the GM panel uses its shared message instead). */
-function OwnSavePrompts({ saves, targetName }: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string }>) {
+function OwnSavePrompts({ saves, targetName, rollMode }: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string; rollMode: "auto" | "manual" }>) {
   const [feedback, setFeedback] = useState("");
   if (saves.length === 0 && !feedback) return null;
   return <div className="own-save-prompts">
-    {saves.map((save) => <SavePrompt key={save.id} save={save} targetName={targetName} canDismiss={false} onFeedback={setFeedback} />)}
+    {saves.map((save) => <SavePrompt key={save.id} save={save} targetName={targetName} canDismiss={false} onFeedback={setFeedback} rollMode={rollMode} />)}
     {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
@@ -307,7 +314,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           </div>
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} />}
-          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} />}
+          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} />}
         </li>;
       })}</ol>
@@ -506,6 +513,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="freeform">Freeform - no checks</option>
               </select>
             </label>
+            <label className="rules-mode-control">Rolls
+              <select value={state.combat.rollMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "auto" | "manual"; socket.emit("encounter:set-roll-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Roll mode: ${mode === "auto" ? "auto-roll" : "manual entry"}.` : result.message ?? "The roll mode could not be changed.")); }}>
+                <option value="auto">Auto-roll - type to override</option>
+                <option value="manual">Manual entry - Roll to auto</option>
+              </select>
+            </label>
             <label className="environment-control">
               <input type="checkbox" checked={state.combat.underwater} disabled={busy} onChange={(event) => { const underwater = event.target.checked; socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed.")); }} />
               Underwater fight
@@ -585,7 +598,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           </>}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
           {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} />}
-          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage}
+          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode}
             legendaryResistanceLeft={actor.legendary?.resistancesPerDay !== undefined ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0)) : undefined} />)}
           {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} />)}
         </li>;
