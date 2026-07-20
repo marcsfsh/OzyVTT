@@ -384,16 +384,16 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 /* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
    stays a pure list. One quiet container; contents are flat. */
 .acting-console { margin-top: .7rem; padding: .75rem .8rem .85rem; border: 1px solid #6e431c; border-left: 3px solid #ffc34d; border-radius: .6rem; background: #211a10; }
-/* Name gets its own full-width first row; the resource controls drop to a right-aligned block beneath it. */
+/* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
 .acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
 .acting-console-head strong { color: #ffd58d; font-size: .86rem; }
+.acting-console-title { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
 .acting-console-name { min-width: 0; line-height: 1.25; }
 .acting-console-sub { color: #9f9789; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
-/* Action/Bonus/Reaction sit on their own right-aligned row; movement lands beneath the Reaction button. */
-.acting-console-economy { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
 .acting-console-economy-row { display: flex; align-items: center; gap: .3rem; }
-/* Override the shared centered align-self so movement right-aligns under Reaction, and read it a touch brighter. */
-.acting-console-head .economy-movement { margin: 0; padding: 0; align-self: flex-end; font-size: .82rem; font-weight: 700; color: #e2c58a; }
+/* Movement rides the name row, right-aligned; read it a touch brighter than the muted default. */
+.acting-console-title .economy-movement { flex: none; margin: 0; padding: 0; align-self: baseline; font-size: .82rem; font-weight: 700; color: #e2c58a; white-space: nowrap; }
+.acting-console-title .legendary-pill { flex: none; }
 .acting-console .turn-economy { margin-top: 0; padding: 0; border: 0; background: transparent; }
 .acting-console .action-runner { margin-top: .45rem; }
 .builtin-more { border-style: dashed; color: #9f9789; }

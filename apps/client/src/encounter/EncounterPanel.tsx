@@ -605,28 +605,26 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
           </div>}
           <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
-            {/* ONE header line: name + economy pills + movement - no separate strip restating anything. */}
-            {/* Name takes the freed room on the left; the resource controls right-align as a block, with
-                movement tucked directly beneath the Reaction button (owner feedback). */}
+            {/* Row 1: name on the left, movement (or the off-turn legendary pool) right-aligned on the
+                same line. Row 2: the turn's resource buttons, left-aligned (owner feedback). */}
             <header className="acting-console-head">
-              <strong className="acting-console-name">{actor.name}</strong>
+              <div className="acting-console-title">
+                <strong className="acting-console-name">{actor.name}</strong>
+                {legendaryActor
+                  ? <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills when this creature's own turn starts.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
+                  : actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
+              </div>
               {legendaryActor
-                // Off-turn legendary console: the turn economy belongs to the turn actor, so show the
-                // legendary pool (with a GM correction toggle) instead of Action/Bonus/movement.
-                ? <div className="acting-console-economy">
-                    <div className="acting-console-economy-row">
-                      <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills when this creature's own turn starts.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
-                      <button type="button" className="economy-slot" disabled={busy || legendarySpent === 0} title="Restore one legendary action (GM correction)" onClick={() => void run(() => emitCommand("turn:use-legendary", { commandId: newId(), actorId: actor.id, spent: Math.max(0, legendarySpent - 1), expectedRevision: state.revision }), "Legendary action restored.")}>+1</button>
-                    </div>
+                // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a GM
+                // correction (+1) and a way back instead of Action/Bonus/Reaction.
+                ? <div className="acting-console-economy-row">
+                    <button type="button" className="economy-slot" disabled={busy || legendarySpent === 0} title="Restore one legendary action (GM correction)" onClick={() => void run(() => emitCommand("turn:use-legendary", { commandId: newId(), actorId: actor.id, spent: Math.max(0, legendarySpent - 1), expectedRevision: state.revision }), "Legendary action restored.")}>+1</button>
                     <button type="button" className="secondary legendary-done" onClick={() => setLegendaryActingId(null)}>Back to {turnActor?.name ?? "the turn"}</button>
                   </div>
-                : <div className="acting-console-economy">
-                    <div className="acting-console-economy-row">
-                      <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
-                      <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
-                      <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
-                    </div>
-                    {actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
+                : <div className="acting-console-economy-row">
+                    <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
+                    <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
+                    <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
                   </div>}
             </header>
             <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
