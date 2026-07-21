@@ -1,0 +1,245 @@
+import type { ReactNode } from "react";
+import { useState } from "react";
+import {
+  Button,
+  Chip,
+  Eyebrow,
+  Field,
+  IconButton,
+  Input,
+  Menu,
+  MenuItem,
+  Modal,
+  Panel,
+  PanelHeader,
+  Select,
+  Tabs,
+  Textarea,
+  ThemeToggle,
+  Tooltip,
+  ToastProvider,
+  useToast,
+  Wordmark,
+  type TabItem
+} from "@vtt/ui";
+
+/** Living style guide for the Neon Horizon design system. Dev-only reference
+    (its own Vite entry, styleguide.html); renders every token, type role, and
+    primitive with its states, and switches themes live. Keep it current: a new
+    primitive isn't done until it appears here. */
+
+const SURFACES = ["--void", "--bg", "--surface-1", "--surface-2", "--surface-3", "--overlay"];
+const LINES = ["--line", "--line-strong"];
+const NEON = ["--magenta", "--magenta-hi", "--cyan", "--cyan-hi", "--violet", "--violet-hi", "--indigo"];
+const SEMANTIC = ["--primary", "--success", "--caution", "--danger", "--danger-hi", "--info"];
+const TEXTS = ["--text", "--text-dim", "--text-muted", "--text-on-neon"];
+
+function Section({ id, title, blurb, children }: { id: string; title: string; blurb?: string; children: ReactNode }) {
+  return (
+    <section className="sg-section" id={id}>
+      <div className="sg-section-head">
+        <h2 className="sg-h2">{title}</h2>
+        {blurb && <p className="sg-blurb">{blurb}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Swatch({ token }: { token: string }) {
+  return (
+    <div className="sg-swatch">
+      <div className="sg-swatch-chip" style={{ background: `var(${token})` }} />
+      <code className="sg-swatch-name">{token}</code>
+    </div>
+  );
+}
+
+function ToastDemo() {
+  const { toast } = useToast();
+  return (
+    <div className="sg-row">
+      <Button variant="secondary" onClick={() => toast("Encounter saved", { tone: "success" })}>Success toast</Button>
+      <Button variant="secondary" onClick={() => toast("Couldn't reach the server", { tone: "error" })}>Error toast</Button>
+      <Button variant="secondary" onClick={() => toast("Player joined the table", { tone: "info" })}>Info toast</Button>
+    </div>
+  );
+}
+
+const DEMO_TABS: TabItem[] = [
+  { id: "encounter", label: "Encounter" },
+  { id: "maps", label: "Map Setup" },
+  { id: "viewer", label: "Viewer" },
+  { id: "replay", label: "Replays" },
+  { id: "setup", label: "VTT Setup" }
+];
+
+export function StyleGuide() {
+  const [tab, setTab] = useState("encounter");
+  const [vtab, setVtab] = useState("encounter");
+  const [modalOpen, setModalOpen] = useState(false);
+
+  return (
+    <ToastProvider>
+      <div className="sg">
+        <header className="sg-header surface-frost">
+          <div className="sg-header-brand">
+            <Wordmark>Neon Horizon</Wordmark>
+            <Eyebrow>Design system reference</Eyebrow>
+          </div>
+          <ThemeToggle />
+        </header>
+
+        <main className="sg-main">
+          <p className="sg-intro">
+            The single source of truth for look and feel. Every control here is a{" "}
+            <code>@vtt/ui</code> primitive driven entirely by the design tokens — switch the theme above
+            to see all three themes. Build new features from these; do not hand-roll bespoke controls.
+          </p>
+
+          <Section id="color" title="Color" blurb="Magenta leads, cyan supports. Surfaces are dark and quiet; neon is reserved for edges and states.">
+            <h3 className="sg-h3">Surfaces</h3>
+            <div className="sg-swatches">{SURFACES.map((t) => <Swatch key={t} token={t} />)}</div>
+            <h3 className="sg-h3">Lines</h3>
+            <div className="sg-swatches">{LINES.map((t) => <Swatch key={t} token={t} />)}</div>
+            <h3 className="sg-h3">Neon accents</h3>
+            <div className="sg-swatches">{NEON.map((t) => <Swatch key={t} token={t} />)}</div>
+            <h3 className="sg-h3">Semantic</h3>
+            <div className="sg-swatches">{SEMANTIC.map((t) => <Swatch key={t} token={t} />)}</div>
+            <h3 className="sg-h3">Text</h3>
+            <div className="sg-swatches">{TEXTS.map((t) => <Swatch key={t} token={t} />)}</div>
+            <h3 className="sg-h3">Signature ramp</h3>
+            <div className="sg-ramp" />
+          </Section>
+
+          <Section id="type" title="Typography" blurb="Arcade voice is fenced to the wordmark and top titles; body and mono stay neutral and legible.">
+            <div className="sg-type-rows">
+              <div className="sg-type-row"><Wordmark>Neon Horizon</Wordmark><code>--font-wordmark · wordmark only</code></div>
+              <div className="sg-type-row"><span className="sg-display">Display / dice totals</span><code>--font-display · Russo One</code></div>
+              <div className="sg-type-row"><span className="sg-body-sample">Body — stat blocks, chat, forms, controls stay in the neutral body face.</span><code>--font-body · Manrope</code></div>
+              <div className="sg-type-row"><span className="tabular sg-mono-sample">2d6+3 · HP 42/58 · +5</span><code>--font-mono · Space Mono, tabular</code></div>
+            </div>
+            <div className="sg-scale">
+              <p style={{ fontSize: "var(--fs-display)" }}>Display 34</p>
+              <p style={{ fontSize: "var(--fs-h1)" }}>Heading 1 · 26</p>
+              <p style={{ fontSize: "var(--fs-h2)" }}>Heading 2 · 20</p>
+              <p style={{ fontSize: "var(--fs-h3)" }}>Heading 3 · 16</p>
+              <p style={{ fontSize: "var(--fs-body)" }}>Body · 15</p>
+              <p style={{ fontSize: "var(--fs-sm)" }}>Small · 13</p>
+              <p style={{ fontSize: "var(--fs-xs)" }}>Caption · 11</p>
+            </div>
+          </Section>
+
+          <Section id="buttons" title="Buttons" blurb="One primary action per view. Variants map to semantic roles; labels are sentence case.">
+            <div className="sg-row">
+              <Button variant="primary">Roll initiative</Button>
+              <Button variant="secondary">Add combatant</Button>
+              <Button variant="ghost">Cancel</Button>
+              <Button variant="destructive">End encounter</Button>
+              <Button variant="primary" disabled>Disabled</Button>
+            </div>
+            <div className="sg-row">
+              <Button variant="primary" size="sm">Small primary</Button>
+              <Button variant="secondary" size="sm">Small secondary</Button>
+              <IconButton label="Ping">📍</IconButton>
+              <IconButton label="Measure">📏</IconButton>
+              <IconButton label="Fog" aria-pressed>🌫</IconButton>
+            </div>
+          </Section>
+
+          <Section id="forms" title="Inputs & forms" blurb="Surface-3 well, cyan-glow focus. Validation always pairs an icon with text.">
+            <div className="sg-grid2">
+              <Field label="GM password" htmlFor="sg-pass" help="Set once on the host machine.">
+                <Input id="sg-pass" type="password" placeholder="GM password" />
+              </Field>
+              <Field label="Roll visibility" htmlFor="sg-vis">
+                <Select id="sg-vis" defaultValue="public">
+                  <option value="public">Everyone</option>
+                  <option value="gm">GM only</option>
+                </Select>
+              </Field>
+              <Field label="Encounter name" htmlFor="sg-name" required error="Name is required.">
+                <Input id="sg-name" invalid placeholder="Goblin ambush" />
+              </Field>
+              <Field label="Notes" htmlFor="sg-notes" help="Markdown supported.">
+                <Textarea id="sg-notes" placeholder="Set the scene…" />
+              </Field>
+            </div>
+          </Section>
+
+          <Section id="panels" title="Panels" blurb="Resting surfaces stay dark. An optional 2px hairline labels a panel kind.">
+            <div className="sg-grid3">
+              <Panel><PanelHeader eyebrow="Notes" title="Plain panel" /><p className="sg-muted">surface-1, 1px line, no glow.</p></Panel>
+              <Panel accent="magenta"><PanelHeader eyebrow="Combat" title="Magenta accent" /><p className="sg-muted">Encounter / combat kind.</p></Panel>
+              <Panel accent="cyan"><PanelHeader eyebrow="Info" title="Cyan accent" /><p className="sg-muted">Notes / info kind.</p></Panel>
+            </div>
+          </Section>
+
+          <Section id="tabs" title="Tabs" blurb="One tab bar everywhere. Active = text + magenta underline (or left bar) with a faint glow.">
+            <Tabs tabs={DEMO_TABS} activeId={tab} onChange={setTab} ariaLabel="Demo tabs" />
+            <div className="sg-vtabs">
+              <Tabs tabs={DEMO_TABS.slice(0, 4)} activeId={vtab} onChange={setVtab} orientation="vertical" ariaLabel="Demo vertical tabs" />
+            </div>
+          </Section>
+
+          <Section id="menus" title="Menus & tooltips" blurb="Native details/summary disclosure; caret rotates on open.">
+            <div className="sg-row">
+              <Menu trigger="Options">
+                <MenuItem icon="⚔">Roll mode</MenuItem>
+                <MenuItem icon="🎲">Rules mode</MenuItem>
+                <MenuItem icon="🗑" tone="danger">End encounter</MenuItem>
+              </Menu>
+              <Tooltip content="Reveal the map to the shared screen">
+                <Button variant="secondary">Hover / focus me</Button>
+              </Tooltip>
+            </div>
+          </Section>
+
+          <Section id="chips" title="Condition chips" blurb="Category reads from icon + label + border, never color alone.">
+            <div className="sg-row">
+              <Chip tone="harmful" icon="☠">Poisoned</Chip>
+              <Chip tone="harmful" icon="⬇">Prone</Chip>
+              <Chip tone="beneficial" icon="✦">Blessed</Chip>
+              <Chip tone="magical" icon="✷">Concentrating</Chip>
+              <Chip tone="magical" icon="✷" atRisk>Concentration at risk</Chip>
+              <Chip tone="info" icon="•">Hidden</Chip>
+              <Chip tone="harmful" icon="☠" onRemove={() => {}} removeLabel="Remove poisoned">Removable</Chip>
+            </div>
+          </Section>
+
+          <Section id="overlays" title="Modals & toasts" blurb="Native dialog with scrim blur, focus return, and scroll lock. Toasts name the result.">
+            <div className="sg-row">
+              <Button variant="primary" onClick={() => setModalOpen(true)}>Open modal</Button>
+              <ToastDemo />
+            </div>
+            <Modal
+              open={modalOpen}
+              onClose={() => setModalOpen(false)}
+              title="Save encounter"
+              accent="magenta"
+              footer={<>
+                <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+                <Button variant="primary" onClick={() => setModalOpen(false)}>Save encounter</Button>
+              </>}
+            >
+              <p className="sg-muted">The scrim blurs the background, focus is trapped and returns to the opener on close, and Escape or a backdrop click dismisses it.</p>
+            </Modal>
+          </Section>
+
+          <Section id="states" title="States, glow & texture" blurb="Neon is a state, not a wallpaper. One glowing element per region; nothing pulses.">
+            <div className="sg-row">
+              <div className="sg-state-box is-selected">Selected · cyan</div>
+              <div className="sg-state-box is-active-turn">Active turn · magenta</div>
+              <div className="sg-state-box combat-active">Combat active · hue shift</div>
+            </div>
+            <div className="sg-textures">
+              <div className="sg-texture scanlines"><span>scanlines</span></div>
+              <div className="sg-texture static-noise"><span>static-noise</span></div>
+              <div className="sg-texture sg-grid-demo"><div className="grid-floor" /><span>grid-floor</span></div>
+            </div>
+          </Section>
+        </main>
+      </div>
+    </ToastProvider>
+  );
+}
