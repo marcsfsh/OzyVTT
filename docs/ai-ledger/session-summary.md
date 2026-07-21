@@ -8,6 +8,37 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-21 — Uniform dice UX: one recognizable roll experience everywhere (owner-directed; same branch/PR #38)
+
+Owner goal: after a roll or two, a player should intuitively know how to roll *anywhere* —
+saving throw, death save, attack, damage, opportunity attack — via one recognizable pattern.
+The saving-throw prompt was the proven reference (auto-roll-on-appear vs manual entry; Adv/Disadv
+after the roll; preview → Confirm). Extracted it into a shared `RollControls` widget and brought
+every other roll surface onto the same experience:
+
+- **Shared widget** (`apps/client/src/encounter/RollControls.tsx`): auto mode rolls on appear;
+  manual mode waits for a Roll click or typed total; once rolled, Adv/Disadv re-roll the d20
+  (2d20kh1 / 2d20kl1), Confirm applies, Re-roll restarts. SavePrompt refactored onto it (no
+  behavior change).
+- **Death saves**: were a bare one-click "Roll death save" → now the full preview → confirm flow
+  through the shared dice engine (raw d20; adv/disadv; auto-rolls on the dying creature's turn).
+  Pure `rollDeathSave` core (`death-saves.ts`) mirrors `answerSave`; `death-save.roll` gains
+  commit/rollMode/naturalRoll.
+- **Attacks**: `action:resolve` gains `commit` (default true — legacy one-shot stays) + `attackNatural`.
+  A single-target attack previews the d20 (nothing applied — no damage/riders/prompts/economy),
+  the result card offers Adv/Disadv/typed-d20/Confirm, and Confirm resolves once reusing the shown
+  roll. Preview returns early after the attack; the operation holds narration until commit.
+- **Damage**: the Apply step is now an editable total (type a hand-rolled number → applied straight
+  on the no-defense-math path; leave it → typed parts through the pipeline as before).
+- **Opportunity attacks**: `reaction:answer` gains commit/rollMode/attackNatural; the swing previews
+  (reaction unspent, nothing applied) → confirm spends + applies. Uncanny Dodge unchanged.
+
+Verified: `npm run check` + `build` green; server suite **383** passing (new preview/commit tests for
+death saves, attacks, and OAs); live Playwright smokes for the death-save widget, the save widget
+(refactored), and the attack preview → confirm card (Adv/Disadv/typed-d20 → HIT nat 19 → editable
+damage → Apply). Full new-command/additive-state checklists followed; `docs/api-reference.md`
+regenerated. Backend was already ~unified on `resolveDice`; this closes the front-end gap.
+
 ## 2026-07-19 — Foundry/AboveVTT research → six-slice adoption pack (owner-directed; same branch/PR #38)
 
 Owner: "thoroughly research github.com/cyruzzo/AboveVTT and github.com/foundryvtt/dnd5e — see what
