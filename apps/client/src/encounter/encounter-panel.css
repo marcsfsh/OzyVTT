@@ -14,6 +14,15 @@
 .encounter-map { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; margin: 1rem 0; padding: .8rem; border: 1px solid #403a2c; border-radius: .55rem; background: #17140f; }
 .encounter-map span { color: #a69e91; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .encounter-map select { flex: 1 1 12rem; margin: 0; font-size: .85rem; color: #e7dfd0; }
+/* Undocked setup at desktop: keep the panel as tall as the map to its left and scroll the combatant
+   lists internally, instead of a long roster pushing the panel far past the battlemap (feedback #1).
+   The map picker above and the Add monsters / Start buttons below stay pinned. Docked panels (inside
+   .encounter-map-dock, not the sidebar) and the single-column mobile layout are unaffected. */
+@media (min-width: 980px) {
+  .table-sidebar > .encounter-panel.setup { display: flex; flex-direction: column; max-height: calc(min(72vh, 680px) + 7rem); }
+  .encounter-panel.setup .combatant-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: .35rem; }
+}
+.combatant-scroll { display: flex; flex-direction: column; }
 .combatant-setup { list-style: none; margin: 0; padding: 0; border-top: 1px solid #403a2c; }
 .combatant-search { width: 100%; margin-top: .1rem; padding: .5rem .6rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .85rem; }
 .combatant-setup li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .75rem 0; border-bottom: 1px solid #403a2c; }

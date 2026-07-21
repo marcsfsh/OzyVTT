@@ -561,7 +561,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     </>;
   };
 
-  return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
+  return <section className={`encounter-panel${state.combat.active ? "" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
     {/* Docking the tracker to the map is available before AND during combat (report #9). */}
@@ -579,20 +579,24 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </select>
           : <strong>{selectedMap?.name ?? "Upload a battlemap on the Map Setup tab first"}</strong>}
       </label>
-      {pcs.length > 0 && <div className="menu-section">
-        <p className="menu-section-title">Party</p>
-        <ul className="combatant-setup">{pcs.map(combatantRow)}</ul>
-      </div>}
-      {recent.length > 0 && <div className="menu-section">
-        <p className="menu-section-title">Recent</p>
-        <ul className="combatant-setup">{recent.map(combatantRow)}</ul>
-      </div>}
-      <div className="menu-section">
-        <p className="menu-section-title">{recent.length > 0 ? "More combatants" : "Combatants"}</p>
-        <input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
-        {otherCombatants.length > 0
-          ? <ul className="combatant-setup">{otherCombatants.map(combatantRow)}</ul>
-          : <p className="menu-empty-note">{search ? "No combatants match your search." : "No other combatants on the roster - add monsters below."}</p>}
+      {/* Undocked at desktop this region scrolls so the panel stays as tall as the map, not taller
+          (feedback #1); the map picker above and the add/start buttons below stay pinned. */}
+      <div className="combatant-scroll">
+        {pcs.length > 0 && <div className="menu-section">
+          <p className="menu-section-title">Party</p>
+          <ul className="combatant-setup">{pcs.map(combatantRow)}</ul>
+        </div>}
+        {recent.length > 0 && <div className="menu-section">
+          <p className="menu-section-title">Recent</p>
+          <ul className="combatant-setup">{recent.map(combatantRow)}</ul>
+        </div>}
+        <div className="menu-section">
+          <p className="menu-section-title">{recent.length > 0 ? "More combatants" : "Combatants"}</p>
+          <input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
+          {otherCombatants.length > 0
+            ? <ul className="combatant-setup">{otherCombatants.map(combatantRow)}</ul>
+            : <p className="menu-empty-note">{search ? "No combatants match your search." : "No other combatants on the roster - add monsters below."}</p>}
+        </div>
       </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
       <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter</button>
