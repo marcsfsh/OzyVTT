@@ -8,6 +8,37 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-21 — PR #40 review-feedback refinements (five items, same branch)
+
+Owner reviewed the three-item PR from the smoke screenshots and asked for five refinements, applied as
+new commits on `claude/vtt-combat-plan-clarify-wy9cji`. All verified green (check/test/build, 393 server
+tests) plus a live browser smoke — 39/39 assertions, zero console errors, screenshots per item.
+
+- **Aura health style (#2 feedback):** a fourth style beside band/bar/ring — a soft green→red glow
+  around the token, colored by the creature's health fraction. Threaded through the enum everywhere
+  (schemas / game-commands / api-contract / domain / viewer-presentation); it flows through the same
+  audience gate as bar/ring (`audience==="all" && style!=="band"`), so no projection-logic change. The
+  glow is a transparent-center radial gradient in `TokenHealthBar` (`mapImage`), shared by GM/player/
+  viewer. Added to both the GM global health select and the per-token right-click control.
+- **Initiative restructure (#3 feedback):** the active combatant now leads the list (rotated turn
+  order, wrapping) and its acting console renders inline directly under that top row — for BOTH the GM
+  tracker and the player panel — replacing the old fixed bottom console. A normal turn drops the
+  redundant console name header (an off-turn legendary actor keeps it). The player's economy rides
+  their own row, so off-turn reaction marking is preserved. Softer rounded active-row highlight;
+  smaller topbar controls.
+- **Right-click menu dropdowns (#4 feedback):** Health became a `<select>` styled/placed like Size
+  (directly below it), with a "Show to" audience select; Conditions became a `<details>` disclosure
+  under Health (kept as a disclosure, not a native select, since conditions stack + exhaustion has a
+  level).
+- **Viewer = player initiative (#5 feedback):** removed the thin band HP bar from the shared
+  `InitiativeRow` (drops it from BOTH player and viewer); the viewer now uses the player's compact
+  Round-pill header (not the big serif), active-on-top, no controls, kept room-scaled. Health still
+  reads as Bloodied/Down text + condition dots + the token's ring/aura. Viewer-safety leak asserts
+  re-confirmed with aura added.
+- **Encounter-setup panel height (#1 feedback):** undocked at desktop the setup panel is capped to the
+  map's height and the Party/Recent/Search combatant region scrolls internally; map picker + Add
+  monsters + Start stay pinned. Scoped to the sidebar + ≥980px (docked/mobile unaffected).
+
 ## 2026-07-21 — Token health display · shared initiative · scene-setup picker (three-item PR after #38)
 
 Three combat-UX items from the roadmap on one branch (`claude/vtt-combat-plan-clarify-wy9cji`), six
