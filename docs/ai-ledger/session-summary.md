@@ -29,11 +29,16 @@ browser is deferred.
   GM-only) / searchable rest.
 
 Verified: `npm run check` + `test` (392 server + 16 contract + others) + `build` green across all
-workspaces; `docs/api-reference.md` regenerated (freshness test green). **No live browser smoke** —
-this repo has no Playwright/browser-test harness installed, so a UI smoke would mean adding
-out-of-scope tooling; the security-critical audience gate and initiative parity are covered by server
-unit tests, and typecheck+build cover the SVG/JSX wiring. Follow-ups: the deferred "manage all scenes"
-browser modal, and adding a Playwright harness so UI slices can get the browser smoke the bar calls for.
+workspaces; `docs/api-reference.md` regenerated (freshness test green). **Live browser smoke** (owner-
+requested round before the PR): a scratchpad playwright-core script drove the real built app (fresh
+`DATA_DIR`, preinstalled Chromium) through GM + player + viewer contexts — 18/18 checks, 0 console
+errors, 11 screenshots (picker sections + search + 375px; GM ring/bar + right-click menu + per-token
+override; player own-exact vs band-fraction; viewer parity dots; audience-gm fallback on player AND
+viewer; wire-level leak asserts on the player/viewer JSON). The smoke caught two visual defects that
+were then fixed: the viewer sidebar crushed long names to one letter (shared row now wraps, name keeps
+≥8ch) and the right-click Health buttons wrapped awkwardly (label now on its own line, equal-width
+buttons). The harness lives in the session scratchpad only — a committed Playwright harness is still a
+follow-up, as is the deferred "manage all scenes" browser modal.
 
 ## 2026-07-21 — Uniform dice UX: one recognizable roll experience everywhere (owner-directed; same branch/PR #38)
 
