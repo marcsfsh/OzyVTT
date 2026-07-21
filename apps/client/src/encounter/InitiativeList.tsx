@@ -1,4 +1,4 @@
-import { bandFraction, initialsOf } from "../scene/mapImage";
+import { initialsOf } from "../scene/mapImage";
 import "./InitiativeList.css";
 
 /**
@@ -31,9 +31,10 @@ function InitiativeConditionDots({ conditionIds, conditions }: Readonly<{ condit
 
 /**
  * One initiative row's shared visual content: avatar, active caret, name (+ optional "YOU" badge),
- * condition dots, a coarse-band health note, the band-fill HP bar, and the score. Rendered by BOTH
- * the player panel and the viewer so the two lists stay identical; the caller owns the surrounding
- * <li> (its active/self classes, an auto-scroll ref, and any own-turn sub-rows underneath).
+ * condition dots, a coarse-band health note, and the score. Rendered by BOTH the player panel and the
+ * viewer so the two lists stay identical; the caller owns the surrounding <li> (its active/self
+ * classes, an auto-scroll ref, and any own-turn sub-rows underneath). No HP bar - health reads as the
+ * coarse Bloodied/Down text plus the token's own ring/aura on the map (feedback #5).
  */
 export function InitiativeRow({ entry, self = false }: Readonly<{ entry: InitiativeRowEntry; self?: boolean }>) {
   return <div className="init-row">
@@ -46,8 +47,6 @@ export function InitiativeRow({ entry, self = false }: Readonly<{ entry: Initiat
         <InitiativeConditionDots conditionIds={entry.conditionIds} conditions={entry.conditions} />
         {entry.health !== "healthy" && <span className={`init-row-health hp-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}
       </span>
-      {/* Players only know the coarse band, so the bar fills full / ~half / a sliver (one source with the token bar/ring). */}
-      <span className="init-row-hpbar" aria-hidden="true"><span className={`init-row-hpbar-fill hp-${entry.health}`} style={{ width: `${bandFraction(entry.health) * 100}%` }} /></span>
     </span>
     <span className="init-row-score">{entry.score}</span>
   </div>;

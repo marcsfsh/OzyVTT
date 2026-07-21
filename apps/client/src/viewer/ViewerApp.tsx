@@ -56,10 +56,16 @@ function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
 
 export function Initiative({ presentation }: Readonly<{ presentation: Presentation }>) {
   if (!presentation.initiative.visible) return null;
-  return <aside className="viewer-initiative" aria-label={`Initiative, round ${presentation.initiative.round}`}>
-    <div><span>INITIATIVE</span><strong>Round {presentation.initiative.round}</strong></div>
-    {presentation.initiative.hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
-    <ol>{presentation.initiative.entries.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
+  // Identical to the player's list (feedback #5): active combatant on top, the rest in turn order, the
+  // compact Round-pill header - no HP bars, no controls (the viewer has no claimed character). Scaled up
+  // for the room via the viewer's font sizing, but structurally the same as a player with no active turn.
+  const { entries, round, hiddenTurn } = presentation.initiative;
+  const activeIndex = entries.findIndex((entry) => entry.active);
+  const ordered = activeIndex > 0 ? [...entries.slice(activeIndex), ...entries.slice(0, activeIndex)] : entries;
+  return <aside className="viewer-initiative" aria-label={`Initiative, round ${round}`}>
+    <div className="viewer-initiative-head"><strong className="viewer-initiative-round">Round {round}</strong></div>
+    {hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
+    <ol>{ordered.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
       <InitiativeRow entry={{ actorId: entry.actorId, name: entry.name, score: entry.initiative, active: entry.active, health: entry.health ?? "healthy", conditionIds: entry.conditionIds, conditions: entry.conditions }} />
     </li>)}</ol>
   </aside>;

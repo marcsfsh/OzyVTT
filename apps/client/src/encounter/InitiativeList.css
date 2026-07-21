@@ -7,7 +7,7 @@
  */
 .init-row { display: flex; align-items: center; justify-content: space-between; gap: .6em; width: 100%; font-size: .82rem; }
 .init-row-avatar { flex: none; width: 2em; height: 2em; display: grid; place-items: center; border-radius: 50%; background: #3a4a5c; color: #d7e2ee; font-size: .68em; font-weight: 800; letter-spacing: .02em; }
-.init-row-body { display: grid; gap: .22em; min-width: 0; flex: 1 1 auto; }
+.init-row-body { display: grid; min-width: 0; flex: 1 1 auto; }
 /* Wrap, don't crush: on a narrow surface (the viewer sidebar) the dots/health tag drop to a second
    line instead of squeezing the name down to one letter; the name still ellipsizes past ~8ch. */
 .init-row-name-line { display: flex; align-items: center; gap: .4em; min-width: 0; flex-wrap: wrap; row-gap: .1em; }
@@ -17,11 +17,6 @@
 .init-row-health { flex: none; font-size: .78em; font-weight: 800; }
 .init-row-health.hp-bloodied { color: #e8b45a; }
 .init-row-health.hp-down { color: #e0897f; }
-.init-row-hpbar { display: block; height: .3em; min-height: 3px; border-radius: 2px; background: #241f17; overflow: hidden; }
-.init-row-hpbar-fill { display: block; height: 100%; border-radius: 2px; transition: width .25s ease; }
-.init-row-hpbar-fill.hp-healthy { background: #4f9e5c; }
-.init-row-hpbar-fill.hp-bloodied { background: #d69442; }
-.init-row-hpbar-fill.hp-down { background: #a03f39; }
 .init-row-dots { display: inline-flex; align-items: center; gap: .2em; margin-left: .1em; }
 .init-row-dot { width: .5em; height: .5em; border-radius: 50%; background: #a98ee0; box-shadow: 0 0 0 1px #241f2e; }
 .init-row-dot-more { color: #a98ee0; font-size: .7em; font-weight: 800; }
