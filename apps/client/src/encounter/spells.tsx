@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import type { ContentSpellSummary } from "@vtt/domain";
+import { Modal } from "@vtt/ui";
 import { socket } from "../socket";
 import { RichText } from "./RichText";
 
@@ -110,24 +110,16 @@ export function SpellcastingText({ text }: Readonly<{ text: string }>) {
 /** In-tab spell rules window: header, the four reference lines, full description, and upcast note. */
 function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSummary; onClose: () => void }>) {
   const levelLine = spell.level === 0 ? `${capitalize(spell.school)} cantrip` : `Level ${spell.level} ${spell.school}`;
-  return createPortal(<div className="confirm-overlay" role="presentation" onClick={onClose}>
-    <div className="spell-card" role="dialog" aria-modal="true" aria-label={`${spell.name} spell rules`} onClick={(event) => event.stopPropagation()}>
-      <div className="spell-card-head">
-        <div>
-          <h2>{spell.name}</h2>
-          <p className="spell-card-type">{levelLine}{spell.ritual ? " · ritual" : ""}</p>
-        </div>
-        <button type="button" className="secondary spell-card-close" aria-label="Close spell rules" onClick={onClose}>✕</button>
-      </div>
-      <dl className="spell-card-meta">
-        <div><dt>Casting Time</dt><dd>{capitalize(spell.castingTime)}</dd></div>
-        <div><dt>Range</dt><dd>{spell.rangeText ?? "Self"}</dd></div>
-        <div><dt>Components</dt><dd>{spell.componentsText}</dd></div>
-        <div><dt>Duration</dt><dd>{spell.concentration ? `Concentration, ${spell.duration}` : spell.duration}</dd></div>
-      </dl>
-      <div className="spell-card-desc"><RichText text={spell.description} /></div>
-      {spell.higherLevel && <div className="spell-card-higher"><RichText text={`**At Higher Levels.** ${spell.higherLevel}`} /></div>}
-      <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
-    </div>
-  </div>, document.body);
+  return <Modal open onClose={onClose} size="md" accent="violet" title={spell.name} ariaLabel={`${spell.name} spell rules`}>
+    <p className="spell-card-type">{levelLine}{spell.ritual ? " · ritual" : ""}</p>
+    <dl className="spell-card-meta">
+      <div><dt>Casting Time</dt><dd>{capitalize(spell.castingTime)}</dd></div>
+      <div><dt>Range</dt><dd>{spell.rangeText ?? "Self"}</dd></div>
+      <div><dt>Components</dt><dd>{spell.componentsText}</dd></div>
+      <div><dt>Duration</dt><dd>{spell.concentration ? `Concentration, ${spell.duration}` : spell.duration}</dd></div>
+    </dl>
+    <div className="spell-card-desc"><RichText text={spell.description} /></div>
+    {spell.higherLevel && <div className="spell-card-higher"><RichText text={`**At Higher Levels.** ${spell.higherLevel}`} /></div>}
+    <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
+  </Modal>;
 }

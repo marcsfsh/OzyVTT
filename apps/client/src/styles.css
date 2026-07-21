@@ -188,13 +188,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .notice-info { border-left-color: var(--info); }
 .connection-banner { margin-top: 1.5rem; padding: .7rem 1rem; border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); color: var(--text-dim); font-size: .9rem; text-align: center; }
 
-/* Confirm dialog (useConfirm) */
-.confirm-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1.5rem; background: var(--overlay); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.confirm-dialog { width: min(100%, 28rem); padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
-.confirm-dialog h2 { font-size: var(--fs-h1); font-family: var(--font-display); margin: 0 0 .5rem; }
-.confirm-dialog p { margin: 0; }
-.confirm-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.5rem; }
-.confirm-actions button { padding: .7rem 1.2rem; text-align: center; }
+/* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
+   card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */
 
 /* "You're playing" banner (your claimed character = cyan selection accent) */
 .you-are-playing { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.3rem; padding: .9rem 1.2rem; border: 1px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--glow-cyan); }
@@ -244,11 +239,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .scene-preview-actions { display: flex; gap: .5rem; flex: none; }
 .scene-preview-actions button { padding: .5rem 1rem; text-align: center; }
 
-.scene-prep-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1.5rem; background: var(--overlay); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.scene-prep-modal { position: relative; width: min(100%, 42rem); max-height: 90vh; overflow-y: auto; }
+/* Scene prep renders in the shared Modal; only the scene panel's top margin needs a reset there. */
 .scene-prep-modal .scene-panel { margin-top: 0; }
-.scene-prep-close { position: absolute; top: 1rem; right: 1rem; z-index: 1; width: 2rem; height: 2rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); cursor: pointer; }
-.scene-prep-close:hover { color: var(--text); border-color: var(--line-strong); }
 .empty-scene-prep { margin-top: 1rem; padding: .6rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
 
 /* Live-combat roster collapse: one quiet line instead of a wall of duplicate character cards. */

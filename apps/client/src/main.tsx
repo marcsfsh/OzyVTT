@@ -21,7 +21,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -319,12 +319,9 @@ function App() {
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
-      {mode === "gm" && gmToken && scenePrepOpen && state && <div className="scene-prep-backdrop" role="dialog" aria-modal="true" aria-label="Scene prep" onPointerDown={(event) => { if (event.target === event.currentTarget) setScenePrepOpen(false); }}>
-        <div className="scene-prep-modal">
-          <button type="button" className="scene-prep-close" aria-label="Close scene prep" onClick={() => setScenePrepOpen(false)}>✕</button>
-          <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} />
-        </div>
-      </div>}
+      {mode === "gm" && gmToken && scenePrepOpen && state && <Modal open onClose={() => setScenePrepOpen(false)} size="lg" className="scene-prep-modal" title="Scene prep" ariaLabel="Scene prep">
+        <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} />
+      </Modal>}
 
       {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">
         <section className="setup-appearance"><span className="eyebrow">APPEARANCE</span><ThemeToggle /></section>

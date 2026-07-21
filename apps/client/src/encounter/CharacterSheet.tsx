@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
+import { Modal } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
@@ -79,17 +79,10 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
   // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
   // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
-  return createPortal(<div className="confirm-overlay" role="presentation" onClick={onClose}>
-    <div className="character-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(event) => event.stopPropagation()}>
-      <div className="sheet-head">
-        <div>
-          <h2 id="sheet-title">{actor.name}</h2>
-          <p className="sheet-typeline">
-            {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
-          </p>
-        </div>
-        <button type="button" className="secondary sheet-close" aria-label="Close the sheet" onClick={onClose}>✕</button>
-      </div>
+  return <Modal open onClose={onClose} size="lg" className="character-sheet" title={actor.name} ariaLabel={`${actor.name} character sheet`}>
+      <p className="sheet-typeline">
+        {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
+      </p>
 
       <div className="sheet-vitals">
         <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
@@ -133,6 +126,5 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet - the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
-    </div>
-  </div>, document.fullscreenElement ?? document.body);
+  </Modal>;
 }

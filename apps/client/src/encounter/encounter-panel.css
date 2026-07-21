@@ -279,11 +279,8 @@
 /* Character sheet: live state over the immutable stat block. Track, never build. */
 .initiative-sheet-link { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted transparent; }
 .initiative-sheet-link:hover { color: var(--cyan-hi); text-decoration-color: var(--cyan); }
-.character-sheet { display: flex; flex-direction: column; width: min(100%, 36rem); max-height: min(88vh, 52rem); overflow-y: auto; padding: 1.2rem 1.3rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
-.sheet-head { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
-.sheet-head h2 { margin: 0; font-size: var(--fs-h1); font-family: var(--font-display); }
-.sheet-typeline { margin: .15rem 0 0; color: var(--text-dim); font-size: .82rem; font-style: italic; }
-.sheet-close { flex: none; width: 2.1rem; height: 2.1rem; padding: 0; display: grid; place-items: center; border-radius: var(--radius-md); }
+/* Character sheet renders in the shared Modal (box, head, close, scroll handled there). */
+.sheet-typeline { margin: -.2rem 0 0; color: var(--text-dim); font-size: .82rem; font-style: italic; }
 .sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
 .sheet-vital { flex: 1 1 7rem; padding: .5rem .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
 .sheet-vital span { display: block; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
@@ -318,12 +315,8 @@
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
 .encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: .85rem; font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); color: var(--text); }
-/* Monster browser: same overlay pattern as the confirm dialog, sized for a scrollable list. */
-.monster-browser { display: flex; flex-direction: column; width: min(100%, 34rem); max-height: min(85vh, 46rem); padding: 1.2rem 1.2rem .9rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
-.monster-browser-head { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
-.monster-browser-head h2 { margin: .15rem 0 0; font-size: var(--fs-h2); font-family: var(--font-display); }
-.monster-browser-close { flex: none; width: 2.1rem; height: 2.1rem; padding: 0; display: grid; place-items: center; border-radius: var(--radius-md); }
-.monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .8rem; }
+/* Monster browser renders in the shared Modal, sized for a scrollable list. */
+.monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
 .monster-browser-controls input[type="search"] { margin-top: 0; padding: .6rem .8rem; }
 .monster-browser-hidden { display: flex; align-items: center; gap: .5rem; color: var(--text-dim); font-size: .8rem; cursor: pointer; }
 .monster-browser-hidden input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: var(--magenta); }
@@ -421,12 +414,8 @@
 .spellcasting-line strong { color: var(--violet-hi); }
 .spell-link { display: inline; width: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--violet-hi); font: inherit; text-decoration: underline dotted var(--violet); text-underline-offset: 2px; cursor: pointer; }
 .spell-link:hover { color: var(--text); text-decoration-style: solid; border-color: transparent; }
-/* In-tab spell rules card, opened from a spell link (uses the shared .confirm-overlay backdrop). */
-.spell-card { display: flex; flex-direction: column; width: min(100%, 34rem); max-height: min(88vh, 46rem); overflow-y: auto; padding: 1.2rem 1.3rem 1rem; border: 1px solid color-mix(in srgb, var(--violet) 55%, var(--line)); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
-.spell-card-head { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
-.spell-card-head h2 { margin: 0; font-size: var(--fs-h1); font-family: var(--font-display); color: var(--text); }
-.spell-card-type { margin: .15rem 0 0; color: var(--violet-hi); font-size: .82rem; font-style: italic; }
-.spell-card-close { flex: none; width: 2.1rem; height: 2.1rem; padding: 0; display: grid; place-items: center; border-radius: var(--radius-md); }
+/* Spell rules card renders in the shared Modal (accent="violet" keeps its violet identity). */
+.spell-card-type { margin: -.2rem 0 0; color: var(--violet-hi); font-size: .82rem; font-style: italic; }
 .spell-card-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; margin: .9rem 0 0; }
 .spell-card-meta div { padding: .5rem .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
 .spell-card-meta dt { color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
