@@ -12,7 +12,7 @@ async function api(path: string, token: string, init?: RequestInit) {
   return body;
 }
 
-function formatTimestamp(value: string | null) { return value ? new Date(value).toLocaleString() : "-"; }
+function formatTimestamp(value: string | null) { return <span className="tabular">{value ? new Date(value).toLocaleString() : "-"}</span>; }
 
 export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [credentials, setCredentials] = useState<IntegrationCredentialMetadata[]>([]);

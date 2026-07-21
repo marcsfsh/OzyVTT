@@ -1,7 +1,7 @@
 /* The generic .card caps at 32rem; a replay needs the room the table gets. */
 .card.replay-panel { max-width: none; outline: none; }
 .replay-panel { outline: none; }
-.replay-panel:focus-visible { box-shadow: 0 0 0 2px var(--info); }
+.replay-panel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
 .replay-header { display: flex; align-items: flex-start; gap: 1rem; }
 .replay-header .replay-export { margin-left: auto; white-space: nowrap; }
 .replay-row-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }

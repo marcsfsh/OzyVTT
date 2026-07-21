@@ -134,7 +134,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
       )}>{presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}</button>
       <button disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined))}>{mapIsPresented ? "Current map is live" : "Switch viewer to current map"}</button>
     </div>
-    {pairing && <div className="viewer-pairing-code" role="status"><span>PAIRING CODE</span><strong>{pairing.code}</strong><small>Expires {new Date(pairing.expiresAt).toLocaleTimeString()}</small><button onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</button></div>}
+    {pairing && <div className="viewer-pairing-code" role="status"><span>PAIRING CODE</span><strong className="tabular">{pairing.code}</strong><small>Expires <span className="tabular">{new Date(pairing.expiresAt).toLocaleTimeString()}</span></small><button onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</button></div>}
 
     {map && <section className="viewer-tools" aria-labelledby="viewer-tools-title">
       <div><span className="viewer-tools-eyebrow">LIVE PRESENTATION TOOLS</span><h3 id="viewer-tools-title">Focus, ping, and measure</h3><p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Present the current map to enable these tools."}</p></div>

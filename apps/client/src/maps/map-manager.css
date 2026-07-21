@@ -46,7 +46,7 @@
 .crosshair-style[aria-pressed="true"] { border-color: var(--magenta); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); }
 .crosshair-hint { color: var(--text-muted); font-size: .68rem; }
 .map-preview:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.map-preview:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.map-preview:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
 .map-preview p { line-height: 1.5; }
 .map-preview svg { display: block; width: 100%; height: 100%; user-select: none; }
 /* Calibration grid preview: cyan minor lines, magenta major lines (fixed hexes — SVG attributes don't resolve var()). */

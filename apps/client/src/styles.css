@@ -43,6 +43,8 @@ button span { color: var(--text-dim); font-size: .9rem; margin-top: .25rem; }
 .card, .table, .dice-proof, .roster { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .card { max-width: 32rem; }
 
+/* Code/identifiers use the branded mono face (Space Mono), not the browser default monospace. */
+code, pre, kbd, samp { font-family: var(--font-mono); }
 input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; border: 1px solid var(--line); background: var(--surface-3); color: var(--text); transition: border-color var(--dur-hover), box-shadow var(--dur-hover); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }

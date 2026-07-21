@@ -26,7 +26,7 @@ async function gmApi(path: string, token: string) {
   return body;
 }
 
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "-");
+const when = (iso: string | null) => <span className="tabular">{iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "-"}</span>;
 
 /** Save an archive document as a JSON file - the same machine-readable record the API serves, for spreadsheets, scripts, or archiving outside the host. */
 function exportDocument(id: number, endedAt: string, document: ArchiveDocument) {
