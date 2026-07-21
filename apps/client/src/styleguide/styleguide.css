@@ -26,6 +26,9 @@
 .sg-muted { color: var(--text-dim); margin: 0; }
 
 .sg-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.sg-row-baseline { align-items: flex-end; }
+.sg-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.sg-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
 
 /* Swatches */
 .sg-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: var(--space-3); }

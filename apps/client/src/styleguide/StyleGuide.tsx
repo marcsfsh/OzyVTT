@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import {
+  Alert,
+  Avatar,
+  Badge,
   Button,
   Chip,
   Eyebrow,
@@ -9,6 +12,7 @@ import {
   Input,
   LinkButton,
   Menu,
+  Meter,
   MenuItem,
   Modal,
   Panel,
@@ -213,6 +217,84 @@ export function StyleGuide() {
               <Chip tone="info" icon="•">Hidden</Chip>
               <Chip tone="harmful" icon="☠" onRemove={() => {}} removeLabel="Remove poisoned">Removable</Chip>
               <Chip tone="magical" icon="✷" pressed={filterOn} onClick={() => setFilterOn((v) => !v)}>Toggle (pressable)</Chip>
+            </div>
+          </Section>
+
+          <Section id="badges" title="Badges & avatars" blurb="Badges label counts and short statuses (quieter than a chip). Avatars carry identity — monogram or portrait, with an optional presence dot.">
+            <h3 className="sg-h3">Badges</h3>
+            <div className="sg-row">
+              <Badge>Draft</Badge>
+              <Badge tone="primary">Homebrew</Badge>
+              <Badge tone="success">Ready</Badge>
+              <Badge tone="caution">Beta</Badge>
+              <Badge tone="danger">Revoked</Badge>
+              <Badge tone="info">SRD</Badge>
+              <Badge tone="primary" solid>LIVE</Badge>
+              <Badge tone="danger" solid>3</Badge>
+            </div>
+            <h3 className="sg-h3">Avatars</h3>
+            <div className="sg-row sg-row-baseline">
+              <Avatar name="Borin Stoneguard" size="sm" />
+              <Avatar name="Mirena Dawnbright" />
+              <Avatar name="Lyra Emberwise" size="lg" />
+              <Avatar name="Aria Voss" presence="online" />
+              <Avatar name="Kel Tanner" presence="away" />
+              <Avatar name="Draven Ash" presence="offline" />
+            </div>
+          </Section>
+
+          <Section id="meters" title="Meters & progress" blurb="Labeled bars for hit points and resources. Health tone auto-bands cyan → magenta → danger, the same fraction the map/token health uses.">
+            <div className="sg-grid2">
+              <Meter value={58} max={58} tone="health" label="HP — healthy" />
+              <Meter value={24} max={58} tone="health" label="HP — bloodied" />
+              <Meter value={5} max={58} tone="health" label="HP — down" />
+              <Meter value={3} max={4} tone="violet" label="Spell slots (lvl 2)" />
+              <Meter value={2} max={3} tone="cyan" label="Hit Dice" />
+              <Meter value={780} max={2700} tone="magenta" label="XP to level 4" />
+            </div>
+          </Section>
+
+          <Section id="alerts" title="Alerts" blurb="In-flow message banners that explain state and stay put — unlike a toast, which is transient. Danger and warning announce assertively.">
+            <div className="sg-stack">
+              <Alert tone="info" title="Server owns the dice">Every roll is resolved and audited on the server; the client only renders the result.</Alert>
+              <Alert tone="success" title="Grid calibrated">The 3 × 3 sample matched at 71px per cell — this battlemap is ready to run.</Alert>
+              <Alert tone="warning" title="Freeform rules mode">Action economy and reach are not enforced. Rejections degrade to warnings.</Alert>
+              <Alert tone="danger" title="Secret shown once">Copy this credential now — it is stored only as a salted hash and cannot be shown again.</Alert>
+            </div>
+          </Section>
+
+          <Section id="table" title="Data table" blurb="One table style for content lists, credentials, and import previews. Numeric columns are mono + right-aligned; rows lift on hover.">
+            <div className="sg-table-wrap">
+              <table className="nh-table">
+                <thead><tr><th>Name</th><th>Type</th><th className="nh-num">CR</th><th className="nh-num">AC</th><th className="nh-num">HP</th></tr></thead>
+                <tbody>
+                  <tr><td>Goblin</td><td>Humanoid</td><td className="nh-num">1/4</td><td className="nh-num">15</td><td className="nh-num">7</td></tr>
+                  <tr><td>Owlbear</td><td>Monstrosity</td><td className="nh-num">3</td><td className="nh-num">13</td><td className="nh-num">59</td></tr>
+                  <tr><td>Adult Red Dragon</td><td>Dragon</td><td className="nh-num">17</td><td className="nh-num">19</td><td className="nh-num">256</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </Section>
+
+          <Section id="statlist" title="Stat block & definition list" blurb="Key–value grid for character-sheet vitals, monster meta, and any labeled data. Values use the tabular mono face.">
+            <dl className="nh-statlist">
+              <div><dt>HP</dt><dd>58 / 58</dd></div>
+              <div><dt>AC</dt><dd>18</dd></div>
+              <div><dt>Speed</dt><dd>30 ft</dd></div>
+              <div><dt>Init</dt><dd>+2</dd></div>
+              <div><dt>Prof</dt><dd>+3</dd></div>
+              <div><dt>STR</dt><dd>16</dd></div>
+              <div><dt>DEX</dt><dd>14</dd></div>
+              <div><dt>CON</dt><dd>15</dd></div>
+            </dl>
+          </Section>
+
+          <Section id="empty" title="Empty states" blurb="A consistent 'nothing here yet' block: icon, display-face title, one line of guidance, and (optionally) the action that fills it.">
+            <div className="nh-empty">
+              <span className="nh-empty-icon" aria-hidden="true">🗺️</span>
+              <span className="nh-empty-title">No maps yet</span>
+              <span className="nh-empty-text">Upload a battlemap to stage encounters, or import a folder of scenes to get started.</span>
+              <Button variant="primary" arrow>Upload a map</Button>
             </div>
           </Section>
 

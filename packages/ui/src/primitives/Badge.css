@@ -1,0 +1,29 @@
+.nh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font: 700 var(--fs-xs) / 1.5 var(--font-body);
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+/* Soft outline tones — a colored edge + readable tinted text, surface stays quiet. */
+.nh-badge--primary { border-color: var(--magenta); color: var(--magenta-hi); }
+.nh-badge--success { border-color: var(--success); color: var(--cyan-hi); }
+.nh-badge--caution { border-color: var(--caution); color: var(--violet-hi); }
+.nh-badge--danger  { border-color: var(--danger); color: var(--danger-hi); }
+.nh-badge--info    { border-color: var(--info); color: var(--indigo); }
+:root[data-theme="light"] .nh-badge--info { color: var(--info); }
+
+/* Solid — filled tone for counts / high emphasis. Dark ink on neon per §5.1. */
+.nh-badge--solid { border-color: transparent; color: var(--text-on-neon); }
+.nh-badge--solid.nh-badge--primary { background: var(--primary); }
+.nh-badge--solid.nh-badge--success { background: var(--success); }
+.nh-badge--solid.nh-badge--caution { background: var(--caution); }
+.nh-badge--solid.nh-badge--danger  { background: var(--danger); }
+.nh-badge--solid.nh-badge--info    { background: var(--info); }
+.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not([class*="nh-badge--caution"]):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) { background: var(--line-strong); color: var(--text); }

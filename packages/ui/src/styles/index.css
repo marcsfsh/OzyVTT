@@ -3,3 +3,4 @@
    (design-tokens.css carries both the variables and the shared base rules). */
 @import "./fonts.css";
 @import "./design-tokens.css";
+@import "./patterns.css";
