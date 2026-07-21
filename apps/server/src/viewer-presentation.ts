@@ -28,6 +28,8 @@ export type ViewerInitiativeEntry = Readonly<{
   health: "healthy" | "bloodied" | "down";
   /** Display labels ("Prone", "Exhaustion 3") for public combatants. */
   conditions: readonly string[];
+  /** Content-bundle condition ids parallel to `conditions` so the initiative row picks the same glyphs as the table (labels are already public; ids add nothing hidden). */
+  conditionIds?: readonly string[];
 }>;
 
 /** The fog mask exactly as the table renders it (geometry only; hidden tokens never reach the viewer anyway). */
@@ -162,7 +164,7 @@ function initiative(value: ViewerInitiative): ViewerInitiative {
     actorIds.add(actorId);
     if (!Number.isFinite(entry.initiative)) throw new Error("Initiative value must be finite.");
     if (entry.active) activeEntries++;
-    return { actorId, name: safeText(entry.name, "Initiative name", 100), initiative: entry.initiative, active: entry.active, health: healthBand(entry.health), conditions: conditionList(entry.conditions) };
+    return { actorId, name: safeText(entry.name, "Initiative name", 100), initiative: entry.initiative, active: entry.active, health: healthBand(entry.health), conditions: conditionList(entry.conditions), ...(entry.conditionIds ? { conditionIds: conditionIdList(entry.conditionIds) } : {}) };
   });
   if (activeEntries > 1) throw new Error("Viewer initiative can have at most one active entry.");
   const hiddenTurn = value.hiddenTurn ?? false;

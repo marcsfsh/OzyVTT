@@ -29,7 +29,7 @@ describe("recipient-safe encounter projections", () => {
   it("omits hidden combatants and reports a safe hidden-turn indicator", () => {
     const state = game(HIDDEN);
     const combat = projectPlayerCombat(state);
-    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy" }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", underwater: false, reactionsUsed: [], fog: { enabled: false, shapes: [] }, rewound: false, pendingSaves: [], pendingReactions: [] });
+    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy", conditionIds: [], conditions: [] }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", underwater: false, reactionsUsed: [], fog: { enabled: false, shapes: [] }, rewound: false, pendingSaves: [], pendingReactions: [] });
     const serialized = JSON.stringify(projectPlayerView(state, undefined, () => null));
     expect(serialized).not.toContain(HIDDEN);
     expect(serialized).not.toContain("Secret Lurker");
@@ -39,7 +39,7 @@ describe("recipient-safe encounter projections", () => {
   it("marks a public current turn for players and the shared viewer", () => {
     const state = game(PUBLIC);
     expect(projectPlayerCombat(state)).toMatchObject({ turnActorId: PUBLIC, hiddenTurn: false, initiative: [{ actorId: PUBLIC, active: true }] });
-    expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true, health: "healthy", conditions: [] }] });
+    expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true, health: "healthy", conditions: [], conditionIds: [] }] });
     expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [], conditionIds: [] }], annotations: [], fog: { enabled: false, shapes: [] } });
   });
 
@@ -208,5 +208,36 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     const demotedTokens = projectViewerEncounterScene(demoted).tokens;
     expect(demotedTokens.find((token) => token.actorId === GOBLIN)!.healthDisplay).toBeUndefined();
     expect(demotedTokens.find((token) => token.actorId === PUBLIC)!.healthDisplay).toEqual({ style: "bar" });
+  });
+});
+
+describe("shared initiative source (player == viewer)", () => {
+  it("gives a public combatant identical shared row fields on the player and viewer lists", () => {
+    const state = game(PUBLIC);
+    state.actors = state.actors.map((actor) => actor.id === PUBLIC ? { ...actor, conditions: [{ id: "prone" }, { id: "exhaustion", level: 2 }] } : actor);
+    const player = projectPlayerCombat(state).initiative.find((entry) => entry.actorId === PUBLIC)!;
+    const viewer = projectViewerInitiative(state).entries.find((entry) => entry.actorId === PUBLIC)!;
+    // Every shared field matches exactly (the viewer just surfaces `score` as `initiative`).
+    expect({ name: player.name, active: player.active, health: player.health, conditionIds: player.conditionIds, conditions: player.conditions })
+      .toEqual({ name: viewer.name, active: viewer.active, health: viewer.health, conditionIds: viewer.conditionIds, conditions: viewer.conditions });
+    expect(player.score).toBe(viewer.initiative);
+    expect(player.conditions).toEqual(["Prone", "Exhaustion 2"]);
+    expect(player.conditionIds).toEqual(["prone", "exhaustion"]);
+  });
+
+  it("omits a gm-only combatant from both the player and the viewer lists", () => {
+    const state = game(PUBLIC);
+    expect(projectPlayerCombat(state).initiative.some((entry) => entry.actorId === HIDDEN)).toBe(false);
+    expect(projectViewerInitiative(state).entries.some((entry) => entry.actorId === HIDDEN)).toBe(false);
+  });
+
+  it("never leaks a hidden combatant's name on the viewer initiative, even while the table is rewound", () => {
+    const state = game(HIDDEN); // a hidden combatant holds the current turn
+    state.combat = { ...state.combat, historyCursor: 0 }; // the GM is reviewing an earlier turn
+    const viewer = projectViewerInitiative(state);
+    expect(viewer.hiddenTurn).toBe(true);
+    expect(viewer.entries.some((entry) => entry.actorId === HIDDEN)).toBe(false);
+    expect(JSON.stringify(viewer)).not.toContain("Secret Lurker");
+    expect(JSON.stringify(viewer)).not.toContain(HIDDEN);
   });
 });

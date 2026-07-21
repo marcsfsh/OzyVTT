@@ -19,11 +19,18 @@ function safeRoll(roll: RollRecord): PlayerRollRecord {
   return visible;
 }
 
+/** Display labels for condition badges ("Prone", "Exhaustion 3") - public info, safe for players and the shared screen (which has no rules-reference lookup of its own). */
+export function conditionLabels(actor: GameState["actors"][number]): readonly string[] {
+  return actor.conditions.map((condition) => `${condition.id.split("-").map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`).join(" ")}${condition.level !== undefined ? ` ${condition.level}` : ""}`);
+}
+
 export function projectPublicInitiative(state: GameState): readonly PlayerInitiativeEntry[] {
   const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
   return state.combat.initiative.flatMap((entry) => {
     const actor = publicActors.get(entry.actorId);
-    return actor ? [{ actorId: actor.id, name: actor.name, score: entry.score, active: state.combat.active && state.combat.turnActorId === actor.id, health: healthBandOf(actor.hp) }] : [];
+    // Conditions travel as parallel ids + labels (like the viewer token) so players and the shared
+    // screen render the same dots from one source; public actors only, so nothing hidden leaks.
+    return actor ? [{ actorId: actor.id, name: actor.name, score: entry.score, active: state.combat.active && state.combat.turnActorId === actor.id, health: healthBandOf(actor.hp), conditionIds: actor.conditions.map((condition) => condition.id), conditions: conditionLabels(actor) }] : [];
   });
 }
 

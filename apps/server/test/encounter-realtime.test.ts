@@ -103,7 +103,7 @@ describe("live authoritative encounter workflow", () => {
       expect(started).toMatchObject({ ok: true, revision: 1, duplicate: false });
       const playerHiddenView = await hiddenTurnState;
       expect(playerHiddenView.combat).toMatchObject({ active: true, round: 1, turnActorId: null, mapAssetId: imported.metadata.id, hiddenTurn: true });
-      expect(playerHiddenView.combat.initiative).toEqual([{ actorId: HERO_ID, name: "Public Hero", score: 18, active: false, health: "healthy" }]);
+      expect(playerHiddenView.combat.initiative).toEqual([{ actorId: HERO_ID, name: "Public Hero", score: 18, active: false, health: "healthy", conditionIds: [], conditions: [] }]);
       const playerJson = JSON.stringify(playerHiddenView);
       expect(playerJson).not.toContain(SECRET_ID);
       expect(playerJson).not.toContain("Unrevealed Tyrant");
@@ -112,7 +112,7 @@ describe("live authoritative encounter workflow", () => {
         visible: true,
         round: 1,
         hiddenTurn: true,
-        entries: [{ actorId: HERO_ID, name: "Public Hero", initiative: 18, active: false, health: "healthy", conditions: [] }]
+        entries: [{ actorId: HERO_ID, name: "Public Hero", initiative: 18, active: false, health: "healthy", conditions: [], conditionIds: [] }]
       });
       const activeMap = await fetch(`${base}/api/v1/map-assets/${imported.metadata.id}/content`, { headers: { authorization: `Bearer ${playerToken}` } });
       expect(activeMap.status).toBe(200);
