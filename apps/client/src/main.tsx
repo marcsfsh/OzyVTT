@@ -21,7 +21,8 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast } from "@vtt/ui";
+import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
 async function api(path: string, init?: RequestInit) {
@@ -67,6 +68,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   const { confirm, dialog } = useConfirm();
+  const { toast } = useToast();
   // Undocked setup: the encounter-setup panel is sized to the map/scene panel's exact height (its
   // combatant list scrolls inside). We measure that panel live and publish it as `--setup-h` on the
   // grid, which the setup panel reads; the ResizeObserver keeps it in step as the map column reflows
@@ -85,7 +87,9 @@ function App() {
   }, []);
 
   const fail = (text: string) => setNotice({ tone: "error", text });
-  const succeed = (text: string) => setNotice({ tone: "success", text });
+  // Ephemeral acknowledgements ("Signed out", "GM password set") go to the shared toast surface;
+  // errors and pending states stay inline (Notice) where they're prominent next to the auth form.
+  const succeed = (text: string) => toast(text, { tone: "success" });
 
   useEffect(() => {
     api("/api/bootstrap/status").then(({ bootstrapped }) => setBootstrapped(bootstrapped)).catch((error) => fail(error.message));
@@ -217,6 +221,7 @@ function App() {
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
   return <main>
     <div className="app-texture" aria-hidden="true" />
+    {mode !== "home" && <TableEventToasts />}
     {mode === "home" && <header className="home-hero scanlines anim-view">
       <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
       <span className="eyebrow">Your table</span>
@@ -331,4 +336,4 @@ function App() {
   </main>;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><AppErrorBoundary><App /></AppErrorBoundary></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><AppErrorBoundary><ToastProvider><App /></ToastProvider></AppErrorBoundary></StrictMode>);

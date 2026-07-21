@@ -1,37 +1,31 @@
-import { useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import type { TableEvent } from "@vtt/domain";
+import { useToast, type ToastTone } from "@vtt/ui";
 import { socket } from "../socket";
 
 /**
- * Transient battlemap notifications ("Goblin took 6 damage"). Fed by the server's `table:event`
- * broadcast (role-filtered there), capped and auto-fading here. Presentation only - never persisted,
- * and the roll history remains the durable record.
+ * Transient battlemap notifications ("Goblin took 6 damage"), fed by the server's role-filtered
+ * `table:event` broadcast. Routed through the shared toast surface (`useToast`) so combat feedback
+ * looks and moves like every other notification - the durable record stays the combat log/roll
+ * history. Mount once inside the ToastProvider; renders nothing itself.
  */
-let toasts: readonly TableEvent[] = [];
-const listeners = new Set<() => void>();
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
-const emit = () => { for (const listener of listeners) listener(); };
-const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
+const TONE_FOR_KIND: Record<TableEvent["kind"], ToastTone> = {
+  damage: "error",
+  heal: "success",
+  save: "info",
+  action: "info",
+  condition: "info",
+  reaction: "info",
+  effect: "info",
+  "death-save": "info"
+};
 
-function dismiss(id: string) {
-  const timer = timers.get(id);
-  if (timer) { clearTimeout(timer); timers.delete(id); }
-  toasts = toasts.filter((toast) => toast.id !== id);
-  emit();
-}
-function push(event: TableEvent) {
-  toasts = [...toasts, event].slice(-4); // keep the four most recent
-  emit();
-  timers.set(event.id, setTimeout(() => dismiss(event.id), 4200));
-}
-socket.on("table:event", push); // registered once at module load; fires whenever the server emits
-
-function useTableToasts() { return useSyncExternalStore(subscribe, () => toasts, () => toasts); }
-
-export function MapToastStack() {
-  const current = useTableToasts();
-  if (current.length === 0) return null;
-  return <div className="map-toast-stack" aria-live="polite">
-    {current.map((toast) => <div key={toast.id} className={`map-toast map-toast-${toast.kind}`}>{toast.text}</div>)}
-  </div>;
+export function TableEventToasts() {
+  const { toast } = useToast();
+  useEffect(() => {
+    const onEvent = (event: TableEvent) => toast(event.text, { tone: TONE_FOR_KIND[event.kind] ?? "info" });
+    socket.on("table:event", onEvent);
+    return () => { socket.off("table:event", onEvent); };
+  }, [toast]);
+  return null;
 }

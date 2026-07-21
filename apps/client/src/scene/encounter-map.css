@@ -159,13 +159,7 @@
 .token-condition-glyph { fill: var(--violet-hi); }
 .token-condition-more circle { fill: var(--surface-2); stroke: var(--line-strong); }
 
-/* Transient battlemap event toasts (top-center, inside the stage so they show enlarged). */
-.map-toast-stack { position: absolute; left: 50%; top: 3.4rem; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: .35rem; max-width: min(90%, 26rem); pointer-events: none; }
-.map-toast { padding: .4rem .85rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-1) 94%, transparent); border: 1px solid var(--line-strong); color: var(--text); font-size: .8rem; font-weight: 700; box-shadow: var(--shadow-2); animation: map-toast-in .18s ease-out; }
-.map-toast-damage { border-color: var(--danger); color: var(--danger-hi); }
-.map-toast-heal { border-color: var(--success); color: var(--cyan-hi); }
-.map-toast-save { border-color: var(--caution); color: var(--violet-hi); }
-@keyframes map-toast-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Battlemap event toasts now route through the shared toast surface (scene/toasts.tsx -> useToast). */
 
 /* Click-to-target: rings while a targeting session is live. Targetable = subtle cyan invite; targeted = danger ring (§6.6). */
 .encounter-token.targetable { cursor: crosshair; }
@@ -174,8 +168,8 @@
 .encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); font-size: .85rem; }
 /* Center the transient overlays over the MAP area, not the whole stage — when the tracker is docked
    into the stage, half the width is the dock, so a plain 50% would sit over the initiative list. */
-.encounter-map-stage.has-dock-left .map-toast-stack, .encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
-.encounter-map-stage.has-dock-right .map-toast-stack, .encounter-map-stage.has-dock-right .encounter-target-bar { left: calc(50% - var(--dock-side-width) / 2); }
+.encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
+.encounter-map-stage.has-dock-right .encounter-target-bar { left: calc(50% - var(--dock-side-width) / 2); }
 .encounter-target-bar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .encounter-target-bar-buttons { display: inline-flex; flex: none; gap: .4rem; }
 .encounter-target-bar-buttons button { padding: .45rem .8rem; font-size: .8rem; text-align: center; }
