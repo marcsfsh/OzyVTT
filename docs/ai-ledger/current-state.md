@@ -32,9 +32,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     shared SRD glyphs as icons + tone (harmful/magical) so category survives a color-blind read;
     map health uses `hp-fill-*` band classes that resolve `--cyan`/`--magenta`/`--danger` so token
     health follows dark/dusk/light on table + viewer; drawing colors (player/annotation/crosshair/
-    AoE) move onto the brand ramp, dropping the banned green/orange/yellow/amber. Deferred: the ⌘K
-    command palette (its motion landed; the feature is a later pass) and full per-control swap of
-    the remaining ~281 raw controls (global element styles are already primitive-equivalent).
+    AoE) move onto the brand ramp, dropping the banned green/orange/yellow/amber.
+  - **Consolidation wave 2 (2026-07-21, same PR).** Transient notifications collapse onto one
+    surface: the app is wrapped in `ToastProvider`, battlemap `table:event`s and ephemeral GM
+    acknowledgements route through `useToast`, and the bespoke `MapToastStack` + inline-success
+    `Notice` path are retired (`Notice` stays for inline errors/pending). Effect chips join
+    condition chips on the `Chip` primitive (dead pill CSS removed). Rich popovers stay bespoke
+    (they hold controls, not menu items) but match the `Menu` primitive's behavior — the ⋯ options
+    popover closes on Escape and both it and the token menu use the `anim-popover` entrance; the
+    two `role="group"` segmented controls (viewer tool, API language) are correctly left as groups,
+    not forced into tablists. `<code>`/timestamps use the branded mono face (tabular figures), and
+    the replay/viewer/map focus rings unify onto the shared layered `--focus-ring-color`.
+    Deferred: the ⌘K command palette (its motion landed; the feature is a later pass) and the
+    full per-control swap of the remaining ~281 raw controls (global element styles are already
+    primitive-equivalent, so they render identically — this is cleanup, not a visible gap).
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
