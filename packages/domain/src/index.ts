@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, type Actor, type ActorDefinition, type EffectInstance, type EffectModifier } from "@vtt/schemas";
+import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type EffectInstance, type EffectModifier } from "@vtt/schemas";
 
-export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier } from "@vtt/schemas";
+export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier, type HealthDisplay, type HealthDisplayAudience, type HealthDisplayStyle } from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(200), definition: ActorDefinitionSchema }).strict();
@@ -235,6 +235,8 @@ const sceneCombatShape = {
   rulesMode: z.enum(["strict", "assisted", "freeform"]).default("strict"),
   /** Table-wide roll preference: "auto" rolls each encounter roll for you (with a typed override, and adv/disadv after a d20), "manual" waits for you to type your physical dice result (with a Roll button to auto-roll instead). Additive; the default preserves the prior always-auto behavior. */
   rollMode: z.enum(["auto", "manual"]).default("auto"),
+  /** How a token's current health shows on the map (table-wide default; a per-token `actor.healthDisplay` overrides it). `band` is the coarse badge shown to everyone (today's behavior); `bar`/`ring` are richer indicators gated by `audience` ("gm" = GM map only, "all" = everyone with a band-fraction for non-owners). Additive; the default preserves the prior badge-only behavior. */
+  healthDisplay: HealthDisplaySchema.default({ style: "band", audience: "gm" }),
   /** GM-set underwater environment (SRD Underwater Combat): melee disadvantage unless piercing, ranged auto-miss beyond normal range, everyone resists fire. Additive. */
   underwater: z.boolean().default(false),
   /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
@@ -331,7 +333,7 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool - only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool - only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }>; /** The resolved token health indicator, present only when the table shows a bar/ring to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
@@ -481,6 +483,8 @@ export interface ClientToServerEvents {
   "death-save:roll": (payload: { commandId: string; actorId: string; commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; naturalRoll?: number; expectedRevision?: number }, acknowledgement: (result: DeathSaveResult) => void) => void;
   "encounter:set-rules-mode": (payload: { commandId: string; mode: "strict" | "assisted" | "freeform"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-roll-mode": (payload: { commandId: string; mode: "auto" | "manual"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "encounter:set-health-display": (payload: { commandId: string; style: "band" | "bar" | "ring"; audience: "gm" | "all"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:set-health-display": (payload: { commandId: string; actorId: string; display: { style: "band" | "bar" | "ring"; audience: "gm" | "all" } | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-environment": (payload: { commandId: string; underwater: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:rest": (payload: { commandId: string; actorId: string; kind: "long" | "short"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:spend-hit-dice": (payload: { commandId: string; actorId: string; count: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

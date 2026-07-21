@@ -40,6 +40,8 @@ function restorableSlice(state: GameState): string {
     // Rules-engine state (effects, dying, spent uses) restores with hp/conditions - a rewind must
     // undo a Rage grant or a death-save tick, or the strict engine reasons from corrupt state.
     // legendaryUsed rides the combat spread above for the same reason (spent legendary actions rewind).
+    // The table-wide healthDisplay preference also rides that spread (like rulesMode/rollMode); the
+    // per-token actor.healthDisplay override is cosmetic and deliberately stays out of the actor slice below.
     actors: state.actors.map((actor) => ({ id: actor.id, hp: actor.hp, conditions: actor.conditions, effects: actor.effects, deathSaves: actor.deathSaves, actionUses: actor.actionUses }))
   });
 }

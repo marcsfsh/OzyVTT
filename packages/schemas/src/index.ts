@@ -76,6 +76,21 @@ export const DeathSavesSchema = z.object({
   stable: z.boolean().default(false)
 }).strict();
 export type DeathSaves = z.infer<typeof DeathSavesSchema>;
+
+/**
+ * How a token's current health shows on the battlemap. `band` is the coarse status badge shown to
+ * everyone (the prior behavior); `bar` and `ring` are richer indicators whose visibility to
+ * players/viewer is gated by `audience` ("gm" = GM map only; "all" = everyone, with exact fill for
+ * the GM and the token's owner but only a coarse band-fraction for others - exact HP never leaks).
+ * Used both table-wide (`combat.healthDisplay`) and as a per-token override (`actor.healthDisplay`).
+ */
+export const HealthDisplayStyleSchema = z.enum(["band", "bar", "ring"]);
+export const HealthDisplayAudienceSchema = z.enum(["gm", "all"]);
+export const HealthDisplaySchema = z.object({ style: HealthDisplayStyleSchema, audience: HealthDisplayAudienceSchema }).strict();
+export type HealthDisplayStyle = z.infer<typeof HealthDisplayStyleSchema>;
+export type HealthDisplayAudience = z.infer<typeof HealthDisplayAudienceSchema>;
+export type HealthDisplay = z.infer<typeof HealthDisplaySchema>;
+
 export const ActorSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(120),
@@ -109,7 +124,9 @@ export const ActorSchema = z.object({
   /** Legendary resources seeded from the definition (SRD 2024): per-round legendary actions and Legendary Resistance per day. GM knowledge - stripped from player projections. Additive. */
   legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional(),
   /** Short-rest healing pool (SRD Hit Point Dice), seeded from the definition's hit-point formula; null = not modeled (rests behave as before). Reaches players only on their own claimed character. Additive. */
-  hitDice: z.object({ die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]), maximum: z.number().int().min(1).max(40), remaining: z.number().int().min(0).max(40) }).strict().nullable().default(null)
+  hitDice: z.object({ die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]), maximum: z.number().int().min(1).max(40), remaining: z.number().int().min(0).max(40) }).strict().nullable().default(null),
+  /** Per-token health-display override; absent = inherit the table-wide `combat.healthDisplay`. GM knowledge - resolved and audience-gated in the player/viewer projections. Additive. */
+  healthDisplay: HealthDisplaySchema.optional()
 });
 
 export type Actor = z.infer<typeof ActorSchema>;

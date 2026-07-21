@@ -129,3 +129,84 @@ describe("recipient-safe annotation projections", () => {
     expect(projectViewerEncounterScene(gameWithAnnotations(), 6000).annotations).toEqual([]);
   });
 });
+
+const GOBLIN = "40000000-0000-4000-8000-000000000003";
+
+/** A public owned PC (7/10), a public non-owned monster (3/12 -> bloodied), and a gm-only monster. */
+function healthGame(combatHealthDisplay?: { style: string; audience: string }, goblinOverride?: { style: string; audience: string }) {
+  return GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: PUBLIC, name: "Visible Hero", kind: "player-character", visibility: "public", hp: { current: 7, maximum: 10 }, ownerSessionId: PLAYER_A },
+      { id: GOBLIN, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 3, maximum: 12 }, ...(goblinOverride ? { healthDisplay: goblinOverride } : {}) },
+      { id: HIDDEN, name: "Secret Lurker", kind: "monster", visibility: "gm-only", hp: { current: 10, maximum: 10 } }
+    ],
+    combat: {
+      active: true, round: 1, turnActorId: PUBLIC, mapAssetId: MAP,
+      initiative: [{ actorId: PUBLIC, score: 18 }, { actorId: GOBLIN, score: 12 }, { actorId: HIDDEN, score: 22 }],
+      tokens: [
+        { actorId: PUBLIC, position: { x: 10, y: 10 }, sizePx: 40, gridSizePx: 50 },
+        { actorId: GOBLIN, position: { x: 20, y: 20 }, sizePx: 40, gridSizePx: 50 },
+        { actorId: HIDDEN, position: { x: 30, y: 30 }, sizePx: 40, gridSizePx: 50 }
+      ],
+      ...(combatHealthDisplay ? { healthDisplay: combatHealthDisplay } : {})
+    }
+  });
+}
+
+describe("token health-display projection (audience gate, viewer safety)", () => {
+  it("defaults healthDisplay for a save written before the field existed (additive parse)", () => {
+    const state = GameStateSchema.parse({ schemaVersion: 1, actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", hp: { current: 5, maximum: 5 } }], combat: { active: false } });
+    expect(state.combat.healthDisplay).toEqual({ style: "band", audience: "gm" });
+    expect(state.actors[0].healthDisplay).toBeUndefined();
+  });
+
+  it("keeps the default band silent - no healthDisplay reaches players or the viewer", () => {
+    const state = healthGame();
+    expect(projectPlayerView(state, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
+    expect(projectViewerEncounterScene(state).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
+  });
+
+  it("with audience gm, a bar/ring stays GM-only and exact HP never reaches others", () => {
+    const state = healthGame({ style: "ring", audience: "gm" });
+    const view = projectPlayerView(state, PLAYER_A, () => null);
+    expect(view.actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
+    // The non-owned monster is still a coarse band for players - never exact HP.
+    expect(view.actors.find((actor) => actor.id === GOBLIN)!.hp).toEqual({ kind: "band", band: "bloodied" });
+    expect(projectViewerEncounterScene(state).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
+  });
+
+  it("with audience all, the resolved style (only) reaches players + viewer; owner exact, others band, hidden omitted", () => {
+    const state = healthGame({ style: "bar", audience: "all" });
+    const viewerTokens = projectViewerEncounterScene(state).tokens;
+    expect(viewerTokens.map((token) => token.actorId).sort()).toEqual([PUBLIC, GOBLIN].sort());
+    expect(viewerTokens.every((token) => token.healthDisplay?.style === "bar")).toBe(true);
+    // Structural safety: a viewer token has no hit-point field at all, only the coarse band + a style.
+    expect(viewerTokens.every((token) => !("hp" in token) && !("current" in token) && !("maximum" in token))).toBe(true);
+
+    const view = projectPlayerView(state, PLAYER_A, () => null);
+    const hero = view.actors.find((actor) => actor.id === PUBLIC)!;
+    const goblin = view.actors.find((actor) => actor.id === GOBLIN)!;
+    expect(hero.healthDisplay).toEqual({ style: "bar" });
+    expect(hero.hp).toEqual({ kind: "exact", current: 7, maximum: 10, temporary: 0 }); // own claimed PC: exact
+    expect(goblin.healthDisplay).toEqual({ style: "bar" });
+    expect(goblin.hp).toEqual({ kind: "band", band: "bloodied" }); // someone else's token: band-fraction only
+    expect(view.actors.some((actor) => actor.id === HIDDEN)).toBe(false);
+    expect(JSON.stringify(view)).not.toContain(HIDDEN);
+  });
+
+  it("resolves a per-token override against the table default in both directions", () => {
+    // Table default band/gm, but the goblin alone is promoted to bar-for-everyone.
+    const promoted = healthGame(undefined, { style: "bar", audience: "all" });
+    const promotedTokens = projectViewerEncounterScene(promoted).tokens;
+    expect(promotedTokens.find((token) => token.actorId === GOBLIN)!.healthDisplay).toEqual({ style: "bar" });
+    expect("healthDisplay" in promotedTokens.find((token) => token.actorId === PUBLIC)!).toBe(false);
+    expect(projectPlayerView(promoted, PLAYER_A, () => null).actors.find((actor) => actor.id === GOBLIN)!.healthDisplay).toEqual({ style: "bar" });
+
+    // Table default bar/all, but the goblin alone is demoted back to GM-only.
+    const demoted = healthGame({ style: "bar", audience: "all" }, { style: "ring", audience: "gm" });
+    const demotedTokens = projectViewerEncounterScene(demoted).tokens;
+    expect(demotedTokens.find((token) => token.actorId === GOBLIN)!.healthDisplay).toBeUndefined();
+    expect(demotedTokens.find((token) => token.actorId === PUBLIC)!.healthDisplay).toEqual({ style: "bar" });
+  });
+});

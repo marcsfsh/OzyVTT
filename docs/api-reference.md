@@ -84,6 +84,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.set-roll-mode` | `combat:write` |
+| `encounter.set-health-display` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
 | `actor.spend-hit-dice` | `actor:write` |
@@ -100,6 +101,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.force-release` | `actor:write` |
 | `actor.set-token-image` | `actor:write` |
 | `actor.set-size` | `actor:write` |
+| `actor.set-health-display` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
@@ -865,6 +867,23 @@ Sets the table's roll preference (GM-grade only): `auto` rolls each encounter ro
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/encounter/health-display`
+
+Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM - non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `style` | `band` \| `bar` \| `ring` | yes |  |
+| `audience` | `gm` \| `all` | yes | gm keeps a bar/ring on the GM map only; all shows it to players and the shared screen (coarse band-fraction for non-owners) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/encounter/environment`
 
 Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.
@@ -1161,6 +1180,24 @@ Moves a combatant between the shared layer (public) and the GM-only layer (GM-gr
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `visibility` | `public` \| `gm-only` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/health-display`
+
+Overrides how one combatant's token health shows on the map (GM-grade only), or clears the override (`display: null`) so the token follows the table-wide default. Same style/audience choices as the table-wide health-display command.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `display` | object \| null | yes | The per-token override, or null to clear it and follow the table default |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

@@ -32,7 +32,13 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
     mapAssetId: state.combat.mapAssetId,
     tokens: state.combat.tokens.flatMap((token) => {
       const actor = publicActors.get(token.actorId);
-      return actor && token.position ? [{
+      if (!actor || !token.position) return [];
+      // Effective per-token health display (override or table default). The shared screen only ever
+      // learns the bar/ring style when the GM aimed it at everyone (audience "all"); it derives the
+      // fill from the band below, so exact HP never reaches it. Band stays the coarse badge.
+      const effective = actor.healthDisplay ?? state.combat.healthDisplay;
+      const displayStyle = effective.audience === "all" && effective.style !== "band" ? effective.style : null;
+      return [{
         actorId: actor.id,
         name: actor.name,
         kind: actor.kind,
@@ -43,8 +49,9 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
         conditions: conditionLabels(actor),
         // Ids parallel the labels so the shared screen picks the same glyphs as the table; public actors only.
         conditionIds: actor.conditions.map((condition) => condition.id),
-        ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {})
-      }] : [];
+        ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {}),
+        ...(displayStyle ? { healthDisplay: { style: displayStyle } } : {})
+      }];
     }),
     // The shared screen is a public display, so only `public` annotations reach it; expired
     // measurements drop out here (the server re-syncs the viewer at each annotation expiry).

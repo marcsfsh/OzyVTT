@@ -252,6 +252,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));
   router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
   router.post(expressPath(GAME_PATHS.rollMode), ...command("encounter.set-roll-mode"));
+  router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
   router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
   router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpendHitDice), ...command("actor.spend-hit-dice", actorIdParam));
@@ -270,6 +271,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actorTokenImage), ...command("actor.set-token-image", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorVisibility), ...command("actor.set-visibility", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorHealthDisplay), ...command("actor.set-health-display", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
   router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
   router.delete(expressPath(GAME_PATHS.sceneById), ...command("scene.remove", (req) => ({ sceneId: req.params.sceneId })));

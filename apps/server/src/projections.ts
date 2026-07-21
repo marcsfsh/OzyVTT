@@ -117,8 +117,14 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       // actionUses (limited-use spending names stat-block action ids - own claimed character only),
       // conditionImmunities and legendary resources (monster defenses are GM knowledge), and
       // hitDice (a healing resource that tracks with exact HP - own claimed character only).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, ...actor } = source;
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, healthDisplay: _healthDisplay, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
+      // Effective token-health display = the per-token override or the table default. The richer
+      // bar/ring reaches players only when the GM aimed it at everyone (audience "all"); band stays
+      // the coarse badge. Only the style crosses - the client derives the fill from `hp` (exact for
+      // the owner, coarse band otherwise), so exact HP never leaks for someone else's token.
+      const effectiveDisplay = source.healthDisplay ?? state.combat.healthDisplay;
+      const sharedDisplayStyle = effectiveDisplay.audience === "all" && effectiveDisplay.style !== "band" ? effectiveDisplay.style : null;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
       const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
       return {
@@ -129,7 +135,8 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
         ...(ownDefinition ? { definition: ownDefinition } : {}),
         ...(mine ? { actionUses: { ...actionUses } } : {}),
-        ...(mine && hitDice ? { hitDice: { ...hitDice } } : {})
+        ...(mine && hitDice ? { hitDice: { ...hitDice } } : {}),
+        ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
       };
     }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)

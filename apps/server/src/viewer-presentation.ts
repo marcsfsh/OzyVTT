@@ -51,6 +51,8 @@ export type ViewerEncounterToken = Readonly<{
   conditions: readonly string[];
   /** Content-bundle condition ids parallel to `conditions` - the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
   conditionIds?: readonly string[];
+  /** Present only when the GM shows a richer indicator to everyone (audience "all"); the viewer derives the fill fraction from `health` (band) - exact HP never reaches the shared screen. */
+  healthDisplay?: Readonly<{ style: "bar" | "ring" }>;
   tokenAssetId?: string;
 }>;
 
@@ -186,6 +188,12 @@ function conditionIdList(value: unknown): readonly string[] {
   });
 }
 
+/** The shared screen only ever receives the richer bar/ring style (band is a table-client fallback, never sent). */
+function healthDisplayStyle(value: unknown): "bar" | "ring" {
+  if (value === "bar" || value === "ring") return value;
+  throw new Error("Viewer token health display style must be \"bar\" or \"ring\".");
+}
+
 function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   const mapAssetId = value.mapAssetId === null ? null : safeText(value.mapAssetId, "Encounter map asset ID", 128);
   if (value.tokens.length > 200) throw new Error("Viewer encounter cannot exceed 200 tokens.");
@@ -198,7 +206,7 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     if (token.active) activeTokens++;
     if (token.kind !== "player-character" && token.kind !== "monster" && token.kind !== "npc") throw new Error("Viewer token kind is invalid.");
     if (!Number.isFinite(token.sizePx) || token.sizePx <= 0 || token.sizePx > 4096) throw new Error("Viewer token size is invalid.");
-    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions), ...(token.conditionIds ? { conditionIds: conditionIdList(token.conditionIds) } : {}) };
+    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions), ...(token.conditionIds ? { conditionIds: conditionIdList(token.conditionIds) } : {}), ...(token.healthDisplay ? { healthDisplay: { style: healthDisplayStyle(token.healthDisplay.style) } } : {}) };
   });
   if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
   if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");
