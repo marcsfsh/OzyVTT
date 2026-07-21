@@ -32,12 +32,15 @@
 .encounter-primary:disabled, .turn-controls button:disabled { opacity: .45; cursor: not-allowed; }
 .initiative-list { list-style: none; margin: 1rem 0 0; padding: 0; }
 .initiative-list li { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem 1rem; border-top: 1px solid #403a2c; }
-.initiative-list li.active { border-color: #d69442; background: #6e431c; box-shadow: inset .35rem 0 #ffc34d; }
-/* The active row's accent strip is an inset shadow .35rem in; pad the row so nested death-save and
-   save prompts clear it instead of hiding it behind their own background (report #1). */
-.initiative-list.gm li.active, .initiative-list.player li.active { padding-left: .6rem; }
+/* The active row reads as a soft rounded highlight, not a hard rectangle: rounded corners + a
+   rounded-off left accent (the inset shadow is clipped by the radius) instead of a sharp inset bar
+   running corner to corner (feedback #3.2). */
+.initiative-list li.active { border-color: transparent; border-radius: .6rem; background: #6e431c; box-shadow: inset .22rem 0 0 #ffc34d; }
+/* Pad past the accent so nested death-save and save prompts clear it instead of hiding it behind
+   their own background (report #1). */
+.initiative-list.gm li.active, .initiative-list.player li.active { padding-left: .55rem; }
 .initiative-list li.you { background: #1f2a1c; }
-.initiative-list li.you.active { background: #4c5a1e; box-shadow: inset .35rem 0 #b6e35a; }
+.initiative-list li.you.active { background: #4c5a1e; box-shadow: inset .22rem 0 0 #b6e35a; }
 .initiative-list li > span { display: flex; align-items: center; }
 .initiative-list li > strong { color: #f6c452; }
 .your-turn { margin-top: 1rem; padding: .85rem 1rem; border-radius: .5rem; border: 1px solid #7bbf5a; background: #24361d; color: #d7f0c4; }
@@ -84,17 +87,18 @@
 /* Compact control bar: turn navigation + the ⋯ options menu. */
 /* One control bar, one control height: the round pill, ‹, Next, +, and ⋯ all line up as equal-height
    pills with their glyph/text centered, so nothing reads as an odd shape (report #1). */
-.encounter-topbar { --control-h: 2.5rem; position: relative; display: flex; align-items: center; gap: .4rem; margin-top: .6rem; }
-.encounter-topbar > .encounter-round { display: inline-flex; align-items: center; height: var(--control-h); margin: 0; padding: 0 .8rem; }
-.encounter-topbar .turn-controls { flex: 1 1 auto; margin-top: 0; display: grid; grid-template-columns: var(--control-h) 1fr; gap: .4rem; }
-.encounter-topbar .turn-controls button { height: var(--control-h); padding: 0 .7rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
-.encounter-topbar .turn-controls button:first-child { padding: 0; font-size: 1.25rem; } /* the ‹ chevron is a centered square */
+/* Kept deliberately compact - turn nav is frequent but shouldn't dominate the panel (feedback #3.3). */
+.encounter-topbar { --control-h: 2rem; position: relative; display: flex; align-items: center; gap: .35rem; margin-top: .6rem; }
+.encounter-topbar > .encounter-round { display: inline-flex; align-items: center; height: var(--control-h); margin: 0; padding: 0 .7rem; }
+.encounter-topbar .turn-controls { flex: 1 1 auto; margin-top: 0; display: grid; grid-template-columns: var(--control-h) 1fr; gap: .35rem; }
+.encounter-topbar .turn-controls button { height: var(--control-h); padding: 0 .6rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: .82rem; }
+.encounter-topbar .turn-controls button:first-child { padding: 0; font-size: 1.05rem; } /* the ‹ chevron is a centered square */
 /* Turn controls share the Round pill's warm palette so the topbar reads as one turn cluster rather
    than a bright button pasted onto the muted panel (report #2). */
 .encounter-topbar .turn-controls button, .encounter-topbar .turn-controls .encounter-primary { background: #6e431c; border: 1px solid #d69442; color: #ffdca0; font-weight: 700; }
 .encounter-topbar .turn-controls button:hover:not(:disabled) { background: #7d4d20; border-color: #ffc34d; color: #fff; }
 .encounter-topbar .turn-controls .encounter-primary.resume { background: #2f6e3a; border-color: #4dd06a; color: #eafbe6; }
-.encounter-menu-toggle { flex: none; width: var(--control-h); height: var(--control-h); display: inline-flex; align-items: center; justify-content: center; border: 1px solid #6b5e4b; border-radius: .5rem; background: #241f17; color: #d9d2c4; font-size: 1.15rem; font-weight: 800; line-height: 1; cursor: pointer; }
+.encounter-menu-toggle { flex: none; width: var(--control-h); height: var(--control-h); display: inline-flex; align-items: center; justify-content: center; border: 1px solid #6b5e4b; border-radius: .5rem; background: #241f17; color: #d9d2c4; font-size: 1rem; font-weight: 800; line-height: 1; cursor: pointer; }
 .encounter-menu-toggle:hover, .encounter-menu-toggle[aria-expanded="true"] { border-color: #e8a743; color: #ffdca0; }
 .encounter-menu { position: absolute; z-index: 41; top: calc(100% + .3rem); right: 0; width: min(21rem, 92vw); max-height: min(80vh, 40rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid #6b5e4b; border-radius: .55rem; background: #1f1a12; box-shadow: 0 12px 28px rgba(0, 0, 0, .55); }
 /* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
@@ -475,7 +479,8 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .encounter-topbar.player { align-items: center; flex-wrap: wrap; }
 .your-turn-flag { color: #b6e35a; font-size: .8rem; font-weight: 800; }
 .encounter-quiet-note { color: #b09a6e; font-size: .74rem; }
-.acting-console.player { margin-top: .6rem; }
+/* The player's economy now rides their own initiative row (feedback #3): quiet card, tight top gap. */
+.initiative-list.player .turn-economy { margin-top: .3rem; }
 
 /* Touch devices: the dense desktop metrics gain back tap height without changing the layout. */
 @media (pointer: coarse) {
