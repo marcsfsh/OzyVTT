@@ -165,12 +165,55 @@ const CONDITION_GLYPHS: Record<string, string> = {
 
 export type TokenConditionBadge = Readonly<{ id: string | null; label: string }>;
 
+/** Coarse band -> a fill fraction, matching the initiative HP bar (healthy full, bloodied ~half, down a sliver). The single source the bar/ring, the viewer, and the initiative bar all read. */
+export function bandFraction(band: "healthy" | "bloodied" | "down"): number {
+  return band === "healthy" ? 1 : band === "bloodied" ? 0.45 : 0.06;
+}
+
+/** Fill fraction for a token health bar/ring: exact when the audience holds exact hit points (the GM, or a player's own character), else the coarse band fraction - so nobody else's exact HP is ever implied. Lives here (React-only, viewer-safe) so the viewer can share it without the socket. */
+export function hpFillFraction(hp: { current: number; maximum: number; temporary: number } | { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: "healthy" | "bloodied" | "down" }): number {
+  if ("kind" in hp && hp.kind === "band") return bandFraction(hp.band);
+  const exact = hp as { current: number; maximum: number };
+  return exact.maximum > 0 ? Math.max(0, Math.min(1, exact.current / exact.maximum)) : 0;
+}
+
 /**
- * Health/condition badges layered over a token: a bloodied/down dot at the top-right and up
- * to three condition glyphs beneath the body (with a +N overflow). Shared by the table
- * client and the viewer so both read the same at a glance.
+ * A richer token-health indicator shown in place of the coarse band dot when the GM opts into it:
+ * a thin HP bar pinned under the token, or a green->red ring around its body. The fill fraction is
+ * always audience-safe (the server only sends this style when it may show, and exact HP never
+ * reaches non-owners - the fraction is band-derived for them). Image-pixel/SVG space like the body.
  */
-export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[] }>) {
+function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring"; fraction: number }>) {
+  const clamped = Math.max(0, Math.min(1, fraction));
+  const color = `hsl(${Math.round(120 * clamped)} 70% 45%)`;
+  const title = `${Math.round(clamped * 100)}% health`;
+  if (style === "ring") {
+    const r = sizePx * 0.5 + Math.max(2, sizePx * 0.06);
+    const circumference = 2 * Math.PI * r;
+    const strokeWidth = Math.max(2, sizePx * 0.09);
+    // rotate -90 so the arc grows from the top of the token clockwise.
+    return <g className="token-health-ring" transform="rotate(-90)">
+      <title>{title}</title>
+      <circle className="token-health-ring-track" r={r} fill="none" strokeWidth={strokeWidth} />
+      <circle className="token-health-ring-fill" r={r} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${circumference * clamped} ${circumference}`} />
+    </g>;
+  }
+  const width = sizePx * 0.92;
+  const height = Math.max(3, sizePx * 0.12);
+  const y = sizePx * 0.52;
+  return <g className="token-health-bar">
+    <title>{title}</title>
+    <rect className="token-health-bar-track" x={-width / 2} y={y} width={width} height={height} rx={height / 2} />
+    <rect className="token-health-bar-fill" x={-width / 2} y={y} width={width * clamped} height={height} rx={height / 2} style={{ fill: color }} />
+  </g>;
+}
+
+/**
+ * Health/condition badges layered over a token: a bloodied/down dot at the top-right (or, when the
+ * GM opts in via `healthBar`, an HP bar / green->red ring instead) and up to three condition glyphs
+ * beneath the body (with a +N overflow). Shared by the table client and the viewer.
+ */
+export function TokenStatusBadges({ sizePx, health, conditions, healthBar }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[]; healthBar?: Readonly<{ style: "bar" | "ring"; fraction: number }> }>) {
   const radius = Math.max(4, sizePx * 0.11);
   const shown = conditions.slice(0, 3);
   const overflow = conditions.length - shown.length;
@@ -178,9 +221,11 @@ export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ siz
   const startX = -((shown.length + (overflow > 0 ? 1 : 0)) - 1) * radius * 1.1;
   const names = conditions.map((condition) => condition.label).join(", ");
   return <>
-    {health !== "healthy" && <circle className={`token-health token-health-${health}`} cx={sizePx * 0.38} cy={-sizePx * 0.38} r={radius}>
-      <title>{health === "down" ? "Down" : "Bloodied"}</title>
-    </circle>}
+    {healthBar
+      ? <TokenHealthBar sizePx={sizePx} style={healthBar.style} fraction={healthBar.fraction} />
+      : health !== "healthy" && <circle className={`token-health token-health-${health}`} cx={sizePx * 0.38} cy={-sizePx * 0.38} r={radius}>
+        <title>{health === "down" ? "Down" : "Bloodied"}</title>
+      </circle>}
     {shown.map((condition, index) => {
       const glyph = condition.id !== null ? CONDITION_GLYPHS[condition.id] : undefined;
       return <g key={condition.label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>

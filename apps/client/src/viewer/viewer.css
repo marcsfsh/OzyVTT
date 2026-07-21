@@ -58,6 +58,11 @@
 .token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .token-health-bloodied { fill: #e8a743; }
 .token-health-down { fill: #d9605a; }
+/* Richer token-health indicators mirrored on the shared screen (audience "all"); fill color inlined. */
+.token-health-bar-track { fill: #0c0a07; fill-opacity: .8; }
+.token-health-bar-fill { stroke: none; }
+.token-health-ring-track { fill: none; stroke: #0c0a07; stroke-opacity: .5; }
+.token-health-ring-fill { fill: none; }
 /* Fog of war on the shared screen: solid cover — the audience sees only what the GM revealed. */
 .fog-overlay-player { fill: #0b0a08; }
 

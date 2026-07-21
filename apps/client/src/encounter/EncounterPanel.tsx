@@ -560,6 +560,19 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="manual">Manual entry - Roll to auto</option>
               </select>
             </label>
+            <label className="rules-mode-control">Health
+              <select value={state.combat.healthDisplay.style} disabled={busy} onChange={(event) => { const style = event.target.value as "band" | "bar" | "ring"; socket.emit("encounter:set-health-display", { commandId: newId(), style, audience: state.combat.healthDisplay.audience }, (result: MutationResult) => setMessage(result.ok ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : "a health ring"}.` : result.message ?? "The health display could not be changed.")); }}>
+                <option value="band">Status badge</option>
+                <option value="bar">HP bar</option>
+                <option value="ring">Health ring</option>
+              </select>
+            </label>
+            <label className="rules-mode-control">Show health to
+              <select value={state.combat.healthDisplay.audience} disabled={busy || state.combat.healthDisplay.style === "band"} onChange={(event) => { const audience = event.target.value as "gm" | "all"; socket.emit("encounter:set-health-display", { commandId: newId(), style: state.combat.healthDisplay.style, audience }, (result: MutationResult) => setMessage(result.ok ? `Health shown to ${audience === "all" ? "everyone" : "the GM only"}.` : result.message ?? "The health display could not be changed.")); }}>
+                <option value="gm">GM only</option>
+                <option value="all">Everyone</option>
+              </select>
+            </label>
             <label className="environment-control">
               <input type="checkbox" checked={state.combat.underwater} disabled={busy} onChange={(event) => { const underwater = event.target.checked; socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed.")); }} />
               Underwater fight

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { FogOverlay, footprintCells, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
+import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
@@ -92,7 +92,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging, healthDisplay
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -113,6 +113,8 @@ export function EncounterMap({
   onScenePrep?: () => void;
   /** Present while staging a prepared scene privately - adds "back to live" / "make live" controls to the map. */
   staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
+  /** Table-wide health-display default (read only for the GM view; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style server-side, so this is unused for them. */
+  healthDisplay?: HealthDisplay;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -655,10 +657,15 @@ export function EncounterMap({
             const active = activeActorId === actor.id;
             const targetable = activeTargeting !== null && activeTargeting.mode !== "template" && actor.id !== activeTargeting.attackerId;
             const targeted = targetable && activeTargeting.selected.includes(actor.id);
+            const band = healthBandFor(actor.hp);
+            // GM resolves the effective style (token override, else the table default); a player gets
+            // only the server-resolved style, present when the GM aimed a bar/ring at everyone.
+            const healthStyle = role === "gm" ? (actor.healthDisplay?.style ?? healthDisplay?.style ?? "band") : actor.healthDisplay?.style;
+            const healthBar: { style: "bar" | "ring"; fraction: number } | undefined = healthStyle && healthStyle !== "band" ? { style: healthStyle, fraction: hpFillFraction(actor.hp) } : undefined;
             return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
               <AuthorizedTokenGlyph assetId={actor.tokenAssetId ?? null} token={token} sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
-              <TokenStatusBadges sizePx={encounterToken.sizePx} health={healthBandFor(actor.hp)} conditions={actor.conditions.map((condition) => ({ id: condition.id, label: conditionBadgeLabel(condition) }))} />
+              <TokenStatusBadges sizePx={encounterToken.sizePx} health={band} conditions={actor.conditions.map((condition) => ({ id: condition.id, label: conditionBadgeLabel(condition) }))} healthBar={healthBar} />
             </g>;
           })}
           {/* Measurements and pings render above the token layer so they're never hidden behind a piece. */}
