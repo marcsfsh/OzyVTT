@@ -73,6 +73,9 @@ const PRIMARY_BUILTINS = ["dodge", "dash", "disengage", "help", "hide"] as const
 export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmView; actor: GmActor; onFeedback: (text: string) => void }>) {
   const [actions, setActions] = useState<readonly ContentActionSummary[] | null>(actionCache.get(actor.definitionId ?? "") ?? null);
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
+  // A typed damage override (manual roll mode, or a GM adjustment): when it differs from the rolled
+  // total the manual number is applied straight (no defense math), matching the save prompt's manual path.
+  const [damageEdit, setDamageEdit] = useState<string | null>(null);
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -100,7 +103,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
   useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
   // Fresh result (from this runner's Roll or the map confirm bar) clears prior apply bookkeeping.
-  useEffect(() => { setApplied(new Set()); }, [result]);
+  useEffect(() => { setApplied(new Set()); setDamageEdit(null); }, [result]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => { const target = state.actors.find((item) => item.id === entry.actorId); return target ? [target] : []; });
@@ -111,16 +114,18 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const resolve = () => resolveTargeting(state.revision, onOutcome);
   const useDirect = (action: ContentActionSummary) => resolveActionDirect(actor.id, action.id, state.revision, onOutcome);
 
-  const applyDamage = (targetId: string, targetName: string, key: string) => {
-    if (!result || result.damageTotal <= 0) { setApplied((current) => new Set([...current, key])); return; }
+  const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
+    if (!result || (overrideAmount ?? result.damageTotal) <= 0) { setApplied((current) => new Set([...current, key])); return; }
     setBusy(true);
     // The typed parts (weapon dice + rage-style bonus lines) travel with the apply so the server can
-    // run resistances and the dying transition; the total stays for compatibility and manual edits.
+    // run resistances and the dying transition. A manual override is a whole different number, so it
+    // goes as a bare total on the no-defense-math path (the DamageRequest `amount` contract).
     const parts = [
       ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
       ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
     ].filter((part) => part.amount > 0);
-    socket.emit("actor:apply-damage", { commandId: newId(), actorId: targetId, amount: result.damageTotal, parts, sourceActorId: actor.id, sourceName: `${actor.name}'s ${result.actionName}`, critical: result.crit }, (response: DamageApplyResult) => {
+    const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
+    socket.emit("actor:apply-damage", { commandId: newId(), actorId: targetId, amount: overrideAmount ?? result.damageTotal, ...(useOverride ? {} : { parts }), sourceActorId: actor.id, sourceName: `${actor.name}'s ${result.actionName}`, critical: result.crit }, (response: DamageApplyResult) => {
       setBusy(false);
       if (!response.ok) { onFeedback(response.message ?? "The damage could not be applied."); return; }
       setApplied((current) => new Set([...current, key]));
@@ -264,7 +269,11 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         }
         return applied.has(result.attack.targetId)
           ? <p className="action-applied">Applied to {result.attack.targetName}.</p>
-          : <button type="button" className="action-apply" disabled={busy} onClick={() => applyDamage(result.attack!.targetId, result.attack!.targetName, result.attack!.targetId)}>Apply {result.damageTotal} to {result.attack.targetName}</button>;
+          : <span className="action-apply-group">
+              {/* The rolled total is pre-filled; type over it to apply a hand-rolled number instead. */}
+              <input type="text" inputMode="numeric" pattern="[0-9]*" className="action-damage-edit" aria-label="Damage to apply" value={damageEdit ?? String(result.damageTotal)} onChange={(event) => setDamageEdit(event.target.value.replace(/[^0-9]/g, ""))} />
+              <button type="button" className="action-apply" disabled={busy} onClick={() => applyDamage(result.attack!.targetId, result.attack!.targetName, result.attack!.targetId, damageEdit === null || damageEdit === "" ? result.damageTotal : Number(damageEdit))}>Apply to {result.attack!.targetName}</button>
+            </span>;
       })()}
       {result.warnings?.map((warning) => <p key={warning} className="action-warning">⚠ {warning}</p>)}
       {result.save && (() => {

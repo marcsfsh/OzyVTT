@@ -194,6 +194,9 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .outcome-unknown { color: #c8c0b1; }
 .action-damage { margin: .35rem 0 0; font-size: .82rem; color: #e8b9a0; }
 .action-damage strong { font-size: 1rem; color: #ff9d7a; }
+.action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
+.action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
+.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid #9b5a3c; border-radius: .5rem; background: #241a10; color: #ffc9ae; font-weight: 700; text-align: center; font-size: .95rem; }
 .action-apply { width: 100%; margin-top: .5rem; padding: .55rem; border: 1px solid #9b5a3c; border-radius: .5rem; background: #4a2417; color: #ffc9ae; font-weight: 700; text-align: center; cursor: pointer; }
 .action-apply:hover:not(:disabled) { border-color: #ff9d7a; }
 .action-applied { color: #8fd69a; font-size: .8rem; font-weight: 700; }
