@@ -58,6 +58,22 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   rect strokes, three GM-only commands with parked-scene `sceneId` prep, GM-dim/player-solid
   mask, timeline-neutral, presentation-not-security-boundary; the BUILD_PLAN Phase-2 gate item).
   Regression suite now 104 tests + 7 fog tests; hit dice moved OFF the unsupported list above.
+- **Token health display + shared initiative + scene-setup picker (2026-07-21, PR after #38).**
+  Three combat-UX items. (1) **Token health on the map:** a table-wide default
+  `combat.healthDisplay {style: band|bar|ring, audience: gm|all}` plus an optional per-token
+  `Actor.healthDisplay` override, set from the token right-click menu (per-token) and the encounter
+  options menu (table). `bar` (thin HP bar) / `ring` (green→red arc) render in place of the coarse
+  band dot; the audience gate is resolved once, server-side (GM exact fill; a player's own PC exact;
+  every other combatant band-fraction; viewer band-fraction), so exact HP never reaches a non-owner.
+  Two GM-only commands `encounter.set-health-display` + `actor.set-health-display` mirror the
+  roll-mode pattern (49 command routes now). (2) **Single-source initiative:** `projectPublicInitiative`
+  carries public-only condition ids + labels, and one shared `InitiativeRow` renders the player panel
+  AND the viewer, so the two lists can't drift — the viewer now shows the same condition dots.
+  (3) **Scene-setup picker:** the flat combatant list is now pinned PCs (pre-checked) → recent
+  (server-tracked GM-only `Actor.lastUsedAt`) → searchable rest. `bandFraction`/`hpFillFraction`
+  (client, React-only, in `mapImage`) are the single fill source for the token bar/ring, the viewer,
+  and the initiative bar. **Deferred follow-up:** a "manage all scenes" browser modal (the
+  `SceneSwitcher` strip stays the quick switcher).
 
 - TypeScript monorepo: React/Vite client (`@vtt/web`) + authoritative Express + Socket.IO
   server (`@vtt/server`); packages `domain`, `rules-5e`, `schemas`, `api-contract`, `ui`,

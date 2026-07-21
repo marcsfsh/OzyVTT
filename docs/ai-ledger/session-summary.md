@@ -8,6 +8,33 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-21 — Token health display · shared initiative · scene-setup picker (three-item PR after #38)
+
+Three combat-UX items from the roadmap on one branch (`claude/vtt-combat-plan-clarify-wy9cji`), six
+green slices. Owner decisions this session: health display is BOTH a global default and a per-token
+override; recency is server-tracked; #10 goes to full parity incl. viewer condition dots; the scene
+browser is deferred.
+
+- **#11 Token health on the map:** `combat.healthDisplay {style, audience}` (table default) + optional
+  `Actor.healthDisplay` override; controls in the token right-click menu (per-token) and the encounter
+  options menu (table). A bar/ring renders instead of the coarse band dot. The audience gate is
+  resolved ONCE server-side in the projections — GM exact, own-PC exact, everyone-else band-fraction,
+  viewer band-fraction — so exact HP never reaches a non-owner (leak tests cover it). Two GM-only
+  commands mirror roll-mode; `TokenStatusBadges` gains an optional bar/ring; `bandFraction`/
+  `hpFillFraction` live in React-only `mapImage` so the viewer shares them without the socket.
+- **#10 Shared initiative:** `projectPublicInitiative` now carries public-only condition ids + labels;
+  a shared `InitiativeRow` (em-scaled, self-contained CSS) renders both the player panel and the
+  viewer, so the two lists never drift and the viewer shows the same condition dots.
+- **#2 Scene-setup picker:** flat list → pinned PCs (pre-checked) / recent (server `lastUsedAt`,
+  GM-only) / searchable rest.
+
+Verified: `npm run check` + `test` (392 server + 16 contract + others) + `build` green across all
+workspaces; `docs/api-reference.md` regenerated (freshness test green). **No live browser smoke** —
+this repo has no Playwright/browser-test harness installed, so a UI smoke would mean adding
+out-of-scope tooling; the security-critical audience gate and initiative parity are covered by server
+unit tests, and typecheck+build cover the SVG/JSX wiring. Follow-ups: the deferred "manage all scenes"
+browser modal, and adding a Playwright harness so UI slices can get the browser smoke the bar calls for.
+
 ## 2026-07-21 — Uniform dice UX: one recognizable roll experience everywhere (owner-directed; same branch/PR #38)
 
 Owner goal: after a roll or two, a player should intuitively know how to roll *anywhere* —
