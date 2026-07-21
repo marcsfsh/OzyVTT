@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResolution, ActorDefinition, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
+import { Chip } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { RollControls, type DieMode } from "./RollControls";
@@ -207,10 +208,9 @@ function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorI
     });
   };
   return <span className="effect-chips">
-    {effects.map((effect) => <span key={effect.id} className="effect-chip" title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`}>
+    {effects.map((effect) => <Chip key={effect.id} tone="info" title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`} onRemove={canEnd ? () => { if (!busy) end(effect.id, effect.name); } : undefined} removeLabel={`End ${effect.name}`}>
       {effect.name}{effect.escapeDc ? <small> DC {effect.escapeDc}</small> : null}
-      {canEnd && <button type="button" className="effect-chip-end" disabled={busy} aria-label={`End ${effect.name}`} onClick={() => end(effect.id, effect.name)}>✕</button>}
-    </span>)}
+    </Chip>)}
   </span>;
 }
 
