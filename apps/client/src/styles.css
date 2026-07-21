@@ -286,8 +286,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .home-hero-title { margin: .35rem 0 1.1rem; }
 .home-hero-title .nh-wordmark { font-size: clamp(2.6rem, 9vw, 5.5rem); line-height: .95; }
 
-/* Empty map = the hero moment built from grid + line + color, not an object (§6.5). */
-.map-empty-hero { position: relative; overflow: hidden; }
+/* Empty map = the hero moment built from grid + line + color, not an object (§6.5). It stands in for a
+   loaded battlemap, so it's sized like one — this also drives the map panel (and the --setup-h-matched
+   encounter panel beside it) to a comfortable height instead of a short stub. */
+.map-empty-hero { position: relative; overflow: hidden; min-height: min(52vh, 30rem); }
 .map-empty-hero > :not(.empty-atmos) { position: relative; z-index: 1; }
 .map-empty-hero .home-hero-bloom { top: 8%; height: 42%; opacity: .22; }
 .map-empty-hero .home-hero-grid { bottom: -14%; height: 58%; opacity: .55; }
