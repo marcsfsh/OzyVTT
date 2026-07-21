@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { projectPlayerCombat, projectPlayerView } from "../src/projections.js";
+import { projectGmView, projectPlayerCombat, projectPlayerView } from "../src/projections.js";
 import { projectViewerEncounterScene, projectViewerInitiative } from "../src/viewer-encounter.js";
+import { startEncounter } from "../src/encounter.js";
 
 const PUBLIC = "40000000-0000-4000-8000-000000000001";
 const HIDDEN = "40000000-0000-4000-8000-000000000002";
@@ -239,5 +240,19 @@ describe("shared initiative source (player == viewer)", () => {
     expect(viewer.entries.some((entry) => entry.actorId === HIDDEN)).toBe(false);
     expect(JSON.stringify(viewer)).not.toContain("Secret Lurker");
     expect(JSON.stringify(viewer)).not.toContain(HIDDEN);
+  });
+});
+
+describe("combatant recency (GM-only)", () => {
+  it("stamps lastUsedAt when an actor enters a fight and keeps it off the player projection", () => {
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [{ id: PUBLIC, name: "Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 } }]
+    });
+    startEncounter(state, { mapAssetId: MAP, entries: [{ actorId: PUBLIC, score: 12 }] }, () => 1, { width: 900, height: 600, calibration: null }, undefined, 1720000000000);
+    expect(state.actors[0].lastUsedAt).toBe(1720000000000);
+    // The GM sees recency; the player projection strips it.
+    expect(projectGmView(state, () => null).actors[0].lastUsedAt).toBe(1720000000000);
+    expect("lastUsedAt" in projectPlayerView(state, undefined, () => null).actors[0]).toBe(false);
   });
 });

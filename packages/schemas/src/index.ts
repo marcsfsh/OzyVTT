@@ -126,7 +126,9 @@ export const ActorSchema = z.object({
   /** Short-rest healing pool (SRD Hit Point Dice), seeded from the definition's hit-point formula; null = not modeled (rests behave as before). Reaches players only on their own claimed character. Additive. */
   hitDice: z.object({ die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]), maximum: z.number().int().min(1).max(40), remaining: z.number().int().min(0).max(40) }).strict().nullable().default(null),
   /** Per-token health-display override; absent = inherit the table-wide `combat.healthDisplay`. GM knowledge - resolved and audience-gated in the player/viewer projections. Additive. */
-  healthDisplay: HealthDisplaySchema.optional()
+  healthDisplay: HealthDisplaySchema.optional(),
+  /** Epoch-ms timestamp of when this actor last entered a fight (encounter start / add-combatant). Powers the scene-setup "Recent" list; GM-only, stripped from the player projection. Additive. */
+  lastUsedAt: z.number().int().nonnegative().optional()
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
