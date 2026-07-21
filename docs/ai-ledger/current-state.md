@@ -49,10 +49,16 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     per-modal head/close/box rule; the spell card keeps its violet identity via `accent="violet"`.
     The `/styleguide` gallery demos every primitive (Modal, Toast, Menu, Tooltip, Chip-with-icon,
     Tabs, motion) across all three themes — it is the complete living reference.
-    Deferred: the ⌘K command palette (its motion landed; the feature is a later pass) and the
-    full per-control swap of the remaining raw `<button>`/`<input>`/`<select>` to `Button`/`Field`/
-    `Select` components — the global element styles are already primitive-*equivalent*, so those
-    controls render identically; this is internal code hygiene with no UI/UX change, not a gap.
+  - **Full component-primitive adoption (2026-07-21, same PR).** The generic raw controls across
+    all ~16 client feature files now render as `Button`/`Input`/`Select` components (variants
+    secondary/ghost/destructive/primary) instead of raw `<button>`/`<input>`/`<select>` — done as a
+    visual-preserving swap (parallel agents + review). Genuinely-specialized controls stay
+    intentional custom components (combat CTAs, economy-slot toggles, map-tool icon buttons,
+    condition/scene chips, token/map cards, menu rows, HP/dice steppers, calibration swatches,
+    `role="group"` segmented controls) — the design system's Button/Input are for generic controls,
+    not these. Form submit buttons keep an explicit `type="submit"` (the primitive defaults to
+    `type="button"`). No CSS/logic/projection changes. Only deferred item left: the ⌘K command
+    palette (its motion already landed; the feature is a separate later pass).
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
