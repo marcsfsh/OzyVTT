@@ -10,6 +10,7 @@ import {
   Field,
   IconButton,
   Input,
+  Kbd,
   LinkButton,
   Menu,
   Meter,
@@ -17,7 +18,12 @@ import {
   Modal,
   Panel,
   PanelHeader,
+  SegmentedControl,
   Select,
+  Skeleton,
+  Stepper,
+  Steps,
+  Switch,
   Tabs,
   Textarea,
   ThemeToggle,
@@ -85,6 +91,9 @@ export function StyleGuide() {
   const [modalOpen, setModalOpen] = useState(false);
   const [entranceKey, setEntranceKey] = useState(0);
   const [filterOn, setFilterOn] = useState(false);
+  const [switchOn, setSwitchOn] = useState(true);
+  const [count, setCount] = useState(3);
+  const [seg, setSeg] = useState("all");
 
   return (
     <ToastProvider>
@@ -295,6 +304,61 @@ export function StyleGuide() {
               <span className="nh-empty-title">No maps yet</span>
               <span className="nh-empty-text">Upload a battlemap to stage encounters, or import a folder of scenes to get started.</span>
               <Button variant="primary" arrow>Upload a map</Button>
+            </div>
+          </Section>
+
+          <Section id="switch" title="Switch" blurb="On/off toggle for settings that take effect immediately (role=switch). Reach for a checkbox only inside a form that's submitted.">
+            <div className="sg-row">
+              <Switch checked={switchOn} onChange={setSwitchOn} label="Reveal to players" />
+              <Switch checked={!switchOn} onChange={(v) => setSwitchOn(!v)} label="GM-only" />
+              <Switch checked={false} onChange={() => {}} disabled aria-label="Disabled off" />
+            </div>
+          </Section>
+
+          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge.">
+            <div className="sg-row">
+              <Stepper value={count} onChange={setCount} min={1} max={6} label="Dice" />
+              <Stepper value={16} onChange={() => {}} min={1} max={20} label="STR" />
+              <Stepper value={0} onChange={() => {}} min={0} max={9} label="Spell level" />
+            </div>
+          </Section>
+
+          <Section id="segmented" title="Segmented control" blurb="Inline 'pick exactly one' for filters and mode switches. Distinct from Tabs, which swap whole views — use this for in-place option toggles.">
+            <div className="sg-row">
+              <SegmentedControl
+                ariaLabel="Map filter"
+                value={seg}
+                onChange={setSeg}
+                options={[{ value: "all", label: "All" }, { value: "battlemap", label: "Battlemaps" }, { value: "regional", label: "Regional" }, { value: "world", label: "World" }]}
+              />
+            </div>
+          </Section>
+
+          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Done steps check off; the current step glows.">
+            <Steps
+              current={1}
+              steps={[{ label: "Upload map" }, { label: "Calibrate grid" }, { label: "Verify scale" }, { label: "Save" }]}
+            />
+          </Section>
+
+          <Section id="skeleton" title="Skeleton loaders" blurb="Quiet shimmer placeholders shaped like the content they stand in for (neutralized under reduced-motion). Use while a fetch resolves.">
+            <div className="sg-skeleton-card">
+              <div className="sg-skeleton-head">
+                <Skeleton variant="circle" />
+                <div className="sg-skeleton-lines">
+                  <Skeleton variant="text" width="40%" />
+                  <Skeleton variant="text" width="65%" />
+                </div>
+              </div>
+              <Skeleton variant="block" height="6rem" />
+            </div>
+          </Section>
+
+          <Section id="kbd" title="Keyboard hints" blurb="Key caps for shortcut hints and cheat sheets. Compose several for a chord — ready for the coming command palette.">
+            <div className="sg-row">
+              <span className="sg-kbd-hint"><Kbd>⌘</Kbd><Kbd>K</Kbd> Command palette</span>
+              <span className="sg-kbd-hint"><Kbd>⌘</Kbd><Kbd>Enter</Kbd> Confirm roll</span>
+              <span className="sg-kbd-hint"><Kbd>Esc</Kbd> Close</span>
             </div>
           </Section>
 

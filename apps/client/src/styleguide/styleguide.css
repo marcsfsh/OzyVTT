@@ -29,6 +29,10 @@
 .sg-row-baseline { align-items: flex-end; }
 .sg-stack { display: flex; flex-direction: column; gap: var(--space-3); }
 .sg-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
+.sg-skeleton-card { max-width: 24rem; display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
+.sg-skeleton-head { display: flex; align-items: center; gap: var(--space-3); }
+.sg-skeleton-lines { flex: 1; display: grid; gap: var(--space-2); }
+.sg-kbd-hint { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* Swatches */
 .sg-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: var(--space-3); }

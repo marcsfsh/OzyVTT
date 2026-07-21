@@ -1,0 +1,15 @@
+.nh-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font: 600 var(--fs-xs) / 1.6 var(--font-mono);
+  white-space: nowrap;
+}
+.nh-kbd + .nh-kbd { margin-left: 3px; }
