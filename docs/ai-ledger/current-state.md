@@ -67,7 +67,11 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     to a Toast). Added `styles/patterns.css` with shared class templates `.nh-table` (content lists/
     imports), `.nh-statlist` (stat-block key-value grid), and `.nh-empty` (empty state). All
     on-palette (success = cyan, no green), theme-aware (AA in light), and demoed live in `/styleguide`
-    with their own sections. Two fixes: the theme-toggle content is now optically centred (Manrope
+    with their own sections. Six more distinct primitives followed, each its own category:
+    `Switch` (immediate on/off setting), `Stepper` (numeric −/+ spinner), `SegmentedControl` (inline
+    pick-one for filters/modes, distinct from Tabs), `Steps` (multi-step wizard progress), `Skeleton`
+    (reduced-motion-safe loading shimmer), and `Kbd` (key cap for shortcut hints / the coming ⌘K
+    palette). Two fixes: the theme-toggle content is now optically centred (Manrope
     line-box nudge), and the GM setup view's empty map hero is sized like a real battlemap so the map
     panel and the `--setup-h`-matched encounter panel are comfortably tall instead of short stubs.
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
