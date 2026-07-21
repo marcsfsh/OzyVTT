@@ -42,10 +42,17 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     popover closes on Escape and both it and the token menu use the `anim-popover` entrance; the
     two `role="group"` segmented controls (viewer tool, API language) are correctly left as groups,
     not forced into tablists. `<code>`/timestamps use the branded mono face (tabular figures), and
-    the replay/viewer/map focus rings unify onto the shared layered `--focus-ring-color`.
+    the replay/viewer/map focus rings unify onto the shared layered `--focus-ring-color`. All five
+    bespoke feature modals — scene prep, character sheet, monster browser, spell card, token
+    library — now render through the shared `Modal` primitive (native `<dialog>` focus-trap + return,
+    scrim blur, scroll-lock, `dialog-in`), retiring the three hand-rolled backdrops and every
+    per-modal head/close/box rule; the spell card keeps its violet identity via `accent="violet"`.
+    The `/styleguide` gallery demos every primitive (Modal, Toast, Menu, Tooltip, Chip-with-icon,
+    Tabs, motion) across all three themes — it is the complete living reference.
     Deferred: the ⌘K command palette (its motion landed; the feature is a later pass) and the
-    full per-control swap of the remaining ~281 raw controls (global element styles are already
-    primitive-equivalent, so they render identically — this is cleanup, not a visible gap).
+    full per-control swap of the remaining raw `<button>`/`<input>`/`<select>` to `Button`/`Field`/
+    `Select` components — the global element styles are already primitive-*equivalent*, so those
+    controls render identically; this is internal code hygiene with no UI/UX change, not a gap.
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
