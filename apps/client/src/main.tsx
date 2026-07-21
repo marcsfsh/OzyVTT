@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "./styles.css";
@@ -65,6 +65,22 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   const { confirm, dialog } = useConfirm();
+  // Undocked setup: the encounter-setup panel is sized to the map/scene panel's exact height (its
+  // combatant list scrolls inside). We measure that panel live and publish it as `--setup-h` on the
+  // grid, which the setup panel reads; the ResizeObserver keeps it in step as the map column reflows
+  // (async image load, window resize, combat toggling). A callback ref binds it whenever the panel
+  // mounts, without depending on render order.
+  const tableObserverRef = useRef<ResizeObserver | null>(null);
+  const measureTablePanel = useCallback((section: HTMLElement | null) => {
+    tableObserverRef.current?.disconnect();
+    tableObserverRef.current = null;
+    if (!section) return;
+    const layout = section.closest(".table-layout") as HTMLElement | null;
+    const apply = () => layout?.style.setProperty("--setup-h", `${section.offsetHeight}px`);
+    apply();
+    tableObserverRef.current = new ResizeObserver(apply);
+    tableObserverRef.current.observe(section);
+  }, []);
 
   const fail = (text: string) => setNotice({ tone: "error", text });
   const succeed = (text: string) => setNotice({ tone: "success", text });
@@ -225,7 +241,7 @@ function App() {
       </nav>}
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
-        <section className="table">
+        <section className="table" ref={measureTablePanel}>
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
               Guarded on the field, not just the mode - the first state after login can still be
               player-projected (no scenes) until the session join lands. */}

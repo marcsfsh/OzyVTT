@@ -12,7 +12,7 @@
 .viewer-pairing button { width: 100%; margin-top: 1.5rem; padding: 1rem; border: 0; border-radius: .6rem; background: #a76724; color: #fff; font-weight: 800; cursor: pointer; }
 .viewer-pairing button:focus-visible, .viewer-pairing input:focus-visible, .viewer-fullscreen:focus-visible { outline: 4px solid #f6c452; outline-offset: 3px; }
 .viewer-feedback { min-height: 1.5rem; color: #ffb3a8 !important; }
-.viewer-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) clamp(16rem, 22vw, 30rem); background: #050504; }
+.viewer-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--viewer-initiative-width, clamp(16rem, 22vw, 30rem)); background: #050504; }
 .viewer-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; cursor: grab; touch-action: none; }
 .viewer-stage:active { cursor: grabbing; }
 .viewer-stage svg { width: 100%; height: 100%; background: #0d0b08; }
@@ -33,7 +33,13 @@
 .viewer-distance, .viewer-ping-label { position: absolute; padding: .45rem .75rem; border-radius: .45rem; background: rgb(8 7 5 / 88%); color: #fff2c4; font-size: clamp(1rem, 2vw, 1.6rem); font-weight: 800; box-shadow: 0 2px 12px #000; }
 .viewer-distance { left: 50%; bottom: 2rem; transform: translateX(-50%); }
 .viewer-ping-label { top: 2rem; left: 50%; transform: translateX(-50%); }
-.viewer-initiative { overflow: auto; border-left: 1px solid #5d4b31; background: #17130d; padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
+/* Drag-resizable column: the panel holds a pinned resize handle at its left edge; the content scrolls
+   inside a wrapper so the handle never scrolls away. */
+.viewer-initiative { position: relative; overflow: hidden; border-left: 1px solid #5d4b31; background: #17130d; }
+.viewer-initiative-scroll { height: 100%; overflow: auto; padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
+.viewer-initiative-resize { position: absolute; z-index: 3; left: 0; top: 0; bottom: 0; width: 14px; cursor: col-resize; touch-action: none; }
+.viewer-initiative-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: #5d4b31; transition: background .15s, width .15s; }
+.viewer-initiative-resize:hover::before, .viewer-initiative-resize:active::before { background: #e8a743; width: 4px; }
 /* The shared screen mirrors the PLAYER panel (feedback #5): a compact Round-pill header, no big serif,
    scaled up for the room. It reads as a player with no active turn - no HP bars, no controls. */
 .viewer-initiative-head { position: sticky; top: 0; z-index: 1; padding: clamp(.9rem, 2vw, 2rem) 0 clamp(.6rem, 1.2vw, 1.1rem); background: #17130d; }
@@ -46,13 +52,16 @@
 .viewer-initiative li strong { color: #f6c452; }
 /* The shared row scales up for the room display; its em-relative styles handle the rest (sized so a
    typical monster name, dots, and the health tag share one line in the sidebar). */
-.viewer-initiative .init-row { font-size: clamp(.95rem, 1.2vw, 1.35rem); }
+.viewer-initiative .init-row { font-size: clamp(.9rem, 1.05vw, 1.2rem); }
+/* Give the name the row's full first line before it ellipsizes; dots/health wrap beneath it. Widen
+   the panel (drag handle) when a room needs more. */
+.viewer-initiative .init-row-name { min-width: 0; }
 .viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid #756344; border-radius: .45rem; background: rgb(10 8 5 / 75%); color: #eee4d2; cursor: pointer; opacity: .25; }
 .viewer-fullscreen:hover, .viewer-fullscreen:focus-visible { opacity: 1; }
 .viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: 999px; background: #173a20; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-connection.reconnecting { background: #644715; }
 @keyframes viewer-pulse { from { opacity: 1; transform: scale(.45); } to { opacity: 0; transform: scale(1.25); } }
-@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; border-left: 0; border-top: 1px solid #5d4b31; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid #393020; } .viewer-connection { right: 1rem; } }
+@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; overflow: auto; border-left: 0; border-top: 1px solid #5d4b31; } .viewer-initiative-scroll { height: auto; overflow: visible; } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid #393020; } .viewer-connection { right: 1rem; } }
 @media (prefers-reduced-motion: reduce) { .viewer-ping circle { animation: none; } }
 /* Health band + conditions on the shared screen (bands only, never exact numbers). */
 .viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem .5rem; border-radius: 999px; font: 800 .55em/1.6 sans-serif; letter-spacing: .05em; vertical-align: middle; }

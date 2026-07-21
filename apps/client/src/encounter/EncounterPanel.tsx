@@ -567,7 +567,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     {/* Docking the tracker to the map is available before AND during combat (report #9). */}
     <DockPicker dock={dock} />
     {!state.combat.active ? <>
-      <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically - drag them from the tray onto the map.</p>
       {/* The battlemap is picked right here - starting a fight never requires a Maps-tab visit
           (upload/calibration still live there). */}
       <label className="encounter-map">

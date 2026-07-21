@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
+import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph, annotationCenter, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
@@ -661,9 +661,13 @@ export function EncounterMap({
             // GM resolves the effective style (token override, else the table default); a player gets
             // only the server-resolved style, present when the GM aimed a bar/ring at everyone.
             const healthStyle = role === "gm" ? (actor.healthDisplay?.style ?? healthDisplay?.style ?? "band") : actor.healthDisplay?.style;
-            const healthBar: { style: "bar" | "ring" | "aura"; fraction: number } | undefined = healthStyle && healthStyle !== "band" ? { style: healthStyle, fraction: hpFillFraction(actor.hp) } : undefined;
+            const healthFraction = hpFillFraction(actor.hp);
+            const healthBar: { style: "bar" | "ring"; fraction: number } | undefined = healthStyle === "bar" || healthStyle === "ring" ? { style: healthStyle, fraction: healthFraction } : undefined;
+            // The aura paints UNDER the token so the body + active-turn ring stay crisp on top of it.
+            const auraFraction = healthStyle === "aura" ? healthFraction : undefined;
             return <g key={actor.id} data-token-id={actor.id} transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`} className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging?.actorId === actor.id ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`} role={movable ? "button" : "img"} tabIndex={movable ? 0 : undefined} aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`} aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined} onKeyDown={movable ? (event) => keyboardMove(event, encounterToken) : undefined}>
               <title>{actor.name}{actor.visibility === "gm-only" ? " (hidden from players)" : ""}</title>
+              {auraFraction !== undefined && <TokenHealthAura sizePx={encounterToken.sizePx} fraction={auraFraction} />}
               <AuthorizedTokenGlyph assetId={actor.tokenAssetId ?? null} token={token} sizePx={encounterToken.sizePx} name={actor.name} active={active} turnClassName="encounter-token-turn" bodyClassName="encounter-token-body" initialsClassName="encounter-token-initials" nameClassName="encounter-token-name" nameY={encounterToken.sizePx * .72} initialsStyle={{ fontSize: Math.max(10, encounterToken.sizePx * .34) }} nameStyle={{ fontSize: Math.max(9, encounterToken.sizePx * .23) }} />
               <TokenStatusBadges sizePx={encounterToken.sizePx} health={band} conditions={actor.conditions.map((condition) => ({ id: condition.id, label: conditionBadgeLabel(condition) }))} healthBar={healthBar} />
             </g>;

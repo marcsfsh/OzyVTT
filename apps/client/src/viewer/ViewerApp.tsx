@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { bandFraction, FogOverlay, probeImageDimensions, TokenGlyph, TokenStatusBadges } from "../scene/mapImage";
+import { bandFraction, FogOverlay, probeImageDimensions, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/mapImage";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
 import "./viewer.css";
@@ -54,7 +54,8 @@ function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
   </form></main>;
 }
 
-export function Initiative({ presentation }: Readonly<{ presentation: Presentation }>) {
+export function Initiative({ presentation, onResize }: Readonly<{ presentation: Presentation; onResize?: (width: number) => void }>) {
+  const asideRef = useRef<HTMLElement | null>(null);
   if (!presentation.initiative.visible) return null;
   // Identical to the player's list (feedback #5): active combatant on top, the rest in turn order, the
   // compact Round-pill header - no HP bars, no controls (the viewer has no claimed character). Scaled up
@@ -62,12 +63,27 @@ export function Initiative({ presentation }: Readonly<{ presentation: Presentati
   const { entries, round, hiddenTurn } = presentation.initiative;
   const activeIndex = entries.findIndex((entry) => entry.active);
   const ordered = activeIndex > 0 ? [...entries.slice(activeIndex), ...entries.slice(0, activeIndex)] : entries;
-  return <aside className="viewer-initiative" aria-label={`Initiative, round ${round}`}>
-    <div className="viewer-initiative-head"><strong className="viewer-initiative-round">Round {round}</strong></div>
-    {hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
-    <ol>{ordered.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
-      <InitiativeRow entry={{ actorId: entry.actorId, name: entry.name, score: entry.initiative, active: entry.active, health: entry.health ?? "healthy", conditionIds: entry.conditionIds, conditions: entry.conditions }} />
-    </li>)}</ol>
+  // Drag the left edge to widen/narrow the column (persisted by the caller). Dragging left grows it,
+  // since it's the right-hand column; clamp to a legible minimum and 60% of the screen.
+  const startResize = (event: React.PointerEvent) => {
+    if (!onResize) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = asideRef.current?.offsetWidth ?? 320;
+    const onMove = (move: PointerEvent) => onResize(Math.max(240, Math.min(window.innerWidth * 0.6, startWidth + (startX - move.clientX))));
+    const onUp = () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  return <aside ref={asideRef} className="viewer-initiative" aria-label={`Initiative, round ${round}`}>
+    {onResize && <div className="viewer-initiative-resize" role="separator" aria-orientation="vertical" aria-label="Drag to resize the initiative panel" onPointerDown={startResize} />}
+    <div className="viewer-initiative-scroll">
+      <div className="viewer-initiative-head"><strong className="viewer-initiative-round">Round {round}</strong></div>
+      {hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
+      <ol>{ordered.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
+        <InitiativeRow entry={{ actorId: entry.actorId, name: entry.name, score: entry.initiative, active: entry.active, health: entry.health ?? "healthy", conditionIds: entry.conditionIds, conditions: entry.conditions }} />
+      </li>)}</ol>
+    </div>
   </aside>;
 }
 
@@ -157,8 +173,9 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
         return <AnnotationGlyph key={annotation.id} data={data} arrowSize={arrowSize} color={annotation.color} />;
       })}
       {tokens.map((token) => <g className={`viewer-token ${token.kind}${token.active ? " active" : ""}`} key={token.actorId} transform={`translate(${token.position.x} ${token.position.y})`}>
+        {token.healthDisplay?.style === "aura" && <TokenHealthAura sizePx={token.sizePx} fraction={bandFraction(token.health ?? "healthy")} />}
         <TokenGlyph sizePx={token.sizePx} name={token.name} active={token.active} imageUrl={token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null} turnClassName="viewer-token-turn" bodyClassName="viewer-token-body" initialsClassName="viewer-token-initials" nameClassName="viewer-token-name" nameY={token.sizePx * .78} />
-        <TokenStatusBadges sizePx={token.sizePx} health={token.health ?? "healthy"} conditions={(token.conditions ?? []).map((label, index) => ({ id: token.conditionIds?.[index] ?? null, label }))} healthBar={token.healthDisplay ? { style: token.healthDisplay.style, fraction: bandFraction(token.health ?? "healthy") } : undefined} />
+        <TokenStatusBadges sizePx={token.sizePx} health={token.health ?? "healthy"} conditions={(token.conditions ?? []).map((label, index) => ({ id: token.conditionIds?.[index] ?? null, label }))} healthBar={token.healthDisplay && token.healthDisplay.style !== "aura" ? { style: token.healthDisplay.style, fraction: bandFraction(token.health ?? "healthy") } : undefined} />
       </g>)}
       {measurementPoints && <polyline className="viewer-measurement" points={measurementPoints} />}
       {presentation.pings.map((ping) => <g className="viewer-ping" key={ping.id} transform={`translate(${ping.point.x} ${ping.point.y})`}>
@@ -183,6 +200,13 @@ export function ViewerApp() {
   const [presentation, setPresentation] = useState<Presentation | null>(null);
   const [message, setMessage] = useState("");
   const sourceRef = useRef<EventSource | null>(null);
+  // The initiative column is drag-resizable (persisted), like the GM's docked tracker - so a room can
+  // widen it until long names fit instead of ellipsizing.
+  const [initiativeWidth, setInitiativeWidth] = useState<number | null>(() => {
+    const stored = Number(localStorage.getItem("vtt.viewer-initiative-width"));
+    return Number.isFinite(stored) && stored >= 240 ? stored : null;
+  });
+  const resizeInitiative = (width: number) => { setInitiativeWidth(width); localStorage.setItem("vtt.viewer-initiative-width", String(Math.round(width))); };
 
   const connect = async () => {
     setConnection("connecting"); setMessage(""); sourceRef.current?.close();
@@ -206,10 +230,10 @@ export function ViewerApp() {
   if (connection === "pairing") return <Pairing onPaired={() => void connect()} />;
   if (!presentation) return <main className="viewer-waiting"><span className="viewer-eyebrow">SHARED TABLE VIEWER</span><h1>{connection === "reconnecting" ? "Reconnecting…" : "Connecting…"}</h1><p role="alert">{message}</p></main>;
   if (!presentation.enabled) return <main className="viewer-waiting"><span className="viewer-eyebrow">VIEWER CONNECTED</span><h1>Presentation paused</h1><p>The GM will begin when the table is ready.</p></main>;
-  return <main className="viewer-shell">
+  return <main className="viewer-shell" style={initiativeWidth ? ({ "--viewer-initiative-width": `${initiativeWidth}px` } as React.CSSProperties) : undefined}>
     <button className="viewer-fullscreen" onClick={() => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()}>Fullscreen</button>
     <div className={`viewer-connection ${connection}`} role="status">{connection === "live" ? "Live" : "Reconnecting"}</div>
     <MapStage presentation={presentation} />
-    <Initiative presentation={presentation} />
+    <Initiative presentation={presentation} onResize={resizeInitiative} />
   </main>;
 }

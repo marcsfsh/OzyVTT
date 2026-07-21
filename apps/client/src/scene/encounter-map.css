@@ -183,8 +183,9 @@
 .token-context-hp button { flex: 1; text-align: center; }
 .token-context-item { text-align: left; }
 .token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: #e8a743; }
-.token-context-size { display: flex; align-items: center; gap: .5rem; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.token-context-size select { flex: 1; margin: 0; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
+/* Fixed label column so the Size / Health / Show-to selects all share one width and left edge. */
+.token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: .5rem; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+.token-context-size select { width: 100%; margin: 0; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
 .token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
 /* Conditions collapse into a Size-styled disclosure (native <details>) under the Health dropdown. */
 .token-context-conditions { display: grid; gap: .3rem; margin-top: .1rem; }
