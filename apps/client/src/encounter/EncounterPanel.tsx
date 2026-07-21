@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ActionResolution, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ActionResolution, ActorDefinition, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
@@ -290,6 +290,42 @@ function OwnDyingTracker({ actorId, name, deathSaves, rollMode, isActingTurn }: 
   </div>;
 }
 
+/**
+ * A player's read-only view of their own attacks on their turn - the same rows the GM's action console
+ * shows (name + to-hit / reach / range / damage), sourced from their projected stat block. No rolling
+ * here: the GM still resolves attacks (the server authorizes that), so this is a reference, not a
+ * control surface.
+ */
+function PlayerActionList({ definition }: Readonly<{ definition: ActorDefinition }>) {
+  const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
+  const nameOf = (id: string) => definition.actions.find((candidate) => candidate.id === id)?.name ?? id;
+  const linesFor = (action: ActorDefinition["actions"][number]): string[] => {
+    const parts: string[] = [];
+    if (action.attack) parts.push(`${signed(action.attack.bonus)} to hit${action.attack.reachFeet ? `, reach ${action.attack.reachFeet} ft` : action.attack.rangeFeet ? `, range ${action.attack.rangeFeet} ft` : ""}`);
+    if (action.attack?.count && action.attack.count > 1) parts.push(`${action.attack.count} attacks`);
+    if (action.multiattack) parts.push(action.multiattack.map((component) => `${component.count}× ${nameOf(component.actionId)}`).join(" + "));
+    if (action.save) parts.push(`DC ${action.save.dc} ${action.save.ability.toUpperCase()} save`);
+    for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
+    return parts;
+  };
+  const combatActions = definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0 || action.multiattack);
+  if (combatActions.length === 0) return null;
+  return <div className="action-runner player-actions">
+    <p className="player-actions-label">Your actions <span>· the GM rolls these</span></p>
+    <ul className="action-list">
+      {combatActions.map((action) => {
+        const parts = linesFor(action);
+        return <li key={action.id}>
+          <div className="action-row action-row-readonly" title={action.description}>
+            <strong className="action-row-name">{action.name}</strong>
+            {parts.length > 0 && <ul className="action-row-summary">{parts.map((part) => <li key={part}>{part}</li>)}</ul>}
+          </div>
+        </li>;
+      })}
+    </ul>
+  </div>;
+}
+
 /** A player's own economy: Action/Bonus live only on their turn; the reaction is an off-turn resource, markable any time. Pressed = spent. */
 function PlayerTurnEconomy({ combat, myId, myTurn, mySpeedFeet }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
   const [busy, setBusy] = useState(false);
@@ -345,6 +381,8 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {/* Foundry-style row shared with the shared-screen viewer so the two lists never drift. */}
           <InitiativeRow entry={entry} self={isMe} />
           {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
+          {/* On your turn, the same read-only attack list the GM sees for the active creature (#5.2, read-only). */}
+          {isMe && myTurn && rowActor?.definition && <PlayerActionList definition={rowActor.definition} />}
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}

@@ -173,6 +173,11 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 /* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
 .action-runner { margin-top: .6rem; }
 .action-runner-status { color: #a69e91; font-size: .8rem; margin: .4rem 0; }
+/* Read-only player attack reference (#5.2): the GM's action rows without the interactivity. */
+.player-actions { margin-top: .45rem; }
+.player-actions-label { margin: 0 0 .3rem; color: #a69e91; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.player-actions-label span { color: #7f7768; font-weight: 700; text-transform: none; letter-spacing: normal; }
+.action-row.action-row-readonly, .action-row.action-row-readonly:hover { cursor: default; background: #221d15; border-color: #4d4534; border-left-color: #9e6121; }
 .action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
 /* Rollable stat-block actions read as real buttons (report #6): a border + raised fill + left accent
    so it's obvious they're tappable. The name sits on its own line with the mechanics stacked as
