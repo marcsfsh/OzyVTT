@@ -7,6 +7,7 @@ import {
   Field,
   IconButton,
   Input,
+  LinkButton,
   Menu,
   MenuItem,
   Modal,
@@ -23,7 +24,7 @@ import {
   type TabItem
 } from "@vtt/ui";
 
-/** Living style guide for the Neon Horizon design system. Dev-only reference
+/** Living style guide for the OzyVTT design system. Dev-only reference
     (its own Vite entry, styleguide.html); renders every token, type role, and
     primitive with its states, and switches themes live. Keep it current: a new
     primitive isn't done until it appears here. */
@@ -78,13 +79,15 @@ export function StyleGuide() {
   const [tab, setTab] = useState("encounter");
   const [vtab, setVtab] = useState("encounter");
   const [modalOpen, setModalOpen] = useState(false);
+  const [entranceKey, setEntranceKey] = useState(0);
+  const [filterOn, setFilterOn] = useState(false);
 
   return (
     <ToastProvider>
       <div className="sg">
         <header className="sg-header surface-frost">
           <div className="sg-header-brand">
-            <Wordmark>Neon Horizon</Wordmark>
+            <Wordmark>OzyVTT</Wordmark>
             <Eyebrow>Design system reference</Eyebrow>
           </div>
           <ThemeToggle />
@@ -114,7 +117,7 @@ export function StyleGuide() {
 
           <Section id="type" title="Typography" blurb="Arcade voice is fenced to the wordmark and top titles; body and mono stay neutral and legible.">
             <div className="sg-type-rows">
-              <div className="sg-type-row"><Wordmark>Neon Horizon</Wordmark><code>--font-wordmark · wordmark only</code></div>
+              <div className="sg-type-row"><Wordmark>OzyVTT</Wordmark><code>--font-wordmark · wordmark only</code></div>
               <div className="sg-type-row"><span className="sg-display">Display / dice totals</span><code>--font-display · Russo One</code></div>
               <div className="sg-type-row"><span className="sg-body-sample">Body — stat blocks, chat, forms, controls stay in the neutral body face.</span><code>--font-body · Manrope</code></div>
               <div className="sg-type-row"><span className="tabular sg-mono-sample">2d6+3 · HP 42/58 · +5</span><code>--font-mono · Space Mono, tabular</code></div>
@@ -144,6 +147,11 @@ export function StyleGuide() {
               <IconButton label="Ping">📍</IconButton>
               <IconButton label="Measure">📏</IconButton>
               <IconButton label="Fog" aria-pressed>🌫</IconButton>
+            </div>
+            <div className="sg-row">
+              <Button variant="primary" arrow>Start encounter</Button>
+              <Button variant="secondary" arrow>Open sheet</Button>
+              <Button variant="secondary" lift>Lift on hover</Button>
             </div>
           </Section>
 
@@ -204,6 +212,7 @@ export function StyleGuide() {
               <Chip tone="magical" icon="✷" atRisk>Concentration at risk</Chip>
               <Chip tone="info" icon="•">Hidden</Chip>
               <Chip tone="harmful" icon="☠" onRemove={() => {}} removeLabel="Remove poisoned">Removable</Chip>
+              <Chip tone="magical" icon="✷" pressed={filterOn} onClick={() => setFilterOn((v) => !v)}>Toggle (pressable)</Chip>
             </div>
           </Section>
 
@@ -237,6 +246,29 @@ export function StyleGuide() {
               <div className="sg-texture static-noise"><span>static-noise</span></div>
               <div className="sg-texture sg-grid-demo"><div className="grid-floor" /><span>grid-floor</span></div>
             </div>
+          </Section>
+
+          <Section id="motion" title="Motion & interaction" blurb="One easing (--ease-settle), tiered durations. Smooth the moments that change context; leave dense lists alone. Nothing pulses; reduced-motion neutralizes all of it.">
+            <h3 className="sg-h3">Hover-lift cards — hover them</h3>
+            <div className="sg-grid3">
+              <Panel interactive><PanelHeader eyebrow="Card" title="Lifts + presses" /><p className="sg-muted">translateY(-2px) + shadow on hover, settles flush on press.</p></Panel>
+              <Panel lift><PanelHeader eyebrow="Card" title="Lift only" /><p className="sg-muted">Rises on hover without the press inversion.</p></Panel>
+              <Panel><PanelHeader eyebrow="Card" title="Static" /><p className="sg-muted">Resting surface — no motion.</p></Panel>
+            </div>
+            <h3 className="sg-h3">Forward-nav arrows — hover them</h3>
+            <div className="sg-row">
+              <Button variant="primary" arrow>Start encounter</Button>
+              <Button variant="secondary" arrow>Open sheet</Button>
+              <LinkButton variant="ghost" arrow href="#motion">Jump to section</LinkButton>
+            </div>
+            <h3 className="sg-h3">Entrance vocabulary</h3>
+            <div className="sg-row">
+              <Button variant="secondary" onClick={() => setEntranceKey((k) => k + 1)}>Replay entrance</Button>
+            </div>
+            <div key={entranceKey} className="anim-view sg-state-box" style={{ marginTop: "var(--space-3)", minWidth: "16rem" }}>anim-view · fade + 7px drift</div>
+            <p className="sg-muted" style={{ marginTop: "var(--space-4)" }}>
+              Press feedback rides every control; disclosure carets rotate; dialogs pop (fade + 8px drift + scale), menus slide from the trigger side, mobile sheets rise. Dense, frequently-re-rendered lists (initiative rows, combat log, token list) never animate — press-only.
+            </p>
           </Section>
         </main>
       </div>

@@ -177,7 +177,7 @@ export function hpFillFraction(hp: { current: number; maximum: number; temporary
   return exact.maximum > 0 ? Math.max(0, Math.min(1, exact.current / exact.maximum)) : 0;
 }
 
-/** Health fraction -> a Neon Horizon fill: cyan healthy (>50%), magenta bloodied (25-50%), danger
+/** Health fraction -> a themed palette fill: cyan healthy (>50%), magenta bloodied (25-50%), danger
  * critical (<25%), matching the HP-bar bands in §6.7 and the initiative row's hp-* text classes.
  * Fixed hexes (not CSS custom properties) because SVG presentation attributes don't resolve var(). */
 export function healthFillColor(fraction: number): string {

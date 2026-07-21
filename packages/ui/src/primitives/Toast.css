@@ -31,5 +31,5 @@
 .nh-toast--error .nh-toast-icon { color: var(--danger-hi); }
 .nh-toast--info .nh-toast-icon { color: var(--info); }
 .nh-toast-message { flex: 1; font-size: var(--fs-sm); line-height: 1.4; }
-.nh-toast-close { flex: none; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+.nh-toast-close { flex: none; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; transition: color var(--dur-hover); }
 .nh-toast-close:hover { color: var(--text); }

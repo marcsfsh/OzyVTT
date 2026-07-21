@@ -1,4 +1,4 @@
-/* @vtt/ui — the shared Neon Horizon design system: tokens (see styles/), theme
+/* @vtt/ui — the shared OzyVTT design system: tokens (see styles/), theme
    control, and accessible UI primitives. Consumed as source by the client's Vite
    build (mirrors @vtt/domain). Import the stylesheet once per app entry:
      import "@vtt/ui/styles.css";

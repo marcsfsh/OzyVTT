@@ -220,7 +220,7 @@ function App() {
     {mode === "home" && <header className="home-hero scanlines anim-view">
       <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
       <span className="eyebrow">Your table</span>
-      <h1 className="home-hero-title"><Wordmark>Neon Horizon</Wordmark></h1>
+      <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
       <p>Combat-first D&amp;D 5e, hosted by your group. Table ready.</p>
       <div className="home-theme-switch"><ThemeToggle /></div>
     </header>}

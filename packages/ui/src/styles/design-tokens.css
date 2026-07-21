@@ -1,5 +1,5 @@
 /* ============================================================
-   Neon Horizon: Design Tokens
+   OzyVTT: Design Tokens
    Retrowave / synthwave, magenta-to-blue, for a D&D 5e VTT.
    Import once at the app root. Reference these variables in
    components. Do not hardcode hex values elsewhere.
@@ -11,7 +11,7 @@
 
 :root {
   /* ---- Brand ---- */
-  --brand-name: "Neon Horizon";
+  --brand-name: "OzyVTT";
 
   /* =========================================================
      THEME: DARK (default). Lifted deep indigo/purple, not black.
@@ -261,6 +261,24 @@ html {
 }
 .interactive:active { transform: translateY(0.5px); }
 
+/* Hover-lift for genuine CARDS (never dense/re-rendered list rows — §7.3): the card rises
+   on hover with a deeper shadow, and settles flush on press. Compose freely with .interactive. */
+.lift {
+  transition:
+    transform var(--dur-hover) var(--ease-settle),
+    box-shadow var(--dur-hover),
+    border-color var(--dur-hover),
+    background var(--dur-hover);
+}
+.lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.lift:active { transform: translateY(0); }
+
+/* Forward-nav nudge (7.5): a trailing arrow glyph that slides 2px when its control is
+   hovered or focused. Put <span class="nav-arrow">→</span> at the end of the label. */
+.nav-arrow { display: inline-block; transition: transform var(--dur-press) var(--ease-settle); }
+button:hover .nav-arrow, a:hover .nav-arrow, [role="button"]:hover .nav-arrow, .lift:hover .nav-arrow,
+button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: translateX(2px); }
+
 /* Frosted floating/sticky surfaces (7.8). Keep panel mostly opaque. */
 .surface-frost {
   background: color-mix(in srgb, var(--surface-2) 88%, transparent);
@@ -404,8 +422,10 @@ html {
 @keyframes dialog-in  { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
 @keyframes backdrop-in{ from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheet-up   { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes panel-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .anim-view    { animation: view-in    var(--dur-enter) var(--ease-settle) both; }
+.anim-panel   { animation: panel-fade var(--dur-base)  ease both; }
 .anim-popover { animation: popover-in var(--dur-base)  var(--ease-settle) both; }
 .anim-dialog  { animation: dialog-in  var(--dur-base)  var(--ease-settle) both; }
 .anim-dialog::backdrop { animation: backdrop-in var(--dur-base) ease both; }

@@ -10,14 +10,28 @@ export interface PanelProps extends HTMLAttributes<HTMLElement> {
   accent?: PanelAccent;
   /** Frosted, semi-transparent surface for sticky/floating panels (§7.8). */
   frost?: boolean;
+  /** Clickable card: adds press feedback + a hover-lift. */
+  interactive?: boolean;
+  /** Hover-lift only (no press inversion). */
+  lift?: boolean;
+  /** One-shot entrance animation when the panel mounts. */
+  entrance?: boolean;
 }
 
 /** Resting surface: surface-1, 1px line, radius-md, no glow. A panel glows only
     while it is the active target (add .is-active-turn / .is-selected then). */
-export function Panel({ accent = "none", frost = false, className, children, ...rest }: PanelProps) {
+export function Panel({ accent = "none", frost = false, interactive = false, lift = false, entrance = false, className, children, ...rest }: PanelProps) {
   return (
     <section
-      className={cx("nh-panel", accent !== "none" && `nh-panel--accent-${accent}`, frost && "surface-frost", className)}
+      className={cx(
+        "nh-panel",
+        accent !== "none" && `nh-panel--accent-${accent}`,
+        frost && "surface-frost",
+        interactive && "interactive",
+        (interactive || lift) && "lift",
+        entrance && "anim-view",
+        className
+      )}
       {...rest}
     >
       {children}

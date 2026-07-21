@@ -22,7 +22,7 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
-- **UI design system: Neon Horizon (2026-07-21).** A tokenized retrowave design language is the
+- **UI design system: OzyVTT (2026-07-21).** A tokenized retrowave design language is the
   single source of look-and-feel, living in `packages/ui` (`design-tokens.css` + self-hosted
   `@fontsource` fonts + `nh-`-namespaced primitives), consumed as source by the client's Vite
   entries via `import "@vtt/ui/styles.css"`. Three themes (dark default, dusk, light) via

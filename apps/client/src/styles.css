@@ -1,4 +1,4 @@
-/* App shell + shared surfaces, migrated to the Neon Horizon tokens (@vtt/ui).
+/* App shell + shared surfaces, migrated to the OzyVTT tokens (@vtt/ui).
    Base surface/text/body type come from the token `body` rule; the theme root is
    data-theme on <html>. Layout is unchanged; only color/type/radius/state moved
    to tokens. Reusable controls should prefer the @vtt/ui primitives; these legacy

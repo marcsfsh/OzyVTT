@@ -1,4 +1,4 @@
-# Neon Horizon: Design Language
+# OzyVTT: Design Language
 
 A visual identity for a D&D 5e (2024) virtual tabletop. The aesthetic is
 retrowave / synthwave in a magenta-to-blue range, grounded in deep indigo-black
@@ -14,8 +14,9 @@ not the point and should not be leaned on. A screen with no sun and no palm tree
 is still fully on brand if the grid, the line, the texture, and the color are
 right.
 
-> Rename freely. "Neon Horizon" is a working name. If you change it, update the
-> `--brand-*` references and this heading only.
+> The app and its design system are named **OzyVTT** (retrowave aesthetic codename
+> "Neon Horizon" was the earlier working title). If you rename, update the
+> `--brand-*` references and this heading.
 
 ---
 

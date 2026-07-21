@@ -10,6 +10,7 @@
   background: var(--surface-3);
   color: var(--text);
   font: 400 var(--fs-body) / 1.4 var(--font-body);
+  transition: border-color var(--dur-hover), box-shadow var(--dur-hover), background var(--dur-hover);
 }
 .nh-input::placeholder { color: var(--text-muted); }
 .nh-input:hover:not(:disabled) { border-color: var(--line-strong); }
