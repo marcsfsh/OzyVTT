@@ -95,7 +95,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   // In fullscreen, only the fullscreen element's subtree renders - portal into it (not document.body,
   // which is hidden) so the menu is visible. Falls back to body when not in fullscreen.
   return createPortal(
-    <div ref={ref} className="token-context-menu" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
+    <div ref={ref} className="token-context-menu anim-popover" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
       <div className="token-context-head"><strong>{actor.name}</strong><button type="button" aria-label="Close menu" onClick={onClose}>✕</button></div>
       {role === "gm" && <div className="token-context-hp" role="group" aria-label="Adjust hit points">
         <input type="number" min="1" max="1000" placeholder="HP" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />

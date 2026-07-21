@@ -416,6 +416,14 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  // Close the ⋯ options popover on Escape, matching the token menu and the Menu primitive (it already
+  // closes on outside-click via the backdrop). Rich content keeps it a bespoke popover, not a Menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
   // A legendary creature acting off-turn (SRD Legendary Actions): the acting console temporarily
   // switches to it; cleared whenever the real turn advances.
   const [legendaryActingId, setLegendaryActingId] = useState<string | null>(null);
@@ -661,7 +669,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         <button type="button" className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Encounter options - rules mode, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && <>
           <div className="encounter-overlay-backdrop" onPointerDown={() => setMenuOpen(false)} />
-          <div className="encounter-menu" role="menu" aria-label="Encounter options">
+          <div className="encounter-menu anim-popover" role="menu" aria-label="Encounter options">
             <label className="rules-mode-control">Rules
               <select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules mode: ${mode}.` : result.message ?? "The rules mode could not be changed.")); }}>
                 <option value="strict">Strict - block invalid actions (override available)</option>
