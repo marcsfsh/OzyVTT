@@ -210,8 +210,8 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         <td>{when(archive.endedAt)}</td>
         <td>{archive.turnCount}</td>
         <td className="replay-row-actions">
-          <button onClick={() => setOpen(archive)}>▶ Watch</button>
-          <button className="secondary" onClick={() => exportArchive(archive)} disabled={exporting === archive.id} title="Download the full machine-readable record as JSON.">{exporting === archive.id ? "Exporting…" : "⬇ Export"}</button>
+          <Button variant="secondary" onClick={() => setOpen(archive)}>▶ Watch</Button>
+          <Button variant="secondary" onClick={() => exportArchive(archive)} disabled={exporting === archive.id} title="Download the full machine-readable record as JSON.">{exporting === archive.id ? "Exporting…" : "⬇ Export"}</Button>
         </td>
       </tr>)}</tbody>
     </table>}

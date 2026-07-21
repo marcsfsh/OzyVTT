@@ -361,7 +361,7 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
             <span className="api-lang-label">Language</span>
             {LANGUAGES.map((entry) => <button key={entry.id} type="button" aria-pressed={language === entry.id} onClick={() => setLanguage(entry.id)}>{entry.label}</button>)}
           </div>
-          <button type="button" className="secondary api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</button>
+          <Button variant="secondary" className="api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</Button>
         </div>
         <p className="api-reference-count">{operationCount} operations across {Object.keys(document.paths).length} paths. Example values are synthetic - real ids come from the game state.</p>
         {GROUPS.map((group) => {
