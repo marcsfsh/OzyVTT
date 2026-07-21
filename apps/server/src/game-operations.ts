@@ -616,7 +616,7 @@ export function createGameOperations(context: GameOperationsContext) {
     async actionResolve(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can resolve stat-block actions.");
       const request = parse(ActionResolveSchema, raw, "The action command is malformed.", true);
-      const { commandId, actorId, actionId, targetIds, template, conditionId, rollMode, override, expectedRevision } = request;
+      const { commandId, actorId, actionId, targetIds, template, conditionId, rollMode, override, commit, attackNatural, expectedRevision } = request;
       if (conditionId !== undefined && !contentLibrary.hasCondition(conditionId)) throw new CommandRejectedError("That condition is not in the bundled reference.");
       // The map grid is fetched up front (async) so template containment AND token-distance rules
       // (prone within 5 ft, unconscious auto-crit) can run inside the synchronous mutation.
@@ -654,12 +654,15 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null, cover: request.cover ?? null }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null, cover: request.cover ?? null, commit, attackNatural }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
       if (!result.duplicate && resolution) {
+        // A preview recorded only the attack die - publish it so the table sees the roll, but hold every
+        // narration/broadcast until the resolve is confirmed (nothing was actually used yet).
         await context.publishGameState(result.state);
+        if (!resolution.preview) {
         const hidden = actorHidden(actorId);
         context.broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId], gmOnly: hidden });
         // Rules-engine narration (ADR-0020): overrides are loudly audited, warnings reach the GM,
@@ -689,6 +692,7 @@ export function createGameOperations(context: GameOperationsContext) {
         for (const ended of resolution.effectsEnded ?? []) {
           context.appendLog({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
           context.broadcastTableEvent({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
+        }
         }
       }
       return { revision: result.state.revision, duplicate: result.duplicate, ...(resolution && !result.duplicate ? { resolution } : {}) };

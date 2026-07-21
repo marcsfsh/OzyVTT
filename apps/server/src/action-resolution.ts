@@ -26,6 +26,10 @@ export type ResolveInput = Readonly<{
   effectId?: string | null;
   /** GM-adjudicated cover for the target (SRD Cover): half +2 / three-quarters +5 to AC and Dex saves; total blocks targeting. */
   cover?: "half" | "three-quarters" | "total" | null;
+  /** false previews the attack roll only (no damage/riders/prompts/economy); the client then confirms with `attackNatural`. Ignored by non-attack actions. */
+  commit?: boolean;
+  /** A confirmed or hand-rolled natural d20 for the attack - used instead of rolling (the preview→confirm reuse, and the manual path). */
+  attackNatural?: number;
 }>;
 export type ResolveDependencies = Readonly<{
   random: RandomSource;
@@ -607,17 +611,32 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const bonus = action.attack.bonus + exhaustionPenalty(attacker);
     if (exhaustionLevel(attacker) > 0) warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
     const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
-    const attackResolution = resolveDice(parseDiceFormula(`${die} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), deps.random);
-    recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
-    const diceTerm = attackResolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
-    const naturalRoll = (diceTerm.dice.find((dieResult) => dieResult.kept) ?? diceTerm.dice[0]).face;
+    // A preview (or a hand-rolled/confirmed d20) supplies the natural roll; otherwise roll it. The die is
+    // recorded on the preview or the legacy one-shot, but NOT on a confirm (which reuses the shown roll).
+    const isPreview = input.commit === false;
+    let naturalRoll: number;
+    let attackTotal: number;
+    if (input.attackNatural !== undefined) {
+      naturalRoll = input.attackNatural;
+      attackTotal = naturalRoll + bonus;
+      if (isPreview) {
+        const manual = resolveDice(parseDiceFormula(`1d20 ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), () => naturalRoll);
+        recordRoll(state, manual, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
+      }
+    } else {
+      const attackResolution = resolveDice(parseDiceFormula(`${die} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), deps.random);
+      recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
+      const diceTerm = attackResolution.terms.find((term): term is Extract<typeof term, { kind: "dice" }> => term.kind === "dice")!;
+      naturalRoll = (diceTerm.dice.find((dieResult) => dieResult.kept) ?? diceTerm.dice[0]).face;
+      attackTotal = attackResolution.total;
+    }
     // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), shown in the result.
     const targetAc = target.armorClass !== undefined ? target.armorClass + coverBonus : null;
     crit = naturalRoll === 20;
     let outcome = naturalRoll === 20 ? "crit" as const
       : naturalRoll === 1 ? "fumble" as const
       : targetAc === null ? "unknown" as const
-      : attackResolution.total >= targetAc ? "hit" as const : "miss" as const;
+      : attackTotal >= targetAc ? "hit" as const : "miss" as const;
     // 2024: hitting an Unconscious OR Paralyzed creature from within 5 feet is a critical hit.
     if (outcome === "hit" && target.conditions.some((condition) => condition.id === "unconscious" || condition.id === "paralyzed")) {
       const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
@@ -626,7 +645,21 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
         crit = true;
       }
     }
-    attack = { targetId: target.id, targetName: target.name, total: attackResolution.total, naturalRoll, targetAc, outcome, ...(coverBonus > 0 ? { coverBonus } : {}) };
+    attack = { targetId: target.id, targetName: target.name, total: attackTotal, naturalRoll, targetAc, outcome, ...(coverBonus > 0 ? { coverBonus } : {}) };
+    // PREVIEW: the d20 is rolled and shown, but nothing is applied - no damage, riders, prompts, or
+    // economy. The client offers Adv/Disadv/Confirm; confirming resolves for real with this natural roll
+    // (the uniform roll widget, matching saving throws). Economy was validated above, so an illegal
+    // attack is blocked before the preview roll, not after.
+    if (isPreview) {
+      return {
+        actionName: action.name, activation: action.activation, attack,
+        save: null, damage: [], damageTotal: 0, crit,
+        ...(rollMode && (rollMode.advantage.length > 0 || rollMode.disadvantage.length > 0) ? { rollMode } : {}),
+        effectGranted: null, componentsRemaining: null,
+        ...(warnings.length > 0 ? { warnings } : {}),
+        overridden, preview: true
+      };
+    }
   }
 
   // Damage is rolled unless the attack already whiffed outright.

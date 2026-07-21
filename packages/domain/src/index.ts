@@ -406,6 +406,9 @@ export type ActionResolution = Readonly<{
   check?: Readonly<{ skill: string; total: number; naturalRoll: number; dc: number | null; success: boolean | null }> | null;
   /** Effects this resolve ended as a rule consequence (attacking revealed Hiding; an off-turn action released a Ready). */
   effectsEnded?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; name: string }>>;
+  /** true when this is an attack-roll PREVIEW: the d20 is rolled and shown but nothing is applied yet (no damage,
+   * riders, prompts, or economy) - the answerer re-rolls adv/disadv or confirms, which resolves for real. */
+  preview?: boolean;
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;

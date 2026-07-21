@@ -65,20 +65,38 @@ export function clearBlockedPrompt() { if (blockedPrompt !== null) { blockedProm
  * machine-readable `blocked` details so the caller can offer the one-tap audited override -
  * re-calling with `override` keeps the same targets.
  */
-export function resolveTargeting(revision: number | undefined, onResult: (ok: boolean, message?: string) => void, override?: { reason: string }) {
+export type ResolveOptions = Readonly<{
+  override?: { reason: string };
+  /** false previews the attack roll (no apply); the confirming call passes commit:true. Attacks default to preview. */
+  commit?: boolean;
+  /** The answerer's advantage/disadvantage choice for the attack d20 (re-previewing). */
+  rollMode?: "advantage" | "disadvantage" | "normal";
+  /** A confirmed or hand-rolled natural d20, used instead of rolling. */
+  attackNatural?: number;
+}>;
+
+export function resolveTargeting(revision: number | undefined, onResult: (ok: boolean, message?: string) => void, opts: ResolveOptions = {}) {
   if (!session || busy) return;
   const { attackerId, action, mode, selected, template } = session;
+  // A single-target attack roll previews first (commit:false) so the result card can offer Adv/Disadv,
+  // a typed d20, and Confirm - the same roll experience as a saving throw. Templates, multi-target, and
+  // save/utility actions resolve straight through. An explicit commit in opts wins (the Confirm tap).
+  const isAttack = action.attackBonus !== null && mode === "single";
+  const commit = opts.commit ?? !isAttack;
+  const extra = { ...(opts.override ? { override: opts.override } : {}), ...(opts.rollMode ? { rollMode: opts.rollMode } : {}), ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}), commit, ...(revision !== undefined ? { expectedRevision: revision } : {}) };
   const payload = mode === "template"
-    ? (template?.placed ? { commandId: newId(), actorId: attackerId, actionId: action.id, template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target }, ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) } : null)
-    : (selected.length > 0 ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...(override ? { override } : {}), ...(revision !== undefined ? { expectedRevision: revision } : {}) } : null);
+    ? (template?.placed ? { commandId: newId(), actorId: attackerId, actionId: action.id, template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target }, ...extra } : null)
+    : (selected.length > 0 ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra } : null);
   if (!payload) return;
   busy = true; blockedPrompt = null; emit();
   socket.emit("action:resolve", payload, (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
     busy = false;
-    if (response.ok && response.resolution) { result = response.resolution; session = null; }
+    // A preview keeps the session so the answerer can re-roll adv/disadv, type a d20, or confirm; a
+    // committed resolve ends it (the session's job is done).
+    if (response.ok && response.resolution) { result = response.resolution; if (!response.resolution.preview) session = null; }
     // Overridable rejection: keep the session (same targets) and surface the one-tap audited
     // override; the retry skips expectedRevision since it's an explicit human confirmation.
-    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveTargeting(undefined, onResult, confirmed) };
+    else if (response.blocked?.overridable) blockedPrompt = { blocked: response.blocked, retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }) };
     emit();
     onResult(response.ok, response.blocked ? undefined : response.message);
   });

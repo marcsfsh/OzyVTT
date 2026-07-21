@@ -72,6 +72,10 @@ export const ActionResolveSchema = z.object({
   cover: z.enum(["half", "three-quarters", "total"]).optional(),
   /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
   note: z.string().trim().min(1).max(100).optional(),
+  /** false previews the attack roll only (no damage/riders/economy) so the answerer can re-roll adv/disadv or confirm; the confirming call passes the shown `attackNatural`. Non-attack actions ignore it. */
+  commit: z.boolean().default(true),
+  /** Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die. */
+  attackNatural: z.number().int().min(1).max(20).optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." });
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), expectedRevision: z.number().int().nonnegative().optional() }).strict()

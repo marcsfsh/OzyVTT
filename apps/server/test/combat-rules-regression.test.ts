@@ -253,6 +253,27 @@ describe("report test 8 - crocodile Multiattack, grapple riders, and target rule
     expect(game.actors.find((actor) => actor.id === IDS.pip)!.effects).toEqual([]);
   });
 
+  it("attack preview shows the d20 but applies nothing until the roll is confirmed (#5/#2)", () => {
+    const game = buildGame([{ actorId: IDS.croc1, score: 20 }, { actorId: IDS.pip, score: 12 }, { actorId: IDS.torva, score: 8 }]);
+    const bite = actionOf(crocodileDefinition, "bite");
+    // Preview a natural 18 hit: the die shows, but no damage rolls, no grapple rider lands, no economy is spent.
+    const preview = resolveDefinitionAction(game, bite, { actorId: IDS.croc1, targetIds: [IDS.pip], commandId: nextCommandId(), commit: false, attackNatural: 18 }, deps([], crocodileDefinition));
+    expect(preview.preview).toBe(true);
+    expect(preview.attack).toMatchObject({ naturalRoll: 18, outcome: "hit" });
+    expect(preview.damage).toHaveLength(0);
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.conditions).toEqual([]);
+    expect(pip.effects).toEqual([]);
+    expect(game.combat.turn.actionUsed).toBe(false);
+    // Confirm that exact d20 (commit + the shown natural): now damage rolls and the grapple lands for real.
+    const committed = resolveDefinitionAction(game, bite, { actorId: IDS.croc1, targetIds: [IDS.pip], commandId: nextCommandId(), commit: true, attackNatural: 18 }, deps([5, 5, 5], crocodileDefinition));
+    expect(committed.preview).toBeFalsy();
+    expect(committed.attack).toMatchObject({ naturalRoll: 18, outcome: "hit" });
+    expect(committed.damage.length).toBeGreaterThan(0);
+    expect(game.actors.find((actor) => actor.id === IDS.pip)!.conditions.map((condition) => condition.id)).toEqual(["grappled", "restrained"]);
+    expect(game.combat.turn.actionUsed).toBe(true);
+  });
+
   it("skips the grapple rider for targets above the printed size cap", () => {
     const game = buildGame();
     const gargantuan = game.actors.find((actor) => actor.id === IDS.croc2)!;

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
-import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBlocked, useTargetingBusy, useTargetingResult } from "./targeting";
+import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBlocked, useTargetingBusy, useTargetingResult, type ResolveOptions } from "./targeting";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -76,6 +76,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   // A typed damage override (manual roll mode, or a GM adjustment): when it differs from the rolled
   // total the manual number is applied straight (no defense math), matching the save prompt's manual path.
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
+  // A typed d20 for the attack preview (the manual-entry path, or a physical die).
+  const [attackDieEdit, setAttackDieEdit] = useState("");
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -103,7 +105,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
   useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
   // Fresh result (from this runner's Roll or the map confirm bar) clears prior apply bookkeeping.
-  useEffect(() => { setApplied(new Set()); setDamageEdit(null); }, [result]);
+  useEffect(() => { setApplied(new Set()); setDamageEdit(null); setAttackDieEdit(""); }, [result]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => { const target = state.actors.find((item) => item.id === entry.actorId); return target ? [target] : []; });
@@ -215,7 +217,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         </details>}
       </>;
     })()}
-    {picking && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
+    {picking && !result?.preview && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       {picking.mode === "template"
         ? <p className="action-targeting-head"><strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft {picking.action.area?.shape} on the map{picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.</p>
         : <>
@@ -241,8 +243,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         <div className="action-result-actions">
           {/* An open compound action (Extra Attack / Multiattack) continues from here; anything else
               re-resolves through the rules check, where strict mode offers the audited override. */}
-          {(() => { const again = actions?.find((candidate) => candidate.name === result.actionName); return again ? <button type="button" className="action-again" disabled={busy || resolveBusy} title="Resolve this action again" onClick={() => beginTargeting(again, actor.id)}>↻ Again</button> : null; })()}
-          <button type="button" className="secondary action-result-close" aria-label="Dismiss result" onClick={() => setTargetingResult(null)}>✕</button>
+          {!result.preview && (() => { const again = actions?.find((candidate) => candidate.name === result.actionName); return again ? <button type="button" className="action-again" disabled={busy || resolveBusy} title="Resolve this action again" onClick={() => beginTargeting(again, actor.id)}>↻ Again</button> : null; })()}
+          <button type="button" className="secondary action-result-close" aria-label={result.preview ? "Cancel roll" : "Dismiss result"} onClick={() => { setTargetingResult(null); if (result.preview) clearTargeting(); }}>✕</button>
         </div>
       </div>
       {result.overridden && <p className="action-overridden">Override ({result.overridden.rule}): {result.overridden.reason}</p>}
@@ -250,6 +252,22 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
         {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} - {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "no AC on record" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
       </p>}
+      {/* Attack PREVIEW: the same roll experience as a saving throw - Adv/Disadv re-roll the d20, a typed
+          d20 is the manual path, and Confirm resolves the hit for real (damage, riders, economy). */}
+      {result.preview && result.attack && (() => {
+        const previewResolve = (opts: ResolveOptions) => resolveTargeting(state.revision, onOutcome, opts);
+        const mode = result.rollMode?.mode;
+        const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } previewResolve({ commit: false, attackNatural: value }); };
+        return <div className="action-preview">
+          <span className="save-prompt-confirm">
+            <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => previewResolve({ commit: false, rollMode: "advantage" })}>Adv</button>
+            <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => previewResolve({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
+            <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
+            <button type="button" className="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</button>
+          </span>
+          <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="or type the d20" aria-label="Attack d20" value={attackDieEdit} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && attackDieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
+        </div>;
+      })()}
       {result.save && <p className="action-outcome">Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save</p>}
       {result.effectGranted && <p className="action-effect-granted">{actor.name} gains <strong>{result.effectGranted.name}</strong>.</p>}
       {result.effectsApplied?.map((appliedEffect) => <p key={`${appliedEffect.targetId}-${appliedEffect.name}`} className="action-effect-applied">{appliedEffect.targetName} is <strong>{appliedEffect.name}</strong>.</p>)}
