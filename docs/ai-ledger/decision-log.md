@@ -31,6 +31,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   from `@vtt/ui` primitives and must appear in the dev-only `/styleguide`. Magenta leads / cyan
   supports; green is absent, so every semantic state pairs color with an icon/label. See
   `docs/ai-context/design-language.md`.
+  - **Motion is a shared vocabulary, applied pervasively (2026-07-21).** One easing/keyframe set
+    (`--ease-settle`, `view-in`/`dialog-in`/`sheet-up`, `--dur-*`) drives all motion. Press feedback
+    belongs on every control (raw `<button>` included), hover-**lift** only on genuine click-target
+    cards, forward **nudge arrows** on advance CTAs, and view **entrances** on switches — but
+    **dense / frequently-re-rendered list items never lift or animate** (initiative rows, combat log,
+    token list, chat): press-feedback only. Feature code adopts the shared primitives for structural
+    pieces rather than re-hand-rolling them — dialogs via `Modal` (`useConfirm`/`usePrompt`), status
+    pills via `Chip` (icon + tone, never color alone), toasts via `useToast`. Map health and drawing
+    colors stay on the brand ramp and, where they're rendered (not wire-transmitted), resolve theme
+    tokens so they follow dark/dusk/light. The ⌘K command palette is deferred (motion landed; feature
+    is a later pass).
 - **The server owns combat rules, not just combat records (ADR-0020, 2026-07-18).** Structured
   `action.resolve` validates action economy, compound-action instances, feature requirements, and
   limited uses against engine-owned state, per an encounter-level `rulesMode` (strict default /

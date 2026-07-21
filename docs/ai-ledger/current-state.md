@@ -21,6 +21,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   the `.combat-active` hue shift. Dev-only `/styleguide` route is the living reference. No
   server/domain/projection changes; viewer projection untouched. See
   `docs/ai-context/design-language.md`. The app + design system are named **OzyVTT**.
+  - **Motion + audit follow-up (2026-07-21, same PR).** The shared motion vocabulary is now
+    pervasive, not primitive-only: every raw `<button>` presses, `input`/`select`/`textarea`/
+    `summary` transition instead of snapping, genuine click-target cards (map library, grid-type,
+    token thumbs) hover-lift, forward CTAs (home choices, Enter table, Start encounter, Next turn)
+    carry a nudge arrow, and each GM tab panel animates in (`view-in`, guarded so dense initiative/
+    log/token rows stay press-only). Structural primitive adoption closed conformance gaps:
+    `useConfirm`/`usePrompt` are rebuilt on the `Modal` primitive (native `<dialog>` focus-trap +
+    return, scrim blur, scroll-lock, `dialog-in`); condition chips flow through `Chip` with the
+    shared SRD glyphs as icons + tone (harmful/magical) so category survives a color-blind read;
+    map health uses `hp-fill-*` band classes that resolve `--cyan`/`--magenta`/`--danger` so token
+    health follows dark/dusk/light on table + viewer; drawing colors (player/annotation/crosshair/
+    AoE) move onto the brand ramp, dropping the banned green/orange/yellow/amber. Deferred: the ⌘K
+    command palette (its motion landed; the feature is a later pass) and full per-control swap of
+    the remaining ~281 raw controls (global element styles are already primitive-equivalent).
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
