@@ -21,7 +21,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Button, Input } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -238,9 +238,9 @@ function App() {
     {mode === "gm" && !gmToken && <section className="card anim-view">
       <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
       <p>{bootstrapped ? "Enter the GM password to run the table." : "Do this once, on the host machine, before players join."}</p>
-      <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
-      <button onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <span className="nav-arrow" aria-hidden="true">→</span>}</button>
-      <button className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</button>
+      <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
+      <Button variant="primary" onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <span className="nav-arrow" aria-hidden="true">→</span>}</Button>
+      <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
     </section>}
     {mode !== "home" && state && <>
       {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
@@ -290,7 +290,7 @@ function App() {
             healthDisplay={mode === "gm" ? (state as GmView).combat.healthDisplay : undefined}
           /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
-          {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
+          {mode === "gm" && gmToken && !previewScene && <Button variant="secondary" className="viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</Button>}
         </section>
         <div className="table-sidebar">
           {previewScene
@@ -306,7 +306,7 @@ function App() {
                 <DicePanel role={mode} state={state} />
                 <CombatLogPanel />
               </>}
-          {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
+          {mode === "player" && <section className="gm-session-controls"><Button variant="secondary" onClick={leavePlayer}>Leave table</Button></section>}
         </div>
       </div>}
 
@@ -326,7 +326,7 @@ function App() {
       {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">
         <section className="setup-appearance"><span className="eyebrow">APPEARANCE</span><ThemeToggle /></section>
         <IntegrationsPanel gmToken={gmToken} />
-        <section className="gm-session-controls"><button className="secondary" onClick={signOutGm} disabled={busy}>Sign out</button><button className="danger" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</button></section>
+        <section className="gm-session-controls"><Button variant="secondary" onClick={signOutGm} disabled={busy}>Sign out</Button><Button variant="destructive" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</Button></section>
       </div>}
     </>}
     {dialog}
