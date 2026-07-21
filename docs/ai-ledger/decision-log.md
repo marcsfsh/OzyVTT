@@ -22,6 +22,15 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **UI design system: Neon Horizon (2026-07-21).** A tokenized retrowave design language is the
+  single source of look-and-feel, living in `packages/ui` (`design-tokens.css` + self-hosted
+  `@fontsource` fonts + `nh-`-namespaced primitives), consumed as source by the client's Vite
+  entries via `import "@vtt/ui/styles.css"`. Three themes (dark default, dusk, light) via
+  `data-theme` on `<html>`; the only user-facing look switches are theme + OS accessibility.
+  **Do not hardcode hex in components — add a token first, then `var(--…)`.** New UI is composed
+  from `@vtt/ui` primitives and must appear in the dev-only `/styleguide`. Magenta leads / cyan
+  supports; green is absent, so every semantic state pairs color with an icon/label. See
+  `docs/ai-context/design-language.md`.
 - **The server owns combat rules, not just combat records (ADR-0020, 2026-07-18).** Structured
   `action.resolve` validates action economy, compound-action instances, feature requirements, and
   limited uses against engine-owned state, per an encounter-level `rulesMode` (strict default /

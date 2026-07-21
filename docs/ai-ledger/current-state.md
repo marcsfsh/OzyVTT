@@ -8,6 +8,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **UI design system — Neon Horizon (2026-07-21).** A tokenized retrowave design language
+  lives in `packages/ui`: `design-tokens.css` (three themes — dark default, dusk, light — via
+  `data-theme` on `<html>`), self-hosted `@fontsource` fonts (Bungee/Russo One/Manrope/Space
+  Mono, no runtime CDN), and an `nh-`-namespaced primitive kit (Button, Field/Input/Select,
+  Panel, Tabs, Menu, Tooltip, Modal, Chip, Wordmark, Toast, ThemeToggle). Consumed as source by
+  the client's three Vite entries (`main`, `viewer`, `styleguide`) via `import "@vtt/ui/styles.css"`.
+  All 16 client stylesheets migrated off the old parchment/amber palette to tokens (0 hardcoded
+  legacy colors); native `window.confirm/prompt` retired for styled `useConfirm`/`usePrompt`
+  dialogs; on-map HP/team/active-turn colors moved to the palette. Signature moments: the home
+  hero (chrome wordmark + grid + bloom), empty-map atmosphere, faint app-shell CRT texture, and
+  the `.combat-active` hue shift. Dev-only `/styleguide` route is the living reference. No
+  server/domain/projection changes; viewer projection untouched. See
+  `docs/ai-context/design-language.md`. **App/wordmark name is a placeholder ("Neon Horizon") —
+  a one-string swap when the owner picks a product name.**
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,

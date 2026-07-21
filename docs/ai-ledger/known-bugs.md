@@ -15,6 +15,10 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   bouncing), but the owner wants the whole upload → browse → prepare → start experience rethought
   against how other VTTs structure it (scene-centric). Needs a real design pass, not another patch.
   More live-testing rounds are expected to add to this list.
+  - _Partial (2026-07-21):_ the Neon Horizon overhaul delivered the **visual + component-consistency**
+    pass (tokens, primitives, restyled surfaces) but deliberately **kept the current layout/navigation
+    IA**. The scene-centric upload → browse → prepare → start **flow rethink is still open** — it's a
+    separate design effort, not covered by the visual overhaul.
 
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
