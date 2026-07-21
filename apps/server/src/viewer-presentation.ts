@@ -54,7 +54,7 @@ export type ViewerEncounterToken = Readonly<{
   /** Content-bundle condition ids parallel to `conditions` - the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
   conditionIds?: readonly string[];
   /** Present only when the GM shows a richer indicator to everyone (audience "all"); the viewer derives the fill fraction from `health` (band) - exact HP never reaches the shared screen. */
-  healthDisplay?: Readonly<{ style: "bar" | "ring" }>;
+  healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }>;
   tokenAssetId?: string;
 }>;
 
@@ -191,8 +191,8 @@ function conditionIdList(value: unknown): readonly string[] {
 }
 
 /** The shared screen only ever receives the richer bar/ring style (band is a table-client fallback, never sent). */
-function healthDisplayStyle(value: unknown): "bar" | "ring" {
-  if (value === "bar" || value === "ring") return value;
+function healthDisplayStyle(value: unknown): "bar" | "ring" | "aura" {
+  if (value === "bar" || value === "ring" || value === "aura") return value;
   throw new Error("Viewer token health display style must be \"bar\" or \"ring\".");
 }
 

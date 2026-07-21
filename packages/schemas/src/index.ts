@@ -84,7 +84,7 @@ export type DeathSaves = z.infer<typeof DeathSavesSchema>;
  * the GM and the token's owner but only a coarse band-fraction for others - exact HP never leaks).
  * Used both table-wide (`combat.healthDisplay`) and as a per-token override (`actor.healthDisplay`).
  */
-export const HealthDisplayStyleSchema = z.enum(["band", "bar", "ring"]);
+export const HealthDisplayStyleSchema = z.enum(["band", "bar", "ring", "aura"]);
 export const HealthDisplayAudienceSchema = z.enum(["gm", "all"]);
 export const HealthDisplaySchema = z.object({ style: HealthDisplayStyleSchema, audience: HealthDisplayAudienceSchema }).strict();
 export type HealthDisplayStyle = z.infer<typeof HealthDisplayStyleSchema>;

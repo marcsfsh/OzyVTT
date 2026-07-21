@@ -210,6 +210,15 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     expect(demotedTokens.find((token) => token.actorId === GOBLIN)!.healthDisplay).toBeUndefined();
     expect(demotedTokens.find((token) => token.actorId === PUBLIC)!.healthDisplay).toEqual({ style: "bar" });
   });
+
+  it("gates the aura style exactly like bar/ring - to everyone under audience all, hidden under gm", () => {
+    const shown = healthGame({ style: "aura", audience: "all" });
+    expect(projectViewerEncounterScene(shown).tokens.every((token) => token.healthDisplay?.style === "aura")).toBe(true);
+    expect(projectPlayerView(shown, PLAYER_A, () => null).actors.find((actor) => actor.id === GOBLIN)!.healthDisplay).toEqual({ style: "aura" });
+    const hidden = healthGame({ style: "aura", audience: "gm" });
+    expect(projectViewerEncounterScene(hidden).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
+    expect(projectPlayerView(hidden, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
+  });
 });
 
 describe("shared initiative source (player == viewer)", () => {

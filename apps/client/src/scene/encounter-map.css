@@ -137,6 +137,8 @@
 .token-health-bar-fill { stroke: none; }
 .token-health-ring-track { fill: none; stroke: #0c0a07; stroke-opacity: .5; }
 .token-health-ring-fill { fill: none; }
+/* Soft health glow: purely decorative and larger than the token, so it must never capture pointer events. */
+.token-health-aura { pointer-events: none; }
 /* Manual fog of war: the GM sees a dim veil (everything stays workable); players get solid cover. */
 .fog-overlay-gm { fill: #060409; fill-opacity: .45; }
 .fog-overlay-player { fill: #0b0a08; }

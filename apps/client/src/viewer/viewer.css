@@ -67,6 +67,7 @@
 .token-health-bar-fill { stroke: none; }
 .token-health-ring-track { fill: none; stroke: #0c0a07; stroke-opacity: .5; }
 .token-health-ring-fill { fill: none; }
+.token-health-aura { pointer-events: none; }
 /* Fog of war on the shared screen: solid cover — the audience sees only what the GM revealed. */
 .fog-overlay-player { fill: #0b0a08; }
 

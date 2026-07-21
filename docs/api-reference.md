@@ -879,7 +879,7 @@ Sets the table-wide default for how token health shows on the map (GM-grade only
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
-| `style` | `band` \| `bar` \| `ring` | yes |  |
+| `style` | `band` \| `bar` \| `ring` \| `aura` | yes |  |
 | `audience` | `gm` \| `all` | yes | gm keeps a bar/ring on the GM map only; all shows it to players and the shared screen (coarse band-fraction for non-owners) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`

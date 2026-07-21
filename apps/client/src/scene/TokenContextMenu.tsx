@@ -64,7 +64,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
     });
   };
-  const setHealthDisplay = (display: { style: "band" | "bar" | "ring"; audience: "gm" | "all" } | null) => {
+  const setHealthDisplay = (display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null) => {
     setBusy(true);
     socket.emit("actor:set-health-display", { commandId: newId(), actorId: actor.id, display }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);

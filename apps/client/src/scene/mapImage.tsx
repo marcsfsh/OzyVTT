@@ -183,10 +183,27 @@ export function hpFillFraction(hp: { current: number; maximum: number; temporary
  * always audience-safe (the server only sends this style when it may show, and exact HP never
  * reaches non-owners - the fraction is band-derived for them). Image-pixel/SVG space like the body.
  */
-function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring"; fraction: number }>) {
+function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring" | "aura"; fraction: number }>) {
+  const gradientId = useId();
   const clamped = Math.max(0, Math.min(1, fraction));
   const color = `hsl(${Math.round(120 * clamped)} 70% 45%)`;
   const title = `${Math.round(clamped * 100)}% health`;
+  if (style === "aura") {
+    // A soft green->red haze hugging the token's edge and fading outward. Transparent through the
+    // centre so the token (painted under it) stays fully visible - a glow around it, not a light.
+    return <g className="token-health-aura">
+      <title>{title}</title>
+      <defs>
+        <radialGradient id={gradientId}>
+          <stop offset="0%" stopColor={color} stopOpacity="0" />
+          <stop offset="48%" stopColor={color} stopOpacity="0" />
+          <stop offset="62%" stopColor={color} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle r={sizePx * 1.05} fill={`url(#${gradientId})`} />
+    </g>;
+  }
   if (style === "ring") {
     const r = sizePx * 0.5 + Math.max(2, sizePx * 0.06);
     const circumference = 2 * Math.PI * r;
@@ -213,7 +230,7 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
  * GM opts in via `healthBar`, an HP bar / green->red ring instead) and up to three condition glyphs
  * beneath the body (with a +N overflow). Shared by the table client and the viewer.
  */
-export function TokenStatusBadges({ sizePx, health, conditions, healthBar }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[]; healthBar?: Readonly<{ style: "bar" | "ring"; fraction: number }> }>) {
+export function TokenStatusBadges({ sizePx, health, conditions, healthBar }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[]; healthBar?: Readonly<{ style: "bar" | "ring" | "aura"; fraction: number }> }>) {
   const radius = Math.max(4, sizePx * 0.11);
   const shown = conditions.slice(0, 3);
   const overflow = conditions.length - shown.length;
