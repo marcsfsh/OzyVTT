@@ -2,7 +2,8 @@
    viewer-main.tsx, NOT by the shared `.viewer-*` component styles in viewer.css — the main SPA
    reuses those components (in the GM's in-tab Viewer preview) and must not inherit this
    `overflow: hidden`, which would kill its page scroll. */
-:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #090806; color: #f7f0e3; }
+/* Colors/type come from @vtt/ui tokens; keep only the shared-screen page frame. */
+:root { color-scheme: dark; background: var(--void); color: var(--text); }
 * { box-sizing: border-box; }
 html, body, #viewer-root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 button, input { font: inherit; }

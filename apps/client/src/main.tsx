@@ -1,6 +1,7 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
+import "@vtt/ui/styles.css";
 import "./styles.css";
 import { ActorRoster } from "./actors/ActorRoster";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -20,6 +21,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
+import { ThemeToggle } from "@vtt/ui";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
 async function api(path: string, init?: RequestInit) {
@@ -214,7 +216,7 @@ function App() {
   }, [previewScene]);
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
   return <main>
-    {mode === "home" && <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>}
+    {mode === "home" && <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p><div className="home-theme-switch"><ThemeToggle /></div></header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
     <Notice notice={notice} />
     {mode === "home" && <section className="choices">
@@ -309,6 +311,7 @@ function App() {
       </div>}
 
       {mode === "gm" && gmToken && gmTab === "setup" && <>
+        <section className="setup-appearance"><span className="eyebrow">APPEARANCE</span><ThemeToggle /></section>
         <IntegrationsPanel gmToken={gmToken} />
         <section className="gm-session-controls"><button className="secondary" onClick={signOutGm} disabled={busy}>Sign out</button><button className="danger" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</button></section>
       </>}
