@@ -26,7 +26,7 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
 
 function TokenThumb({ asset, gmToken, remembered, selected, onPick }: Readonly<{ asset: TokenAsset; gmToken: string; remembered: boolean; selected: boolean; onPick: () => void }>) {
   const url = useTokenImageUrl(asset.id, gmToken);
-  return <button type="button" className={`token-thumb${selected ? " selected" : ""}`} onClick={onPick} aria-pressed={selected} title={asset.name}>
+  return <button type="button" className={`token-thumb lift${selected ? " selected" : ""}`} onClick={onPick} aria-pressed={selected} title={asset.name}>
     <span className="token-thumb-image">{url ? <img src={url} alt="" /> : <span className="token-thumb-placeholder" aria-hidden="true">🎴</span>}</span>
     <span className="token-thumb-name">{asset.name}</span>
     {remembered && <span className="token-thumb-badge">Recent</span>}

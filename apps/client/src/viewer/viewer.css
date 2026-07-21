@@ -19,7 +19,7 @@
 .viewer-stage:active { cursor: grabbing; }
 .viewer-stage svg { width: 100%; height: 100%; background: var(--void); }
 .viewer-zoom { position: absolute; right: .8rem; bottom: .8rem; display: flex; gap: .4rem; }
-.viewer-zoom button { padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); font-weight: 700; cursor: pointer; opacity: .55; }
+.viewer-zoom button { padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); font-weight: 700; cursor: pointer; opacity: .55; transition: opacity var(--dur-hover), border-color var(--dur-hover); }
 .viewer-zoom button:hover, .viewer-zoom button:focus-visible { opacity: 1; border-color: var(--cyan); }
 /* Tokens on the shared screen: team coding (§6.6). Glyph fills stay fixed light for legibility. */
 .viewer-token { pointer-events: none; }
@@ -59,7 +59,7 @@
 /* Give the name the row's full first line before it ellipsizes; dots/health wrap beneath it. Widen
    the panel (drag handle) when a room needs more. */
 .viewer-initiative .init-row-name { min-width: 0; }
-.viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); cursor: pointer; opacity: .25; }
+.viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); cursor: pointer; opacity: .25; transition: opacity var(--dur-hover); }
 .viewer-fullscreen:hover, .viewer-fullscreen:focus-visible { opacity: 1; }
 .viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .viewer-connection.reconnecting { background: color-mix(in srgb, var(--surface-2) 66%, var(--caution)); }

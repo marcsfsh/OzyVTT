@@ -15,6 +15,8 @@ p { color: var(--text-dim); line-height: var(--lh-body); }
 .eyebrow { display: inline-block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
 
 .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 3rem; max-width: 46rem; }
+.choices button { position: relative; }
+.choices .nav-arrow { position: absolute; top: 1.3rem; right: 1.3rem; margin: 0; font-size: 1.15rem; line-height: 1; color: var(--cyan); }
 
 /* Base controls. Reusable buttons should use @vtt/ui <Button>; this styles the
    raw <button>/<input>/<select> that remain, in the token vocabulary. */
@@ -26,10 +28,13 @@ button {
   color: var(--text);
   padding: 1.3rem;
   cursor: pointer;
-  transition: border-color var(--dur-hover), background var(--dur-hover), box-shadow var(--dur-hover), color var(--dur-hover);
+  transition: border-color var(--dur-hover), background var(--dur-hover), box-shadow var(--dur-hover), color var(--dur-hover), transform var(--dur-press) var(--ease-settle);
 }
 button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+button:active:not(:disabled) { transform: translateY(0.5px); }
 button:disabled { cursor: not-allowed; opacity: .55; }
+/* Smooth every native disclosure header (no more snap on open/hover). */
+summary { transition: color var(--dur-hover), background var(--dur-hover), border-color var(--dur-hover); }
 button strong, button span { display: block; }
 button strong { font-size: 1.1rem; }
 button span { color: var(--text-dim); font-size: .9rem; margin-top: .25rem; }
@@ -38,7 +43,7 @@ button span { color: var(--text-dim); font-size: .9rem; margin-top: .25rem; }
 .card, .table, .dice-proof, .roster { margin-top: 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .card { max-width: 32rem; }
 
-input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; border: 1px solid var(--line); background: var(--surface-3); color: var(--text); }
+input, select, textarea { width: 100%; padding: .8rem; margin-top: .4rem; border: 1px solid var(--line); background: var(--surface-3); color: var(--text); transition: border-color var(--dur-hover), box-shadow var(--dur-hover); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .card input { margin-bottom: 1rem; }

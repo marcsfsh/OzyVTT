@@ -226,15 +226,15 @@ function App() {
     </header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
     <Notice notice={notice} />
-    {mode === "home" && <section className="choices">
-      <button onClick={joinPlayer} disabled={busy}><strong>Join as Player</strong><span>Choose your character and take your seat.</span></button>
-      <button className="secondary" onClick={() => { setNotice(null); setMode("gm"); }}><strong>Enter as GM</strong><span>Run the table, encounter, and hidden information.</span></button>
+    {mode === "home" && <section className="choices anim-view">
+      <button className="lift" onClick={joinPlayer} disabled={busy}><strong>Join as Player</strong><span>Choose your character and take your seat.</span><span className="nav-arrow" aria-hidden="true">→</span></button>
+      <button className="secondary lift" onClick={() => { setNotice(null); setMode("gm"); }}><strong>Enter as GM</strong><span>Run the table, encounter, and hidden information.</span><span className="nav-arrow" aria-hidden="true">→</span></button>
     </section>}
     {mode === "gm" && !gmToken && <section className="card anim-view">
       <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
       <p>{bootstrapped ? "Enter the GM password to run the table." : "Do this once, on the host machine, before players join."}</p>
       <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
-      <button onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}</button>
+      <button onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <span className="nav-arrow" aria-hidden="true">→</span>}</button>
       <button className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</button>
     </section>}
     {mode !== "home" && state && <>
@@ -253,7 +253,7 @@ function App() {
         onChange={(id) => setGmTab(id as GmTab)}
       />}
 
-      {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
+      {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
               Guarded on the field, not just the mode - the first state after login can still be
@@ -305,12 +305,12 @@ function App() {
         </div>
       </div>}
 
-      {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
+      {mode === "gm" && gmToken && gmTab === "maps" && <div className="anim-view"><MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} /></div>}
       {/* Scenes moved to the Encounter tab's switcher strip; Map Setup is purely library management. */}
 
-      {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
+      {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
-      {mode === "gm" && gmToken && gmTab === "replay" && <ReplayPanel gmToken={gmToken} />}
+      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
@@ -321,11 +321,11 @@ function App() {
         </div>
       </div>}
 
-      {mode === "gm" && gmToken && gmTab === "setup" && <>
+      {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">
         <section className="setup-appearance"><span className="eyebrow">APPEARANCE</span><ThemeToggle /></section>
         <IntegrationsPanel gmToken={gmToken} />
         <section className="gm-session-controls"><button className="secondary" onClick={signOutGm} disabled={busy}>Sign out</button><button className="danger" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</button></section>
-      </>}
+      </div>}
     </>}
     {dialog}
   </main>;

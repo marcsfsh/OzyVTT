@@ -26,7 +26,7 @@
 .calibration-instruction > strong { display: block; margin-top: .2rem; font: 400 1.05rem var(--font-display); }
 .calibration-instruction p { margin: .3rem 0 0; color: var(--text-dim); font-size: .85rem; }
 .calibration-instruction small { display: block; margin-top: .55rem; color: var(--text-dim); }
-.map-preview { position: relative; width: 100%; min-height: 4rem; display: grid; place-items: center; overflow: hidden; border: 2px solid var(--line-strong); border-radius: var(--radius-md); background: var(--void); cursor: crosshair; line-height: 0; }
+.map-preview { position: relative; width: 100%; min-height: 4rem; display: grid; place-items: center; overflow: hidden; border: 2px solid var(--line-strong); border-radius: var(--radius-md); background: var(--void); cursor: crosshair; line-height: 0; transition: border-color var(--dur-hover); }
 .map-preview.grid-area-mode { cursor: crosshair; touch-action: none; }
 .map-preview.movable { cursor: move; touch-action: none; }
 .map-preview.resizing { cursor: nwse-resize; touch-action: none; }

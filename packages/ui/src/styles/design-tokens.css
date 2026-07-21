@@ -275,7 +275,7 @@ html {
 
 /* Forward-nav nudge (7.5): a trailing arrow glyph that slides 2px when its control is
    hovered or focused. Put <span class="nav-arrow">→</span> at the end of the label. */
-.nav-arrow { display: inline-block; transition: transform var(--dur-press) var(--ease-settle); }
+.nav-arrow { display: inline-block; margin-left: .35em; transition: transform var(--dur-press) var(--ease-settle); }
 button:hover .nav-arrow, a:hover .nav-arrow, [role="button"]:hover .nav-arrow, .lift:hover .nav-arrow,
 button:focus-visible .nav-arrow, a:focus-visible .nav-arrow { transform: translateX(2px); }
 
