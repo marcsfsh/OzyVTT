@@ -15,6 +15,7 @@
 .encounter-map span { color: #a69e91; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .encounter-map select { flex: 1 1 12rem; margin: 0; font-size: .85rem; color: #e7dfd0; }
 .combatant-setup { list-style: none; margin: 0; padding: 0; border-top: 1px solid #403a2c; }
+.combatant-search { width: 100%; margin-top: .1rem; padding: .5rem .6rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .85rem; }
 .combatant-setup li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .75rem 0; border-bottom: 1px solid #403a2c; }
 .combatant-tools { display: flex; align-items: center; gap: .5rem; }
 .combatant-tools .initiative-score { width: 8rem; }

@@ -355,9 +355,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character").map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
+  const [combatantSearch, setCombatantSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
@@ -484,6 +485,23 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
+  // Setup picker, organized: pinned PCs (the party) first, then the last-used monsters/NPCs (server-
+  // tracked recency, GM-only), then a searchable list of everything else on the roster.
+  const RECENT_COUNT = 10;
+  const pcs = state.actors.filter((actor) => actor.kind === "player-character");
+  const nonPcs = state.actors.filter((actor) => actor.kind !== "player-character");
+  const recent = nonPcs.filter((actor) => actor.lastUsedAt !== undefined).sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0)).slice(0, RECENT_COUNT);
+  const recentIds = new Set(recent.map((actor) => actor.id));
+  const search = combatantSearch.trim().toLowerCase();
+  const otherCombatants = nonPcs.filter((actor) => !recentIds.has(actor.id)).filter((actor) => !search || actor.name.toLowerCase().includes(search) || actor.kind.toLowerCase().includes(search));
+  const combatantRow = (actor: (typeof state.actors)[number]) => <li key={actor.id}>
+    <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
+    <div className="combatant-tools">
+      {actor.kind !== "player-character" && <button type="button" className="combatant-remove" disabled={busy} title={`Remove ${actor.name} from the roster`} aria-label={`Remove ${actor.name} from the roster`} onClick={() => remove(actor.id, actor.name)}>✕</button>}
+      <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
+    </div>
+  </li>;
+
   return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
@@ -502,13 +520,21 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </select>
           : <strong>{selectedMap?.name ?? "Upload a battlemap on the Map Setup tab first"}</strong>}
       </label>
-      <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
-        <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
-        <div className="combatant-tools">
-          {actor.kind !== "player-character" && <button type="button" className="combatant-remove" disabled={busy} title={`Remove ${actor.name} from the roster`} aria-label={`Remove ${actor.name} from the roster`} onClick={() => remove(actor.id, actor.name)}>✕</button>}
-          <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
-        </div>
-      </li>)}</ul>
+      {pcs.length > 0 && <div className="menu-section">
+        <p className="menu-section-title">Party</p>
+        <ul className="combatant-setup">{pcs.map(combatantRow)}</ul>
+      </div>}
+      {recent.length > 0 && <div className="menu-section">
+        <p className="menu-section-title">Recent</p>
+        <ul className="combatant-setup">{recent.map(combatantRow)}</ul>
+      </div>}
+      <div className="menu-section">
+        <p className="menu-section-title">{recent.length > 0 ? "More combatants" : "Combatants"}</p>
+        <input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
+        {otherCombatants.length > 0
+          ? <ul className="combatant-setup">{otherCombatants.map(combatantRow)}</ul>
+          : <p className="menu-empty-note">{search ? "No combatants match your search." : "No other combatants on the roster - add monsters below."}</p>}
+      </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
       <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter</button>
     </> : <>
