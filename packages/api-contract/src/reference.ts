@@ -10,7 +10,7 @@ import {
 
 /**
  * Renders `docs/api-reference.md` from the SAME `openApiDocument` the server serves byte-identical
- * at `GET /api/v1/openapi.json` — so the human-readable reference cannot drift from the machine
+ * at `GET /api/v1/openapi.json` - so the human-readable reference cannot drift from the machine
  * contract. `packages/api-contract/test/reference.test.ts` fails whenever the committed file no
  * longer matches this renderer's output; regenerate with `npm run docs:generate -w @vtt/api-contract`.
  */
@@ -41,17 +41,17 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
   },
   {
     title: "Integration credentials (GM-managed)",
-    intro: "Minting, rotating, revoking, and auditing the scoped bearer tokens integrations authenticate with. GM sessions only — an integration token can never manage credentials.",
+    intro: "Minting, rotating, revoking, and auditing the scoped bearer tokens integrations authenticate with. GM sessions only - an integration token can never manage credentials.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/gm/integration-credentials`)
   },
   {
     title: "Player sessions",
-    intro: "Session issuance for headless or custom player clients — the HTTP mirror of the socket's open, LAN-trust join.",
+    intro: "Session issuance for headless or custom player clients - the HTTP mirror of the socket's open, LAN-trust join.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/sessions`)
   },
   {
     title: "Live game",
-    intro: "The authoritative game state and every game command — combat, initiative and time-travel, turns, tokens, hit points, conditions, roster, dice, actions, saves, annotations, character claims, and staged scenes. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.",
+    intro: "The authoritative game state and every game command - combat, initiative and time-travel, turns, tokens, hit points, conditions, roster, dice, actions, saves, annotations, character claims, and staged scenes. Reads are projected per principal; writes dispatch through the exact same validation/authorization/execution path as the built-in table UI.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/game`)
   },
   {
@@ -61,7 +61,7 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
   },
   {
     title: "Encounter archives (Time Machine)",
-    intro: "Permanent, machine-readable records of ended encounters — see the archive document section above for the full v2 shape. GM-grade principals only.",
+    intro: "Permanent, machine-readable records of ended encounters - see the archive document section above for the full v2 shape. GM-grade principals only.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/encounters`)
   },
   {
@@ -71,7 +71,7 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
   },
   {
     title: "Table viewer (second screen)",
-    intro: "Pairing a shared display and driving its player-safe presentation. The viewer never authenticates with game credentials — pairing codes and an HttpOnly cookie only.",
+    intro: "Pairing a shared display and driving its player-safe presentation. The viewer never authenticates with game credentials - pairing codes and an HttpOnly cookie only.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/viewer`)
   }
 ];
@@ -79,9 +79,9 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
 const SCOPE_NOTES: Record<string, string> = {
   "system:read": "Capability discovery and the command catalog.",
   "game:read": "Game-state snapshots (GM-full or player-safe) and reference content.",
-  "actor:read": "Reserved — no endpoint requires it yet.",
+  "actor:read": "Reserved - no endpoint requires it yet.",
   "actor:write": "Roster changes, hit points, conditions, sheet imports, claims management, and token cosmetics.",
-  "scene:read": "Reserved — no endpoint requires it yet.",
+  "scene:read": "Reserved - no endpoint requires it yet.",
   "scene:write": "Preparing, editing, activating, and removing staged scenes.",
   "combat:read": "The combat log and encounter archives.",
   "combat:write": "Encounter lifecycle, initiative/timeline, turns, tokens, actions, saves, annotations.",
@@ -165,9 +165,9 @@ function fieldRows(schema: Schema, referenced: Set<string>): string[] {
 
 function securityLabel(operation: Operation): string {
   const security = operation.security;
-  if (!security || security.length === 0) return "**Auth:** Public — no credentials required.";
+  if (!security || security.length === 0) return "**Auth:** Public - no credentials required.";
   const parts = security.map((entry) => {
-    if ("bearerAuth" in entry) return entry.bearerAuth.length > 0 ? `Integration credential with \`${entry.bearerAuth.join("`, `")}\`` : "Integration credential (required scope depends on the command type — see the catalog)";
+    if ("bearerAuth" in entry) return entry.bearerAuth.length > 0 ? `Integration credential with \`${entry.bearerAuth.join("`, `")}\`` : "Integration credential (required scope depends on the command type - see the catalog)";
     if ("gmAuth" in entry) return "GM session";
     if ("playerAuth" in entry) return "Player session (own-character limits apply)";
     if ("viewerCookieAuth" in entry) return "Paired viewer session (cookie)";
@@ -195,7 +195,7 @@ function renderOperation(method: string, path: string, operation: Operation, ref
   lines.push("");
   const parameters = operation.parameters ?? [];
   if (parameters.length > 0) {
-    lines.push(`**Parameters:** ${parameters.map((parameter) => `\`${parameter.name}\` (${parameter.in}${parameter.required ? "" : ", optional"}) — ${typeLabel(parameter.schema)}`).join(" · ")}`);
+    lines.push(`**Parameters:** ${parameters.map((parameter) => `\`${parameter.name}\` (${parameter.in}${parameter.required ? "" : ", optional"}) - ${typeLabel(parameter.schema)}`).join(" · ")}`);
     lines.push("");
   }
   const body = operation.requestBody;
@@ -220,7 +220,7 @@ function renderOperation(method: string, path: string, operation: Operation, ref
     const isError = schemaRef && typeof schemaRef.$ref === "string" && schemaRef.$ref.endsWith("ApiErrorEnvelope");
     if (code.startsWith("2") || code === "304") {
       const label = responseSchemaLabel(schemaRef);
-      successes.push(`\`${code}\` ${response.description ?? ""}${label ? ` — ${label}` : ""}`);
+      successes.push(`\`${code}\` ${response.description ?? ""}${label ? ` - ${label}` : ""}`);
     } else if (isError || response.$ref || code.startsWith("4") || code.startsWith("5")) {
       errors.push(`\`${code}\``);
     }
@@ -235,9 +235,9 @@ export function renderApiReference(): string {
   const scopes = IntegrationScopeSchema.options;
   const out: string[] = [];
 
-  out.push(`# ${doc.info.title} — API reference (v${API_VERSION})`);
+  out.push(`# ${doc.info.title} - API reference (v${API_VERSION})`);
   out.push("");
-  out.push("<!-- GENERATED FILE — do not edit by hand. -->");
+  out.push("<!-- GENERATED FILE - do not edit by hand. -->");
   out.push("<!-- Rendered from packages/api-contract (the same document served at /api/v1/openapi.json). -->");
   out.push("<!-- Regenerate: npm run docs:generate -w @vtt/api-contract -->");
   out.push("");
@@ -246,7 +246,7 @@ export function renderApiReference(): string {
   out.push(`- **Base path:** \`${API_NAMESPACE}\` on the LAN host (default port 3001).`);
   out.push(`- **Machine-readable contract:** \`GET ${OPENAPI_DOCUMENT_PATH}\` serves the OpenAPI 3.1 document this reference is generated from, byte-identical to \`@vtt/api-contract\`.`);
   out.push(`- **Realtime sibling:** the built-in clients drive the same commands over Socket.IO (protocol version ${REALTIME_PROTOCOL_VERSION}); command \`type\` strings below are shared between both transports.`);
-  out.push("- **Webhooks / server push:** not part of v1 core yet — poll with ETags (below).");
+  out.push("- **Webhooks / server push:** not part of v1 core yet - poll with ETags (below).");
   out.push("");
 
   out.push("## Authentication");
@@ -270,10 +270,10 @@ export function renderApiReference(): string {
   out.push("");
   out.push(`- **Envelopes.** Success: \`{ "ok": true, "apiVersion": "${API_VERSION}", "data": … }\`. Failure: \`{ "ok": false, "apiVersion": "${API_VERSION}", "error": { "code", "message", "requestId", "details"?, "currentRevision"?, "retryAfterSeconds"? } }\`.`);
   out.push("- **Request IDs.** Send `X-Request-Id` (UUID) to correlate; the server echoes it (minting one otherwise) on the response header and in error bodies.");
-  out.push("- **Idempotency.** Every write accepts `commandId` (UUID). The server executes each commandId exactly once; retries replay the stored outcome with `duplicate: true`. Omitted ids are minted server-side and echoed — supply your own whenever you might need to retry.");
+  out.push("- **Idempotency.** Every write accepts `commandId` (UUID). The server executes each commandId exactly once; retries replay the stored outcome with `duplicate: true`. Omitted ids are minted server-side and echoed - supply your own whenever you might need to retry.");
   out.push("- **Optimistic concurrency.** Pass `expectedRevision` to reject writes against a state you haven't seen; a stale value returns `409` with `error.currentRevision`.");
-  out.push("- **Error statuses.** `400 validation_failed` (malformed request, `details.issues`), `401 unauthenticated` (no token), `403 forbidden` (invalid/revoked/underscoped token, or a role denial), `404 not_found`, `409 conflict` for everything the game itself refuses — rule rejections, stale revisions, and timeline confirmations (`details.needsConfirm`: resend with `confirmRewrite`/`confirmDiscard`), `413` oversized body (limit 512kb).");
-  out.push("- **Polling.** `GET /game` sends a weak ETag derived from the revision; send `If-None-Match` to get free `304`s. Presence and timed-annotation expiry don't bump the revision — re-fetch when you need those fresh.");
+  out.push("- **Error statuses.** `400 validation_failed` (malformed request, `details.issues`), `401 unauthenticated` (no token), `403 forbidden` (invalid/revoked/underscoped token, or a role denial), `404 not_found`, `409 conflict` for everything the game itself refuses - rule rejections, stale revisions, and timeline confirmations (`details.needsConfirm`: resend with `confirmRewrite`/`confirmDiscard`), `413` oversized body (limit 512kb).");
+  out.push("- **Polling.** `GET /game` sends a weak ETag derived from the revision; send `If-None-Match` to get free `304`s. Presence and timed-annotation expiry don't bump the revision - re-fetch when you need those fresh.");
   out.push("- **CORS.** Wide open on `/api/v1` (bearer-only surface), so browser-based overlays can call it directly. The legacy same-origin endpoints (`/api/gm/login` etc.) deliberately have no CORS.");
   out.push("");
 
@@ -291,21 +291,21 @@ export function renderApiReference(): string {
   out.push("`GET /encounters/{id}` returns `data.document`, the permanent Time Machine record of one ended fight, stored verbatim at `encounter.end` in the same transaction that closes the encounter:");
   out.push("");
   out.push("- `startedAt` / `endedAt` (ISO 8601) and `turnCount`.");
-  out.push("- `turns[]` — `{ index, kind: \"turn\"|\"return\", label, revision, at, state }`: one **full GameState** per turn boundary.");
-  out.push("- `log[]` — the fight's timestamped combat-log slice (`{ id, at, kind, text, gmOnly, revision }`), GM-only lines included.");
-  out.push("- `journal[]` — **every accepted command while the fight was live**, `encounter.start` through `encounter.end` inclusive: `{ seq, commandId, type, actorId, principal, payload, revision, at }`. `principal` is `gm:<sessionId>`, `player:<sessionId>`, or `integration:<credentialId>`.");
-  out.push("- `finalState` — the last live GameState, captured just before ending cleared the fight.");
-  out.push("- `rolls[]` — every dice roll seen across the fight (survives the live state's rolling 200-roll cap).");
-  out.push("- `definitions[]` — `{ id, source: \"imported\"|\"bundled\", definition }`: the full stat blocks the fight used, making the document self-contained.");
-  out.push("- `attribution` — the CC BY 4.0 line when bundled SRD content is included, else `null`.");
+  out.push("- `turns[]` - `{ index, kind: \"turn\"|\"return\", label, revision, at, state }`: one **full GameState** per turn boundary.");
+  out.push("- `log[]` - the fight's timestamped combat-log slice (`{ id, at, kind, text, gmOnly, revision }`), GM-only lines included.");
+  out.push("- `journal[]` - **every accepted command while the fight was live**, `encounter.start` through `encounter.end` inclusive: `{ seq, commandId, type, actorId, principal, payload, revision, at }`. `principal` is `gm:<sessionId>`, `player:<sessionId>`, or `integration:<credentialId>`.");
+  out.push("- `finalState` - the last live GameState, captured just before ending cleared the fight.");
+  out.push("- `rolls[]` - every dice roll seen across the fight (survives the live state's rolling 200-roll cap).");
+  out.push("- `definitions[]` - `{ id, source: \"imported\"|\"bundled\", definition }`: the full stat blocks the fight used, making the document self-contained.");
+  out.push("- `attribution` - the CC BY 4.0 line when bundled SRD content is included, else `null`.");
   out.push("");
-  out.push("`turns`, `log`, and `journal` join on `revision` — align \"what the state was\" with \"what was commanded\" and \"what was narrated\". Archives are GM-grade only (full state, hidden combatants included) and never reach player sessions.");
+  out.push("`turns`, `log`, and `journal` join on `revision` - align \"what the state was\" with \"what was commanded\" and \"what was narrated\". Archives are GM-grade only (full state, hidden combatants included) and never reach player sessions.");
   out.push("");
 
   out.push("## Quick start");
   out.push("");
   out.push("```bash");
-  out.push("# 1. GM signs in (same-origin) and mints a scoped credential — the token is shown exactly once.");
+  out.push("# 1. GM signs in (same-origin) and mints a scoped credential - the token is shown exactly once.");
   out.push("GM=$(curl -s -X POST http://host:3001/api/gm/login -H 'content-type: application/json' \\");
   out.push("  -d '{\"password\":\"…\"}' | jq -r .token)");
   out.push("TOKEN=$(curl -s -X POST http://host:3001/api/v1/gm/integration-credentials \\");

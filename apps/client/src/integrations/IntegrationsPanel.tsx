@@ -11,7 +11,7 @@ async function api(path: string, token: string, init?: RequestInit) {
   return body;
 }
 
-function formatTimestamp(value: string | null) { return value ? new Date(value).toLocaleString() : "—"; }
+function formatTimestamp(value: string | null) { return value ? new Date(value).toLocaleString() : "-"; }
 
 export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [credentials, setCredentials] = useState<IntegrationCredentialMetadata[]>([]);
@@ -84,9 +84,9 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     <div className="roster-heading"><div><span className="eyebrow">GM INTEGRATIONS</span><h2 id="integrations-heading">Scoped API credentials.</h2></div><p>Issue least-privilege credentials for bots, overlays, and external tools. Secrets are shown once and stored only as a salted hash.</p></div>
     {issued && <div className="notice integration-secret" role="alertdialog" aria-labelledby="integration-secret-heading">
       <strong id="integration-secret-heading">{issued.rotated ? `New secret for "${issued.name}"` : `Secret for "${issued.name}"`}</strong>
-      <p>This is the only time this secret will be shown. Copy it now — the server cannot redisplay it.</p>
+      <p>This is the only time this secret will be shown. Copy it now - the server cannot redisplay it.</p>
       <code className="integration-token">{issued.token}</code>
-      <div className="integration-secret-actions"><button onClick={copyToken}>{copyConfirmed ? "Copied" : "Copy secret"}</button><button className="secondary" onClick={dismissIssued}>{copyConfirmed ? "Done" : "I have saved it elsewhere — dismiss"}</button></div>
+      <div className="integration-secret-actions"><button onClick={copyToken}>{copyConfirmed ? "Copied" : "Copy secret"}</button><button className="secondary" onClick={dismissIssued}>{copyConfirmed ? "Done" : "I have saved it elsewhere - dismiss"}</button></div>
       {!copyConfirmed && <p className="integration-secret-warning">You have not confirmed a copy yet. Dismissing without saving this secret means it is lost for good.</p>}
     </div>}
     <form className="integration-form" onSubmit={createCredential}>
@@ -106,7 +106,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
           <button className="danger" disabled={!!credential.revokedAt} onClick={() => revoke(credential)}>Revoke</button>
           <button className="link" onClick={() => viewAudit(credential)}>{auditFor === credential.id ? "Hide audit history" : "View audit history"}</button>
         </div>
-        {auditFor === credential.id && <ul className="integration-audit">{auditEvents.map((event) => <li key={event.id}>{formatTimestamp(event.occurredAt)} — {event.type}</li>)}</ul>}
+        {auditFor === credential.id && <ul className="integration-audit">{auditEvents.map((event) => <li key={event.id}>{formatTimestamp(event.occurredAt)} - {event.type}</li>)}</ul>}
       </li>)}
     </ul>}
     <ApiReference gmToken={gmToken} />

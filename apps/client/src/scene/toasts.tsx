@@ -4,7 +4,7 @@ import { socket } from "../socket";
 
 /**
  * Transient battlemap notifications ("Goblin took 6 damage"). Fed by the server's `table:event`
- * broadcast (role-filtered there), capped and auto-fading here. Presentation only — never persisted,
+ * broadcast (role-filtered there), capped and auto-fading here. Presentation only - never persisted,
  * and the roll history remains the durable record.
  */
 let toasts: readonly TableEvent[] = [];

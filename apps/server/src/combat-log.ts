@@ -9,7 +9,7 @@ type LogRow = Readonly<{ id: number; at: string; kind: string; text: string; gm_
 const CAP = 1000;
 
 /**
- * The persistent combat/encounter log (#12): a durable, append-only record of what happened —
+ * The persistent combat/encounter log (#12): a durable, append-only record of what happened -
  * damage, saves, actions, conditions, turn transitions, encounter/scene changes, and GM history
  * rewinds. Lives on the game SQLite alongside the other catalogs. Visibility mirrors the toast/
  * projection rules: an entry that references a GM-only combatant (or is marked gmOnly) never reaches
@@ -40,7 +40,7 @@ export class CombatLogStore {
     return { id, at, kind: entry.kind, text: entry.text, gmOnly: entry.gmOnly, revision: entry.revision };
   }
 
-  /** Every retained line at or after a revision, chronological — the commentary slice for an encounter archive (GM export, so GM-only lines are included). */
+  /** Every retained line at or after a revision, chronological - the commentary slice for an encounter archive (GM export, so GM-only lines are included). */
   exportSince(minRevision: number): readonly CombatLogEntry[] {
     const rows = this.requireDatabase()
       .prepare("SELECT id, at, kind, text, gm_only, revision FROM combat_log WHERE revision >= ? ORDER BY id")

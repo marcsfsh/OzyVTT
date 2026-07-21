@@ -11,7 +11,7 @@ type Actor = GmActor | PlayerActor;
 /**
  * Right-click / long-press actions on a token. GM acts on any token; a player only ever opens it on
  * their own claimed token (the caller gates that). Portaled to <body> so it clears the docked panel
- * and enlarged-map stacking contexts. Uses only existing commands — the server stays authoritative.
+ * and enlarged-map stacking contexts. Uses only existing commands - the server stays authoritative.
  */
 export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, placed, onOpenSheet, onReturnToTray, onClose }: Readonly<{
   actor: Actor;
@@ -64,6 +64,15 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
     });
   };
+  const onGmLayer = actor.visibility === "gm-only";
+  const toggleLayer = () => {
+    const visibility = onGmLayer ? "public" : "gm-only";
+    setBusy(true);
+    socket.emit("actor:set-visibility", { commandId: newId(), actorId: actor.id, visibility }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      setFeedback(result.ok ? (visibility === "gm-only" ? "Moved to the GM layer." : "Moved to the shared layer.") : result.message ?? "The layer could not be changed.");
+    });
+  };
   const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
   const cap = (value: string) => `${value[0].toUpperCase()}${value.slice(1)}`;
   const currentSize = actor.size ?? (actor.sizeCells === 4 ? "gargantuan" : actor.sizeCells === 3 ? "huge" : actor.sizeCells === 2 ? "large" : "medium");
@@ -74,7 +83,7 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
   // Clamp so the menu stays on-screen near the pointer.
   const style: React.CSSProperties = { left: Math.max(8, Math.min(x, window.innerWidth - 240)), top: Math.max(8, Math.min(y, window.innerHeight - 340)) };
 
-  // In fullscreen, only the fullscreen element's subtree renders — portal into it (not document.body,
+  // In fullscreen, only the fullscreen element's subtree renders - portal into it (not document.body,
   // which is hidden) so the menu is visible. Falls back to body when not in fullscreen.
   return createPortal(
     <div ref={ref} className="token-context-menu" role="menu" style={style} aria-label={`Actions for ${actor.name}`}>
@@ -91,9 +100,10 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       </label>}
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
       {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}
-      <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent — restore" : "Use reaction"}</button>
+      {role === "gm" && <button type="button" className="token-context-item" disabled={busy} title={onGmLayer ? "Reveal this token to players and the shared screen" : "Hide this token from players and the shared screen"} onClick={toggleLayer}>{onGmLayer ? "Move to shared layer" : "Move to GM layer"}</button>}
+      <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent - restore" : "Use reaction"}</button>
       {role === "gm" && placed && <button type="button" className="token-context-item" onClick={() => { onReturnToTray(); onClose(); }}>Return to tray</button>}
-      <div className="token-context-conditions"><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
+      <div className="token-context-conditions"><span className="token-context-conditions-label">Conditions</span><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
       {feedback && <p className="token-context-feedback" role="status">{feedback}</p>}
     </div>,
     document.fullscreenElement ?? document.body

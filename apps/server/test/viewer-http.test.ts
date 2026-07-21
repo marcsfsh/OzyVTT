@@ -93,7 +93,7 @@ describe("viewer HTTP vertical slice", () => {
     connection.disconnect();
     test.coordinator.broadcast();
     expect(received).toHaveLength(2);
-    expect(closed).toBe(false); // an explicit disconnect() does not itself call the close callback — that's for server-initiated drops.
+    expect(closed).toBe(false); // an explicit disconnect() does not itself call the close callback - that's for server-initiated drops.
     expect(() => test.coordinator.connectGm("not-the-gm", () => {}, () => {})).toThrow();
   });
 

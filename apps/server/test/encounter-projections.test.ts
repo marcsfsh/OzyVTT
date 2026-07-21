@@ -29,7 +29,7 @@ describe("recipient-safe encounter projections", () => {
   it("omits hidden combatants and reports a safe hidden-turn indicator", () => {
     const state = game(HIDDEN);
     const combat = projectPlayerCombat(state);
-    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy" }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], rewound: false, pendingSaves: [] });
+    expect(combat).toEqual({ active: true, round: 3, turnActorId: null, mapAssetId: MAP, hiddenTurn: true, initiative: [{ actorId: PUBLIC, name: "Visible Hero", score: 18, active: false, health: "healthy" }], tokens: [{ actorId: PUBLIC, position: { x: 200, y: 200 }, sizePx: 40, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", underwater: false, reactionsUsed: [], fog: { enabled: false, shapes: [] }, rewound: false, pendingSaves: [], pendingReactions: [] });
     const serialized = JSON.stringify(projectPlayerView(state, undefined, () => null));
     expect(serialized).not.toContain(HIDDEN);
     expect(serialized).not.toContain("Secret Lurker");
@@ -40,7 +40,15 @@ describe("recipient-safe encounter projections", () => {
     const state = game(PUBLIC);
     expect(projectPlayerCombat(state)).toMatchObject({ turnActorId: PUBLIC, hiddenTurn: false, initiative: [{ actorId: PUBLIC, active: true }] });
     expect(projectViewerInitiative(state)).toEqual({ visible: true, round: 3, hiddenTurn: false, entries: [{ actorId: PUBLIC, name: "Visible Hero", initiative: 18, active: true, health: "healthy", conditions: [] }] });
-    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [] }], annotations: [] });
+    expect(projectViewerEncounterScene(state)).toEqual({ mapAssetId: MAP, tokens: [{ actorId: PUBLIC, name: "Visible Hero", kind: "player-character", position: { x: 200, y: 200 }, sizePx: 40, active: true, health: "healthy", conditions: [], conditionIds: [] }], annotations: [], fog: { enabled: false, shapes: [] } });
+  });
+
+  it("sends condition ids parallel to the display labels so the viewer picks matching glyphs", () => {
+    const state = game(PUBLIC);
+    state.actors = state.actors.map((actor) => actor.id === PUBLIC ? { ...actor, conditions: [{ id: "poisoned" }, { id: "exhaustion", level: 3 }] } : actor);
+    const token = projectViewerEncounterScene(state).tokens[0];
+    expect(token.conditions).toEqual(["Poisoned", "Exhaustion 3"]);
+    expect(token.conditionIds).toEqual(["poisoned", "exhaustion"]);
   });
 
   it("hides the Initiative list after combat ends", () => {

@@ -24,11 +24,14 @@ export type ViewerInitiativeEntry = Readonly<{
   name: string;
   initiative: number;
   active: boolean;
-  /** Coarse band only — exact hit points never reach the shared screen. */
+  /** Coarse band only - exact hit points never reach the shared screen. */
   health: "healthy" | "bloodied" | "down";
   /** Display labels ("Prone", "Exhaustion 3") for public combatants. */
   conditions: readonly string[];
 }>;
+
+/** The fog mask exactly as the table renders it (geometry only; hidden tokens never reach the viewer anyway). */
+export type ViewerFog = Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
 
 export type ViewerInitiative = Readonly<{
   visible: boolean;
@@ -46,10 +49,12 @@ export type ViewerEncounterToken = Readonly<{
   active: boolean;
   health: "healthy" | "bloodied" | "down";
   conditions: readonly string[];
+  /** Content-bundle condition ids parallel to `conditions` - the viewer picks glyphs by id (labels are already public; ids add nothing hidden). */
+  conditionIds?: readonly string[];
   tokenAssetId?: string;
 }>;
 
-/** Player-safe drawing shown on the shared screen — only `public` annotations are ever projected here. */
+/** Player-safe drawing shown on the shared screen - only `public` annotations are ever projected here. */
 export type ViewerAnnotation = Readonly<{
   id: string;
   kind: "measurement" | "shape" | "ping";
@@ -65,6 +70,8 @@ export type ViewerEncounterScene = Readonly<{
   mapAssetId: string | null;
   tokens: readonly ViewerEncounterToken[];
   annotations: readonly ViewerAnnotation[];
+  /** Absent = no fog (older servers); the viewer renders the mask above everything. */
+  fog?: ViewerFog;
 }>;
 
 export type ViewerPresentationState = Readonly<{
@@ -170,6 +177,15 @@ function conditionList(value: unknown): readonly string[] {
   return value.slice(0, 20).map((label) => safeText(String(label), "Condition label", 60));
 }
 
+function conditionIdList(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 20).map((id) => {
+    const text = String(id);
+    if (!/^[a-z0-9-]{1,60}$/.test(text)) throw new Error("Condition ids must be lowercase content-bundle slugs.");
+    return text;
+  });
+}
+
 function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   const mapAssetId = value.mapAssetId === null ? null : safeText(value.mapAssetId, "Encounter map asset ID", 128);
   if (value.tokens.length > 200) throw new Error("Viewer encounter cannot exceed 200 tokens.");
@@ -182,7 +198,7 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     if (token.active) activeTokens++;
     if (token.kind !== "player-character" && token.kind !== "monster" && token.kind !== "npc") throw new Error("Viewer token kind is invalid.");
     if (!Number.isFinite(token.sizePx) || token.sizePx <= 0 || token.sizePx > 4096) throw new Error("Viewer token size is invalid.");
-    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions) };
+    return { actorId, name: safeText(token.name, "Viewer token name", 120), kind: token.kind, position: point(token.position, "Viewer token position"), sizePx: token.sizePx, active: token.active, health: healthBand(token.health), conditions: conditionList(token.conditions), ...(token.conditionIds ? { conditionIds: conditionIdList(token.conditionIds) } : {}) };
   });
   if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
   if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");
@@ -201,7 +217,20 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     return { id, kind: annotation.kind, shape: annotation.shape, origin: point(annotation.origin, "Viewer annotation origin"), target: point(annotation.target, "Viewer annotation target"), sizeFeet: annotation.sizeFeet, color: annotation.color, label };
   });
   if (mapAssetId === null && annotations.length) throw new Error("Viewer annotations require an active encounter map.");
-  return { mapAssetId, tokens, annotations };
+  const fog = value.fog === undefined ? undefined : sanitizedFog(value.fog);
+  return { mapAssetId, tokens, annotations, ...(fog ? { fog } : {}) };
+}
+
+function sanitizedFog(value: ViewerFog): ViewerFog {
+  if (typeof value.enabled !== "boolean") throw new Error("Viewer fog enabled flag is invalid.");
+  const rawShapes = value.shapes ?? [];
+  if (rawShapes.length > 200) throw new Error("Viewer fog cannot exceed 200 shapes.");
+  const shapes = rawShapes.map((shape) => {
+    if (shape.kind !== "rect" || shape.op !== "reveal" && shape.op !== "hide") throw new Error("Viewer fog shape is invalid.");
+    for (const bound of [shape.x, shape.y, shape.width, shape.height]) if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000) throw new Error("Viewer fog geometry is invalid.");
+    return { kind: "rect" as const, id: safeText(shape.id, "Viewer fog shape ID", 128), op: shape.op, x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+  });
+  return { enabled: value.enabled, shapes };
 }
 
 export function createViewerPresentationState(): ViewerPresentationState {

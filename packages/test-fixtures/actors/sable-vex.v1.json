@@ -1,0 +1,149 @@
+{
+ "schemaId": "vtt.actor-character",
+ "schemaVersion": 1,
+ "source": {
+  "name": "Example imports (SRD 5.2.1)",
+  "version": "1.0.0",
+  "externalId": "example-import-sable"
+ },
+ "name": "Sable Vex",
+ "summary": "Level 7 tiefling Fiend warlock \u2014 relentless Eldritch Blast artillery with a burst of pact-slot fire.",
+ "size": "medium",
+ "abilityScores": {
+  "str": 8,
+  "dex": 14,
+  "con": 14,
+  "int": 12,
+  "wis": 10,
+  "cha": 18
+ },
+ "proficiencyBonus": 3,
+ "armorClass": 13,
+ "hitPoints": {
+  "maximum": 52
+ },
+ "initiativeBonus": 2,
+ "speedFeet": 30,
+ "actions": [
+  {
+   "id": "eldritch-blast",
+   "name": "Eldritch Blast (Cantrip)",
+   "activation": "action",
+   "description": "*Ranged Spell Attack:* +7, range 120 ft, **two beams** (roll each separately \u2014 use this action twice). *Hit:* 1d10 + 4 force damage per beam (Agonizing Blast adds Charisma). Add **+1d6 necrotic** against the Hexed target.",
+   "attack": {
+    "bonus": 7,
+    "rangeFeet": 120,
+    "count": 2
+   },
+   "damage": [
+    {
+     "formula": "1d10 + 4",
+     "type": "force"
+    }
+   ]
+  },
+  {
+   "id": "hex",
+   "name": "Hex (1st, cast at 4th)",
+   "activation": "bonus-action",
+   "description": "*Bonus Action:* curse a creature within 90 ft. Sable's attacks deal an extra **1d6 necrotic** to it, and it has Disadvantage on checks with one chosen ability. Concentration, up to 24 hours at this slot level; a Bonus Action moves the curse when the target drops.",
+   "damage": []
+  },
+  {
+   "id": "fireball",
+   "name": "Fireball (3rd, cast at 4th)",
+   "activation": "action",
+   "description": "*Dexterity Saving Throw:* DC 15, each creature in a **20-foot-radius Sphere** within 150 ft. *Failure:* 9d6 fire damage (cast with a 4th-level pact slot). *Success:* Half damage.",
+   "save": {
+    "ability": "dex",
+    "dc": 15
+   },
+   "damage": [
+    {
+     "formula": "9d6",
+     "type": "fire"
+    }
+   ]
+  },
+  {
+   "id": "hellish-rebuke",
+   "name": "Hellish Rebuke (1st, cast at 4th)",
+   "activation": "reaction",
+   "description": "*Reaction, when damaged by a creature within 60 ft:* the attacker makes a DC 15 Dexterity save. *Failure:* 5d10 fire damage. *Success:* Half damage.",
+   "save": {
+    "ability": "dex",
+    "dc": 15
+   },
+   "damage": [
+    {
+     "formula": "5d10",
+     "type": "fire"
+    }
+   ]
+  },
+  {
+   "id": "command",
+   "name": "Command (1st, cast at 4th)",
+   "activation": "action",
+   "description": "*Wisdom Saving Throw:* DC 15, up to **four** creatures within 60 ft. *Failure:* the target obeys a one-word command (Approach, Drop, Flee, Grovel, or Halt) on its next turn.",
+   "save": {
+    "ability": "wis",
+    "dc": 15
+   },
+   "damage": []
+  }
+ ],
+ "token": {
+  "disposition": "friendly",
+  "footprint": {
+   "width": 1,
+   "height": 1
+  }
+ },
+ "extensions": {
+  "open5e.srd-2024": {
+   "type": "Warlock 7 (tiefling)",
+   "alignment": "Neutral",
+   "armorDetail": "leather armor",
+   "senses": [
+    "Darkvision 60 ft. (sees through magical darkness \u2014 Devil's Sight)"
+   ],
+   "passivePerception": 10,
+   "languages": "Common, Infernal",
+   "savingThrows": {
+    "str": -1,
+    "dex": 2,
+    "con": 2,
+    "int": 1,
+    "wis": 3,
+    "cha": 7
+   },
+   "traits": [
+    {
+     "name": "Pact Magic",
+     "description": "Charisma caster \u2014 spell save **DC 15**, spell attack **+7**. **Two pact slots, both 4th level**, recharged on a Short Rest."
+    },
+    {
+     "name": "Agonizing Blast",
+     "description": "Adds Charisma (+4) to Eldritch Blast damage (already included)."
+    },
+    {
+     "name": "Devil's Sight",
+     "description": "Sees normally in darkness, magical and nonmagical, to 120 ft."
+    },
+    {
+     "name": "Dark One's Blessing",
+     "description": "When Sable reduces a hostile creature to 0 hit points, they gain **11 temporary hit points** (Charisma + warlock level)."
+    },
+    {
+     "name": "Fiendish Resilience",
+     "description": "After a Short or Long Rest, choose one damage type; Sable has resistance to it until the next rest."
+    },
+    {
+     "name": "Infernal Legacy",
+     "description": "Resistance to fire damage; knows Thaumaturgy."
+    }
+   ]
+  }
+ }
+}

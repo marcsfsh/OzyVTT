@@ -51,7 +51,7 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
 
 /**
  * Read/track sheet: live actor state (hp, conditions) over the immutable stat block.
- * Track, never build — no editing of scores or actions here. The GM opens any combatant;
+ * Track, never build - no editing of scores or actions here. The GM opens any combatant;
  * a player only ever receives their own actor (and no monster definition fetch succeeds
  * for them server-side).
  */
@@ -76,7 +76,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
     ? (["walk", "swim", "fly", "climb", "burrow"] as const).flatMap((mode) => { const feet = extension.speeds?.[mode]; return feet ? [`${mode === "walk" ? "" : `${mode} `}${feet} ft.${mode === "fly" && extension.speeds?.hover ? " (hover)" : ""}`] : []; }).join(", ")
     : definition ? `${definition.speedFeet} ft.` : null;
 
-  // Portal to <body> so the sheet escapes any stacking context it's rendered inside — notably a
+  // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
   // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
   // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
   return createPortal(<div className="confirm-overlay" role="presentation" onClick={onClose}>
@@ -85,16 +85,16 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
         <div>
           <h2 id="sheet-title">{actor.name}</h2>
           <p className="sheet-typeline">
-            {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` — CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
+            {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
           </p>
         </div>
         <button type="button" className="secondary sheet-close" aria-label="Close the sheet" onClick={onClose}>✕</button>
       </div>
 
       <div className="sheet-vitals">
-        <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "—"}</strong></div>
-        <div className="sheet-vital"><span>AC</span><strong>{actor.armorClass ?? "—"}</strong>{extension.armorDetail ? <small>{extension.armorDetail}</small> : null}</div>
-        <div className="sheet-vital"><span>Initiative</span><strong>{actor.initiative !== undefined ? signed(actor.initiative) : "—"}</strong></div>
+        <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
+        <div className="sheet-vital"><span>AC</span><strong>{actor.armorClass ?? "-"}</strong>{extension.armorDetail ? <small>{extension.armorDetail}</small> : null}</div>
+        <div className="sheet-vital"><span>Initiative</span><strong>{actor.initiative !== undefined ? signed(actor.initiative) : "-"}</strong></div>
         {speeds && <div className="sheet-vital"><span>Speed</span><strong>{speeds}</strong></div>}
       </div>
       <SheetHpControls actorId={actor.id} allowSet={role === "gm"} onFeedback={setFeedback} />
@@ -131,7 +131,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
         <p className="sheet-attribution">Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.</p>
       </>}
       {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
-      {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet — the GM can import this character's JSON sheet from the roster.</p>}
+      {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet - the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
     </div>
   </div>, document.fullscreenElement ?? document.body);

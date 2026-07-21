@@ -185,7 +185,7 @@ describe("live authoritative encounter workflow", () => {
       await emitCommand(gmSocket, "encounter:start", { commandId: START_COMMAND_ID, mapAssetId: imported.metadata.id, entries: [{ actorId: HERO_ID, score: 18 }] });
       await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000060", slot: "bonus-action", used: true });
       await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000061", slot: "action", used: true });
-      // Un-marking is a correction, not an event — it must stay silent.
+      // Un-marking is a correction, not an event - it must stay silent.
       await emitCommand(gmSocket, "turn:use", { commandId: "30000000-0000-4000-8000-000000000062", slot: "action", used: false });
       await new Promise((resolve) => setTimeout(resolve, 150));
 
@@ -242,7 +242,7 @@ describe("live authoritative encounter workflow", () => {
       expect(typeof list.encounters[0].endedAt).toBe("string");
 
       const document = await (await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { headers: gmHeaders })).json();
-      expect(document.archiveSchemaVersion).toBe(2);
+      expect(document.archiveSchemaVersion).toBe(3);
       expect(document.turns.length).toBe(list.encounters[0].turnCount);
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
       expect(Array.isArray(document.log)).toBe(true);
@@ -252,6 +252,8 @@ describe("live authoritative encounter workflow", () => {
       expect(document.journal[0].principal).toMatch(/^gm:/);
       expect(document.journal[0].payload.mapAssetId).toBe(imported.metadata.id);
       expect(document.finalState.combat.active).toBe(true);
+      // v3: the post-encounter aftermath - combat cleared, end-of-fight sweeps landed.
+      expect(document.postEncounterState.combat.active).toBe(false);
       expect(Array.isArray(document.rolls)).toBe(true);
       expect(Array.isArray(document.definitions)).toBe(true);
 
@@ -319,7 +321,7 @@ describe("live authoritative encounter workflow", () => {
       expect(moved).toMatchObject({ ok: true, revision: 3, duplicate: false });
       const ownerView = await ownerConvergence;
       expect(ownerView.combat.tokens).toEqual([{ actorId: HERO_ID, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, gridRotationRadians: 0, sizeCells: 1 }]);
-      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false, health: "healthy", conditions: [] }], annotations: [] });
+      expect(running.viewerPresentation.snapshot.encounter).toEqual({ mapAssetId: imported.metadata.id, tokens: [{ actorId: HERO_ID, name: "Public Hero", kind: "player-character", position: { x: 75, y: 75 }, sizePx: 41, active: false, health: "healthy", conditions: [], conditionIds: [] }], annotations: [], fog: { enabled: false, shapes: [] } });
 
       const hiddenMoveId = "61000000-0000-4000-8000-000000000005";
       expect(await emitCommand(gmSocket, "token:move", { commandId: hiddenMoveId, actorId: SECRET_ID, position: { x: 127, y: 127 }, expectedRevision: 3 })).toMatchObject({ ok: true, revision: 4, duplicate: false });

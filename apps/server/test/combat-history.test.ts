@@ -50,12 +50,12 @@ describe("turn time-travel timeline", () => {
     expect(store.snapshot.combat.historyCursor).toBeNull();
     const history = store.listTurnSnapshots();
     expect(history).toHaveLength(1);
-    expect(history[0]).toMatchObject({ index: 0, kind: "turn", label: "Round 1 — Alpha" });
+    expect(history[0]).toMatchObject({ index: 0, kind: "turn", label: "Round 1 - Alpha" });
   });
 
   it("rewinds the whole table to the end of the prior turn and resumes live without undoing anything", async () => {
     await next(); // capture Alpha's turn @0, now live on Goblin
-    // Goblin takes damage during its (live) turn — this must survive a rewind-and-resume round trip.
+    // Goblin takes damage during its (live) turn - this must survive a rewind-and-resume round trip.
     await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: MON }, (state) => applyDamage(state, MON, 4, GM));
     expect(store.snapshot.actors.find((a) => a.id === MON)?.hp.current).toBe(6);
 
@@ -97,7 +97,7 @@ describe("turn time-travel timeline", () => {
 
     await expect(next(false)).rejects.toBeInstanceOf(TimelineConfirmationRequired);
     await expect(next(false)).rejects.toMatchObject({ confirm: "rewrite-history" });
-    // The rejected attempts burned nothing — still rewound, still dirty.
+    // The rejected attempts burned nothing - still rewound, still dirty.
     expect(store.snapshot.combat.historyCursor).toBe(0);
     expect(store.snapshot.combat.historyDirty).toBe(true);
 
@@ -166,6 +166,7 @@ describe("turn time-travel timeline", () => {
       log: LOG,
       journal: timeline.journalEntries(),
       finalState,
+      postEncounterState: structuredClone(state),
       endedAt: new Date(1000).toISOString(),
       resolveBundledDefinition: () => undefined,
       attribution: "test attribution"
@@ -188,7 +189,7 @@ describe("turn time-travel timeline", () => {
     expect(archives[0].turnCount).toBe(captured);
 
     const document = JSON.parse(store.getEncounterArchive(archives[0].id)!);
-    expect(document.archiveSchemaVersion).toBe(2);
+    expect(document.archiveSchemaVersion).toBe(3);
     expect(document.turns).toHaveLength(captured);
     // Each turn carries the FULL machine-readable state captured at that boundary, plus the log slice.
     expect(document.turns[0].state.actors.find((a: { id: string }) => a.id === PC)).toBeDefined();
@@ -197,13 +198,15 @@ describe("turn time-travel timeline", () => {
     // v2 additions: the journal of the fight's commands and the last live picture before the end wiped it.
     expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["initiative.next", "initiative.next"]);
     expect(document.finalState.combat.active).toBe(true);
+    // v3 addition: the true aftermath - captured after encounter.end cleared the fight.
+    expect(document.postEncounterState.combat.active).toBe(false);
     expect(store.listJournal()).toHaveLength(0); // wiped with the fight, atomically
 
     store.deleteEncounterArchive(archives[0].id);
     expect(store.listEncounterArchives()).toHaveLength(0);
   });
 
-  it("does not archive — and keeps the buffer — when ending is rejected mid-review", async () => {
+  it("does not archive - and keeps the buffer - when ending is rejected mid-review", async () => {
     await next();
     await previous(); // rewound
     await expect(endAndArchive(randomUUID())).rejects.toThrow(/reviewing the combat history/i);

@@ -1,9 +1,11 @@
-import type { AbilityId, GameState, PendingSave, RollRecord } from "@vtt/domain";
-import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
+import type { AbilityId, Actor, GameState, PendingSave, RollRecord } from "@vtt/domain";
+import { aggregateRollMode, parseDiceFormula, resolveDice, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { applyDamage, adjustableActor, type ActorScope } from "./hit-points.js";
+import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
+import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
+import { addEffect, endEffectIfPresent, type EffectNarration } from "./effects.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -13,11 +15,40 @@ export type SaveAnswerDependencies = Readonly<{
   now: () => string;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
 }>;
-export type SaveOutcome = Readonly<{ success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean }>;
+export type SaveOutcome = Readonly<{
+  success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean;
+  /** The condition that forced an automatic failure (Paralyzed etc. on a Str/Dex save); null when the die was rolled. */
+  autoFailed?: string | null;
+  /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
+  rollMode?: AggregatedRollMode;
+}>;
+
+/**
+ * Advantage/disadvantage sources the engine can see for a saving throw (SRD conditions appendix):
+ * Restrained imposes disadvantage on Dexterity saves; effect modifiers (Dodge's Dex-save advantage)
+ * plug in here as the vocabulary grows. Pure and explainable, mirroring attackRollSources.
+ */
+export function saveRollSources(target: Actor, ability: AbilityId): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
+  const advantage: RollModeSource[] = [];
+  const disadvantage: RollModeSource[] = [];
+  if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
+    disadvantage.push({ source: "target-restrained", label: "Restrained (Dex saves)" });
+  }
+  // Effect modifiers (Dodge's Dex-save advantage); voidWhileIncapacitated effects lapse per the SRD.
+  const incapacitated = isIncapacitated(target);
+  for (const effect of target.effects) {
+    if (effect.voidWhileIncapacitated && incapacitated) continue;
+    for (const modifier of effect.modifiers) {
+      if (modifier.type === "save-advantage" && (modifier.ability === undefined || modifier.ability === ability)) advantage.push({ source: effect.id, label: effect.name });
+      if (modifier.type === "save-disadvantage" && (modifier.ability === undefined || modifier.ability === ability)) disadvantage.push({ source: effect.id, label: effect.name });
+    }
+  }
+  return { advantage, disadvantage };
+}
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
-/** SRD 2024 stat blocks phrase the success line as "Success: Half damage." — absence of an explicit "no damage/effect" success keeps the safer half-damage default. */
+/** SRD 2024 stat blocks phrase the success line as "Success: Half damage." - absence of an explicit "no damage/effect" success keeps the safer half-damage default. */
 export function halfOnSuccessFrom(description: string): boolean {
   return !/success:?\s*(the target )?(takes? )?no\b/i.test(description);
 }
@@ -42,7 +73,7 @@ export function conditionFrom(description: string): string | null {
  * Best-known save modifier for a target. Monsters carry final per-ability save bonuses in the
  * (untyped) open5e extension; anything else falls back to the ability modifier from the definition's
  * scores. Imported PCs don't encode save proficiencies (not in ActorDefinitionSchema), so a proficient
- * PC save is the manual-total path's job — documented limitation, not a bug.
+ * PC save is the manual-total path's job - documented limitation, not a bug.
  */
 export function saveModifierFor(definition: ActorDefinition | undefined, ability: AbilityId): number {
   if (!definition) return 0;
@@ -58,7 +89,9 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
 export function createPendingSaves(state: GameState, input: Readonly<{
   sourceActorId: string; sourceName: string; actionName: string; ability: AbilityId; dc: number;
-  targetIds: readonly string[]; proposedDamage: number; halfOnSuccess: boolean; conditionId: string | null;
+  targetIds: readonly string[]; proposedDamage: number; proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>; halfOnSuccess: boolean; conditionId: string | null;
+  saveBonus?: number;
+  onFailEffect?: PendingSave["onFailEffect"];
   newSaveId: () => string; createdAt: number;
 }>) {
   const additions: PendingSave[] = input.targetIds.map((targetActorId) => ({
@@ -70,8 +103,11 @@ export function createPendingSaves(state: GameState, input: Readonly<{
     sourceName: input.sourceName,
     actionName: input.actionName,
     proposedDamage: input.proposedDamage,
+    ...(input.proposedDamageParts && input.proposedDamageParts.length > 0 ? { proposedDamageParts: [...input.proposedDamageParts] } : {}),
     halfOnSuccess: input.halfOnSuccess,
     conditionId: input.conditionId,
+    saveBonus: input.saveBonus ?? 0,
+    ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt (one owed save per target per source action keeps the tracker readable).
@@ -109,12 +145,12 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
 
 /**
  * Answer a pending save: roll d20 + best-known modifier (or take a typed total), then AUTO-APPLY the
- * outcome — fail: full proposed damage + condition; success: half damage if the action says so, no
+ * outcome - fail: full proposed damage + condition; success: half damage if the action says so, no
  * condition. The owner-approved exception to the propose→apply ladder for structured saves
  * (ADR-0008's structured attack/save/damage carve-out). GM answers any save; a player only their own
  * claimed character's.
  */
-export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies): SaveOutcome {
+export function answerSave(state: GameState, commandId: string, saveId: string, method: "roll" | "manual", manualTotal: number | undefined, commit: boolean, scope: ActorScope, deps: SaveAnswerDependencies, legendaryResistance = false, explicitRollMode?: "advantage" | "disadvantage" | "normal"): { outcome: SaveOutcome; events: EffectNarration[] } {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
@@ -122,13 +158,29 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
   if (!ABILITIES.includes(pending.ability)) throw new CommandRejectedError("That saving throw has an unknown ability.");
 
   let total: number;
+  let autoFailed: string | null = null;
+  let rollMode: AggregatedRollMode | undefined;
   if (method === "manual") {
+    // The manual total is the GM escape hatch and deliberately bypasses auto-fail (a table may
+    // rule an exception); the typed number is what counts.
     if (manualTotal === undefined || !Number.isInteger(manualTotal) || manualTotal < -20 || manualTotal > 60) throw new CommandRejectedError("Enter the rolled save total (a whole number from -20 to 60).");
     total = manualTotal;
+  } else if ((pending.ability === "str" || pending.ability === "dex") && autoFailsPhysicalSaves(target) !== null) {
+    // SRD conditions appendix: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves - no die is rolled.
+    autoFailed = autoFailsPhysicalSaves(target);
+    total = 0;
   } else {
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
-    const modifier = saveModifierFor(definition, pending.ability);
-    const resolution = resolveDice(parseDiceFormula(`1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
+    // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1); cover's saveBonus adds (SRD Cover).
+    const modifier = saveModifierFor(definition, pending.ability) + exhaustionPenalty(target) + pending.saveBonus;
+    const sources = saveRollSources(target, pending.ability);
+    const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
+    // An explicit choice (the answerer's adv/disadv button, or a forced "normal") wins over the
+    // engine-detected sources, mirroring how attacks let the GM override the aggregation.
+    const mode = explicitRollMode ?? aggregated.mode;
+    const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
+    const resolution = resolveDice(parseDiceFormula(`${die} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`), deps.random);
+    if (mode !== "normal") rollMode = { mode, advantage: mode === "advantage" ? (aggregated.advantage.length > 0 ? aggregated.advantage : ["Chosen"]) : [], disadvantage: mode === "disadvantage" ? (aggregated.disadvantage.length > 0 ? aggregated.disadvantage : ["Chosen"]) : [] };
     // The save roll lands in the shared history attributed to the target; hidden targets stay GM-only.
     recordSaveRoll(state, resolution, {
       id: deps.newRollId(), commandId, sessionId: deps.sessionId, role: deps.role, label: target.name, actorId: target.id,
@@ -137,24 +189,91 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     total = resolution.total;
   }
 
-  const success = total >= pending.dc;
-  const outcomeDamage = !success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0);
+  let success = autoFailed === null && total >= pending.dc;
+  // SRD Legendary Resistance: "if the creature fails a saving throw, it can choose to succeed
+  // instead" - the die is rolled (usually previewed first), then the GM commits with the flag.
+  // The pool rides actionUses["legendary-resistance"]; a long rest re-arms it (day = long rest).
+  let legendaryNote: string | null = null;
+  if (legendaryResistance) {
+    if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");
+    if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can spend Legendary Resistance.");
+    const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+    const perDay = definition?.legendary?.resistancesPerDay ?? 0;
+    if (perDay === 0) throw new CommandRejectedError(`${target.name} has no Legendary Resistance.`);
+    const spentSoFar = target.actionUses["legendary-resistance"] ?? 0;
+    if (spentSoFar >= perDay) throw new CommandRejectedError(`${target.name} has no Legendary Resistance left (0 of ${perDay} remaining).`);
+    // A natural success spends nothing - the flag means "succeed no matter what", not "waste a use".
+    if (!success) {
+      target.actionUses = { ...target.actionUses, "legendary-resistance": spentSoFar + 1 };
+      success = true;
+      autoFailed = null;
+      legendaryNote = `${target.name} uses Legendary Resistance to succeed (${perDay - spentSoFar - 1} of ${perDay} remaining).`;
+    }
+  }
+  // Typed parts (ADR-0020) halve per part on success and run the defense pipeline on application;
+  // saves persisted before the field fall back to the untyped total.
+  const parts = pending.proposedDamageParts;
+  const outcomeParts = parts && parts.length > 0
+    ? (!success ? parts : pending.halfOnSuccess ? parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })) : [])
+    : null;
+  const outcomeDamage = outcomeParts !== null
+    ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
+    : (!success ? pending.proposedDamage : (pending.halfOnSuccess ? Math.floor(pending.proposedDamage / 2) : 0));
   const outcomeCondition = !success && pending.conditionId !== null;
 
   // Preview (commit=false): the die roll is still recorded for the table so everyone sees it, but the
   // outcome is NOT applied and the save stays open until the answerer confirms. This makes "Roll" a
-  // reveal, not an auto-resolve — the answerer then commits (manual with the rolled total).
-  if (!commit) return { success, total, dc: pending.dc, appliedDamage: outcomeDamage, conditionApplied: outcomeCondition, committed: false };
+  // reveal, not an auto-resolve - the answerer then commits (manual with the rolled total).
+  if (!commit) return { outcome: { success, total, dc: pending.dc, appliedDamage: outcomeDamage, conditionApplied: outcomeCondition, committed: false, autoFailed, ...(rollMode ? { rollMode } : {}) }, events: [] };
 
+  const events: EffectNarration[] = [];
+  if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
+  if (autoFailed !== null) events.push({ kind: "condition", text: `${target.name} automatically fails the ${pending.ability.toUpperCase()} save (${conditionLabel(autoFailed)}).`, actorId: target.id });
   let appliedDamage = 0;
   let conditionApplied = false;
-  if (outcomeDamage > 0) { applyDamage(state, target.id, outcomeDamage, { role: "gm" }); appliedDamage = outcomeDamage; }
-  if (outcomeCondition && pending.conditionId) { setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }); conditionApplied = true; }
+  if (outcomeDamage > 0) {
+    const outcome = applyDamageDetailed(state, target.id, outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage }, { role: "gm" }, { resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId), newId: deps.newRollId, now: deps.now });
+    appliedDamage = outcome.application.totalApplied;
+    events.push(...outcome.events);
+  }
+  if (outcomeCondition && pending.conditionId) {
+    // setCondition narrates immunity skips; whether the condition actually landed is read back.
+    events.push(...setCondition(state, target.id, pending.conditionId, true, undefined, { role: "gm" }));
+    conditionApplied = target.conditions.some((condition) => condition.id === pending.conditionId);
+  }
+  // A committed FAILED concentration check ends the sustained effects (SRD Concentration);
+  // tolerant of effects already gone (timeline rewinds, earlier breaks).
+  if (!success && pending.endsEffects) {
+    for (const reference of pending.endsEffects) events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
+  }
+  // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple -
+  // the same carve-out class as on-hit riders, ADR-0020).
+  if (!success && pending.onFailEffect) {
+    const applied = addEffect(state, target.id, {
+      id: `${commandId}:${saveId}:fail`,
+      name: pending.onFailEffect.name,
+      tags: [...pending.onFailEffect.tags],
+      sourceActorId: pending.onFailEffect.sourceActorId,
+      sourceName: pending.onFailEffect.sourceName,
+      sourceActionId: null,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: false,
+      concentration: false,
+      modifiers: [],
+      linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
+      escapeDc: pending.onFailEffect.escapeDc,
+      onEnd: [],
+      endsWithTag: null
+    });
+    events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
+  }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
-  return { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true };
+  return { outcome: { success, total, dc: pending.dc, appliedDamage, conditionApplied, committed: true, autoFailed, ...(rollMode ? { rollMode } : {}) }, events };
 }
 
-/** Drop a pending save without resolving it (GM housekeeping — e.g. the effect ended). */
+/** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
 export function dismissSave(state: GameState, saveId: string, scope: ActorScope) {
   if (scope.role !== "gm") throw new CommandRejectedError("Only the GM can dismiss a saving throw.");
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId)) throw new CommandRejectedError("That saving throw was already answered or dismissed.");

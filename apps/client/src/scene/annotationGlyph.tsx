@@ -19,7 +19,7 @@ export function annotationCenter(data: AnnotationGlyphData): Point {
   return { x: (data.origin.x + data.target.x) / 2, y: (data.origin.y + data.target.y) / 2 };
 }
 
-/** The outline geometry for a shape — shared by the encounter map's live preview and confirmed shapes. */
+/** The outline geometry for a shape - shared by the encounter map's live preview and confirmed shapes. */
 export function ShapeOutline({ shape, origin, target, className, style }: Readonly<{ shape: Exclude<GlyphShape, null>; origin: Point; target: Point; className: string; style?: React.CSSProperties }>) {
   if (shape === "circle") return <circle className={className} style={style} cx={origin.x} cy={origin.y} r={Math.max(1, Math.hypot(target.x - origin.x, target.y - origin.y))} />;
   if (shape === "square") {
@@ -45,7 +45,7 @@ export function PingGlyph({ point, color, label, size }: Readonly<{ point: Point
   </g>;
 }
 
-/** Filled triangle at `target`, pointing from `origin` toward `target` — the measurement arrowhead. */
+/** Filled triangle at `target`, pointing from `origin` toward `target` - the measurement arrowhead. */
 function arrowPoints(origin: Point, target: Point, size: number) {
   const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
   const back = angle + Math.PI;

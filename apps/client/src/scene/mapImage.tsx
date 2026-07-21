@@ -17,7 +17,7 @@ export function probeImageDimensions(url: string): Promise<{ width: number; heig
 /**
  * Fetches an authorized map image as a revocable blob URL and probes its natural pixel
  * dimensions. Shared by every renderer that needs a bearer-authorized map (the encounter
- * canvas and the GM's map/viewer-tool previews). The shared-screen viewer does not use this —
+ * canvas and the GM's map/viewer-tool previews). The shared-screen viewer does not use this -
  * it embeds the content URL directly (cookie-authorized, no bearer header available inside
  * an SVG `<image>`), but still uses `probeImageDimensions` for its own dimension probe.
  */
@@ -42,6 +42,35 @@ export function useAuthorizedMapImage(assetId: string | null, token: string | nu
   }, [assetId, token]);
 
   return state;
+}
+
+/**
+ * Session-lifetime thumbnail cache: one authorized fetch per map asset, shared by every chip that
+ * shows the same map (the scene switcher), object URLs deliberately never revoked (bounded by the
+ * ≤20-scene library). Distinct from `useAuthorizedMapImage`, which is per-mount and revocable -
+ * a strip of chips re-rendering on every state broadcast must not refetch or churn URLs.
+ */
+const thumbnailCache = new Map<string, Promise<string>>();
+export function useCachedMapThumbnail(assetId: string | null, token: string | null | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!assetId || !token) { setUrl(null); return; }
+    let cancelled = false;
+    let promise = thumbnailCache.get(assetId);
+    if (!promise) {
+      promise = fetch(`/api/v1/map-assets/${encodeURIComponent(assetId)}/content`, { headers: { authorization: `Bearer ${token}` } })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("thumbnail unavailable");
+          return URL.createObjectURL(await response.blob());
+        });
+      thumbnailCache.set(assetId, promise);
+      // A failed fetch must not poison the cache - the next mount retries.
+      promise.catch(() => thumbnailCache.delete(assetId));
+    }
+    promise.then((objectUrl) => { if (!cancelled) setUrl(objectUrl); }).catch(() => { if (!cancelled) setUrl(null); });
+    return () => { cancelled = true; };
+  }, [assetId, token]);
+  return url;
 }
 
 /**
@@ -86,7 +115,7 @@ export type TokenGlyphProps = Readonly<{
 /**
  * The visual content of a map token (turn ring, body, portrait-or-initials, name) shared by the
  * interactive encounter canvas and the read-only shared-screen viewer. Each caller supplies its own
- * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs —
+ * class names/sizing and wraps this in whatever `<g>` (with its own interactivity, if any) it needs -
  * this component owns only the repeated drawing, not the per-app interaction semantics.
  */
 export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, bodyClassName, initialsClassName, nameClassName, nameY, initialsStyle, nameStyle }: TokenGlyphProps) {
@@ -112,36 +141,99 @@ export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, body
 }
 
 /**
+ * Original minimal glyphs (16×16 box) for the SRD conditions, so a token reads "poisoned, prone"
+ * at a glance instead of "P, P". Unknown ids fall back to the initial letter. Shared by the table
+ * client and the viewer; drawn as single filled paths (fill-rule evenodd carves the cutouts).
+ */
+const CONDITION_GLYPHS: Record<string, string> = {
+  blinded: "M8 4.6C4.9 4.6 2.6 8 2.6 8s2.3 3.4 5.4 3.4S13.4 8 13.4 8 11.1 4.6 8 4.6zm0 1.9A1.5 1.5 0 1 1 8 9.5 1.5 1.5 0 0 1 8 6.5zM3.9 2.8l9.3 9.3-1.1 1.1L2.8 3.9z",
+  charmed: "M8 13.4 3.4 8.8a3 3 0 0 1 4.2-4.2l.4.4.4-.4a3 3 0 0 1 4.2 4.2z",
+  deafened: "M3 6.2v3.6h2.4L9 12.8V3.2L5.4 6.2H3zM12.1 3l1.1 1.1-8.2 8.2-1.1-1.1z",
+  exhaustion: "M3.2 3.6h5.6v1.6L5.6 8.4h3.2V10H3.2V8.4l3.2-3.2H3.2zM9.4 9.4h4v1.3l-2.1 2.1h2.1V14h-4v-1.3l2.1-2.1H9.4z",
+  frightened: "M6.9 2.6h2.2v6.8H6.9zM6.9 11h2.2v2.4H6.9z",
+  grappled: "M5.4 4.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm0 1.7a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4zM10.6 4.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm0 1.7a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4z",
+  incapacitated: "M7.1 2.2h1.8v4l3.5-2 .9 1.5-3.5 2 3.5 2-.9 1.6-3.5-2v4H7.1v-4l-3.5 2-.9-1.6 3.5-2-3.5-2 .9-1.5 3.5 2z",
+  invisible: "M8 2.8a4.2 4.2 0 0 0-4.2 4.2v6.2l1.7-1.4 1.25 1.4L8 11.8l1.25 1.4 1.25-1.4 1.7 1.4V7A4.2 4.2 0 0 0 8 2.8z",
+  paralyzed: "M9.2 2 3.8 9h3l-1.2 5 5.6-7.2h-3z",
+  petrified: "M5.2 3.2h5.6l2.8 4.8-2.8 4.8H5.2L2.4 8z",
+  poisoned: "M8 2.2S4.2 7 4.2 9.8a3.8 3.8 0 0 0 7.6 0C11.8 7 8 2.2 8 2.2z",
+  prone: "M2.2 9.4h8.6v2.6H2.2zM13 12.4a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8z",
+  restrained: "M3.2 3h1.8v10H3.2zM7.1 3h1.8v10H7.1zM11 3h1.8v10H11z",
+  stunned: "M8 2.2l1.5 3.6 3.9.3-3 2.6.9 3.8L8 10.4l-3.3 2.1.9-3.8-3-2.6 3.9-.3z",
+  unconscious: "M10.5 2.5A6 6 0 1 0 13.5 12 7 7 0 0 1 10.5 2.5z"
+};
+
+export type TokenConditionBadge = Readonly<{ id: string | null; label: string }>;
+
+/**
  * Health/condition badges layered over a token: a bloodied/down dot at the top-right and up
- * to three condition initials beneath the body (with a +N overflow). Shared by the table
+ * to three condition glyphs beneath the body (with a +N overflow). Shared by the table
  * client and the viewer so both read the same at a glance.
  */
-export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly string[] }>) {
+export function TokenStatusBadges({ sizePx, health, conditions }: Readonly<{ sizePx: number; health: "healthy" | "bloodied" | "down"; conditions: readonly TokenConditionBadge[] }>) {
   const radius = Math.max(4, sizePx * 0.11);
   const shown = conditions.slice(0, 3);
   const overflow = conditions.length - shown.length;
   const badgeY = sizePx * 0.5 + radius * 1.15;
   const startX = -((shown.length + (overflow > 0 ? 1 : 0)) - 1) * radius * 1.1;
+  const names = conditions.map((condition) => condition.label).join(", ");
   return <>
     {health !== "healthy" && <circle className={`token-health token-health-${health}`} cx={sizePx * 0.38} cy={-sizePx * 0.38} r={radius}>
       <title>{health === "down" ? "Down" : "Bloodied"}</title>
     </circle>}
-    {shown.map((label, index) => <g key={label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>
-      <title>{conditions.join(", ")}</title>
-      <circle r={radius} />
-      <text style={{ fontSize: radius * 1.25 }}>{label[0]?.toUpperCase() ?? "?"}</text>
-    </g>)}
+    {shown.map((condition, index) => {
+      const glyph = condition.id !== null ? CONDITION_GLYPHS[condition.id] : undefined;
+      return <g key={condition.label} className="token-condition" transform={`translate(${startX + index * radius * 2.2} ${badgeY})`}>
+        <title>{names}</title>
+        <circle r={radius} />
+        {glyph
+          // The 16×16 glyph box scales onto the badge's inscribed square, centered on the circle.
+          ? <path className="token-condition-glyph" d={glyph} fillRule="evenodd" transform={`translate(${-radius * 0.82} ${-radius * 0.82}) scale(${(radius * 1.64) / 16})`} />
+          : <text style={{ fontSize: radius * 1.25 }}>{condition.label[0]?.toUpperCase() ?? "?"}</text>}
+      </g>;
+    })}
     {overflow > 0 && <g className="token-condition token-condition-more" transform={`translate(${startX + shown.length * radius * 2.2} ${badgeY})`}>
-      <title>{conditions.join(", ")}</title>
+      <title>{names}</title>
       <circle r={radius} />
       <text style={{ fontSize: radius * 1.1 }}>+{overflow}</text>
     </g>}
   </>;
 }
 
+/**
+ * Manual fog-of-war mask: one SVG `<mask>` - a white base (fog everywhere), then each stroke in
+ * order paints black (reveal: the fog is cut away there) or white (hide: re-covered). The GM sees
+ * the fog dimmed below tokens (everything stays visible); players and the shared screen get it
+ * solid and above everything - anything inside fog is visually covered even where public data
+ * crossed the wire. Shared by the table client and the viewer.
+ */
+export function FogOverlay({ width, height, fog, variant }: Readonly<{
+  width: number; height: number;
+  fog: Readonly<{ enabled: boolean; shapes: readonly Readonly<{ id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }>;
+  variant: "gm" | "player";
+}>) {
+  const base = useId();
+  if (!fog.enabled) return null;
+  // Chromium caches an SVG <mask>'s raster keyed on the element and does NOT re-evaluate it when
+  // only the mask's child <rect>s change (e.g. Hide-all removes every reveal) - the stale holes stay
+  // until an unrelated repaint (a pan/zoom). Suffix the mask id with a hash of the fog so any change
+  // yields a new id → a new url() reference → a guaranteed re-resolve. (Bug: hide-all didn't render.)
+  const signature = `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`;
+  const maskId = `${base}${signature}`;
+  return <>
+    <defs>
+      <mask id={maskId}>
+        <rect x={0} y={0} width={width} height={height} fill="white" />
+        {fog.shapes.map((shape) => <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} fill={shape.op === "reveal" ? "black" : "white"} />)}
+      </mask>
+    </defs>
+    <rect className={`fog-overlay fog-overlay-${variant}`} x={0} y={0} width={width} height={height} mask={`url(#${maskId})`} pointerEvents="none" />
+  </>;
+}
+
 export type GridCalibration = Readonly<{ origin: { x: number; y: number }; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
 
-/** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret — the client already receives grid-derived token sizing. */
+/** Fetches the active map's grid calibration (or null on a gridless map) for client-side preview math. Not secret - the client already receives grid-derived token sizing. */
 export function useMapCalibration(assetId: string | null, token: string | null | undefined): Readonly<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }> {
   const [state, setState] = useState<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }>({ status: "loading", calibration: null });
   useEffect(() => {
@@ -162,7 +254,7 @@ export function useMapCalibration(assetId: string | null, token: string | null |
 
 /**
  * Preview-only grid math mirroring the server's authoritative snapping (`grid-calibration.ts`,
- * `map-measurement.ts`). Used only to show a live number/snap while the pointer is still moving —
+ * `map-measurement.ts`). Used only to show a live number/snap while the pointer is still moving -
  * the server always re-derives and persists the real geometry when a drag ends (`annotation:add`/
  * `annotation:move`), so any drift here affects only what's shown for a moment, never what's saved.
  */
@@ -186,13 +278,13 @@ export function snapCellCenterPreview(calibration: GridCalibration, point: { x: 
   const grid = imageToGridPreview(calibration, point);
   return gridToImagePreview(calibration, { column: Math.floor(grid.column) + centerOffset, row: Math.floor(grid.row) + centerOffset });
 }
-/** Whole-cell Chebyshev distance in feet between two image points — every cell (including diagonals) costs one step, matching the server's default measurement rule. */
+/** Whole-cell Chebyshev distance in feet between two image points - every cell (including diagonals) costs one step, matching the server's default measurement rule. */
 export function chebyshevFeetPreview(calibration: GridCalibration, a: { x: number; y: number }, b: { x: number; y: number }) {
   const gridA = imageToGridPreview(calibration, a);
   const gridB = imageToGridPreview(calibration, b);
   return Math.round(Math.max(Math.abs(gridB.column - gridA.column), Math.abs(gridB.row - gridA.row))) * calibration.distancePerCell;
 }
-/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection — mirrors the server). Preview-only. */
+/** The `"col,row"` grid cells a token's footprint covers, given its snapped image position and sizeCells (odd footprints center on a cell, even on an intersection - mirrors the server). Preview-only. */
 export function footprintCells(calibration: GridCalibration, position: { x: number; y: number }, sizeCells = 1): Set<string> {
   const grid = imageToGridPreview(calibration, position);
   const odd = sizeCells % 2 === 1;
@@ -206,7 +298,7 @@ export function footprintCells(calibration: GridCalibration, position: { x: numb
  * Every grid cell the straight segment (grid-space) from `a` to `b` passes through, via an
  * Amanatides–Woo voxel/DDA traversal. Unlike a Chebyshev "diagonal-first" walk, this visits exactly
  * the cells the drawn line crosses, so the occupied-cell count matches what the ruler visibly passes
- * over. At an exact lattice corner it steps diagonally (skips the two side cells) — the standard choice.
+ * over. At an exact lattice corner it steps diagonally (skips the two side cells) - the standard choice.
  */
 function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): string[] {
   let column = Math.floor(ax), row = Math.floor(ay);
@@ -229,9 +321,9 @@ function cellsOnGridSegment(ax: number, ay: number, bx: number, by: number): str
 
 /**
  * 5e movement-through-occupied-cells cost, display-only. Base distance is the whole-cell Chebyshev
- * count (diagonals cost one). The penalty is every cell the straight path crosses — excluding the
- * start and destination cells — that another token occupies, each adding one cell (+distancePerCell).
- * Preview-only — the client only ever has the tokens it may see, so nothing hidden leaks into the count.
+ * count (diagonals cost one). The penalty is every cell the straight path crosses - excluding the
+ * start and destination cells - that another token occupies, each adding one cell (+distancePerCell).
+ * Preview-only - the client only ever has the tokens it may see, so nothing hidden leaks into the count.
  */
 export function occupiedPathCost(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }, occupied: ReadonlySet<string>): { baseFeet: number; penaltyFeet: number } {
   const from = imageToGridPreview(calibration, origin);
@@ -240,7 +332,7 @@ export function occupiedPathCost(calibration: GridCalibration, origin: { x: numb
   const destCell = `${Math.floor(to.column)},${Math.floor(to.row)}`;
   // Chebyshev distance from the raw center-to-center grid delta (matches chebyshevFeetPreview). Using
   // floor-differences here is unstable for even footprints (Large/Huge/Gargantuan center on integer
-  // grid intersections, where floating-point noise flips the floor) — that caused the 10→20 ft skips.
+  // grid intersections, where floating-point noise flips the floor) - that caused the 10→20 ft skips.
   const steps = Math.round(Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row)));
   let penaltyCells = 0;
   for (const cell of cellsOnGridSegment(from.column, from.row, to.column, to.row)) {
@@ -254,7 +346,7 @@ export type SnappedGeometry = Readonly<{ origin: { x: number; y: number }; targe
 /**
  * Client mirrors of the server's `measurementGeometry`/`squareGeometry`/`radialGeometry`
  * (`apps/server/src/annotations.ts`) so the live drag preview snaps to the grid exactly as the saved
- * result will — the server still re-derives and persists the authoritative geometry on release.
+ * result will - the server still re-derives and persists the authoritative geometry on release.
  */
 export function snapMeasurementPreview(calibration: GridCalibration, origin: { x: number; y: number }, target: { x: number; y: number }): SnappedGeometry {
   const from = snapCellCenterPreview(calibration, origin);

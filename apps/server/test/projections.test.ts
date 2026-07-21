@@ -88,7 +88,7 @@ describe("GM view drops expired ephemeral annotations", () => {
   }
 
   // Regression: the GM projection used to spread state verbatim, so an expired ping only vanished on
-  // the next add (not on the scheduled expiry re-broadcast) — pings lingered on the GM's own screen.
+  // the next add (not on the scheduled expiry re-broadcast) - pings lingered on the GM's own screen.
   it("hides a ping past its expiry while keeping a still-live one", () => {
     const view = projectGmView(twoPings(), noPresence, 5500);
     expect(view.combat.annotations.map((annotation) => annotation.id)).toEqual(["20000000-0000-4000-8000-000000000002"]);

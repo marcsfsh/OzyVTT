@@ -224,7 +224,7 @@ export function setAnnotationMovable(state: GameState, id: string, movableByOthe
   state.combat = { ...state.combat, annotations: state.combat.annotations.map((annotation) => annotation.id === id ? { ...annotation, movableByOthers } : annotation) };
 }
 
-/** Soonest future expiry among current annotations, or null if none are ephemeral — used to schedule the next expiry re-broadcast. */
+/** Soonest future expiry among current annotations, or null if none are ephemeral - used to schedule the next expiry re-broadcast. */
 export function nextAnnotationExpiry(state: GameState, now: number): number | null {
   const expiries = state.combat.annotations
     .map((annotation) => annotation.expiresAt)

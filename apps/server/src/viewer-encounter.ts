@@ -26,6 +26,7 @@ export function projectViewerInitiative(state: GameState): ViewerInitiative {
 
 export function projectViewerEncounterScene(state: GameState, now = Date.now()): ViewerEncounterScene {
   if (!state.combat.active || !state.combat.mapAssetId) return { mapAssetId: null, tokens: [], annotations: [] };
+  const fog = { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) };
   const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
   return {
     mapAssetId: state.combat.mapAssetId,
@@ -40,6 +41,8 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
         active: state.combat.turnActorId === actor.id,
         health: healthBandOf(actor.hp),
         conditions: conditionLabels(actor),
+        // Ids parallel the labels so the shared screen picks the same glyphs as the table; public actors only.
+        conditionIds: actor.conditions.map((condition) => condition.id),
         ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {})
       }] : [];
     }),
@@ -48,7 +51,8 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
     annotations: state.combat.annotations.flatMap((annotation) =>
       annotation.visibility === "public" && (annotation.expiresAt === null || annotation.expiresAt > now)
         ? [{ id: annotation.id, kind: annotation.kind, shape: annotation.shape, origin: annotation.geometry.origin, target: annotation.geometry.target, sizeFeet: annotation.geometry.sizeFeet, color: annotation.color, label: annotation.label }]
-        : [])
+        : []),
+    fog
   };
 }
 

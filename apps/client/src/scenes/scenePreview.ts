@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * Which prepared scene the GM is privately previewing/staging, if any. This is a purely local GM
- * concern — it never touches the server or the players' view; it only decides which scene the GM's own
+ * concern - it never touches the server or the players' view; it only decides which scene the GM's own
  * battle map renders for arranging tokens. Cleared when the GM closes the preview or a scene goes live.
  * A module store (like the targeting store) so the ScenePanel and the main table view stay in sync.
  */

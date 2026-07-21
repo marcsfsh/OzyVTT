@@ -8,6 +8,57 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
+  `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
+  (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
+  linked conditions, escape DCs, onEnd grants, and endsWithTag cascades; typed damage with automatic
+  resistance/immunity/vulnerability breakdowns; advantage/disadvantage aggregation with explainable
+  sources (incl. 2024 prone distance rule + unconscious-adjacent auto-crit); PC dying state machine
+  with death-save rolls; commands `effect.add/end`, `death-save.roll`, `encounter.set-rules-mode`,
+  `actor.rest`, and (slice 2, same day) reaction prompts as first-class pending windows — a hit
+  parks its damage on `pendingReactions`, `reaction.answer` applies half (Uncanny Dodge) or full,
+  `reaction.dismiss` for manual bookkeeping — plus incapacitation gating
+  (`condition.incapacitated`), a server-computed `available-actions` read (shared evaluation with
+  enforcement), and archive v3 `postEncounterState` (47 commands total); SRD bundle enriched
+  (126/178 structured Multiattacks, 47 on-hit riders, 146 typed-defense monsters); enriched
+  replay-party fixtures + a regression suite derived from the two archived encounter runs.
+- **SRD combat-rules gap closure, tiers A–D (ADR-0020 second amendment, 2026-07-19, same PR #38).**
+  Full SRD 5.2.1 cross-audit implemented in four tiers: every condition's modifiers (frightened,
+  invisible, grappled-vs-grappler, charmed-charmer, paralyzed auto-crit, physical-save auto-fail,
+  restrained Dex-save disadvantage, exhaustion −2×level with level-6 death, petrified defenses,
+  condition immunities — GM-only, stripped from player views); the eleven 2024 generic actions +
+  Unarmed Strike/Grapple/Shove/Escape as a frozen-id builtin catalog for any combatant (Dodge/Help/
+  Hide/Ready with real effect mechanics); movement budgets (`speedFeet`, `movementUsedFeet`, Dash,
+  exhaustion, prone stand cost, `actor.set-speed`, GM-only overrides) and opportunity attacks as
+  `leaves-reach` prompts answered by a real off-turn melee attack (hidden movers prompt no one);
+  range/reach/long-range/close-combat validation with normal/max range bands in the ETL;
+  GM-adjudicated cover (±AC and Dex saves, total-cover block); concentration (one-at-a-time,
+  damage-prompted CON saves, incapacitation/0-HP breaks); 2024 surprise (initiative disadvantage);
+  short rests (per-short-rest pools only, no hit dice); underwater fights
+  (`encounter.set-environment`); nonlethal knock-out; a falling-damage dice helper. 81-test
+  regression suite with SRD citations. Deferred (documented in the amendment): two-weapon
+  fighting, weapon mastery, mounted, jumping, burn/suffocation timers, breaking objects, hit
+  dice, vision/LoS/auto-cover, difficult terrain. Roadmap:
+  `docs/product/rules-engine-followup-assessment.md` §4.
+- **Foundry/AboveVTT adoption pack (2026-07-19, same PR #38; ADR-0020 third amendment +
+  ADR-0021).** Design-study adoption (no code copied; AGPL/convention): **recharge abilities**
+  (structured `uses.per: "recharge"` pools from the ETL — 86 across the bundle incl. 13
+  upstream-mislabeled die-range recharges — auto-rolled d6 at the owner's turn start with narrated
+  dice, re-armed by encounter start and rests); **legendary actions + Legendary Resistance**
+  (`combat.legendaryUsed` per-round pool refreshing at the creature's own turn start, economy
+  blocks for own-turn/over-pool, GM `turn.use-legendary`, LR as a GM commit flag on `save.answer`
+  that flips a previewed failure into the success outcome from an N/day `actionUses` pool; ⭐
+  off-turn console switch in the tracker; pools stripped from player views); **hit dice**
+  (`Actor.hitDice` seeded from hit-point formulas, `actor.spend-hit-dice` heals roll+Con min 1
+  per die through `healActor` with the dice in the shared roll history, long rest refills, roster
+  gains the missing Short/Long rest buttons + stepper, pool owner-only in projections);
+  **condition glyphs** (original SVG icons for all 15 SRD conditions on map tokens, shared
+  table/replay/viewer via `conditionIds`); **scene thumbnails** (cached one-fetch-per-asset map
+  previews in the Scenes strip chips); **manual fog of war v1** (ADR-0021 — per-scene reveal/hide
+  rect strokes, three GM-only commands with parked-scene `sceneId` prep, GM-dim/player-solid
+  mask, timeline-neutral, presentation-not-security-boundary; the BUILD_PLAN Phase-2 gate item).
+  Regression suite now 104 tests + 7 fog tests; hit dice moved OFF the unsupported list above.
+
 - TypeScript monorepo: React/Vite client (`@vtt/web`) + authoritative Express + Socket.IO
   server (`@vtt/server`); packages `domain`, `rules-5e`, `schemas`, `api-contract`, `ui`,
   `content-srd-5.2.1`, `test-fixtures`.

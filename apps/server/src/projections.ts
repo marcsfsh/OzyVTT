@@ -1,4 +1,4 @@
-import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
+import type { Annotation, GameState, GmView, PlayerAnnotation, PlayerCombatView, PlayerEffect, PlayerHp, PlayerInitiativeEntry, PlayerRollRecord, PlayerView, PresenceStatus, RollRecord } from "@vtt/domain";
 import { healthBandOf } from "./hit-points.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -61,35 +61,75 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     initiative,
     tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : [],
     annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
-    // A hidden combatant's turn stays opaque: economy flags reset to idle rather than narrating its activity.
-    turn: currentIsPublic ? { ...state.combat.turn } : { actionUsed: false, bonusActionUsed: false },
+    // A hidden combatant's turn stays opaque: economy flags (and the compound-action instance /
+    // per-turn uses, which name stat-block action ids) reset to idle rather than narrating its activity.
+    turn: currentIsPublic
+      ? { actionUsed: state.combat.turn.actionUsed, bonusActionUsed: state.combat.turn.bonusActionUsed, actionInstance: state.combat.turn.actionInstance ? { actorId: state.combat.turn.actionInstance.actorId, components: { ...state.combat.turn.actionInstance.components } } : null, turnUses: { ...state.combat.turn.turnUses }, movementUsedFeet: state.combat.turn.movementUsedFeet }
+      // Hidden turn: movement spent would narrate a hidden combatant's activity - reset with the rest.
+      : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
+    rulesMode: state.combat.rulesMode,
+    rollMode: state.combat.rollMode,
+    underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
+    // The fog mask travels verbatim - it IS what players render, and it carries geometry only.
+    // Fog is never the security boundary: hidden actors/annotations are stripped above regardless.
+    fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
+    // legendaryUsed is deliberately absent: a monster's remaining legendary actions are GM knowledge
+    // (same rationale as the stripped actionUses), and the pool never drives player-side UI.
     // The whole table is rewound when the GM is reviewing an earlier turn; players see only the flag
-    // (a banner), never the turn labels — those can name hidden combatants.
+    // (a banner), never the turn labels - those can name hidden combatants.
     rewound: state.combat.historyCursor !== null,
     // A player sees only the saves their own claimed character owes. The source actor id never
     // crosses the wire, and a hidden source's name is masked so gm-only attackers stay unnarrated.
     pendingSaves: state.combat.pendingSaves
       .filter((entry) => { const target = state.actors.find((actor) => actor.id === entry.targetActorId); return target !== undefined && target.ownerSessionId !== null && target.ownerSessionId === playerSessionId; })
+      .map(({ sourceActorId, endsEffects: _endsEffects, ...entry }) => ({
+        ...entry,
+        sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName,
+        // The on-fail effect's source ids never cross the wire either (same masking as effects);
+        // concentration effect references (endsEffects) are server bookkeeping and are stripped.
+        ...(entry.onFailEffect ? { onFailEffect: { ...entry.onFailEffect, sourceActorId: null, sourceName: entry.onFailEffect.sourceActorId !== null && !publicActorIds.has(entry.onFailEffect.sourceActorId) ? "A hidden threat" : entry.onFailEffect.sourceName } } : {})
+      })),
+    // Same boundary as saves: a player sees only their own claimed character's reaction prompts,
+    // with the source actor id stripped and a hidden source's name masked.
+    pendingReactions: state.combat.pendingReactions
+      .filter((entry) => { const reactor = state.actors.find((actor) => actor.id === entry.actorId); return reactor !== undefined && reactor.ownerSessionId !== null && reactor.ownerSessionId === playerSessionId; })
       .map(({ sourceActorId, ...entry }) => ({ ...entry, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : entry.sourceName }))
   };
 }
 
+/**
+ * An effect as players see it (viewer safety): source ids never cross the wire, and a hidden
+ * source's name is masked - a player learns "Grappled by A hidden threat", never who.
+ */
+function playerEffect(effect: GameState["actors"][number]["effects"][number], publicActorIds: ReadonlySet<string>): PlayerEffect {
+  const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
+  return { ...visible, sourceName: sourceActorId !== null && !publicActorIds.has(sourceActorId) ? "A hidden threat" : effect.sourceName };
+}
+
 export function projectPlayerView(state: GameState, playerSessionId: string | undefined, presenceFor: PresenceLookup, now = Date.now()): PlayerView {
+  const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id));
   return {
     revision: state.revision,
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public").map((source) => {
-      const { notes: _notes, ownerSessionId, hp: _exactHp, ...actor } = source;
+      // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
+      // actionUses (limited-use spending names stat-block action ids - own claimed character only),
+      // conditionImmunities and legendary resources (monster defenses are GM knowledge), and
+      // hitDice (a healing resource that tracks with exact HP - own claimed character only).
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Only your own claimed character's imported sheet travels to you; nobody else's does.
       const ownDefinition = mine && source.definitionId ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition : undefined;
       return {
         ...actor,
         hp: playerHp(source),
+        effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
         claimStatus: ownerSessionId === null ? "available" as const : mine ? "mine" as const : "claimed" as const,
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
-        ...(ownDefinition ? { definition: ownDefinition } : {})
+        ...(ownDefinition ? { definition: ownDefinition } : {}),
+        ...(mine ? { actionUses: { ...actionUses } } : {}),
+        ...(mine && hitDice ? { hitDice: { ...hitDice } } : {})
       };
     }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(safeRoll)
@@ -100,7 +140,7 @@ export function projectGmView(state: GameState, presenceFor: PresenceLookup, now
   return {
     ...state,
     // Ephemeral annotations (measurements ~5s, pings ~4s) must drop off the GM's own screen when
-    // they expire, not only when the next add prunes state — the scheduled expiry re-broadcast
+    // they expire, not only when the next add prunes state - the scheduled expiry re-broadcast
     // relies on this filter (the player/viewer projections already do the same).
     combat: { ...state.combat, annotations: state.combat.annotations.filter((annotation) => annotation.expiresAt === null || annotation.expiresAt > now) },
     actors: state.actors.map((actor) => ({ ...actor, presence: actor.ownerSessionId === null ? null : presenceFor(actor.ownerSessionId) }))

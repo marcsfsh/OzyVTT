@@ -12,6 +12,7 @@ import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
+import { SceneSwitcher } from "./scenes/SceneSwitcher";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { SceneBuilder } from "./scenes/SceneBuilder";
 import { EncounterMap } from "./scene/EncounterMap";
@@ -47,6 +48,7 @@ function App() {
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
   const [gmToken, setGmToken] = useState<string | null>(null);
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
+  const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const previewSceneId = usePreviewScene();
@@ -90,6 +92,23 @@ function App() {
   }, []);
   useEffect(() => { localStorage.setItem("vtt.dock-position", dockPosition); }, [dockPosition]);
   useEffect(() => { localStorage.setItem("vtt.dock-width", String(dockWidth)); }, [dockWidth]);
+  // The map library loads with the GM session (refreshed on returning to the Encounter tab) so
+  // encounter setup can pick a battlemap directly - starting a fight never requires a Maps-tab visit.
+  useEffect(() => {
+    if (!gmToken || (gmTab !== "table" && gmTab !== "maps")) return;
+    let cancelled = false;
+    fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${gmToken}` } })
+      .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error?.message ?? "Couldn't load the map library."); return body.data.assets as ReadonlyArray<MapSelection & { kind: MapSelection["kind"] }>; })
+      .then((assets) => {
+        if (cancelled) return;
+        const library = assets.map((asset) => ({ id: asset.id, name: asset.name, kind: asset.kind, width: asset.width, height: asset.height, calibration: asset.calibration, scale: asset.scale }));
+        setMapLibrary(library);
+        // Default the selection to the newest battlemap so Start is one click away on first login.
+        setSelectedMap((current) => current && library.some((map) => map.id === current.id) ? current : library.find((map) => map.kind === "battlemap") ?? null);
+      })
+      .catch(() => { /* the Maps tab surfaces library errors; setup just stays pickable-empty */ });
+    return () => { cancelled = true; };
+  }, [gmToken, gmTab]);
 
   const joinPlayer = () => {
     setBusy(true);
@@ -150,12 +169,15 @@ function App() {
   };
 
   const mapToken = mode === "gm" ? gmToken : localStorage.getItem(PLAYER_TOKEN_KEY);
-  const combatMapActive = !!state && state.combat.active && !!state.combat.mapAssetId;
+  // Docking is available whenever a map is loaded (a live scene), not only once combat starts, so the
+  // GM can position the tracker during encounter setup too (report #9/#6). Players' projection nulls
+  // mapAssetId until combat is active, so this stays GM-side and never affects the viewer.
+  const combatMapActive = !!state && !!state.combat.mapAssetId;
   const showDocked = combatMapActive && dockPosition !== "sidebar";
   const encounterDock = combatMapActive ? { position: dockPosition, onChange: setDockPosition } : undefined;
   const encounterPanel = state
     ? (mode === "gm"
-      ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} dock={encounterDock} />
+      ? <EncounterPanel role="gm" state={state as GmView} selectedMap={selectedMap} mapLibrary={mapLibrary} onSelectMap={setSelectedMap} dock={encounterDock} />
       : <EncounterPanel role="player" state={state as PlayerView} dock={encounterDock} />)
     : null;
   // The map dock is present whenever combat is running (even in sidebar mode) so its in-map dock
@@ -164,14 +186,14 @@ function App() {
     ? { position: dockPosition, onChange: setDockPosition, width: dockWidth, onWidthChange: setDockWidth, node: showDocked ? encounterPanel : null }
     : undefined;
   // GM-private scene staging: when the GM is previewing a prepared scene, the table map renders THAT
-  // scene (its map + staged tokens) for arranging — players and the shared screen are unaffected.
+  // scene (its map + staged tokens) for arranging - players and the shared screen are unaffected.
   const previewScene = mode === "gm" && previewSceneId ? (state as GmView | null)?.combat.scenes.find((scene) => scene.id === previewSceneId) ?? null : null;
   useEffect(() => {
     // Drop the preview if its scene was removed or went live (it's the live map then, not a private one).
     if (previewSceneId && !(mode === "gm" && (state as GmView | null)?.combat.scenes.some((scene) => scene.id === previewSceneId && scene.id !== (state as GmView).combat.activeSceneId))) setPreviewScene(null);
   }, [previewSceneId, state, mode]);
   useEffect(() => {
-    // Staging renders on the table map — make sure the GM is looking at it, and close the picker.
+    // Staging renders on the table map - make sure the GM is looking at it, and close the picker.
     if (previewScene) { setGmTab("table"); setScenePrepOpen(false); }
   }, [previewScene]);
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
@@ -191,7 +213,12 @@ function App() {
       <button className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</button>
     </section>}
     {mode !== "home" && state && <>
-      <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />
+      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
+          encounter it duplicates the combat tracker at several times the size, so it collapses to
+          one quiet line - still one tap away for a player joining mid-fight. */}
+      {state.combat.active
+        ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
+        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
 
       {mode === "gm" && <nav className="gm-tabs" aria-label="GM sections">
         {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}
@@ -199,11 +226,15 @@ function App() {
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
         <section className="table">
+          {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
+              Guarded on the field, not just the mode - the first state after login can still be
+              player-projected (no scenes) until the session join lands. */}
+          {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <SceneSwitcher scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onFeedback={(text) => setNotice({ tone: "error", text })} />}
           {previewScene ? <>
-            <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> — only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
-            <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} />
+            <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> - only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
+            <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} fog={previewScene.combat.fog} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} />
           </> : <>
-          {!state.combat.active && state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "Scene is live — add combatants and start the encounter from the panel below." : "Waiting for the GM to start combat."}</p>}
+          {!state.combat.active && state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "Scene is live - add combatants and start the encounter from the panel below." : "Waiting for the GM to start combat."}</p>}
           {!state.combat.active && !state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
           {/* Render the map once a scene is live (has a map) even before combat starts, so making a
               prepared scene live shows it instead of a blank "no map" page. Players still only get the
@@ -219,9 +250,10 @@ function App() {
             revision={state.revision}
             activeActorId={state.combat.turnActorId}
             reactionsUsed={state.combat.reactionsUsed}
+            fog={state.combat.fog}
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
-          /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter — or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
+          /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
           {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>
@@ -229,14 +261,22 @@ function App() {
           {previewScene
             ? <SceneBuilder scene={previewScene} actors={(state as GmView).actors} revision={state.revision} />
             : !showDocked && encounterPanel}
-          <DicePanel role={mode} state={state} />
-          <CombatLogPanel />
+          {/* Mid-fight the column belongs to the tracker; dice and the log sit one tap away. */}
+          {state.combat.active
+            ? <>
+                <details className="sidebar-collapsed"><summary>Dice</summary><DicePanel role={mode} state={state} /></details>
+                <details className="sidebar-collapsed"><summary>Combat log</summary><CombatLogPanel /></details>
+              </>
+            : <>
+                <DicePanel role={mode} state={state} />
+                <CombatLogPanel />
+              </>}
           {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
         </div>
       </div>}
 
       {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
-      {mode === "gm" && gmToken && gmTab === "maps" && <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} />}
+      {/* Scenes moved to the Encounter tab's switcher strip; Map Setup is purely library management. */}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
 
@@ -247,7 +287,7 @@ function App() {
       {mode === "gm" && gmToken && scenePrepOpen && state && <div className="scene-prep-backdrop" role="dialog" aria-modal="true" aria-label="Scene prep" onPointerDown={(event) => { if (event.target === event.currentTarget) setScenePrepOpen(false); }}>
         <div className="scene-prep-modal">
           <button type="button" className="scene-prep-close" aria-label="Close scene prep" onClick={() => setScenePrepOpen(false)}>✕</button>
-          <ScenePanel scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId} combatActive={(state as GmView).combat.active} combatRound={(state as GmView).combat.round} actors={(state as GmView).actors} selectedMap={selectedMap} />
+          <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} />
         </div>
       </div>}
 
