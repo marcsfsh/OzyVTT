@@ -76,7 +76,7 @@ function GridAreaPreview({ start, end, handle }: Readonly<{ start: Point; end: P
 
 /** Two full-map guide lines that follow the point being placed/adjusted, to help line up a corner against printed grid art before or during a drag. */
 const CROSSHAIR_PRESETS: ReadonlyArray<{ color: string; label: string }> = [
-  { color: "#ffcf62", label: "Amber" }, { color: "#58c3ff", label: "Cyan" }, { color: "#ff6b6b", label: "Red" }, { color: "#8fff9a", label: "Green" }, { color: "#ffffff", label: "White" }
+  { color: "#2de2ff", label: "Cyan" }, { color: "#ff2e9a", label: "Magenta" }, { color: "#a45cff", label: "Violet" }, { color: "#ff2d5e", label: "Rose" }, { color: "#ffffff", label: "White" }
 ];
 function CrosshairOverlay({ points, width, height, color, opacity, dash }: Readonly<{ points: readonly Point[]; width: number; height: number; color: string; opacity: number; dash: string }>) {
   return <g className="grid-crosshair" aria-hidden="true" style={{ stroke: color, opacity, strokeDasharray: dash }}>
@@ -104,7 +104,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [pendingArea, setPendingArea] = useState<{ start: Point; end: Point } | null>(null);
   const [areaAction, setAreaAction] = useState<"move" | "resize" | null>(null);
   const [moveGrab, setMoveGrab] = useState<Point | null>(null);
-  const [crosshairColor, setCrosshairColor] = useState("#ffcf62");
+  const [crosshairColor, setCrosshairColor] = useState("#2de2ff");
   const [crosshairOpacity, setCrosshairOpacity] = useState(0.8);
   const [crosshairStyle, setCrosshairStyle] = useState<"dashed" | "dotted" | "solid">("dashed");
   const [previewCamera, setPreviewCamera] = useState<{ center: Point; zoom: number } | null>(null);

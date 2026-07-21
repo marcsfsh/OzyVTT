@@ -80,6 +80,11 @@
 .token-health-ring-track { fill: none; stroke: var(--void); stroke-opacity: .5; }
 .token-health-ring-fill { fill: none; }
 .token-health-aura { pointer-events: none; }
+/* Theme-aware health fill mirrored on the shared screen: bar fill, ring stroke, and aura stop-color
+   resolve the same themed brand token, so map health follows dark/dusk/light. */
+.hp-fill-healthy { fill: var(--cyan); stroke: var(--cyan); stop-color: var(--cyan); }
+.hp-fill-bloodied { fill: var(--magenta); stroke: var(--magenta); stop-color: var(--magenta); }
+.hp-fill-down { fill: var(--danger); stroke: var(--danger); stop-color: var(--danger); }
 /* Fog of war on the shared screen: solid --void cover — the audience sees only what the GM revealed. */
 .fog-overlay-player { fill: var(--void); }
 

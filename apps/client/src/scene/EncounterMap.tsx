@@ -85,7 +85,10 @@ function emitFogReset(payload: Parameters<ClientToServerEvents["fog:reset"]>[0])
   return new Promise<MutationResult>((resolve) => socket.emit("fog:reset", payload, resolve));
 }
 
-const PLAYER_COLORS = ["#58c3ff", "#ff6b6b", "#8fff9a", "#ffd43f", "#c58cff", "#ff9d5c", "#5cf2e0", "#ff8cc6"];
+// Brand-ramp annotation swatches (cyan -> indigo -> violet -> magenta -> rose -> pinks -> white); the
+// banned green/orange/yellow/amber hues are dropped so pings stay on-palette. Concrete hexes (not theme
+// vars) because the chosen color travels over the wire and must read the same on every screen.
+const PLAYER_COLORS = ["#2de2ff", "#5b6ef5", "#a45cff", "#ff2e9a", "#ff2d5e", "#ff8cc6", "#7cefff", "#ffffff"];
 
 function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
   return role === "gm" || ("mine" in annotation && annotation.mine);
@@ -168,7 +171,7 @@ export function EncounterMap({
     tabTimer.current = setTimeout(() => setClosingTab(null), 190);
   };
   const [gmLayer, setGmLayer] = useState(false);
-  const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ffb52e" : PLAYER_COLORS[0]));
+  const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ff2e9a" : PLAYER_COLORS[0]));
   useEffect(() => { localStorage.setItem("vtt.annotation-color", sessionColor); }, [sessionColor]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -645,7 +648,7 @@ export function EncounterMap({
           {preview && preview.data.kind === "shape" && <g className="annotation-shape live"><AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} color={sessionColor} /></g>}
           {activeTargeting?.mode === "template" && activeTargeting.template?.placed && calibration && !preview && (() => {
             const snap = snapShapePreview(calibration, activeTargeting.template.shape, activeTargeting.template.placed.origin, activeTargeting.template.placed.target);
-            return <g className="annotation-shape live"><AnnotationGlyph data={{ kind: "shape", shape: activeTargeting.template.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet }} arrowSize={arrowSize} labelSize={labelSize} color="#ff9d5c" /></g>;
+            return <g className="annotation-shape live"><AnnotationGlyph data={{ kind: "shape", shape: activeTargeting.template.shape, origin: snap.origin, target: snap.target, sizeFeet: snap.feet }} arrowSize={arrowSize} labelSize={labelSize} color="#ff2e9a" /></g>;
           })()}
 
           {/* GM fog: dimmed, above the map and shapes but below tokens - the GM always sees everything. */}

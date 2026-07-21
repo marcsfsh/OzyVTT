@@ -142,6 +142,11 @@
 .token-health-ring-fill { fill: none; }
 /* Soft health glow: purely decorative and larger than the token, so it must never capture pointer events. */
 .token-health-aura { pointer-events: none; }
+/* Theme-aware health fill: one band class drives the bar fill, ring stroke, and aura stop-color from
+   the same brand token, so map health follows dark/dusk/light instead of a baked dark-theme hex. */
+.hp-fill-healthy { fill: var(--cyan); stroke: var(--cyan); stop-color: var(--cyan); }
+.hp-fill-bloodied { fill: var(--magenta); stroke: var(--magenta); stop-color: var(--magenta); }
+.hp-fill-down { fill: var(--danger); stroke: var(--danger); stop-color: var(--danger); }
 /* Manual fog of war: --void veil (§6.5). The GM sees a dim veil (everything stays workable); players get solid cover. */
 .fog-overlay-gm { fill: var(--void); fill-opacity: .45; }
 .fog-overlay-player { fill: var(--void); }

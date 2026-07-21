@@ -180,11 +180,13 @@ export function hpFillFraction(hp: { current: number; maximum: number; temporary
 /** Health fraction -> a themed palette fill: cyan healthy (>50%), magenta bloodied (25-50%), danger
  * critical (<25%), matching the HP-bar bands in §6.7 and the initiative row's hp-* text classes.
  * Fixed hexes (not CSS custom properties) because SVG presentation attributes don't resolve var(). */
-export function healthFillColor(fraction: number): string {
+/** Band class for token health fill/stroke/stop-color. A CSS class (not a baked hex) so the
+    color resolves the themed --cyan/--magenta/--danger token and follows dark/dusk/light. */
+export function healthFillClass(fraction: number): string {
   const clamped = Math.max(0, Math.min(1, fraction));
-  if (clamped > 0.5) return "#2DE2FF"; // --cyan
-  if (clamped > 0.25) return "#FF2E9A"; // --magenta
-  return "#FF2D5E"; // --danger
+  if (clamped > 0.5) return "hp-fill-healthy"; // --cyan
+  if (clamped > 0.25) return "hp-fill-bloodied"; // --magenta
+  return "hp-fill-down"; // --danger
 }
 
 /**
@@ -195,7 +197,7 @@ export function healthFillColor(fraction: number): string {
 export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number; fraction: number }>) {
   const gradientId = useId();
   const clamped = Math.max(0, Math.min(1, fraction));
-  const color = healthFillColor(clamped);
+  const bandClass = healthFillClass(clamped);
   // Thin band hugging the body edge (0.5) out to 0.86 - ~35% thinner than before, and the peak sits
   // right at the edge so it reads as attached. The inner half is hidden behind the opaque body.
   const outer = sizePx * 0.86;
@@ -204,9 +206,9 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
     <title>{`${Math.round(clamped * 100)}% health`}</title>
     <defs>
       <radialGradient id={gradientId}>
-        <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-        <stop offset={`${edge}%`} stopColor={color} stopOpacity="0.5" />
-        <stop offset="100%" stopColor={color} stopOpacity="0" />
+        <stop className={bandClass} offset="0%" stopOpacity="0.5" />
+        <stop className={bandClass} offset={`${edge}%`} stopOpacity="0.5" />
+        <stop className={bandClass} offset="100%" stopOpacity="0" />
       </radialGradient>
     </defs>
     <circle r={outer} fill={`url(#${gradientId})`} />
@@ -222,7 +224,7 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
  */
 function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring"; fraction: number }>) {
   const clamped = Math.max(0, Math.min(1, fraction));
-  const color = healthFillColor(clamped);
+  const bandClass = healthFillClass(clamped);
   const title = `${Math.round(clamped * 100)}% health`;
   if (style === "ring") {
     const r = sizePx * 0.5 + Math.max(2, sizePx * 0.06);
@@ -232,7 +234,7 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
     return <g className="token-health-ring" transform="rotate(-90)">
       <title>{title}</title>
       <circle className="token-health-ring-track" r={r} fill="none" strokeWidth={strokeWidth} />
-      <circle className="token-health-ring-fill" r={r} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${circumference * clamped} ${circumference}`} />
+      <circle className={`token-health-ring-fill ${bandClass}`} r={r} fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${circumference * clamped} ${circumference}`} />
     </g>;
   }
   const width = sizePx * 0.92;
@@ -241,7 +243,7 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
   return <g className="token-health-bar">
     <title>{title}</title>
     <rect className="token-health-bar-track" x={-width / 2} y={y} width={width} height={height} rx={height / 2} />
-    <rect className="token-health-bar-fill" x={-width / 2} y={y} width={width * clamped} height={height} rx={height / 2} style={{ fill: color }} />
+    <rect className={`token-health-bar-fill ${bandClass}`} x={-width / 2} y={y} width={width * clamped} height={height} rx={height / 2} />
   </g>;
 }
 
