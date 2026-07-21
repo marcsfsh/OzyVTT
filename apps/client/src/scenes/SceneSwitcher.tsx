@@ -5,6 +5,7 @@ import { socket } from "../socket";
 import { useCachedMapThumbnail } from "../scene/mapImage";
 import { setPreviewScene } from "./scenePreview";
 import "./scene-switcher.css";
+import { useConfirm } from "../components/feedback";
 
 type Ack = (result: { ok: boolean; message?: string }) => void;
 
@@ -37,6 +38,7 @@ export function SceneSwitcher({ scenes, activeSceneId, combatActive, mapLibrary,
     });
   };
   const mapName = (mapAssetId: string) => (mapLibrary ?? []).find((map) => map.id === mapAssetId)?.name ?? "Battlemap";
+  const { confirm, dialog } = useConfirm();
 
   return <div className="scene-switcher" role="group" aria-label="Scenes">
     <span className="scene-switcher-label">Scenes</span>
@@ -51,11 +53,12 @@ export function SceneSwitcher({ scenes, activeSceneId, combatActive, mapLibrary,
           <small>{live ? "LIVE" : staging ? "staging" : `${scene.combat.initiative.length}⚔`}</small>
         </button>
         {!live && <button type="button" className="scene-chip-go" title={`Make “${scene.name}” live for the whole table${combatActive ? " (the current fight is parked and resumes when you switch back)" : ""}`}
-          onClick={() => { if (!combatActive || window.confirm(`Make “${scene.name}” live? Players and the shared screen switch now; the current fight is parked and resumes when you switch back.`)) { setPreviewScene(null); emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched."); } }}>▶</button>}
+          onClick={async () => { if (!combatActive || (await confirm({ title: "Make scene live?", body: `Make “${scene.name}” live? Players and the shared screen switch now; the current fight is parked and resumes when you switch back.`, confirmLabel: "Make live" }))) { setPreviewScene(null); emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched."); } }}>▶</button>}
         {!live && <button type="button" className="scene-chip-remove" title={`Remove “${scene.name}”`} aria-label={`Remove ${scene.name}`}
-          onClick={() => { if (window.confirm(`Remove “${scene.name}”?`)) { if (staging) setPreviewScene(null); emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed."); } }}>✕</button>}
+          onClick={async () => { if (await confirm({ title: "Remove scene?", body: `Remove “${scene.name}”?`, confirmLabel: "Remove", danger: true })) { if (staging) setPreviewScene(null); emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed."); } }}>✕</button>}
       </div>;
     })}
     <button type="button" className="scene-chip scene-chip-new" onClick={onNewScene}>+ New scene</button>
+    {dialog}
   </div>;
 }

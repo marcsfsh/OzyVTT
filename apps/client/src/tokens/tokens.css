@@ -1,35 +1,36 @@
-.token-library-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1.5rem; background: rgb(6 5 3 / 72%); }
-.token-library { width: min(100%, 40rem); max-height: 90vh; overflow-y: auto; padding: 1.4rem; border: 1px solid #6b5e4b; border-radius: .9rem; background: #1d1a14; box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 55%); }
+.token-library-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1.5rem; background: var(--overlay); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.token-library { width: min(100%, 40rem); max-height: 90vh; overflow-y: auto; padding: 1.4rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
 .token-library-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
-.token-library-head h2 { font-size: 1.5rem; margin: .15rem 0 0; }
+.token-library-head h2 { font-size: var(--fs-h2); font-family: var(--font-display); margin: .15rem 0 0; }
 .token-library-head button { padding: .4rem .7rem; text-align: center; }
 
-.token-upload { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: .7rem; align-items: end; margin-top: 1.1rem; padding: .9rem; border: 1px solid #403a2c; border-radius: .7rem; background: #17140f; }
-.token-upload label { color: #c8c0b1; font-size: .78rem; }
-.token-upload button { align-self: end; background: #9e6121; border: 0; text-align: center; padding: .8rem 1rem; }
+.token-upload { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: .7rem; align-items: end; margin-top: 1.1rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
+.token-upload label { color: var(--text-dim); font-size: .78rem; }
+.token-upload button { align-self: end; background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; padding: .8rem 1rem; }
+.token-upload button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 
 .token-library-filters { display: flex; gap: .7rem; margin-top: 1rem; }
 .token-library-filters input { flex: 1 1 auto; margin-top: 0; }
 .token-library-filters select { width: auto; margin-top: 0; }
 
-.token-library-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: .88rem; color: #efc474; }
+.token-library-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: .88rem; color: var(--text-dim); }
 
 .token-library-section { margin-top: 1.2rem; }
-.token-library-section h3 { margin: 0 0 .6rem; font: 700 .8rem/1 sans-serif; text-transform: uppercase; letter-spacing: .08em; color: #9f9789; }
-.token-library-empty { margin: 0; padding: 1.4rem; border: 1px dashed #6b5e4b; border-radius: .6rem; text-align: center; color: #c8c0b1; font-size: .9rem; }
+.token-library-section h3 { margin: 0 0 .6rem; font: 700 .8rem/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+.token-library-empty { margin: 0; padding: 1.4rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .9rem; }
 
 .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: .7rem; }
-.token-thumb { position: relative; display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: .6rem .4rem; border: 1px solid #403a2c; border-radius: .7rem; background: #17140f; }
-.token-thumb.selected { border-color: #f6c452; box-shadow: inset 0 0 0 1px #f6c452; }
-.token-thumb-image { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 50%; overflow: hidden; background: #2a2318; border: 1px solid #6b5e4b; }
+.token-thumb { position: relative; display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: .6rem .4rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); }
+.token-thumb.selected { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.token-thumb-image { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 50%; overflow: hidden; background: var(--surface-3); border: 1px solid var(--line-strong); }
 .token-thumb-image img { width: 100%; height: 100%; object-fit: cover; }
 .token-thumb-placeholder { font-size: 1.6rem; }
 .token-thumb-name { max-width: 100%; font-size: .78rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.token-thumb-badge { position: absolute; top: .3rem; right: .3rem; padding: .05rem .35rem; border-radius: .3rem; background: #6e431c; color: #ffdca0; font: 800 .55rem/1.4 sans-serif; letter-spacing: .05em; }
+.token-thumb-badge { position: absolute; top: .3rem; right: .3rem; padding: .05rem .35rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-3) 65%, var(--magenta)); color: var(--text); font: 800 .55rem/1.4 var(--font-body); letter-spacing: .05em; }
 
 .token-library-foot { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.4rem; }
 .token-library-foot button { padding: .7rem 1.2rem; text-align: center; }
-.token-library-remove { background: #5a1f1f; border: 1px solid #8a3333; }
-.token-library-remove:hover { border-color: #d9605a; }
+.token-library-remove { background: transparent; border: 1px solid var(--danger); color: var(--danger-hi); }
+.token-library-remove:hover { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 
 @media (max-width: 640px) { .token-upload { grid-template-columns: 1fr 1fr; } .token-upload button { grid-column: 1 / -1; } }

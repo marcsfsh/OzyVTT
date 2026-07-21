@@ -35,3 +35,51 @@ export function useConfirm() {
     : null;
   return { confirm, dialog };
 }
+
+type PromptOptions = { title: string; body?: string; defaultValue?: string; placeholder?: string; confirmLabel?: string; cancelLabel?: string };
+type PromptRequest = PromptOptions & { resolve: (value: string | null) => void };
+
+/**
+ * Styled replacement for window.prompt. `prompt(options)` returns a Promise<string | null>
+ * (trimmed value, or null on cancel/empty), plus a `dialog` element to render near the app root.
+ */
+export function usePrompt() {
+  const [request, setRequest] = useState<PromptRequest | null>(null);
+  const [value, setValue] = useState("");
+  const prompt = useCallback(
+    (options: PromptOptions) =>
+      new Promise<string | null>((resolve) => {
+        setValue(options.defaultValue ?? "");
+        setRequest({ ...options, resolve });
+      }),
+    []
+  );
+  const settle = (result: string | null) => { request?.resolve(result); setRequest(null); };
+  const dialog = request
+    ? <div className="confirm-overlay" role="presentation" onClick={() => settle(null)}>
+        <form
+          className="confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="prompt-title"
+          onClick={(event) => event.stopPropagation()}
+          onSubmit={(event) => { event.preventDefault(); const trimmed = value.trim(); settle(trimmed ? trimmed : null); }}
+        >
+          <h2 id="prompt-title">{request.title}</h2>
+          {request.body && <p>{request.body}</p>}
+          <input
+            autoFocus
+            value={value}
+            placeholder={request.placeholder}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Escape") settle(null); }}
+          />
+          <div className="confirm-actions">
+            <button type="button" className="secondary" onClick={() => settle(null)}>{request.cancelLabel ?? "Cancel"}</button>
+            <button type="submit">{request.confirmLabel ?? "OK"}</button>
+          </div>
+        </form>
+      </div>
+    : null;
+  return { prompt, dialog };
+}

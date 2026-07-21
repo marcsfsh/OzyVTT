@@ -11,6 +11,7 @@ import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
+import { useConfirm } from "../components/feedback";
 
 type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:use-legendary" | "turn:end" | "scene:activate";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
@@ -405,6 +406,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [message, setMessage] = useState("");
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{ message: string; run: () => Promise<MutationResult>; success: string } | null>(null);
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
@@ -508,12 +510,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     "Moved to the previous turn.",
     () => emitCommand("initiative:previous", { commandId: newId(), confirmDiscard: true, expectedRevision: state.revision })
   );
-  const end = () => {
-    if (!window.confirm("End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.")) return;
+  const end = async () => {
+    if (!(await askConfirm({ title: "End encounter?", body: "End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.", confirmLabel: "End encounter", danger: true }))) return;
     void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
   };
-  const remove = (actorId: string, name: string) => {
-    if (!window.confirm(`Remove ${name} from the roster?`)) return;
+  const remove = async (actorId: string, name: string) => {
+    if (!(await askConfirm({ title: "Remove combatant?", body: `Remove ${name} from the roster?`, confirmLabel: "Remove", danger: true }))) return;
     void run(() => emitCommand("actor:remove", { commandId: newId(), actorId, expectedRevision: state.revision }), `Removed ${name}.`);
   };
   const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string, options?: { nonlethal?: boolean }) => {
@@ -777,5 +779,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
     {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" onClose={() => setSheetActorId(null)} /> : null; })()}
+    {confirmDialog}
   </section>;
 }

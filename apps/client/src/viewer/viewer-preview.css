@@ -1,14 +1,14 @@
-.viewer-preview-panel { position: fixed; z-index: 50; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #756344; border-radius: .65rem; background: #100d09; box-shadow: 0 12px 32px rgb(0 0 0 / 55%); }
-.viewer-preview-titlebar { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border-bottom: 1px solid #4c3f2d; background: #211a10; cursor: move; touch-action: none; }
+.viewer-preview-panel { position: fixed; z-index: 50; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-1); box-shadow: var(--shadow-2); }
+.viewer-preview-titlebar { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border-bottom: 1px solid var(--line); background: var(--surface-2); cursor: move; touch-action: none; }
 .viewer-preview-titlebar strong { font-size: .85rem; }
-.viewer-preview-hint { flex: 1; color: #9f9789; font-size: .72rem; }
-.viewer-preview-action { padding: .3rem .6rem; border: 1px solid #6b5e4b; border-radius: .4rem; background: rgb(9 8 6 / 82%); color: #eee4d2; font-size: .72rem; font-weight: 700; cursor: pointer; }
-.viewer-preview-action:hover { border-color: #e8a743; }
-.viewer-preview-close { padding: 0 .4rem; border: 0; background: transparent; color: #cfc5b4; font-size: 1.1rem; line-height: 1; cursor: pointer; }
-.viewer-preview-close:hover { color: #ffb3a8; }
-.viewer-preview-body { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; background: #050504; }
-.viewer-preview-frame { flex: 1; width: 100%; height: 100%; border: 0; background: #050504; }
+.viewer-preview-hint { flex: 1; color: var(--text-muted); font-size: .72rem; }
+.viewer-preview-action { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-size: .72rem; font-weight: 700; cursor: pointer; }
+.viewer-preview-action:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.viewer-preview-close { padding: 0 .4rem; border: 0; background: transparent; color: var(--text-dim); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.viewer-preview-close:hover { color: var(--danger-hi); }
+.viewer-preview-body { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; background: var(--void); }
+.viewer-preview-frame { flex: 1; width: 100%; height: 100%; border: 0; background: var(--void); }
 /* While dragging the panel, cover the iframe so its own document doesn't swallow the pointer stream. */
 .viewer-preview-dragmask { position: absolute; inset: 0; z-index: 1; cursor: inherit; }
-.viewer-preview-empty { margin: auto; padding: 1rem; color: #aaa193; text-align: center; }
-.viewer-preview-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, #6b5e4b 50%); }
+.viewer-preview-empty { margin: auto; padding: 1rem; color: var(--text-muted); text-align: center; }
+.viewer-preview-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }

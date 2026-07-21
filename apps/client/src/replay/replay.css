@@ -1,39 +1,39 @@
 /* The generic .card caps at 32rem; a replay needs the room the table gets. */
 .card.replay-panel { max-width: none; outline: none; }
 .replay-panel { outline: none; }
-.replay-panel:focus-visible { box-shadow: 0 0 0 2px var(--accent, #58c3ff); }
+.replay-panel:focus-visible { box-shadow: 0 0 0 2px var(--info); }
 .replay-header { display: flex; align-items: flex-start; gap: 1rem; }
 .replay-header .replay-export { margin-left: auto; white-space: nowrap; }
 .replay-row-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
 .replay-header h2 { margin: 0; }
 .replay-meta { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.9rem; }
-.replay-error { color: #ff8f8f; }
+.replay-error { color: var(--danger-hi); }
 
 .replay-transport { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0 0.25rem; flex-wrap: wrap; }
 .replay-transport input[type="range"] { flex: 1; min-width: 8rem; }
-.replay-position { font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
+.replay-position { font-family: var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.8; white-space: nowrap; }
 .replay-step-label { margin: 0.25rem 0 0.75rem; }
 
 .replay-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); gap: 1rem; align-items: start; }
-.replay-stage svg { width: 100%; height: auto; max-height: 68vh; display: block; border-radius: 8px; background: #0b0e13; }
-.replay-stage-missing { display: grid; gap: 0.35rem; place-content: center; min-height: 14rem; border: 1px dashed rgba(255, 255, 255, 0.25); border-radius: 8px; padding: 1rem; text-align: center; opacity: 0.85; }
+.replay-stage svg { width: 100%; height: auto; max-height: 68vh; display: block; border-radius: var(--radius-md); background: var(--void); }
+.replay-stage-missing { display: grid; gap: 0.35rem; place-content: center; min-height: 14rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); padding: 1rem; text-align: center; opacity: 0.85; }
 .replay-token-hidden { opacity: 0.65; }
 .replay-token-hidden .encounter-token-body { stroke-dasharray: 4 3; }
 
 .replay-side h3 { margin: 0.25rem 0 0.4rem; font-size: 0.95rem; }
 .replay-initiative, .replay-log { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.3rem; }
-.replay-initiative li { display: grid; grid-template-columns: 1fr auto; gap: 0 0.5rem; padding: 0.35rem 0.55rem; border-radius: 6px; background: rgba(255, 255, 255, 0.05); }
-.replay-initiative li.active { background: rgba(88, 195, 255, 0.18); box-shadow: inset 2px 0 0 var(--accent, #58c3ff); }
-.replay-initiative li > strong { grid-column: 2; grid-row: 1; }
-.replay-init-hp { font-size: 0.82rem; opacity: 0.8; grid-column: 1; }
+.replay-initiative li { display: grid; grid-template-columns: 1fr auto; gap: 0 0.5rem; padding: 0.35rem 0.55rem; border-radius: var(--radius-sm); background: var(--surface-2); }
+.replay-initiative li.active { background: color-mix(in srgb, var(--magenta) 18%, transparent); box-shadow: inset 2px 0 0 var(--magenta), var(--glow-magenta-strong); }
+.replay-initiative li > strong { grid-column: 2; grid-row: 1; font-family: var(--font-mono); }
+.replay-init-hp { font-family: var(--font-mono); font-size: 0.82rem; opacity: 0.8; grid-column: 1; }
 .replay-init-conditions { font-size: 0.78rem; opacity: 0.7; grid-column: 1 / -1; }
-.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: 4px; padding: 0 0.3rem; margin-left: 0.4rem; }
-.replay-log li { padding: 0.3rem 0.55rem; border-left: 3px solid rgba(255, 255, 255, 0.25); border-radius: 4px; background: rgba(255, 255, 255, 0.04); font-size: 0.88rem; }
+.replay-hidden-tag { font-style: normal; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 0 0.3rem; margin-left: 0.4rem; }
+.replay-log li { padding: 0.3rem 0.55rem; border-left: 3px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 0.88rem; }
 .replay-log li.replay-log-gm { border-left-style: dashed; }
 .replay-log-empty { opacity: 0.7; }
 
 .replay-list { width: 100%; border-collapse: collapse; }
-.replay-list th, .replay-list td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.replay-list th, .replay-list td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
 .replay-list td:last-child { text-align: right; }
 
 @media (max-width: 900px) {

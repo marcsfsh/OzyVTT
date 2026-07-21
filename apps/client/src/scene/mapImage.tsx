@@ -177,15 +177,25 @@ export function hpFillFraction(hp: { current: number; maximum: number; temporary
   return exact.maximum > 0 ? Math.max(0, Math.min(1, exact.current / exact.maximum)) : 0;
 }
 
+/** Health fraction -> a Neon Horizon fill: cyan healthy (>50%), magenta bloodied (25-50%), danger
+ * critical (<25%), matching the HP-bar bands in §6.7 and the initiative row's hp-* text classes.
+ * Fixed hexes (not CSS custom properties) because SVG presentation attributes don't resolve var(). */
+export function healthFillColor(fraction: number): string {
+  const clamped = Math.max(0, Math.min(1, fraction));
+  if (clamped > 0.5) return "#2DE2FF"; // --cyan
+  if (clamped > 0.25) return "#FF2E9A"; // --magenta
+  return "#FF2D5E"; // --danger
+}
+
 /**
- * A soft green->red glow colored by the health fraction, hugging the token's edge and fading outward.
+ * A soft cyan->magenta->danger glow colored by the health fraction, hugging the token's edge and fading outward.
  * Rendered UNDER the token (before TokenGlyph) so the body AND the active-turn ring paint over it -
  * a glow around the token, not a wash across it, with no gap at the token edge. Image-pixel/SVG space.
  */
 export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number; fraction: number }>) {
   const gradientId = useId();
   const clamped = Math.max(0, Math.min(1, fraction));
-  const color = `hsl(${Math.round(120 * clamped)} 70% 45%)`;
+  const color = healthFillColor(clamped);
   // Thin band hugging the body edge (0.5) out to 0.86 - ~35% thinner than before, and the peak sits
   // right at the edge so it reads as attached. The inner half is hidden behind the opaque body.
   const outer = sizePx * 0.86;
@@ -205,14 +215,14 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
 
 /**
  * A richer token-health indicator shown in place of the coarse band dot when the GM opts into it:
- * a thin HP bar pinned under the token, or a green->red ring around its body (the aura style renders
+ * a thin HP bar pinned under the token, or a cyan->magenta->danger ring around its body (the aura style renders
  * separately, behind the token - see TokenHealthAura). The fill fraction is always audience-safe (the
  * server only sends this style when it may show, and exact HP never reaches non-owners - the fraction
  * is band-derived for them). Image-pixel/SVG space like the body.
  */
 function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring"; fraction: number }>) {
   const clamped = Math.max(0, Math.min(1, fraction));
-  const color = `hsl(${Math.round(120 * clamped)} 70% 45%)`;
+  const color = healthFillColor(clamped);
   const title = `${Math.round(clamped * 100)}% health`;
   if (style === "ring") {
     const r = sizePx * 0.5 + Math.max(2, sizePx * 0.06);

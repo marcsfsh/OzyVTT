@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
 import "./map-manager.css";
+import { usePrompt } from "../components/feedback";
 
 type Point = { x: number; y: number };
 type MapKind = "battlemap" | "regional" | "world";
@@ -118,6 +119,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [unit, setUnit] = useState("miles");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const { prompt, dialog } = usePrompt();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const selected = maps.find((map) => map.id === selectedId) ?? null;
@@ -374,7 +376,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
               <option value="">Unfiled</option>
               {folderNames.map((folder) => <option key={folder} value={folder}>{folder}</option>)}
             </select>
-            <button type="button" className="secondary" disabled={busy} onClick={() => { const folder = window.prompt("Move this map to a new folder:")?.trim(); if (folder) moveToFolder(folder); }}>New folder…</button>
+            <button type="button" className="secondary" disabled={busy} onClick={async () => { const folder = await prompt({ title: "New folder", body: "Move this map to a new folder.", placeholder: "Folder name", confirmLabel: "Move" }); if (folder) moveToFolder(folder); }}>New folder…</button>
           </div>
           {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
           <div className="calibration-instruction" id="calibration-instruction" role="status">
@@ -433,5 +435,6 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
       </div>}
       {maps.length === 0 && <p className="map-empty">No maps uploaded yet.</p>}
     </section>
+    {dialog}
   </>;
 }

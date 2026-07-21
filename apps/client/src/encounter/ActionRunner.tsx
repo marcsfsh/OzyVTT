@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePrompt } from "../components/feedback";
 import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
@@ -81,6 +82,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { prompt, dialog } = usePrompt();
   // A strict-mode rejection awaiting the GM's call - store state, so a resolve rolled from the
   // map's confirm bar surfaces the same override dialog here (ADR-0020).
   const blockedPrompt = useTargetingBlocked();
@@ -155,7 +157,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       <span><strong>Blocked:</strong> {blockedPrompt.blocked.message}</span>
       <div className="action-blocked-actions">
         <button type="button" className="secondary" onClick={() => clearBlockedPrompt()}>Cancel</button>
-        <button type="button" className="encounter-primary" onClick={() => { const pending = blockedPrompt; clearBlockedPrompt(); pending.retry({ reason: window.prompt("Override reason (logged for the table):", "GM override")?.trim() || "GM override" }); }}>Override</button>
+        <button type="button" className="encounter-primary" onClick={async () => { const pending = blockedPrompt; clearBlockedPrompt(); const reason = await prompt({ title: "Override reason", body: "Logged for the table.", defaultValue: "GM override", confirmLabel: "Override" }); pending.retry({ reason: reason || "GM override" }); }}>Override</button>
       </div>
     </div>}
     {attacksLeft > 0 && !picking && instance && <p className="action-instance-note" role="status">Remaining in this action: {componentLabel(instance)}.</p>}
@@ -304,5 +306,6 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       })()}
       {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next attack above.</p>}
     </div>}
+    {dialog}
   </div>;
 }

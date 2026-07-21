@@ -1,25 +1,25 @@
 /* Shared visual styling for measurement/shape annotations, used by both the encounter map
    (EncounterMap) and the shared-screen viewer (ViewerApp). Class-scoped only — no page reset. */
-.annotation-measurement line { stroke: #ffd463; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; }
-.annotation-measurement circle { fill: #ffd463; }
-.annotation-arrow { fill: #ffd463; stroke: none; }
-.annotation-measurement text, .annotation-shape-label { fill: #fff2c4; font: 700 13px sans-serif; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
+.annotation-measurement line { stroke: var(--magenta); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.annotation-measurement circle { fill: var(--magenta); }
+.annotation-arrow { fill: var(--magenta); stroke: none; }
+.annotation-measurement text, .annotation-shape-label { fill: var(--text); font: 700 13px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--void); stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
 .annotation-measurement.live line { stroke-dasharray: 6 5; }
 .annotation-measurement.expiring { animation: annotation-fade-out 5s ease-in forwards; }
 
-.annotation-shape-body { fill: rgb(88 195 255 / 18%); stroke: #58c3ff; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
-.annotation-shape.visibility-gm-only .annotation-shape-body { stroke: #ffb52e; stroke-dasharray: 7 5; fill: rgb(255 181 46 / 14%); }
-.annotation-shape.visibility-owner-only .annotation-shape-body { stroke: #b58cff; stroke-dasharray: 7 5; fill: rgb(181 140 255 / 14%); }
-.annotation-shape.visibility-owner-gm .annotation-shape-body { stroke: #ff8cc6; stroke-dasharray: 7 5; fill: rgb(255 140 198 / 14%); }
-.annotation-shape.visibility-gm-actor .annotation-shape-body { stroke: #7fe3b0; stroke-dasharray: 7 5; fill: rgb(127 227 176 / 14%); }
+.annotation-shape-body { fill: color-mix(in srgb, var(--info) 18%, transparent); stroke: var(--info); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.annotation-shape.visibility-gm-only .annotation-shape-body { stroke: var(--violet); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--violet) 14%, transparent); }
+.annotation-shape.visibility-owner-only .annotation-shape-body { stroke: var(--caution); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--caution) 14%, transparent); }
+.annotation-shape.visibility-owner-gm .annotation-shape-body { stroke: var(--magenta); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--magenta) 14%, transparent); }
+.annotation-shape.visibility-gm-actor .annotation-shape-body { stroke: var(--success); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--success) 14%, transparent); }
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
 @keyframes annotation-fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Pings: an expanding, pulsing ring + core dot + the sender's name. `color` is set inline per sender. */
-.annotation-ping { color: #ffd43f; pointer-events: none; }
+.annotation-ping { color: var(--magenta); pointer-events: none; }
 .annotation-ping-ring { fill: none; stroke: currentcolor; stroke-width: 3; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: annotation-ping-pulse 1.3s ease-out infinite; }
 .annotation-ping-core { fill: currentcolor; }
-.annotation-ping-label { fill: #fff2c4; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #0a0805; stroke-linejoin: round; font-weight: 800; }
+.annotation-ping-label { fill: var(--text); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--void); stroke-linejoin: round; font-weight: 800; }
 @keyframes annotation-ping-pulse { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.35); } }
 @media (prefers-reduced-motion: reduce) { .annotation-measurement.expiring, .annotation-ping-ring { animation: none; } }

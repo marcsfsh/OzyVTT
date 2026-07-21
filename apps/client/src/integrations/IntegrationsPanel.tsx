@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { IntegrationScopeSchema, type CredentialAuditEvent, type IntegrationCredentialMetadata, type IntegrationScope } from "@vtt/api-contract";
 import { ApiReference } from "./ApiReference";
+import { useConfirm } from "../components/feedback";
 
 const SCOPES = IntegrationScopeSchema.options;
 
@@ -23,6 +24,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [copyConfirmed, setCopyConfirmed] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [auditEvents, setAuditEvents] = useState<CredentialAuditEvent[]>([]);
+  const { confirm, dialog } = useConfirm();
 
   const loadCredentials = () => {
     api("/api/v1/gm/integration-credentials", gmToken).then((body) => setCredentials(body.data.credentials)).catch((error) => setFeedback((error as Error).message));
@@ -52,7 +54,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   };
 
   const rotate = async (credential: IntegrationCredentialMetadata) => {
-    if (!window.confirm(`Rotate "${credential.name}"? The current secret stops working immediately, and every integration using it must switch to the new one.`)) return;
+    if (!(await confirm({ title: "Rotate credential?", body: `Rotate "${credential.name}"? The current secret stops working immediately, and every integration using it must switch to the new one.`, confirmLabel: "Rotate", danger: true }))) return;
     try {
       const body = await api(`/api/v1/gm/integration-credentials/${credential.id}/rotate`, gmToken, { method: "POST", body: JSON.stringify({}) });
       setIssued({ name: credential.name, token: body.data.token, rotated: true });
@@ -62,7 +64,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   };
 
   const revoke = async (credential: IntegrationCredentialMetadata) => {
-    if (!window.confirm(`Revoke "${credential.name}"? Access is denied immediately and cannot be undone; issue a new credential if it is needed again.`)) return;
+    if (!(await confirm({ title: "Revoke credential?", body: `Revoke "${credential.name}"? Access is denied immediately and cannot be undone; issue a new credential if it is needed again.`, confirmLabel: "Revoke", danger: true }))) return;
     try { await api(`/api/v1/gm/integration-credentials/${credential.id}/revoke`, gmToken, { method: "POST" }); setFeedback(`"${credential.name}" revoked.`); loadCredentials(); }
     catch (error) { setFeedback((error as Error).message); }
   };
@@ -110,5 +112,6 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       </li>)}
     </ul>}
     <ApiReference gmToken={gmToken} />
+    {dialog}
   </section>;
 }

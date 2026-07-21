@@ -21,7 +21,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle } from "@vtt/ui";
+import { ThemeToggle, Tabs } from "@vtt/ui";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
 async function api(path: string, init?: RequestInit) {
@@ -238,9 +238,13 @@ function App() {
         ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
         : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
 
-      {mode === "gm" && <nav className="gm-tabs" aria-label="GM sections">
-        {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}
-      </nav>}
+      {mode === "gm" && <Tabs
+        className="gm-tabs"
+        ariaLabel="GM sections"
+        tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+        activeId={gmTab}
+        onChange={(id) => setGmTab(id as GmTab)}
+      />}
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
