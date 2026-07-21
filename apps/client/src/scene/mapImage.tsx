@@ -145,7 +145,7 @@ export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, body
  * at a glance instead of "P, P". Unknown ids fall back to the initial letter. Shared by the table
  * client and the viewer; drawn as single filled paths (fill-rule evenodd carves the cutouts).
  */
-const CONDITION_GLYPHS: Record<string, string> = {
+export const CONDITION_GLYPHS: Record<string, string> = {
   blinded: "M8 4.6C4.9 4.6 2.6 8 2.6 8s2.3 3.4 5.4 3.4S13.4 8 13.4 8 11.1 4.6 8 4.6zm0 1.9A1.5 1.5 0 1 1 8 9.5 1.5 1.5 0 0 1 8 6.5zM3.9 2.8l9.3 9.3-1.1 1.1L2.8 3.9z",
   charmed: "M8 13.4 3.4 8.8a3 3 0 0 1 4.2-4.2l.4.4.4-.4a3 3 0 0 1 4.2 4.2z",
   deafened: "M3 6.2v3.6h2.4L9 12.8V3.2L5.4 6.2H3zM12.1 3l1.1 1.1-8.2 8.2-1.1-1.1z",
