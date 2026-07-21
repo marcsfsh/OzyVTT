@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CombatLogEntry, GameState } from "@vtt/domain";
+import { Button } from "@vtt/ui";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph } from "../scene/annotationGlyph";
 import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
@@ -111,7 +112,7 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
   }, [playing, index, steps.length]);
   useEffect(() => { containerRef.current?.focus(); }, [document]);
 
-  if (error) return <section className="card replay-panel"><h2>Encounter replay</h2><p className="replay-error">{error}</p><button className="secondary" onClick={onBack}>Back to replays</button></section>;
+  if (error) return <section className="card replay-panel"><h2>Encounter replay</h2><p className="replay-error">{error}</p><Button variant="secondary" onClick={onBack}>Back to replays</Button></section>;
   if (!document || !step) return <section className="card replay-panel"><h2>Encounter replay</h2><p>Loading the recording…</p></section>;
 
   const turnLog = document.log.filter((entry) => entry.revision > step.from && entry.revision <= step.to);
@@ -128,12 +129,12 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
     }}
   >
     <div className="replay-header">
-      <button className="secondary" onClick={onBack}>← All replays</button>
+      <Button variant="secondary" onClick={onBack}>← All replays</Button>
       <div>
         <h2>Encounter replay</h2>
         <p className="replay-meta">{when(document.startedAt)} → {when(document.endedAt)} · {document.turns.length} recorded turns</p>
       </div>
-      <button className="secondary replay-export" onClick={() => exportDocument(summary.id, summary.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks.">⬇ Export JSON</button>
+      <Button variant="secondary" className="replay-export" onClick={() => exportDocument(summary.id, summary.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks.">⬇ Export JSON</Button>
     </div>
     <div className="replay-transport" role="group" aria-label="Replay controls">
       <button onClick={() => move(-1)} disabled={index === 0} aria-label="Previous turn">⏮ Prev</button>

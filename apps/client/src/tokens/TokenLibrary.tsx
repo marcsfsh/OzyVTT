@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal } from "@vtt/ui";
+import { Modal, Button, Input, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { useTokenImageUrl } from "./tokenImages";
@@ -106,25 +106,25 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
     ariaLabel={`Token image for ${actorName}`}
     footer={<>
       {currentAssetId && <button type="button" className="token-library-remove" disabled={busy} onClick={() => assign(null)}>Remove image</button>}
-      <button type="button" disabled={busy} onClick={onClose}>Done</button>
+      <Button variant="secondary" disabled={busy} onClick={onClose}>Done</Button>
     </>}
   >
         <span className="eyebrow">TOKEN IMAGE</span>
         <form className="token-upload" onSubmit={upload}>
           <label>Image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !uploadName) setUploadName(next.name.replace(/\.[^.]+$/, "")); }} /></label>
-          <label>Name<input value={uploadName} onChange={(event) => setUploadName(event.target.value)} maxLength={80} placeholder="Goblin" /></label>
-          <label>Folder<input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="token-folder-list" /></label>
+          <label>Name<Input value={uploadName} onChange={(event) => setUploadName(event.target.value)} maxLength={80} placeholder="Goblin" /></label>
+          <label>Folder<Input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="token-folder-list" /></label>
           <datalist id="token-folder-list">{folders.map((name) => <option key={name} value={name} />)}</datalist>
           <button disabled={busy || !file}>Upload &amp; use</button>
         </form>
 
         <div className="token-library-filters" role="group" aria-label="Filter tokens">
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tokens" aria-label="Search tokens" />
-          <select value={folder} onChange={(event) => setFolder(event.target.value)} aria-label="Folder">
+          <Select value={folder} onChange={(event) => setFolder(event.target.value)} aria-label="Folder">
             <option value="all">All folders</option>
             <option value="__unfiled">Unfiled</option>
             {folders.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
+          </Select>
         </div>
 
         {message && <p className="token-library-feedback" role="status">{message}</p>}

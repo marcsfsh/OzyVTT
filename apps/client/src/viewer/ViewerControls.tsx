@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Select } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient } from "../scene/mapImage";
@@ -123,18 +124,18 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   return <section className="viewer-controls" aria-labelledby="viewer-controls-title">
     <div className="viewer-controls-heading"><div><span>SHARED DISPLAY</span><h2 id="viewer-controls-title">Table viewer</h2></div><strong className={connections.length ? "online" : ""}>{connections.length} connected</strong></div>
     <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
-    <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</select> : <code>{viewerUrl}</code>}<button onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</button></div>
+    <div className="viewer-address"><span>Second-screen address</span>{viewerUrls.length > 1 ? <Select aria-label="Second-screen network address" value={viewerUrl} onChange={(event) => setSelectedViewerUrl(event.target.value)}>{viewerUrls.map((url) => <option key={url} value={url}>{url}</option>)}</Select> : <code>{viewerUrl}</code>}<Button variant="secondary" onClick={() => void copy(viewerUrl, "Viewer address copied.")}>Copy address</Button></div>
     {!map && <p className="viewer-no-map-notice" role="status">Choose a map on the <strong>Maps</strong> tab first to present it here and unlock the focus/ping/measure tools below.</p>}
     <div className="viewer-control-actions">
-      <button disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</button>
-      <button disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</button>
-      <button disabled={busy || !presentation || (!presentationHasMap && !map)} onClick={() => void run(() => presentationHasMap
+      <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>Open viewer here</Button>
+      <Button variant="secondary" disabled={busy} onClick={() => void run(async () => { const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" }); setPairing(body.pairing); })}>Create pairing code</Button>
+      <Button variant="secondary" disabled={busy || !presentation || (!presentationHasMap && !map)} onClick={() => void run(() => presentationHasMap
         ? command({ type: "viewer.enabled.set", enabled: false }).then(() => undefined)
         : command({ type: "viewer.presentation.begin", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined)
-      )}>{presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}</button>
-      <button disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined))}>{mapIsPresented ? "Current map is live" : "Switch viewer to current map"}</button>
+      )}>{presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}</Button>
+      <Button variant="secondary" disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={() => void run(() => command({ type: "viewer.map.set", assetId: map!.assetId, altText: map!.altText, camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 } }).then(() => undefined))}>{mapIsPresented ? "Current map is live" : "Switch viewer to current map"}</Button>
     </div>
-    {pairing && <div className="viewer-pairing-code" role="status"><span>PAIRING CODE</span><strong className="tabular">{pairing.code}</strong><small>Expires <span className="tabular">{new Date(pairing.expiresAt).toLocaleTimeString()}</span></small><button onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</button></div>}
+    {pairing && <div className="viewer-pairing-code" role="status"><span>PAIRING CODE</span><strong className="tabular">{pairing.code}</strong><small>Expires <span className="tabular">{new Date(pairing.expiresAt).toLocaleTimeString()}</span></small><Button variant="secondary" onClick={() => void copy(pairing.code, "Pairing code copied.")}>Copy code</Button></div>}
 
     {map && <section className="viewer-tools" aria-labelledby="viewer-tools-title">
       <div><span className="viewer-tools-eyebrow">LIVE PRESENTATION TOOLS</span><h3 id="viewer-tools-title">Focus, ping, and measure</h3><p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Present the current map to enable these tools."}</p></div>
@@ -153,13 +154,13 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
         {tool === "focus" && <label>Zoom<input type="number" min="0.1" max="8" step="0.1" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>}
         {tool === "measure" && <label>Displayed distance<input value={labelOverride} onChange={(event) => setLabelOverride(event.target.value)} maxLength={64} placeholder={suggestedLabel || "Choose two points"} /></label>}
       </div>
-      <div className="viewer-tool-actions"><button disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount} onClick={sendTool}>{tool === "focus" ? "Send focus" : tool === "ping" ? "Send ping" : "Show measurement"}</button>{tool === "measure" && <button disabled={busy || !presentation?.measurement} onClick={() => void run(() => command({ type: "viewer.measurement.clear" }))}>Clear measurement</button>}</div>
+      <div className="viewer-tool-actions"><Button variant="primary" disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount} onClick={sendTool}>{tool === "focus" ? "Send focus" : tool === "ping" ? "Send ping" : "Show measurement"}</Button>{tool === "measure" && <Button variant="secondary" disabled={busy || !presentation?.measurement} onClick={() => void run(() => command({ type: "viewer.measurement.clear" }))}>Clear measurement</Button>}</div>
     </section>}
 
     {message && <p className="viewer-control-feedback" role="status">{message}</p>}
     {viewers.length > 0 && <div className="viewer-access-list"><h3>Paired displays</h3><ul>{viewers.map((viewer) => <li key={viewer.id}>
       <div><strong>{viewer.name}</strong><span>{viewer.revokedAt ? "Revoked" : connectedIds.has(viewer.id) ? "Connected" : "Offline"}</span></div>
-      {!viewer.revokedAt && <button disabled={busy} onClick={async () => { if (await confirm({ title: `Revoke ${viewer.name}?`, body: "This display immediately loses access and stops receiving updates.", confirmLabel: "Revoke", danger: true })) void run(async () => { await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" }); }); }}>Revoke</button>}
+      {!viewer.revokedAt && <Button variant="secondary" disabled={busy} onClick={async () => { if (await confirm({ title: `Revoke ${viewer.name}?`, body: "This display immediately loses access and stops receiving updates.", confirmLabel: "Revoke", danger: true })) void run(async () => { await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" }); }); }}>Revoke</Button>}
     </li>)}</ul></div>}
     {dialog}
   </section>;

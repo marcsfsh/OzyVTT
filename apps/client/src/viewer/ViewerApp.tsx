@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Input } from "@vtt/ui";
 import { bandFraction, FogOverlay, probeImageDimensions, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/mapImage";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
@@ -47,9 +48,9 @@ function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
     <span className="viewer-eyebrow">SHARED TABLE VIEWER</span>
     <h1 id="pair-title">Pair this screen</h1>
     <p>Ask the GM for the temporary pairing code. This screen receives only player-safe presentation data.</p>
-    <label>Display name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} autoComplete="off" /></label>
-    <label>Pairing code<input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="XXXX-XXXX-XXXX" inputMode="text" autoCapitalize="characters" autoComplete="one-time-code" autoFocus /></label>
-    <button disabled={busy}>{busy ? "Pairing…" : "Pair viewer"}</button>
+    <label>Display name<Input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} autoComplete="off" /></label>
+    <label>Pairing code<Input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="XXXX-XXXX-XXXX" inputMode="text" autoCapitalize="characters" autoComplete="one-time-code" autoFocus /></label>
+    <Button variant="primary" type="submit" disabled={busy}>{busy ? "Pairing…" : "Pair viewer"}</Button>
     <p className="viewer-feedback" role="alert">{message}</p>
   </form></main>;
 }

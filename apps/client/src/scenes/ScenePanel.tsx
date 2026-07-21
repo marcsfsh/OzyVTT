@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { GmActor } from "@vtt/domain";
+import { Button, Input, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import type { MapSelection } from "../maps/MapManager";
@@ -45,12 +46,12 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Reado
     <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>Name it, pick its battlemap and combatants - it appears in the Scenes strip, ready to stage or make live.</p></div>
 
     <form className="scene-create" onSubmit={(event) => { event.preventDefault(); create(); }}>
-      <label>Scene name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Goblin ambush" /></label>
+      <label>Scene name<Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Goblin ambush" /></label>
       {battlemaps.length > 0
         ? <label className="scene-create-map">On map
-            <select value={sceneMap?.id ?? ""} onChange={(event) => setSceneMapId(event.target.value)}>
+            <Select value={sceneMap?.id ?? ""} onChange={(event) => setSceneMapId(event.target.value)}>
               {battlemaps.map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
-            </select>
+            </Select>
           </label>
         : <p className="scene-create-map">{sceneMap ? <>On map <strong>{sceneMap.name}</strong></> : <em>Upload a battlemap on the Map Setup tab to use it here.</em>}</p>}
       <fieldset className="scene-combatants">
@@ -60,7 +61,7 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Reado
             <input type="checkbox" checked={chosen.includes(actor.id)} onChange={() => toggle(actor.id)} />{actor.name}{actor.visibility === "gm-only" ? " (hidden)" : ""}
           </label>)}</div>}
       </fieldset>
-      <button disabled={busy || !sceneMap}>Prepare scene</button>
+      <Button variant="primary" type="submit" disabled={busy || !sceneMap}>Prepare scene</Button>
     </form>
 
     {message && <p className="scene-feedback" role="status">{message}</p>}

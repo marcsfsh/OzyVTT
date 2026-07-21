@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { usePrompt } from "../components/feedback";
 import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
+import { Button } from "@vtt/ui";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
 import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBlocked, useTargetingBusy, useTargetingResult, type ResolveOptions } from "./targeting";
@@ -156,7 +157,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
     {blockedPrompt && <div className="action-blocked" role="alertdialog" aria-label="Rules check">
       <span><strong>Blocked:</strong> {blockedPrompt.blocked.message}</span>
       <div className="action-blocked-actions">
-        <button type="button" className="secondary" onClick={() => clearBlockedPrompt()}>Cancel</button>
+        <Button type="button" variant="secondary" onClick={() => clearBlockedPrompt()}>Cancel</Button>
         <button type="button" className="encounter-primary" onClick={async () => { const pending = blockedPrompt; clearBlockedPrompt(); const reason = await prompt({ title: "Override reason", body: "Logged for the table.", defaultValue: "GM override", confirmLabel: "Override" }); pending.retry({ reason: reason || "GM override" }); }}>Override</button>
       </div>
     </div>}
@@ -235,7 +236,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             })}</ul>
           </>}
       <div className="action-targeting-buttons">
-        <button type="button" className="secondary" disabled={resolveBusy} onClick={() => clearTargeting()}>Back</button>
+        <Button type="button" variant="secondary" disabled={resolveBusy} onClick={() => clearTargeting()}>Back</Button>
         <button type="button" className="encounter-primary" disabled={resolveBusy || (picking.mode === "template" ? !picking.template?.placed : picking.selected.length === 0)} onClick={resolve}>Roll {picking.action.name}</button>
       </div>
     </div>}
@@ -265,7 +266,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => previewResolve({ commit: false, rollMode: "advantage" })}>Adv</button>
             <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => previewResolve({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
             <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
-            <button type="button" className="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</button>
+            <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</Button>
           </span>
           <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="or type the d20" aria-label="Attack d20" value={attackDieEdit} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && attackDieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
         </div>;

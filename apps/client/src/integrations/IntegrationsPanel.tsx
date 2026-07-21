@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { IntegrationScopeSchema, type CredentialAuditEvent, type IntegrationCredentialMetadata, type IntegrationScope } from "@vtt/api-contract";
+import { Button, Input } from "@vtt/ui";
 import { ApiReference } from "./ApiReference";
 import { useConfirm } from "../components/feedback";
 
@@ -88,14 +89,14 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       <strong id="integration-secret-heading">{issued.rotated ? `New secret for "${issued.name}"` : `Secret for "${issued.name}"`}</strong>
       <p>This is the only time this secret will be shown. Copy it now - the server cannot redisplay it.</p>
       <code className="integration-token">{issued.token}</code>
-      <div className="integration-secret-actions"><button onClick={copyToken}>{copyConfirmed ? "Copied" : "Copy secret"}</button><button className="secondary" onClick={dismissIssued}>{copyConfirmed ? "Done" : "I have saved it elsewhere - dismiss"}</button></div>
+      <div className="integration-secret-actions"><Button variant="primary" onClick={copyToken}>{copyConfirmed ? "Copied" : "Copy secret"}</Button><Button variant="secondary" onClick={dismissIssued}>{copyConfirmed ? "Done" : "I have saved it elsewhere - dismiss"}</Button></div>
       {!copyConfirmed && <p className="integration-secret-warning">You have not confirmed a copy yet. Dismissing without saving this secret means it is lost for good.</p>}
     </div>}
     <form className="integration-form" onSubmit={createCredential}>
-      <label>Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Stream overlay" required maxLength={100} /></label>
+      <label>Name<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Stream overlay" required maxLength={100} /></label>
       <fieldset><legend>Scopes</legend>{SCOPES.map((scope) => <label key={scope} className="integration-scope"><input type="checkbox" checked={scopes.has(scope)} onChange={() => toggleScope(scope)} />{scope}</label>)}</fieldset>
       <label>Expires (optional)<input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label>
-      <button type="submit">Create credential</button>
+      <Button type="submit" variant="primary">Create credential</Button>
     </form>
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
     {credentials.length === 0 ? <p className="roster-empty">No integration credentials yet.</p> : <ul className="integration-list">
@@ -104,9 +105,9 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
         <p className="integration-scopes">{credential.scopes.join(", ")}{credential.gameId && ` · game ${credential.gameId}`}</p>
         <dl className="integration-meta"><div><dt>Created</dt><dd>{formatTimestamp(credential.createdAt)}</dd></div><div><dt>Expires</dt><dd>{formatTimestamp(credential.expiresAt)}</dd></div><div><dt>Last used</dt><dd>{formatTimestamp(credential.lastUsedAt)}</dd></div><div><dt>Revoked</dt><dd>{formatTimestamp(credential.revokedAt)}</dd></div></dl>
         <div className="integration-row-actions">
-          <button className="secondary" disabled={!!credential.revokedAt} onClick={() => rotate(credential)}>Rotate</button>
-          <button className="danger" disabled={!!credential.revokedAt} onClick={() => revoke(credential)}>Revoke</button>
-          <button className="link" onClick={() => viewAudit(credential)}>{auditFor === credential.id ? "Hide audit history" : "View audit history"}</button>
+          <Button variant="secondary" disabled={!!credential.revokedAt} onClick={() => rotate(credential)}>Rotate</Button>
+          <Button variant="destructive" disabled={!!credential.revokedAt} onClick={() => revoke(credential)}>Revoke</Button>
+          <Button variant="ghost" onClick={() => viewAudit(credential)}>{auditFor === credential.id ? "Hide audit history" : "View audit history"}</Button>
         </div>
         {auditFor === credential.id && <ul className="integration-audit">{auditEvents.map((event) => <li key={event.id}>{formatTimestamp(event.occurredAt)} - {event.type}</li>)}</ul>}
       </li>)}

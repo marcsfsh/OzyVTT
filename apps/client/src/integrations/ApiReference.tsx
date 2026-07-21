@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@vtt/ui";
 import "./api-reference.css";
 
 /**
@@ -353,7 +354,7 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
         The machine-readable contract lives at <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">/api/v1/openapi.json</a>; a full generated write-up ships in the repo at <code>docs/api-reference.md</code>.
       </p>
       {state.status === "loading" && <p>Loading the contract…</p>}
-      {state.status === "error" && <p className="api-reference-error">{state.message} <button className="link" onClick={load}>Retry</button></p>}
+      {state.status === "error" && <p className="api-reference-error">{state.message} <Button variant="ghost" onClick={load}>Retry</Button></p>}
       {document && <>
         <div className="api-reference-toolbar">
           <div className="api-lang-tabs" role="group" aria-label="Example request language">

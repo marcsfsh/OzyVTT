@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domain";
+import { Button, Input } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import { ConditionChips, ConditionEditor } from "../encounter/conditions";
@@ -35,7 +36,7 @@ function OwnHpTracker({ actorId, onFeedback }: Readonly<{ actorId: string; onFee
     });
   };
   return <div className="own-hp-tracker" role="group" aria-label="Track your hit points">
-    <input type="number" min="0" max="1000" placeholder="0" aria-label="Hit point amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
+    <Input type="number" min="0" max="1000" placeholder="0" aria-label="Hit point amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
     <button type="button" disabled={sending} onClick={() => send("actor:apply-damage", "Took")}>Damage</button>
     <button type="button" disabled={sending} onClick={() => send("actor:heal", "Healed")}>Heal</button>
     <button type="button" disabled={sending} onClick={() => send("actor:set-temp-hp", "Temp HP set to")}>Temp</button>
@@ -156,15 +157,15 @@ export function ActorRoster(props: Props) {
     {collapsed ? null : <div id="roster-body">
     {props.role === "gm" && <div className="roster-import">
       <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
-      <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</button>
+      <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
     </div>}
     {props.role === "player" && ownedActor && <div className="you-are-playing">
       <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
       <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
       {ownedActor.hitDice && <HitDiceSpender actorId={ownedActor.id} hitDice={ownedActor.hitDice} onFeedback={setFeedback} />}
       <div className="you-are-playing-buttons">
-        <button className="secondary" disabled={busy} onClick={() => setSheetOpen(true)}>View sheet</button>
-        <button className="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</button>
+        <Button variant="secondary" disabled={busy} onClick={() => setSheetOpen(true)}>View sheet</Button>
+        <Button variant="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</Button>
       </div>
     </div>}
     {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" onClose={() => setSheetOpen(false)} />}

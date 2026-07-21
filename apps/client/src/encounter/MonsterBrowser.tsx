@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
-import { Modal } from "@vtt/ui";
+import { Modal, Input } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -47,7 +47,7 @@ export function MonsterBrowser({ onClose }: Readonly<{ onClose: () => void }>) {
 
   return <Modal open onClose={onClose} size="lg" className="monster-browser" title="Add monsters" ariaLabel="Add monsters from the SRD bestiary">
     <div className="monster-browser-controls">
-      <input type="search" placeholder="Search by name or type…" aria-label="Search monsters" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
+      <Input type="search" placeholder="Search by name or type…" aria-label="Search monsters" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
       <label className="monster-browser-hidden"><input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} />Add as GM-only (hidden from players)</label>
     </div>
     {error && <p className="monster-browser-status" role="alert">{error}</p>}
