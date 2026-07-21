@@ -128,6 +128,10 @@ export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId:
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), commit: z.boolean().default(true), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), naturalRoll: z.number().int().min(1).max(20).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRollModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["auto", "manual"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Table-wide default for how token health shows on the map (GM). */
+export const SetHealthDisplaySchema = z.object({ commandId: z.string().uuid(), style: z.enum(["band", "bar", "ring", "aura"]), audience: z.enum(["gm", "all"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Per-token health-display override (GM); `display: null` clears the override so the token follows the table default. */
+export const SetActorHealthDisplaySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), display: z.object({ style: z.enum(["band", "bar", "ring", "aura"]), audience: z.enum(["gm", "all"]) }).strict().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetEnvironmentSchema = z.object({ commandId: z.string().uuid(), underwater: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Manual fog of war (GM-only). `sceneId` targets a parked scene's GM-private prep instead of the live table (the token-move pattern). */
 export const FogSetEnabledSchema = z.object({ commandId: z.string().uuid(), enabled: z.boolean(), sceneId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();

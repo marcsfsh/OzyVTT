@@ -88,7 +88,7 @@ describe("hit point tracking", () => {
     const viewer = projectViewerInitiative(game);
     // The shared screen now carries the coarse band + condition labels - and still no exact hp shape.
     for (const entry of viewer.entries) {
-      expect(Object.keys(entry).sort()).toEqual(["active", "actorId", "conditions", "health", "initiative", "name"]);
+      expect(Object.keys(entry).sort()).toEqual(["active", "actorId", "conditionIds", "conditions", "health", "initiative", "name"]);
       expect(["healthy", "bloodied", "down"]).toContain(entry.health);
     }
     expect(JSON.stringify(viewer)).not.toMatch(/"current"|"maximum"|"temporary"/);

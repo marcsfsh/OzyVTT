@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ActionResolution, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ActionResolution, ActorDefinition, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { RollControls, type DieMode } from "./RollControls";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
+import { InitiativeRow } from "./InitiativeList";
 import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
@@ -289,6 +290,42 @@ function OwnDyingTracker({ actorId, name, deathSaves, rollMode, isActingTurn }: 
   </div>;
 }
 
+/**
+ * A player's read-only view of their own attacks on their turn - the same rows the GM's action console
+ * shows (name + to-hit / reach / range / damage), sourced from their projected stat block. No rolling
+ * here: the GM still resolves attacks (the server authorizes that), so this is a reference, not a
+ * control surface.
+ */
+function PlayerActionList({ definition }: Readonly<{ definition: ActorDefinition }>) {
+  const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
+  const nameOf = (id: string) => definition.actions.find((candidate) => candidate.id === id)?.name ?? id;
+  const linesFor = (action: ActorDefinition["actions"][number]): string[] => {
+    const parts: string[] = [];
+    if (action.attack) parts.push(`${signed(action.attack.bonus)} to hit${action.attack.reachFeet ? `, reach ${action.attack.reachFeet} ft` : action.attack.rangeFeet ? `, range ${action.attack.rangeFeet} ft` : ""}`);
+    if (action.attack?.count && action.attack.count > 1) parts.push(`${action.attack.count} attacks`);
+    if (action.multiattack) parts.push(action.multiattack.map((component) => `${component.count}× ${nameOf(component.actionId)}`).join(" + "));
+    if (action.save) parts.push(`DC ${action.save.dc} ${action.save.ability.toUpperCase()} save`);
+    for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
+    return parts;
+  };
+  const combatActions = definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0 || action.multiattack);
+  if (combatActions.length === 0) return null;
+  return <div className="action-runner player-actions">
+    <p className="player-actions-label">Your actions <span>· the GM rolls these</span></p>
+    <ul className="action-list">
+      {combatActions.map((action) => {
+        const parts = linesFor(action);
+        return <li key={action.id}>
+          <div className="action-row action-row-readonly" title={action.description}>
+            <strong className="action-row-name">{action.name}</strong>
+            {parts.length > 0 && <ul className="action-row-summary">{parts.map((part) => <li key={part}>{part}</li>)}</ul>}
+          </div>
+        </li>;
+      })}
+    </ul>
+  </div>;
+}
+
 /** A player's own economy: Action/Bonus live only on their turn; the reaction is an off-turn resource, markable any time. Pressed = spent. */
 function PlayerTurnEconomy({ combat, myId, myTurn, mySpeedFeet }: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
   const [busy, setBusy] = useState(false);
@@ -322,9 +359,13 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [combat.turnActorId]);
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
-    // Same visual language as the GM tracker: one compact bar, dense one-line rows (score · name ·
-    // condition dots · health), and the player's OWN details (effects, dying, prompts, economy)
-    // grouped under their row - other combatants stay one glanceable line each.
+    // Active creature on top: rotate the turn order so the acting combatant leads, the rest follow in
+    // order (wrapping). The player's own economy rides their row - so on their turn it sits directly
+    // under the top/active row (feedback #3), and off-turn it stays with their row as a reaction toggle.
+    const activeIndex = combat.initiative.findIndex((entry) => entry.active);
+    const orderedInitiative = activeIndex > 0
+      ? [...combat.initiative.slice(activeIndex), ...combat.initiative.slice(0, activeIndex)]
+      : combat.initiative;
     return <section className="encounter-panel" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
@@ -332,34 +373,22 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
-      <ol className="initiative-list player">{combat.initiative.map((entry) => {
+      <ol className="initiative-list player">{orderedInitiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
         return <li key={entry.actorId} ref={entry.active ? activeRowRef : undefined} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
-          <div className="initiative-row-main">
-            {/* Foundry-style row for players too: avatar | name + band HP bar | initiative. Players
-                only know the health band, so the bar fills full/half/sliver. */}
-            <span className="initiative-avatar player-known" aria-hidden="true">{initialsOf(entry.name)}</span>
-            <span className="initiative-main-col">
-              <span className="initiative-name-line">
-                {entry.active && <span className="initiative-caret" aria-hidden="true">▶</span>}
-                <strong className="initiative-name-text">{entry.name}</strong>
-                {isMe && <span className="you-badge">YOU</span>}
-                <ConditionDots conditions={rowActor?.conditions ?? []} />
-                {entry.health !== "healthy" && <span className={`player-health hp-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}
-              </span>
-              <span className="initiative-hpbar" aria-hidden="true"><span className={`initiative-hpbar-fill hp-${entry.health}`} style={{ width: entry.health === "healthy" ? "100%" : entry.health === "bloodied" ? "45%" : "6%" }} /></span>
-            </span>
-            <span className="initiative-score-plain">{entry.score}</span>
-          </div>
+          {/* Foundry-style row shared with the shared-screen viewer so the two lists never drift. */}
+          <InitiativeRow entry={entry} self={isMe} />
+          {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
+          {/* On your turn, the same read-only attack list the GM sees for the active creature (#5.2, read-only). */}
+          {isMe && myTurn && rowActor?.definition && <PlayerActionList definition={rowActor.definition} />}
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={combat.rollMode} />}
         </li>;
       })}</ol>
-      {myId !== null && <div className="acting-console player"><PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={props.state.actors.find((actor) => actor.id === myId)?.speedFeet} /></div>}
       <DockPicker dock={props.dock} />
     </section>;
   }
@@ -368,9 +397,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character").map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
+  const [combatantSearch, setCombatantSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
@@ -497,13 +527,84 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
-  return <section className="encounter-panel" {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
+  // Setup picker, organized: pinned PCs (the party) first, then the last-used monsters/NPCs (server-
+  // tracked recency, GM-only), then a searchable list of everything else on the roster.
+  const RECENT_COUNT = 10;
+  const pcs = state.actors.filter((actor) => actor.kind === "player-character");
+  const nonPcs = state.actors.filter((actor) => actor.kind !== "player-character");
+  const recent = nonPcs.filter((actor) => actor.lastUsedAt !== undefined).sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0)).slice(0, RECENT_COUNT);
+  const recentIds = new Set(recent.map((actor) => actor.id));
+  const search = combatantSearch.trim().toLowerCase();
+  const otherCombatants = nonPcs.filter((actor) => !recentIds.has(actor.id)).filter((actor) => !search || actor.name.toLowerCase().includes(search) || actor.kind.toLowerCase().includes(search));
+  const combatantRow = (actor: (typeof state.actors)[number]) => <li key={actor.id}>
+    <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
+    <div className="combatant-tools">
+      {actor.kind !== "player-character" && <button type="button" className="combatant-remove" disabled={busy} title={`Remove ${actor.name} from the roster`} aria-label={`Remove ${actor.name} from the roster`} onClick={() => remove(actor.id, actor.name)}>✕</button>}
+      <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
+    </div>
+  </li>;
+
+  // Active creature on top: rotate the turn order so the acting combatant leads the list, the rest
+  // follow in order (wrapping). The acting console renders inline directly under that top row (feedback #3).
+  const activeIndex = state.combat.initiative.findIndex((entry) => state.combat.turnActorId === entry.actorId);
+  const orderedInitiative = activeIndex > 0
+    ? [...state.combat.initiative.slice(activeIndex), ...state.combat.initiative.slice(0, activeIndex)]
+    : state.combat.initiative;
+  // The acting creature's console, rendered inline under the active/top row. On a normal turn it needs
+  // no name header - the row above already names it (feedback #3.4); an off-turn legendary actor differs
+  // from that row, so it keeps its name. Contents are otherwise unchanged from the old bottom console.
+  const renderActingConsole = () => {
+    const turnActor = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
+    const legendaryActor = legendaryActingId && legendaryActingId !== state.combat.turnActorId ? actorsById.get(legendaryActingId) : undefined;
+    const actor = legendaryActor ?? turnActor;
+    // Legendary creatures act on OTHER creatures' turns (SRD Legendary Actions): offer a one-tap
+    // console switch for each off-turn legendary combatant with pool remaining.
+    const legendaryOffers = state.combat.initiative
+      .flatMap((entry) => { const candidate = actorsById.get(entry.actorId); return candidate?.legendary?.actionsPerRound && candidate.id !== state.combat.turnActorId && candidate.id !== legendaryActingId ? [candidate] : []; })
+      .map((candidate) => ({ candidate, remaining: Math.max(0, (candidate.legendary!.actionsPerRound ?? 0) - (state.combat.legendaryUsed[candidate.id] ?? 0)) }));
+    if (!actor) return null;
+    const legendaryPool = legendaryActor?.legendary?.actionsPerRound;
+    const legendarySpent = legendaryActor ? state.combat.legendaryUsed[legendaryActor.id] ?? 0 : 0;
+    return <>
+      {legendaryOffers.length > 0 && <div className="legendary-strip" role="group" aria-label="Legendary actions available">
+        {legendaryOffers.map(({ candidate, remaining }) => <button key={candidate.id} type="button" className="legendary-offer" disabled={busy || remaining === 0}
+          title={remaining === 0 ? `${candidate.name} has no legendary actions left this round (they refill when its turn starts).` : `Take a legendary action with ${candidate.name} (used on other creatures' turns).`}
+          onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
+      </div>}
+      <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
+        <header className="acting-console-head">
+          {/* Row 1 (only when there's something to show): legendary name + pool, or the turn actor's
+              movement. A normal turn omits the name - the active row above already carries it. */}
+          {(legendaryActor || actor.speedFeet !== undefined) && <div className="acting-console-title">
+            {legendaryActor && <strong className="acting-console-name">{actor.name}</strong>}
+            {legendaryActor
+              ? <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills when this creature's own turn starts.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
+              : actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
+          </div>}
+          {legendaryActor
+            // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a GM
+            // correction (+1) and a way back instead of Action/Bonus/Reaction.
+            ? <div className="acting-console-economy-row">
+                <button type="button" className="economy-slot" disabled={busy || legendarySpent === 0} title="Restore one legendary action (GM correction)" onClick={() => void run(() => emitCommand("turn:use-legendary", { commandId: newId(), actorId: actor.id, spent: Math.max(0, legendarySpent - 1), expectedRevision: state.revision }), "Legendary action restored.")}>+1</button>
+                <button type="button" className="secondary legendary-done" onClick={() => setLegendaryActingId(null)}>Back to {turnActor?.name ?? "the turn"}</button>
+              </div>
+            : <div className="acting-console-economy-row">
+                <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
+                <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
+                <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
+              </div>}
+        </header>
+        <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
+      </section>
+    </>;
+  };
+
+  return <section className={`encounter-panel${state.combat.active ? "" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
     {/* Docking the tracker to the map is available before AND during combat (report #9). */}
     <DockPicker dock={dock} />
     {!state.combat.active ? <>
-      <p>Choose who's fighting and enter any known initiative scores. Starting combat creates each token automatically - drag them from the tray onto the map.</p>
       {/* The battlemap is picked right here - starting a fight never requires a Maps-tab visit
           (upload/calibration still live there). */}
       <label className="encounter-map">
@@ -515,13 +616,25 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </select>
           : <strong>{selectedMap?.name ?? "Upload a battlemap on the Map Setup tab first"}</strong>}
       </label>
-      <ul className="combatant-setup">{state.actors.map((actor) => <li key={actor.id}>
-        <label className="combatant-choice"><input type="checkbox" checked={selectedActors.has(actor.id)} onChange={(event) => setSelectedActors((current) => { const next = new Set(current); event.target.checked ? next.add(actor.id) : next.delete(actor.id); return next; })} /><span><strong>{actor.name}</strong><small>{actor.kind}{actor.visibility === "gm-only" ? " · GM-only" : ""} · modifier {actor.initiative && actor.initiative > 0 ? `+${actor.initiative}` : actor.initiative ?? 0}</small></span></label>
-        <div className="combatant-tools">
-          {actor.kind !== "player-character" && <button type="button" className="combatant-remove" disabled={busy} title={`Remove ${actor.name} from the roster`} aria-label={`Remove ${actor.name} from the roster`} onClick={() => remove(actor.id, actor.name)}>✕</button>}
-          <label className="initiative-score">Initiative<input type="number" min="-1000" max="1000" value={scores[actor.id] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [actor.id]: event.target.value }))} placeholder="Roll" disabled={!selectedActors.has(actor.id)} /></label>
+      {/* Undocked at desktop this region scrolls so the panel stays as tall as the map, not taller
+          (feedback #1); the map picker above and the add/start buttons below stay pinned. */}
+      <div className="combatant-scroll">
+        {pcs.length > 0 && <div className="menu-section">
+          <p className="menu-section-title">Party</p>
+          <ul className="combatant-setup">{pcs.map(combatantRow)}</ul>
+        </div>}
+        {recent.length > 0 && <div className="menu-section">
+          <p className="menu-section-title">Recent</p>
+          <ul className="combatant-setup">{recent.map(combatantRow)}</ul>
+        </div>}
+        <div className="menu-section">
+          <p className="menu-section-title">{recent.length > 0 ? "More combatants" : "Combatants"}</p>
+          <input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
+          {otherCombatants.length > 0
+            ? <ul className="combatant-setup">{otherCombatants.map(combatantRow)}</ul>
+            : <p className="menu-empty-note">{search ? "No combatants match your search." : "No other combatants on the roster - add monsters below."}</p>}
         </div>
-      </li>)}</ul>
+      </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
       <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter</button>
     </> : <>
@@ -560,6 +673,20 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="manual">Manual entry - Roll to auto</option>
               </select>
             </label>
+            <label className="rules-mode-control">Health
+              <select value={state.combat.healthDisplay.style} disabled={busy} onChange={(event) => { const style = event.target.value as "band" | "bar" | "ring" | "aura"; socket.emit("encounter:set-health-display", { commandId: newId(), style, audience: state.combat.healthDisplay.audience }, (result: MutationResult) => setMessage(result.ok ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.` : result.message ?? "The health display could not be changed.")); }}>
+                <option value="band">Status badge</option>
+                <option value="bar">HP bar</option>
+                <option value="ring">Health ring</option>
+                <option value="aura">Health aura</option>
+              </select>
+            </label>
+            <label className="rules-mode-control">Show health to
+              <select value={state.combat.healthDisplay.audience} disabled={busy || state.combat.healthDisplay.style === "band"} onChange={(event) => { const audience = event.target.value as "gm" | "all"; socket.emit("encounter:set-health-display", { commandId: newId(), style: state.combat.healthDisplay.style, audience }, (result: MutationResult) => setMessage(result.ok ? `Health shown to ${audience === "all" ? "everyone" : "the GM only"}.` : result.message ?? "The health display could not be changed.")); }}>
+                <option value="gm">GM only</option>
+                <option value="all">Everyone</option>
+              </select>
+            </label>
             <label className="environment-control">
               <input type="checkbox" checked={state.combat.underwater} disabled={busy} onChange={(event) => { const underwater = event.target.checked; socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed.")); }} />
               Underwater fight
@@ -588,7 +715,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
         </div>
       </div>}
-      <ol className="initiative-list gm">{state.combat.initiative.map((entry) => {
+      <ol className="initiative-list gm">{orderedInitiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
         const active = state.combat.turnActorId === entry.actorId;
         const editing = editingActorId === entry.actorId;
@@ -615,6 +742,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
               : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
           </div>
+          {/* The acting console rides directly under the active/top row (feedback #3). */}
+          {active && renderActingConsole()}
           {expanded && actor && <>
             <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); }} />
             <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
@@ -644,54 +773,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode} />)}
         </li>;
       })}</ol>
-      {/* The initiative order stays a pure, glanceable list; the acting creature's console is its
-          own labeled surface below it - never interleaved between rows (that read as one giant
-          cluttered column). */}
-      {(() => {
-        const turnActor = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
-        const legendaryActor = legendaryActingId && legendaryActingId !== state.combat.turnActorId ? actorsById.get(legendaryActingId) : undefined;
-        const actor = legendaryActor ?? turnActor;
-        // Legendary creatures act on OTHER creatures' turns (SRD Legendary Actions): offer a one-tap
-        // console switch for each off-turn legendary combatant with pool remaining.
-        const legendaryOffers = state.combat.initiative
-          .flatMap((entry) => { const candidate = actorsById.get(entry.actorId); return candidate?.legendary?.actionsPerRound && candidate.id !== state.combat.turnActorId && candidate.id !== legendaryActingId ? [candidate] : []; })
-          .map((candidate) => ({ candidate, remaining: Math.max(0, (candidate.legendary!.actionsPerRound ?? 0) - (state.combat.legendaryUsed[candidate.id] ?? 0)) }));
-        if (!actor) return null;
-        const legendaryPool = legendaryActor?.legendary?.actionsPerRound;
-        const legendarySpent = legendaryActor ? state.combat.legendaryUsed[legendaryActor.id] ?? 0 : 0;
-        return <>
-          {legendaryOffers.length > 0 && <div className="legendary-strip" role="group" aria-label="Legendary actions available">
-            {legendaryOffers.map(({ candidate, remaining }) => <button key={candidate.id} type="button" className="legendary-offer" disabled={busy || remaining === 0}
-              title={remaining === 0 ? `${candidate.name} has no legendary actions left this round (they refill when its turn starts).` : `Take a legendary action with ${candidate.name} (used on other creatures' turns).`}
-              onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
-          </div>}
-          <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
-            {/* Row 1: name on the left, movement (or the off-turn legendary pool) right-aligned on the
-                same line. Row 2: the turn's resource buttons, left-aligned (owner feedback). */}
-            <header className="acting-console-head">
-              <div className="acting-console-title">
-                <strong className="acting-console-name">{actor.name}</strong>
-                {legendaryActor
-                  ? <span className="economy-slot legendary-pill" title="Legendary actions remaining this round; the pool refills when this creature's own turn starts.">⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}</span>
-                  : actor.speedFeet !== undefined && <span className="economy-movement" title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)">{Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft</span>}
-              </div>
-              {legendaryActor
-                // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a GM
-                // correction (+1) and a way back instead of Action/Bonus/Reaction.
-                ? <div className="acting-console-economy-row">
-                    <button type="button" className="economy-slot" disabled={busy || legendarySpent === 0} title="Restore one legendary action (GM correction)" onClick={() => void run(() => emitCommand("turn:use-legendary", { commandId: newId(), actorId: actor.id, spent: Math.max(0, legendarySpent - 1), expectedRevision: state.revision }), "Legendary action restored.")}>+1</button>
-                    <button type="button" className="secondary legendary-done" onClick={() => setLegendaryActingId(null)}>Back to {turnActor?.name ?? "the turn"}</button>
-                  </div>
-                : <div className="acting-console-economy-row">
-                    <button type="button" className="economy-slot" aria-pressed={state.combat.turn.actionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !state.combat.turn.actionUsed, expectedRevision: state.revision }), state.combat.turn.actionUsed ? "Action restored." : "Action spent.")}>Action</button>
-                    <button type="button" className="economy-slot" aria-pressed={state.combat.turn.bonusActionUsed} disabled={busy} onClick={() => void run(() => emitCommand("turn:use", { commandId: newId(), slot: "bonus-action", used: !state.combat.turn.bonusActionUsed, expectedRevision: state.revision }), state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent.")}>Bonus</button>
-                    <button type="button" className="economy-slot" aria-pressed={state.combat.reactionsUsed.includes(actor.id)} disabled={busy} title="Reactions refresh when this combatant's turn starts" onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>Reaction</button>
-                  </div>}
-            </header>
-            <ActionRunner state={state} actor={actor} onFeedback={setMessage} />
-          </section>
-        </>;
-      })()}
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}

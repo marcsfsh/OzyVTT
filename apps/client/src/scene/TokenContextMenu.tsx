@@ -64,6 +64,15 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
       if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
     });
   };
+  const setHealthDisplay = (display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null) => {
+    setBusy(true);
+    socket.emit("actor:set-health-display", { commandId: newId(), actorId: actor.id, display }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "The health display could not be changed.");
+    });
+  };
+  // GM-only control: the token's per-token override (undefined = follows the table default).
+  const healthOverride = role === "gm" ? (actor as GmActor).healthDisplay : undefined;
   const onGmLayer = actor.visibility === "gm-only";
   const toggleLayer = () => {
     const visibility = onGmLayer ? "public" : "gm-only";
@@ -98,12 +107,30 @@ export function TokenContextMenu({ actor, role, gmToken, x, y, reactionUsed, pla
           {SIZES.map((size) => <option key={size} value={size}>{cap(size)}</option>)}
         </select>
       </label>}
+      {role === "gm" && <label className="token-context-size">Health
+        <select value={healthOverride?.style ?? "default"} disabled={busy} onChange={(event) => { const value = event.target.value; if (value === "default") setHealthDisplay(null); else setHealthDisplay({ style: value as "band" | "bar" | "ring" | "aura", audience: healthOverride?.audience ?? "gm" }); }}>
+          <option value="default">Default (table)</option>
+          <option value="band">Status badge</option>
+          <option value="bar">HP bar</option>
+          <option value="ring">Health ring</option>
+          <option value="aura">Health aura</option>
+        </select>
+      </label>}
+      {role === "gm" && healthOverride && healthOverride.style !== "band" && <label className="token-context-size">Show to
+        <select value={healthOverride.audience} disabled={busy} onChange={(event) => setHealthDisplay({ style: healthOverride.style, audience: event.target.value as "gm" | "all" })}>
+          <option value="gm">GM only</option>
+          <option value="all">Everyone</option>
+        </select>
+      </label>}
+      <details className="token-context-conditions">
+        <summary className="token-context-conditions-summary">Conditions{actor.conditions.length > 0 ? ` (${actor.conditions.length})` : ""}</summary>
+        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+      </details>
       <button type="button" className="token-context-item" onClick={() => { onOpenSheet(); onClose(); }}>Open {actor.kind === "player-character" ? "character sheet" : "stat block"}</button>
       {role === "gm" && gmToken && <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>Set token image…</button>}
       {role === "gm" && <button type="button" className="token-context-item" disabled={busy} title={onGmLayer ? "Reveal this token to players and the shared screen" : "Hide this token from players and the shared screen"} onClick={toggleLayer}>{onGmLayer ? "Move to shared layer" : "Move to GM layer"}</button>}
       <button type="button" className="token-context-item" aria-pressed={reactionUsed} disabled={busy} onClick={toggleReaction}>{reactionUsed ? "Reaction spent - restore" : "Use reaction"}</button>
       {role === "gm" && placed && <button type="button" className="token-context-item" onClick={() => { onReturnToTray(); onClose(); }}>Return to tray</button>}
-      <div className="token-context-conditions"><span className="token-context-conditions-label">Conditions</span><ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} /></div>
       {feedback && <p className="token-context-feedback" role="status">{feedback}</p>}
     </div>,
     document.fullscreenElement ?? document.body

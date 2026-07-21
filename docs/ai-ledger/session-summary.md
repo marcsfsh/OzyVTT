@@ -8,6 +8,95 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-21 — PR #40 review round 2 (seven items, same branch)
+
+Second screenshot-review pass on `claude/vtt-combat-plan-clarify-wy9cji`. Verified green (check/test/
+build, 393 server tests) + live browser smoke (41/41, zero console errors, screenshots per item).
+
+- **Aura** now renders BEHIND the token (before `TokenGlyph`) so the body + active-turn ring stay
+  crisp on top; ~35% thinner and hugging the token edge (own `TokenHealthAura`; the on-top
+  `TokenHealthBar` handles bar/ring only). Hue is relative to the exact fraction where the audience
+  holds it (GM, own PC); the shared screen stays band-derived (HP-privacy invariant).
+- **Viewer initiative** column is drag-resizable (left-edge handle, persisted to
+  `vtt.viewer-initiative-width`; content moved into a `.viewer-initiative-scroll` wrapper so the handle
+  never scrolls away); room font + name min-width tuned so full names fit.
+- **Right-click menu** Size/Health/Show-to selects share one width (fixed label grid column).
+- **Encounter setup** panel is the EXACT height of the map/scene panel — measured live via a
+  ResizeObserver on `.table` into `--setup-h` (main.tsx), combatant list scrolls inside; helper blurb
+  removed.
+- **End turn** restyled to match the Action/Bonus/Reaction pills (keeps its orange).
+- **CSS-bleed fix (important):** Item C nested the acting console INSIDE the active `<li>`, so every
+  `.initiative-list … li` descendant rule was leaking onto the console's own `<li>`s (bullets stacked,
+  stray borders). Scoped all row rules to direct children (`> li`). Also `padding:0` on the `+`/`⋯`
+  menu toggles so they match the ‹/Next-turn height.
+- **Player actions (#5.2, read-only):** on a player's turn their row shows the same attack rows the GM
+  console shows (name + to-hit/reach/range/damage), sourced from the player's already-projected stat
+  block. Reference only — the GM still rolls/applies, so NO server-authority change. (The interactive
+  option was scoped out by the owner.)
+
+## 2026-07-21 — PR #40 review-feedback refinements (five items, same branch)
+
+Owner reviewed the three-item PR from the smoke screenshots and asked for five refinements, applied as
+new commits on `claude/vtt-combat-plan-clarify-wy9cji`. All verified green (check/test/build, 393 server
+tests) plus a live browser smoke — 39/39 assertions, zero console errors, screenshots per item.
+
+- **Aura health style (#2 feedback):** a fourth style beside band/bar/ring — a soft green→red glow
+  around the token, colored by the creature's health fraction. Threaded through the enum everywhere
+  (schemas / game-commands / api-contract / domain / viewer-presentation); it flows through the same
+  audience gate as bar/ring (`audience==="all" && style!=="band"`), so no projection-logic change. The
+  glow is a transparent-center radial gradient in `TokenHealthBar` (`mapImage`), shared by GM/player/
+  viewer. Added to both the GM global health select and the per-token right-click control.
+- **Initiative restructure (#3 feedback):** the active combatant now leads the list (rotated turn
+  order, wrapping) and its acting console renders inline directly under that top row — for BOTH the GM
+  tracker and the player panel — replacing the old fixed bottom console. A normal turn drops the
+  redundant console name header (an off-turn legendary actor keeps it). The player's economy rides
+  their own row, so off-turn reaction marking is preserved. Softer rounded active-row highlight;
+  smaller topbar controls.
+- **Right-click menu dropdowns (#4 feedback):** Health became a `<select>` styled/placed like Size
+  (directly below it), with a "Show to" audience select; Conditions became a `<details>` disclosure
+  under Health (kept as a disclosure, not a native select, since conditions stack + exhaustion has a
+  level).
+- **Viewer = player initiative (#5 feedback):** removed the thin band HP bar from the shared
+  `InitiativeRow` (drops it from BOTH player and viewer); the viewer now uses the player's compact
+  Round-pill header (not the big serif), active-on-top, no controls, kept room-scaled. Health still
+  reads as Bloodied/Down text + condition dots + the token's ring/aura. Viewer-safety leak asserts
+  re-confirmed with aura added.
+- **Encounter-setup panel height (#1 feedback):** undocked at desktop the setup panel is capped to the
+  map's height and the Party/Recent/Search combatant region scrolls internally; map picker + Add
+  monsters + Start stay pinned. Scoped to the sidebar + ≥980px (docked/mobile unaffected).
+
+## 2026-07-21 — Token health display · shared initiative · scene-setup picker (three-item PR after #38)
+
+Three combat-UX items from the roadmap on one branch (`claude/vtt-combat-plan-clarify-wy9cji`), six
+green slices. Owner decisions this session: health display is BOTH a global default and a per-token
+override; recency is server-tracked; #10 goes to full parity incl. viewer condition dots; the scene
+browser is deferred.
+
+- **#11 Token health on the map:** `combat.healthDisplay {style, audience}` (table default) + optional
+  `Actor.healthDisplay` override; controls in the token right-click menu (per-token) and the encounter
+  options menu (table). A bar/ring renders instead of the coarse band dot. The audience gate is
+  resolved ONCE server-side in the projections — GM exact, own-PC exact, everyone-else band-fraction,
+  viewer band-fraction — so exact HP never reaches a non-owner (leak tests cover it). Two GM-only
+  commands mirror roll-mode; `TokenStatusBadges` gains an optional bar/ring; `bandFraction`/
+  `hpFillFraction` live in React-only `mapImage` so the viewer shares them without the socket.
+- **#10 Shared initiative:** `projectPublicInitiative` now carries public-only condition ids + labels;
+  a shared `InitiativeRow` (em-scaled, self-contained CSS) renders both the player panel and the
+  viewer, so the two lists never drift and the viewer shows the same condition dots.
+- **#2 Scene-setup picker:** flat list → pinned PCs (pre-checked) / recent (server `lastUsedAt`,
+  GM-only) / searchable rest.
+
+Verified: `npm run check` + `test` (392 server + 16 contract + others) + `build` green across all
+workspaces; `docs/api-reference.md` regenerated (freshness test green). **Live browser smoke** (owner-
+requested round before the PR): a scratchpad playwright-core script drove the real built app (fresh
+`DATA_DIR`, preinstalled Chromium) through GM + player + viewer contexts — 18/18 checks, 0 console
+errors, 11 screenshots (picker sections + search + 375px; GM ring/bar + right-click menu + per-token
+override; player own-exact vs band-fraction; viewer parity dots; audience-gm fallback on player AND
+viewer; wire-level leak asserts on the player/viewer JSON). The smoke caught two visual defects that
+were then fixed: the viewer sidebar crushed long names to one letter (shared row now wraps, name keeps
+≥8ch) and the right-click Health buttons wrapped awkwardly (label now on its own line, equal-width
+buttons). The harness lives in the session scratchpad only — a committed Playwright harness is still a
+follow-up, as is the deferred "manage all scenes" browser modal.
+
 ## 2026-07-21 — Uniform dice UX: one recognizable roll experience everywhere (owner-directed; same branch/PR #38)
 
 Owner goal: after a roll or two, a player should intuitively know how to roll *anywhere* —

@@ -38,7 +38,7 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
     || left.actorId.localeCompare(right.actorId));
 }
 
-export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined) {
+export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined, now: number = Date.now()) {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200) throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
@@ -54,6 +54,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     actorIds.add(entry.actorId);
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
+    actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
     // 2024 Surprise: a surprised combatant rolls initiative with disadvantage (two d20s, keep lower).
     const rolled = entry.score === undefined
@@ -92,7 +93,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its token. GM-only at the command layer. */
-export function addCombatant(state: GameState, actorId: string, score: number | undefined, rollD20: () => number, tokenGeometry: TokenMapGeometry) {
+export function addCombatant(state: GameState, actorId: string, score: number | undefined, rollD20: () => number, tokenGeometry: TokenMapGeometry, now: number = Date.now()) {
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -101,6 +102,7 @@ export function addCombatant(state: GameState, actorId: string, score: number | 
   const tieBreaker = actor.initiative ?? 0;
   const rolled = score === undefined ? rollD20() + tieBreaker : score;
   if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+  actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
   state.combat = {
     ...state.combat,
     initiative: ordered(state, [...state.combat.initiative, { actorId, score: rolled, tieBreaker }]),
