@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { Modal, Button, Input } from "@vtt/ui";
 
 export type NoticeTone = "success" | "error" | "info";
 export type NoticeMessage = { tone: NoticeTone; text: string } | null;
@@ -15,24 +16,28 @@ type ConfirmRequest = ConfirmOptions & { resolve: (confirmed: boolean) => void }
 
 /**
  * Styled replacement for window.confirm. Returns `confirm(options)` returning a Promise<boolean>,
- * plus a `dialog` element to render once near the app root.
+ * plus a `dialog` element to render once near the app root. Built on the shared Modal primitive,
+ * so it inherits the native focus-trap, focus return, scrim blur, scroll lock, and dialog entrance.
  */
 export function useConfirm() {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const confirm = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => setRequest({ ...options, resolve })), []);
   const settle = (confirmed: boolean) => { request?.resolve(confirmed); setRequest(null); };
-  const dialog = request
-    ? <div className="confirm-overlay" role="presentation" onClick={() => settle(false)}>
-        <div className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" onClick={(event) => event.stopPropagation()}>
-          <h2 id="confirm-title">{request.title}</h2>
-          <p>{request.body}</p>
-          <div className="confirm-actions">
-            <button className="secondary" onClick={() => settle(false)}>{request.cancelLabel ?? "Cancel"}</button>
-            <button className={request.danger ? "danger" : ""} autoFocus onClick={() => settle(true)}>{request.confirmLabel ?? "Confirm"}</button>
-          </div>
-        </div>
-      </div>
-    : null;
+  const dialog = (
+    <Modal
+      open={!!request}
+      onClose={() => settle(false)}
+      size="sm"
+      title={request?.title}
+      ariaLabel={request?.title ?? "Confirm"}
+      footer={request && <>
+        <Button variant="secondary" onClick={() => settle(false)}>{request.cancelLabel ?? "Cancel"}</Button>
+        <Button variant={request.danger ? "destructive" : "primary"} autoFocus onClick={() => settle(true)}>{request.confirmLabel ?? "Confirm"}</Button>
+      </>}
+    >
+      {request && <p>{request.body}</p>}
+    </Modal>
+  );
   return { confirm, dialog };
 }
 
@@ -42,6 +47,7 @@ type PromptRequest = PromptOptions & { resolve: (value: string | null) => void }
 /**
  * Styled replacement for window.prompt. `prompt(options)` returns a Promise<string | null>
  * (trimmed value, or null on cancel/empty), plus a `dialog` element to render near the app root.
+ * Built on the shared Modal primitive (focus-trap, scrim blur, scroll lock, dialog entrance).
  */
 export function usePrompt() {
   const [request, setRequest] = useState<PromptRequest | null>(null);
@@ -55,31 +61,30 @@ export function usePrompt() {
     []
   );
   const settle = (result: string | null) => { request?.resolve(result); setRequest(null); };
-  const dialog = request
-    ? <div className="confirm-overlay" role="presentation" onClick={() => settle(null)}>
-        <form
-          className="confirm-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="prompt-title"
-          onClick={(event) => event.stopPropagation()}
-          onSubmit={(event) => { event.preventDefault(); const trimmed = value.trim(); settle(trimmed ? trimmed : null); }}
-        >
-          <h2 id="prompt-title">{request.title}</h2>
-          {request.body && <p>{request.body}</p>}
-          <input
-            autoFocus
-            value={value}
-            placeholder={request.placeholder}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Escape") settle(null); }}
-          />
-          <div className="confirm-actions">
-            <button type="button" className="secondary" onClick={() => settle(null)}>{request.cancelLabel ?? "Cancel"}</button>
-            <button type="submit">{request.confirmLabel ?? "OK"}</button>
-          </div>
-        </form>
-      </div>
-    : null;
+  const submit = () => { const trimmed = value.trim(); settle(trimmed ? trimmed : null); };
+  const dialog = (
+    <Modal
+      open={!!request}
+      onClose={() => settle(null)}
+      size="sm"
+      title={request?.title}
+      ariaLabel={request?.title ?? "Enter a value"}
+      footer={request && <>
+        <Button variant="secondary" onClick={() => settle(null)}>{request.cancelLabel ?? "Cancel"}</Button>
+        <Button variant="primary" onClick={submit}>{request.confirmLabel ?? "OK"}</Button>
+      </>}
+    >
+      {request && <>
+        {request.body && <p>{request.body}</p>}
+        <Input
+          autoFocus
+          value={value}
+          placeholder={request.placeholder}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submit(); } }}
+        />
+      </>}
+    </Modal>
+  );
   return { prompt, dialog };
 }
