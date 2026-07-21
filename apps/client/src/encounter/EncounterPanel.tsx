@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ActionResolution, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
@@ -103,18 +103,27 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
  * in full. The shown numbers are before resistances; the server reports the final applied total. The
  * GM's ✕ dismisses without applying, for damage already entered by hand.
  */
-function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonly<{ reaction: PendingReaction | PlayerPendingReaction; actorName: string; canDismiss: boolean; onFeedback: (text: string) => void }>) {
+function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback, rollMode }: Readonly<{ reaction: PendingReaction | PlayerPendingReaction; actorName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual" }>) {
   const [busy, setBusy] = useState(false);
   const opportunity = reaction.kind === "leaves-reach";
+  // An opportunity attack previewed but not yet applied: the swing was rolled, the reactor confirms
+  // (or re-rolls adv/disadv, or types a d20) - the same roll experience as a saving throw.
+  const [rolled, setRolled] = useState<{ attack: NonNullable<ActionResolution["attack"]>; mode?: DieMode } | null>(null);
+  const [dieEdit, setDieEdit] = useState("");
+  const autoRolled = useRef(false);
   const halved = reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
-  const answer = (use: boolean) => {
+  // `use` distinguishes the swing (Attack) from letting the mover go; the opts drive the OA preview flow.
+  const answer = (use: boolean, opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number } = {}) => {
     setBusy(true);
-    socket.emit("reaction:answer", { commandId: newId(), reactionId: reaction.id, use }, (result: ReactionAnswerResult) => {
+    socket.emit("reaction:answer", { commandId: newId(), reactionId: reaction.id, use, ...opts }, (result: ReactionAnswerResult) => {
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The reaction could not be answered."); return; }
       const outcome = result.outcome;
       if (!outcome) return;
       if (opportunity) {
+        // A preview keeps the prompt open and shows the swing for confirm/adv-disadv; an applied answer clears it.
+        if (outcome.resolution?.preview && outcome.resolution.attack) { setRolled({ attack: outcome.resolution.attack, mode: outcome.resolution.rollMode?.mode }); return; }
+        setRolled(null);
         const attack = outcome.resolution?.attack;
         onFeedback(use
           ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
@@ -124,6 +133,12 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonl
       }
     });
   };
+  // Auto mode rolls the opportunity swing the moment the prompt appears (still a preview to confirm).
+  useEffect(() => {
+    if (opportunity && rollMode === "auto" && !rolled && !autoRolled.current) { autoRolled.current = true; answer(true, { commit: false }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opportunity, rollMode, rolled]);
+  const submitDie = () => { const value = Number(dieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } answer(true, { commit: false, attackNatural: value }); };
   const dismiss = () => {
     setBusy(true);
     socket.emit("reaction:dismiss", { commandId: newId(), reactionId: reaction.id }, (result: MutationResult) => {
@@ -131,33 +146,45 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback }: Readonl
       onFeedback(result.ok ? "Reaction prompt dismissed - nothing applied." : result.message ?? "The prompt could not be dismissed.");
     });
   };
+  const hit = rolled ? rolled.attack.outcome === "hit" || rolled.attack.outcome === "crit" : false;
   return <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
     <span className="save-prompt-label">
       {opportunity
         ? <><strong>Opportunity Attack</strong> - {reaction.sourceName} is leaving reach</>
         : <><strong>{reaction.actionName}</strong> vs {reaction.sourceName}{reaction.critical ? " (crit)" : ""} · {reaction.proposedDamage} dmg incoming</>}
     </span>
-    <span className="save-prompt-actions">
-      {opportunity
-        ? <>
-            <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; rolls one melee attack against the mover" onClick={() => answer(true)}>Attack</button>
-            <button type="button" disabled={busy} title="Keep the reaction; the mover leaves freely" onClick={() => answer(false)}>Let them go</button>
-          </>
-        : <>
-            <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use - take {halved}</button>
-            <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline - take {reaction.proposedDamage}</button>
-          </>}
-      {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying anything" onClick={dismiss}>✕</button>}
-    </span>
+    {opportunity && rolled
+      // The swing is rolled: confirm it (applies the hit), re-roll adv/disadv, type a d20, or let them go.
+      ? <span className="save-prompt-confirm">
+          <strong className={hit ? "save-pass" : "save-fail"}>Rolled {rolled.attack.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""}{rolled.attack.targetAc !== null ? ` vs AC ${rolled.attack.targetAc}` : ""} - {rolled.attack.outcome === "crit" ? "CRIT" : rolled.attack.outcome.toUpperCase()} (nat {rolled.attack.naturalRoll})</strong>
+          <button type="button" className={`save-die-mode${rolled.mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => answer(true, { commit: false, rollMode: "advantage" })}>Adv</button>
+          <button type="button" className={`save-die-mode${rolled.mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => answer(true, { commit: false, rollMode: "disadvantage" })}>Disadv</button>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => answer(true, { commit: true, attackNatural: rolled.attack.naturalRoll })}>Confirm {hit ? "hit" : "miss"}</button>
+          <button type="button" className="secondary" disabled={busy} title="Roll the swing again" onClick={() => answer(true, { commit: false })}>Re-roll</button>
+          <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="or type the d20" aria-label="Attack d20" value={dieEdit} onChange={(event) => setDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && dieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={busy || dieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
+          <button type="button" className="secondary" disabled={busy} onClick={() => { setRolled(null); answer(false); }}>Let them go</button>
+        </span>
+      : <span className="save-prompt-actions">
+          {opportunity
+            ? <>
+                <button type="button" className="save-prompt-roll" disabled={busy} title="Roll one melee attack against the mover" onClick={() => answer(true, { commit: false })}>Attack</button>
+                <button type="button" disabled={busy} title="Keep the reaction; the mover leaves freely" onClick={() => answer(false)}>Let them go</button>
+              </>
+            : <>
+                <button type="button" className="save-prompt-roll" disabled={busy} title="Spend the reaction; halved before resistances" onClick={() => answer(true)}>Use - take {halved}</button>
+                <button type="button" disabled={busy} title="Keep the reaction; full damage before resistances" onClick={() => answer(false)}>Decline - take {reaction.proposedDamage}</button>
+              </>}
+          {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying anything" onClick={dismiss}>✕</button>}
+        </span>}
   </div>;
 }
 
 /** A player's own pending reaction prompts with a local feedback line (the GM panel uses its shared message). */
-function OwnReactionPrompts({ reactions, actorName }: Readonly<{ reactions: readonly PlayerPendingReaction[]; actorName: string }>) {
+function OwnReactionPrompts({ reactions, actorName, rollMode }: Readonly<{ reactions: readonly PlayerPendingReaction[]; actorName: string; rollMode: "auto" | "manual" }>) {
   const [feedback, setFeedback] = useState("");
   if (reactions.length === 0 && !feedback) return null;
   return <div className="own-save-prompts">
-    {reactions.map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actorName} canDismiss={false} onFeedback={setFeedback} />)}
+    {reactions.map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actorName} canDismiss={false} onFeedback={setFeedback} rollMode={rollMode} />)}
     {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
@@ -329,7 +356,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
-          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} />}
+          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={combat.rollMode} />}
         </li>;
       })}</ol>
       {myId !== null && <div className="acting-console player"><PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={props.state.actors.find((actor) => actor.id === myId)?.speedFeet} /></div>}
@@ -614,7 +641,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
           {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode}
             legendaryResistanceLeft={actor.legendary?.resistancesPerDay !== undefined ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0)) : undefined} />)}
-          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} />)}
+          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode} />)}
         </li>;
       })}</ol>
       {/* The initiative order stays a pure, glanceable list; the acting creature's console is its

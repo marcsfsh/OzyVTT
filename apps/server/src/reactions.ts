@@ -40,7 +40,9 @@ export type ReactionOutcome = Readonly<{
  * (chosen actionId, else the reactor's first melee attack, else Unarmed Strike) against the mover,
  * auto-applying rolled damage on a hit - the reaction carve-out class. "decline" just clears.
  */
-export function answerReaction(state: GameState, commandId: string, reactionId: string, use: boolean, actionId: string | undefined, scope: ActorScope, deps: ReactionAnswerDependencies): ReactionOutcome {
+export type OpportunityAttackOptions = Readonly<{ commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; attackNatural?: number }>;
+
+export function answerReaction(state: GameState, commandId: string, reactionId: string, use: boolean, actionId: string | undefined, scope: ActorScope, deps: ReactionAnswerDependencies, attackOptions: OpportunityAttackOptions = {}): ReactionOutcome {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
   const pending = state.combat.pendingReactions.find((entry) => entry.id === reactionId);
   if (!pending) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
@@ -67,15 +69,19 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     const fallbackMelee = definition?.actions.find((candidate) => candidate.attack !== undefined && candidate.attack.reachFeet !== undefined);
     const chosen = declared ?? fallbackMelee ?? builtinAction("unarmed-strike")!;
     const isBuiltin = declared === undefined && fallbackMelee === undefined;
-    clearPrompt(true);
-    // One melee attack against the mover, off-turn (economy stays ungated; the reaction is spent above).
-    // No distance function on purpose: the SRD opportunity attack happens right before the target
-    // leaves reach, but the engine moves the token first (documented arrival-timing approximation) -
-    // range-checking the mover's ARRIVAL position would wrongly block the swing it already provoked.
-    const resolution = resolveDefinitionAction(state, chosen, { actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin, rollMode: null, override: null }, {
+    const commit = attackOptions.commit ?? true;
+    // One melee attack against the mover, off-turn. A PREVIEW (commit:false) rolls the swing but leaves
+    // the reaction unspent and applies nothing - the answerer sees the hit, then re-rolls adv/disadv,
+    // types a d20, or confirms; the same roll experience as a saving throw. The COMMIT spends the
+    // reaction and applies the damage. No distance function on purpose: the SRD opportunity attack
+    // happens right before the target leaves reach, but the engine moves the token first (documented
+    // arrival-timing approximation) - range-checking the ARRIVAL position would wrongly block the swing.
+    const resolution = resolveDefinitionAction(state, chosen, { actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin, rollMode: attackOptions.rollMode ?? null, override: null, commit, attackNatural: attackOptions.attackNatural }, {
       random: deps.random, newRollId: deps.newRollId, gmSessionId: deps.gmSessionId, now: deps.now,
       definition, resolveDefinition: deps.resolveDefinition
     });
+    if (!commit) return { ...base, used: false, appliedDamage: 0, resolution, events: [] };
+    clearPrompt(true);
     let appliedDamage = 0;
     let events: readonly EffectNarration[] = [];
     // Auto-apply the hit's damage - unless the resolve itself parked it on a NEW prompt (the mover's

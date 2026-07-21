@@ -559,6 +559,29 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     expect(game.combat.pendingReactions).toHaveLength(0);
   });
 
+  it("opportunity attack previews the swing, then confirms - the reaction is spent only on confirm (#5/#4)", () => {
+    const game = buildGame([{ actorId: IDS.croc1, score: 20 }, { actorId: IDS.torva, score: 8 }]);
+    const promptId = "40000000-0000-4000-8000-0000000000aa";
+    // The leaves-reach shape movement-rules produces: croc1 (the reactor) swings at Torva (the mover).
+    game.combat = { ...game.combat, pendingReactions: [{ id: promptId, kind: "leaves-reach", actorId: IDS.croc1, actionId: "opportunity-attack", actionName: "Opportunity Attack", sourceActorId: IDS.torva, sourceName: "Torva Grimtusk", targetActorId: IDS.torva, triggerCommandId: nextCommandId(), proposedDamage: 0, proposedDamageParts: [], critical: false, createdAt: 0 }] };
+    const torvaHp = game.actors.find((actor) => actor.id === IDS.torva)!.hp.current;
+    // PREVIEW: a natural 18 hit shows, but the reaction stays unspent and nothing is applied.
+    const preview = answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game), { commit: false, attackNatural: 18 });
+    expect(preview.used).toBe(false);
+    expect(preview.resolution?.preview).toBe(true);
+    expect(preview.resolution?.attack).toMatchObject({ naturalRoll: 18, outcome: "hit" });
+    expect(game.combat.reactionsUsed).not.toContain(IDS.croc1);
+    expect(game.combat.pendingReactions).toHaveLength(1);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBe(torvaHp);
+    // CONFIRM the shown swing: reaction spent, damage applied, prompt cleared.
+    const committed = answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game, [6, 6, 6]), { commit: true, attackNatural: 18 });
+    expect(committed.used).toBe(true);
+    expect(committed.resolution?.preview).toBeFalsy();
+    expect(game.combat.reactionsUsed).toContain(IDS.croc1);
+    expect(game.combat.pendingReactions).toHaveLength(0);
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBeLessThan(torvaHp);
+  });
+
   it("offers no prompt when the reaction is already spent, the reactor is incapacitated, or the mode is freeform", () => {
     const spent = buildGame();
     spent.combat = { ...spent.combat, reactionsUsed: [IDS.pip] };

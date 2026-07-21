@@ -739,7 +739,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(ReactionAnswerSchema, raw, "The reaction answer is malformed.");
       const scope = actorScopeOf(principal);
       const gmSessionId = sessionIdOf(principal);
-      const { commandId, reactionId, use, actionId: chosenActionId, expectedRevision } = request;
+      const { commandId, reactionId, use, actionId: chosenActionId, commit, rollMode, attackNatural, expectedRevision } = request;
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const result = await store.execute({ id: commandId, type: "reaction.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         outcome = answerReaction(state, commandId, reactionId, use, chosenActionId, scope, {
@@ -748,7 +748,7 @@ export function createGameOperations(context: GameOperationsContext) {
           newRollId: context.newId,
           gmSessionId,
           now: () => new Date().toISOString()
-        });
+        }, { commit, rollMode, attackNatural });
       });
       if (!result.duplicate && outcome) {
         await context.publishGameState(result.state);

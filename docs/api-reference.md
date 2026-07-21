@@ -738,6 +738,10 @@ Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damag
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `use` | boolean | yes | true spends the reaction and applies half the parked damage; false applies it in full |
+| `actionId` | string (pattern) | no | Opportunity attacks: which melee action to swing with (defaults to the reactor's first melee, else Unarmed Strike) |
+| `commit` | boolean | no | Opportunity attacks: false previews the swing (roll only, reaction unspent, nothing applied) so the answerer can re-roll adv/disadv or confirm; confirm with commit=true and the shown attackNatural Default: `true`. |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | Opportunity attacks: the answerer's advantage/disadvantage choice for the swing's d20 |
+| `attackNatural` | integer (1–20) | no | Opportunity attacks: apply this exact d20 for the swing instead of rolling - confirming a preview, or a hand-rolled die |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
