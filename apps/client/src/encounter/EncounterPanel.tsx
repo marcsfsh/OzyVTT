@@ -367,7 +367,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     const orderedInitiative = activeIndex > 0
       ? [...combat.initiative.slice(activeIndex), ...combat.initiative.slice(0, activeIndex)]
       : combat.initiative;
-    return <section className="encounter-panel" aria-label={`Turn order - round ${combat.round}`}>
+    return <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
         {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
@@ -601,7 +601,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     </>;
   };
 
-  return <section className={`encounter-panel${state.combat.active ? "" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
+  return <section className={`encounter-panel${state.combat.active ? " combat-active" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
     {/* Docking the tracker to the map is available before AND during combat (report #9). */}

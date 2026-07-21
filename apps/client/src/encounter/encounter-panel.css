@@ -1,5 +1,8 @@
 .encounter-panel { margin-top: 2.5rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); }
 .encounter-panel.compact { padding-block: 1.1rem; }
+/* Live-combat hue shift (§6.10): a quiet magenta tint while an encounter runs. Higher specificity than
+   the resting `.encounter-panel` surface so it wins; eases in/out, never pulses. */
+.encounter-panel.combat-active { background: color-mix(in srgb, var(--surface-1) 90%, var(--magenta)); border-color: color-mix(in srgb, var(--line) 65%, var(--magenta)); transition: background var(--dur-base) var(--ease-settle), border-color var(--dur-base) var(--ease-settle); }
 .encounter-panel h2 { margin: .2rem 0 0; }
 .encounter-panel > p { color: var(--text-dim); }
 .encounter-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }

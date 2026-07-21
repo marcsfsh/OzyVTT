@@ -21,7 +21,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark } from "@vtt/ui";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
 async function api(path: string, init?: RequestInit) {
@@ -216,14 +216,21 @@ function App() {
   }, [previewScene]);
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
   return <main>
-    {mode === "home" && <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p><div className="home-theme-switch"><ThemeToggle /></div></header>}
+    <div className="app-texture" aria-hidden="true" />
+    {mode === "home" && <header className="home-hero scanlines anim-view">
+      <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
+      <span className="eyebrow">Your table</span>
+      <h1 className="home-hero-title"><Wordmark>Neon Horizon</Wordmark></h1>
+      <p>Combat-first D&amp;D 5e, hosted by your group. Table ready.</p>
+      <div className="home-theme-switch"><ThemeToggle /></div>
+    </header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
     <Notice notice={notice} />
     {mode === "home" && <section className="choices">
       <button onClick={joinPlayer} disabled={busy}><strong>Join as Player</strong><span>Choose your character and take your seat.</span></button>
       <button className="secondary" onClick={() => { setNotice(null); setMode("gm"); }}><strong>Enter as GM</strong><span>Run the table, encounter, and hidden information.</span></button>
     </section>}
-    {mode === "gm" && !gmToken && <section className="card">
+    {mode === "gm" && !gmToken && <section className="card anim-view">
       <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
       <p>{bootstrapped ? "Enter the GM password to run the table." : "Do this once, on the host machine, before players join."}</p>
       <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
@@ -276,7 +283,7 @@ function App() {
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
             healthDisplay={mode === "gm" ? (state as GmView).combat.healthDisplay : undefined}
-          /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
+          /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
           {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
         </section>

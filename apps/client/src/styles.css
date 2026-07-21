@@ -260,3 +260,35 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 
 /* GM section tabs use the @vtt/ui <Tabs> primitive; this only adds outer spacing. */
 .gm-tabs { margin-top: var(--space-5); }
+
+/* ---- Signature atmosphere (hero/empty zones + subtle app-shell CRT texture) ---- */
+
+/* Faint everyday CRT texture behind all panels (§6.4); off in light theme + reduced transparency. */
+.app-texture {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(to bottom,
+    transparent 0,
+    transparent calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) calc(var(--scanline-gap) - 1px),
+    var(--scanline-color) var(--scanline-gap));
+  opacity: .4;
+}
+.app-texture::after { content: ""; position: absolute; inset: 0; background-image: var(--noise); background-size: 140px 140px; opacity: .035; mix-blend-mode: screen; }
+[data-theme="light"] .app-texture { display: none; }
+@media (prefers-reduced-transparency: reduce) { .app-texture { display: none; } }
+
+/* Home hero: one bold moment — arcade wordmark over a receding grid + color bloom. */
+.home-hero { position: relative; overflow: hidden; max-width: none; padding: clamp(2rem, 7vw, 5rem) 0 clamp(3rem, 9vw, 6rem); }
+.home-hero > *:not(.home-hero-atmos) { position: relative; z-index: 1; }
+.home-hero > p { max-width: 40rem; }
+.home-hero-atmos, .empty-atmos { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.home-hero-bloom { position: absolute; left: 6%; right: 6%; top: 4%; height: 46%; background: var(--grad-bloom); filter: blur(72px); opacity: .32; border-radius: 50%; }
+.home-hero-grid { position: absolute; left: -25%; right: -25%; bottom: -12%; height: 62%; opacity: .7; -webkit-mask-image: linear-gradient(to top, #000, transparent); mask-image: linear-gradient(to top, #000, transparent); }
+.home-hero-title { margin: .35rem 0 1.1rem; }
+.home-hero-title .nh-wordmark { font-size: clamp(2.6rem, 9vw, 5.5rem); line-height: .95; }
+
+/* Empty map = the hero moment built from grid + line + color, not an object (§6.5). */
+.map-empty-hero { position: relative; overflow: hidden; }
+.map-empty-hero > :not(.empty-atmos) { position: relative; z-index: 1; }
+.map-empty-hero .home-hero-bloom { top: 8%; height: 42%; opacity: .22; }
+.map-empty-hero .home-hero-grid { bottom: -14%; height: 58%; opacity: .55; }
