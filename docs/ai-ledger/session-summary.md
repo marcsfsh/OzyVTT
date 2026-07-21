@@ -8,6 +8,32 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-21 — PR #40 review round 2 (seven items, same branch)
+
+Second screenshot-review pass on `claude/vtt-combat-plan-clarify-wy9cji`. Verified green (check/test/
+build, 393 server tests) + live browser smoke (41/41, zero console errors, screenshots per item).
+
+- **Aura** now renders BEHIND the token (before `TokenGlyph`) so the body + active-turn ring stay
+  crisp on top; ~35% thinner and hugging the token edge (own `TokenHealthAura`; the on-top
+  `TokenHealthBar` handles bar/ring only). Hue is relative to the exact fraction where the audience
+  holds it (GM, own PC); the shared screen stays band-derived (HP-privacy invariant).
+- **Viewer initiative** column is drag-resizable (left-edge handle, persisted to
+  `vtt.viewer-initiative-width`; content moved into a `.viewer-initiative-scroll` wrapper so the handle
+  never scrolls away); room font + name min-width tuned so full names fit.
+- **Right-click menu** Size/Health/Show-to selects share one width (fixed label grid column).
+- **Encounter setup** panel is the EXACT height of the map/scene panel — measured live via a
+  ResizeObserver on `.table` into `--setup-h` (main.tsx), combatant list scrolls inside; helper blurb
+  removed.
+- **End turn** restyled to match the Action/Bonus/Reaction pills (keeps its orange).
+- **CSS-bleed fix (important):** Item C nested the acting console INSIDE the active `<li>`, so every
+  `.initiative-list … li` descendant rule was leaking onto the console's own `<li>`s (bullets stacked,
+  stray borders). Scoped all row rules to direct children (`> li`). Also `padding:0` on the `+`/`⋯`
+  menu toggles so they match the ‹/Next-turn height.
+- **Player actions (#5.2, read-only):** on a player's turn their row shows the same attack rows the GM
+  console shows (name + to-hit/reach/range/damage), sourced from the player's already-projected stat
+  block. Reference only — the GM still rolls/applies, so NO server-authority change. (The interactive
+  option was scoped out by the owner.)
+
 ## 2026-07-21 — PR #40 review-feedback refinements (five items, same branch)
 
 Owner reviewed the three-item PR from the smoke screenshots and asked for five refinements, applied as
