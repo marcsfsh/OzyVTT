@@ -113,7 +113,15 @@ export const EffectAddSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), effectId: z.string().min(1).max(120), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * Roll a death saving throw. The default (`commit: true`, no `naturalRoll`) rolls and applies in one
+ * step - the legacy behavior. The uniform roll widget instead previews first: `commit: false` rolls
+ * the d20 (honoring `rollMode` adv/disadv) and returns the projected pips WITHOUT touching them, then
+ * a `commit: true` with the shown `naturalRoll` applies it - so death saves match the saving-throw
+ * flow (roll, see, confirm; Adv/Disadv re-roll). A typed `naturalRoll` with `commit: true` is the
+ * off-screen-die shortcut.
+ */
+export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), commit: z.boolean().default(true), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), naturalRoll: z.number().int().min(1).max(20).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRollModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["auto", "manual"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetEnvironmentSchema = z.object({ commandId: z.string().uuid(), underwater: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();

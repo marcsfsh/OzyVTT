@@ -809,7 +809,7 @@ Ends an effect: linked conditions clear (a released grapple removes Grappled/Res
 
 ### `POST /api/v1/game/actors/{actorId}/death-save`
 
-Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.
+Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.
 
 **Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
 
@@ -821,6 +821,9 @@ Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
+| `commit` | boolean | no | false previews the projected pips without changing them; confirm with commit=true and the shown naturalRoll Default: `true`. |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no | Roll two d20s keeping the higher/lower (2d20kh1 / 2d20kl1); the kept face is the natural roll |
+| `naturalRoll` | integer (1–20) | no | Apply this exact d20 value with no fresh roll - confirming a preview, or an off-screen physical die |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

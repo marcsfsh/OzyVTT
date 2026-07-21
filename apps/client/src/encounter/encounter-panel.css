@@ -335,7 +335,9 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .effect-chip-end { border: 0; background: none; color: #79909f; font-size: .7rem; cursor: pointer; padding: 0 .1rem; }
 .effect-chip-end:hover { color: #e9b861; }
 .own-effect-row { margin-top: .25rem; }
-.dying-tracker { display: flex; align-items: center; gap: .5rem; margin: .35rem 0 0; padding: .35rem .55rem; border: 1px solid #7a3535; border-radius: .5rem; background: #1d1212; }
+.dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .35rem 0 0; padding: .35rem .55rem; border: 1px solid #7a3535; border-radius: .5rem; background: #1d1212; }
+/* The shared roll widget sits after the pips and wraps to its own line on a phone. */
+.dying-tracker .save-prompt-actions, .dying-tracker .save-prompt-confirm { flex: 1 1 12rem; }
 .dying-label { color: #e88b8b; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .dying-label.dead { color: #b0524d; }
 .dying-pips { display: inline-flex; align-items: center; gap: .22rem; }
@@ -343,7 +345,6 @@ button.condition-chip[aria-pressed="true"], .condition-chip-active { background:
 .pip.success.filled { background: #4dd06a; border-color: #4dd06a; }
 .pip.failure.filled { background: #d5504a; border-color: #d5504a; }
 .pip-divider { width: 1px; height: .7rem; background: #403a2c; margin: 0 .2rem; }
-.dying-roll { padding: .3rem .7rem; border: 1px solid #7a3535; border-radius: .4rem; background: #2a1616; color: #f3d8b8; font-size: .75rem; font-weight: 700; cursor: pointer; }
 .own-dying { margin-top: .25rem; }
 .rules-mode-control { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 0; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .rules-mode-control select { width: auto; flex: 1 1 auto; margin: 0; text-transform: none; letter-spacing: normal; font-size: .8rem; color: #c8c0b1; }

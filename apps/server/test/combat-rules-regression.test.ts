@@ -8,6 +8,7 @@ import { answerReaction, dismissReaction } from "../src/reactions.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
+import { rollDeathSave } from "../src/death-saves.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
 import { applyRest, spendHitDice } from "../src/rests.js";
@@ -295,6 +296,53 @@ describe("report test 9 - zero HP, dying, and healing", () => {
     expect(pip.deathSaves).toBeNull();
     expect(pip.conditions.map((condition) => condition.id)).toEqual(["prone"]);
     expect(events).toEqual([{ kind: "condition", text: "Pip Underbough regained consciousness.", actorId: IDS.pip }]);
+  });
+
+  // A death save is just a raw d20 (no modifier) run through the same dice engine as every other roll,
+  // with the same preview-then-confirm + adv/disadv flow as a saving throw (#5/#7 - uniform dice UX).
+  describe("death saves through the shared roll widget (#5/#7)", () => {
+    const nid = (suffix: number) => `40000000-0000-4000-8000-0000000000${String(suffix).padStart(2, "0")}`;
+    const dying = () => { const game = buildGame(); applyDamageDetailed(game, IDS.pip, { amount: 60 }, { role: "gm" }); return { game, pip: game.actors.find((actor) => actor.id === IDS.pip)! }; };
+    const deps = (random: () => number) => ({ random, rollId: nid(1), commandId: nid(2), sessionId: IDS.gmSession, role: "gm" as const, now: () => "2026-01-01T00:00:00.000Z" });
+    const queue = (faces: number[]) => { const values = [...faces]; return () => values.shift() ?? 1; };
+
+    it("previews without touching the pips, records the die, and projects the outcome", () => {
+      const { game, pip } = dying();
+      const before = { ...pip.deathSaves! };
+      const recorded = game.rolls.length;
+      const result = rollDeathSave(game, pip, { commit: false, rollMode: "normal" }, deps(() => 14));
+      expect(result).toMatchObject({ committed: false, face: 14 });
+      expect(result.outcome.outcome).toBe("success");
+      expect(game.rolls.length).toBe(recorded + 1); // the die shows in the shared history
+      expect(pip.deathSaves).toEqual(before); // ...but the pips wait for a commit
+    });
+
+    it("advantage keeps the higher d20, disadvantage the lower", () => {
+      const adv = dying();
+      const advResult = rollDeathSave(adv.game, adv.pip, { commit: false, rollMode: "advantage" }, deps(queue([4, 18])));
+      expect(advResult).toMatchObject({ face: 18, mode: "advantage" });
+      expect(adv.game.rolls.at(-1)!.formula).toBe("2d20kh1");
+      const dis = dying();
+      const disResult = rollDeathSave(dis.game, dis.pip, { commit: false, rollMode: "disadvantage" }, deps(queue([4, 18])));
+      expect(disResult).toMatchObject({ face: 4, mode: "disadvantage" });
+    });
+
+    it("commit applies the pip; confirming a natural roll applies that exact value with no fresh roll", () => {
+      const { game, pip } = dying();
+      const recorded = game.rolls.length;
+      const result = rollDeathSave(game, pip, { commit: true, naturalRoll: 7 }, deps(() => 20));
+      expect(result).toMatchObject({ committed: true, face: 7 });
+      expect(pip.deathSaves).toEqual({ successes: 0, failures: 1, stable: false });
+      expect(game.rolls.length).toBe(recorded); // a confirmed/typed roll records nothing new
+    });
+
+    it("a natural 20 signals the regain-1-HP heal and resets the pips", () => {
+      const { game, pip } = dying();
+      pip.deathSaves = { successes: 1, failures: 2, stable: false };
+      const result = rollDeathSave(game, pip, { commit: true }, deps(() => 20));
+      expect(result.outcome.regainsOneHitPoint).toBe(true);
+      expect(pip.deathSaves).toEqual({ successes: 0, failures: 0, stable: false });
+    });
   });
 });
 

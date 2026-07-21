@@ -3,6 +3,7 @@ import type { ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, Mutatio
 import type { MapSelection } from "../maps/MapManager";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
+import { RollControls, type DieMode } from "./RollControls";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
 import { initialsOf } from "../scene/mapImage";
@@ -50,15 +51,13 @@ function DockPicker({ dock }: Readonly<{ dock?: DockControl }>) {
  * auto-applies server-side (fail: damage + condition; success: half or none) and the prompt clears.
  */
 function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legendaryResistanceLeft }: Readonly<{ save: PendingSave | PlayerPendingSave; targetName: string; canDismiss: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number }>) {
-  const [manualTotal, setManualTotal] = useState("");
   const [busy, setBusy] = useState(false);
-  const autoRolled = useRef(false);
   // A rolled-but-not-yet-applied result: the server records the die and returns the projected outcome,
   // so we can show it and let the answerer confirm rather than auto-resolving on the Roll click.
-  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean; mode?: "advantage" | "disadvantage" | "normal" } | null>(null);
+  const [rolled, setRolled] = useState<{ total: number; success: boolean; damage: number; condition: boolean; mode?: DieMode } | null>(null);
   // Outcome feedback goes to the parent: committing removes this prompt from state, so the component
   // unmounts before it could show its own result. `dieMode` is the answerer's explicit adv/disadv.
-  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false, dieMode?: "advantage" | "disadvantage" | "normal") => {
+  const send = (method: "roll" | "manual", total: number | undefined, commit: boolean, legendaryResistance = false, dieMode?: DieMode) => {
     setBusy(true);
     socket.emit("save:answer", { commandId: newId(), saveId: save.id, method, commit, ...(legendaryResistance ? { legendaryResistance } : {}), ...(total !== undefined ? { total } : {}), ...(dieMode ? { rollMode: dieMode } : {}) }, (result: SaveAnswerResult) => {
       setBusy(false);
@@ -69,17 +68,6 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
       onFeedback(`${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`);
     });
   };
-  const submitManual = () => {
-    const total = Number(manualTotal.trim());
-    if (!Number.isInteger(total) || total < -20 || total > 60) { onFeedback("Enter the rolled total (-20 to 60)."); return; }
-    send("manual", total, true);
-  };
-  // Auto mode rolls the save the moment it is owed (still a preview, so the answerer confirms or types
-  // an override); manual mode waits for the answerer to roll or type. One roll per prompt.
-  useEffect(() => {
-    if (rollMode === "auto" && !rolled && !autoRolled.current) { autoRolled.current = true; send("roll", undefined, false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rollMode, rolled]);
   const dismiss = () => {
     setBusy(true);
     socket.emit("save:dismiss", { commandId: newId(), saveId: save.id }, (result: MutationResult) => {
@@ -89,23 +77,23 @@ function SavePrompt({ save, targetName, canDismiss, onFeedback, rollMode, legend
   };
   return <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
     <span className="save-prompt-label"><strong>DC {save.dc} {save.ability.toUpperCase()}</strong> vs {save.actionName} ({save.sourceName}){save.proposedDamage > 0 ? ` · ${save.proposedDamage} dmg` : ""}</span>
-    {rolled
-      // Reveal the rolled total and what it will do, and require an explicit Confirm before applying.
-      ? <span className="save-prompt-confirm">
-          <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.success ? "Success" : "Failure"}</strong>
-          <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
-          {/* Adv/disadv re-roll the d20 keeping the higher/lower (2d20kh1 / kl1), applied after the roll. */}
-          <button type="button" className={`save-die-mode${rolled.mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => send("roll", undefined, false, false, "advantage")}>Adv</button>
-          <button type="button" className={`save-die-mode${rolled.mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => send("roll", undefined, false, false, "disadvantage")}>Disadv</button>
-          <button type="button" className="encounter-primary" disabled={busy} onClick={() => send("manual", rolled.total, true)}>Confirm</button>
-          {!rolled.success && (legendaryResistanceLeft ?? 0) > 0 && <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when the creature fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>}
-          <button type="button" className="secondary" disabled={busy} onClick={() => setRolled(null)}>Re-roll</button>
-        </span>
-      : <span className="save-prompt-actions">
-          <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => send("roll", undefined, false)}>Roll</button>
-          <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="-?[0-9]*" placeholder="or type the total" aria-label="Rolled save total" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && manualTotal.trim() !== "") submitManual(); }} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
-          {canDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={dismiss}>✕</button>}
-        </span>}
+    <RollControls
+      rollMode={rollMode} busy={busy} rolled={rolled !== null} currentMode={rolled?.mode}
+      manualLabel="Rolled save total" onInvalidManual={onFeedback}
+      onRoll={(mode) => send("roll", undefined, false, false, mode)}
+      onManual={(total) => send("manual", total, true)}
+      onConfirm={() => rolled && send("manual", rolled.total, true)}
+      onReroll={() => setRolled(null)}
+      onDismiss={canDismiss ? dismiss : undefined}
+      summary={rolled ? <>
+        {/* Reveal the rolled total and what it will do; an explicit Confirm applies it. */}
+        <strong className={rolled.success ? "save-pass" : "save-fail"}>Rolled {rolled.total}{rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.success ? "Success" : "Failure"}</strong>
+        <span className="save-prompt-effect">{rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}{rolled.condition ? " + condition" : ""}</span>
+      </> : undefined}
+      extraActions={rolled && !rolled.success && (legendaryResistanceLeft ?? 0) > 0
+        ? <button type="button" className="save-legendary" disabled={busy} title="SRD Legendary Resistance: when the creature fails a save, it can choose to succeed instead" onClick={() => send("manual", rolled.total, true, true)}>Legendary Resistance ({legendaryResistanceLeft} left)</button>
+        : undefined}
+    />
   </div>;
 }
 
@@ -197,22 +185,34 @@ function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorI
   </span>;
 }
 
+type DeathPreview = NonNullable<DeathSaveResult["deathSave"]>;
+
 /**
- * A dying player character's death-save tracker (ADR-0020): success/failure pips plus the roll -
- * the replay's "heal 1 HP so the turn isn't skipped" workaround, replaced by the real state machine.
+ * A dying character's death-save tracker (ADR-0020): success/failure pips plus the roll - the
+ * replay's "heal 1 HP so the turn isn't skipped" workaround, replaced by the real state machine.
+ *
+ * The roll rides the shared RollControls widget, so a death save behaves exactly like a saving throw
+ * (roll, see the projected pips, confirm; Adv/Disadv re-roll; or type an off-screen d20). In auto mode
+ * it rolls itself the moment the dying creature's turn comes up, matching 5e's start-of-turn timing.
  */
-function DyingTracker({ actorId, name, deathSaves, canRoll, onFeedback }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves; canRoll: boolean; onFeedback: (text: string) => void }>) {
+function DyingTracker({ actorId, name, deathSaves, canRoll, onFeedback, rollMode, isActingTurn }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves; canRoll: boolean; onFeedback: (text: string) => void; rollMode: "auto" | "manual"; isActingTurn: boolean }>) {
   const [busy, setBusy] = useState(false);
+  // A rolled-but-unapplied preview: the server reveals the d20 and projected pips; Confirm applies them.
+  const [rolled, setRolled] = useState<DeathPreview | null>(null);
   const dead = deathSaves.failures >= 3;
-  const roll = () => {
+  const send = (commit: boolean, extra: { rollMode?: DieMode; naturalRoll?: number }) => {
     setBusy(true);
-    socket.emit("death-save:roll", { commandId: newId(), actorId }, (result: DeathSaveResult) => {
+    socket.emit("death-save:roll", { commandId: newId(), actorId, commit, ...extra }, (result: DeathSaveResult) => {
       setBusy(false);
       if (!result.ok) { onFeedback(result.message ?? "The death save failed."); return; }
       const outcome = result.deathSave;
-      if (outcome) onFeedback(outcome.regainedConsciousness ? `${name} rolled a natural 20 and regains 1 HP!` : outcome.dead ? `${name} died.` : outcome.stable ? `${name} is stable.` : `${name}: ${outcome.successes} successes, ${outcome.failures} failures.`);
+      if (!outcome) return;
+      if (!outcome.committed) { setRolled(outcome); return; }
+      setRolled(null);
+      onFeedback(outcome.regainedConsciousness ? `${name} rolled a natural 20 and regains 1 HP!` : outcome.dead ? `${name} died.` : outcome.stable ? `${name} is stable.` : `${name}: ${outcome.successes} successes, ${outcome.failures} failures.`);
     });
   };
+  const passed = rolled?.outcome === "success" || rolled?.outcome === "critical-success";
   return <div className="dying-tracker" role="group" aria-label={`Death saves for ${name}`}>
     <span className={`dying-label${dead ? " dead" : ""}`}>{dead ? "Dead" : deathSaves.stable ? "Stable" : "Dying"}</span>
     <span className="dying-pips" aria-label={`${deathSaves.successes} successes, ${deathSaves.failures} failures`}>
@@ -220,7 +220,18 @@ function DyingTracker({ actorId, name, deathSaves, canRoll, onFeedback }: Readon
       <span className="pip-divider" />
       {[0, 1, 2].map((index) => <span key={`f${index}`} className={`pip failure${index < deathSaves.failures ? " filled" : ""}`} />)}
     </span>
-    {canRoll && !deathSaves.stable && !dead && <button type="button" className="dying-roll" disabled={busy} onClick={roll}>Roll death save</button>}
+    {canRoll && !deathSaves.stable && !dead && <RollControls
+      rollMode={rollMode} autoRoll={rollMode === "auto" && isActingTurn} busy={busy} rolled={rolled !== null} currentMode={rolled?.rollMode}
+      manualPlaceholder="or type the d20" manualLabel="Death save d20" manualMin={1} manualMax={20} onInvalidManual={onFeedback}
+      onRoll={(mode) => send(false, mode ? { rollMode: mode } : {})}
+      onManual={(natural) => send(true, { naturalRoll: natural })}
+      onConfirm={() => rolled && send(true, { naturalRoll: rolled.naturalRoll })}
+      onReroll={() => setRolled(null)}
+      summary={rolled ? <>
+        <strong className={passed ? "save-pass" : "save-fail"}>Rolled {rolled.naturalRoll}{rolled.rollMode ? ` (${rolled.rollMode === "advantage" ? "adv" : "disadv"})` : ""} - {rolled.regainedConsciousness ? "Natural 20!" : rolled.naturalRoll === 1 ? "Natural 1" : passed ? "Success" : "Failure"}</strong>
+        <span className="save-prompt-effect">{rolled.dead ? "dies" : rolled.stable ? "stabilizes" : rolled.regainedConsciousness ? "back up at 1 HP" : `${rolled.successes}S / ${rolled.failures}F`}</span>
+      </> : undefined}
+    />}
   </div>;
 }
 
@@ -243,10 +254,10 @@ function PlayerEffectRow({ actorId, effects, isMe }: Readonly<{ actorId: string;
     {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
-function OwnDyingTracker({ actorId, name, deathSaves }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves }>) {
+function OwnDyingTracker({ actorId, name, deathSaves, rollMode, isActingTurn }: Readonly<{ actorId: string; name: string; deathSaves: DeathSaves; rollMode: "auto" | "manual"; isActingTurn: boolean }>) {
   const [feedback, setFeedback] = useState("");
   return <div className="own-dying">
-    <DyingTracker actorId={actorId} name={name} deathSaves={deathSaves} canRoll onFeedback={setFeedback} />
+    <DyingTracker actorId={actorId} name={name} deathSaves={deathSaves} canRoll onFeedback={setFeedback} rollMode={rollMode} isActingTurn={isActingTurn} />
     {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
@@ -316,7 +327,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
             <span className="initiative-score-plain">{entry.score}</span>
           </div>
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
-          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} />}
+          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} />}
         </li>;
@@ -600,7 +611,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
             </div>
           </>}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
-          {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} />}
+          {actor && actor.deathSaves && actor.hp.current <= 0 && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
           {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode}
             legendaryResistanceLeft={actor.legendary?.resistancesPerDay !== undefined ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0)) : undefined} />)}
           {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} />)}

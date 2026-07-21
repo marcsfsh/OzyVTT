@@ -14,7 +14,7 @@ import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
 import { addCombatant, endEncounter, nextInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
-import { resolveDeathSave } from "@vtt/rules-5e";
+import { rollDeathSave } from "./death-saves.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
 import { activateScene, createScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
 import { buildEncounterArchive } from "./encounter-archive.js";
@@ -863,10 +863,10 @@ export function createGameOperations(context: GameOperationsContext) {
     async deathSaveRoll(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(DeathSaveRollSchema, raw, "The death save is malformed.");
       const scope = actorScopeOf(principal);
-      const { commandId, actorId, expectedRevision } = request;
+      const { commandId, actorId, commit, rollMode, naturalRoll, expectedRevision } = request;
       const rollId = context.newId();
       const initiatorSessionId = sessionIdOf(principal);
-      let outcome: ReturnType<typeof resolveDeathSave> | undefined;
+      let roll: ReturnType<typeof rollDeathSave> | undefined;
       let events: EffectNarration[] = [];
       const result = await store.execute({ id: commandId, type: "death-save.roll", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -875,36 +875,28 @@ export function createGameOperations(context: GameOperationsContext) {
         if (actor.deathSaves === null || actor.hp.current > 0) throw new CommandRejectedError("That character isn't dying.");
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
         if (actor.deathSaves.failures >= 3) throw new CommandRejectedError("That character is dead - heal or revive them through the GM.");
-        const face = context.random(20);
-        outcome = resolveDeathSave(actor.deathSaves, face);
-        actor.deathSaves = outcome.state;
-        // The roll lands in the shared history under the dying character's name and real initiator role.
-        const record: RollRecord = {
-          id: rollId, commandId, initiatorSessionId, initiatorRole: isGmGrade(principal) ? "gm" : "player", initiatorLabel: actor.name, actorId,
-          purpose: "save", visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
-          formula: "1d20", normalizedFormula: "1d20",
-          dice: [{ group: 0, sides: 20, face, kept: true, sign: 1 }], modifiers: [], total: face, createdAt: new Date().toISOString()
-        };
-        state.rolls.push(record);
-        if (state.rolls.length > 200) state.rolls.splice(0, state.rolls.length - 200);
-        if (outcome.regainsOneHitPoint) {
-          events = healActor(state, actorId, 1, { role: "gm" });
-        }
+        // The die (and preview-vs-commit) is the shared, unit-tested death-save core; the operation keeps
+        // authorization above and the natural-20 heal + narration below.
+        roll = rollDeathSave(state, actor, { commit, rollMode, naturalRoll }, { random: context.random, rollId, commandId, sessionId: initiatorSessionId, role: isGmGrade(principal) ? "gm" : "player", now: () => new Date().toISOString() });
+        if (commit && roll.outcome.regainsOneHitPoint) events = healActor(state, actorId, 1, { role: "gm" });
       });
-      if (!result.duplicate && outcome) {
+      if (!result.duplicate && roll) {
         await context.publishGameState(result.state);
-        const hidden = actorHidden(actorId);
-        const text = outcome.regainsOneHitPoint ? `${actorName(actorId)} rolled a natural 20 on a death save and regains 1 HP!`
-          : outcome.dead ? `${actorName(actorId)} failed a third death save and dies.`
-          : outcome.state.stable ? `${actorName(actorId)} is stable.`
-          : `${actorName(actorId)} ${outcome.outcome === "critical-failure" ? "rolled a natural 1 - two death save failures" : outcome.outcome === "success" ? "succeeded on a death save" : "failed a death save"} (${outcome.state.successes}S/${outcome.state.failures}F).`;
-        context.appendLog({ kind: "death-save", text, actorIds: [actorId], gmOnly: hidden });
-        context.broadcastTableEvent({ kind: "death-save", text, actorIds: [actorId], gmOnly: hidden });
-        publishNarrations(events);
+        if (commit) {
+          const outcome = roll.outcome;
+          const hidden = actorHidden(actorId);
+          const text = outcome.regainsOneHitPoint ? `${actorName(actorId)} rolled a natural 20 on a death save and regains 1 HP!`
+            : outcome.dead ? `${actorName(actorId)} failed a third death save and dies.`
+            : outcome.state.stable ? `${actorName(actorId)} is stable.`
+            : `${actorName(actorId)} ${outcome.outcome === "critical-failure" ? "rolled a natural 1 - two death save failures" : outcome.outcome === "success" ? "succeeded on a death save" : "failed a death save"} (${outcome.state.successes}S/${outcome.state.failures}F).`;
+          context.appendLog({ kind: "death-save", text, actorIds: [actorId], gmOnly: hidden });
+          context.broadcastTableEvent({ kind: "death-save", text, actorIds: [actorId], gmOnly: hidden });
+          publishNarrations(events);
+        }
       }
       return {
         revision: result.state.revision, duplicate: result.duplicate, rollId,
-        ...(outcome && !result.duplicate ? { deathSave: { naturalRoll: result.state.rolls.find((roll) => roll.id === rollId)?.total ?? 0, outcome: outcome.outcome, successes: outcome.state.successes, failures: outcome.state.failures, stable: outcome.state.stable, dead: outcome.dead, regainedConsciousness: outcome.regainsOneHitPoint } } : {})
+        ...(roll && !result.duplicate ? { deathSave: { naturalRoll: roll.face, outcome: roll.outcome.outcome, successes: roll.outcome.state.successes, failures: roll.outcome.state.failures, stable: roll.outcome.state.stable, dead: roll.outcome.dead, regainedConsciousness: roll.outcome.regainsOneHitPoint, committed: commit, ...(roll.mode ? { rollMode: roll.mode } : {}) } } : {})
       };
     },
 
