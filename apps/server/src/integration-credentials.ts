@@ -10,7 +10,7 @@ const TOKEN_PREFIX = "vtt_int_";
  * Successful verifications are audited at most once per credential per this window. The game API
  * invites tight polling (ETag reads every second or two); auditing every poll would grow the audit
  * table by tens of thousands of identical "used" rows a day while telling the GM nothing new.
- * Failures are always audited — they are the security-relevant signal.
+ * Failures are always audited - they are the security-relevant signal.
  */
 const USED_AUDIT_THROTTLE_MS = 60_000;
 const CreateCredentialSchema = z.object({

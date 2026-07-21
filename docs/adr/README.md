@@ -21,5 +21,6 @@
 | [017](0017-open-source-distribution.md) | Proposed | Open-source self-host distribution, licensing boundaries, contribution policy, and release governance |
 | [018](0018-character-sheet-pdf-ingestion.md) | Proposed | Isolated MarkItDown extraction followed by reviewed conversion into canonical character JSON |
 | [019](0019-ai-character-participants.md) | Proposed / long-term | Actor-bound AI players with structured persona, bounded autonomy/memory, safe observations, typed intents, and human control |
+| [020](0020-combat-rules-engine.md) | Accepted | Server-owned combat rules: validated action resolution with rules modes + audited overrides, action instances, persistent effects, typed damage, and the dying state |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence. Every row with a dedicated file is linked; ADR-003/009/010/013 remain index-only entries pending their spikes.

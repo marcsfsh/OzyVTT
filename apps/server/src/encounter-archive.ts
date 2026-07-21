@@ -5,20 +5,21 @@ import type { JournalEntry } from "./game-store.js";
 /**
  * The permanent, machine-readable record of one ended encounter (#12 export, Time Machine v2). Built
  * at encounter end from the turn-boundary snapshots + the timestamped combat log + the per-command
- * journal, then stored verbatim so external tools can consume it — the app never analyzes it.
+ * journal, then stored verbatim so external tools can consume it - the app never analyzes it.
  * GM-only: `turns[].state`/`finalState` are the FULL game state (hidden combatants included), `log`
  * includes GM-only lines, and `journal` payloads can reference hidden combatants, so it is served
  * only behind GM-grade auth (GM session or a GM-minted integration credential).
  *
- * Shape (archiveSchemaVersion 2 — strictly additive over version 1):
+ * Shape (archiveSchemaVersion 3 - strictly additive over versions 1 and 2):
  *   {
- *     archiveSchemaVersion: 2,
+ *     archiveSchemaVersion: 3,
  *     startedAt, endedAt,               // ISO 8601
  *     turnCount,
  *     turns: [{ index, kind, label, revision, at, state }],    // one full GameState per turn boundary
  *     log:   [{ id, at, kind, text, gmOnly, revision }],       // the fight's commentary, chronological
  *     journal: [{ seq, commandId, type, actorId, principal, payload, revision, at }],  // EVERY accepted command while the fight was live, incl. the ending encounter.end
  *     finalState,                       // the last live GameState, captured just before encounter.end cleared the fight
+ *     postEncounterState,               // v3: the state AFTER encounter.end ran - combat cleared, end-of-fight effect sweeps (and their on-end grants) landed
  *     rolls: [RollRecord...],           // every dice roll seen across the fight (survives the live state's rolling cap)
  *     definitions: [{ id, source: "imported"|"bundled", definition }],  // full stat blocks used by the fight, so the document is self-contained
  *     attribution                       // CC BY 4.0 line when bundled SRD content is included, else null
@@ -26,7 +27,7 @@ import type { JournalEntry } from "./game-store.js";
  * `turns`, `log`, and `journal` join on `revision` (and time), which is how a consumer aligns "what
  * the state was" with "what was commanded" and "what was narrated as it happened".
  */
-export const ENCOUNTER_ARCHIVE_SCHEMA_VERSION = 2;
+export const ENCOUNTER_ARCHIVE_SCHEMA_VERSION = 3;
 
 export type EncounterArchiveTurn = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string; state: GameState }>;
 export type EncounterArchiveDefinition = Readonly<{ id: string; source: "imported" | "bundled"; definition: ActorDefinition }>;
@@ -39,6 +40,8 @@ export type EncounterArchiveDocument = Readonly<{
   log: readonly CombatLogEntry[];
   journal: readonly JournalEntry[];
   finalState: GameState;
+  /** v3: the true aftermath - captured after encounter.end cleared combat and ran its effect sweeps. */
+  postEncounterState: GameState;
   rolls: readonly RollRecord[];
   definitions: readonly EncounterArchiveDefinition[];
   attribution: string | null;
@@ -50,8 +53,10 @@ export type BuildEncounterArchiveInput = Readonly<{
   readState: (index: number) => GameState | null;
   log: readonly CombatLogEntry[];
   journal: readonly JournalEntry[];
-  /** The last live picture of the fight — cloned before `endEncounter` cleared the combat. */
+  /** The last live picture of the fight - cloned before `endEncounter` cleared the combat. */
   finalState: GameState;
+  /** The state after `encounter.end`'s own work: combat cleared, end-of-fight effect sweeps (Frenzy's Exhaustion) landed. */
+  postEncounterState: GameState;
   endedAt: string;
   /** Resolves a bundled (SRD) stat block by definition id; imported ones come from the states themselves. */
   resolveBundledDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -92,6 +97,7 @@ export function buildEncounterArchive(input: BuildEncounterArchiveInput): Encoun
     log: input.log,
     journal: input.journal,
     finalState: input.finalState,
+    postEncounterState: input.postEncounterState,
     rolls: [...rolls.values()],
     definitions: [...definitions.values()],
     attribution: includesBundled ? input.attribution : null

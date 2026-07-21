@@ -30,7 +30,7 @@ function rowToEntry(row: CatalogRow): TokenCatalogEntry {
 /**
  * Names/folders for uploaded token images, plus a small per-definition memory of the last image used
  * so re-adding the same creature can offer it as a quick option. Lives on the game SQLite, alongside
- * the map catalog. Folders are implicit — they exist while a row references them.
+ * the map catalog. Folders are implicit - they exist while a row references them.
  */
 export class TokenCatalogStore {
   private database?: DatabaseSync;

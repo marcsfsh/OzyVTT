@@ -17,7 +17,7 @@ import { CombatLogStore } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
-import { CommandRejectedError, GameStore, TimelineConfirmationRequired } from "./game-store.js";
+import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -87,7 +87,7 @@ export function createServer(options: CreateServerOptions) {
   /** Ephemeral annotations (measurements) carry their own `expiresAt`; the projection already hides expired ones, but nothing re-broadcasts once the timestamp passes without other activity, so schedule one at the soonest expiry — same pattern as ViewerCoordinator's ping expiry. Re-publishing (not just broadcast) also drops the expired measurement from the shared screen (Channel B). */
   function scheduleAnnotationExpiry() {
     // Keep exactly one pending timer: clear any prior one, arm the soonest expiry, then re-arm from
-    // inside the callback so every staggered annotation drops at its own expiry — not just the first.
+    // inside the callback so every staggered annotation drops at its own expiry - not just the first.
     // Without the re-arm, a second ping placed after the first would linger until unrelated activity
     // re-broadcast the state (the reported "extra pings don't disappear" bug).
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
@@ -123,7 +123,7 @@ export function createServer(options: CreateServerOptions) {
   }
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
-   * GM-only AND every referenced actor is public — so a hidden combatant is never narrated to players.
+   * GM-only AND every referenced actor is public - so a hidden combatant is never narrated to players.
    * Not stored in GameState (ephemeral presentation); the viewer channel gets nothing.
    */
   function broadcastTableEvent(event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) {
@@ -154,17 +154,17 @@ export function createServer(options: CreateServerOptions) {
       else if (!gmOnly && auth.verifyPlayer(token)) socket.emit("log:entry", record);
     }
   }
-  /** "Round 3 — Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
+  /** "Round 3 - Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
   function logTurnBegin(state: GameState) {
     if (state.combat.turnActorId === null) return;
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
-    appendLog({ kind: "turn", text: `Round ${state.combat.round} — ${name}'s turn.`, actorIds: [state.combat.turnActorId] });
+    appendLog({ kind: "turn", text: `Round ${state.combat.round} - ${name}'s turn.`, actorIds: [state.combat.turnActorId] });
   }
-  /** Translate a timeline navigation outcome into log lines — plain turns for forward play, GM-only history notes for rewinds. */
+  /** Translate a timeline navigation outcome into log lines - plain turns for forward play, GM-only history notes for rewinds. */
   function logTimelineOutcome(outcome: TimelineOutcome, state: GameState) {
     switch (outcome.kind) {
       case "advanced": case "legacy": logTurnBegin(state); break;
-      case "rewrote": appendLog({ kind: "history", text: "The GM rewrote history from this turn — every later turn was undone.", gmOnly: true }); logTurnBegin(state); break;
+      case "rewrote": appendLog({ kind: "history", text: "The GM rewrote history from this turn - every later turn was undone.", gmOnly: true }); logTurnBegin(state); break;
       case "rewound": appendLog({ kind: "history", text: `The GM rewound to ${outcome.label}.`, gmOnly: true }); break;
       case "stepped": appendLog({ kind: "history", text: `The GM moved to ${outcome.label}.`, gmOnly: true }); break;
       case "discarded": appendLog({ kind: "history", text: `The GM discarded the changes at ${outcome.label}.`, gmOnly: true }); break;
@@ -185,7 +185,7 @@ export function createServer(options: CreateServerOptions) {
   }
 
   // The shared game capabilities: the Socket.IO handlers below and the public HTTP API both run
-  // these exact operations — same validation, authorization, dispatch, and narration (ADR-0016).
+  // these exact operations - same validation, authorization, dispatch, and narration (ADR-0016).
   const operations = createGameOperations({
     store,
     combatLog,
@@ -211,9 +211,9 @@ export function createServer(options: CreateServerOptions) {
   app.use(express.json({ limit: "512kb" }));
   // Open CORS for the VERSIONED integration surface only: every /api/v1 credential travels as a
   // bearer header (or a SameSite=Strict cookie the browser refuses to send cross-origin anyway),
-  // so a wildcard origin grants nothing a token doesn't already grant — and it lets browser-based
+  // so a wildcard origin grants nothing a token doesn't already grant - and it lets browser-based
   // integrations (overlays, dashboards) call the documented surface directly. The legacy
-  // /api/gm/* session endpoints — password login above all — deliberately stay same-origin:
+  // /api/gm/* session endpoints - password login above all - deliberately stay same-origin:
   // wildcard CORS there would let any web page relay password guesses through a LAN browser.
   app.use((req, res, next) => {
     if (req.path !== "/api/v1" && !req.path.startsWith("/api/v1/")) return next();
@@ -283,7 +283,7 @@ export function createServer(options: CreateServerOptions) {
     return res.json({ viewerUrls });
   });
   // Encounter archives (#12): permanent, machine-readable turn-by-turn records auto-saved at encounter
-  // end. GM-only — a document holds full state (hidden combatants) and GM-only log lines. The shape is
+  // end. GM-only - a document holds full state (hidden combatants) and GM-only log lines. The shape is
   // documented in encounter-archive.ts; consumers list, fetch, and delete over these endpoints.
   app.get("/api/gm/encounters", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
@@ -296,7 +296,7 @@ export function createServer(options: CreateServerOptions) {
     const id = Number(req.params.id);
     const document = Number.isInteger(id) ? store.getEncounterArchive(id) : null;
     if (document === null) return res.status(404).json({ message: "No such encounter archive." });
-    return res.type("application/json").send(document); // raw stored JSON — no re-serialization
+    return res.type("application/json").send(document); // raw stored JSON - no re-serialization
   });
   app.delete("/api/gm/encounters/:id", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
@@ -347,7 +347,7 @@ export function createServer(options: CreateServerOptions) {
     },
     sessions: {
       // The HTTP mirror of the socket's open LAN-trust join: anyone who can reach the host may
-      // take a player seat once GM setup is complete — same rule as session:join below.
+      // take a player seat once GM setup is complete - same rule as session:join below.
       issuePlayer: () => {
         if (!auth.isBootstrapped) return null;
         const token = auth.issuePlayerSession();
@@ -376,7 +376,7 @@ export function createServer(options: CreateServerOptions) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
     // `dotfiles: "allow"` and serving index.html root-relative both matter on hosts whose install
     // path contains a dot-segment (e.g. OneDrive's `.DesktopOneDrive`): `send` defaults to
-    // `dotfiles: "ignore"`, which 404s any *absolute* path containing a dot-segment — so the SPA
+    // `dotfiles: "ignore"`, which 404s any *absolute* path containing a dot-segment - so the SPA
     // fallback below must pass a root and a clean relative filename, not the full absolute path.
     app.use(express.static(options.webDist, { dotfiles: "allow" }));
     app.get("/{*path}", (_req, res) => res.sendFile("index.html", { root: options.webDist, dotfiles: "allow" }));
@@ -432,7 +432,7 @@ export function createServer(options: CreateServerOptions) {
     /**
      * Socket adapter over the shared operations: resolve the principal (or refuse with this
      * command's historical join/role message), run the operation, and translate outcomes back to
-     * the ack wire shape — including the timeline-confirmation bounce, which is an ok:true ack.
+     * the ack wire shape - including the timeline-confirmation bounce, which is an ok:true ack.
      */
     const respond = async <Result extends { ok: boolean }>(
       acknowledge: (result: Result) => void,
@@ -446,6 +446,9 @@ export function createServer(options: CreateServerOptions) {
         acknowledge({ ok: true, ...(await work(principal)) } as unknown as Result);
       } catch (error) {
         if (error instanceof TimelineConfirmationRequired) return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message } as unknown as Result);
+        // A rules-mode rejection carries machine-readable details so the client can offer the
+        // one-tap audited override instead of parsing prose (ADR-0020).
+        if (error instanceof RulesBlockedError) return acknowledge({ ok: false, message: error.message, blocked: { rule: error.rule, message: error.message, overridable: error.overridable } } as unknown as Result);
         acknowledge({ ok: false, message: error instanceof Error ? error.message : fallbackMessage } as unknown as Result);
       }
     };
@@ -458,18 +461,33 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) => operations.actorRemove(principal, payload)));
     socket.on("actor:set-token-image", (payload, acknowledge) => respond(acknowledge, "Only the GM can set token images.", "The token image could not be set.", (principal) => operations.actorSetTokenImage(principal, payload)));
     socket.on("actor:set-size", (payload, acknowledge) => respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) => operations.actorSetSize(principal, payload)));
+    socket.on("actor:set-visibility", (payload, acknowledge) => respond(acknowledge, "Only the GM can change token visibility.", "The token visibility could not be changed.", (principal) => operations.actorSetVisibility(principal, payload)));
+    socket.on("actor:set-speed", (payload, acknowledge) => respond(acknowledge, "Only the GM can set movement speed.", "The speed could not be set.", (principal) => operations.actorSetSpeed(principal, payload)));
     socket.on("actor:apply-damage", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The damage could not be applied.", (principal) => operations.actorApplyDamage(principal, payload)));
     socket.on("actor:heal", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The healing could not be applied.", (principal) => operations.actorHeal(principal, payload)));
     socket.on("actor:set-temp-hp", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The temporary hit points could not be set.", (principal) => operations.actorSetTempHp(principal, payload)));
     socket.on("content:conditions", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentConditions(principal)));
+    socket.on("content:spells", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpells(principal)));
     socket.on("actor:set-condition", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking conditions.", "The condition could not be updated.", (principal) => operations.actorSetCondition(principal, payload)));
     socket.on("content:monster-actions", (payload, acknowledge) => respond(acknowledge, "Only the GM can browse stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterActions(principal, payload)));
     socket.on("content:monster-sheet", (payload, acknowledge) => respond(acknowledge, "Only the GM can read stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterSheet(principal, payload)));
     socket.on("action:resolve", (payload, acknowledge) => respond(acknowledge, "Only the GM can resolve stat-block actions.", "The action could not be resolved.", (principal) => operations.actionResolve(principal, payload)));
     socket.on("save:answer", (payload, acknowledge) => respond(acknowledge, "Join the table before answering saving throws.", "The saving throw could not be answered.", (principal) => operations.saveAnswer(principal, payload)));
     socket.on("save:dismiss", (payload, acknowledge) => respond(acknowledge, "Join the table before managing saving throws.", "The saving throw could not be dismissed.", (principal) => operations.saveDismiss(principal, payload)));
+    socket.on("reaction:answer", (payload, acknowledge) => respond(acknowledge, "Join the table before answering reactions.", "The reaction could not be answered.", (principal) => operations.reactionAnswer(principal, payload)));
+    socket.on("reaction:dismiss", (payload, acknowledge) => respond(acknowledge, "Join the table before managing reactions.", "The reaction prompt could not be dismissed.", (principal) => operations.reactionDismiss(principal, payload)));
+    socket.on("actor:available-actions", (payload, acknowledge) => respond(acknowledge, "Join the table before checking actions.", "The action availability is unavailable.", (principal) => operations.actorAvailableActions(principal, payload)));
+    socket.on("effect:add", (payload, acknowledge) => respond(acknowledge, "Only the GM can add effects.", "The effect could not be added.", (principal) => operations.effectAdd(principal, payload)));
+    socket.on("effect:end", (payload, acknowledge) => respond(acknowledge, "Join the table before managing effects.", "The effect could not be ended.", (principal) => operations.effectEnd(principal, payload)));
+    socket.on("death-save:roll", (payload, acknowledge) => respond(acknowledge, "Join the table before rolling death saves.", "The death save failed.", (principal) => operations.deathSaveRoll(principal, payload)));
+    socket.on("encounter:set-rules-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the rules mode.", "The rules mode could not be changed.", (principal) => operations.encounterSetRulesMode(principal, payload)));
+    socket.on("encounter:set-roll-mode", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the roll mode.", "The roll mode could not be changed.", (principal) => operations.encounterSetRollMode(principal, payload)));
+    socket.on("encounter:set-environment", (payload, acknowledge) => respond(acknowledge, "Only the GM can change the encounter environment.", "The environment could not be changed.", (principal) => operations.encounterSetEnvironment(principal, payload)));
+    socket.on("actor:rest", (payload, acknowledge) => respond(acknowledge, "Only the GM can apply a rest.", "The rest could not be applied.", (principal) => operations.actorRest(principal, payload)));
+    socket.on("actor:spend-hit-dice", (payload, acknowledge) => respond(acknowledge, "Join the table before spending Hit Dice.", "The Hit Dice could not be spent.", (principal) => operations.actorSpendHitDice(principal, payload)));
     socket.on("turn:use", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The turn could not be updated.", (principal) => operations.turnUse(principal, payload)));
     socket.on("turn:use-reaction", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The reaction could not be updated.", (principal) => operations.turnUseReaction(principal, payload)));
+    socket.on("turn:use-legendary", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking turns.", "The legendary actions could not be updated.", (principal) => operations.turnUseLegendary(principal, payload)));
     socket.on("turn:end", (payload, acknowledge) => respond(acknowledge, "Join the table before ending a turn.", "The turn could not end.", (principal) => operations.turnEnd(principal, payload)));
     socket.on("actor:set-hp", (payload, acknowledge) => respond(acknowledge, "Only the GM can set hit points directly.", "The hit points could not be set.", (principal) => operations.actorSetHp(principal, payload)));
     socket.on("dice:roll", (payload, acknowledge) => respond(acknowledge, "Join a session before rolling.", "The roll failed.", (principal) => operations.diceRoll(principal, payload)));
@@ -486,6 +504,9 @@ export function createServer(options: CreateServerOptions) {
     socket.on("scene:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove scenes.", "The scene could not be removed.", (principal) => operations.sceneRemove(principal, payload)));
     socket.on("scene:activate", (payload, acknowledge) => respond(acknowledge, "Only the GM can switch scenes.", "The scene could not be switched.", (principal) => operations.sceneActivate(principal, payload)));
     socket.on("scene:set-combatants", (payload, acknowledge) => respond(acknowledge, "Only the GM can change a scene's combatants.", "The scene could not be updated.", (principal) => operations.sceneSetCombatants(principal, payload)));
+    socket.on("fog:set-enabled", (payload, acknowledge) => respond(acknowledge, "Only the GM controls the fog of war.", "The fog could not be updated.", (principal) => operations.fogSetEnabled(principal, payload)));
+    socket.on("fog:paint", (payload, acknowledge) => respond(acknowledge, "Only the GM controls the fog of war.", "The fog stroke could not be painted.", (principal) => operations.fogPaint(principal, payload)));
+    socket.on("fog:reset", (payload, acknowledge) => respond(acknowledge, "Only the GM controls the fog of war.", "The fog could not be reset.", (principal) => operations.fogReset(principal, payload)));
     socket.on("annotation:add", (payload, acknowledge) => respond(acknowledge, "Join a session before adding to the map.", "That could not be added to the map.", (principal) => operations.annotationAdd(principal, payload)));
     socket.on("annotation:ping", (payload, acknowledge) => respond(acknowledge, "Join a session before pinging the map.", "The ping could not be sent.", (principal) => operations.annotationPing(principal, payload)));
     socket.on("annotation:set-color", (payload, acknowledge) => respond(acknowledge, "Join a session before editing the map.", "The color could not be changed.", (principal) => operations.annotationSetColor(principal, payload)));

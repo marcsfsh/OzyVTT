@@ -13,7 +13,7 @@ const TOKENS: ProofToken[] = [
 /** Phase 0 only: validates WebGL, high-DPI rendering, pan/zoom, pointer drag and touch pinch. */
 export function RendererProof() {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState("Interactive renderer proof — local-only, no encounter state is changed.");
+  const [status, setStatus] = useState("Interactive renderer proof - local-only, no encounter state is changed.");
 
   useEffect(() => {
     const mount = mountRef.current;

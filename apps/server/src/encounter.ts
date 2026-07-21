@@ -1,11 +1,32 @@
-import type { EncounterStartEntry, GameState, InitiativeEntry } from "@vtt/domain";
+import type { ActorDefinition, EncounterStartEntry, GameState, InitiativeEntry } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
   entries: readonly EncounterStartEntry[];
+  rulesMode?: "strict" | "assisted" | "freeform";
 }>;
+
+const EMPTY_TURN = { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 } as const;
+
+/** A fresh fight refreshes per-encounter limited-use pools (Frenzy next fight) and recharge pools (a dragon opens with its breath ready); long-rest pools persist until a rest. */
+function clearPerEncounterUses(state: GameState, combatantIds: ReadonlySet<string>, resolveDefinition: (definitionId: string) => ActorDefinition | undefined) {
+  for (const actor of state.actors) {
+    if (!combatantIds.has(actor.id) || !actor.definitionId) continue;
+    const definition = resolveDefinition(actor.definitionId);
+    if (!definition) continue;
+    for (const action of definition.actions) {
+      if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge") continue;
+      const key = action.uses.pool ?? action.id;
+      if (actor.actionUses[key] !== undefined) {
+        const { [key]: _cleared, ...rest } = actor.actionUses;
+        actor.actionUses = rest;
+      }
+    }
+  }
+}
 
 const validScore = (value: number) => Number.isInteger(value) && value >= -1000 && value <= 1000;
 
@@ -17,7 +38,7 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
     || left.actorId.localeCompare(right.actorId));
 }
 
-export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry) {
+export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined) {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200) throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
@@ -34,13 +55,17 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
     const tieBreaker = actor.initiative ?? 0;
-    const rolled = entry.score === undefined ? rollD20() + tieBreaker : entry.score;
+    // 2024 Surprise: a surprised combatant rolls initiative with disadvantage (two d20s, keep lower).
+    const rolled = entry.score === undefined
+      ? (entry.surprised === true ? Math.min(rollD20(), rollD20()) : rollD20()) + tieBreaker
+      : entry.score;
     if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
     return { actorId: actor.id, score: rolled, tieBreaker };
   });
   const sorted = ordered(state, initiative);
   // Spread, never a fresh literal: CombatState grows fields over time (pendingSaves today; scenes
-  // next) and a wholesale replacement here would silently drop them.
+  // next) and a wholesale replacement here would silently drop them. Fog deliberately rides the
+  // spread untouched - it's scene dressing prepped before the fight and persisting after it.
   state.combat = {
     ...state.combat,
     active: true,
@@ -48,17 +73,22 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     turnActorId: sorted[0].actorId,
     mapAssetId: input.mapAssetId,
     initiative: sorted,
-    tokens: createEncounterTokens(sorted.map((entry) => ({ actorId: entry.actorId, sizeCells: state.actors.find((actor) => actor.id === entry.actorId)?.sizeCells ?? 1 })), tokenGeometry)
+    tokens: createEncounterTokens(sorted.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), tokenGeometry)
       .map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
     annotations: [],
-    turn: { actionUsed: false, bonusActionUsed: false },
+    turn: { ...EMPTY_TURN },
+    rulesMode: input.rulesMode ?? state.combat.rulesMode,
+    underwater: false,
     reactionsUsed: [],
+    legendaryUsed: {},
     pendingSaves: [],
+    pendingReactions: [],
     // A fresh fight starts live on the timeline; the handler wipes any prior fight's snapshots and
     // captures this start state as the baseline the GM can rewind all the way back to.
     historyCursor: null,
     historyDirty: false
   };
+  if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition);
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its token. GM-only at the command layer. */
@@ -74,7 +104,7 @@ export function addCombatant(state: GameState, actorId: string, score: number | 
   state.combat = {
     ...state.combat,
     initiative: ordered(state, [...state.combat.initiative, { actorId, score: rolled, tieBreaker }]),
-    tokens: [...state.combat.tokens, ...createEncounterTokens([{ actorId, sizeCells: actor.sizeCells ?? 1 }], tokenGeometry)]
+    tokens: [...state.combat.tokens, ...createEncounterTokens([{ actorId, sizeCells: actor.sizeCells ?? 1, size: actor.size }], tokenGeometry)]
   };
 }
 
@@ -82,7 +112,8 @@ export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { actionUsed: false, bonusActionUsed: false }, reactionsUsed: [], pendingSaves: [], historyCursor: null, historyDirty: false };
+  // Fog persists through the spread below: what the party has revealed stays revealed after the fight.
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {
@@ -95,7 +126,40 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
   };
 }
 
-export function nextInitiativeTurn(state: GameState) {
+/** Dependencies for start-of-turn recharge rolls; optional so scene bookkeeping paths can advance turns without them. */
+export type TurnAdvanceDeps = Readonly<{
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  rollDie: (sides: number) => number;
+}>;
+
+/**
+ * SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the
+ * spent pool. Rolled here (not offered as a prompt) because the SRD makes it automatic; the
+ * narration shows the die so the table sees why the breath is back. One roll per shared pool.
+ */
+function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps, events?: EffectNarration[]) {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId) return;
+  const definition = deps.resolveDefinition(actor.definitionId);
+  if (!definition) return;
+  const rolledPools = new Set<string>();
+  for (const action of definition.actions) {
+    if (action.uses?.per !== "recharge" || action.uses.recharge === undefined) continue;
+    const key = action.uses.pool ?? action.id;
+    if (rolledPools.has(key) || (actor.actionUses[key] ?? 0) === 0) continue;
+    rolledPools.add(key);
+    const die = deps.rollDie(6);
+    if (die >= action.uses.recharge) {
+      const { [key]: _spent, ...rest } = actor.actionUses;
+      actor.actionUses = rest;
+      events?.push({ kind: "effect", text: `${actor.name}'s ${action.name} recharges (rolled ${die}).`, actorId: actor.id });
+    } else {
+      events?.push({ kind: "effect", text: `${actor.name}'s ${action.name} stays spent (rolled ${die}, needs ${action.uses.recharge}+).`, actorId: actor.id });
+    }
+  }
+}
+
+export function nextInitiativeTurn(state: GameState, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   if (!state.combat.active || !state.combat.turnActorId || state.combat.initiative.length === 0) throw new CommandRejectedError("Start an encounter before advancing Initiative.");
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
@@ -105,10 +169,16 @@ export function nextInitiativeTurn(state: GameState) {
     ...state.combat,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes.
-    turn: { actionUsed: false, bonusActionUsed: false },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId)
+    // A new turn starts: fresh action/bonus for the incoming actor, whose reaction also refreshes -
+    // as does its legendary-action pool (SRD: uses regained at the start of the creature's turn).
+    turn: { ...EMPTY_TURN },
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    legendaryUsed: Object.fromEntries(Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== nextActorId))
   };
+  // The incoming actor's sustained durations tick: Reckless ends, Rage counts down (ADR-0020).
+  const expiry = expireEffectsAtTurnStart(state, nextActorId);
+  events?.push(...expiry);
+  if (deps) rollRecharges(state, nextActorId, deps, events);
 }
 
 export function previousInitiativeTurn(state: GameState) {
@@ -122,7 +192,9 @@ export function previousInitiativeTurn(state: GameState) {
     round: wraps && state.combat.round > 1 ? state.combat.round - 1 : state.combat.round,
     turnActorId: previousActorId,
     // Backing up is a GM correction; treat it like any turn change so the strip starts clean.
-    turn: { actionUsed: false, bonusActionUsed: false },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId)
+    // Effect durations deliberately do NOT rewind here - the Time Machine restore is the real undo.
+    turn: { ...EMPTY_TURN },
+    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
+    legendaryUsed: Object.fromEntries(Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== previousActorId))
   };
 }

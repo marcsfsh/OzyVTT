@@ -61,7 +61,7 @@ export class ViewerCoordinator {
     };
   }
 
-  /** Lets the GM's own session subscribe to the exact live presentation the paired TV shows, for an in-tab preview — without a separate self-pairing step. */
+  /** Lets the GM's own session subscribe to the exact live presentation the paired TV shows, for an in-tab preview - without a separate self-pairing step. */
   connectGm(token: string, listener: PresentationListener, close: CloseListener = () => {}) {
     if (!this.authorizeGm(token)) throw new ViewerAccessDeniedError("A valid GM session is required.");
     const connectionId = randomUUID();

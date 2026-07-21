@@ -1,0 +1,18 @@
+.scene-switcher { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: 0 0 .55rem; }
+.scene-switcher-label { color: #9f9789; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-right: .15rem; }
+.scene-chip { display: inline-flex; align-items: stretch; border: 1px solid #403a2c; border-radius: .5rem; background: #17140f; overflow: hidden; }
+.scene-chip.live { border-color: #6e431c; box-shadow: inset 0 0 0 1px #6e431c; }
+.scene-chip.staging { border-color: #58c3ff; }
+.scene-chip-main { display: flex; align-items: center; gap: .4rem; padding: .3rem .55rem; border: 0; background: transparent; color: #e7dfd0; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.scene-chip-main:hover { background: #241f17; }
+.scene-chip-thumb { width: 2.4rem; height: 1.6rem; margin: -0.3rem 0 -0.3rem -0.55rem; object-fit: cover; border-right: 1px solid #403a2c; flex: none; }
+.scene-chip-main small { color: #9f9789; font-size: .64rem; font-weight: 800; }
+.scene-chip.live .scene-chip-main { cursor: pointer; }
+.scene-chip.live .scene-chip-main small { color: #ffc34d; }
+.scene-chip.staging .scene-chip-main small { color: #58c3ff; }
+.scene-chip-go, .scene-chip-remove { padding: 0 .5rem; border: 0; border-left: 1px solid #403a2c; background: transparent; color: #cdbfa6; font-size: .7rem; cursor: pointer; }
+.scene-chip-go:hover { background: #6e431c; color: #ffdca0; }
+.scene-chip-remove { color: #8f6a63; }
+.scene-chip-remove:hover { background: #3a1c1a; color: #f2b0a8; }
+.scene-chip-new { padding: .3rem .6rem; border-style: dashed; color: #9f9789; font-size: .76rem; font-weight: 700; cursor: pointer; background: transparent; }
+.scene-chip-new:hover { border-color: #6b5e4b; color: #e7dfd0; }

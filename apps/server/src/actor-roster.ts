@@ -1,4 +1,5 @@
 import type { ActorDefinition, GameState } from "@vtt/domain";
+import { endEffectsSustainedBy } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ACTORS = 200;
@@ -14,8 +15,17 @@ function dedupedName(state: GameState, base: string): string {
   }
 }
 
+/** SRD Hit Point Dice pool from a definition's hit-point formula ("7d8 + 14" → 7 × d8); no parseable formula = unmodeled (null, the fail-open pattern). */
+export function hitDiceFromDefinition(definition: ActorDefinition): { die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number } | null {
+  const match = definition.hitPoints.formula?.match(/^(\d+)d(4|6|8|10|12|20)\b/i);
+  if (!match) return null;
+  const count = Math.min(40, Number.parseInt(match[1], 10));
+  if (count < 1) return null;
+  return { die: `d${match[2]}` as "d4" | "d6" | "d8" | "d10" | "d12" | "d20", maximum: count, remaining: count };
+}
+
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
-  if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full — remove unused combatants first.");
+  if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   state.actors.push({
     id,
     name: dedupedName(state, definition.name),
@@ -26,6 +36,13 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],
+    effects: [],
+    deathSaves: null,
+    actionUses: {},
+    conditionImmunities: definition.conditionImmunities ? [...definition.conditionImmunities] : [],
+    speedFeet: definition.speedFeet,
+    ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
+    hitDice: hitDiceFromDefinition(definition),
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,
@@ -45,7 +62,7 @@ export function addActorFromDefinition(state: GameState, definition: ActorDefini
  * become claimable player-characters; the ActorDefinitionSchema already forces them friendly.
  */
 export function importActorDefinition(state: GameState, definition: ActorDefinition, actorId: string, visibility: "public" | "gm-only") {
-  if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS) throw new CommandRejectedError("The imported-sheet library is full — remove unused combatants first.");
+  if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS) throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? "player-character" as const : "monster" as const;
   instantiate(state, definition, actorId, visibility, kind, definitionId);
@@ -67,6 +84,8 @@ export function removeActor(state: GameState, actorId: string) {
   if (state.combat.scenes.some((scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId))) {
     throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this combatant first.");
   }
+  // A removed actor can no longer sustain effects on others (its grapples release, ADR-0020).
+  endEffectsSustainedBy(state, actorId);
   state.actors = state.actors.filter((item) => item.id !== actorId);
   // Drop the actor from every inactive prepared scene so no scene references a combatant that no longer exists.
   if (state.combat.scenes.some((scene) => !scene.combat.active && (scene.combat.initiative.some((entry) => entry.actorId === actorId) || scene.combat.tokens.some((token) => token.actorId === actorId)))) {

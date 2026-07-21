@@ -11,7 +11,7 @@ import { createServer } from "../src/server.js";
 /**
  * ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
  * credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
- * commands, hits stale-revision and confirmation conflicts, and loses access on revocation — while
+ * commands, hits stale-revision and confirmation conflicts, and loses access on revocation - while
  * the hidden combatant never leaks through any player-safe response.
  */
 
@@ -69,7 +69,7 @@ async function bootWithBattlemap() {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
 const post = (base: string, path: string, token: string, body: unknown = {}) =>
   fetch(base + path, { method: "POST", headers: bearer(token), body: JSON.stringify(body) });
-/** Issue an integration credential over the documented GM endpoint — the same door an external tool uses. */
+/** Issue an integration credential over the documented GM endpoint - the same door an external tool uses. */
 async function issueCredential(base: string, gmToken: string, name: string, scopes: readonly string[]) {
   const response = await post(base, "/api/v1/gm/integration-credentials", gmToken, { name, scopes });
   expect(response.status).toBe(201);
@@ -177,7 +177,7 @@ describe("public game API over /api/v1", () => {
     expect(staleBody.error.code).toBe("conflict");
     expect(staleBody.error.currentRevision).toBe(1);
 
-    // Damage, heal, temp HP, set HP, condition — the actor routes.
+    // Damage, heal, temp HP, set HP, condition - the actor routes.
     const damaged = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.actorDamage.replace("{actorId}", HERO_ID), writer.token, { amount: 7 })).json());
     expect(damaged.data.duplicate).toBe(false);
     await post(base, GAME_PATHS.actorHeal.replace("{actorId}", HERO_ID), writer.token, { amount: 2 });
@@ -352,8 +352,9 @@ describe("public game API over /api/v1", () => {
     const envelope = await documentResponse.json();
     expect(envelope.ok).toBe(true);
     const document = envelope.data.document;
-    // The v2 document: turns, log, complete journal (start..end), final state, dice, and the fight's stat blocks.
-    expect(document.archiveSchemaVersion).toBe(2);
+    // The v3 document: turns, log, complete journal (start..end), final + post-encounter states, dice, and the fight's stat blocks.
+    expect(document.archiveSchemaVersion).toBe(3);
+    expect(document.postEncounterState.combat.active).toBe(false);
     expect(document.turns.length).toBeGreaterThan(0);
     expect(document.journal.map((entry: { type: string }) => entry.type)).toEqual(["encounter.start", "dice.roll", "actor.apply-damage", "initiative.next", "encounter.end"]);
     expect(document.journal.every((entry: { principal: string }) => entry.principal.startsWith("gm:"))).toBe(true);
@@ -361,7 +362,7 @@ describe("public game API over /api/v1", () => {
     expect(document.rolls.length).toBe(1);
     expect(document.rolls[0].formula).toBe("1d20+5");
 
-    // Deletion needs the admin scope (or a GM session) — combat:read cannot destroy the record.
+    // Deletion needs the admin scope (or a GM session) - combat:read cannot destroy the record.
     expect((await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { method: "DELETE", headers: bearer(reader.token) })).status).toBe(403);
     const deleted = await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), { method: "DELETE", headers: bearer(admin.token) });
     expect(deleted.status).toBe(200);
@@ -375,7 +376,7 @@ describe("public game API over /api/v1", () => {
     const { base, gmToken } = await boot();
     const integration = await issueCredential(base, gmToken, "seat manager", ["game:read", "actor:write"]);
 
-    // Two players join over pure HTTP — the socketless mirror of the open LAN join.
+    // Two players join over pure HTTP - the socketless mirror of the open LAN join.
     const seatA = PlayerSessionIssuedResponseSchema.parse(await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json());
     const seatB = PlayerSessionIssuedResponseSchema.parse(await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json());
     expect(seatA.data.sessionId).not.toBe(seatB.data.sessionId);
@@ -433,7 +434,14 @@ describe("public game API over /api/v1", () => {
     const cosmetics = await issueCredential(base, gmToken, "cosmetics", ["actor:write"]);
     expect((await post(base, GAME_PATHS.actorSize.replace("{actorId}", HERO_ID), cosmetics.token, { size: "large" })).status).toBe(200);
     expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)?.sizeCells).toBe(2);
+    expect((await post(base, GAME_PATHS.actorVisibility.replace("{actorId}", HERO_ID), cosmetics.token, { visibility: "gm-only" })).status).toBe(200);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)?.visibility).toBe("gm-only");
+    expect((await post(base, GAME_PATHS.actorVisibility.replace("{actorId}", HERO_ID), cosmetics.token, { visibility: "public" })).status).toBe(200);
     expect((await post(base, GAME_PATHS.actorTokenImage.replace("{actorId}", HERO_ID), cosmetics.token, { tokenAssetId: null })).status).toBe(200);
+    // Table roll preference is a combat:write command.
+    const combatPref = await issueCredential(base, gmToken, "roll pref", ["combat:write"]);
+    expect((await post(base, GAME_PATHS.rollMode, combatPref.token, { mode: "manual" })).status).toBe(200);
+    expect(server.store.snapshot.combat.rollMode).toBe("manual");
   });
 
   it("narrates token movement into the combat log with distances, keeping hidden ranges GM-only", async () => {
@@ -453,7 +461,7 @@ describe("public game API over /api/v1", () => {
     const movement = gmLog.data.entries.filter((entry) => entry.kind === "movement");
     // The studied move: 4 cells = 20 ft, with the hidden Tyrant's ranges split into a GM-only line.
     expect(movement.map((entry) => entry.text)).toContain("Public Hero moved 20 ft.");
-    expect(movement.map((entry) => entry.text)).toContain("Hidden ranges for Public Hero — Unrevealed Tyrant 10 ft → 20 ft.");
+    expect(movement.map((entry) => entry.text)).toContain("Hidden ranges for Public Hero - Unrevealed Tyrant 10 ft → 20 ft.");
     expect(movement.find((entry) => entry.text.startsWith("Hidden ranges"))?.gmOnly).toBe(true);
 
     // Players get the public movement lines but never the hidden ranges.
@@ -469,7 +477,7 @@ describe("public game API over /api/v1", () => {
     expect(JSON.stringify(archived.data.document.log)).toContain("Public Hero moved 20 ft.");
   });
 
-  it("answers CORS preflights for /api/v1 only — never for the legacy session/login endpoints", async () => {
+  it("answers CORS preflights for /api/v1 only - never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, { method: "OPTIONS", headers: { origin: "https://overlay.example", "access-control-request-method": "GET", "access-control-request-headers": "authorization" } });
     expect(preflight.status).toBe(204);
@@ -490,6 +498,34 @@ describe("public game API over /api/v1", () => {
     expect(legacyState.headers.get("access-control-allow-origin")).toBeNull();
   });
 
+  it("serves server-computed action availability with role gating", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+
+    // Roster a bundled crocodile; the response's actorId equals the commandId.
+    const commandId = randomUUID();
+    const added = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.actors, gmToken, { commandId, definitionId: "giant-crocodile" })).json());
+    const crocId = added.data.actorId as string;
+
+    const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
+    expect((await fetch(base + path)).status).toBe(401);
+    // A player who hasn't claimed this actor is refused - availability names stat-block internals.
+    expect((await fetch(base + path, { headers: bearer(playerToken) })).status).toBe(403);
+    expect((await fetch(base + GAME_PATHS.actorAvailableActions.replace("{actorId}", randomUUID()), { headers: bearer(gmToken) })).status).toBe(404);
+
+    const body = await (await fetch(base + path, { headers: bearer(gmToken) })).json();
+    expect(body.ok).toBe(true);
+    expect(body.data.rulesMode).toBe("strict");
+    const rows = body.data.actions as ReadonlyArray<{ id: string; available: boolean; violations: readonly unknown[]; builtin?: boolean }>;
+    // Stat-block rows first, then the SRD builtin generic actions flagged builtin: true.
+    expect(rows.filter((row) => !row.builtin).map((row) => row.id).sort()).toEqual(["bite", "multiattack", "tail"]);
+    for (const id of ["dodge", "dash", "disengage", "help", "hide", "ready", "unarmed-grapple", "escape-grapple"]) {
+      expect(rows.find((row) => row.id === id)?.builtin).toBe(true);
+    }
+    // No encounter running: nothing is spent, so everything reports available with no violations.
+    expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
+  });
+
   it("keeps the OpenAPI-documented scopes identical to the runtime command scopes (no drift between doc, tunnel, and typed routes)", () => {
     const TYPED_ROUTES: ReadonlyArray<[string, "post" | "delete", keyof typeof GAME_COMMAND_SCOPES]> = [
       [GAME_PATHS.encounterStart, "post", "encounter.start"],
@@ -501,6 +537,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.turnEnd, "post", "turn.end"],
       [GAME_PATHS.turnUse, "post", "turn.use"],
       [GAME_PATHS.turnReaction, "post", "turn.use-reaction"],
+      [GAME_PATHS.turnLegendary, "post", "turn.use-legendary"],
       [GAME_PATHS.tokenMove, "post", "token.move"],
       [GAME_PATHS.actors, "post", "actor.add-from-definition"],
       [GAME_PATHS.actorById, "delete", "actor.remove"],
@@ -514,6 +551,16 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.actionResolve, "post", "action.resolve"],
       [GAME_PATHS.saveAnswer, "post", "save.answer"],
       [GAME_PATHS.saveDismiss, "post", "save.dismiss"],
+      [GAME_PATHS.reactionAnswer, "post", "reaction.answer"],
+      [GAME_PATHS.reactionDismiss, "post", "reaction.dismiss"],
+      [GAME_PATHS.effects, "post", "effect.add"],
+      [GAME_PATHS.effectEnd, "post", "effect.end"],
+      [GAME_PATHS.deathSaveRoll, "post", "death-save.roll"],
+      [GAME_PATHS.rulesMode, "post", "encounter.set-rules-mode"],
+      [GAME_PATHS.rollMode, "post", "encounter.set-roll-mode"],
+      [GAME_PATHS.environment, "post", "encounter.set-environment"],
+      [GAME_PATHS.actorRest, "post", "actor.rest"],
+      [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
       [GAME_PATHS.annotationsClear, "post", "annotation.clear"],
@@ -527,11 +574,16 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.claimForceRelease, "post", "character.force-release"],
       [GAME_PATHS.actorTokenImage, "post", "actor.set-token-image"],
       [GAME_PATHS.actorSize, "post", "actor.set-size"],
+      [GAME_PATHS.actorVisibility, "post", "actor.set-visibility"],
+      [GAME_PATHS.actorSpeed, "post", "actor.set-speed"],
       [GAME_PATHS.scenes, "post", "scene.create"],
       [GAME_PATHS.sceneById, "delete", "scene.remove"],
       [GAME_PATHS.sceneRename, "post", "scene.rename"],
       [GAME_PATHS.sceneActivate, "post", "scene.activate"],
-      [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"]
+      [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"],
+      [GAME_PATHS.fogEnabled, "post", "fog.set-enabled"],
+      [GAME_PATHS.fogPaint, "post", "fog.paint"],
+      [GAME_PATHS.fogReset, "post", "fog.reset"]
     ];
     // Every cataloged command has exactly one typed route in this table...
     expect(TYPED_ROUTES.map(([, , type]) => type).sort()).toEqual(Object.keys(GAME_COMMAND_SCOPES).sort());

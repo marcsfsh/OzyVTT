@@ -19,6 +19,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [fallFeet, setFallFeet] = useState("");
   const visibilityOptions: Array<{ value: RollVisibility; label: string }> = role === "gm"
     ? [{ value: "public", label: "Everyone" }, { value: "gm-only", label: "Just me (GM)" }, { value: "self-only", label: "Just me" }]
     : [{ value: "public", label: "Everyone" }, { value: "blind", label: "Just the GM" }, { value: "self-only", label: "Just me" }];
@@ -33,7 +34,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
   };
   // Advantage/disadvantage are toggles that arm the *next* d20 roll only; rolling a d20 consumes
   // and clears them. Core 5e rules never allow both at once, so turning one on while the other is
-  // already armed cancels both rather than silently overriding — the player has to choose again.
+  // already armed cancels both rather than silently overriding - the player has to choose again.
   const toggleAdvantage = () => { if (advantage) return setAdvantage(false); if (disadvantage) { setAdvantage(false); setDisadvantage(false); return; } setAdvantage(true); };
   const toggleDisadvantage = () => { if (disadvantage) return setDisadvantage(false); if (advantage) { setAdvantage(false); setDisadvantage(false); return; } setDisadvantage(true); };
   const quickRoll = (sides: number) => {
@@ -51,6 +52,17 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
       return submit(`2d20${kind}`, purpose);
     }
     submit(formula, purpose);
+  };
+  // SRD Falling: 1d6 bludgeoning per 10 feet fallen, max 20d6; the faller lands Prone. The server
+  // rolls (dice authority) - this just builds the formula and reminds about the apply/Prone steps.
+  const fallDice = Math.min(Math.floor((Number.parseInt(fallFeet, 10) || 0) / 10), 20);
+  const rollFall = () => {
+    if (fallDice < 1) return setFeedback("Falls under 10 feet deal no damage.");
+    setFeedback("Rolling…");
+    socket.emit("dice:roll", { commandId: newId(), formula: `${fallDice}d6`, purpose: "damage", visibility }, (result) => {
+      if (!result.ok) return setFeedback(result.message ?? "That roll didn't work.");
+      setFeedback(`Fall damage rolled (${fallDice}d6 bludgeoning) - apply the total as damage; the faller lands Prone.`);
+    });
   };
 
   return <section className="dice-proof" aria-labelledby="dice-proof-heading">
@@ -75,6 +87,14 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
         <button onClick={customRoll}>Roll</button>
       </div>
       <p className="dice-hint">Try 1d20, 2d20kh1 + 5, or 2d6 + 1d4 - 2.</p>
+    </details>
+    <details className="dice-custom">
+      <summary>Falling damage (1d6 per 10 ft, max 20d6)</summary>
+      <div className="dice-form">
+        <label>Feet fallen<input type="number" min="0" max="10000" inputMode="numeric" value={fallFeet} onChange={(event) => setFallFeet(event.target.value)} placeholder="30" /></label>
+        <button onClick={rollFall} disabled={fallDice < 1}>Roll {fallDice > 0 ? `${fallDice}d6` : "fall"}</button>
+      </div>
+      <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
     </details>
     <p className="dice-feedback" aria-live="polite">{feedback}</p>
     <div className="roll-list" aria-label="Recent rolls">

@@ -82,7 +82,7 @@ describe("scene staging (GM-private token placement)", () => {
     createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
     createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
     activateScene(game, IDS.sceneA, IDS.implicit); // A is live
-    // Stage the parked scene B privately — its token gets a position, and the live top-level is untouched.
+    // Stage the parked scene B privately - its token gets a position, and the live top-level is untouched.
     moveSceneToken(game, IDS.sceneB, IDS.beta, { x: 200, y: 150 }, GEOMETRY);
     expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.tokens.find((token) => token.actorId === IDS.beta)!.position).toEqual({ x: 200, y: 150 });
     expect(() => GameStateSchema.parse(game)).not.toThrow();

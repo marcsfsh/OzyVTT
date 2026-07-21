@@ -2,7 +2,7 @@ import { GameStateSchema, type GameState, type StoredDefinition } from "@vtt/dom
 import type { ActorDefinition } from "@vtt/schemas";
 
 /**
- * Three level-7 example player characters — a self-sufficient adventuring party that exercises every
+ * Three level-7 example player characters - a self-sufficient adventuring party that exercises every
  * combat system the table has (melee multiattack, ranged/AoE spells, saving throws, healing,
  * reactions, and enough hit points that a fight spans many turns). Each ships a full
  * `ActorDefinition` sheet in `state.definitions`; its live actor references it by `definitionId`, so
@@ -26,12 +26,12 @@ const EXAMPLE_DEFINITION_IDS = {
 const SOURCE = { name: "Example party (SRD 5.2.1)", version: "1.0.0" } as const;
 const CHARACTER = { schemaId: "vtt.actor-character", schemaVersion: 1, size: "medium", speedFeet: 30, token: { disposition: "friendly", footprint: { width: 1, height: 1 } } } as const;
 
-/** Borin Stoneguard — Fighter (Champion) 7, dwarf. Front-line guardian: two attacks, self-heal, action surge. */
+/** Borin Stoneguard - Fighter (Champion) 7, dwarf. Front-line guardian: two attacks, self-heal, action surge. */
 const BORIN: ActorDefinition = {
   ...CHARACTER,
   source: { ...SOURCE, externalId: "example-pc-borin" },
   name: "Borin Stoneguard",
-  summary: "Level 7 dwarf Champion fighter — the party's shield wall.",
+  summary: "Level 7 dwarf Champion fighter - the party's shield wall.",
   abilityScores: { str: 18, dex: 12, con: 16, int: 10, wis: 13, cha: 8 },
   proficiencyBonus: 3,
   armorClass: 18,
@@ -60,12 +60,12 @@ const BORIN: ActorDefinition = {
   } }
 };
 
-/** Mirena Dawnbright — Cleric (Life Domain) 7, human. Healer and controller: big heals, radiant damage, save spells. */
+/** Mirena Dawnbright - Cleric (Life Domain) 7, human. Healer and controller: big heals, radiant damage, save spells. */
 const MIRENA: ActorDefinition = {
   ...CHARACTER,
   source: { ...SOURCE, externalId: "example-pc-mirena" },
   name: "Mirena Dawnbright",
-  summary: "Level 7 human Life Domain cleric — keeps the party standing.",
+  summary: "Level 7 human Life Domain cleric - keeps the party standing.",
   abilityScores: { str: 14, dex: 10, con: 14, int: 10, wis: 18, cha: 12 },
   proficiencyBonus: 3,
   armorClass: 18,
@@ -94,20 +94,20 @@ const MIRENA: ActorDefinition = {
     passivePerception: 14, languages: "Common, Celestial",
     savingThrows: { str: 2, dex: 0, con: 2, int: 0, wis: 7, cha: 4 },
     traits: [
-      { name: "Spellcasting", description: "Wisdom caster — spell save **DC 15**, spell attack **+7**. Slots: 4 x 1st, 3 x 2nd, 3 x 3rd, 1 x 4th." },
-      { name: "Channel Divinity (2 per rest)", description: "Turn Undead, or **Preserve Life** — restore up to 35 hit points, divided among creatures within 30 ft (no more than half a creature's max each)." },
+      { name: "Spellcasting", description: "Wisdom caster - spell save **DC 15**, spell attack **+7**. Slots: 4 x 1st, 3 x 2nd, 3 x 3rd, 1 x 4th." },
+      { name: "Channel Divinity (2 per rest)", description: "Turn Undead, or **Preserve Life** - restore up to 35 hit points, divided among creatures within 30 ft (no more than half a creature's max each)." },
       { name: "Disciple of Life", description: "Whenever a spell of level 1+ restores hit points, the target regains an extra 2 + the spell's level HP." },
       { name: "Blessed Healer", description: "When one of her spells heals another creature, Mirena also regains 2 + the spell's level HP." }
     ]
   } }
 };
 
-/** Lyra Emberwise — Wizard (Evoker) 7, high elf. Artillery: Fireball, Fire Bolt, Scorching Ray, Shield reaction. */
+/** Lyra Emberwise - Wizard (Evoker) 7, high elf. Artillery: Fireball, Fire Bolt, Scorching Ray, Shield reaction. */
 const LYRA: ActorDefinition = {
   ...CHARACTER,
   source: { ...SOURCE, externalId: "example-pc-lyra" },
   name: "Lyra Emberwise",
-  summary: "Level 7 high-elf Evoker wizard — area damage and burst.",
+  summary: "Level 7 high-elf Evoker wizard - area damage and burst.",
   abilityScores: { str: 8, dex: 14, con: 14, int: 18, wis: 12, cha: 10 },
   proficiencyBonus: 3,
   armorClass: 15,
@@ -132,7 +132,7 @@ const LYRA: ActorDefinition = {
     senses: ["Darkvision 60 ft."], passivePerception: 14, languages: "Common, Elvish, Draconic",
     savingThrows: { str: -1, dex: 2, con: 2, int: 7, wis: 4, cha: 0 },
     traits: [
-      { name: "Spellcasting", description: "Intelligence caster — spell save **DC 15**, spell attack **+7**. Slots: 4 x 1st, 3 x 2nd, 3 x 3rd, 1 x 4th." },
+      { name: "Spellcasting", description: "Intelligence caster - spell save **DC 15**, spell attack **+7**. Slots: 4 x 1st, 3 x 2nd, 3 x 3rd, 1 x 4th." },
       { name: "Sculpt Spells", description: "When she casts an evocation spell that affects others she can see, she chooses 1 + the spell's level of them to automatically succeed on their saves and take no damage." },
       { name: "Potent Cantrip", description: "A creature that succeeds on a save against one of her cantrips still takes half damage (if the cantrip deals damage)." },
       { name: "Fey Ancestry", description: "Advantage on saving throws to avoid or end the Charmed condition." }

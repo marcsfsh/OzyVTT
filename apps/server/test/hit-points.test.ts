@@ -86,7 +86,7 @@ describe("hit point tracking", () => {
     const initiative = projectPublicInitiative(game);
     expect(initiative.find((entry) => entry.actorId === IDS.monster)?.health).toBe("down");
     const viewer = projectViewerInitiative(game);
-    // The shared screen now carries the coarse band + condition labels — and still no exact hp shape.
+    // The shared screen now carries the coarse band + condition labels - and still no exact hp shape.
     for (const entry of viewer.entries) {
       expect(Object.keys(entry).sort()).toEqual(["active", "actorId", "conditions", "health", "initiative", "name"]);
       expect(["healthy", "bloodied", "down"]).toContain(entry.health);

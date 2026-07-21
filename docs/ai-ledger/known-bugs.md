@@ -10,6 +10,12 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[ux] Maps/scenes/encounter IA redesign (owner round-1 feedback, 2026-07-19)** — the worst
+  frictions are fixed (encounter setup and scene prep both pick battlemaps inline; no forced tab
+  bouncing), but the owner wants the whole upload → browse → prepare → start experience rethought
+  against how other VTTs structure it (scene-centric). Needs a real design pass, not another patch.
+  More live-testing rounds are expected to add to this list.
+
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device

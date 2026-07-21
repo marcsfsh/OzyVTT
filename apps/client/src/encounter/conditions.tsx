@@ -6,7 +6,7 @@ import { socket } from "../socket";
 type ConditionInstance = Actor["conditions"][number];
 
 /**
- * One shared fetch of the 15 SRD condition names/texts. Failures are never cached — a
+ * One shared fetch of the 15 SRD condition names/texts. Failures are never cached - a
  * transient miss (e.g. an ack racing the join) retries on the next mount or picker open,
  * and a late success propagates to every mounted chip/editor via the listener set.
  */
@@ -54,6 +54,17 @@ const labelFor = (instance: ConditionInstance, reference: readonly ContentCondit
   return instance.id === "exhaustion" && instance.level !== undefined ? `${name} ${instance.level}` : name;
 };
 const descriptionFor = (id: string, reference: readonly ContentConditionSummary[]) => reference.find((entry) => entry.id === id)?.description ?? "";
+
+/** Ultra-compact condition presence for dense list rows: dots with tooltips (full names one tap away in the row's tools). */
+export function ConditionDots({ conditions }: Readonly<{ conditions: readonly ConditionInstance[] }>) {
+  const reference = useConditionReference();
+  if (conditions.length === 0) return null;
+  const shown = conditions.slice(0, 4);
+  return <span className="condition-dots" role="img" aria-label={conditions.map((instance) => labelFor(instance, reference)).join(", ")}>
+    {shown.map((instance) => <span key={instance.id} className="condition-dot" title={labelFor(instance, reference)} />)}
+    {conditions.length > shown.length && <span className="condition-dot-more">+{conditions.length - shown.length}</span>}
+  </span>;
+}
 
 /** Read-only condition chips with rules-text tooltips. */
 export function ConditionChips({ conditions }: Readonly<{ conditions: readonly ConditionInstance[] }>) {

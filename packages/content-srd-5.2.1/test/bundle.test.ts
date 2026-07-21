@@ -49,9 +49,57 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(consume?.save).toEqual({ ability: "int", dc: 16 });
   });
 
+  it("carries structured rules mechanics for the giant crocodile (ADR-0020 golden check)", () => {
+    const crocodile = monsters.find((monster) => monster.source.externalId === "giant-crocodile")!;
+    expect(crocodile.actions.find((action) => action.id === "multiattack")!.multiattack).toEqual([{ actionId: "bite", count: 1 }, { actionId: "tail", count: 1 }]);
+    // Bite: Grappled AND Restrained ride one source-linked rider with the printed escape DC and size cap.
+    expect(crocodile.actions.find((action) => action.id === "bite")!.onHit).toEqual([{ conditions: [{ id: "grappled" }, { id: "restrained" }], escapeDc: 15, maxTargetSize: "large" }]);
+    const tail = crocodile.actions.find((action) => action.id === "tail")!;
+    expect(tail.onHit).toEqual([{ conditions: [{ id: "prone" }], maxTargetSize: "large" }]);
+    expect(tail.targetRules).toEqual(["not-grappled-by-source"]);
+  });
+
+  it("carries structured limited-use pools (recharge and rest scopes)", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    expect(byId("white-dragon-wyrmling").actions.find((action) => action.id === "cold-breath")!.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
+    // Upstream marks these RECHARGE (rest) but the SRD prints a die range; the param carries it.
+    expect(byId("basilisk").actions.find((action) => action.id === "petrifying-gaze-recharge-4-6")!.uses).toEqual({ limit: 1, per: "recharge", recharge: 4 });
+    const medusaGaze = byId("medusa").actions.find((action) => action.id === "petrifying-gaze-recharge-5-6")!;
+    expect(medusaGaze.uses).toEqual({ limit: 1, per: "recharge", recharge: 5 });
+    expect(medusaGaze.name).toBe("Petrifying Gaze (Recharge 5-6)");
+    // The one true rest-recharge, and a per-day pool mapped to the long-rest scope.
+    expect(byId("cloaker").actions.find((action) => action.uses?.per === "short-rest")!.name).toBe("Phantasms (Recharge after a Short or Long Rest)");
+    expect(byId("aboleth").actions.find((action) => action.id === "dominate-mind")!.uses).toEqual({ limit: 2, per: "long-rest" });
+    // Coverage floor + no double-printed recharge notes on names.
+    const withUses = monsters.flatMap((monster) => monster.actions).filter((action) => action.uses);
+    expect(withUses.filter((action) => action.uses!.per === "recharge").length).toBeGreaterThanOrEqual(80);
+    for (const action of withUses) expect((action.name.match(/\(Recharge /g) ?? []).length, action.name).toBeLessThanOrEqual(1);
+  });
+
+  it("splits typed defense lists from the display strings (adult red dragon golden check)", () => {
+    const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
+    expect(dragon.damageImmunities).toEqual(["fire"]);
+    // Coverage floor: enrichment must not silently regress on a rebuild.
+    expect(monsters.filter((monster) => monster.actions.some((action) => action.multiattack)).length).toBeGreaterThanOrEqual(120);
+    expect(monsters.filter((monster) => monster.actions.some((action) => action.onHit)).length).toBeGreaterThanOrEqual(40);
+    expect(monsters.filter((monster) => (monster.damageResistances?.length ?? 0) + (monster.damageImmunities?.length ?? 0) + (monster.damageVulnerabilities?.length ?? 0) > 0).length).toBeGreaterThanOrEqual(140);
+  });
+
+  it("parses save-for-damage from the 'Failure:' clause so failed saves apply damage", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    // Fire Breath: "Failure: 45 (10d8) Fire damage. Success: Half damage." → structured 10d8 fire.
+    expect(byId("adult-brass-dragon").actions.find((action) => action.id === "fire-breath")!.damage).toEqual([{ formula: "10d8", type: "fire" }]);
+    expect(byId("adult-red-dragon").actions.find((action) => action.id === "fire-breath")!.damage).toEqual([{ formula: "17d6", type: "fire" }]);
+    // A condition-only breath (no dice in its Failure clause) stays prose-only.
+    expect(byId("adult-brass-dragon").actions.find((action) => action.id === "sleep-breath")!.damage).toEqual([]);
+    // Coverage floor: most save-for-damage actions are now structured (was 12 before the fix).
+    const saveActions = monsters.flatMap((monster) => monster.actions).filter((action) => action.save);
+    expect(saveActions.filter((action) => action.damage.length > 0).length).toBeGreaterThanOrEqual(100);
+  });
+
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
-    // rat: flat "1 Piercing damage" — attack is structured, damage stays prose-only.
+    // rat: flat "1 Piercing damage" - attack is structured, damage stays prose-only.
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
     expect(ratBite?.damage).toEqual([]);

@@ -8,6 +8,37 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-21 — Uniform dice UX: one recognizable roll experience everywhere (owner-directed; same branch/PR #38)
+
+Owner goal: after a roll or two, a player should intuitively know how to roll *anywhere* —
+saving throw, death save, attack, damage, opportunity attack — via one recognizable pattern.
+The saving-throw prompt was the proven reference (auto-roll-on-appear vs manual entry; Adv/Disadv
+after the roll; preview → Confirm). Extracted it into a shared `RollControls` widget and brought
+every other roll surface onto the same experience:
+
+- **Shared widget** (`apps/client/src/encounter/RollControls.tsx`): auto mode rolls on appear;
+  manual mode waits for a Roll click or typed total; once rolled, Adv/Disadv re-roll the d20
+  (2d20kh1 / 2d20kl1), Confirm applies, Re-roll restarts. SavePrompt refactored onto it (no
+  behavior change).
+- **Death saves**: were a bare one-click "Roll death save" → now the full preview → confirm flow
+  through the shared dice engine (raw d20; adv/disadv; auto-rolls on the dying creature's turn).
+  Pure `rollDeathSave` core (`death-saves.ts`) mirrors `answerSave`; `death-save.roll` gains
+  commit/rollMode/naturalRoll.
+- **Attacks**: `action:resolve` gains `commit` (default true — legacy one-shot stays) + `attackNatural`.
+  A single-target attack previews the d20 (nothing applied — no damage/riders/prompts/economy),
+  the result card offers Adv/Disadv/typed-d20/Confirm, and Confirm resolves once reusing the shown
+  roll. Preview returns early after the attack; the operation holds narration until commit.
+- **Damage**: the Apply step is now an editable total (type a hand-rolled number → applied straight
+  on the no-defense-math path; leave it → typed parts through the pipeline as before).
+- **Opportunity attacks**: `reaction:answer` gains commit/rollMode/attackNatural; the swing previews
+  (reaction unspent, nothing applied) → confirm spends + applies. Uncanny Dodge unchanged.
+
+Verified: `npm run check` + `build` green; server suite **383** passing (new preview/commit tests for
+death saves, attacks, and OAs); live Playwright smokes for the death-save widget, the save widget
+(refactored), and the attack preview → confirm card (Adv/Disadv/typed-d20 → HIT nat 19 → editable
+damage → Apply). Full new-command/additive-state checklists followed; `docs/api-reference.md`
+regenerated. Backend was already ~unified on `resolveDice`; this closes the front-end gap.
+
 ## 2026-07-20 — Nightly PR F increment: `GET /api/v1/game/events` SSE stream (`claude/nightly-openapi-2026-07-20`)
 
 Closed the last documented PR-F gap ("realtime for integrators"): a Server-Sent Events mirror of
@@ -24,6 +55,277 @@ GM-grade stream sees the hidden actor, a player's stream never does, a live comm
 frame with the bumped revision)/`npm run build` green.
 **Next suggested increment:** webhooks (deferred by design, still the largest remaining PR-F gap) or
 the dead credential `gameId` plumbing cleanup (known-bugs) — both are safe, PR-E-independent slices.
+
+## 2026-07-19 — Foundry/AboveVTT research → six-slice adoption pack (owner-directed; same branch/PR #38)
+
+Owner: "thoroughly research github.com/cyruzzo/AboveVTT and github.com/foundryvtt/dnd5e — see what
+can be learned from and implemented." Researched both (web-only; **AGPL = design study only, no
+code read for reuse** — now a decision-log rule), planned six ranked slices, shipped all six as
+independent green commits:
+
+1. **Recharge abilities** — `uses.per: "recharge"` + d6 threshold; ETL emits 86 structured pools
+   (and fixed 13 upstream `RECHARGE`+param rows that are really die-range recharges — basilisk/
+   medusa gaze, blink dog Teleport…); auto-rolled at the owner's turn start via `nextInitiativeTurn`
+   deps; rests/encounter-start re-arm.
+2. **Legendary actions + Resistance** — per-round `legendaryUsed` pool (reactionsUsed pattern),
+   economy blocks, `turn.use-legendary`, ⭐ off-turn console switch, LR commit flag on `save.answer`
+   after a previewed failure (success outcome still applies — e.g. half damage). Pools are GM
+   knowledge (stripped, leak-tested).
+3. **Condition glyphs** — original 16×16 SVG icons for all 15 SRD conditions in the token badges;
+   viewer gets parallel `conditionIds`. Catalog render + live smoke verified legibility.
+4. **Scene thumbnails** — cached one-fetch-per-asset map previews in the Scenes strip chips.
+5. **Hit dice** — pool seeded from HP formulas; `actor.spend-hit-dice` (pre-rolled faces, min 1/die,
+   heals via `healActor`, shared roll record); long-rest refill; the roster's missing rest UI
+   (GM Short/Long buttons + stepper; player's own card too).
+6. **Manual fog of war v1 (ADR-0021; BUILD_PLAN Phase-2 gate item)** — per-scene reveal/hide rect
+   strokes over "all hidden"; `fog.set-enabled/paint/reset` (GM, `sceneId` preps parked scenes);
+   server snaps/clamps/compacts/caps; GM-dim-below-tokens vs player/viewer-solid-above-everything
+   mask; timeline-neutral (never dirties, survives rewinds); fog ≠ security boundary (documented +
+   pinned). Smoke: real drags — grid-snapped stroke, covered player map, re-hide, reveal-all
+   compaction, 375 px tools.
+
+Rejected as out of scope (decision log): D&D Beyond integration, voice/video, generic
+Active-Effects engine, full Activities generality, dynamic lighting/vision fog. Suite: 104
+regression + 7 fog tests; all gates from root; five live Playwright smokes with screenshots.
+
+## 2026-07-19 — Foundry-style tracker + Scene IA strip (owner-directed; same branch/PR #38)
+
+Owner's messages finally came through ("responses weren't going through" explains four identical
+rejections): (1) make the initiative like Foundry, simplified; (2) next task = the scene IA.
+
+- **Foundry-anatomy rows, GM + player**: `[avatar disc | name + condition dots + HP text | 3px HP
+  bar underneath | initiative right]`. Avatars are kind-colored initials (PC blue / monster red /
+  npc green; dashed ring = GM-only); player rows show band-filled bars (full/45%/sliver). GM rows
+  49px (Foundry ≈48), player rows 34px. The per-row HP button is gone — the whole row opens the
+  tools popover (HP input autofocuses on fine pointers only).
+- **Scene IA — the owner's named next task**: new `SceneSwitcher` strip at the top of the
+  Encounter tab: every prepared scene is a chip (name + combatant count; LIVE / staging badges);
+  tap = private staging preview, ▶ = make live (one click; confirm only when a fight is running —
+  the fight parks and its auto-created "Current encounter" chip resumes it), ✕ = remove,
+  "+ New scene" opens the prep modal. ScenePanel removed from the Maps tab — Map Setup is purely
+  library management now. Verified live end-to-end: create → stage → go live → map switched → LIVE
+  badge → parked fight resumed with combat intact.
+- **Crash caught by smoke**: the strip initially read `combat.scenes` unguarded and the first
+  post-login state can be player-projected (no scenes) → boundary crash. Guard on the field, not
+  the mode. (Pattern for future: any GM-only combat field used in the shared table view needs a
+  field-presence guard.)
+- Gates green from repo root; smokes: 9/9 foundry+scene checks, 6/6 player checks.
+
+## 2026-07-19 — Player tracker parity + independent UX audit fixes (same branch/PR #38)
+
+A fourth identical owner rejection prompted two moves instead of another blind CSS pass: an
+independent ux-reviewer audit, and a blind-spot check that found the real miss — the PLAYER-side
+initiative list was never overhauled (old fat rows, text chips, banners, standalone economy card).
+If the owner tested from a phone as a player, every "fixed" round looked identical. Shipped:
+
+- **Player tracker parity**: same dense language as the GM list — compact Round bar with a single
+  status flag, 23-24 px one-line rows (score · name · YOU badge · condition dots · band-colored
+  health text), the player's own details grouped under their row, economy in a quiet card below
+  the list. 375 px: 229 px list, 400 px panel.
+- **Audit fixes** (agent findings, ranked): permanent map tutorial caption removed and the token
+  tray now renders only while it has tokens (or during a drag); the 12-icon map toolbar collapsed
+  to Select/Ping/Measure + one ✏ Draw toggle holding shapes/color/visibility/layer/wrench; the
+  duplicate DockPicker dropped from the ⋯ menu (the map's control remains); "+ Add monsters"
+  promoted from the ⋯ menu to the topbar (reinforcements are a combat action, not a setting); the
+  acting console's header merged into ONE line (name + economy pills + movement — no restated
+  caret/"acting"/separate strip); `(pointer: coarse)` media query restores touch-size targets
+  without changing desktop density; narrow viewports cap the docked panel at 62vw.
+- **Deliberately kept** vs the audit: the row-popover reaction toggle stays (it is the only
+  reaction control for NON-acting combatants — the "duplicate" exists only for the acting one).
+- GM panel now 782 px / page 1230 px; all gates green from the repo root (an apps/client-cwd gate
+  run earlier in the session was client-only — noted so future sessions run gates from root).
+
+## 2026-07-19 — Tracker strip-down, third pass (same branch/PR #38)
+
+Third owner rejection ("still bloated and cluttered") → removed every remaining block and per-row
+ornament: no heading block during combat (Round pill rides the single control bar with ‹/Next/⋯);
+the placement nudge is one unboxed line; rows lose all chrome (dim right-aligned initiative
+number, plain band-colored HP text, condition dots instead of text chips, per-row R button moved
+into the row-tools popover with only a dim struck-R marker when spent); Dice and Combat log
+collapse behind one-line disclosures during combat. Measured: 30 px rows, 301 px list (10
+combatants), 819 px whole panel (from 1822 two passes ago), 1279 px full page (from 1958).
+Screenshots now CROPPED to the tracker column — full-page captures were making every iteration
+look like a wall regardless of changes. Awaiting owner calibration: is this composition right, or
+rebuild against a named reference (Foundry-style portraits/HP bars vs more minimal)?
+
+## 2026-07-19 — Tracker COMPOSITION redesign (owner re-rejected density-only pass; same branch/PR #38)
+
+Shrinking paddings wasn't the problem — the composition was. Fixes, following how real combat
+trackers are structured:
+
+- **The initiative order is now a pure list.** The acting creature's console (economy chips +
+  action runner) moved OUT of the `<li>` into its own labeled card below the list
+  (`.acting-console`, "▶ Name ACTING · Move x/y ft"). Tracker for 10 combatants: **339 px**;
+  console: **~230 px**. No more action UI interleaved between initiative rows.
+- **Flat visual language**: action rows are borderless one-liners ("Greataxe  +7 to hit, reach
+  5 ft · 1d12 + 4 slashing", summary truncates) with hover/left-accent affordance — no more
+  boxes-in-boxes.
+- **Common actions curated**: 5 primary chips (Dodge/Dash/Disengage/Help/Hide) + "More ▾" for
+  the other 11 builtins, one line instead of five.
+- **Roster collapse**: the lobby ActorRoster (huge per-character cards) collapses to one
+  "Characters & claims" line while combat is active — it duplicated the tracker at ~5× size.
+- Verified live at 1440/375 px: 33 px rows, popover no-shift, Enter-damage, menu contents, page
+  height accounting. Full check/tests/build green.
+
+## 2026-07-19 — Tracker density overhaul (owner rejected the accordion pass; same branch/PR #38)
+
+The accordion pass still produced a paint-roller of a panel (~1822 px for 10 combatants). The real
+structural fixes, measured with Playwright bounding boxes:
+
+- **Floating popovers, not inline expanders**: a row's tools (HP editor with Enter-to-damage,
+  condition/effect editors, Open sheet) open OVER the list (`.row-tools-popover` + click-away
+  backdrop) — other rows provably don't move.
+- **Controls behind ⋯**: rules mode, underwater, dock position, add-combatant, and End encounter
+  all moved into one topbar menu next to compact Prev/Next. Nothing occasional is inline anymore.
+- **Dense one-line rows**: `[initiative | name + condition badges | R | HP]` at **33 px** (was ~3×).
+- **The real bloat culprit — the builtin catalog**: milestone 3's 16 generic actions (Dodge, Dash,
+  Unarmed Strike…) rendered as full rows on every active combatant (~900 px). They're now one
+  wrapped chip cluster ("Common"); prose traits collapse behind "Traits & reference (n)".
+- **Result**: tracker for 10 combatants incl. the active runner 1468 → ~700 px; whole panel
+  1822 → ~1100 px; verified at 1440 and 375 px, Enter-damage + menu + popover all exercised live.
+
+## 2026-07-19 — Round-2 live-testing fixes: footprint distance, tab-free encounter start, multiattack flow, collapsed tracker (same branch/PR #38)
+
+Owner's first live-testing round reported five issues; four fixed fully, one partially (the
+maps/scenes IA got its worst frictions removed; the full redesign is queued):
+
+- **Footprint-aware distance (bugs 1+3, engine).** All rules-facing distances were center-to-center,
+  so a Medium attacker adjacent to a Large/Huge creature read 7.5–10 ft ("out of reach") and a big
+  mover's OA never triggered. New `creatureDistance`/`tokenCreatureDistance`
+  (movement-narration.ts): edge-to-edge per the SRD (grid: Chebyshev cells minus each footprint's
+  half-width; scaled gridless: minus token radius beyond its central cell). Wired through action
+  resolve range checks + advantage sources, OA reach checks (`applyMovementRules` gains a
+  `creatureDistance` input), and movement narration. 4 regression tests.
+- **Encounter start needed a Maps-tab visit (bug 4a).** `selectedMap` only hydrated when MapManager
+  mounted. The App now fetches the map library at GM login (and on returning to the Encounter tab),
+  defaults to the newest battlemap, and encounter setup carries its own battlemap `<select>`.
+- **Multiattack ergonomics (bug 5).** Tapping Multiattack mid-instance was a violation ("no attacks
+  remaining" → override). Now it's a continue (reports the remaining plan); blocked component
+  messages name what's left ("no Bite left — remaining: 1× Tail"); client instance notes/hints name
+  components; the Multiattack row hints "In progress — pick the next attack". Regression test.
+- **Combat tracker collapse-by-default (bug 2).** GM initiative rows are one line (name +
+  inline condition badges + R/HP/score); an accordion expands one row's tools (HP editor,
+  condition/effect editors, Open sheet). Enter in the HP amount applies damage. Save/reaction
+  prompts and the dying tracker stay always-visible. Active row keeps economy + ActionRunner.
+- **Scenes flow (bug 4b, partial).** ScenePanel gets its own battlemap picker (same library), so
+  preparing a scene works from the Encounter tab's Scene-prep modal without tab bouncing. The
+  fuller maps/upload/browse IA redesign is deliberately deferred (needs a design pass).
+- **Verification**: check green; 347 server + 61 package tests; build green; live Playwright smoke
+  13/14 checks + narration line "Torva entered the map — Giant Crocodile 5 ft" proving edge-to-edge
+  (the one "failure" was a smoke regex expecting "moved" for a tray entry); desktop + 375 px shots.
+
+## 2026-07-19 — SRD gap closure tiers A–D (ADR-0020 second amendment, same branch/PR #38)
+
+Owner asked for a comprehensive review of the SRD 5e combat rules (an external SRD-mirror repo —
+verified identical to the in-repo SRD 5.2.1, which served as the citation source) and full
+implementation. A rule-by-rule inventory vs the engine produced four tiers, all approved
+(all-tiers scope; GM-adjudicated inputs where vision/terrain/inventory subsystems are deliberately
+absent; only the cheap niche trio):
+
+- **Tier A — conditions**: frightened/invisible/grappled-vs-grappler/charmed-charmer modifiers,
+  paralyzed auto-crit, physical-save auto-fail (manual total = GM escape hatch), restrained
+  Dex-save disadvantage, exhaustion teeth (−2×level, level 6 = death, −5 ft/level), petrified
+  resist-all + poison immunity, `conditionImmunities` skip-with-narration (stripped from players).
+- **Tier B — builtins**: the eleven 2024 generic actions + Unarmed Strike/Grapple/Shove/Escape as
+  a frozen-id catalog (`builtin-actions.ts`) usable by any combatant; Dodge/Disengage/Dash/Help/
+  Ready grant typed effects (`voidWhileIncapacitated`); Hide → Stealth vs DC 15 → Invisible-linked
+  reveal-on-attack; grapples as escapable source-linked effects (DC 8+Str+PB, one-size cap,
+  incapacitated grappler releases).
+- **Tier C — movement/OA/range**: `speedFeet` + `turn.movementUsedFeet` budgets (Dash ×2, speed-0
+  conditions, prone stand cost, `actor.set-speed`, GM-only override), opportunity attacks as
+  `leaves-reach` reaction prompts answered by a real off-turn melee resolve with auto-applied
+  damage (hidden movers prompt no one — viewer safety), range/reach/long-range/close-combat
+  checks, ETL normal/max range bands.
+- **Tier D — cover/concentration/surprise/rests/niche**: GM-selected cover (+2/+5 AC and Dex
+  saves, overridable `cover.total`), concentration (one-at-a-time, CON save DC
+  min(30, max(10, ⌊dmg/2⌋)) on damage, incapacitation/0-HP breaks), surprise = min of two d20s,
+  short rest re-arms per-short-rest pools only, underwater toggle (`encounter.set-environment`),
+  nonlethal knock-out (KO button), falling-damage dice helper. Rest logic extracted to `rests.ts`.
+- **Verification**: regression suite 35 → 81 tests (SRD-cited per block); suites 341 server / 16
+  contract / 23 rules / 7 schema / 15 content; check + build green; api-reference regenerated.
+  ADR-0020 second amendment (items 13–17 + new deferred list); assessment §3b/§4 refreshed;
+  BUILD_PLAN MVP-022. Follow-up: Parry/damage-taken triggers, triggered features, difficult
+  terrain, spell slots, import compatibility states.
+
+## 2026-07-18 — Rules engine slice 2: reactions, incapacitation, availability API, archive v3 (same branch/PR #38)
+
+Owner sent a follow-up milestone prompt written without baseline knowledge; per instruction it was
+reviewed and corrected first — the assessment + remaining-work roadmap lives in
+`docs/product/rules-engine-followup-assessment.md` (kept: strict-by-default modes and one-command-
+one-roll instances; substituted: in-repo SRD sources for the external mirror). Then the largest
+coherent remaining slice shipped on the same PR:
+
+- **Reaction prompts (Uncanny Dodge).** `reaction {trigger, response}` vocabulary on ActionSchema;
+  a qualifying hit parks its typed damage on `combat.pendingReactions` instead of the apply button;
+  `reaction.answer` applies half (use — spends the reaction) or full (decline); `reaction.dismiss`
+  (GM) drops without damage. Eligibility: reaction free, not incapacitated, not freeform. Prompts
+  persist until answered (parked damage is never lost). Pip's fixture carries the declaration.
+- **Incapacitation gating**: `condition.incapacitated` violations for action/bonus/reaction while
+  Incapacitated/Paralyzed/Petrified/Stunned/Unconscious — same strict/assisted/override ladder.
+- **Available-actions read** (`GET .../actors/{id}/available-actions` + socket): per-action
+  availability from the *shared* `evaluateActionEconomy` (report can't drift from enforcement),
+  with rule violations, uses remaining, instance counts. GM any; player own claimed only.
+- **Archive v3**: additive `postEncounterState` (aftermath after encounter.end's sweeps — Frenzy's
+  Exhaustion now recorded); finalState unchanged. 47 commands total now.
+- **Client**: reaction prompt rows (GM all / player own) beside save prompts; ActionRunner replaces
+  its apply button with a waiting note while a prompt is open (double-apply impossible).
+- **Verification**: regression suite 25 → 35 tests (prompt lifecycle, gating, availability); +HTTP
+  availability test; archive/projection/scope pins updated; api-reference regenerated; suites 288
+  server / 16 contract / 23 rules+schemas green; full check + build green. ADR-0020 amended (items
+  9–12).
+
+## 2026-07-18 — Combat rules engine (ADR-0020) (`claude/vtt-combat-rules-validation-hkw7tn`)
+
+Owner-directed from a forensic diff of two archived runs of one encounter (manual GM run vs
+API-scripted recreation) plus a gap-analysis report: the engine recorded mechanics but didn't own
+them. Direction: legal action = easiest path, clear explanations, explicit audited GM overrides.
+
+- **Mechanics vocabulary (additive on schemaVersion 1).** ActionSchema: `attack.count`,
+  `attack.criticalBonusDice`, `multiattack`, `onHit` riders (conditions + escape DC + size cap),
+  `targetRules`, `grants` (effects with typed modifiers/durations/onEnd/endsWithTag),
+  `requiresEffectTag`, `uses` (turn/encounter/long-rest + shared pools). ActorDefinition: typed
+  `damageResistances/Immunities/Vulnerabilities/conditionImmunities`. JSON-schema twin regenerated
+  (fixed its pre-existing missing-`save` drift) and now pinned against the enriched fixtures.
+- **Validated resolution.** Per-encounter `rulesMode` (strict default/assisted/freeform);
+  action.resolve validates economy + compound-action instances (generic attack pool so Extra Attack
+  mixes weapons; actionId components for Multiattack) + requirements + uses on the actor's own turn;
+  rejections carry `blocked {rule, overridable}` (socket ack + HTTP 409 details) and re-sending with
+  `override:{reason}` bypasses with a loud `override` log line. Prose-only Multiattack degrades
+  blocking to warnings. Manual `turn.use` stays free and clears the instance when un-marking.
+- **Effects engine** (`effects.ts`): EffectInstances on actors with source links, durations
+  (rounds/until-source-next-turn/encounter/manual), linked conditions, escape DCs, onEnd grants,
+  endsWithTag cascades (Frenzy's Exhaustion fires exactly once however the Rage ends), grant
+  refresh-not-stack, turn-boundary expiry, source-defeat release (0 HP or removal), encounter-end
+  sweep scoped to the fight's combatants (parked scenes keep theirs).
+- **Typed damage + dying.** `actor.apply-damage` accepts typed `parts` → immunity/resistance/
+  vulnerability from definition + active effects with a per-part breakdown ("17 bludgeoning → 8,
+  resistance: Rage") logged and returned; amount-only stays exact. All five HP entry points share
+  the zero-HP machine: PCs drop dying (Unconscious+Prone+death saves; crit = 2 failures; overflow ≥
+  max = instant death; stabilization resets counters), `death-save.roll` runs the d20 pipeline,
+  heal/set-hp above 0 restores consciousness; non-PCs at 0 release sustained effects.
+- **Advantage aggregation** with explainable sources (Reckless out/in, prone 2024 distance rule via
+  token distance, restrained/poisoned/blinded/stunned/paralyzed/petrified/unconscious,
+  unconscious-adjacent auto-crit); explicit `rollMode` wins; sources shown in result + archived.
+- **Commands/API.** New `effect.add`, `effect.end`, `death-save.roll`, `encounter.set-rules-mode`,
+  `actor.rest` through operations layer + both transports + OpenAPI (45 commands now); damage/
+  resolve/encounter.start requests extended additively; capabilities gains `rulesEngine: true`;
+  api-reference regenerated; `turn.use` contract wording updated (no longer "never enforced").
+- **ETL enrichment** (confident patterns only, fail-open): 126/178 Multiattacks structured, 47
+  on-hit riders (crocodile Bite = Grappled+Restrained, escape DC 15, Large cap), 146 monsters with
+  typed defenses; giant-crocodile Tail `not-grappled-by-source` via reviewed ACTION_ENRICHMENTS.
+- **Client.** Action rows show availability hints but stay tappable (server authority) with a
+  blocked→override dialog; "N attacks remaining" instance notes; typed apply with breakdown
+  feedback; effect chips (+end), dying tracker with death-save roll (GM + owning player), rules-mode
+  select. Projections: PlayerEffect strips source ids/masks hidden names; actionUses own-only;
+  hidden-turn instance masked; viewer untouched.
+- **Verification.** New 25-test replay-derived regression suite + rules-5e combat unit tests;
+  timeline restore now covers effects/deathSaves/actionUses; suites: 277 server / 16 contract /
+  23 rules / 7 schema / 15 content green; full check + build green. Playwright smoke still pending
+  this session (documented below).
+- **Unsupported (deliberate, listed in ADR-0020):** reaction prompts (Uncanny Dodge), triggered
+  features (Relentless Endurance, Dark One's Blessing, Sneak Attack *eligibility*), concentration/
+  Hex, movement legality, rolled grapple escapes, player action.resolve, monster death policies,
+  ruleset declarations, structured recharge/legendary.
 
 ## 2026-07-18 — Public Open API v1 core (PR F) + Time Machine v2 (`claude/open-api-core-m75t9d`)
 

@@ -1,4 +1,7 @@
-.encounter-map-interaction { margin-top: .5rem; }
+.encounter-map-interaction { margin-top: .5rem; position: relative; }
+/* The tray floats over the map's top edge rather than reflowing the whole map when it appears (for a
+   drag or unplaced tokens), so grabbing a token no longer shoves the map down (report #5). */
+.encounter-map-interaction:not(.enlarged) .encounter-token-tray { position: absolute; z-index: 4; top: 0; left: 0; right: 0; margin-bottom: 0; }
 .encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; font-size: .82rem; }
 .encounter-map-help strong { color: #fff0d2; }
 .encounter-map-help span { color: #cfc5b4; font-size: .78rem; text-align: right; }
@@ -63,15 +66,27 @@
 
 /* Top-left overlaid tool cluster (eye ▾ · tools · ruler toggle · wrench ▾). Visible in normal,
    enlarged, and OS-fullscreen modes since it lives inside the stage. */
-.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; max-width: calc(100% - 1.4rem); }
+/* align-items: center keeps every control on one vertical plane; min-height reserves the slide-out's
+   height so opening a tab never nudges the whole row down (report #8). */
+.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 2.25rem; max-width: calc(100% - 1.4rem); }
 .encounter-map-tools { display: flex; gap: .3rem; }
+/* Drawing and fog tools open as one grouped tab that slides out to the right of their toggle (reports
+   #11, #13): a bordered panel that reads as a set. It grows in from the left on open and fades out on
+   close (via .closing) rather than snapping (report #8). */
+.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; min-width: 0; padding: 0 .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); overflow: visible; white-space: nowrap; }
+/* Opening/closing animate the tab's own width (clipped) so the buttons it pushes aside slide with it,
+   not snap (report #4); once settled the class drops so the eye/color/wrench dropdowns can overflow. */
+.encounter-map-slideout.opening { overflow: hidden; animation: encounter-map-slideout .18s ease-out; }
+.encounter-map-slideout.closing { overflow: hidden; pointer-events: none; animation: encounter-map-slideout-close .18s ease-in forwards; }
+@keyframes encounter-map-slideout { from { opacity: 0; max-width: 0; } to { opacity: 1; max-width: 24rem; } }
+@keyframes encounter-map-slideout-close { from { opacity: 1; max-width: 24rem; } to { opacity: 0; max-width: 0; } }
 .encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
 .encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
 .encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }
 .encounter-map-swatches button.selected { outline: 2px solid #fff; outline-offset: 1px; }
 .encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
 .encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
-.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; }
+.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
 .encounter-map-icon:hover { border-color: #e8a743; }
 .encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
 .encounter-map-icon:disabled { opacity: .4; cursor: not-allowed; }
@@ -116,8 +131,16 @@
 .token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .token-health-bloodied { fill: #e8a743; }
 .token-health-down { fill: #d9605a; }
+/* Manual fog of war: the GM sees a dim veil (everything stays workable); players get solid cover. */
+.fog-overlay-gm { fill: #060409; fill-opacity: .45; }
+.fog-overlay-player { fill: #0b0a08; }
+.fog-stroke-preview { fill-opacity: .18; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.fog-stroke-reveal { fill: #ffd76a; stroke: #ffd76a; }
+.fog-stroke-hide { fill: #6a5cff; stroke: #8a7dff; }
+
 .token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.token-condition-glyph { fill: #e4d7fa; }
 .token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }
 
 /* Transient battlemap event toasts (top-center, inside the stage so they show enlarged). */
@@ -156,7 +179,13 @@
 .token-context-size select { flex: 1; margin: 0; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
 .token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
 .token-context-conditions { margin-top: .1rem; }
+.token-context-conditions-label { display: block; margin-bottom: .3rem; color: #9f9789; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .token-context-feedback { margin: .1rem 0 0; color: #e9b861; font-size: .75rem; }
 
 .encounter-map-scene-live { display: inline-flex; gap: .35rem; }
 .encounter-map-scene-live .scene-golive { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+
+/* Narrow viewports: a saved left/right dock must never squeeze the map to a sliver. */
+@media (max-width: 700px) {
+  .encounter-map-dock.dock-right, .encounter-map-dock.dock-left { width: min(var(--dock-side-width), 62vw); }
+}
