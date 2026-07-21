@@ -59,6 +59,17 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     not these. Form submit buttons keep an explicit `type="submit"` (the primitive defaults to
     `type="button"`). No CSS/logic/projection changes. Only deferred item left: the ⌘K command
     palette (its motion already landed; the feature is a separate later pass).
+  - **New primitives + template patterns + polish (2026-07-21, same PR).** Expanded `@vtt/ui` with
+    four small forward-looking primitives for the app's next surfaces (character sheets/builder,
+    homebrew, content importing): `Badge` (count/status/tag), `Avatar` (monogram or portrait + presence
+    dot), `Meter` (labeled HP/resource bar; health tone auto-bands cyan/magenta/danger like token +
+    map health), and `Alert` (in-flow info/success/warning/danger banner — the persistent counterpart
+    to a Toast). Added `styles/patterns.css` with shared class templates `.nh-table` (content lists/
+    imports), `.nh-statlist` (stat-block key-value grid), and `.nh-empty` (empty state). All
+    on-palette (success = cyan, no green), theme-aware (AA in light), and demoed live in `/styleguide`
+    with their own sections. Two fixes: the theme-toggle content is now optically centred (Manrope
+    line-box nudge), and the GM setup view's empty map hero is sized like a real battlemap so the map
+    panel and the `--setup-h`-matched encounter panel are comfortably tall instead of short stubs.
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
