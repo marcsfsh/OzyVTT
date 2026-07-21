@@ -6,6 +6,7 @@ import { ActionRunner } from "./ActionRunner";
 import { RollControls, type DieMode } from "./RollControls";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
+import { InitiativeRow } from "./InitiativeList";
 import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
@@ -337,22 +338,8 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
         return <li key={entry.actorId} ref={entry.active ? activeRowRef : undefined} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
-          <div className="initiative-row-main">
-            {/* Foundry-style row for players too: avatar | name + band HP bar | initiative. Players
-                only know the health band, so the bar fills full/half/sliver. */}
-            <span className="initiative-avatar player-known" aria-hidden="true">{initialsOf(entry.name)}</span>
-            <span className="initiative-main-col">
-              <span className="initiative-name-line">
-                {entry.active && <span className="initiative-caret" aria-hidden="true">▶</span>}
-                <strong className="initiative-name-text">{entry.name}</strong>
-                {isMe && <span className="you-badge">YOU</span>}
-                <ConditionDots conditions={rowActor?.conditions ?? []} />
-                {entry.health !== "healthy" && <span className={`player-health hp-${entry.health}`}>{entry.health === "down" ? "Down" : "Bloodied"}</span>}
-              </span>
-              <span className="initiative-hpbar" aria-hidden="true"><span className={`initiative-hpbar-fill hp-${entry.health}`} style={{ width: entry.health === "healthy" ? "100%" : entry.health === "bloodied" ? "45%" : "6%" }} /></span>
-            </span>
-            <span className="initiative-score-plain">{entry.score}</span>
-          </div>
+          {/* Foundry-style row shared with the shared-screen viewer so the two lists never drift. */}
+          <InitiativeRow entry={entry} self={isMe} />
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}

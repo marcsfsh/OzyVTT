@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { bandFraction, FogOverlay, probeImageDimensions, TokenGlyph, TokenStatusBadges } from "../scene/mapImage";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
+import { InitiativeRow } from "../encounter/InitiativeList";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -13,7 +14,7 @@ export type Presentation = Readonly<{
   camera: Readonly<{ center: Point; zoom: number }> | null;
   measurement: Readonly<{ id: string; points: readonly Point[]; distanceLabel: string }> | null;
   pings: readonly Readonly<{ id: string; point: Point; label?: string; expiresAt: number }>[];
-  initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[] }>[] }>;
+  initiative: Readonly<{ visible: boolean; round: number; hiddenTurn: boolean; entries: readonly Readonly<{ actorId: string; name: string; initiative: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; conditionIds?: readonly string[] }>[] }>;
   encounter: Readonly<{ mapAssetId: string | null; tokens: readonly Readonly<{ actorId: string; name: string; kind: "player-character" | "monster" | "npc"; position: Point; sizePx: number; active: boolean; health?: "healthy" | "bloodied" | "down"; conditions?: readonly string[]; conditionIds?: readonly string[]; healthDisplay?: Readonly<{ style: "bar" | "ring" }>; tokenAssetId?: string }>[]; annotations?: readonly ViewerAnnotation[]; fog?: Readonly<{ enabled: boolean; shapes: readonly Readonly<{ kind: "rect"; id: string; op: "reveal" | "hide"; x: number; y: number; width: number; height: number }>[] }> }>;
 }>;
 
@@ -59,10 +60,7 @@ export function Initiative({ presentation }: Readonly<{ presentation: Presentati
     <div><span>INITIATIVE</span><strong>Round {presentation.initiative.round}</strong></div>
     {presentation.initiative.hiddenTurn && <p className="viewer-hidden-turn">GM turn</p>}
     <ol>{presentation.initiative.entries.map((entry) => <li key={entry.actorId} className={entry.active ? "active" : ""} aria-current={entry.active ? "step" : undefined}>
-      <span>{entry.name}
-        {entry.health && entry.health !== "healthy" && <span className={`viewer-health viewer-health-${entry.health}`}>{entry.health === "down" ? "DOWN" : "BLOODIED"}</span>}
-        {entry.conditions && entry.conditions.length > 0 && <span className="viewer-conditions">{entry.conditions.join(" · ")}</span>}
-      </span><strong>{entry.initiative}</strong>
+      <InitiativeRow entry={{ actorId: entry.actorId, name: entry.name, score: entry.initiative, active: entry.active, health: entry.health ?? "healthy", conditionIds: entry.conditionIds, conditions: entry.conditions }} />
     </li>)}</ol>
   </aside>;
 }
