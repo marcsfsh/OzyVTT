@@ -80,6 +80,8 @@
 /* align-items: center keeps every control on one vertical plane; min-height reserves the slide-out's
    height so opening a tab never nudges the whole row down (report #8). */
 .encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 2.25rem; max-width: calc(100% - 1.4rem); }
+/* The per-viewer notifications bell sits top-right, opposite the top-left tool cluster. */
+.encounter-map-notify { position: absolute; right: .7rem; top: .7rem; z-index: 3; }
 .encounter-map-tools { display: flex; gap: .3rem; }
 /* Drawing and fog tools open as one grouped tab that slides out to the right of their toggle (reports
    #11, #13): a bordered panel that reads as a set. It grows in from the left on open and fades out on
