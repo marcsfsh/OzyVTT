@@ -274,10 +274,17 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.save && <p className="action-outcome">Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save</p>}
       {result.effectGranted && <p className="action-effect-granted">{actor.name} gains <strong>{result.effectGranted.name}</strong>.</p>}
       {result.effectsApplied?.map((appliedEffect) => <p key={`${appliedEffect.targetId}-${appliedEffect.name}`} className="action-effect-applied">{appliedEffect.targetName} is <strong>{appliedEffect.name}</strong>.</p>)}
-      {result.damage.length > 0 && <p className="action-damage">Damage: <strong>{result.damageTotal}</strong> ({[
-        ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
-        ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-      ].join(" + ")}){result.crit ? " - crit dice doubled" : ""}</p>}
+      {result.damage.length > 0 && (() => {
+        // When the GM has typed a manual amount in the apply field, the headline reflects THAT number
+        // (what will be applied), not the stale rolled total - the rolled value is kept for reference.
+        const typed = damageEdit !== null && damageEdit.trim() !== "" ? Number(damageEdit) : null;
+        const overriding = typed !== null && Number.isFinite(typed) && typed >= 0 && typed !== result.damageTotal;
+        const breakdown = [
+          ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
+          ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
+        ].join(" + ");
+        return <p className="action-damage">Damage: <strong>{overriding ? typed : result.damageTotal}</strong>{overriding ? ` (manual - rolled ${result.damageTotal})` : ` (${breakdown})`}{!overriding && result.crit ? " - crit dice doubled" : ""}</p>;
+      })()}
       {result.attack && (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
         // A reaction window (Uncanny Dodge) parked this damage on a prompt: the answer applies it
         // server-side, so the apply button never shows for this target - that would double-apply.
