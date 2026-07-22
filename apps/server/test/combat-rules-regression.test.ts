@@ -395,6 +395,18 @@ describe("report test 12 - GM override", () => {
     nextInitiativeTurn(game);
     expect(game.combat.turn.rulesOverridden).toBeFalsy();
   });
+
+  it("blocks a down creature (0 HP) from acting, and a standing override does not bypass it", () => {
+    const game = buildGame();
+    const torva = game.actors.find((candidate) => candidate.id === IDS.torva)!;
+    torva.hp = { ...torva.hp, current: 0 };
+    expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]))
+      .toThrow(/is down/);
+    // A standing economy/range override this turn must NOT let a down creature act - it re-prompts.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, rulesOverridden: true } };
+    expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]))
+      .toThrow(RulesBlockedError);
+  });
 });
 
 describe("effect lifecycle - Frenzy's Exhaustion and Rage duration", () => {

@@ -171,6 +171,9 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
   if (action.activation !== "other") {
     const incapacitating = attacker.conditions.find((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id));
     if (incapacitating) violations.push({ rule: "condition.incapacitated", message: `${attacker.name} is ${conditionLabel(incapacitating.id)} and can't take actions, bonus actions, or reactions.` });
+    // A creature at 0 HP is down (a dying PC or a defeated monster) and can't act. Keyed on hp, not a
+    // condition, so a defeated monster - which carries no incapacitating condition - is blocked too.
+    else if (attacker.hp.current <= 0) violations.push({ rule: "condition.down", message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.` });
   }
 
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag)) {

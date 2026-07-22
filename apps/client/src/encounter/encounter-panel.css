@@ -450,6 +450,10 @@
 /* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
    stays a pure list. One quiet container with the active magenta accent; contents are flat. */
 .acting-console { margin-top: .7rem; padding: .75rem .8rem .85rem; border: 1px solid color-mix(in srgb, var(--magenta) 45%, var(--line)); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+/* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
+   the audited override), with its death saves / down note lifted above it. */
+.acting-console.down { opacity: .5; border-left-color: var(--danger); }
+.acting-down-note { margin: .5rem 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; }
 /* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
 .acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
 .acting-console-head strong { color: var(--text); font-size: .86rem; }
