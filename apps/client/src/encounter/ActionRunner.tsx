@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePrompt } from "../components/feedback";
 import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
@@ -80,6 +80,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
   // A typed d20 for the attack preview (the manual-entry path, or a physical die).
   const [attackDieEdit, setAttackDieEdit] = useState("");
+  // Whether that typed d20 has been submitted to the preview - drives "Use roll" → Confirm/Re-roll.
+  const [manualSubmitted, setManualSubmitted] = useState(false);
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -108,7 +110,16 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
   useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
   // Fresh result (from this runner's Roll or the map confirm bar) clears prior apply bookkeeping.
-  useEffect(() => { setApplied(new Set()); setDamageEdit(null); setAttackDieEdit(""); }, [result]);
+  useEffect(() => { setApplied(new Set()); setDamageEdit(null); }, [result]);
+  // The manual d20 field resets only when a NEW attack preview first appears - not on every preview
+  // change (Adv/Disadv/Use roll each produce a fresh result), so a submitted manual roll persists
+  // instead of the field clearing itself the instant it's used.
+  const previewShownRef = useRef(false);
+  useEffect(() => {
+    const showing = Boolean(result?.preview);
+    if (showing && !previewShownRef.current) { setAttackDieEdit(""); setManualSubmitted(false); }
+    previewShownRef.current = showing;
+  }, [result]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => { const target = state.actors.find((item) => item.id === entry.actorId); return target ? [target] : []; });
@@ -259,21 +270,20 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           d20 is the manual path, and Confirm resolves the hit for real (damage, riders, economy). */}
       {result.preview && result.attack && (() => {
         const previewResolve = (opts: ResolveOptions) => resolveTargeting(state.revision, onOutcome, opts);
+        // Any auto control (Adv/Disadv/Re-roll) abandons a pending manual entry.
+        const autoPreview = (opts: ResolveOptions) => { setManualSubmitted(false); previewResolve(opts); };
         const mode = result.rollMode?.mode;
         // Roll mode drives the layout: auto shows just the roll controls; manual adds a labeled
         // "type the d20" zone under an "or" divider so the two paths read distinctly (feedback #1).
         const manualEntry = state.combat.rollMode === "manual";
-        const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } previewResolve({ commit: false, attackNatural: value }); };
-        // Once the preview reflects the typed d20, "Use roll" becomes Confirm/Re-roll (derived, so it
-        // resets on its own when the field clears or an auto Re-roll changes the shown die).
-        const manualUsed = attackDieEdit.trim() !== "" && Number(attackDieEdit.trim()) === result.attack!.naturalRoll;
+        const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setManualSubmitted(true); previewResolve({ commit: false, attackNatural: value }); };
         return <div className="action-preview">
           <div className="roll-zone">
             <span className="save-prompt-confirm">
-              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => previewResolve({ commit: false, rollMode: "advantage" })}>Adv</button>
-              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => previewResolve({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
+              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => autoPreview({ commit: false, rollMode: "advantage" })}>Adv</button>
+              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => autoPreview({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
               <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
-              <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</Button>
+              <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => autoPreview({ commit: false })}>Re-roll</Button>
             </span>
             {manualEntry && <span className="roll-zone-caption">auto-roll</span>}
           </div>
@@ -281,9 +291,13 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             <div className="roll-or"><span>or</span></div>
             <div className="roll-zone">
               <span className="roll-zone-caption">manual entry</span>
-              <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} disabled={manualUsed} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualUsed && attackDieEdit.trim() !== "") submitDie(); }} />{manualUsed
-                ? <><button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={resolveBusy} title="Enter a different d20" onClick={() => setAttackDieEdit("")}>Re-roll</Button></>
-                : <button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
+              <span className="save-prompt-manual">
+                <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} disabled={manualSubmitted} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDieEdit.trim() !== "") submitDie(); }} />
+                {/* "Use roll" sits flush-right; once used it becomes Confirm/Re-roll, aligned under the auto-roll buttons above. */}
+                <span className="manual-actions">{manualSubmitted
+                  ? <><button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={resolveBusy} title="Enter a different d20" onClick={() => { setAttackDieEdit(""); setManualSubmitted(false); }}>Re-roll</Button></>
+                  : <button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
+              </span>
             </div>
           </>}
         </div>;
