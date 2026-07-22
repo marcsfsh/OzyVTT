@@ -8,6 +8,33 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-22 — Scene-centric IA redesign (the deferred flow rethink; 7-slice PR)
+
+Turned the "Scenes hub" design (`docs/product/scene-centric-ia.md`) into shipping code, one verified
+slice per commit:
+1. **Backend** `scene:duplicate` + `scene:reorder` (shared operations layer, socket + `/api/v1`,
+   api-contract byte-identical + reference regen).
+2. **Viewer bridge** — `scene:activate` presents the scene's map to the shared screen; a live scene
+   projects its map + prepared fog pre-combat (tokens still gated on `combat.active` — no new actor
+   exposure). New `viewer-coordinator.presentMap`.
+3. **`@vtt/ui`** `.nh-gallery`/`.nh-card` pattern + `/styleguide` (live = the one magenta glow; staging
+   = cyan edge; a stretched card button so the ⋯ menu/actions layer above it).
+4. **Scenes hub** gallery tab (cards, go-live, stage, rename, duplicate, remove, empty state; map-glyph
+   thumbnail fallback for a missing/corrupt map).
+5. **Map Setup folded in** — tab retired; "Manage maps" opens the library/calibration sub-view.
+6. **Encounter start reconciled** — starts on the live scene's map (the server requires the match); the
+   map row is read-only when a scene is live.
+7. **Drag-to-reorder** the gallery (pointer + touch grip, `touch-action:none`; menu Move earlier/later
+   stays the keyboard path).
+
+Owner decisions: auto-present to the TV on go-live; new Scenes hub folding Map Setup in; duplicate +
+reorder (no persisted thumbnails); one PR. Verified per slice: `check`+`test` (462)+`build` green;
+Playwright smokes (gallery in 3 themes + 390px, ⋯ menu, thumbnail fallback, Manage-maps round trip,
+scene-first start, drag-reorder DOM+server both update). Closes the known-bugs IA item. Follow-ups:
+persisted server thumbnails; slim the Encounter quick-switch strip; a physical touch-device pass.
+
+---
+
 ## 2026-07-21 — PR #40 review round 2 (seven items, same branch)
 
 Second screenshot-review pass on `claude/vtt-combat-plan-clarify-wy9cji`. Verified green (check/test/

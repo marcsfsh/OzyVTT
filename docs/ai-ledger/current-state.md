@@ -8,6 +8,17 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
+  of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
+  staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
+  GM-only, through the shared operations layer + `/api/v1` twins). Going **live also presents the
+  scene's map to the shared screen** (viewer bridge: a live scene projects its map + prepared fog
+  pre-combat; combatant tokens still only once the fight runs — no new actor exposure). The standalone
+  **Map Setup tab is retired** — the map library + 3×3 calibration fold into the hub ("Manage maps");
+  the Encounter tab starts combat on the live scene's map (server requires the match). Gallery/cards use
+  a new `@vtt/ui` `.nh-gallery`/`.nh-card` pattern (in `/styleguide`, all three themes). Design record:
+  `docs/product/scene-centric-ia.md`. Built in 7 verified slices; `check`+`test` (462)+`build` green,
+  a live Playwright smoke per slice. GM tabs are now Scenes · Encounter · Viewer · Replays · VTT Setup.
 - **UI design system — OzyVTT (2026-07-21).** A tokenized retrowave design language
   lives in `packages/ui`: `design-tokens.css` (three themes — dark default, dusk, light — via
   `data-theme` on `<html>`), self-hosted `@fontsource` fonts (Bungee/Russo One/Manrope/Space

@@ -1,7 +1,10 @@
 # Scene-centric IA redesign — design & implementation plan
 
-> **Status:** planned, not yet implemented. **Branch:** `claude/scene-prep-gm-notes-c1gcur`.
-> **Ships as:** one large PR. **Owner-approved decisions are in §4.**
+> **Status:** ✅ IMPLEMENTED 2026-07-22 — 7 verified slices on `claude/scene-prep-gm-notes-c1gcur`.
+> **Ships as:** one PR. **Owner-approved decisions are in §4.** This doc is the design record; the
+> shipped code refines a couple of details (reorder is drag **plus** a keyboard menu path; the
+> Encounter tab keeps a scene quick-switch strip). See `docs/ai-ledger/session-summary.md`
+> (2026-07-22) for the per-slice log.
 >
 > **How to use this doc.** This is the single source of truth for the scene-centric
 > information-architecture (IA) redesign. It is written to be self-contained: a fresh

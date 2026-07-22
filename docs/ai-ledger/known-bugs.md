@@ -10,15 +10,15 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
-- **[ux] Maps/scenes/encounter IA redesign (owner round-1 feedback, 2026-07-19)** — the worst
-  frictions are fixed (encounter setup and scene prep both pick battlemaps inline; no forced tab
-  bouncing), but the owner wants the whole upload → browse → prepare → start experience rethought
-  against how other VTTs structure it (scene-centric). Needs a real design pass, not another patch.
-  More live-testing rounds are expected to add to this list.
-  - _Partial (2026-07-21):_ the OzyVTT design overhaul delivered the **visual + component-consistency**
-    pass (tokens, primitives, restyled surfaces) but deliberately **kept the current layout/navigation
-    IA**. The scene-centric upload → browse → prepare → start **flow rethink is still open** — it's a
-    separate design effort, not covered by the visual overhaul.
+- **[ux] ~~Maps/scenes/encounter IA redesign~~ — RESOLVED 2026-07-22 (scene-centric IA, this PR).**
+  The upload → browse → prepare → start experience was rethought scene-first: a new **Scenes** hub tab
+  is the prep home (a gallery of scene cards — thumbnail, LIVE/staging badge, go-live, private staging,
+  duplicate, drag-reorder, rename, remove); the standalone **Map Setup tab was retired** (its library +
+  3×3 calibration fold into the hub via "Manage maps"); **going live also presents the scene's map to
+  the shared screen**; and the Encounter tab starts combat on the live scene's map. See
+  `docs/product/scene-centric-ia.md` and `session-summary.md` (2026-07-22). Remaining polish (not
+  blocking): persisted server thumbnails; the Encounter quick-switch strip could slim further; a
+  physical touch-device pass.
 
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a

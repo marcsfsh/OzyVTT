@@ -62,6 +62,16 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 
 ## Feature-architecture decisions (no ADR)
 
+- **2026-07-22 — Scene-centric IA: the scene is the primary object; going live drives the shared
+  screen.** The GM's prep is a **Scenes** hub (a gallery of prepared scenes), not a map-library tab plus
+  a separate encounter tab. `scene:activate` (go-live) also **presents the scene's map to the viewer**
+  (a live scene projects its map + prepared fog even pre-combat; combatant tokens stay gated on
+  `combat.active`, so no actor data leaks pre-combat). The standalone **Map Setup tab is retired** — its
+  library + 3×3 calibration fold into the hub. Reorder/duplicate are real GM commands through the shared
+  operations layer; a scene's **array order IS its order** (no `order` field). Reorder is drag
+  (pointer + touch) with a keyboard menu fallback. Design record: `docs/product/scene-centric-ia.md`.
+  Owner-approved (auto-present to TV; hub folding Map Setup in; duplicate + reorder; one PR).
+
 - **2026-07-19 — Other VTTs are design studies, never code sources.** AboveVTT (AGPL-3.0) and
   Foundry's dnd5e (MIT) were researched for the adoption pack: read their *behavior and docs*,
   design original implementations in this repo's idioms, never port code. AGPL makes this a
