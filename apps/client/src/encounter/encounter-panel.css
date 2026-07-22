@@ -244,7 +244,8 @@
 .roll-or { display: flex; align-items: center; gap: .55rem; margin: .05rem 0; color: var(--text-muted); font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .roll-or::before, .roll-or::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line-strong); }
 /* The number field and Use button share one shorter height (box-sizing so their padding doesn't grow them). */
-.action-preview .save-prompt-manual { flex: 0 0 auto; display: flex; gap: .4rem; }
+.action-preview .save-prompt-manual { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: .4rem; }
+.action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .action-preview .save-prompt-manual input { flex: 1 1 auto; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
 .action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }

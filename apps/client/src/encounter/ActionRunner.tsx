@@ -264,6 +264,9 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         // "type the d20" zone under an "or" divider so the two paths read distinctly (feedback #1).
         const manualEntry = state.combat.rollMode === "manual";
         const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } previewResolve({ commit: false, attackNatural: value }); };
+        // Once the preview reflects the typed d20, "Use roll" becomes Confirm/Re-roll (derived, so it
+        // resets on its own when the field clears or an auto Re-roll changes the shown die).
+        const manualUsed = attackDieEdit.trim() !== "" && Number(attackDieEdit.trim()) === result.attack!.naturalRoll;
         return <div className="action-preview">
           <div className="roll-zone">
             <span className="save-prompt-confirm">
@@ -278,7 +281,9 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
             <div className="roll-or"><span>or</span></div>
             <div className="roll-zone">
               <span className="roll-zone-caption">manual entry</span>
-              <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && attackDieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
+              <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} disabled={manualUsed} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualUsed && attackDieEdit.trim() !== "") submitDie(); }} />{manualUsed
+                ? <><button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={resolveBusy} title="Enter a different d20" onClick={() => setAttackDieEdit("")}>Re-roll</Button></>
+                : <button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
             </div>
           </>}
         </div>;
