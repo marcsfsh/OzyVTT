@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResolution, ActorDefinition, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
-import { Chip, Button, Select, Input } from "@vtt/ui";
+import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { RollControls, type DieMode } from "./RollControls";
@@ -697,10 +697,13 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="all">Everyone</option>
               </Select>
             </label>
-            <label className="environment-control">
-              <input type="checkbox" checked={state.combat.underwater} disabled={busy} onChange={(event) => { const underwater = event.target.checked; socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed.")); }} />
-              Underwater fight
-            </label>
+            <Switch
+              className="environment-control"
+              label="Underwater fight"
+              checked={state.combat.underwater}
+              disabled={busy}
+              onChange={(underwater) => socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed."))}
+            />
             <div className="menu-section" role="group" aria-label="Add combatants">
               <p className="menu-section-title">Add to the fight</p>
               {(() => {

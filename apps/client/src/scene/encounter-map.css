@@ -118,8 +118,7 @@
 .encounter-shape-editor-head span { color: var(--text-muted); font-size: .7rem; }
 .encounter-shape-editor label { display: flex; flex-direction: column; gap: .25rem; color: var(--text-dim); font-size: .75rem; }
 .encounter-shape-editor select { padding: .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
-.encounter-shape-editor-check { flex-direction: row !important; align-items: center; gap: .4rem; }
-.encounter-shape-editor-check input { width: auto; }
+.encounter-shape-editor-check { align-self: start; }
 .encounter-shape-editor .danger { padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); text-align: center; cursor: pointer; }
 .encounter-shape-editor .danger:hover { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 .encounter-shape-editor-note { margin: 0; color: var(--text-muted); font-size: .75rem; }

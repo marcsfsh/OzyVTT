@@ -99,7 +99,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       <Button type="submit" variant="primary">Create credential</Button>
     </form>
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
-    {credentials.length === 0 ? <p className="roster-empty">No integration credentials yet.</p> : <ul className="integration-list">
+    {credentials.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🔌</span><span className="nh-empty-title">No credentials yet</span><span className="nh-empty-text">Create an API credential above to let stream overlays and other tools read from this game.</span></div> : <ul className="integration-list">
       {credentials.map((credential) => <li key={credential.id} className="integration-row">
         <div className="integration-row-heading"><strong>{credential.name}</strong><span>{credential.revokedAt ? "Revoked" : credential.expiresAt && new Date(credential.expiresAt) <= new Date() ? "Expired" : "Active"}</span></div>
         <p className="integration-scopes">{credential.scopes.join(", ")}{credential.gameId && ` · game ${credential.gameId}`}</p>

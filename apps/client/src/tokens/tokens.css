@@ -22,7 +22,7 @@
 .token-thumb-image img { width: 100%; height: 100%; object-fit: cover; }
 .token-thumb-placeholder { font-size: 1.6rem; }
 .token-thumb-name { max-width: 100%; font-size: .78rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.token-thumb-badge { position: absolute; top: .3rem; right: .3rem; padding: .05rem .35rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-3) 65%, var(--magenta)); color: var(--text); font: 800 .55rem/1.4 var(--font-body); letter-spacing: .05em; }
+.token-thumb-badge { position: absolute; top: .3rem; right: .3rem; }
 
 .token-library-remove { background: transparent; border: 1px solid var(--danger); color: var(--danger-hi); }
 .token-library-remove:hover { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }

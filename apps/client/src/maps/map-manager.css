@@ -97,9 +97,6 @@
 .map-list-column { display: flex; flex-direction: column; gap: .8rem; min-width: 0; }
 .map-list-filters { display: flex; flex-direction: column; gap: .5rem; }
 .map-list-filters input { margin-top: 0; }
-.map-kind-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
-.map-kind-chips button { flex: 0 0 auto; padding: .4rem .75rem; text-align: center; font-size: .8rem; background: var(--surface-2); }
-.map-kind-chips button[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .map-list-empty { margin: 0; padding: 1rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--text-dim); font-size: .85rem; }
 .map-folder-group { display: grid; gap: .5rem; }
 .map-folder-group + .map-folder-group { margin-top: .6rem; }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { Button } from "@vtt/ui";
+import { Button, Switch } from "@vtt/ui";
 import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
@@ -705,7 +705,7 @@ export function EncounterMap({
               <label className="encounter-shape-editor-color">Color<input type="color" value={selected.color} disabled={busy} onChange={(event) => setColor(selected.id, event.target.value)} /></label>
               <label>Visible to<select value={selected.visibility} disabled={busy} onChange={(event) => { const value = event.target.value as AnnotationVisibility; setVisibility(selected.id, value, value === "gm-actor" ? (selected.visibleToActorId ?? characters[0]?.id ?? null) : null); }}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
               {selected.visibility === "gm-actor" && <label>Character<select value={selected.visibleToActorId ?? ""} disabled={busy} onChange={(event) => setVisibility(selected.id, "gm-actor", event.target.value || null)}><option value="">Choose…</option>{characters.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}</select></label>}
-              <label className="encounter-shape-editor-check"><input type="checkbox" checked={selected.movableByOthers} disabled={busy} onChange={(event) => setMovable(selected.id, event.target.checked)} /> Others can move this</label>
+              <Switch className="encounter-shape-editor-check" label="Others can move this" checked={selected.movableByOthers} disabled={busy} onChange={(checked) => setMovable(selected.id, checked)} />
               <Button variant="destructive" disabled={busy} onClick={() => { setSelectedId(null); void removeAnnotation(selected.id); }}>Delete shape</Button>
             </> : <p className="encounter-shape-editor-note">Visible to {VISIBILITY_SHORT[selected.visibility]}{selected.movableByOthers ? " · shared" : ""}</p>}
           </div>;

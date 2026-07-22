@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Select } from "@vtt/ui";
+import { Button, SegmentedControl, Select } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient } from "../scene/mapImage";
@@ -139,9 +139,13 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
 
     {map && <section className="viewer-tools" aria-labelledby="viewer-tools-title">
       <div><span className="viewer-tools-eyebrow">LIVE PRESENTATION TOOLS</span><h3 id="viewer-tools-title">Focus, ping, and measure</h3><p>{mapIsPresented ? "Click the map, then send the selected action to every paired display." : "Present the current map to enable these tools."}</p></div>
-      <div className="viewer-tool-tabs" role="group" aria-label="Presentation tool">
-        {(["focus", "ping", "measure"] as const).map((candidate) => <button key={candidate} aria-pressed={tool === candidate} onClick={() => setTool(candidate)}>{candidate === "focus" ? "Focus view" : candidate === "ping" ? "Ping point" : "Measure line"}</button>)}
-      </div>
+      <SegmentedControl
+        className="viewer-tool-tabs"
+        ariaLabel="Presentation tool"
+        value={tool}
+        onChange={(value) => setTool(value as typeof tool)}
+        options={[{ value: "focus", label: "Focus view" }, { value: "ping", label: "Ping point" }, { value: "measure", label: "Measure line" }]}
+      />
       {map.previewUrl && <div className="viewer-tool-preview"><div className="viewer-tool-image" onClick={choosePoint} aria-label="Viewer presentation map. Click to choose a point; coordinate fields below are the keyboard alternative.">
         <svg ref={svgRef} viewBox={`0 0 ${map.width} ${map.height}`} width={map.width} height={map.height} preserveAspectRatio="xMidYMid meet">
           <image href={map.previewUrl} width={map.width} height={map.height} role="img" aria-label="" />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Input, Select } from "@vtt/ui";
+import { Button, Input, SegmentedControl, Select } from "@vtt/ui";
 import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
 import "./map-manager.css";
 import { usePrompt } from "../components/feedback";
@@ -360,7 +360,13 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
         <div className="map-list-column">
           <div className="map-list-filters" role="group" aria-label="Filter maps">
             <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search maps" aria-label="Search maps" />
-            <div className="map-kind-chips">{(["all", "battlemap", "regional", "world"] as const).map((value) => <button key={value} type="button" aria-pressed={kindFilter === value} onClick={() => setKindFilter(value)}>{value === "all" ? "All" : value === "battlemap" ? "Battlemaps" : value === "regional" ? "Regional" : "World"}</button>)}</div>
+            <SegmentedControl
+              ariaLabel="Filter maps by type"
+              size="sm"
+              value={kindFilter}
+              onChange={(value) => setKindFilter(value as typeof kindFilter)}
+              options={[{ value: "all", label: "All" }, { value: "battlemap", label: "Battlemaps" }, { value: "regional", label: "Regional" }, { value: "world", label: "World" }]}
+            />
           </div>
           <nav className="map-list" aria-label="Uploaded maps">
             {groupedMaps.length === 0 && <p className="map-list-empty">No maps match this filter.</p>}

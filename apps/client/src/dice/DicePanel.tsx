@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
-import { Button, Input, Select } from "@vtt/ui";
+import { Button, Input, Select, Stepper } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -77,7 +77,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     <div className="dice-adv-row" role="group" aria-label="Advantage and modifier">
       <button type="button" className="secondary" aria-pressed={advantage} onClick={toggleAdvantage}>Advantage</button>
       <button type="button" className="secondary" aria-pressed={disadvantage} onClick={toggleDisadvantage}>Disadvantage</button>
-      <div className="dice-modifier"><span>Modifier</span><button type="button" aria-label="Decrease modifier" onClick={() => setModifier((value) => value - 1)}>−</button><strong>{modifierLabel(modifier)}</strong><button type="button" aria-label="Increase modifier" onClick={() => setModifier((value) => value + 1)}>+</button></div>
+      <Stepper label="Modifier" value={modifier} onChange={setModifier} format={modifierLabel} aria-label="Roll modifier" />
     </div>
     {(advantage || disadvantage) && <p className="dice-armed">{advantage ? "Advantage" : "Disadvantage"} is armed for the next d20 roll.</p>}
     <details className="dice-custom">

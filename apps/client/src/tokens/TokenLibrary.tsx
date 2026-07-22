@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Button, Input, Select } from "@vtt/ui";
+import { Modal, Badge, Button, Input, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { useTokenImageUrl } from "./tokenImages";
@@ -29,7 +29,7 @@ function TokenThumb({ asset, gmToken, remembered, selected, onPick }: Readonly<{
   return <button type="button" className={`token-thumb lift${selected ? " selected" : ""}`} onClick={onPick} aria-pressed={selected} title={asset.name}>
     <span className="token-thumb-image">{url ? <img src={url} alt="" /> : <span className="token-thumb-placeholder" aria-hidden="true">🎴</span>}</span>
     <span className="token-thumb-name">{asset.name}</span>
-    {remembered && <span className="token-thumb-badge">Recent</span>}
+    {remembered && <Badge className="token-thumb-badge" tone="primary" solid>Recent</Badge>}
   </button>;
 }
 
@@ -137,7 +137,9 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
         <section className="token-library-section">
           <h3>Library</h3>
           {visible.length === 0
-            ? <p className="token-library-empty">{assets.length === 0 ? "No token images yet. Upload one above." : "No tokens match this filter."}</p>
+            ? (assets.length === 0
+                ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎴</span><span className="nh-empty-title">No token images yet</span><span className="nh-empty-text">Upload an image above to give this creature a token.</span></div>
+                : <p className="token-library-empty">No tokens match this filter.</p>)
             : <div className="token-grid">{visible.map((asset) => <TokenThumb key={asset.id} asset={asset} gmToken={gmToken} remembered={asset.id === remembered} selected={currentAssetId === asset.id} onPick={() => assign(asset.id)} />)}</div>}
         </section>
 

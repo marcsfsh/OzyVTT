@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
-import { Chip, type ChipTone } from "@vtt/ui";
+import { Chip, Stepper, type ChipTone } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { CONDITION_GLYPHS } from "../scene/mapImage";
@@ -115,11 +115,7 @@ export function ConditionEditor({ actorId, conditions, onFeedback }: Readonly<{ 
         const instance = activeById.get(entry.id);
         return <span key={entry.id} className="condition-option">
           <Chip tone={conditionTone(entry.id)} icon={conditionIcon(entry.id)} pressed={instance !== undefined} disabled={busy} title={entry.description} onClick={() => send(entry.id, instance === undefined, undefined)}>{entry.name}</Chip>
-          {entry.id === "exhaustion" && instance && <span className="exhaustion-level" aria-label="Exhaustion level">
-            <button type="button" disabled={busy || (instance.level ?? 1) <= 1} onClick={() => send("exhaustion", true, (instance.level ?? 1) - 1)}>−</button>
-            <strong>{instance.level ?? 1}</strong>
-            <button type="button" disabled={busy || (instance.level ?? 1) >= 6} onClick={() => send("exhaustion", true, (instance.level ?? 1) + 1)}>+</button>
-          </span>}
+          {entry.id === "exhaustion" && instance && <Stepper value={instance.level ?? 1} min={1} max={6} disabled={busy} aria-label="Exhaustion level" onChange={(level) => send("exhaustion", true, level)} />}
         </span>;
       })}
     </div>}

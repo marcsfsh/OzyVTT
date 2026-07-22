@@ -93,6 +93,7 @@ export function StyleGuide() {
   const [filterOn, setFilterOn] = useState(false);
   const [switchOn, setSwitchOn] = useState(true);
   const [count, setCount] = useState(3);
+  const [mod, setMod] = useState(0);
   const [seg, setSeg] = useState("all");
 
   return (
@@ -315,11 +316,12 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge.">
+          <Section id="stepper" title="Stepper" blurb="Numeric −/+ spinner for small bounded quantities — ability scores, dice counts, HP nudges, limited uses. Clamps and disables the spent edge. Pass format to render signed modifiers or units.">
             <div className="sg-row">
               <Stepper value={count} onChange={setCount} min={1} max={6} label="Dice" />
               <Stepper value={16} onChange={() => {}} min={1} max={20} label="STR" />
               <Stepper value={0} onChange={() => {}} min={0} max={9} label="Spell level" />
+              <Stepper value={mod} onChange={setMod} label="Modifier" format={(v) => (v === 0 ? "±0" : v > 0 ? `+${v}` : `−${Math.abs(v)}`)} />
             </div>
           </Section>
 

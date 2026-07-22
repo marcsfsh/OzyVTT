@@ -46,11 +46,8 @@
 .api-copy:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 
 .api-reference-toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-.api-lang-tabs { display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); flex-wrap: wrap; }
-.api-lang-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 0 0.3rem; }
-.api-lang-tabs button { padding: 0.35rem 0.75rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-dim); text-align: center; font-size: 0.82rem; font-weight: 600; }
-.api-lang-tabs button:hover { color: var(--text); }
-.api-lang-tabs button[aria-pressed="true"] { background: var(--primary); color: var(--text-on-neon); }
+.api-lang-tabs { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.api-lang-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
 .api-export-spec { margin-left: auto; padding: 0.45rem 0.9rem; text-align: center; white-space: nowrap; }
 @media (max-width: 700px) { .api-export-spec { margin-left: 0; } }
 .api-response { padding: 0.35rem 0 0.35rem 0.6rem; border-left: 2px solid var(--line); }

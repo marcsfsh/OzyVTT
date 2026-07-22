@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@vtt/ui";
+import { Button, SegmentedControl } from "@vtt/ui";
 import "./api-reference.css";
 
 /**
@@ -357,9 +357,15 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
       {state.status === "error" && <p className="api-reference-error">{state.message} <Button variant="ghost" onClick={load}>Retry</Button></p>}
       {document && <>
         <div className="api-reference-toolbar">
-          <div className="api-lang-tabs" role="group" aria-label="Example request language">
+          <div className="api-lang-tabs">
             <span className="api-lang-label">Language</span>
-            {LANGUAGES.map((entry) => <button key={entry.id} type="button" aria-pressed={language === entry.id} onClick={() => setLanguage(entry.id)}>{entry.label}</button>)}
+            <SegmentedControl
+              ariaLabel="Example request language"
+              size="sm"
+              value={language}
+              onChange={(value) => setLanguage(value as typeof language)}
+              options={LANGUAGES.map((entry) => ({ value: entry.id, label: entry.label }))}
+            />
           </div>
           <Button variant="secondary" className="api-export-spec" onClick={() => exportSpec(document)} title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool.">⬇ Export OpenAPI spec</Button>
         </div>

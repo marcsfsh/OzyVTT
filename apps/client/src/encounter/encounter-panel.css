@@ -158,9 +158,6 @@
 .initiative-list.gm .condition-editor { margin-top: .3rem; }
 .condition-picker { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .condition-option { display: inline-flex; align-items: center; gap: .3rem; }
-.exhaustion-level { display: inline-flex; align-items: center; gap: .25rem; }
-.exhaustion-level button { width: 1.4rem; height: 1.4rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--violet-hi); font-weight: 800; cursor: pointer; }
-.exhaustion-level strong { min-width: 1rem; text-align: center; color: var(--violet-hi); font-size: .8rem; }
 .actor-card-conditions { margin: -.4rem 0 .8rem; }
 .actor-card-conditions .condition-chips { margin-left: 0; }
 .you-are-playing .condition-editor { margin-top: .4rem; }
@@ -379,8 +376,7 @@
 .own-dying { margin-top: .25rem; }
 .rules-mode-control { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 0; color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .rules-mode-control select { width: auto; flex: 1 1 auto; margin: 0; text-transform: none; letter-spacing: normal; font-size: .8rem; color: var(--text-dim); }
-.environment-control { display: flex; align-items: center; gap: .5rem; margin: .35rem 0 0; color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
-.environment-control input { width: auto; margin: 0; }
+.environment-control { align-self: start; margin: .35rem 0 0; }
 .action-hint { color: var(--text-dim); font-weight: 700; }
 .action-row-hinted { opacity: .82; }
 .action-instance-note { margin: .3rem 0; color: var(--text); font-size: .8rem; font-weight: 700; }

@@ -70,16 +70,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .actor-card-owned { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .actor-card-title { display: flex; align-items: center; gap: .75rem; }
 .actor-card h3 { margin: 0 0 .2rem; font: 400 1rem/1.2 var(--font-display); }
-.actor-monogram { display: grid; place-items: center; flex: 0 0 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--surface-3); color: var(--magenta-hi); font: 400 1.2rem var(--font-display); }
-.claim-status { color: var(--text-muted); font-size: .75rem; }
-.claim-status-owned { color: var(--cyan-hi); }
-.presence { display: inline-flex; align-items: center; gap: .35rem; margin-top: .2rem; font-size: .7rem; color: var(--text-muted); }
-.presence-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--line-strong); flex: 0 0 auto; }
-.presence-online .presence-dot { background: var(--success); }
+.actor-card-status { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .25rem; }
+.presence { display: inline-flex; align-items: center; font-size: .7rem; color: var(--text-muted); }
 .presence-online { color: var(--cyan-hi); }
-.presence-reconnecting .presence-dot { background: var(--caution); }
 .presence-reconnecting { color: var(--violet-hi); }
-.presence-offline .presence-dot { background: var(--line-strong); }
 .presence-offline { color: var(--text-muted); }
 .actor-card dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; margin: 1rem 0; }
 .actor-card dl div { padding: .55rem .35rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
@@ -88,7 +82,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .actor-action { width: 100%; margin-top: auto; padding: .7rem; background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; }
 .actor-action:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .actor-release { background: transparent; color: var(--text); border: 1px solid var(--line-strong); }
-.roster-feedback, .roster-empty { min-height: 1.4rem; margin: .8rem 0 0; font-size: .85rem; }
+.roster-feedback { min-height: 1.4rem; margin: .8rem 0 0; font-size: .85rem; }
 
 .renderer-proof { margin-top: 3rem; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-1); }
 .proof-heading { padding: 1.25rem 1.5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; align-items: end; }
@@ -109,10 +103,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .dice-adv-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; align-items: stretch; }
 .dice-adv-row .secondary { padding: .65rem 1rem; text-align: center; }
 .dice-adv-row .secondary[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
-.dice-modifier { display: flex; align-items: center; gap: .4rem; padding: .3rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
-.dice-modifier span { color: var(--text-muted); font-size: .72rem; }
-.dice-modifier button { padding: .4rem .7rem; }
-.dice-modifier strong { min-width: 2.6rem; text-align: center; color: var(--text); font-family: var(--font-mono); }
 .dice-custom { margin-top: 1rem; color: var(--text-muted); font-size: .85rem; }
 .dice-custom summary { cursor: pointer; }
 .dice-custom .dice-form { margin-top: .8rem; }
@@ -177,7 +167,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
   .roster-heading p, .proof-heading p { text-align: left; margin-top: .8rem; }
   .proof-canvas { height: 68vw; min-height: 310px; }
   .dice-form { grid-template-columns: 1fr; }
-  .dice-modifier { margin-left: 0; }
   .gm-session-controls { flex-direction: column; }
   .gm-session-controls button { width: 100%; }
 }
@@ -196,7 +185,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .you-are-playing .eyebrow { color: var(--cyan-hi); }
 .you-are-playing strong { display: block; margin-top: .15rem; font: 400 1.3rem var(--font-display); color: var(--text); }
 .you-are-playing button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
-.you-badge { display: inline-block; margin-left: .5rem; padding: .1rem .45rem; border-radius: var(--radius-sm); background: var(--cyan); color: var(--text-on-neon); font: 800 .6rem/1.5 var(--font-body); letter-spacing: .08em; vertical-align: middle; }
+.you-badge { margin-left: .5rem; vertical-align: middle; }
 
 .own-hp { display: block; margin-top: .3rem; color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
 .own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
@@ -206,10 +195,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 /* Hit Point Dice (SRD short-rest healing): pool readout + stepper + one roll button. */
 .hit-dice-spender { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
 .hit-dice-pool { color: var(--text-dim); font-size: .8rem; font-weight: 700; }
-.hit-dice-spender button { padding: .4rem .65rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
-.hit-dice-spender button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.hit-dice-spender strong { min-width: 1.4rem; text-align: center; color: var(--cyan-hi); font-family: var(--font-mono); }
-.hit-dice-roll { background: var(--surface-3); }
+.hit-dice-roll { padding: .4rem .65rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
+.hit-dice-roll:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .hit-dice-empty { margin: .6rem 0 0; color: var(--text-muted); font-size: .78rem; }
 .actor-rest { display: flex; gap: .5rem; margin: .6rem 0; }
 .actor-rest button { flex: 1; padding: .5rem .6rem; font-size: .78rem; font-weight: 700; text-align: center; }

@@ -202,7 +202,7 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     <p>Every finished encounter is recorded automatically. Open one to step through it turn by turn and study how the fight unfolded - positions, hit points, and everything that was narrated, including GM-only lines.</p>
     {error && <p className="replay-error">{error}</p>}
     {archives === null && <p>Loading recordings…</p>}
-    {archives !== null && archives.length === 0 && !error && <p className="replay-log-empty">No recordings yet - end an encounter and it will appear here.</p>}
+    {archives !== null && archives.length === 0 && !error && <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎬</span><span className="nh-empty-title">No recordings yet</span><span className="nh-empty-text">Finish an encounter and its replay appears here to step through turn by turn.</span></div>}
     {archives !== null && archives.length > 0 && <table className="replay-list">
       <thead><tr><th>Fought</th><th>Ended</th><th>Turns</th><th aria-label="Actions" /></tr></thead>
       <tbody>{archives.map((archive) => <tr key={archive.id}>
