@@ -385,15 +385,15 @@ describe("report test 12 - GM override", () => {
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []))
       .toThrow(RulesBlockedError);
     resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1], override: { reason: "haste variant" } }, [15, 6]);
-    expect(game.combat.turn.economyOverridden).toBe(true);
+    expect(game.combat.turn.rulesOverridden).toBe(true);
     // The reported fix: a THIRD bonus action the same turn no longer needs a fresh override
     // (nat-1 keeps it a harmless miss). The override is once per turn, not once per action.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6]))
       .not.toThrow();
-    expect(game.combat.turn.economyOverridden).toBe(true);
+    expect(game.combat.turn.rulesOverridden).toBe(true);
     // The standing override evaporates on turn advance (cleared with the rest of `turn`).
     nextInitiativeTurn(game);
-    expect(game.combat.turn.economyOverridden).toBeFalsy();
+    expect(game.combat.turn.rulesOverridden).toBeFalsy();
   });
 });
 
