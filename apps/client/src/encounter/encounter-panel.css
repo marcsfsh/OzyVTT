@@ -177,7 +177,11 @@
 .turn-end { margin-left: auto; padding: .24rem .8rem; border-radius: var(--radius-pill); font-size: .78rem; font-weight: 700; }
 .economy-feedback { width: 100%; color: var(--text-dim); font-size: .78rem; }
 /* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
-.action-runner { margin-top: .6rem; }
+.action-runner { margin-top: .6rem; display: flex; flex-direction: column; }
+/* Every resolution card (attack preview, damage, save DC, apply-damage) sits directly under the
+   creature's name like the attack roll does, instead of dropping below the action list once the
+   targeting session clears on commit. */
+.action-runner > .action-result { order: -1; }
 .action-runner-status { color: var(--text-muted); font-size: .8rem; margin: .4rem 0; }
 /* Read-only player attack reference (#5.2): the GM's action rows without the interactivity. */
 .player-actions { margin-top: .45rem; }

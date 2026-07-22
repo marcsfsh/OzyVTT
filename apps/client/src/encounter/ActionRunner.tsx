@@ -305,7 +305,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then confirm to apply.</p>
           : <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>;
       })()}
-      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next attack above.</p>}
+      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next attack from the list below.</p>}
     </div>}
     {dialog}
   </div>;
