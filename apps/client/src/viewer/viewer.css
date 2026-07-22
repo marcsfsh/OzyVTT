@@ -2,85 +2,93 @@
    imported ONLY by viewer-main.tsx. This file holds the `.viewer-*` component styles, which are also
    loaded by the main app (via the GM's in-tab Viewer preview reusing MapStage/Initiative); a global
    `overflow: hidden` reset here would kill the main SPA's page scroll. */
-.viewer-eyebrow { color: #efb24f; font-size: clamp(.72rem, 1.2vw, 1rem); font-weight: 800; letter-spacing: .14em; }
-.viewer-pairing, .viewer-waiting { width: 100%; height: 100%; display: grid; place-items: center; padding: 2rem; text-align: center; background: radial-gradient(circle at center, #2a2114, #090806 65%); }
-.viewer-pairing form { width: min(100%, 34rem); padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid #655438; border-radius: 1rem; background: #17130d; text-align: left; }
-.viewer-pairing h1, .viewer-waiting h1 { margin: .5rem 0; font: 700 clamp(2.5rem, 7vw, 5.5rem)/1 Georgia, serif; }
-.viewer-pairing p, .viewer-waiting p { color: #c9c0b2; line-height: 1.5; }
-.viewer-pairing label { display: block; margin-top: 1.25rem; color: #d8d0c3; font-weight: 700; }
-.viewer-pairing input { width: 100%; margin-top: .4rem; padding: .9rem 1rem; border: 1px solid #776448; border-radius: .6rem; background: #080706; color: inherit; font-size: 1.1rem; }
-.viewer-pairing button { width: 100%; margin-top: 1.5rem; padding: 1rem; border: 0; border-radius: .6rem; background: #a76724; color: #fff; font-weight: 800; cursor: pointer; }
-.viewer-pairing button:focus-visible, .viewer-pairing input:focus-visible, .viewer-fullscreen:focus-visible { outline: 4px solid #f6c452; outline-offset: 3px; }
-.viewer-feedback { min-height: 1.5rem; color: #ffb3a8 !important; }
-.viewer-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--viewer-initiative-width, clamp(16rem, 22vw, 30rem)); background: #050504; }
+.viewer-eyebrow { color: var(--text-dim); font-size: clamp(.72rem, 1.2vw, 1rem); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+/* Pairing/waiting are the viewer's hero zones: a magenta bloom on the void (§6.2 horizon glow). */
+.viewer-pairing, .viewer-waiting { width: 100%; height: 100%; display: grid; place-items: center; padding: 2rem; text-align: center; background: radial-gradient(circle at center, color-mix(in srgb, var(--magenta) 22%, var(--void)), var(--void) 65%); }
+.viewer-pairing form { width: min(100%, 34rem); padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-1); text-align: left; }
+.viewer-pairing h1, .viewer-waiting h1 { margin: .5rem 0; font: 400 clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display); }
+.viewer-pairing p, .viewer-waiting p { color: var(--text-dim); line-height: 1.5; }
+.viewer-pairing label { display: block; margin-top: 1.25rem; color: var(--text-dim); font-weight: 700; }
+.viewer-pairing input { width: 100%; margin-top: .4rem; padding: .9rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: 1.1rem; }
+.viewer-pairing button { width: 100%; margin-top: 1.5rem; padding: 1rem; border: 0; border-radius: var(--radius-md); background: var(--primary); color: var(--text-on-neon); font-weight: 800; cursor: pointer; }
+.viewer-pairing button:hover { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
+.viewer-pairing button:focus-visible, .viewer-pairing input:focus-visible, .viewer-fullscreen:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
+.viewer-feedback { min-height: 1.5rem; color: var(--danger-hi) !important; }
+.viewer-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--viewer-initiative-width, clamp(16rem, 22vw, 30rem)); background: var(--void); }
 .viewer-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; cursor: grab; touch-action: none; }
 .viewer-stage:active { cursor: grabbing; }
-.viewer-stage svg { width: 100%; height: 100%; background: #0d0b08; }
+.viewer-stage svg { width: 100%; height: 100%; background: var(--void); }
 .viewer-zoom { position: absolute; right: .8rem; bottom: .8rem; display: flex; gap: .4rem; }
-.viewer-zoom button { padding: .5rem .8rem; border: 1px solid #756344; border-radius: .5rem; background: rgb(10 8 5 / 75%); color: #eee4d2; font-weight: 700; cursor: pointer; opacity: .55; }
-.viewer-zoom button:hover, .viewer-zoom button:focus-visible { opacity: 1; border-color: #e8a743; }
+.viewer-zoom button { padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); font-weight: 700; cursor: pointer; opacity: .55; transition: opacity var(--dur-hover), border-color var(--dur-hover); }
+.viewer-zoom button:hover, .viewer-zoom button:focus-visible { opacity: 1; border-color: var(--cyan); }
+/* Tokens on the shared screen: team coding (§6.6). Glyph fills stay fixed light for legibility. */
 .viewer-token { pointer-events: none; }
-.viewer-token-body { fill: #315a8a; stroke: #e8f2ff; stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
-.viewer-token.monster .viewer-token-body { fill: #7e302a; stroke: #ffd7cf; }
-.viewer-token.npc .viewer-token-body { fill: #52623d; stroke: #e5f2c8; }
-.viewer-token-turn { fill: rgb(255 190 58 / 25%); stroke: #ffc33d; stroke-width: 5; vector-effect: non-scaling-stroke; }
-.viewer-token-initials, .viewer-token-name { fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: Inter, sans-serif; font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
+.viewer-token-body { fill: color-mix(in srgb, var(--cyan) 40%, var(--void)); stroke: var(--cyan-hi); stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
+.viewer-token.monster .viewer-token-body { fill: color-mix(in srgb, var(--magenta) 40%, var(--void)); stroke: var(--magenta-hi); }
+.viewer-token.npc .viewer-token-body { fill: color-mix(in srgb, var(--indigo) 45%, var(--void)); stroke: var(--violet-hi); }
+.viewer-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); }
+.viewer-token-initials, .viewer-token-name { fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: var(--font-body); font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
 .viewer-token-initials { font-size: 18px; }
 .viewer-token-name { font-size: 13px; dominant-baseline: hanging; }
-.viewer-measurement { fill: none; stroke: #ffd463; stroke-width: 4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 2px #000); }
-.viewer-ping circle { fill: none; stroke: #ffb52e; stroke-width: 4; vector-effect: non-scaling-stroke; animation: viewer-pulse 1s ease-out 5; }
-.viewer-ping circle + circle { fill: #ffb52e; animation: none; }
-.viewer-distance, .viewer-ping-label { position: absolute; padding: .45rem .75rem; border-radius: .45rem; background: rgb(8 7 5 / 88%); color: #fff2c4; font-size: clamp(1rem, 2vw, 1.6rem); font-weight: 800; box-shadow: 0 2px 12px #000; }
+.viewer-measurement { fill: none; stroke: var(--cyan); stroke-width: 4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 2px #000); }
+.viewer-ping circle { fill: none; stroke: var(--magenta); stroke-width: 4; vector-effect: non-scaling-stroke; animation: viewer-pulse 1s ease-out 5; }
+.viewer-ping circle + circle { fill: var(--magenta); animation: none; }
+.viewer-distance, .viewer-ping-label { position: absolute; padding: .45rem .75rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 88%, transparent); color: var(--cyan-hi); font-size: clamp(1rem, 2vw, 1.6rem); font-weight: 800; box-shadow: var(--shadow-2); }
 .viewer-distance { left: 50%; bottom: 2rem; transform: translateX(-50%); }
-.viewer-ping-label { top: 2rem; left: 50%; transform: translateX(-50%); }
+.viewer-ping-label { top: 2rem; left: 50%; transform: translateX(-50%); color: var(--magenta-hi); }
 /* Drag-resizable column: the panel holds a pinned resize handle at its left edge; the content scrolls
    inside a wrapper so the handle never scrolls away. */
-.viewer-initiative { position: relative; overflow: hidden; border-left: 1px solid #5d4b31; background: #17130d; }
+.viewer-initiative { position: relative; overflow: hidden; border-left: 1px solid var(--line); background: var(--surface-1); }
 .viewer-initiative-scroll { height: 100%; overflow: auto; padding: 0 clamp(.6rem, 1.4vw, 1.4rem) clamp(.6rem, 1.4vw, 1.4rem); }
 .viewer-initiative-resize { position: absolute; z-index: 3; left: 0; top: 0; bottom: 0; width: 14px; cursor: col-resize; touch-action: none; }
-.viewer-initiative-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: #5d4b31; transition: background .15s, width .15s; }
-.viewer-initiative-resize:hover::before, .viewer-initiative-resize:active::before { background: #e8a743; width: 4px; }
+.viewer-initiative-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); transition: background .15s, width .15s; }
+.viewer-initiative-resize:hover::before, .viewer-initiative-resize:active::before { background: var(--cyan); width: 4px; }
 /* The shared screen mirrors the PLAYER panel (feedback #5): a compact Round-pill header, no big serif,
    scaled up for the room. It reads as a player with no active turn - no HP bars, no controls. */
-.viewer-initiative-head { position: sticky; top: 0; z-index: 1; padding: clamp(.9rem, 2vw, 2rem) 0 clamp(.6rem, 1.2vw, 1.1rem); background: #17130d; }
-.viewer-initiative-round { display: inline-flex; align-items: center; padding: .35em .85em; border-radius: 999px; background: #6e431c; color: #ffd58d; font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 sans-serif; white-space: nowrap; }
-.viewer-hidden-turn { margin: 0 0 clamp(.5rem, 1vw, 1rem); padding: .6rem .9rem; border-radius: .5rem; background: #2c2114; color: #efc474; font-weight: 800; }
+.viewer-initiative-head { position: sticky; top: 0; z-index: 1; padding: clamp(.9rem, 2vw, 2rem) 0 clamp(.6rem, 1.2vw, 1.1rem); background: var(--surface-1); }
+.viewer-initiative-round { display: inline-flex; align-items: center; padding: .35em .85em; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); color: var(--text); font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-mono); white-space: nowrap; }
+.viewer-hidden-turn { margin: 0 0 clamp(.5rem, 1vw, 1rem); padding: .6rem .9rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--violet-hi); font-weight: 800; }
 .viewer-initiative ol { list-style: none; margin: 0; padding: 0; }
-.viewer-initiative li { display: flex; align-items: stretch; justify-content: space-between; gap: 1rem; padding: clamp(.5rem, 1.2vw, 1.1rem) clamp(.5rem, 1.2vw, 1.1rem); border-top: 1px solid #393020; font-size: clamp(1rem, 1.65vw, 1.65rem); }
-/* Same soft, rounded active highlight as the player list - a rounded-off left accent, not a hard bar. */
-.viewer-initiative li.active { border-top-color: transparent; border-radius: .6rem; background: #6e431c; box-shadow: inset .3rem 0 0 #ffc34d; padding-left: clamp(.7rem, 1.5vw, 1.4rem); }
-.viewer-initiative li strong { color: #f6c452; }
+.viewer-initiative li { display: flex; align-items: stretch; justify-content: space-between; gap: 1rem; padding: clamp(.5rem, 1.2vw, 1.1rem) clamp(.5rem, 1.2vw, 1.1rem); border-top: 1px solid var(--line); font-size: clamp(1rem, 1.65vw, 1.65rem); }
+/* Same soft, rounded active highlight as the player list - a magenta rounded-off left accent + glow. */
+.viewer-initiative li.active { border-top-color: transparent; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .3rem 0 0 var(--magenta), var(--glow-magenta-strong); padding-left: clamp(.7rem, 1.5vw, 1.4rem); }
+.viewer-initiative li strong { color: var(--text); font-family: var(--font-mono); }
 /* The shared row scales up for the room display; its em-relative styles handle the rest (sized so a
    typical monster name, dots, and the health tag share one line in the sidebar). */
 .viewer-initiative .init-row { font-size: clamp(.9rem, 1.05vw, 1.2rem); }
 /* Give the name the row's full first line before it ellipsizes; dots/health wrap beneath it. Widen
    the panel (drag handle) when a room needs more. */
 .viewer-initiative .init-row-name { min-width: 0; }
-.viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid #756344; border-radius: .45rem; background: rgb(10 8 5 / 75%); color: #eee4d2; cursor: pointer; opacity: .25; }
+.viewer-fullscreen { position: fixed; z-index: 5; left: 1rem; top: 1rem; padding: .55rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text); cursor: pointer; opacity: .25; transition: opacity var(--dur-hover); }
 .viewer-fullscreen:hover, .viewer-fullscreen:focus-visible { opacity: 1; }
-.viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: 999px; background: #173a20; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.viewer-connection.reconnecting { background: #644715; }
+.viewer-connection { position: fixed; z-index: 5; right: calc(clamp(16rem, 22vw, 30rem) + 1rem); top: 1rem; padding: .35rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-2) 66%, var(--cyan)); color: var(--text); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.viewer-connection.reconnecting { background: color-mix(in srgb, var(--surface-2) 66%, var(--caution)); }
 @keyframes viewer-pulse { from { opacity: 1; transform: scale(.45); } to { opacity: 0; transform: scale(1.25); } }
-@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; overflow: auto; border-left: 0; border-top: 1px solid #5d4b31; } .viewer-initiative-scroll { height: auto; overflow: visible; } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid #393020; } .viewer-connection { right: 1rem; } }
+@media (max-aspect-ratio: 4/3) { .viewer-shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .viewer-initiative { max-height: 32vh; overflow: auto; border-left: 0; border-top: 1px solid var(--line); } .viewer-initiative-scroll { height: auto; overflow: visible; } .viewer-initiative-resize { display: none; } .viewer-initiative ol { display: flex; overflow-x: auto; } .viewer-initiative li { min-width: 12rem; border-top: 0; border-left: 1px solid var(--line); } .viewer-connection { right: 1rem; } }
 @media (prefers-reduced-motion: reduce) { .viewer-ping circle { animation: none; } }
 /* Health band + conditions on the shared screen (bands only, never exact numbers). */
-.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem .5rem; border-radius: 999px; font: 800 .55em/1.6 sans-serif; letter-spacing: .05em; vertical-align: middle; }
-.viewer-health-bloodied { background: #4a2c10; color: #e8a743; }
-.viewer-health-down { background: #43201d; color: #e0897f; }
-.viewer-conditions { display: block; margin-top: .15rem; color: #c9b8e8; font-size: .6em; }
-.token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.token-health-bloodied { fill: #e8a743; }
-.token-health-down { fill: #d9605a; }
+.viewer-health { display: inline-block; margin-left: .6rem; padding: .1rem .5rem; border-radius: var(--radius-pill); font: 800 .55em/1.6 var(--font-body); letter-spacing: .05em; vertical-align: middle; }
+.viewer-health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
+.viewer-health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
+.viewer-conditions { display: block; margin-top: .15rem; color: var(--violet-hi); font-size: .6em; }
+.token-health { stroke: var(--void); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.token-health-bloodied { fill: var(--magenta); }
+.token-health-down { fill: var(--danger); }
 /* Richer token-health indicators mirrored on the shared screen (audience "all"); fill color inlined. */
-.token-health-bar-track { fill: #0c0a07; fill-opacity: .8; }
+.token-health-bar-track { fill: var(--void); fill-opacity: .8; }
 .token-health-bar-fill { stroke: none; }
-.token-health-ring-track { fill: none; stroke: #0c0a07; stroke-opacity: .5; }
+.token-health-ring-track { fill: none; stroke: var(--void); stroke-opacity: .5; }
 .token-health-ring-fill { fill: none; }
 .token-health-aura { pointer-events: none; }
-/* Fog of war on the shared screen: solid cover — the audience sees only what the GM revealed. */
-.fog-overlay-player { fill: #0b0a08; }
+/* Theme-aware health fill mirrored on the shared screen: bar fill, ring stroke, and aura stop-color
+   resolve the same themed brand token, so map health follows dark/dusk/light. */
+.hp-fill-healthy { fill: var(--cyan); stroke: var(--cyan); stop-color: var(--cyan); }
+.hp-fill-bloodied { fill: var(--magenta); stroke: var(--magenta); stop-color: var(--magenta); }
+.hp-fill-down { fill: var(--danger); stroke: var(--danger); stop-color: var(--danger); }
+/* Fog of war on the shared screen: solid --void cover — the audience sees only what the GM revealed. */
+.fog-overlay-player { fill: var(--void); }
 
-.token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
-.token-condition-glyph { fill: #e4d7fa; }
-.token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }
+.token-condition circle { fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet)); stroke: var(--violet); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token-condition text { fill: var(--violet-hi); font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.token-condition-glyph { fill: var(--violet-hi); }
+.token-condition-more circle { fill: var(--surface-2); stroke: var(--line-strong); }

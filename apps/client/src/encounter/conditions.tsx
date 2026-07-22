@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
+import { Chip, Stepper, type ChipTone } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { CONDITION_GLYPHS } from "../scene/mapImage";
 
 type ConditionInstance = Actor["conditions"][number];
+
+/** The shared 16×16 SRD condition glyph as a chip-sized icon (inherits the chip's tone color). */
+const conditionIcon = (id: string) => {
+  const d = CONDITION_GLYPHS[id];
+  return d ? <svg viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true"><path d={d} fill="currentColor" fillRule="evenodd" /></svg> : undefined;
+};
+/** SRD conditions are debuffs (harmful); invisibility is a spell-flavored effect (magical). */
+const conditionTone = (id: string): ChipTone => (id === "invisible" ? "magical" : "harmful");
 
 /**
  * One shared fetch of the 15 SRD condition names/texts. Failures are never cached - a
@@ -71,7 +81,7 @@ export function ConditionChips({ conditions }: Readonly<{ conditions: readonly C
   const reference = useConditionReference();
   if (conditions.length === 0) return null;
   return <span className="condition-chips">{conditions.map((instance) => (
-    <span key={instance.id} className="condition-chip" title={descriptionFor(instance.id, reference)}>{labelFor(instance, reference)}</span>
+    <Chip key={instance.id} tone={conditionTone(instance.id)} icon={conditionIcon(instance.id)} title={descriptionFor(instance.id, reference)}>{labelFor(instance, reference)}</Chip>
   ))}</span>;
 }
 
@@ -96,20 +106,16 @@ export function ConditionEditor({ actorId, conditions, onFeedback }: Readonly<{ 
   return <div className="condition-editor">
     <span className="condition-chips">
       {conditions.map((instance) => (
-        <button key={instance.id} type="button" className="condition-chip condition-chip-active" disabled={busy} title={`${descriptionFor(instance.id, reference)}\n\nClick to remove.`} onClick={() => send(instance.id, false)}>{labelFor(instance, reference)}</button>
+        <Chip key={instance.id} tone={conditionTone(instance.id)} icon={conditionIcon(instance.id)} pressed disabled={busy} title={`${descriptionFor(instance.id, reference)}\n\nClick to remove.`} onClick={() => send(instance.id, false)}>{labelFor(instance, reference)}</Chip>
       ))}
-      <button type="button" className="condition-chip condition-add" disabled={busy} aria-expanded={open} aria-label="Edit conditions" title="Add or remove conditions" onClick={() => { requestConditionReference(); setOpen((current) => !current); }}>{open ? "−" : "+"}</button>
+      <Chip className="condition-add" pressed={open} disabled={busy} aria-expanded={open} aria-label="Edit conditions" title="Add or remove conditions" onClick={() => { requestConditionReference(); setOpen((current) => !current); }}>{open ? "Done" : "+ Add"}</Chip>
     </span>
     {open && <div className="condition-picker" role="group" aria-label="Conditions">
       {reference.map((entry) => {
         const instance = activeById.get(entry.id);
         return <span key={entry.id} className="condition-option">
-          <button type="button" className="condition-chip" aria-pressed={instance !== undefined} disabled={busy} title={entry.description} onClick={() => send(entry.id, instance === undefined, undefined)}>{entry.name}</button>
-          {entry.id === "exhaustion" && instance && <span className="exhaustion-level" aria-label="Exhaustion level">
-            <button type="button" disabled={busy || (instance.level ?? 1) <= 1} onClick={() => send("exhaustion", true, (instance.level ?? 1) - 1)}>−</button>
-            <strong>{instance.level ?? 1}</strong>
-            <button type="button" disabled={busy || (instance.level ?? 1) >= 6} onClick={() => send("exhaustion", true, (instance.level ?? 1) + 1)}>+</button>
-          </span>}
+          <Chip tone={conditionTone(entry.id)} icon={conditionIcon(entry.id)} pressed={instance !== undefined} disabled={busy} title={entry.description} onClick={() => send(entry.id, instance === undefined, undefined)}>{entry.name}</Chip>
+          {entry.id === "exhaustion" && instance && <Stepper value={instance.level ?? 1} min={1} max={6} disabled={busy} aria-label="Exhaustion level" onChange={(level) => send("exhaustion", true, level)} />}
         </span>;
       })}
     </div>}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
+import { Modal, Input } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -44,27 +45,21 @@ export function MonsterBrowser({ onClose }: Readonly<{ onClose: () => void }>) {
     });
   };
 
-  return <div className="confirm-overlay" role="presentation" onClick={onClose}>
-    <div className="monster-browser" role="dialog" aria-modal="true" aria-labelledby="monster-browser-title" onClick={(event) => event.stopPropagation()}>
-      <div className="monster-browser-head">
-        <div><span className="eyebrow">SRD 5.2.1 BESTIARY</span><h2 id="monster-browser-title">Add monsters</h2></div>
-        <button type="button" className="secondary monster-browser-close" onClick={onClose} aria-label="Close the monster browser">✕</button>
-      </div>
-      <div className="monster-browser-controls">
-        <input type="search" placeholder="Search by name or type…" aria-label="Search monsters" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
-        <label className="monster-browser-hidden"><input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} />Add as GM-only (hidden from players)</label>
-      </div>
-      {error && <p className="monster-browser-status" role="alert">{error}</p>}
-      {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
-      {monsters && <ol className="monster-browser-list">
-        {shown.map((monster) => <li key={monster.id}>
-          <div className="monster-browser-name"><strong>{monster.name}</strong><small>CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}</small></div>
-          <button type="button" className="monster-browser-add" disabled={busyId !== null} onClick={() => add(monster)}>{busyId === monster.id ? "Adding…" : "Add"}</button>
-        </li>)}
-        {shown.length === 0 && <li className="monster-browser-none">No monsters match "{search}".</li>}
-      </ol>}
-      <p className="monster-browser-feedback" role="status">{feedback}</p>
-      {attribution && <p className="monster-browser-attribution">{attribution}</p>}
+  return <Modal open onClose={onClose} size="lg" className="monster-browser" title="Add monsters" ariaLabel="Add monsters from the SRD bestiary">
+    <div className="monster-browser-controls">
+      <Input type="search" placeholder="Search by name or type…" aria-label="Search monsters" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
+      <label className="monster-browser-hidden"><input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} />Add as GM-only (hidden from players)</label>
     </div>
-  </div>;
+    {error && <p className="monster-browser-status" role="alert">{error}</p>}
+    {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
+    {monsters && <ol className="monster-browser-list">
+      {shown.map((monster) => <li key={monster.id}>
+        <div className="monster-browser-name"><strong>{monster.name}</strong><small>CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}</small></div>
+        <button type="button" className="monster-browser-add" disabled={busyId !== null} onClick={() => add(monster)}>{busyId === monster.id ? "Adding…" : "Add"}</button>
+      </li>)}
+      {shown.length === 0 && <li className="monster-browser-none">No monsters match "{search}".</li>}
+    </ol>}
+    <p className="monster-browser-feedback" role="status">{feedback}</p>
+    {attribution && <p className="monster-browser-attribution">{attribution}</p>}
+  </Modal>;
 }

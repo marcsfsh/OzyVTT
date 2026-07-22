@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button, Input } from "@vtt/ui";
 
 export type DieMode = "advantage" | "disadvantage" | "normal";
 
@@ -74,12 +75,12 @@ export function RollControls({
       </>}
       <button type="button" className="encounter-primary" disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
       {extraActions}
-      <button type="button" className="secondary" disabled={busy} onClick={onReroll}>{rerollLabel}</button>
+      <Button type="button" variant="secondary" disabled={busy} onClick={onReroll}>{rerollLabel}</Button>
     </span>;
   }
   return <span className="save-prompt-actions">
     <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => onRoll()}>Roll</button>
-    <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="-?[0-9]*" placeholder={manualPlaceholder} aria-label={manualLabel} value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && manualTotal.trim() !== "") submitManual(); }} /><button type="button" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</button></span>
+    <span className="save-prompt-manual"><Input type="text" inputMode="numeric" pattern="-?[0-9]*" placeholder={manualPlaceholder} aria-label={manualLabel} value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && manualTotal.trim() !== "") submitManual(); }} /><Button type="button" variant="secondary" disabled={busy || manualTotal.trim() === ""} onClick={submitManual}>Apply</Button></span>
     {onDismiss && <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without resolving" onClick={onDismiss}>✕</button>}
   </span>;
 }

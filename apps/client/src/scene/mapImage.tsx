@@ -145,7 +145,7 @@ export function TokenGlyph({ sizePx, name, active, imageUrl, turnClassName, body
  * at a glance instead of "P, P". Unknown ids fall back to the initial letter. Shared by the table
  * client and the viewer; drawn as single filled paths (fill-rule evenodd carves the cutouts).
  */
-const CONDITION_GLYPHS: Record<string, string> = {
+export const CONDITION_GLYPHS: Record<string, string> = {
   blinded: "M8 4.6C4.9 4.6 2.6 8 2.6 8s2.3 3.4 5.4 3.4S13.4 8 13.4 8 11.1 4.6 8 4.6zm0 1.9A1.5 1.5 0 1 1 8 9.5 1.5 1.5 0 0 1 8 6.5zM3.9 2.8l9.3 9.3-1.1 1.1L2.8 3.9z",
   charmed: "M8 13.4 3.4 8.8a3 3 0 0 1 4.2-4.2l.4.4.4-.4a3 3 0 0 1 4.2 4.2z",
   deafened: "M3 6.2v3.6h2.4L9 12.8V3.2L5.4 6.2H3zM12.1 3l1.1 1.1-8.2 8.2-1.1-1.1z",
@@ -177,15 +177,27 @@ export function hpFillFraction(hp: { current: number; maximum: number; temporary
   return exact.maximum > 0 ? Math.max(0, Math.min(1, exact.current / exact.maximum)) : 0;
 }
 
+/** Health fraction -> a themed palette fill: cyan healthy (>50%), magenta bloodied (25-50%), danger
+ * critical (<25%), matching the HP-bar bands in §6.7 and the initiative row's hp-* text classes.
+ * Fixed hexes (not CSS custom properties) because SVG presentation attributes don't resolve var(). */
+/** Band class for token health fill/stroke/stop-color. A CSS class (not a baked hex) so the
+    color resolves the themed --cyan/--magenta/--danger token and follows dark/dusk/light. */
+export function healthFillClass(fraction: number): string {
+  const clamped = Math.max(0, Math.min(1, fraction));
+  if (clamped > 0.5) return "hp-fill-healthy"; // --cyan
+  if (clamped > 0.25) return "hp-fill-bloodied"; // --magenta
+  return "hp-fill-down"; // --danger
+}
+
 /**
- * A soft green->red glow colored by the health fraction, hugging the token's edge and fading outward.
+ * A soft cyan->magenta->danger glow colored by the health fraction, hugging the token's edge and fading outward.
  * Rendered UNDER the token (before TokenGlyph) so the body AND the active-turn ring paint over it -
  * a glow around the token, not a wash across it, with no gap at the token edge. Image-pixel/SVG space.
  */
 export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number; fraction: number }>) {
   const gradientId = useId();
   const clamped = Math.max(0, Math.min(1, fraction));
-  const color = `hsl(${Math.round(120 * clamped)} 70% 45%)`;
+  const bandClass = healthFillClass(clamped);
   // Thin band hugging the body edge (0.5) out to 0.86 - ~35% thinner than before, and the peak sits
   // right at the edge so it reads as attached. The inner half is hidden behind the opaque body.
   const outer = sizePx * 0.86;
@@ -194,9 +206,9 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
     <title>{`${Math.round(clamped * 100)}% health`}</title>
     <defs>
       <radialGradient id={gradientId}>
-        <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-        <stop offset={`${edge}%`} stopColor={color} stopOpacity="0.5" />
-        <stop offset="100%" stopColor={color} stopOpacity="0" />
+        <stop className={bandClass} offset="0%" stopOpacity="0.5" />
+        <stop className={bandClass} offset={`${edge}%`} stopOpacity="0.5" />
+        <stop className={bandClass} offset="100%" stopOpacity="0" />
       </radialGradient>
     </defs>
     <circle r={outer} fill={`url(#${gradientId})`} />
@@ -205,14 +217,14 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
 
 /**
  * A richer token-health indicator shown in place of the coarse band dot when the GM opts into it:
- * a thin HP bar pinned under the token, or a green->red ring around its body (the aura style renders
+ * a thin HP bar pinned under the token, or a cyan->magenta->danger ring around its body (the aura style renders
  * separately, behind the token - see TokenHealthAura). The fill fraction is always audience-safe (the
  * server only sends this style when it may show, and exact HP never reaches non-owners - the fraction
  * is band-derived for them). Image-pixel/SVG space like the body.
  */
 function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; style: "bar" | "ring"; fraction: number }>) {
   const clamped = Math.max(0, Math.min(1, fraction));
-  const color = `hsl(${Math.round(120 * clamped)} 70% 45%)`;
+  const bandClass = healthFillClass(clamped);
   const title = `${Math.round(clamped * 100)}% health`;
   if (style === "ring") {
     const r = sizePx * 0.5 + Math.max(2, sizePx * 0.06);
@@ -222,7 +234,7 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
     return <g className="token-health-ring" transform="rotate(-90)">
       <title>{title}</title>
       <circle className="token-health-ring-track" r={r} fill="none" strokeWidth={strokeWidth} />
-      <circle className="token-health-ring-fill" r={r} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${circumference * clamped} ${circumference}`} />
+      <circle className={`token-health-ring-fill ${bandClass}`} r={r} fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${circumference * clamped} ${circumference}`} />
     </g>;
   }
   const width = sizePx * 0.92;
@@ -231,7 +243,7 @@ function TokenHealthBar({ sizePx, style, fraction }: Readonly<{ sizePx: number; 
   return <g className="token-health-bar">
     <title>{title}</title>
     <rect className="token-health-bar-track" x={-width / 2} y={y} width={width} height={height} rx={height / 2} />
-    <rect className="token-health-bar-fill" x={-width / 2} y={y} width={width * clamped} height={height} rx={height / 2} style={{ fill: color }} />
+    <rect className={`token-health-bar-fill ${bandClass}`} x={-width / 2} y={y} width={width * clamped} height={height} rx={height / 2} />
   </g>;
 }
 

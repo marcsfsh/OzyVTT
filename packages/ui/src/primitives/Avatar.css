@@ -1,0 +1,40 @@
+.nh-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--magenta), var(--cyan));
+  color: var(--text-on-neon);
+  font: 800 var(--fs-sm) / 1 var(--font-body);
+  letter-spacing: .02em;
+  user-select: none;
+  overflow: visible;
+}
+.nh-avatar--sm { width: 1.8rem; height: 1.8rem; font-size: var(--fs-xs); }
+.nh-avatar--lg { width: 3.4rem; height: 3.4rem; font-size: var(--fs-h3); }
+.nh-avatar-initials { display: block; }
+.nh-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+/* Presence dot rides the lower-right, ringed in the page background so it reads on any surface. */
+.nh-avatar-presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: .7rem;
+  height: .7rem;
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+  background: var(--text-muted);
+}
+.nh-avatar--lg .nh-avatar-presence { width: .9rem; height: .9rem; }
+.nh-avatar-presence--online { background: var(--cyan); box-shadow: 0 0 0 1px color-mix(in srgb, var(--cyan) 50%, transparent); }
+.nh-avatar-presence--away { background: var(--caution); }
+.nh-avatar-presence--offline { background: var(--text-muted); }

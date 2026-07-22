@@ -2,67 +2,70 @@
 /* The tray floats over the map's top edge rather than reflowing the whole map when it appears (for a
    drag or unplaced tokens), so grabbing a token no longer shoves the map down (report #5). */
 .encounter-map-interaction:not(.enlarged) .encounter-token-tray { position: absolute; z-index: 4; top: 0; left: 0; right: 0; margin-bottom: 0; }
-.encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid #e8a743; border-radius: .35rem; background: #282219; font-size: .82rem; }
-.encounter-map-help strong { color: #fff0d2; }
-.encounter-map-help span { color: #cfc5b4; font-size: .78rem; text-align: right; }
-.encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; padding: .5rem .7rem; border: 1px dashed #675a45; border-radius: .55rem; background: #16130e; transition: border-color .15s, background .15s; }
-.encounter-token-tray.receiving { border-color: #e8a743; background: #282015; }
+.encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); font-size: .82rem; }
+.encounter-map-help strong { color: var(--text); }
+.encounter-map-help span { color: var(--text-dim); font-size: .78rem; text-align: right; }
+.encounter-token-tray { min-height: 3.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; padding: .5rem .7rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); transition: border-color .15s, background .15s; }
+.encounter-token-tray.receiving { border-color: var(--cyan); background: color-mix(in srgb, var(--surface-2) 84%, var(--cyan)); }
 .encounter-token-tray > div:first-child strong, .encounter-token-tray > div:first-child span { display: block; }
-.encounter-token-tray > div:first-child span { margin-top: .15rem; color: #9f9789; font-size: .72rem; }
+.encounter-token-tray > div:first-child span { margin-top: .15rem; color: var(--text-muted); font-size: .72rem; }
 .encounter-token-tray-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
-.tray-token { display: flex; align-items: center; gap: .45rem; padding: .42rem .6rem; border-radius: 999px; background: #243e5c; text-align: left; cursor: grab; touch-action: none; }
+.tray-token { display: flex; align-items: center; gap: .45rem; padding: .42rem .6rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface-3) 60%, var(--cyan)); text-align: left; cursor: grab; touch-action: none; }
 .tray-token:active { cursor: grabbing; }
-.tray-token > span { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin: 0; border-radius: 50%; background: #315a8a; color: #fff; font-weight: 900; }
+.tray-token > span { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; margin: 0; border-radius: 50%; background: color-mix(in srgb, var(--cyan) 45%, var(--void)); color: #fff; font-weight: 900; }
 .tray-token > strong { font-size: .75rem; }
-.tray-token.monster { background: #55241f; }
-.tray-token.monster > span { background: #7e302a; }
-.tray-token.npc { background: #35432a; }
-.tray-token.npc > span { background: #52623d; }
+.tray-token.monster { background: color-mix(in srgb, var(--surface-3) 55%, var(--magenta)); }
+.tray-token.monster > span { background: color-mix(in srgb, var(--magenta) 45%, var(--void)); }
+.tray-token.npc { background: color-mix(in srgb, var(--surface-3) 58%, var(--indigo)); }
+.tray-token.npc > span { background: color-mix(in srgb, var(--indigo) 48%, var(--void)); }
 .tray-token.hidden { border-style: dashed; opacity: .76; }
-.encounter-map-stage { --dock-side-width: 22rem; position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid #514936; border-radius: .65rem; background: #090806; touch-action: none; }
-.encounter-map-stage svg { display: block; width: 100%; max-height: min(72vh, 680px); background: #090806; user-select: none; }
+.encounter-map-stage { --dock-side-width: 22rem; position: relative; min-height: 20rem; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void); touch-action: none; }
+.encounter-map-stage svg { display: block; width: 100%; max-height: min(72vh, 680px); background: var(--void); user-select: none; }
 .encounter-map-stage > p { padding: 2rem; text-align: center; }
 .encounter-token { outline: none; }
 .encounter-token.movable { cursor: grab; }
 .encounter-token.dragging { cursor: grabbing; opacity: .82; }
-.encounter-token-body { fill: #315a8a; stroke: #e8f2ff; stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
-.encounter-token.monster .encounter-token-body { fill: #7e302a; stroke: #ffd7cf; }
-.encounter-token.npc .encounter-token-body { fill: #52623d; stroke: #e5f2c8; }
+/* Token bodies: team coding (§6.6) — allies cyan, enemies magenta, neutrals indigo. Glyph fills stay
+   fixed light-on-dark-outline for legibility on any map art (theme-independent). */
+.encounter-token-body { fill: color-mix(in srgb, var(--cyan) 40%, var(--void)); stroke: var(--cyan-hi); stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 3px 4px #000); }
+.encounter-token.monster .encounter-token-body { fill: color-mix(in srgb, var(--magenta) 40%, var(--void)); stroke: var(--magenta-hi); }
+.encounter-token.npc .encounter-token-body { fill: color-mix(in srgb, var(--indigo) 45%, var(--void)); stroke: var(--violet-hi); }
 .encounter-token.hidden .encounter-token-body { stroke-dasharray: 6 4; opacity: .72; }
-.encounter-token-turn { fill: rgb(255 190 58 / 25%); stroke: #ffc33d; stroke-width: 5; vector-effect: non-scaling-stroke; }
-.encounter-token-initials, .encounter-token-name { pointer-events: none; fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: Inter, sans-serif; font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
+/* Active turn on the map = magenta ring + glow, no motion (§6.6). */
+.encounter-token-turn { fill: rgb(255 46 154 / 18%); stroke: var(--magenta); stroke-width: 5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgb(255 46 154 / 55%)); }
+.encounter-token-initials, .encounter-token-name { pointer-events: none; fill: #fff; text-anchor: middle; dominant-baseline: central; font-family: var(--font-body); font-weight: 900; paint-order: stroke; stroke: #0a0805; stroke-width: 3; stroke-linejoin: round; }
 .encounter-token-name { dominant-baseline: hanging; }
-.encounter-token.movable:focus-visible .encounter-token-body { stroke: #ffcf62; stroke-width: 6; }
+.encounter-token.movable:focus-visible .encounter-token-body { stroke: var(--cyan); stroke-width: 6; }
 .encounter-token.locked .encounter-token-body { opacity: .78; filter: none; }
 .encounter-map-zoom { position: absolute; right: .7rem; bottom: .7rem; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; max-width: calc(100% - 1.4rem); }
 /* Keep the zoom cluster clear of a left/right docked panel by moving it to the opposite corner. */
 .encounter-map-zoom.zoom-dock-right { right: auto; left: .7rem; justify-content: flex-start; }
 /* The 3-way dock control lives in the zoom cluster so it's reachable even inside the enlarged map. */
 .encounter-map-dock-control { display: inline-flex; gap: .35rem; margin-right: .2rem; }
-.encounter-map-zoom .encounter-map-dock-control button[aria-pressed="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+.encounter-map-zoom .encounter-map-dock-control button[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 /* Fixed rem sizes per edge (never a viewport %), so the docked panel does not reflow on window resize. */
-.encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: rgb(20 17 12 / 94%); }
-.encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid #514936; }
-.encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid #514936; }
+.encounter-map-dock { position: absolute; z-index: 2; overflow: auto; padding: .6rem; background: color-mix(in srgb, var(--surface-1) 94%, transparent); }
+.encounter-map-dock.dock-right { top: 0; right: 0; bottom: 0; width: var(--dock-side-width); border-left: 1px solid var(--line); }
+.encounter-map-dock.dock-left { top: 0; left: 0; bottom: 0; width: var(--dock-side-width); border-right: 1px solid var(--line); }
 .encounter-map-dock .encounter-panel { margin: 0; border: 0; background: transparent; padding: 0; }
 /* Inner-edge grab strip to resize a left/right dock; spans the full height so you can grab anywhere. */
 .encounter-map-dock-resize { position: absolute; top: 0; bottom: 0; width: 14px; z-index: 3; cursor: col-resize; touch-action: none; }
 .encounter-map-dock-resize.dock-resize-left { left: calc(var(--dock-side-width) - 7px); }
 .encounter-map-dock-resize.dock-resize-right { right: calc(var(--dock-side-width) - 7px); }
-.encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: #514936; transition: background .15s, width .15s; }
-.encounter-map-dock-resize:hover::before, .encounter-map-dock-resize:active::before { background: #e8a743; width: 3px; }
-.encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-weight: 700; text-align: center; cursor: pointer; }
-.encounter-map-zoom button:hover { border-color: #e8a743; }
-.encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: #090806; }
+.encounter-map-dock-resize::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); transition: background .15s, width .15s; }
+.encounter-map-dock-resize:hover::before, .encounter-map-dock-resize:active::before { background: var(--cyan); width: 3px; }
+.encounter-map-zoom button { padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-weight: 700; text-align: center; cursor: pointer; }
+.encounter-map-zoom button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.encounter-map-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; place-items: center; background: var(--void); }
 .encounter-map-stage:fullscreen svg { max-height: 100vh; height: 100vh; }
 /* "Enlarge map" is an in-tab overlay (not the OS Fullscreen API): the whole interaction area floats
    over the page so the map physically grows, with the stage flex-filling the space so the SVG scales
    up. Dismissed by "Shrink map". */
-.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid #514936; border-radius: .75rem; background: rgb(9 8 6 / 97%); box-shadow: 0 12px 40px rgb(0 0 0 / 60%); overflow: auto; }
+.encounter-map-interaction.enlarged { position: fixed; inset: 1rem; z-index: 40; margin: 0; display: flex; flex-direction: column; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: var(--shadow-2); overflow: auto; }
 .encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
 .encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: none; height: 100%; }
-.encounter-map-saving { margin: .5rem 0 0; color: #f6c452; font-size: .85rem; }
-.encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: #e9b861; font-size: .78rem; }
+.encounter-map-saving { margin: .5rem 0 0; color: var(--text-dim); font-size: .85rem; }
+.encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: var(--text-dim); font-size: .78rem; }
 
 /* Top-left overlaid tool cluster (eye ▾ · tools · ruler toggle · wrench ▾). Visible in normal,
    enlarged, and OS-fullscreen modes since it lives inside the stage. */
@@ -73,7 +76,7 @@
 /* Drawing and fog tools open as one grouped tab that slides out to the right of their toggle (reports
    #11, #13): a bordered panel that reads as a set. It grows in from the left on open and fades out on
    close (via .closing) rather than snapping (report #8). */
-.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; min-width: 0; padding: 0 .3rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(9 8 6 / 82%); overflow: visible; white-space: nowrap; }
+.encounter-map-slideout { display: flex; align-items: center; gap: .3rem; min-width: 0; padding: 0 .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); overflow: visible; white-space: nowrap; }
 /* Opening/closing animate the tab's own width (clipped) so the buttons it pushes aside slide with it,
    not snap (report #4); once settled the class drops so the eye/color/wrench dropdowns can overflow. */
 .encounter-map-slideout.opening { overflow: hidden; animation: encounter-map-slideout .18s ease-out; }
@@ -82,121 +85,119 @@
 @keyframes encounter-map-slideout-close { from { opacity: 1; max-width: 24rem; } to { opacity: 0; max-width: 0; } }
 .encounter-map-eye, .encounter-map-wrench, .encounter-map-color { position: relative; }
 .encounter-map-swatches { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem; max-width: 11rem; }
-.encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .3rem; cursor: pointer; }
-.encounter-map-swatches button.selected { outline: 2px solid #fff; outline-offset: 1px; }
+.encounter-map-swatches button { width: 1.5rem; height: 1.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; }
+.encounter-map-swatches button.selected { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
 .encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
 .encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
-.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid #6b5e4b; border-radius: .5rem; background: rgb(9 8 6 / 82%); color: #f5efe3; font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
-.encounter-map-icon:hover { border-color: #e8a743; }
-.encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
+.encounter-map-icon:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .encounter-map-icon:disabled { opacity: .4; cursor: not-allowed; }
-.encounter-map-menu { position: absolute; left: 0; top: 2.5rem; z-index: 6; min-width: 12rem; display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid #6b5e4b; border-radius: .55rem; background: #17130d; box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
+.encounter-map-menu { position: absolute; left: 0; top: 2.5rem; z-index: 6; min-width: 12rem; display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 .encounter-map-wrench .encounter-map-menu { left: auto; right: 0; }
-.encounter-map-menu-title { margin: .1rem .3rem .3rem; color: #9f9789; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
-.encounter-map-menu button { padding: .5rem .6rem; border: 0; border-radius: .4rem; background: transparent; color: #f5efe3; text-align: left; font-size: .82rem; cursor: pointer; }
-.encounter-map-menu button:hover { background: #282016; }
-.encounter-map-menu button.selected { background: #6e431c; color: #ffdca0; }
-.encounter-map-menu-select { display: flex; flex-direction: column; gap: .25rem; margin: .3rem; color: #c8c0b1; font-size: .72rem; }
-.encounter-map-menu-select select { padding: .4rem; border: 1px solid #6b5e4b; border-radius: .4rem; background: #111; color: #f5efe3; }
+.encounter-map-menu-title { margin: .1rem .3rem .3rem; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
+.encounter-map-menu button { padding: .5rem .6rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); text-align: left; font-size: .82rem; cursor: pointer; }
+.encounter-map-menu button:hover { background: var(--surface-3); }
+.encounter-map-menu button.selected { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); color: var(--text); }
+.encounter-map-menu-select { display: flex; flex-direction: column; gap: .25rem; margin: .3rem; color: var(--text-dim); font-size: .72rem; }
+.encounter-map-menu-select select { padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
 
-.annotation-handle { fill: #fff1d2; stroke: #181006; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; }
+.annotation-handle { fill: var(--cyan-hi); stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; }
 .annotation-handle-move { cursor: move; }
 .annotation-handle-resize { cursor: nwse-resize; }
 .annotation-shape.selected .annotation-shape-body { stroke-width: 3.5; }
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
-.encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
+.encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); }
 /* Slide the overlaid tool cluster (top-left) and shape editor (top-right) clear of a docked panel
    sharing their edge, so a left dock never hides the tools and a right dock never hides the editor. */
 .encounter-map-stage.has-dock-left .encounter-map-overlay { left: calc(var(--dock-side-width) + .7rem); }
 .encounter-map-stage.has-dock-right .encounter-shape-editor { right: calc(var(--dock-side-width) + .7rem); }
 .encounter-shape-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .encounter-shape-editor-head strong { text-transform: capitalize; }
-.encounter-shape-editor-head span { color: #9f9789; font-size: .7rem; }
-.encounter-shape-editor label { display: flex; flex-direction: column; gap: .25rem; color: #c8c0b1; font-size: .75rem; }
-.encounter-shape-editor select { padding: .45rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #111; color: #f5efe3; }
-.encounter-shape-editor-check { flex-direction: row !important; align-items: center; gap: .4rem; }
-.encounter-shape-editor-check input { width: auto; }
-.encounter-shape-editor .danger { padding: .55rem; border: 1px solid #8a3333; border-radius: .45rem; background: #5a1f1f; color: #f5efe3; text-align: center; cursor: pointer; }
-.encounter-shape-editor .danger:hover { border-color: #d9605a; }
-.encounter-shape-editor-note { margin: 0; color: #9f9789; font-size: .75rem; }
+.encounter-shape-editor-head span { color: var(--text-muted); font-size: .7rem; }
+.encounter-shape-editor label { display: flex; flex-direction: column; gap: .25rem; color: var(--text-dim); font-size: .75rem; }
+.encounter-shape-editor select { padding: .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
+.encounter-shape-editor-check { align-self: start; }
+.encounter-shape-editor .danger { padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); text-align: center; cursor: pointer; }
+.encounter-shape-editor .danger:hover { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
+.encounter-shape-editor-note { margin: 0; color: var(--text-muted); font-size: .75rem; }
 
-.encounter-live-distance { fill: #fff2c4; font: 800 15px sans-serif; text-anchor: middle; paint-order: stroke; stroke: #0a0805; stroke-width: 4; stroke-linejoin: round; pointer-events: none; }
+.encounter-live-distance { fill: var(--cyan-hi); font: 800 15px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: #0a0805; stroke-width: 4; stroke-linejoin: round; pointer-events: none; }
 .encounter-move-guide { pointer-events: none; }
-.encounter-move-line { stroke: #ffd463; stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.encounter-move-line { stroke: var(--cyan); stroke-width: 3; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 
 @media (max-width: 650px) { .encounter-map-help, .encounter-token-tray { align-items: stretch; flex-direction: column; } .encounter-map-help span { text-align: left; } .encounter-token-tray-list { justify-content: flex-start; } }
 @media (max-width: 560px) { .encounter-map-stage { min-height: 14rem; } .encounter-token-name { display: none; } .encounter-shape-editor { width: 12rem; } }
-/* Health/condition badges over tokens: bloodied amber, down red; condition initials beneath. */
-.token-health { stroke: #0c0a07; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.token-health-bloodied { fill: #e8a743; }
-.token-health-down { fill: #d9605a; }
-/* Richer token-health indicators (GM opt-in): a thin HP bar under the token, or a green->red ring
-   around it. The fill color is inlined from the fraction; these style the track/geometry only. */
-.token-health-bar-track { fill: #0c0a07; fill-opacity: .8; }
+/* Health/condition badges over tokens: bloodied magenta, down danger; condition initials beneath. */
+.token-health { stroke: var(--void); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.token-health-bloodied { fill: var(--magenta); }
+.token-health-down { fill: var(--danger); }
+/* Richer token-health indicators (GM opt-in): a thin HP bar under the token, or a cyan->danger ring
+   around it. The fill color is inlined from the fraction (see mapImage.tsx); these style the track/geometry only. */
+.token-health-bar-track { fill: var(--void); fill-opacity: .8; }
 .token-health-bar-fill { stroke: none; }
-.token-health-ring-track { fill: none; stroke: #0c0a07; stroke-opacity: .5; }
+.token-health-ring-track { fill: none; stroke: var(--void); stroke-opacity: .5; }
 .token-health-ring-fill { fill: none; }
 /* Soft health glow: purely decorative and larger than the token, so it must never capture pointer events. */
 .token-health-aura { pointer-events: none; }
-/* Manual fog of war: the GM sees a dim veil (everything stays workable); players get solid cover. */
-.fog-overlay-gm { fill: #060409; fill-opacity: .45; }
-.fog-overlay-player { fill: #0b0a08; }
+/* Theme-aware health fill: one band class drives the bar fill, ring stroke, and aura stop-color from
+   the same brand token, so map health follows dark/dusk/light instead of a baked dark-theme hex. */
+.hp-fill-healthy { fill: var(--cyan); stroke: var(--cyan); stop-color: var(--cyan); }
+.hp-fill-bloodied { fill: var(--magenta); stroke: var(--magenta); stop-color: var(--magenta); }
+.hp-fill-down { fill: var(--danger); stroke: var(--danger); stop-color: var(--danger); }
+/* Manual fog of war: --void veil (§6.5). The GM sees a dim veil (everything stays workable); players get solid cover. */
+.fog-overlay-gm { fill: var(--void); fill-opacity: .45; }
+.fog-overlay-player { fill: var(--void); }
 .fog-stroke-preview { fill-opacity: .18; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
-.fog-stroke-reveal { fill: #ffd76a; stroke: #ffd76a; }
-.fog-stroke-hide { fill: #6a5cff; stroke: #8a7dff; }
+.fog-stroke-reveal { fill: var(--cyan); stroke: var(--cyan); }
+.fog-stroke-hide { fill: var(--violet); stroke: var(--violet-hi); }
 
-.token-condition circle { fill: #241f2e; stroke: #a98fd8; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.token-condition text { fill: #e4d7fa; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
-.token-condition-glyph { fill: #e4d7fa; }
-.token-condition-more circle { fill: #17140f; stroke: #6b5e4b; }
+.token-condition circle { fill: color-mix(in srgb, var(--surface-3) 65%, var(--violet)); stroke: var(--violet); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token-condition text { fill: var(--violet-hi); font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.token-condition-glyph { fill: var(--violet-hi); }
+.token-condition-more circle { fill: var(--surface-2); stroke: var(--line-strong); }
 
-/* Transient battlemap event toasts (top-center, inside the stage so they show enlarged). */
-.map-toast-stack { position: absolute; left: 50%; top: 3.4rem; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: .35rem; max-width: min(90%, 26rem); pointer-events: none; }
-.map-toast { padding: .4rem .85rem; border-radius: 999px; background: rgb(23 19 13 / 94%); border: 1px solid #6b5e4b; color: #f5efe3; font-size: .8rem; font-weight: 700; box-shadow: 0 4px 14px rgb(0 0 0 / 45%); animation: map-toast-in .18s ease-out; }
-.map-toast-damage { border-color: #b5544c; color: #ffb4ab; }
-.map-toast-heal { border-color: #5fbf6f; color: #a7e8b0; }
-.map-toast-save { border-color: #e8a743; color: #f3c77d; }
-@keyframes map-toast-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Battlemap event toasts now route through the shared toast surface (scene/toasts.tsx -> useToast). */
 
-/* Click-to-target: rings while a targeting session is live. Targetable = subtle dashed invite; targeted = solid amber. */
+/* Click-to-target: rings while a targeting session is live. Targetable = subtle cyan invite; targeted = danger ring (§6.6). */
 .encounter-token.targetable { cursor: crosshair; }
-.encounter-token.targetable .encounter-token-body { stroke: #ffd27a; stroke-dasharray: 5 4; }
-.encounter-token.targeted .encounter-token-body { stroke: #ffc34d; stroke-width: 6; stroke-dasharray: none; }
-.encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: .5rem .8rem; border: 1px solid #7c633e; border-radius: .6rem; background: rgb(23 19 13 / 96%); box-shadow: 0 8px 24px rgb(0 0 0 / 55%); font-size: .85rem; }
+.encounter-token.targetable .encounter-token-body { stroke: var(--cyan-hi); stroke-dasharray: 5 4; }
+.encounter-token.targeted .encounter-token-body { stroke: var(--danger); stroke-width: 6; stroke-dasharray: none; }
+.encounter-target-bar { position: absolute; left: 50%; bottom: 3.7rem; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: .7rem; max-width: min(94%, 34rem); padding: .5rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); font-size: .85rem; }
 /* Center the transient overlays over the MAP area, not the whole stage — when the tracker is docked
    into the stage, half the width is the dock, so a plain 50% would sit over the initiative list. */
-.encounter-map-stage.has-dock-left .map-toast-stack, .encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
-.encounter-map-stage.has-dock-right .map-toast-stack, .encounter-map-stage.has-dock-right .encounter-target-bar { left: calc(50% - var(--dock-side-width) / 2); }
+.encounter-map-stage.has-dock-left .encounter-target-bar { left: calc(50% + var(--dock-side-width) / 2); }
+.encounter-map-stage.has-dock-right .encounter-target-bar { left: calc(50% - var(--dock-side-width) / 2); }
 .encounter-target-bar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .encounter-target-bar-buttons { display: inline-flex; flex: none; gap: .4rem; }
 .encounter-target-bar-buttons button { padding: .45rem .8rem; font-size: .8rem; text-align: center; }
 
 /* Token right-click / long-press menu — portaled to <body>, so it clears the dock/enlarged stacking contexts. */
-.token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .6rem; background: #17130d; box-shadow: 0 10px 30px rgb(0 0 0 / 60%); }
+.token-context-menu { position: fixed; z-index: 60; min-width: 12.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: .3rem; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 .token-context-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .token-context-head strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.token-context-head button { flex: none; padding: .2rem .5rem; border: 0; background: transparent; color: #c8c0b1; font-size: .9rem; cursor: pointer; }
+.token-context-head button { flex: none; padding: .2rem .5rem; border: 0; background: transparent; color: var(--text-dim); font-size: .9rem; cursor: pointer; }
 .token-context-hp { display: flex; gap: .3rem; }
 .token-context-hp input { width: 3.4rem; margin: 0; padding: .5rem; text-align: center; }
-.token-context-hp button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.token-context-hp button, .token-context-item { min-height: 2.6rem; padding: .55rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; cursor: pointer; }
 .token-context-hp button { flex: 1; text-align: center; }
 .token-context-item { text-align: left; }
-.token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: #e8a743; }
+.token-context-hp button:hover:not(:disabled), .token-context-item:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* Fixed label column so the Size / Health / Show-to selects all share one width and left edge. */
-.token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: .5rem; color: #9f9789; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
-.token-context-size select { width: 100%; margin: 0; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #f5efe3; font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
-.token-context-item[aria-pressed="true"] { background: #17140f; border-color: #4a4335; color: #7a7263; }
+.token-context-size { display: grid; grid-template-columns: 4rem 1fr; align-items: center; gap: .5rem; color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+.token-context-size select { width: 100%; margin: 0; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .82rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
+.token-context-item[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); }
 /* Conditions collapse into a Size-styled disclosure (native <details>) under the Health dropdown. */
 .token-context-conditions { display: grid; gap: .3rem; margin-top: .1rem; }
-.token-context-conditions-summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: .5rem; border: 1px solid #6b5e4b; border-radius: .45rem; background: #241f17; color: #9f9789; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; list-style: none; }
+.token-context-conditions-summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; list-style: none; }
 .token-context-conditions-summary::-webkit-details-marker { display: none; }
-.token-context-conditions-summary::after { content: "▾"; color: #9f9789; }
+.token-context-conditions-summary::after { content: "▾"; color: var(--text-muted); }
 .token-context-conditions[open] .token-context-conditions-summary::after { content: "▴"; }
-.token-context-feedback { margin: .1rem 0 0; color: #e9b861; font-size: .75rem; }
+.token-context-feedback { margin: .1rem 0 0; color: var(--text-dim); font-size: .75rem; }
 
 .encounter-map-scene-live { display: inline-flex; gap: .35rem; }
-.encounter-map-scene-live .scene-golive { background: #6e431c; border-color: #ffc34d; color: #ffdca0; }
+.encounter-map-scene-live .scene-golive { background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 
 /* Narrow viewports: a saved left/right dock must never squeeze the map to a sliver. */
 @media (max-width: 700px) {

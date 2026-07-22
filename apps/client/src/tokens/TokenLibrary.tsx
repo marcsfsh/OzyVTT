@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Modal, Badge, Button, Input, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import { useTokenImageUrl } from "./tokenImages";
@@ -26,10 +26,10 @@ async function api(path: string, gmToken: string, init: RequestInit = {}) {
 
 function TokenThumb({ asset, gmToken, remembered, selected, onPick }: Readonly<{ asset: TokenAsset; gmToken: string; remembered: boolean; selected: boolean; onPick: () => void }>) {
   const url = useTokenImageUrl(asset.id, gmToken);
-  return <button type="button" className={`token-thumb${selected ? " selected" : ""}`} onClick={onPick} aria-pressed={selected} title={asset.name}>
+  return <button type="button" className={`token-thumb lift${selected ? " selected" : ""}`} onClick={onPick} aria-pressed={selected} title={asset.name}>
     <span className="token-thumb-image">{url ? <img src={url} alt="" /> : <span className="token-thumb-placeholder" aria-hidden="true">🎴</span>}</span>
     <span className="token-thumb-name">{asset.name}</span>
-    {remembered && <span className="token-thumb-badge">Recent</span>}
+    {remembered && <Badge className="token-thumb-badge" tone="primary" solid>Recent</Badge>}
   </button>;
 }
 
@@ -56,7 +56,6 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
   const [uploadFolder, setUploadFolder] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
 
   const refresh = async () => {
     const query = definitionId ? `?definitionId=${encodeURIComponent(definitionId)}` : "";
@@ -65,11 +64,6 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
     setRemembered(data.rememberedAssetId ?? null);
   };
   useEffect(() => { void refresh().catch((error) => setMessage(error.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [gmToken, definitionId]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const folders = useMemo(() => Array.from(new Set(assets.map((asset) => asset.folder).filter((value): value is string => value !== null))).sort((a, b) => a.localeCompare(b)), [assets]);
   const visible = useMemo(() => {
@@ -103,29 +97,34 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
     } catch (error) { setBusy(false); setMessage((error as Error).message); }
   };
 
-  return createPortal(
-    <div className="token-library-backdrop" role="dialog" aria-modal="true" aria-label={`Token image for ${actorName}`} onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="token-library" ref={ref}>
-        <header className="token-library-head">
-          <div><span className="eyebrow">TOKEN IMAGE</span><h2>{actorName}</h2></div>
-          <button type="button" aria-label="Close" onClick={onClose}>✕</button>
-        </header>
-
+  return <Modal
+    open
+    onClose={onClose}
+    size="lg"
+    className="token-library"
+    title={actorName}
+    ariaLabel={`Token image for ${actorName}`}
+    footer={<>
+      {currentAssetId && <button type="button" className="token-library-remove" disabled={busy} onClick={() => assign(null)}>Remove image</button>}
+      <Button variant="secondary" disabled={busy} onClick={onClose}>Done</Button>
+    </>}
+  >
+        <span className="eyebrow">TOKEN IMAGE</span>
         <form className="token-upload" onSubmit={upload}>
           <label>Image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !uploadName) setUploadName(next.name.replace(/\.[^.]+$/, "")); }} /></label>
-          <label>Name<input value={uploadName} onChange={(event) => setUploadName(event.target.value)} maxLength={80} placeholder="Goblin" /></label>
-          <label>Folder<input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="token-folder-list" /></label>
+          <label>Name<Input value={uploadName} onChange={(event) => setUploadName(event.target.value)} maxLength={80} placeholder="Goblin" /></label>
+          <label>Folder<Input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="token-folder-list" /></label>
           <datalist id="token-folder-list">{folders.map((name) => <option key={name} value={name} />)}</datalist>
           <button disabled={busy || !file}>Upload &amp; use</button>
         </form>
 
         <div className="token-library-filters" role="group" aria-label="Filter tokens">
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tokens" aria-label="Search tokens" />
-          <select value={folder} onChange={(event) => setFolder(event.target.value)} aria-label="Folder">
+          <Select value={folder} onChange={(event) => setFolder(event.target.value)} aria-label="Folder">
             <option value="all">All folders</option>
             <option value="__unfiled">Unfiled</option>
             {folders.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
+          </Select>
         </div>
 
         {message && <p className="token-library-feedback" role="status">{message}</p>}
@@ -138,16 +137,11 @@ export function TokenLibrary({ actorId, actorName, definitionId, currentAssetId,
         <section className="token-library-section">
           <h3>Library</h3>
           {visible.length === 0
-            ? <p className="token-library-empty">{assets.length === 0 ? "No token images yet. Upload one above." : "No tokens match this filter."}</p>
+            ? (assets.length === 0
+                ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎴</span><span className="nh-empty-title">No token images yet</span><span className="nh-empty-text">Upload an image above to give this creature a token.</span></div>
+                : <p className="token-library-empty">No tokens match this filter.</p>)
             : <div className="token-grid">{visible.map((asset) => <TokenThumb key={asset.id} asset={asset} gmToken={gmToken} remembered={asset.id === remembered} selected={currentAssetId === asset.id} onPick={() => assign(asset.id)} />)}</div>}
         </section>
 
-        <footer className="token-library-foot">
-          {currentAssetId && <button type="button" className="token-library-remove" disabled={busy} onClick={() => assign(null)}>Remove image</button>}
-          <button type="button" disabled={busy} onClick={onClose}>Done</button>
-        </footer>
-      </div>
-    </div>,
-    document.fullscreenElement ?? document.body
-  );
+  </Modal>;
 }

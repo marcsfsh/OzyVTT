@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
+import { Button, Input, Select, Stepper } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -68,7 +69,7 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
   return <section className="dice-proof" aria-labelledby="dice-proof-heading">
     <div className="dice-heading">
       <div><span className="eyebrow">DICE</span><h2 id="dice-proof-heading">Roll dice</h2></div>
-      <label className="dice-visibility">Who sees it?<select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+      <label className="dice-visibility">Who sees it?<Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
     </div>
     <div className="dice-quick" role="group" aria-label="Quick rolls">
       {QUICK_DICE.map((sides) => <button key={sides} onClick={() => quickRoll(sides)}>d{sides}</button>)}
@@ -76,23 +77,23 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
     <div className="dice-adv-row" role="group" aria-label="Advantage and modifier">
       <button type="button" className="secondary" aria-pressed={advantage} onClick={toggleAdvantage}>Advantage</button>
       <button type="button" className="secondary" aria-pressed={disadvantage} onClick={toggleDisadvantage}>Disadvantage</button>
-      <div className="dice-modifier"><span>Modifier</span><button type="button" aria-label="Decrease modifier" onClick={() => setModifier((value) => value - 1)}>−</button><strong>{modifierLabel(modifier)}</strong><button type="button" aria-label="Increase modifier" onClick={() => setModifier((value) => value + 1)}>+</button></div>
+      <Stepper label="Modifier" value={modifier} onChange={setModifier} format={modifierLabel} aria-label="Roll modifier" />
     </div>
     {(advantage || disadvantage) && <p className="dice-armed">{advantage ? "Advantage" : "Disadvantage"} is armed for the next d20 roll.</p>}
     <details className="dice-custom">
       <summary>Custom formula (advantage keeps, drop lowest, and more)</summary>
       <div className="dice-form">
-        <label>Formula<input value={formula} onChange={(event) => setFormula(event.target.value)} placeholder="2d20kh1 + 5" /></label>
-        <label>Purpose<select value={purpose} onChange={(event) => setPurpose(event.target.value as RollPurpose)}>{(Object.keys(PURPOSE_LABELS) as RollPurpose[]).map((value) => <option key={value} value={value}>{PURPOSE_LABELS[value]}</option>)}</select></label>
-        <button onClick={customRoll}>Roll</button>
+        <label>Formula<Input value={formula} onChange={(event) => setFormula(event.target.value)} placeholder="2d20kh1 + 5" /></label>
+        <label>Purpose<Select value={purpose} onChange={(event) => setPurpose(event.target.value as RollPurpose)}>{(Object.keys(PURPOSE_LABELS) as RollPurpose[]).map((value) => <option key={value} value={value}>{PURPOSE_LABELS[value]}</option>)}</Select></label>
+        <Button variant="primary" onClick={customRoll}>Roll</Button>
       </div>
       <p className="dice-hint">Try 1d20, 2d20kh1 + 5, or 2d6 + 1d4 - 2.</p>
     </details>
     <details className="dice-custom">
       <summary>Falling damage (1d6 per 10 ft, max 20d6)</summary>
       <div className="dice-form">
-        <label>Feet fallen<input type="number" min="0" max="10000" inputMode="numeric" value={fallFeet} onChange={(event) => setFallFeet(event.target.value)} placeholder="30" /></label>
-        <button onClick={rollFall} disabled={fallDice < 1}>Roll {fallDice > 0 ? `${fallDice}d6` : "fall"}</button>
+        <label>Feet fallen<Input type="number" min="0" max="10000" inputMode="numeric" value={fallFeet} onChange={(event) => setFallFeet(event.target.value)} placeholder="30" /></label>
+        <Button variant="primary" onClick={rollFall} disabled={fallDice < 1}>Roll {fallDice > 0 ? `${fallDice}d6` : "fall"}</Button>
       </div>
       <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
     </details>

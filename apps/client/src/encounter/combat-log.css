@@ -1,19 +1,19 @@
-.combat-log { margin-top: 1rem; border: 1px solid #403a2c; border-radius: .75rem; background: #14110c; padding: .85rem 1rem 1rem; }
+.combat-log { margin-top: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: .85rem 1rem 1rem; }
 .combat-log-heading { display: flex; align-items: baseline; gap: .6rem; }
-.combat-log-heading h2 { margin: 0; font-size: 1.05rem; color: #f5efe3; }
-.combat-log-empty { margin: .7rem 0 0; color: #a69e91; font-size: .85rem; }
+.combat-log-heading h2 { margin: 0; font-size: 1.05rem; color: var(--text); }
+.combat-log-empty { margin: .7rem 0 0; color: var(--text-muted); font-size: .85rem; }
 .combat-log-list { list-style: none; margin: .7rem 0 0; padding: 0 .3rem 0 0; display: grid; gap: .3rem; max-height: 16rem; overflow-y: auto; }
-.combat-log-entry { display: flex; gap: .5rem; padding: .35rem .5rem; border-left: 2px solid #4a4433; border-radius: .35rem; background: #1b170f; font-size: .82rem; line-height: 1.35; color: #d8d0c1; }
+.combat-log-entry { display: flex; gap: .5rem; padding: .35rem .5rem; border-left: 2px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); font-size: .82rem; line-height: 1.35; color: var(--text-dim); }
 .combat-log-text { min-width: 0; }
 /* Kind accents keep the feed skimmable: harm warm, relief green, structure/turn muted, GM history amber. */
-.combat-log-entry.log-damage { border-left-color: #c65b3a; }
-.combat-log-entry.log-heal { border-left-color: #4dd06a; }
-.combat-log-entry.log-save { border-left-color: #d9a441; }
-.combat-log-entry.log-action { border-left-color: #6d8fd0; }
-.combat-log-entry.log-condition { border-left-color: #b06fd0; }
-.combat-log-entry.log-reaction { border-left-color: #d0c46d; }
-.combat-log-entry.log-turn { border-left-color: #6b5e4b; color: #c8c0b1; }
-.combat-log-entry.log-encounter { border-left-color: #8a7c63; color: #c8c0b1; }
-.combat-log-entry.log-scene { border-left-color: #8a7c63; color: #c8c0b1; }
-.combat-log-entry.log-history { border-left-color: #e8a743; background: #201a12; color: #f3d8b8; }
-.combat-log-entry.log-movement { border-left-color: #5fbf9a; }
+.combat-log-entry.log-damage { border-left-color: var(--danger); }
+.combat-log-entry.log-heal { border-left-color: var(--success); }
+.combat-log-entry.log-save { border-left-color: var(--caution); }
+.combat-log-entry.log-action { border-left-color: var(--info); }
+.combat-log-entry.log-condition { border-left-color: var(--violet); }
+.combat-log-entry.log-reaction { border-left-color: var(--magenta); }
+.combat-log-entry.log-turn { border-left-color: var(--line-strong); color: var(--text-dim); }
+.combat-log-entry.log-encounter { border-left-color: var(--line-strong); color: var(--text-dim); }
+.combat-log-entry.log-scene { border-left-color: var(--line-strong); color: var(--text-dim); }
+.combat-log-entry.log-history { border-left-color: var(--violet); background: var(--surface-3); color: var(--violet-hi); }
+.combat-log-entry.log-movement { border-left-color: var(--success); }

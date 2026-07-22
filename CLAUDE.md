@@ -58,7 +58,8 @@ Monorepo layout (see `docs/ai-context/architecture.md` for detail):
 
 `docs/ai-context/` (how it's built):
 `product-vision.md` · `ux-principles.md` · `architecture.md` · `map-grid.md` ·
-`viewer-mode.md` · `mobile-ux.md` · `realtime.md` · `auth-roles.md` · `testing.md`
+`viewer-mode.md` · `mobile-ux.md` · `realtime.md` · `auth-roles.md` · `testing.md` ·
+`design-language.md`
 
 `docs/ai-ledger/` (living state — read at session start, update after real work):
 `current-state.md` · `decision-log.md` · `known-bugs.md` · `session-summary.md`

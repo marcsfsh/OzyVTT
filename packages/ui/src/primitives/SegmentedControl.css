@@ -1,0 +1,28 @@
+.nh-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.nh-segmented-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-body);
+  cursor: pointer;
+}
+.nh-segmented--sm .nh-segmented-option { padding: var(--space-1) var(--space-2); }
+.nh-segmented-option:hover { color: var(--text); }
+.nh-segmented-option[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--text);
+  box-shadow: var(--glow-cyan);
+}
+.nh-segmented-icon { font-size: 1em; line-height: 1; }

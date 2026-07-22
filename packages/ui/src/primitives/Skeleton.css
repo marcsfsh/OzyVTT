@@ -1,0 +1,18 @@
+.nh-skeleton {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface-3) 50%, var(--surface-2) 70%);
+  background-size: 200% 100%;
+  animation: nh-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.nh-skeleton--text { height: .8em; width: 100%; border-radius: var(--radius-pill); }
+.nh-skeleton--block { height: 8rem; width: 100%; border-radius: var(--radius-md); }
+.nh-skeleton--circle { width: 2.4rem; height: 2.4rem; border-radius: 50%; }
+
+@keyframes nh-skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nh-skeleton { animation: none; }
+}

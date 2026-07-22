@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResolution, ActorDefinition, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
+import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { RollControls, type DieMode } from "./RollControls";
@@ -11,6 +12,7 @@ import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { socket } from "../socket";
 import "./encounter-panel.css";
+import { useConfirm } from "../components/feedback";
 
 type CommandEvent = "encounter:start" | "encounter:end" | "encounter:add-combatant" | "initiative:set" | "initiative:next" | "initiative:previous" | "actor:remove" | "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp" | "turn:use" | "turn:use-reaction" | "turn:use-legendary" | "turn:end" | "scene:activate";
 type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
@@ -161,9 +163,9 @@ function ReactionPrompt({ reaction, actorName, canDismiss, onFeedback, rollMode 
           <button type="button" className={`save-die-mode${rolled.mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => answer(true, { commit: false, rollMode: "advantage" })}>Adv</button>
           <button type="button" className={`save-die-mode${rolled.mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => answer(true, { commit: false, rollMode: "disadvantage" })}>Disadv</button>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => answer(true, { commit: true, attackNatural: rolled.attack.naturalRoll })}>Confirm {hit ? "hit" : "miss"}</button>
-          <button type="button" className="secondary" disabled={busy} title="Roll the swing again" onClick={() => answer(true, { commit: false })}>Re-roll</button>
+          <Button type="button" variant="secondary" disabled={busy} title="Roll the swing again" onClick={() => answer(true, { commit: false })}>Re-roll</Button>
           <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="or type the d20" aria-label="Attack d20" value={dieEdit} onChange={(event) => setDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && dieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={busy || dieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
-          <button type="button" className="secondary" disabled={busy} onClick={() => { setRolled(null); answer(false); }}>Let them go</button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => { setRolled(null); answer(false); }}>Let them go</Button>
         </span>
       : <span className="save-prompt-actions">
           {opportunity
@@ -206,10 +208,9 @@ function EffectChips({ actorId, effects, canEnd, onFeedback }: Readonly<{ actorI
     });
   };
   return <span className="effect-chips">
-    {effects.map((effect) => <span key={effect.id} className="effect-chip" title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`}>
+    {effects.map((effect) => <Chip key={effect.id} tone="info" title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${durationLabel(effect)}${effect.escapeDc ? ` · escape DC ${effect.escapeDc}` : ""}`} onRemove={canEnd ? () => { if (!busy) end(effect.id, effect.name); } : undefined} removeLabel={`End ${effect.name}`}>
       {effect.name}{effect.escapeDc ? <small> DC {effect.escapeDc}</small> : null}
-      {canEnd && <button type="button" className="effect-chip-end" disabled={busy} aria-label={`End ${effect.name}`} onClick={() => end(effect.id, effect.name)}>✕</button>}
-    </span>)}
+    </Chip>)}
   </span>;
 }
 
@@ -366,7 +367,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     const orderedInitiative = activeIndex > 0
       ? [...combat.initiative.slice(activeIndex), ...combat.initiative.slice(0, activeIndex)]
       : combat.initiative;
-    return <section className="encounter-panel" aria-label={`Turn order - round ${combat.round}`}>
+    return <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
         {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
@@ -405,6 +406,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [message, setMessage] = useState("");
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{ message: string; run: () => Promise<MutationResult>; success: string } | null>(null);
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [editingActorId, setEditingActorId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState("");
   const [browsing, setBrowsing] = useState(false);
@@ -414,6 +416,14 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [expandedActorId, setExpandedActorId] = useState<string | null>(null);
   const [hpAmount, setHpAmount] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  // Close the ⋯ options popover on Escape, matching the token menu and the Menu primitive (it already
+  // closes on outside-click via the backdrop). Rich content keeps it a bespoke popover, not a Menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
   // A legendary creature acting off-turn (SRD Legendary Actions): the acting console temporarily
   // switches to it; cleared whenever the real turn advances.
   const [legendaryActingId, setLegendaryActingId] = useState<string | null>(null);
@@ -508,12 +518,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     "Moved to the previous turn.",
     () => emitCommand("initiative:previous", { commandId: newId(), confirmDiscard: true, expectedRevision: state.revision })
   );
-  const end = () => {
-    if (!window.confirm("End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.")) return;
+  const end = async () => {
+    if (!(await askConfirm({ title: "End encounter?", body: "End this encounter? Initiative will remain saved for reference, but the shared viewer will hide it.", confirmLabel: "End encounter", danger: true }))) return;
     void run(() => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }), "Encounter ended.");
   };
-  const remove = (actorId: string, name: string) => {
-    if (!window.confirm(`Remove ${name} from the roster?`)) return;
+  const remove = async (actorId: string, name: string) => {
+    if (!(await askConfirm({ title: "Remove combatant?", body: `Remove ${name} from the roster?`, confirmLabel: "Remove", danger: true }))) return;
     void run(() => emitCommand("actor:remove", { commandId: newId(), actorId, expectedRevision: state.revision }), `Removed ${name}.`);
   };
   const adjustHp = (event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp", actorId: string, name: string, options?: { nonlethal?: boolean }) => {
@@ -599,7 +609,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     </>;
   };
 
-  return <section className={`encounter-panel${state.combat.active ? "" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
+  return <section className={`encounter-panel${state.combat.active ? " combat-active" : " setup"}`} {...(state.combat.active ? { "aria-label": `Turn order - round ${state.combat.round}` } : { "aria-labelledby": "gm-encounter-title" })}>
     {/* During combat the panel has NO heading block - the round pill rides the one control bar. */}
     {!state.combat.active && <div className="encounter-heading"><div><span className="eyebrow">ENCOUNTER</span><h2 id="gm-encounter-title">Encounter setup</h2></div></div>}
     {/* Docking the tracker to the map is available before AND during combat (report #9). */}
@@ -610,10 +620,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       <label className="encounter-map">
         <span>Encounter map</span>
         {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").length > 0 && onSelectMap
-          ? <select value={selectedMap?.kind === "battlemap" ? selectedMap.id : ""} disabled={busy} onChange={(event) => { const map = (mapLibrary ?? []).find((candidate) => candidate.id === event.target.value); if (map) onSelectMap(map); }}>
+          ? <Select value={selectedMap?.kind === "battlemap" ? selectedMap.id : ""} disabled={busy} onChange={(event) => { const map = (mapLibrary ?? []).find((candidate) => candidate.id === event.target.value); if (map) onSelectMap(map); }}>
               {selectedMap?.kind !== "battlemap" && <option value="" disabled>Choose a battlemap…</option>}
               {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
-            </select>
+            </Select>
           : <strong>{selectedMap?.name ?? "Upload a battlemap on the Map Setup tab first"}</strong>}
       </label>
       {/* Undocked at desktop this region scrolls so the panel stays as tall as the map, not taller
@@ -629,14 +639,14 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         </div>}
         <div className="menu-section">
           <p className="menu-section-title">{recent.length > 0 ? "More combatants" : "Combatants"}</p>
-          <input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
+          <Input type="search" className="combatant-search" placeholder="Search by name or type…" value={combatantSearch} onChange={(event) => setCombatantSearch(event.target.value)} aria-label="Search combatants" />
           {otherCombatants.length > 0
             ? <ul className="combatant-setup">{otherCombatants.map(combatantRow)}</ul>
             : <p className="menu-empty-note">{search ? "No combatants match your search." : "No other combatants on the roster - add monsters below."}</p>}
         </div>
       </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
-      <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter</button>
+      <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter<span className="nav-arrow" aria-hidden="true">→</span></button>
     </> : <>
       {(() => {
         const placed = state.combat.tokens.filter((token) => token.position !== null).length;
@@ -653,44 +663,47 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           the space; everything occasional (rules mode, environment, dock, add, end) lives behind ⋯. */}
       <div className="encounter-topbar">
         <strong className="encounter-round">Round {state.combat.round}</strong>
-        <div className="turn-controls"><button className="encounter-primary turn-prev" disabled={busy} onClick={previous} title="Previous turn" aria-label="Previous turn">‹</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}</button></div>
+        <div className="turn-controls"><button className="encounter-primary turn-prev" disabled={busy} onClick={previous} title="Previous turn" aria-label="Previous turn">‹</button><button className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`} disabled={busy} onClick={next}>{nextLabel}<span className="nav-arrow" aria-hidden="true">→</span></button></div>
         {/* Mid-fight reinforcements are a combat action, not a setting - one visible tap. */}
         <button type="button" className="encounter-menu-toggle" disabled={busy} title="Add monsters to this fight (SRD)" aria-label="Add monsters to this fight" onClick={() => setBrowsing(true)}>+</button>
         <button type="button" className="encounter-menu-toggle" aria-expanded={menuOpen} aria-haspopup="menu" title="Encounter options - rules mode, environment, roster, end" onClick={() => setMenuOpen((current) => !current)}>⋯</button>
         {menuOpen && <>
           <div className="encounter-overlay-backdrop" onPointerDown={() => setMenuOpen(false)} />
-          <div className="encounter-menu" role="menu" aria-label="Encounter options">
+          <div className="encounter-menu anim-popover" role="menu" aria-label="Encounter options">
             <label className="rules-mode-control">Rules
-              <select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules mode: ${mode}.` : result.message ?? "The rules mode could not be changed.")); }}>
+              <Select value={state.combat.rulesMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "strict" | "assisted" | "freeform"; socket.emit("encounter:set-rules-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Rules mode: ${mode}.` : result.message ?? "The rules mode could not be changed.")); }}>
                 <option value="strict">Strict - block invalid actions (override available)</option>
                 <option value="assisted">Assisted - allow with warnings</option>
                 <option value="freeform">Freeform - no checks</option>
-              </select>
+              </Select>
             </label>
             <label className="rules-mode-control">Rolls
-              <select value={state.combat.rollMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "auto" | "manual"; socket.emit("encounter:set-roll-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Roll mode: ${mode === "auto" ? "auto-roll" : "manual entry"}.` : result.message ?? "The roll mode could not be changed.")); }}>
+              <Select value={state.combat.rollMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "auto" | "manual"; socket.emit("encounter:set-roll-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Roll mode: ${mode === "auto" ? "auto-roll" : "manual entry"}.` : result.message ?? "The roll mode could not be changed.")); }}>
                 <option value="auto">Auto-roll - type to override</option>
                 <option value="manual">Manual entry - Roll to auto</option>
-              </select>
+              </Select>
             </label>
             <label className="rules-mode-control">Health
-              <select value={state.combat.healthDisplay.style} disabled={busy} onChange={(event) => { const style = event.target.value as "band" | "bar" | "ring" | "aura"; socket.emit("encounter:set-health-display", { commandId: newId(), style, audience: state.combat.healthDisplay.audience }, (result: MutationResult) => setMessage(result.ok ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.` : result.message ?? "The health display could not be changed.")); }}>
+              <Select value={state.combat.healthDisplay.style} disabled={busy} onChange={(event) => { const style = event.target.value as "band" | "bar" | "ring" | "aura"; socket.emit("encounter:set-health-display", { commandId: newId(), style, audience: state.combat.healthDisplay.audience }, (result: MutationResult) => setMessage(result.ok ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.` : result.message ?? "The health display could not be changed.")); }}>
                 <option value="band">Status badge</option>
                 <option value="bar">HP bar</option>
                 <option value="ring">Health ring</option>
                 <option value="aura">Health aura</option>
-              </select>
+              </Select>
             </label>
             <label className="rules-mode-control">Show health to
-              <select value={state.combat.healthDisplay.audience} disabled={busy || state.combat.healthDisplay.style === "band"} onChange={(event) => { const audience = event.target.value as "gm" | "all"; socket.emit("encounter:set-health-display", { commandId: newId(), style: state.combat.healthDisplay.style, audience }, (result: MutationResult) => setMessage(result.ok ? `Health shown to ${audience === "all" ? "everyone" : "the GM only"}.` : result.message ?? "The health display could not be changed.")); }}>
+              <Select value={state.combat.healthDisplay.audience} disabled={busy || state.combat.healthDisplay.style === "band"} onChange={(event) => { const audience = event.target.value as "gm" | "all"; socket.emit("encounter:set-health-display", { commandId: newId(), style: state.combat.healthDisplay.style, audience }, (result: MutationResult) => setMessage(result.ok ? `Health shown to ${audience === "all" ? "everyone" : "the GM only"}.` : result.message ?? "The health display could not be changed.")); }}>
                 <option value="gm">GM only</option>
                 <option value="all">Everyone</option>
-              </select>
+              </Select>
             </label>
-            <label className="environment-control">
-              <input type="checkbox" checked={state.combat.underwater} disabled={busy} onChange={(event) => { const underwater = event.target.checked; socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed.")); }} />
-              Underwater fight
-            </label>
+            <Switch
+              className="environment-control"
+              label="Underwater fight"
+              checked={state.combat.underwater}
+              disabled={busy}
+              onChange={(underwater) => socket.emit("encounter:set-environment", { commandId: newId(), underwater }, (result: MutationResult) => setMessage(result.ok ? (underwater ? "The fight is now underwater." : "The fight is no longer underwater.") : result.message ?? "The environment could not be changed."))}
+            />
             <div className="menu-section" role="group" aria-label="Add combatants">
               <p className="menu-section-title">Add to the fight</p>
               {(() => {
@@ -711,7 +724,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       {confirm && <div className="turn-confirm" role="alertdialog" aria-label="Confirm history change">
         <span>{confirm.message}</span>
         <div className="turn-confirm-actions">
-          <button type="button" className="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
         </div>
       </div>}
@@ -760,9 +773,9 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setMessage} />
               <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={setMessage} />
               <div className="initiative-row-tools">
-                <button type="button" className="secondary" disabled={busy} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>{state.combat.reactionsUsed.includes(actor.id) ? "Restore reaction" : "Spend reaction"}</button>
-                <button type="button" className="secondary" onClick={() => { setSheetActorId(actor.id); setExpandedActorId(null); }}>Open sheet</button>
-                <button type="button" className="secondary" onClick={() => { setExpandedActorId(null); }}>Close</button>
+                <Button type="button" variant="secondary" disabled={busy} onClick={() => void run(() => emitCommand("turn:use-reaction", { commandId: newId(), actorId: actor.id, used: !state.combat.reactionsUsed.includes(actor.id), expectedRevision: state.revision }), state.combat.reactionsUsed.includes(actor.id) ? "Reaction restored." : "Reaction spent.")}>{state.combat.reactionsUsed.includes(actor.id) ? "Restore reaction" : "Spend reaction"}</Button>
+                <Button type="button" variant="secondary" onClick={() => { setSheetActorId(actor.id); setExpandedActorId(null); }}>Open sheet</Button>
+                <Button type="button" variant="secondary" onClick={() => { setExpandedActorId(null); }}>Close</Button>
               </div>
             </div>
           </>}
@@ -777,5 +790,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
     {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" onClose={() => setSheetActorId(null)} /> : null; })()}
+    {confirmDialog}
   </section>;
 }

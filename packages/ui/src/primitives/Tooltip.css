@@ -1,0 +1,29 @@
+.nh-tooltip { position: relative; display: inline-flex; }
+.nh-tooltip-trigger { display: inline-flex; }
+.nh-tooltip-bubble {
+  position: absolute;
+  z-index: 50;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(-4px);
+  width: max-content;
+  max-width: 16rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 500 var(--fs-sm) / 1.4 var(--font-body);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-hover), transform var(--dur-hover), visibility var(--dur-hover);
+}
+.nh-tooltip--bottom .nh-tooltip-bubble { bottom: auto; top: calc(100% + 6px); transform: translateX(-50%) translateY(4px); }
+.nh-tooltip:hover .nh-tooltip-bubble,
+.nh-tooltip:focus-within .nh-tooltip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}

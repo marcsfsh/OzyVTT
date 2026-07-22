@@ -1,6 +1,7 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
+import "@vtt/ui/styles.css";
 import "./styles.css";
 import { ActorRoster } from "./actors/ActorRoster";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -20,6 +21,8 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Button, Input } from "@vtt/ui";
+import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
 async function api(path: string, init?: RequestInit) {
@@ -65,6 +68,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState<Connection>("online");
   const { confirm, dialog } = useConfirm();
+  const { toast } = useToast();
   // Undocked setup: the encounter-setup panel is sized to the map/scene panel's exact height (its
   // combatant list scrolls inside). We measure that panel live and publish it as `--setup-h` on the
   // grid, which the setup panel reads; the ResizeObserver keeps it in step as the map column reflows
@@ -83,7 +87,9 @@ function App() {
   }, []);
 
   const fail = (text: string) => setNotice({ tone: "error", text });
-  const succeed = (text: string) => setNotice({ tone: "success", text });
+  // Ephemeral acknowledgements ("Signed out", "GM password set") go to the shared toast surface;
+  // errors and pending states stay inline (Notice) where they're prominent next to the auth form.
+  const succeed = (text: string) => toast(text, { tone: "success" });
 
   useEffect(() => {
     api("/api/bootstrap/status").then(({ bootstrapped }) => setBootstrapped(bootstrapped)).catch((error) => fail(error.message));
@@ -214,19 +220,27 @@ function App() {
   }, [previewScene]);
   const makeSceneLive = (sceneId: string) => socket.emit("scene:activate", { commandId: newId(), sceneId }, () => setPreviewScene(null));
   return <main>
-    {mode === "home" && <header><span className="eyebrow">YOUR TABLE</span><h1>Table ready.</h1><p>Combat-first D&amp;D 5e, hosted by your group.</p></header>}
+    <div className="app-texture" aria-hidden="true" />
+    {mode !== "home" && <TableEventToasts />}
+    {mode === "home" && <header className="home-hero scanlines anim-view">
+      <div className="home-hero-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div>
+      <span className="eyebrow">Your table</span>
+      <h1 className="home-hero-title"><Wordmark>OzyVTT</Wordmark></h1>
+      <p>Combat-first D&amp;D 5e, hosted by your group. Table ready.</p>
+      <div className="home-theme-switch"><ThemeToggle /></div>
+    </header>}
     {mode !== "home" && connection !== "online" && <p className="connection-banner" role="status">{connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}</p>}
     <Notice notice={notice} />
-    {mode === "home" && <section className="choices">
-      <button onClick={joinPlayer} disabled={busy}><strong>Join as Player</strong><span>Choose your character and take your seat.</span></button>
-      <button className="secondary" onClick={() => { setNotice(null); setMode("gm"); }}><strong>Enter as GM</strong><span>Run the table, encounter, and hidden information.</span></button>
+    {mode === "home" && <section className="choices anim-view">
+      <button className="lift" onClick={joinPlayer} disabled={busy}><strong>Join as Player</strong><span>Choose your character and take your seat.</span><span className="nav-arrow" aria-hidden="true">→</span></button>
+      <button className="secondary lift" onClick={() => { setNotice(null); setMode("gm"); }}><strong>Enter as GM</strong><span>Run the table, encounter, and hidden information.</span><span className="nav-arrow" aria-hidden="true">→</span></button>
     </section>}
-    {mode === "gm" && !gmToken && <section className="card">
+    {mode === "gm" && !gmToken && <section className="card anim-view">
       <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
       <p>{bootstrapped ? "Enter the GM password to run the table." : "Do this once, on the host machine, before players join."}</p>
-      <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
-      <button onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}</button>
-      <button className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</button>
+      <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="GM password" autoFocus onKeyDown={(event) => { if (event.key === "Enter" && !busy) (bootstrapped ? loginGm() : bootstrap()); }} />
+      <Button variant="primary" onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <span className="nav-arrow" aria-hidden="true">→</span>}</Button>
+      <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
     </section>}
     {mode !== "home" && state && <>
       {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
@@ -236,11 +250,15 @@ function App() {
         ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
         : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
 
-      {mode === "gm" && <nav className="gm-tabs" aria-label="GM sections">
-        {GM_TABS.map((tab) => <button key={tab.id} aria-pressed={gmTab === tab.id} onClick={() => setGmTab(tab.id)}>{tab.label}</button>)}
-      </nav>}
+      {mode === "gm" && <Tabs
+        className="gm-tabs"
+        ariaLabel="GM sections"
+        tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+        activeId={gmTab}
+        onChange={(id) => setGmTab(id as GmTab)}
+      />}
 
-      {(mode === "player" || gmTab === "table") && <div className={`table-layout${showDocked ? " docked" : ""}`}>
+      {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
               Guarded on the field, not just the mode - the first state after login can still be
@@ -270,9 +288,9 @@ function App() {
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
             healthDisplay={mode === "gm" ? (state as GmView).combat.healthDisplay : undefined}
-          /> : <div className="empty"><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
+          /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
-          {mode === "gm" && gmToken && !previewScene && <button type="button" className="secondary viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</button>}
+          {mode === "gm" && gmToken && !previewScene && <Button variant="secondary" className="viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</Button>}
         </section>
         <div className="table-sidebar">
           {previewScene
@@ -288,33 +306,31 @@ function App() {
                 <DicePanel role={mode} state={state} />
                 <CombatLogPanel />
               </>}
-          {mode === "player" && <section className="gm-session-controls"><button className="secondary" onClick={leavePlayer}>Leave table</button></section>}
+          {mode === "player" && <section className="gm-session-controls"><Button variant="secondary" onClick={leavePlayer}>Leave table</Button></section>}
         </div>
       </div>}
 
-      {mode === "gm" && gmToken && gmTab === "maps" && <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />}
+      {mode === "gm" && gmToken && gmTab === "maps" && <div className="anim-view"><MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} /></div>}
       {/* Scenes moved to the Encounter tab's switcher strip; Map Setup is purely library management. */}
 
-      {mode === "gm" && gmToken && gmTab === "viewer" && <ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} />}
+      {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
-      {mode === "gm" && gmToken && gmTab === "replay" && <ReplayPanel gmToken={gmToken} />}
+      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
-      {mode === "gm" && gmToken && scenePrepOpen && state && <div className="scene-prep-backdrop" role="dialog" aria-modal="true" aria-label="Scene prep" onPointerDown={(event) => { if (event.target === event.currentTarget) setScenePrepOpen(false); }}>
-        <div className="scene-prep-modal">
-          <button type="button" className="scene-prep-close" aria-label="Close scene prep" onClick={() => setScenePrepOpen(false)}>✕</button>
-          <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} />
-        </div>
-      </div>}
+      {mode === "gm" && gmToken && scenePrepOpen && state && <Modal open onClose={() => setScenePrepOpen(false)} size="lg" className="scene-prep-modal" title="Scene prep" ariaLabel="Scene prep">
+        <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} />
+      </Modal>}
 
-      {mode === "gm" && gmToken && gmTab === "setup" && <>
+      {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">
+        <section className="setup-appearance"><span className="eyebrow">APPEARANCE</span><ThemeToggle /></section>
         <IntegrationsPanel gmToken={gmToken} />
-        <section className="gm-session-controls"><button className="secondary" onClick={signOutGm} disabled={busy}>Sign out</button><button className="danger" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</button></section>
-      </>}
+        <section className="gm-session-controls"><Button variant="secondary" onClick={signOutGm} disabled={busy}>Sign out</Button><Button variant="destructive" onClick={revokeAllGmSessions} disabled={busy}>Revoke all GM sessions</Button></section>
+      </div>}
     </>}
     {dialog}
   </main>;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><AppErrorBoundary><App /></AppErrorBoundary></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><AppErrorBoundary><ToastProvider><App /></ToastProvider></AppErrorBoundary></StrictMode>);

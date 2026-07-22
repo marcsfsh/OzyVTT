@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CombatLogEntry, GameState } from "@vtt/domain";
+import { Button } from "@vtt/ui";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { AnnotationGlyph } from "../scene/annotationGlyph";
 import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
@@ -26,7 +27,7 @@ async function gmApi(path: string, token: string) {
   return body;
 }
 
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "-");
+const when = (iso: string | null) => <span className="tabular">{iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "-"}</span>;
 
 /** Save an archive document as a JSON file - the same machine-readable record the API serves, for spreadsheets, scripts, or archiving outside the host. */
 function exportDocument(id: number, endedAt: string, document: ArchiveDocument) {
@@ -111,7 +112,7 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
   }, [playing, index, steps.length]);
   useEffect(() => { containerRef.current?.focus(); }, [document]);
 
-  if (error) return <section className="card replay-panel"><h2>Encounter replay</h2><p className="replay-error">{error}</p><button className="secondary" onClick={onBack}>Back to replays</button></section>;
+  if (error) return <section className="card replay-panel"><h2>Encounter replay</h2><p className="replay-error">{error}</p><Button variant="secondary" onClick={onBack}>Back to replays</Button></section>;
   if (!document || !step) return <section className="card replay-panel"><h2>Encounter replay</h2><p>Loading the recording…</p></section>;
 
   const turnLog = document.log.filter((entry) => entry.revision > step.from && entry.revision <= step.to);
@@ -128,12 +129,12 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
     }}
   >
     <div className="replay-header">
-      <button className="secondary" onClick={onBack}>← All replays</button>
+      <Button variant="secondary" onClick={onBack}>← All replays</Button>
       <div>
         <h2>Encounter replay</h2>
         <p className="replay-meta">{when(document.startedAt)} → {when(document.endedAt)} · {document.turns.length} recorded turns</p>
       </div>
-      <button className="secondary replay-export" onClick={() => exportDocument(summary.id, summary.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks.">⬇ Export JSON</button>
+      <Button variant="secondary" className="replay-export" onClick={() => exportDocument(summary.id, summary.endedAt, document)} title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks.">⬇ Export JSON</Button>
     </div>
     <div className="replay-transport" role="group" aria-label="Replay controls">
       <button onClick={() => move(-1)} disabled={index === 0} aria-label="Previous turn">⏮ Prev</button>
@@ -201,7 +202,7 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     <p>Every finished encounter is recorded automatically. Open one to step through it turn by turn and study how the fight unfolded - positions, hit points, and everything that was narrated, including GM-only lines.</p>
     {error && <p className="replay-error">{error}</p>}
     {archives === null && <p>Loading recordings…</p>}
-    {archives !== null && archives.length === 0 && !error && <p className="replay-log-empty">No recordings yet - end an encounter and it will appear here.</p>}
+    {archives !== null && archives.length === 0 && !error && <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎬</span><span className="nh-empty-title">No recordings yet</span><span className="nh-empty-text">Finish an encounter and its replay appears here to step through turn by turn.</span></div>}
     {archives !== null && archives.length > 0 && <table className="replay-list">
       <thead><tr><th>Fought</th><th>Ended</th><th>Turns</th><th aria-label="Actions" /></tr></thead>
       <tbody>{archives.map((archive) => <tr key={archive.id}>
@@ -209,8 +210,8 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         <td>{when(archive.endedAt)}</td>
         <td>{archive.turnCount}</td>
         <td className="replay-row-actions">
-          <button onClick={() => setOpen(archive)}>▶ Watch</button>
-          <button className="secondary" onClick={() => exportArchive(archive)} disabled={exporting === archive.id} title="Download the full machine-readable record as JSON.">{exporting === archive.id ? "Exporting…" : "⬇ Export"}</button>
+          <Button variant="secondary" onClick={() => setOpen(archive)}>▶ Watch</Button>
+          <Button variant="secondary" onClick={() => exportArchive(archive)} disabled={exporting === archive.id} title="Download the full machine-readable record as JSON.">{exporting === archive.id ? "Exporting…" : "⬇ Export"}</Button>
         </td>
       </tr>)}</tbody>
     </table>}

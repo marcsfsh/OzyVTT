@@ -8,6 +8,87 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **UI design system — OzyVTT (2026-07-21).** A tokenized retrowave design language
+  lives in `packages/ui`: `design-tokens.css` (three themes — dark default, dusk, light — via
+  `data-theme` on `<html>`), self-hosted `@fontsource` fonts (Bungee/Russo One/Manrope/Space
+  Mono, no runtime CDN), and an `nh-`-namespaced primitive kit (Button, Field/Input/Select,
+  Panel, Tabs, Menu, Tooltip, Modal, Chip, Wordmark, Toast, ThemeToggle). Consumed as source by
+  the client's three Vite entries (`main`, `viewer`, `styleguide`) via `import "@vtt/ui/styles.css"`.
+  All 16 client stylesheets migrated off the old parchment/amber palette to tokens (0 hardcoded
+  legacy colors); native `window.confirm/prompt` retired for styled `useConfirm`/`usePrompt`
+  dialogs; on-map HP/team/active-turn colors moved to the palette. Signature moments: the home
+  hero (chrome wordmark + grid + bloom), empty-map atmosphere, faint app-shell CRT texture, and
+  the `.combat-active` hue shift. Dev-only `/styleguide` route is the living reference. No
+  server/domain/projection changes; viewer projection untouched. See
+  `docs/ai-context/design-language.md`. The app + design system are named **OzyVTT**.
+  - **Motion + audit follow-up (2026-07-21, same PR).** The shared motion vocabulary is now
+    pervasive, not primitive-only: every raw `<button>` presses, `input`/`select`/`textarea`/
+    `summary` transition instead of snapping, genuine click-target cards (map library, grid-type,
+    token thumbs) hover-lift, forward CTAs (home choices, Enter table, Start encounter, Next turn)
+    carry a nudge arrow, and each GM tab panel animates in (`view-in`, guarded so dense initiative/
+    log/token rows stay press-only). Structural primitive adoption closed conformance gaps:
+    `useConfirm`/`usePrompt` are rebuilt on the `Modal` primitive (native `<dialog>` focus-trap +
+    return, scrim blur, scroll-lock, `dialog-in`); condition chips flow through `Chip` with the
+    shared SRD glyphs as icons + tone (harmful/magical) so category survives a color-blind read;
+    map health uses `hp-fill-*` band classes that resolve `--cyan`/`--magenta`/`--danger` so token
+    health follows dark/dusk/light on table + viewer; drawing colors (player/annotation/crosshair/
+    AoE) move onto the brand ramp, dropping the banned green/orange/yellow/amber.
+  - **Consolidation wave 2 (2026-07-21, same PR).** Transient notifications collapse onto one
+    surface: the app is wrapped in `ToastProvider`, battlemap `table:event`s and ephemeral GM
+    acknowledgements route through `useToast`, and the bespoke `MapToastStack` + inline-success
+    `Notice` path are retired (`Notice` stays for inline errors/pending). Effect chips join
+    condition chips on the `Chip` primitive (dead pill CSS removed). Rich popovers stay bespoke
+    (they hold controls, not menu items) but match the `Menu` primitive's behavior — the ⋯ options
+    popover closes on Escape and both it and the token menu use the `anim-popover` entrance; the
+    two `role="group"` segmented controls (viewer tool, API language) are correctly left as groups,
+    not forced into tablists. `<code>`/timestamps use the branded mono face (tabular figures), and
+    the replay/viewer/map focus rings unify onto the shared layered `--focus-ring-color`. All five
+    bespoke feature modals — scene prep, character sheet, monster browser, spell card, token
+    library — now render through the shared `Modal` primitive (native `<dialog>` focus-trap + return,
+    scrim blur, scroll-lock, `dialog-in`), retiring the three hand-rolled backdrops and every
+    per-modal head/close/box rule; the spell card keeps its violet identity via `accent="violet"`.
+    The `/styleguide` gallery demos every primitive (Modal, Toast, Menu, Tooltip, Chip-with-icon,
+    Tabs, motion) across all three themes — it is the complete living reference.
+  - **Full component-primitive adoption (2026-07-21, same PR).** The generic raw controls across
+    all ~16 client feature files now render as `Button`/`Input`/`Select` components (variants
+    secondary/ghost/destructive/primary) instead of raw `<button>`/`<input>`/`<select>` — done as a
+    visual-preserving swap (parallel agents + review). Genuinely-specialized controls stay
+    intentional custom components (combat CTAs, economy-slot toggles, map-tool icon buttons,
+    condition/scene chips, token/map cards, menu rows, HP/dice steppers, calibration swatches,
+    `role="group"` segmented controls) — the design system's Button/Input are for generic controls,
+    not these. Form submit buttons keep an explicit `type="submit"` (the primitive defaults to
+    `type="button"`). No CSS/logic/projection changes. Only deferred item left: the ⌘K command
+    palette (its motion already landed; the feature is a separate later pass).
+  - **New primitives + template patterns + polish (2026-07-21, same PR).** Expanded `@vtt/ui` with
+    four small forward-looking primitives for the app's next surfaces (character sheets/builder,
+    homebrew, content importing): `Badge` (count/status/tag), `Avatar` (monogram or portrait + presence
+    dot), `Meter` (labeled HP/resource bar; health tone auto-bands cyan/magenta/danger like token +
+    map health), and `Alert` (in-flow info/success/warning/danger banner — the persistent counterpart
+    to a Toast). Added `styles/patterns.css` with shared class templates `.nh-table` (content lists/
+    imports), `.nh-statlist` (stat-block key-value grid), and `.nh-empty` (empty state). All
+    on-palette (success = cyan, no green), theme-aware (AA in light), and demoed live in `/styleguide`
+    with their own sections. Six more distinct primitives followed, each its own category:
+    `Switch` (immediate on/off setting), `Stepper` (numeric −/+ spinner), `SegmentedControl` (inline
+    pick-one for filters/modes, distinct from Tabs), `Steps` (multi-step wizard progress), `Skeleton`
+    (reduced-motion-safe loading shimmer), and `Kbd` (key cap for shortcut hints / the coming ⌘K
+    palette). Two fixes: the theme-toggle content is now optically centred (Manrope
+    line-box nudge), and the GM setup view's empty map hero is sized like a real battlemap so the map
+    panel and the `--setup-h`-matched encounter panel are comfortably tall instead of short stubs.
+  - **Existing components conformed to the new primitives (2026-07-22, same PR).** After a
+    component audit, the clear hand-rolled duplicates of the new primitives were migrated onto them
+    (presentational only — no logic/projection/API changes): the three −/value/+ clusters (roster
+    hit-dice, exhaustion level, dice modifier) now use `Stepper` — which gained an optional
+    `format` prop for signed values (`±0`/`+3`), demoed in the styleguide; the three
+    `role="group"` aria-pressed pickers (map-kind filter, viewer presentation tool, API example
+    language) now use `SegmentedControl` (this **supersedes** the earlier "left as groups" note now
+    that the primitive exists); the actor-card monogram + presence dot became `Avatar` (domain
+    `reconnecting` maps to Avatar's `away`); the YOU / claim-status / token "Recent" pills became
+    `Badge` (tone by state); the underwater-fight and "others can move this" immediate toggles became
+    `Switch`; and the roster / integrations / token-library / replay section empties adopted the
+    shared `.nh-empty` template. Dead per-feature CSS retired. Specialized controls stay bespoke on
+    purpose (kind-colored initiative/tray avatars, save-die-mode, grid-mode cards, CharacterSheet
+    stat grids, on-canvas health SVG + dense initiative HP bar). Verified `check`+`test` (456)+
+    `build`, and Playwright dark/light/390px on every migrated surface.
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,

@@ -11,6 +11,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "@vtt/api-contract": "*",
     "@vtt/domain": "*",
+    "@vtt/ui": "*",
     "pixi.js": "^8.19.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

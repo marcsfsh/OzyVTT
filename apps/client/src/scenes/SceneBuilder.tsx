@@ -4,6 +4,7 @@ import { MonsterBrowser } from "../encounter/MonsterBrowser";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./scene-panel.css";
+import { usePrompt } from "../components/feedback";
 
 /**
  * The encounter-builder shown in the sidebar while the GM stages a scene privately. It's the same
@@ -16,6 +17,7 @@ export function SceneBuilder({ scene, actors, revision }: Readonly<{ scene: Scen
   const [message, setMessage] = useState("");
   const [browsing, setBrowsing] = useState(false);
   const inScene = new Set(scene.combat.initiative.map((entry) => entry.actorId));
+  const { prompt, dialog } = usePrompt();
 
   const setCombatants = (ids: readonly string[]) => {
     setBusy(true); setMessage("");
@@ -29,8 +31,8 @@ export function SceneBuilder({ scene, actors, revision }: Readonly<{ scene: Scen
   return <section className="scene-builder" aria-labelledby="scene-builder-heading">
     <div className="scene-builder-head"><span className="eyebrow">STAGING · GM ONLY</span>
       <h2 id="scene-builder-heading">{scene.name}
-        <button type="button" className="scene-rename" disabled={busy} title="Rename this scene" aria-label={`Rename ${scene.name}`} onClick={() => {
-          const next = window.prompt("Rename scene:", scene.name)?.trim();
+        <button type="button" className="scene-rename" disabled={busy} title="Rename this scene" aria-label={`Rename ${scene.name}`} onClick={async () => {
+          const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
           if (!next || next === scene.name) return;
           setBusy(true); setMessage("");
           socket.emit("scene:rename", { commandId: newId(), sceneId: scene.id, name: next }, (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setMessage(result.message ?? "The scene could not be renamed."); });
@@ -46,5 +48,6 @@ export function SceneBuilder({ scene, actors, revision }: Readonly<{ scene: Scen
     <p className="scene-builder-count">{inScene.size} combatant{inScene.size === 1 ? "" : "s"} staged</p>
     {message && <p className="scene-builder-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
+    {dialog}
   </section>;
 }

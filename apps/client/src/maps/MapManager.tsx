@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Button, Input, SegmentedControl, Select } from "@vtt/ui";
 import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
 import "./map-manager.css";
+import { usePrompt } from "../components/feedback";
 
 type Point = { x: number; y: number };
 type MapKind = "battlemap" | "regional" | "world";
@@ -75,7 +77,7 @@ function GridAreaPreview({ start, end, handle }: Readonly<{ start: Point; end: P
 
 /** Two full-map guide lines that follow the point being placed/adjusted, to help line up a corner against printed grid art before or during a drag. */
 const CROSSHAIR_PRESETS: ReadonlyArray<{ color: string; label: string }> = [
-  { color: "#ffcf62", label: "Amber" }, { color: "#58c3ff", label: "Cyan" }, { color: "#ff6b6b", label: "Red" }, { color: "#8fff9a", label: "Green" }, { color: "#ffffff", label: "White" }
+  { color: "#2de2ff", label: "Cyan" }, { color: "#ff2e9a", label: "Magenta" }, { color: "#a45cff", label: "Violet" }, { color: "#ff2d5e", label: "Rose" }, { color: "#ffffff", label: "White" }
 ];
 function CrosshairOverlay({ points, width, height, color, opacity, dash }: Readonly<{ points: readonly Point[]; width: number; height: number; color: string; opacity: number; dash: string }>) {
   return <g className="grid-crosshair" aria-hidden="true" style={{ stroke: color, opacity, strokeDasharray: dash }}>
@@ -103,7 +105,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [pendingArea, setPendingArea] = useState<{ start: Point; end: Point } | null>(null);
   const [areaAction, setAreaAction] = useState<"move" | "resize" | null>(null);
   const [moveGrab, setMoveGrab] = useState<Point | null>(null);
-  const [crosshairColor, setCrosshairColor] = useState("#ffcf62");
+  const [crosshairColor, setCrosshairColor] = useState("#2de2ff");
   const [crosshairOpacity, setCrosshairOpacity] = useState(0.8);
   const [crosshairStyle, setCrosshairStyle] = useState<"dashed" | "dotted" | "solid">("dashed");
   const [previewCamera, setPreviewCamera] = useState<{ center: Point; zoom: number } | null>(null);
@@ -118,6 +120,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
   const [unit, setUnit] = useState("miles");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const { prompt, dialog } = usePrompt();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const selected = maps.find((map) => map.id === selectedId) ?? null;
@@ -346,37 +349,43 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
       <div className="map-manager-heading"><div><span className="eyebrow">GM MAP LIBRARY</span><h2 id="map-manager-heading">Maps and grid setup</h2></div><p>Upload an image, align its printed grid, then present it to the shared screen.</p></div>
       <form className="map-upload" onSubmit={upload}>
         <label>Map image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !name) setName(next.name.replace(/\.[^.]+$/, "")); }} /></label>
-        <label>Map name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Ruined Keep" /></label>
-        <label>Map type<select value={kind} onChange={(event) => setKind(event.target.value as MapKind)}><option value="battlemap">Battlemap</option><option value="regional">Regional map</option><option value="world">World map</option></select></label>
-        <label>Folder<input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="map-folder-list" /></label>
+        <label>Map name<Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Ruined Keep" /></label>
+        <label>Map type<Select value={kind} onChange={(event) => setKind(event.target.value as MapKind)}><option value="battlemap">Battlemap</option><option value="regional">Regional map</option><option value="world">World map</option></Select></label>
+        <label>Folder<Input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} maxLength={60} placeholder="Optional" list="map-folder-list" /></label>
         <datalist id="map-folder-list">{folderNames.map((folder) => <option key={folder} value={folder} />)}</datalist>
-        <button disabled={busy || !file}>Upload map</button>
+        <Button variant="primary" type="submit" disabled={busy || !file}>Upload map</Button>
       </form>
       {message && <p className="map-feedback" role="status">{message}</p>}
       {maps.length > 0 && <div className="map-workspace">
         <div className="map-list-column">
           <div className="map-list-filters" role="group" aria-label="Filter maps">
-            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search maps" aria-label="Search maps" />
-            <div className="map-kind-chips">{(["all", "battlemap", "regional", "world"] as const).map((value) => <button key={value} type="button" aria-pressed={kindFilter === value} onClick={() => setKindFilter(value)}>{value === "all" ? "All" : value === "battlemap" ? "Battlemaps" : value === "regional" ? "Regional" : "World"}</button>)}</div>
+            <Input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search maps" aria-label="Search maps" />
+            <SegmentedControl
+              ariaLabel="Filter maps by type"
+              size="sm"
+              value={kindFilter}
+              onChange={(value) => setKindFilter(value as typeof kindFilter)}
+              options={[{ value: "all", label: "All" }, { value: "battlemap", label: "Battlemaps" }, { value: "regional", label: "Regional" }, { value: "world", label: "World" }]}
+            />
           </div>
           <nav className="map-list" aria-label="Uploaded maps">
             {groupedMaps.length === 0 && <p className="map-list-empty">No maps match this filter.</p>}
             {groupedMaps.map((group) => <div key={group.folder ?? "__unfiled"} className="map-folder-group">
               <p className="map-folder-label">{group.folder ?? "Unfiled"}</p>
-              {group.maps.map((map) => <button key={map.id} className={map.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(map.id)}><strong>{map.name}</strong><span>{map.kind} · {map.width}×{map.height}</span><small>{map.calibration ? "Grid calibrated" : map.scale ? `Scale ${map.scale.distancePerPixel.toPrecision(3)} ${map.scale.unit}/px` : "Needs scale setup"}</small></button>)}
+              {group.maps.map((map) => <button key={map.id} className={`lift${map.id === selectedId ? " selected" : ""}`} onClick={() => setSelectedId(map.id)}><strong>{map.name}</strong><span>{map.kind} · {map.width}×{map.height}</span><small>{map.calibration ? "Grid calibrated" : map.scale ? `Scale ${map.scale.distancePerPixel.toPrecision(3)} ${map.scale.unit}/px` : "Needs scale setup"}</small></button>)}
             </div>)}
           </nav>
         </div>
         {selected && <div className="map-calibration">
           <div className="map-folder-move" role="group" aria-label="Organize this map">
             <span>Folder</span>
-            <select value={selected.folder ?? ""} onChange={(event) => moveToFolder(event.target.value || null)} disabled={busy} aria-label="Move map to folder">
+            <Select value={selected.folder ?? ""} onChange={(event) => moveToFolder(event.target.value || null)} disabled={busy} aria-label="Move map to folder">
               <option value="">Unfiled</option>
               {folderNames.map((folder) => <option key={folder} value={folder}>{folder}</option>)}
-            </select>
-            <button type="button" className="secondary" disabled={busy} onClick={() => { const folder = window.prompt("Move this map to a new folder:")?.trim(); if (folder) moveToFolder(folder); }}>New folder…</button>
+            </Select>
+            <Button variant="secondary" type="button" disabled={busy} onClick={async () => { const folder = await prompt({ title: "New folder", body: "Move this map to a new folder.", placeholder: "Folder name", confirmLabel: "Move" }); if (folder) moveToFolder(folder); }}>New folder…</Button>
           </div>
-          {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
+          {selected.kind === "battlemap" && <div className="grid-mode-choice" role="group" aria-label="Battlemap grid type"><button className="lift" aria-pressed={battlemapMode === "square"} onClick={() => { setBattlemapMode("square"); restartCalibration("Drag diagonally across a 3 × 3 block of printed squares."); }}><strong>Printed square grid</strong><span>Drag over a 3 × 3 block to align scale and position.</span></button><button className="lift" aria-pressed={battlemapMode === "gridless"} onClick={() => { setBattlemapMode("gridless"); setUnit("feet"); restartCalibration("Grid overlay skipped. Click the first point of a known distance."); }}><strong>Gridless battlemap</strong><span>Skip the overlay and set distance from two known points.</span></button></div>}
           <div className="calibration-instruction" id="calibration-instruction" role="status">
             <span>{squareMode ? "SQUARE GRID" : selected.kind === "battlemap" ? "GRIDLESS SCALE" : "MAP SCALE"}</span>
             <p>{instruction}</p>
@@ -403,9 +412,9 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
             </svg> : <p>Loading map preview…</p>}
           </div>
 
-          {pendingArea && !wizard && <div className="grid-wizard-actions pending-area-actions"><button className="save-map" disabled={busy} onClick={confirmPendingArea}>Measure this area</button><button className="secondary" disabled={busy} onClick={discardPendingArea}>Start over</button></div>}
-          {showPoints && !pendingArea && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><button onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</button></div>}
-          {!wizard && <details className="advanced-points"><summary>Enter or fine-tune point coordinates (keyboard alternative)</summary><div className="point-editor">{[0, 1].map((index) => <fieldset key={index}><legend>{index === 0 ? "Drag start A" : "Drag end C"}</legend><label>X<input type="number" value={points[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<input type="number" value={points[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}</div>{squareMode && points.length >= 2 && <button disabled={busy} onClick={() => void startAreaWizard(points[0], points[1])}>Measure 3 × 3 area from these points</button>}</details>}
+          {pendingArea && !wizard && <div className="grid-wizard-actions pending-area-actions"><button className="save-map" disabled={busy} onClick={confirmPendingArea}>Measure this area</button><Button variant="secondary" disabled={busy} onClick={discardPendingArea}>Start over</Button></div>}
+          {showPoints && !pendingArea && points.length > 0 && <div className="point-summary"><div>{points.map((point, index) => <span key={index}><strong>{index === 0 ? "A" : index === 1 ? "C" : "V"}</strong> {point.x}, {point.y}</span>)}</div><Button variant="secondary" onClick={() => restartCalibration(squareMode ? "Drag diagonally across a 3 × 3 block of printed squares." : "Click the first point of a known distance.")}>{wizard ? "Start over" : "Reset points"}</Button></div>}
+          {!wizard && <details className="advanced-points"><summary>Enter or fine-tune point coordinates (keyboard alternative)</summary><div className="point-editor">{[0, 1].map((index) => <fieldset key={index}><legend>{index === 0 ? "Drag start A" : "Drag end C"}</legend><label>X<Input type="number" value={points[index]?.x ?? ""} onChange={(event) => updatePoint(index, "x", Number(event.target.value))} /></label><label>Y<Input type="number" value={points[index]?.y ?? ""} onChange={(event) => updatePoint(index, "y", Number(event.target.value))} /></label></fieldset>)}</div>{squareMode && points.length >= 2 && <Button variant="secondary" disabled={busy} onClick={() => void startAreaWizard(points[0], points[1])}>Measure 3 × 3 area from these points</Button>}</details>}
 
           {squareMode ? <div className="grid-wizard">
             {!wizard && <p className="wizard-example">Start exactly on one printed-grid intersection. Hold and drag diagonally across a block containing <strong>nine squares</strong>, then release exactly on the opposite intersection.</p>}
@@ -413,7 +422,7 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
               <p className="grid-detected">{wizard.calibration.cellSizePx.toFixed(0)} px squares · {wizard.calibration.distancePerCell} ft each</p>
               <div className="grid-wizard-actions">
                 <button className="save-map" disabled={busy} onClick={completeWizard}>Confirm grid</button>
-                <button className="secondary" disabled={busy} onClick={reopenArea}>Redo drag</button>
+                <Button variant="secondary" disabled={busy} onClick={reopenArea}>Redo drag</Button>
               </div>
               <details className="grid-fine-tune">
                 <summary>Fine-tune (optional)</summary>
@@ -423,15 +432,16 @@ export function MapManager({ gmToken, preferredMapId, onSelectionChange }: Reado
                   <fieldset><legend>History</legend><button onClick={() => wizardAction({ action: "undo" })}>Undo</button><button onClick={() => wizardAction({ action: "redo" })}>Redo</button></fieldset>
                 </div>
                 <div className="verification-card">
-                  {!verifying ? <button onClick={() => setVerifying(true)}>Check alignment at a distant point</button> : <div><strong>{points.length < 3 ? "Click a distant grid intersection" : "Check point V"}</strong><p>{points.length < 3 ? "Choose one far from the 3 × 3 sample to catch spacing errors." : "Verify whether V lands close enough to an intersection on the blue overlay."}</p><button className="wizard-primary" disabled={busy || points.length < 3} onClick={() => wizardAction({ action: "verify", imagePoint: points[2] })}>Verify selected point</button></div>}
+                  {!verifying ? <Button variant="secondary" onClick={() => setVerifying(true)}>Check alignment at a distant point</Button> : <div><strong>{points.length < 3 ? "Click a distant grid intersection" : "Check point V"}</strong><p>{points.length < 3 ? "Choose one far from the 3 × 3 sample to catch spacing errors." : "Verify whether V lands close enough to an intersection on the blue overlay."}</p><button className="wizard-primary" disabled={busy || points.length < 3} onClick={() => wizardAction({ action: "verify", imagePoint: points[2] })}>Verify selected point</button></div>}
                 </div>
                 {wizard.verification && <p className={wizard.verification.accepted ? "verification accepted" : "verification rejected"}>{wizard.verification.accepted ? `Aligned - V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid.` : `Not aligned - V misses by ${wizard.verification.errorPx.toFixed(2)} px. This does not block Confirm.`}</p>}
               </details>
             </>}
-          </div> : <div className="grid-wizard"><h3>{selected.kind === "battlemap" ? "Gridless movement scale" : "Real-world scale"}</h3><p>{selected.kind === "battlemap" ? "Measure a known span so rulers can display feet without drawing a grid." : "Measure a known span so markers and rulers can use real-world distance."}</p><div className="wizard-fields"><label>Distance between the points<input type="number" min="0.01" value={knownDistance} onChange={(event) => setKnownDistance(Number(event.target.value))} /></label><label>Unit<input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={32} placeholder={selected.kind === "battlemap" ? "feet" : "miles"} /></label></div><button className="wizard-primary" disabled={busy || points.length < 2} onClick={saveScale}>Save map scale</button></div>}
+          </div> : <div className="grid-wizard"><h3>{selected.kind === "battlemap" ? "Gridless movement scale" : "Real-world scale"}</h3><p>{selected.kind === "battlemap" ? "Measure a known span so rulers can display feet without drawing a grid." : "Measure a known span so markers and rulers can use real-world distance."}</p><div className="wizard-fields"><label>Distance between the points<Input type="number" min="0.01" value={knownDistance} onChange={(event) => setKnownDistance(Number(event.target.value))} /></label><label>Unit<Input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={32} placeholder={selected.kind === "battlemap" ? "feet" : "miles"} /></label></div><button className="wizard-primary" disabled={busy || points.length < 2} onClick={saveScale}>Save map scale</button></div>}
         </div>}
       </div>}
       {maps.length === 0 && <p className="map-empty">No maps uploaded yet.</p>}
     </section>
+    {dialog}
   </>;
 }
