@@ -248,13 +248,16 @@
 /* A centered "or" flanked by a solid divider line, separating the auto-roll and manual-entry zones. */
 .roll-or { display: flex; align-items: center; gap: .55rem; margin: .05rem 0; color: var(--text-muted); font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .roll-or::before, .roll-or::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line-strong); }
-/* The number field and Use button share one shorter height (box-sizing so their padding doesn't grow them). */
-/* One row: the field flexes to fill and the button(s) sit flush-right, so "Use roll" - and the
-   Confirm/Re-roll it becomes - line up under the auto-roll's Confirm/Re-roll above (feedback #2). */
-.action-preview .save-prompt-manual { display: flex; flex-wrap: nowrap; align-items: center; gap: .4rem; }
-.action-preview .manual-actions { flex: none; margin-left: auto; display: inline-flex; gap: .3rem; }
+/* Stack the manual roll: a full-width number field on its own row, then the action button(s) on a
+   right-aligned row beneath it. "Use roll" - and the Confirm/Re-roll it becomes once a die is entered -
+   stay flush-right, reading as the manual counterpart to the auto-roll's Confirm/Re-roll above.
+   flex:none resets the generic .save-prompt-manual's 12rem basis, which in this column context was
+   read as a ~12rem *height* and left a tall empty gap around the field. Heights use box-sizing so the
+   padding doesn't grow them. */
+.action-preview .save-prompt-manual { flex: none; display: flex; flex-direction: column; gap: .3rem; }
+.action-preview .manual-actions { flex: none; align-self: flex-end; display: inline-flex; gap: .3rem; }
 .action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
-.action-preview .save-prompt-manual input { flex: 1 1 auto; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
+.action-preview .save-prompt-manual input { width: 100%; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
 .action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
