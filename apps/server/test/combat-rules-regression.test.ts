@@ -377,6 +377,24 @@ describe("report test 12 - GM override", () => {
     expect(overridden.overridden).toEqual({ rule: "economy.bonus-action-used", reason: "Homebrew: haste variant grants a second bonus action" });
     expect(overridden.attack?.outcome).toBe("hit");
   });
+
+  it("keeps one economy override in force for the rest of the creature's turn, then clears it next turn", () => {
+    const game = buildGame();
+    resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
+    // A second bonus action this turn is blocked until the GM overrides once.
+    expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []))
+      .toThrow(RulesBlockedError);
+    resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1], override: { reason: "haste variant" } }, [15, 6]);
+    expect(game.combat.turn.economyOverridden).toBe(true);
+    // The reported fix: a THIRD bonus action the same turn no longer needs a fresh override
+    // (nat-1 keeps it a harmless miss). The override is once per turn, not once per action.
+    expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6]))
+      .not.toThrow();
+    expect(game.combat.turn.economyOverridden).toBe(true);
+    // The standing override evaporates on turn advance (cleared with the rest of `turn`).
+    nextInitiativeTurn(game);
+    expect(game.combat.turn.economyOverridden).toBeFalsy();
+  });
 });
 
 describe("effect lifecycle - Frenzy's Exhaustion and Rage duration", () => {

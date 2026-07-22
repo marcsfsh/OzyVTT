@@ -378,11 +378,16 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
   if (mode !== "freeform" && allViolations.length > 0) {
     if (input.override) {
       overridden = { rule: allViolations[0].rule, reason: input.override.reason };
-    } else if (mode === "strict" && violations.length > 0) {
-      throw new RulesBlockedError(violations[0].rule, violations[0].message);
-    } else {
-      warnings.push(...allViolations.map((violation) => violation.message));
-      if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
+    } else if (!state.combat.turn.economyOverridden) {
+      // A GM economy override earlier this turn (turn.economyOverridden) covers the rest of the
+      // creature's turn - action, bonus, and reaction - so once it's set these violations pass
+      // silently. Until then: strict blocks (offering the audited override path), assisted warns.
+      if (mode === "strict" && violations.length > 0) {
+        throw new RulesBlockedError(violations[0].rule, violations[0].message);
+      } else {
+        warnings.push(...allViolations.map((violation) => violation.message));
+        if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
+      }
     }
   }
 
@@ -859,6 +864,11 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
   if (plan.markReaction) {
     state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id] };
+  }
+  // A GM economy override applies for the rest of this creature's turn: remember it so the next
+  // action/bonus/reaction isn't re-blocked. Cleared on turn advance with the rest of `turn`.
+  if (overridden?.rule.startsWith("economy.")) {
+    state.combat = { ...state.combat, turn: { ...state.combat.turn, economyOverridden: true } };
   }
   if (plan.spendLegendary) {
     state.combat = { ...state.combat, legendaryUsed: { ...state.combat.legendaryUsed, [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost } };
