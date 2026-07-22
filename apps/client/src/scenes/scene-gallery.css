@@ -1,6 +1,11 @@
 /* GM scene-prep hub — the gallery of prepared scenes. The cards, grid, and live/staging states all
    come from the shared @vtt/ui `.nh-gallery` / `.nh-card` pattern; this file is just the hub frame. */
 .scene-gallery-hub { display: flex; flex-direction: column; gap: var(--space-5); }
-.scene-gallery-head { display: flex; flex-direction: column; gap: var(--space-1); }
+.scene-gallery-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); flex-wrap: wrap; }
+.scene-gallery-title { display: flex; flex-direction: column; gap: var(--space-1); }
 .scene-gallery-head h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h1); }
 .scene-gallery-head p { margin: 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+
+/* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). */
+.scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }
+.scenes-back { align-self: flex-start; }

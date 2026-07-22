@@ -28,7 +28,7 @@ function SceneThumb({ mapAssetId, token }: Readonly<{ mapAssetId: string; token:
  * ⋯ menu to reorder, rename, duplicate, or remove it. "New scene" opens the prep flow. The live scene
  * carries a glowing LIVE badge; the one you're privately staging takes a quiet cyan edge.
  */
-export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, previewingSceneId, token, onNewScene, onFeedback }: Readonly<{
+export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onFeedback }: Readonly<{
   scenes: readonly Scene[];
   activeSceneId: string | null;
   combatActive: boolean;
@@ -37,6 +37,8 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
   /** Bearer token for the map-content endpoint; absent = thumbnails stay as the glyph placeholder. */
   token?: string | null;
   onNewScene: () => void;
+  /** Open the folded-in map library / calibration surface (the retired Map Setup tab). */
+  onManageMaps?: () => void;
   onFeedback?: (text: string) => void;
 }>) {
   const { confirm, dialog } = useConfirm();
@@ -76,9 +78,12 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
 
   return <section className="scene-gallery-hub" aria-labelledby="scene-gallery-heading">
     <div className="scene-gallery-head">
-      <span className="eyebrow">GM PREP</span>
-      <h2 id="scene-gallery-heading">Scenes</h2>
-      <p>Build your encounters ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
+      <div className="scene-gallery-title">
+        <span className="eyebrow">GM PREP</span>
+        <h2 id="scene-gallery-heading">Scenes</h2>
+        <p>Build your encounters ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
+      </div>
+      {onManageMaps && <Button variant="secondary" onClick={onManageMaps}>Manage maps</Button>}
     </div>
     {scenes.length === 0
       ? <div className="nh-empty">

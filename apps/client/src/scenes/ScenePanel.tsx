@@ -11,12 +11,14 @@ import "./scene-panel.css";
  * between them. Switching the live scene preserves the running fight (round, turn, positions) and
  * resumes the target exactly; the server owns the swap. Lives in Map Setup, beside the map library.
  */
-export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Readonly<{
+export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated, onManageMaps }: Readonly<{
   actors: readonly GmActor[];
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
   /** Called after a successful create - the launcher (scene strip modal) closes itself. */
   onCreated?: () => void;
+  /** Jump to the folded-in map library to upload/calibrate a battlemap (closes this modal). */
+  onManageMaps?: () => void;
 }>) {
   const [name, setName] = useState("");
   const [chosen, setChosen] = useState<readonly string[]>([]);
@@ -53,7 +55,7 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated }: Reado
               {battlemaps.map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
             </Select>
           </label>
-        : <p className="scene-create-map">{sceneMap ? <>On map <strong>{sceneMap.name}</strong></> : <em>Upload a battlemap on the Map Setup tab to use it here.</em>}</p>}
+        : <p className="scene-create-map">{sceneMap ? <>On map <strong>{sceneMap.name}</strong></> : onManageMaps ? <Button variant="secondary" type="button" onClick={onManageMaps}>Upload a battlemap</Button> : <em>Add a battlemap to build a scene on it.</em>}</p>}
       <fieldset className="scene-combatants">
         <legend>Combatants ({chosen.length})</legend>
         {actors.length === 0 ? <p className="scene-empty-note">Add combatants to the roster first.</p>

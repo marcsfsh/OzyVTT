@@ -33,11 +33,10 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "scenes" | "table" | "maps" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "viewer" | "replay" | "setup";
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "scenes", label: "Scenes" },
   { id: "table", label: "Encounter" },
-  { id: "maps", label: "Map Setup" },
   { id: "viewer", label: "Viewer" },
   { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
@@ -58,6 +57,9 @@ function App() {
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const previewSceneId = usePreviewScene();
   const [scenePrepOpen, setScenePrepOpen] = useState(false);
+  // The Scenes tab shows the gallery by default; "Manage maps" swaps in the map library/calibration
+  // surface (folded in from the retired Map Setup tab) without leaving the scene-prep home.
+  const [scenesView, setScenesView] = useState<"gallery" | "maps">("gallery");
   const [dockPosition, setDockPosition] = useState<DockPosition>(() => {
     const stored = localStorage.getItem("vtt.dock-position");
     if (stored === "top" || stored === "bottom") return "right"; // top/bottom docking was removed; nearest edge is right
@@ -119,7 +121,7 @@ function App() {
   // The map library loads with the GM session (refreshed on returning to the Encounter tab) so
   // encounter setup can pick a battlemap directly - starting a fight never requires a Maps-tab visit.
   useEffect(() => {
-    if (!gmToken || (gmTab !== "table" && gmTab !== "maps" && gmTab !== "scenes")) return;
+    if (!gmToken || (gmTab !== "table" && gmTab !== "scenes")) return;
     let cancelled = false;
     fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${gmToken}` } })
       .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error?.message ?? "Couldn't load the map library."); return body.data.assets as ReadonlyArray<MapSelection & { kind: MapSelection["kind"] }>; })
@@ -130,9 +132,10 @@ function App() {
         // Default the selection to the newest battlemap so Start is one click away on first login.
         setSelectedMap((current) => current && library.some((map) => map.id === current.id) ? current : library.find((map) => map.kind === "battlemap") ?? null);
       })
-      .catch(() => { /* the Maps tab surfaces library errors; setup just stays pickable-empty */ });
+      .catch(() => { /* the maps view surfaces library errors; setup just stays pickable-empty */ });
     return () => { cancelled = true; };
-  }, [gmToken, gmTab]);
+    // Re-fetch when the maps sub-view closes so a just-uploaded battlemap shows up in the scene pickers.
+  }, [gmToken, gmTab, scenesView]);
 
   const joinPlayer = () => {
     setBusy(true);
@@ -290,7 +293,7 @@ function App() {
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
             healthDisplay={mode === "gm" ? (state as GmView).combat.healthDisplay : undefined}
-          /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Upload a map on the Maps tab, then start an encounter - or open Scene prep to stage one." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
+          /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Prepare a scene from the Scenes tab - pick a map and who's in it, then go live." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
           {mode === "gm" && gmToken && !previewScene && <Button variant="secondary" className="viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</Button>}
         </section>
@@ -312,10 +315,14 @@ function App() {
         </div>
       </div>}
 
-      {mode === "gm" && gmToken && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view"><SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onFeedback={(text) => setNotice({ tone: "error", text })} /></div>}
-
-      {mode === "gm" && gmToken && gmTab === "maps" && <div className="anim-view"><MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} /></div>}
-      {/* Scenes moved to the Encounter tab's switcher strip; Map Setup is purely library management. */}
+      {mode === "gm" && gmToken && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view">
+        {scenesView === "maps"
+          ? <div className="scenes-maps-view">
+              <Button variant="ghost" className="scenes-back" onClick={() => setScenesView("gallery")}>← Back to scenes</Button>
+              <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />
+            </div>
+          : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => setScenesView("maps")} onFeedback={(text) => setNotice({ tone: "error", text })} />}
+      </div>}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
@@ -324,7 +331,7 @@ function App() {
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
       {mode === "gm" && gmToken && scenePrepOpen && state && <Modal open onClose={() => setScenePrepOpen(false)} size="lg" className="scene-prep-modal" title="Scene prep" ariaLabel="Scene prep">
-        <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} />
+        <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} onManageMaps={() => { setScenePrepOpen(false); setGmTab("scenes"); setScenesView("maps"); }} />
       </Modal>}
 
       {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">
