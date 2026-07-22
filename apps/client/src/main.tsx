@@ -13,6 +13,7 @@ import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
+import { SceneGallery } from "./scenes/SceneGallery";
 import { SceneSwitcher } from "./scenes/SceneSwitcher";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
 import { SceneBuilder } from "./scenes/SceneBuilder";
@@ -32,8 +33,9 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "table" | "maps" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "maps" | "viewer" | "replay" | "setup";
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
+  { id: "scenes", label: "Scenes" },
   { id: "table", label: "Encounter" },
   { id: "maps", label: "Map Setup" },
   { id: "viewer", label: "Viewer" },
@@ -117,7 +119,7 @@ function App() {
   // The map library loads with the GM session (refreshed on returning to the Encounter tab) so
   // encounter setup can pick a battlemap directly - starting a fight never requires a Maps-tab visit.
   useEffect(() => {
-    if (!gmToken || (gmTab !== "table" && gmTab !== "maps")) return;
+    if (!gmToken || (gmTab !== "table" && gmTab !== "maps" && gmTab !== "scenes")) return;
     let cancelled = false;
     fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${gmToken}` } })
       .then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error?.message ?? "Couldn't load the map library."); return body.data.assets as ReadonlyArray<MapSelection & { kind: MapSelection["kind"] }>; })
@@ -309,6 +311,8 @@ function App() {
           {mode === "player" && <section className="gm-session-controls"><Button variant="secondary" onClick={leavePlayer}>Leave table</Button></section>}
         </div>
       </div>}
+
+      {mode === "gm" && gmToken && gmTab === "scenes" && Array.isArray((state as GmView).combat.scenes) && <div className="anim-view"><SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onFeedback={(text) => setNotice({ tone: "error", text })} /></div>}
 
       {mode === "gm" && gmToken && gmTab === "maps" && <div className="anim-view"><MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} /></div>}
       {/* Scenes moved to the Encounter tab's switcher strip; Map Setup is purely library management. */}
