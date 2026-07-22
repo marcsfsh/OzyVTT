@@ -386,6 +386,8 @@ describe("public game API over /api/v1", () => {
     expect((await post(base, GAME_PATHS.sceneActivate.replace("{sceneId}", sceneId), stager.token, {})).status).toBe(200);
     expect(server.store.snapshot.combat.activeSceneId).toBe(sceneId);
     expect(server.store.snapshot.combat.mapAssetId).toBe(mapAssetId);
+    // Bridge: going live also presents the scene's map on the shared screen (enabled), in one action.
+    expect(server.viewerPresentation.snapshot).toMatchObject({ enabled: true, activeMap: { assetId: mapAssetId } });
 
     // The active scene refuses removal; a second prepared scene deletes fine.
     const removeActive = await fetch(base + GAME_PATHS.sceneById.replace("{sceneId}", sceneId), { method: "DELETE", headers: bearer(stager.token) });

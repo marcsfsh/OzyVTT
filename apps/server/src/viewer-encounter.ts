@@ -18,8 +18,12 @@ export function projectViewerInitiative(state: GameState): ViewerInitiative {
 }
 
 export function projectViewerEncounterScene(state: GameState, now = Date.now()): ViewerEncounterScene {
-  if (!state.combat.active || !state.combat.mapAssetId) return { mapAssetId: null, tokens: [], annotations: [] };
+  if (!state.combat.mapAssetId) return { mapAssetId: null, tokens: [], annotations: [] };
   const fog = { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) };
+  // A live scene shows its map (and any prepared fog) on the shared screen the moment it goes live, so
+  // "go live" is one action. Combatant tokens and drawings only appear once the fight is running - before
+  // that the map is just the scene backdrop and no combatant data reaches the public screen.
+  if (!state.combat.active) return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog };
   const publicActors = new Map(state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor]));
   return {
     mapAssetId: state.combat.mapAssetId,

@@ -108,6 +108,8 @@ export type GameOperationsContext = Readonly<{
   tokenCatalog: Readonly<{ get: (assetId: string) => unknown; touchLastUsed: (assetId: string) => void; rememberForDefinition: (definitionId: string, assetId: string) => void }>;
   tokenGeometryFor: (mapAssetId: string) => Promise<TokenMapGeometry>;
   publishGameState: (state: GameState) => Promise<void>;
+  /** Bridge: present a newly-live scene's map on the shared screen (best-effort; a viewer hiccup must not undo the scene switch). */
+  presentSceneMap: (mapAssetId: string) => Promise<void>;
   broadcastTableEvent: (event: Readonly<{ kind: TableEvent["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) => void;
   appendLog: (entry: Readonly<{ kind: CombatLogEntry["kind"]; text: string; actorIds?: readonly string[]; gmOnly?: boolean }>) => void;
   logTurnBegin: (state: GameState) => void;
@@ -1286,6 +1288,8 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         const scene = result.state.combat.scenes.find((candidate) => candidate.id === sceneId);
         context.appendLog({ kind: "scene", text: `Switched to scene "${scene?.name ?? "Untitled"}".`, gmOnly: true });
+        // Going live also presents the scene's map on the shared screen, so it's one action.
+        if (result.state.combat.mapAssetId) await context.presentSceneMap(result.state.combat.mapAssetId);
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },

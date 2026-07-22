@@ -171,6 +171,16 @@ export function createServer(options: CreateServerOptions) {
     }
     broadcast();
   }
+  /** Bridge: making a scene live also presents its map on the shared screen (one action). Best-effort - a viewer hiccup must never undo the authoritative scene switch that already committed. */
+  async function presentSceneMap(mapAssetId: string) {
+    try {
+      const geometry = await tokenGeometryFor(mapAssetId);
+      const entry = mapCatalog.get(mapAssetId);
+      await viewerCoordinator.presentMap(store.snapshot.revision, { assetId: mapAssetId, altText: entry?.name ?? "Battle map", camera: { center: { x: geometry.width / 2, y: geometry.height / 2 }, zoom: 1 } });
+    } catch {
+      for (const socket of io.sockets.sockets.values()) if (auth.verify(socket.handshake.auth?.token)) socket.emit("system:error", "The scene is live, but the shared screen could not switch to its map. Present it from the Viewer tab.");
+    }
+  }
 
   // The shared game capabilities: the Socket.IO handlers below and the public HTTP API both run
   // these exact operations - same validation, authorization, dispatch, and narration (ADR-0016).
@@ -182,6 +192,7 @@ export function createServer(options: CreateServerOptions) {
     tokenCatalog,
     tokenGeometryFor,
     publishGameState,
+    presentSceneMap,
     broadcastTableEvent,
     appendLog,
     logTurnBegin,
