@@ -260,15 +260,27 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
       {result.preview && result.attack && (() => {
         const previewResolve = (opts: ResolveOptions) => resolveTargeting(state.revision, onOutcome, opts);
         const mode = result.rollMode?.mode;
+        // Roll mode drives the layout: auto shows just the roll controls; manual adds a labeled
+        // "type the d20" zone under an "or" divider so the two paths read distinctly (feedback #1).
+        const manualEntry = state.combat.rollMode === "manual";
         const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } previewResolve({ commit: false, attackNatural: value }); };
         return <div className="action-preview">
-          <span className="save-prompt-confirm">
-            <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => previewResolve({ commit: false, rollMode: "advantage" })}>Adv</button>
-            <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => previewResolve({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
-            <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
-            <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</Button>
-          </span>
-          <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="or type the d20" aria-label="Attack d20" value={attackDieEdit} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && attackDieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
+          <div className="roll-zone">
+            <span className="save-prompt-confirm">
+              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => previewResolve({ commit: false, rollMode: "advantage" })}>Adv</button>
+              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => previewResolve({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
+              <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
+              <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</Button>
+            </span>
+            {manualEntry && <span className="roll-zone-caption">auto-roll</span>}
+          </div>
+          {manualEntry && <>
+            <div className="roll-or"><span>or</span></div>
+            <div className="roll-zone">
+              <span className="roll-zone-caption">manual entry</span>
+              <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && attackDieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
+            </div>
+          </>}
         </div>;
       })()}
       {result.save && <p className="action-outcome">Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save</p>}
