@@ -46,7 +46,7 @@ export { Tabs, type TabsProps, type TabItem } from "./primitives/Tabs";
 export { Menu, MenuItem, type MenuProps, type MenuItemProps } from "./primitives/Menu";
 export { Tooltip, type TooltipProps } from "./primitives/Tooltip";
 export { Modal, type ModalProps } from "./primitives/Modal";
-export { ToastProvider, useToast, type ToastApi, type ToastOptions, type ToastTone } from "./primitives/Toast";
+export { ToastProvider, useToast, useToastMute, type ToastApi, type ToastOptions, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeProps, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarProps, type AvatarSize, type AvatarPresence } from "./primitives/Avatar";
 export { Meter, type MeterProps, type MeterTone } from "./primitives/Meter";

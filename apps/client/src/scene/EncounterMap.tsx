@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { Button, Switch } from "@vtt/ui";
+import { Button, Switch, useToastMute } from "@vtt/ui";
 import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
@@ -171,6 +171,7 @@ export function EncounterMap({
     tabTimer.current = setTimeout(() => setClosingTab(null), 190);
   };
   const [gmLayer, setGmLayer] = useState(false);
+  const { muted: notificationsMuted, setMuted: setNotificationsMuted } = useToastMute();
   const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ff2e9a" : PLAYER_COLORS[0]));
   useEffect(() => { localStorage.setItem("vtt.annotation-color", sessionColor); }, [sessionColor]);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -625,6 +626,9 @@ export function EncounterMap({
           <button type="button" className="encounter-map-icon" aria-pressed={rulerWhileMoving} disabled={!calibration} title="Show distance while moving a token" onClick={() => setRulerWhileMoving((v) => !v)}>⇲</button>
           {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={showOccupied} disabled={!calibration} title={showOccupied ? "Occupied-cell movement cost: on - extra 5 ft per occupied square crossed" : "Occupied-cell movement cost: off"} onClick={() => setShowOccupied((v) => !v)}>⛌</button>}
           {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={gmLayer} title={gmLayer ? "GM layer active - new drawings are hidden from players and only GM-layer objects are interactive" : "Switch to the GM layer (drawings hidden from players)"} onClick={() => setGmLayer((v) => !v)}>🕶</button>}
+        </div>
+        <div className="encounter-map-notify">
+          <button type="button" className="encounter-map-icon" aria-pressed={!notificationsMuted} aria-label={notificationsMuted ? "Notifications muted - click to unmute" : "Notifications on - click to mute"} title={notificationsMuted ? "Notifications muted for you - click to unmute" : "Mute notifications for you"} onClick={() => setNotificationsMuted(!notificationsMuted)}>{notificationsMuted ? "🔕" : "🔔"}</button>
         </div>
 
         <svg ref={svgRef} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`${altText}. Interactive encounter tokens are layered above this map.`}>

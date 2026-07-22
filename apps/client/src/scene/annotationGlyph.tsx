@@ -40,7 +40,7 @@ export function ShapeOutline({ shape, origin, target, className, style }: Readon
 export function PingGlyph({ point, color, label, size }: Readonly<{ point: Point; color: string; label: string | null; size: number }>) {
   return <g className="annotation-ping" style={{ color }}>
     <circle className="annotation-ping-ring" cx={point.x} cy={point.y} r={size} />
-    <circle className="annotation-ping-core" cx={point.x} cy={point.y} r={size * 0.28} />
+    <circle className="annotation-ping-core" cx={point.x} cy={point.y} r={size * 0.34} />
     {label && <text className="annotation-ping-label" x={point.x} y={point.y - size * 1.3} style={{ fontSize: size * 0.9, strokeWidth: Math.max(2, size * 0.18) }}>{label}</text>}
   </g>;
 }
@@ -72,7 +72,7 @@ export function AnnotationGlyph({ data, arrowSize = 14, labelSize = 16, color = 
     </g>;
   }
   return <>
-    {data.shape && <ShapeOutline shape={data.shape} origin={data.origin} target={data.target} className="annotation-shape-body" style={{ stroke: color, fill: color, fillOpacity: 0.18 }} />}
+    {data.shape && <ShapeOutline shape={data.shape} origin={data.origin} target={data.target} className="annotation-shape-body" style={{ stroke: color, fill: color, fillOpacity: 0.28 }} />}
     <text className="annotation-shape-label" style={labelStyle} x={center.x} y={center.y}>{data.sizeFeet}ft {data.shape ? SHAPE_NAMES[data.shape] : ""}</text>
   </>;
 }

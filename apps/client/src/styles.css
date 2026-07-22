@@ -202,6 +202,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .actor-rest button { flex: 1; padding: .5rem .6rem; font-size: .78rem; font-weight: 700; text-align: center; }
 
 .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; }
+/* .anim-view animates transform; with fill-mode:both Blink keeps .table-layout as a containing block
+   for position:fixed even after the entrance settles, which shrank the "Enlarge map" overlay
+   (.encounter-map-interaction.enlarged, inset:1rem) to this grid box instead of the viewport. Drop the
+   forward fill so the settled layout stops trapping fixed descendants — the entrance still plays (its
+   end state already equals the static layout). */
+.table-layout.anim-view { animation-fill-mode: backwards; }
 .table-sidebar > .dice-proof { margin-top: auto; }
 .table-layout .table, .table-layout .encounter-panel, .table-layout .dice-proof, .table-layout .gm-session-controls { margin-top: 0; }
 .table-sidebar { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }

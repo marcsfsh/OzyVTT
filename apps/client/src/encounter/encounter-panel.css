@@ -53,12 +53,14 @@
 /* The active row is the bold combat moment: a rounded highlight with a magenta left accent bar and a
    steady stronger magenta glow (no motion, §6.9). The inset shadow is clipped by the radius so the
    accent reads as a rounded-off bar, not a sharp corner-to-corner rectangle. */
-.initiative-list > li.active { border-color: transparent; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta), var(--glow-magenta-strong); }
+/* The active turn is one clean highlight: a left accent bar + a subtle tint. The acting console
+   below carries its own frame, so an outer glow around the whole (tall) block just doubled up. */
+.initiative-list > li.active { border-color: transparent; border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta); }
 /* Pad past the accent so nested death-save and save prompts clear it instead of hiding it behind
    their own background (report #1). */
 .initiative-list.gm > li.active, .initiative-list.player > li.active { padding-left: .55rem; }
 .initiative-list > li.you { background: color-mix(in srgb, var(--surface-2) 88%, var(--cyan)); }
-.initiative-list > li.you.active { background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta), var(--glow-magenta-strong); }
+.initiative-list > li.you.active { background: color-mix(in srgb, var(--surface-2) 82%, var(--magenta)); box-shadow: inset .22rem 0 0 var(--magenta); }
 .initiative-list > li > span { display: flex; align-items: center; }
 .initiative-list > li > strong { color: var(--text); font-family: var(--font-mono); }
 .your-turn { margin-top: 1rem; padding: .85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--cyan); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); color: var(--text); }
@@ -103,6 +105,9 @@
 /* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
 .row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* The active row carries the acting console inline, so open its HP/tools popover in-flow ABOVE the
+   console (not floating below the whole row), so editing HP shows those controls above the actions. */
+.initiative-list.gm > li.active .row-tools-popover { position: relative; z-index: 41; top: auto; margin-top: .4rem; }
 /* Compact control bar: turn navigation + the ⋯ options menu. */
 /* One control bar, one control height: the round pill, ‹, Next, +, and ⋯ all line up as equal-height
    pills with their glyph/text centered, so nothing reads as an odd shape (report #1). */
@@ -121,14 +126,23 @@
    ‹/Next-turn buttons (feedback #7). */
 .encounter-menu-toggle { flex: none; width: var(--control-h); height: var(--control-h); padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: 1rem; font-weight: 800; line-height: 1; cursor: pointer; }
 .encounter-menu-toggle:hover, .encounter-menu-toggle[aria-expanded="true"] { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
-.encounter-menu { position: absolute; z-index: 41; top: calc(100% + .3rem); right: 0; width: min(21rem, 92vw); max-height: min(80vh, 40rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* The options menu is a centered viewport overlay (not a dropdown anchored inside the panel), so the
+   docked tracker's own scroll container can never clip it: it scrolls on its own instead of forcing
+   the whole initiative list to scroll to reach the bottom / Add-to-the-fight (report). */
+/* Transparent full-screen layer that just catches an outside click/tap to close - no dim, so the
+   menu reads as a popover, not a modal. Above the enlarged map (z-40); the menu sits above it. */
+.encounter-menu-backdrop { position: fixed; inset: 0; z-index: 41; }
+/* Anchored under the ⋯ button via inline top/left/width/max-height computed from the button rect. */
+.encounter-menu { position: fixed; z-index: 42; width: min(24rem, 92vw); max-height: min(85vh, 44rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 /* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
 .encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
 .encounter-menu .rules-mode-control select { width: 100%; }
 .encounter-menu .environment-control { margin: 0; }
 .menu-section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid var(--line); }
 .menu-section-title { margin: 0; color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.menu-add-list { display: grid; gap: .3rem; max-height: 11rem; overflow-y: auto; padding-right: .2rem; }
+/* No nested scroll here: the menu itself scrolls now, so the add list flows as part of that single
+   scroll region (was a second scrollbar-in-a-scrollbar the GM had to fight). */
+.menu-add-list { display: grid; gap: .3rem; }
 .menu-empty-note { margin: 0; color: var(--text-muted); font-size: .78rem; }
 .menu-add-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .82rem; color: var(--text-dim); }
 .menu-add-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -171,7 +185,11 @@
 .turn-end { margin-left: auto; padding: .24rem .8rem; border-radius: var(--radius-pill); font-size: .78rem; font-weight: 700; }
 .economy-feedback { width: 100%; color: var(--text-dim); font-size: .78rem; }
 /* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
-.action-runner { margin-top: .6rem; }
+.action-runner { margin-top: .6rem; display: flex; flex-direction: column; }
+/* Every resolution card (attack preview, damage, save DC, apply-damage) sits directly under the
+   creature's name like the attack roll does, instead of dropping below the action list once the
+   targeting session clears on commit. */
+.action-runner > .action-result { order: -1; }
 .action-runner-status { color: var(--text-muted); font-size: .8rem; margin: .4rem 0; }
 /* Read-only player attack reference (#5.2): the GM's action rows without the interactivity. */
 .player-actions { margin-top: .45rem; }
@@ -225,9 +243,19 @@
 .action-damage strong { font-size: 1rem; color: var(--danger-hi); }
 /* Attack preview: reuses the saving-throw widget's button row + manual field for a recognizable roll. */
 .action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
-/* The manual field's `flex: 1 1 12rem` stretches vertically in this column - keep it its natural height. */
-.action-preview .save-prompt-manual { flex: 0 0 auto; }
-.action-preview .save-prompt-manual input { padding: .4rem .6rem; }
+.roll-zone { display: flex; flex-direction: column; gap: .35rem; }
+.roll-zone-caption { align-self: center; color: var(--text-muted); font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+/* A centered "or" flanked by a solid divider line, separating the auto-roll and manual-entry zones. */
+.roll-or { display: flex; align-items: center; gap: .55rem; margin: .05rem 0; color: var(--text-muted); font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.roll-or::before, .roll-or::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line-strong); }
+/* The number field and Use button share one shorter height (box-sizing so their padding doesn't grow them). */
+/* One row: the field flexes to fill and the button(s) sit flush-right, so "Use roll" - and the
+   Confirm/Re-roll it becomes - line up under the auto-roll's Confirm/Re-roll above (feedback #2). */
+.action-preview .save-prompt-manual { display: flex; flex-wrap: nowrap; align-items: center; gap: .4rem; }
+.action-preview .manual-actions { flex: none; margin-left: auto; display: inline-flex; gap: .3rem; }
+.action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
+.action-preview .save-prompt-manual input { flex: 1 1 auto; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
+.action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
 .action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: .95rem; font-family: var(--font-mono); }
@@ -440,6 +468,10 @@
 /* The acting creature's console: its own labeled card BELOW the initiative order — the tracker
    stays a pure list. One quiet container with the active magenta accent; contents are flat. */
 .acting-console { margin-top: .7rem; padding: .75rem .8rem .85rem; border: 1px solid color-mix(in srgb, var(--magenta) 45%, var(--line)); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+/* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
+   the audited override), with its death saves / down note lifted above it. */
+.acting-console.down { opacity: .5; border-left-color: var(--danger); }
+.acting-down-note { margin: .5rem 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; }
 /* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
 .acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
 .acting-console-head strong { color: var(--text); font-size: .86rem; }

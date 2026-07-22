@@ -16,8 +16,12 @@ interface ToastRecord {
 }
 export interface ToastApi {
   toast: (message: ReactNode, options?: ToastOptions) => void;
+  /** Client-local notification mute (per browser, persisted). While true, toast() is a no-op. */
+  muted: boolean;
+  setMuted: (muted: boolean) => void;
 }
 
+const MUTE_STORAGE_KEY = "vtt.notifications-muted";
 const ToastContext = createContext<ToastApi | null>(null);
 const TONE_ICON: Record<ToastTone, string> = { success: "✓", error: "⚠", info: "•" };
 
@@ -26,10 +30,18 @@ const TONE_ICON: Record<ToastTone, string> = { success: "✓", error: "⚠", inf
 export function ToastProvider({ children, duration = 3200 }: { children: ReactNode; duration?: number }) {
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
   const idRef = useRef(0);
+  const [muted, setMutedState] = useState(() => { try { return localStorage.getItem(MUTE_STORAGE_KEY) === "1"; } catch { return false; } });
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+  const setMuted = useCallback((value: boolean) => {
+    setMutedState(value);
+    try { localStorage.setItem(MUTE_STORAGE_KEY, value ? "1" : "0"); } catch { /* private mode: keep it session-only */ }
+  }, []);
 
   const dismiss = useCallback((id: number) => setToasts((list) => list.filter((t) => t.id !== id)), []);
   const toast = useCallback(
     (message: ReactNode, options?: ToastOptions) => {
+      if (mutedRef.current) return; // this viewer silenced notifications (client-local)
       const id = ++idRef.current;
       const tone = options?.tone ?? "info";
       setToasts((list) => [...list, { id, message, tone }]);
@@ -39,7 +51,7 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
     [dismiss, duration]
   );
 
-  const api = useMemo(() => ({ toast }), [toast]);
+  const api = useMemo(() => ({ toast, muted, setMuted }), [toast, muted, setMuted]);
 
   return (
     <ToastContext.Provider value={api}>
@@ -61,4 +73,11 @@ export function useToast(): ToastApi {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error("useToast must be used within a ToastProvider");
   return ctx;
+}
+
+/** Client-local notification mute, for a "silence notifications" toggle (e.g. a bell icon). */
+export function useToastMute(): { muted: boolean; setMuted: (muted: boolean) => void } {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error("useToastMute must be used within a ToastProvider");
+  return { muted: ctx.muted, setMuted: ctx.setMuted };
 }

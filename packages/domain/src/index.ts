@@ -229,7 +229,12 @@ const sceneCombatShape = {
     actionInstance: z.object({ actorId: z.string().uuid(), components: z.record(z.string(), z.number().int().nonnegative()) }).strict().nullable().default(null),
     turnUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
     /** Feet of movement the current turn's actor has spent (fractional on gridless maps); validated against effective speed per rules mode. Additive. */
-    movementUsedFeet: z.number().nonnegative().max(100000).default(0)
+    movementUsedFeet: z.number().nonnegative().max(100000).default(0),
+    /** GM knowledge: the GM overrode a strict rules block this turn, so the rest of this creature's turn
+     * skips re-prompting for the per-turn-repeatable families it covers - action/bonus/reaction economy
+     * and positional range/reach. Other families (incapacitation, limited uses, legendary, cover) still
+     * re-prompt. Cleared with the rest of `turn` on turn advance. Optional/additive; stripped from player projections. */
+    rulesOverridden: z.boolean().optional()
   }).default({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
   /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
   rulesMode: z.enum(["strict", "assisted", "freeform"]).default("strict"),

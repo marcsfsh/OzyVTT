@@ -171,6 +171,9 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
   if (action.activation !== "other") {
     const incapacitating = attacker.conditions.find((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id));
     if (incapacitating) violations.push({ rule: "condition.incapacitated", message: `${attacker.name} is ${conditionLabel(incapacitating.id)} and can't take actions, bonus actions, or reactions.` });
+    // A creature at 0 HP is down (a dying PC or a defeated monster) and can't act. Keyed on hp, not a
+    // condition, so a defeated monster - which carries no incapacitating condition - is blocked too.
+    else if (attacker.hp.current <= 0) violations.push({ rule: "condition.down", message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.` });
   }
 
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag)) {
@@ -378,11 +381,19 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
   if (mode !== "freeform" && allViolations.length > 0) {
     if (input.override) {
       overridden = { rule: allViolations[0].rule, reason: input.override.reason };
-    } else if (mode === "strict" && violations.length > 0) {
-      throw new RulesBlockedError(violations[0].rule, violations[0].message);
     } else {
-      warnings.push(...allViolations.map((violation) => violation.message));
-      if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
+      // A GM override earlier this turn (turn.rulesOverridden) covers the per-turn-repeatable families
+      // for the rest of the creature's turn: action/bonus/reaction economy and positional range/reach.
+      // Every other family (incapacitation, limited uses, legendary, cover, target-specific) still
+      // re-prompts, so it stays an explicit, audited call each time.
+      const covered = (rule: string) => state.combat.turn.rulesOverridden === true && (rule.startsWith("economy.") || rule.startsWith("range."));
+      const blocking = violations.filter((violation) => !covered(violation.rule));
+      if (mode === "strict" && blocking.length > 0) {
+        throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
+      } else {
+        warnings.push(...allViolations.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
+        if (proseMultiattack && softViolations.length > 0) warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
+      }
     }
   }
 
@@ -859,6 +870,12 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
   if (plan.markReaction) {
     state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id] };
+  }
+  // A GM override of a per-turn-repeatable rule (economy, or positional range/reach) applies for the
+  // rest of this creature's turn, so the next action/bonus/reaction/attack isn't re-blocked for the
+  // same family. Cleared on turn advance with the rest of `turn`.
+  if (overridden && (overridden.rule.startsWith("economy.") || overridden.rule.startsWith("range."))) {
+    state.combat = { ...state.combat, turn: { ...state.combat.turn, rulesOverridden: true } };
   }
   if (plan.spendLegendary) {
     state.combat = { ...state.combat, legendaryUsed: { ...state.combat.legendaryUsed, [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost } };

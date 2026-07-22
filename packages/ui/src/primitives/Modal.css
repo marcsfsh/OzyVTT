@@ -51,8 +51,15 @@
   flex: none;
   width: 2rem;
   height: 2rem;
+  /* Guard against host apps whose global `button` rule sets large padding / left alignment,
+     which otherwise inflates this square and shoves the glyph into a corner. */
+  padding: 0;
+  margin: 0;
   display: grid;
   place-items: center;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-3);

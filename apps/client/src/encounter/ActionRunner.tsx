@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePrompt } from "../components/feedback";
 import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
@@ -80,6 +80,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
   // A typed d20 for the attack preview (the manual-entry path, or a physical die).
   const [attackDieEdit, setAttackDieEdit] = useState("");
+  // Whether that typed d20 has been submitted to the preview - drives "Use roll" → Confirm/Re-roll.
+  const [manualSubmitted, setManualSubmitted] = useState(false);
   const [openReference, setOpenReference] = useState<string | null>(null);
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -108,7 +110,16 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
   useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
   // Fresh result (from this runner's Roll or the map confirm bar) clears prior apply bookkeeping.
-  useEffect(() => { setApplied(new Set()); setDamageEdit(null); setAttackDieEdit(""); }, [result]);
+  useEffect(() => { setApplied(new Set()); setDamageEdit(null); }, [result]);
+  // The manual d20 field resets only when a NEW attack preview first appears - not on every preview
+  // change (Adv/Disadv/Use roll each produce a fresh result), so a submitted manual roll persists
+  // instead of the field clearing itself the instant it's used.
+  const previewShownRef = useRef(false);
+  useEffect(() => {
+    const showing = Boolean(result?.preview);
+    if (showing && !previewShownRef.current) { setAttackDieEdit(""); setManualSubmitted(false); }
+    previewShownRef.current = showing;
+  }, [result]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => { const target = state.actors.find((item) => item.id === entry.actorId); return target ? [target] : []; });
@@ -259,25 +270,52 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           d20 is the manual path, and Confirm resolves the hit for real (damage, riders, economy). */}
       {result.preview && result.attack && (() => {
         const previewResolve = (opts: ResolveOptions) => resolveTargeting(state.revision, onOutcome, opts);
+        // Any auto control (Adv/Disadv/Re-roll) abandons a pending manual entry.
+        const autoPreview = (opts: ResolveOptions) => { setManualSubmitted(false); previewResolve(opts); };
         const mode = result.rollMode?.mode;
-        const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } previewResolve({ commit: false, attackNatural: value }); };
+        // Roll mode drives the layout: auto shows just the roll controls; manual adds a labeled
+        // "type the d20" zone under an "or" divider so the two paths read distinctly (feedback #1).
+        const manualEntry = state.combat.rollMode === "manual";
+        const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setManualSubmitted(true); previewResolve({ commit: false, attackNatural: value }); };
         return <div className="action-preview">
-          <span className="save-prompt-confirm">
-            <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => previewResolve({ commit: false, rollMode: "advantage" })}>Adv</button>
-            <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => previewResolve({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
-            <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
-            <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => previewResolve({ commit: false })}>Re-roll</Button>
-          </span>
-          <span className="save-prompt-manual"><input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="or type the d20" aria-label="Attack d20" value={attackDieEdit} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && attackDieEdit.trim() !== "") submitDie(); }} /><button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use</button></span>
+          <div className="roll-zone">
+            <span className="save-prompt-confirm">
+              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the higher" onClick={() => autoPreview({ commit: false, rollMode: "advantage" })}>Adv</button>
+              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={resolveBusy} title="Roll two d20s and keep the lower" onClick={() => autoPreview({ commit: false, rollMode: "disadvantage" })}>Disadv</button>
+              <button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : result.attack!.outcome === "fumble" ? "miss" : result.attack!.outcome}</button>
+              <Button type="button" variant="secondary" disabled={resolveBusy} title="Roll the attack again" onClick={() => autoPreview({ commit: false })}>Re-roll</Button>
+            </span>
+            {manualEntry && <span className="roll-zone-caption">auto-roll</span>}
+          </div>
+          {manualEntry && <>
+            <div className="roll-or"><span>or</span></div>
+            <div className="roll-zone">
+              <span className="roll-zone-caption">manual entry</span>
+              <span className="save-prompt-manual">
+                <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} disabled={manualSubmitted} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDieEdit.trim() !== "") submitDie(); }} />
+                {/* "Use roll" sits flush-right; once used it becomes Confirm/Re-roll, aligned under the auto-roll buttons above. */}
+                <span className="manual-actions">{manualSubmitted
+                  ? <><button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={resolveBusy} title="Enter a different d20" onClick={() => { setAttackDieEdit(""); setManualSubmitted(false); }}>Re-roll</Button></>
+                  : <button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
+              </span>
+            </div>
+          </>}
         </div>;
       })()}
       {result.save && <p className="action-outcome">Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save</p>}
       {result.effectGranted && <p className="action-effect-granted">{actor.name} gains <strong>{result.effectGranted.name}</strong>.</p>}
       {result.effectsApplied?.map((appliedEffect) => <p key={`${appliedEffect.targetId}-${appliedEffect.name}`} className="action-effect-applied">{appliedEffect.targetName} is <strong>{appliedEffect.name}</strong>.</p>)}
-      {result.damage.length > 0 && <p className="action-damage">Damage: <strong>{result.damageTotal}</strong> ({[
-        ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
-        ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-      ].join(" + ")}){result.crit ? " - crit dice doubled" : ""}</p>}
+      {result.damage.length > 0 && (() => {
+        // When the GM has typed a manual amount in the apply field, the headline reflects THAT number
+        // (what will be applied), not the stale rolled total - the rolled value is kept for reference.
+        const typed = damageEdit !== null && damageEdit.trim() !== "" ? Number(damageEdit) : null;
+        const overriding = typed !== null && Number.isFinite(typed) && typed >= 0 && typed !== result.damageTotal;
+        const breakdown = [
+          ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
+          ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
+        ].join(" + ");
+        return <p className="action-damage">Damage: <strong>{overriding ? typed : result.damageTotal}</strong>{overriding ? ` (manual - rolled ${result.damageTotal})` : ` (${breakdown})`}{!overriding && result.crit ? " - crit dice doubled" : ""}</p>;
+      })()}
       {result.attack && (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
         // A reaction window (Uncanny Dodge) parked this damage on a prompt: the answer applies it
         // server-side, so the apply button never shows for this target - that would double-apply.
@@ -305,7 +343,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
           ? <p className="action-save-note">Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting} {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then confirm to apply.</p>
           : <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>;
       })()}
-      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next attack above.</p>}
+      {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && <p className="action-result-hint">Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next attack from the list below.</p>}
     </div>}
     {dialog}
   </div>;

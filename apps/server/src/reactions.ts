@@ -50,6 +50,10 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
   if (use && state.combat.reactionsUsed.includes(reactor.id)) {
     throw new CommandRejectedError(`${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`);
   }
+  // A down creature (0 HP) can't take reactions, on its turn or off it (SRD Incapacitated / Unconscious).
+  if (use && reactor.hp.current <= 0) {
+    throw new CommandRejectedError(`${reactor.name} is down (0 HP) and can't take reactions.`);
+  }
 
   const base = { actorId: reactor.id, actorName: reactor.name, actionName: pending.actionName, sourceName: pending.sourceName, proposedDamage: pending.proposedDamage, kind: pending.kind };
   const clearPrompt = (markUsed: boolean) => {

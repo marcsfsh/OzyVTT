@@ -377,6 +377,36 @@ describe("report test 12 - GM override", () => {
     expect(overridden.overridden).toEqual({ rule: "economy.bonus-action-used", reason: "Homebrew: haste variant grants a second bonus action" });
     expect(overridden.attack?.outcome).toBe("hit");
   });
+
+  it("keeps one economy override in force for the rest of the creature's turn, then clears it next turn", () => {
+    const game = buildGame();
+    resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
+    // A second bonus action this turn is blocked until the GM overrides once.
+    expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []))
+      .toThrow(RulesBlockedError);
+    resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1], override: { reason: "haste variant" } }, [15, 6]);
+    expect(game.combat.turn.rulesOverridden).toBe(true);
+    // The reported fix: a THIRD bonus action the same turn no longer needs a fresh override
+    // (nat-1 keeps it a harmless miss). The override is once per turn, not once per action.
+    expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6]))
+      .not.toThrow();
+    expect(game.combat.turn.rulesOverridden).toBe(true);
+    // The standing override evaporates on turn advance (cleared with the rest of `turn`).
+    nextInitiativeTurn(game);
+    expect(game.combat.turn.rulesOverridden).toBeFalsy();
+  });
+
+  it("blocks a down creature (0 HP) from acting, and a standing override does not bypass it", () => {
+    const game = buildGame();
+    const torva = game.actors.find((candidate) => candidate.id === IDS.torva)!;
+    torva.hp = { ...torva.hp, current: 0 };
+    expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]))
+      .toThrow(/is down/);
+    // A standing economy/range override this turn must NOT let a down creature act - it re-prompts.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, rulesOverridden: true } };
+    expect(() => resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]))
+      .toThrow(RulesBlockedError);
+  });
 });
 
 describe("effect lifecycle - Frenzy's Exhaustion and Rage duration", () => {
