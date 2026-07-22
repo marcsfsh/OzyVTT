@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
-import { Button, Switch } from "@vtt/ui";
+import { Button, Switch, useToastMute } from "@vtt/ui";
 import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
@@ -171,6 +171,7 @@ export function EncounterMap({
     tabTimer.current = setTimeout(() => setClosingTab(null), 190);
   };
   const [gmLayer, setGmLayer] = useState(false);
+  const { muted: notificationsMuted, setMuted: setNotificationsMuted } = useToastMute();
   const [sessionColor, setSessionColor] = useState<string>(() => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ff2e9a" : PLAYER_COLORS[0]));
   useEffect(() => { localStorage.setItem("vtt.annotation-color", sessionColor); }, [sessionColor]);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -581,6 +582,7 @@ export function EncounterMap({
       {image.status === "ready" && size ? <>
         <div className="encounter-map-overlay" role="group" aria-label="Map tools">
           {TOOLS.filter((entry) => entry.id === "select" || entry.id === "ping" || entry.id === "measure").map((entry) => <button key={entry.id} type="button" className="encounter-map-icon" aria-label={entry.label} title={entry.label} aria-pressed={tool === entry.id} disabled={entry.id === "measure" && !calibration} onClick={() => setTool(entry.id)}>{entry.glyph}</button>)}
+          <button type="button" className="encounter-map-icon" aria-pressed={notificationsMuted} aria-label={notificationsMuted ? "Notifications muted - unmute" : "Mute notifications"} title={notificationsMuted ? "Notifications muted for you - click to unmute" : "Mute notifications for you"} onClick={() => setNotificationsMuted(!notificationsMuted)}>{notificationsMuted ? "🔕" : "🔔"}</button>
           {role === "gm" && <button type="button" className="encounter-map-icon" aria-pressed={fogOpen} aria-expanded={fogOpen} title="Fog of war - hide the map from players and reveal it area by area" onClick={() => { if (fogOpen) { if (tool === "fog-reveal" || tool === "fog-hide") setTool("select"); setFogOpen(false); beginClose("fog"); } else { setFogOpen(true); setDrawOpen(false); setEyeOpen(false); setColorOpen(false); setWrenchOpen(false); beginOpen("fog"); } }}>🌫</button>}
           {(fogOpen || closingTab === "fog") && role === "gm" && <div className={`encounter-map-slideout${fogOpen ? (openingTab === "fog" ? " opening" : "") : " closing"}`} role="group" aria-label="Fog of war">
             <button type="button" className="encounter-map-icon" aria-pressed={fog?.enabled ?? false} disabled={fogBusy} title={fog?.enabled ? "Fog is ON - players see only revealed areas. Turn off." : "Fog is OFF - turn on to hide the map from players."} onClick={() => runFog(() => emitFogSetEnabled({ commandId: newId(), enabled: !(fog?.enabled ?? false), ...fogTarget, expectedRevision: revision }), "The fog could not be toggled.")}>⏻</button>
