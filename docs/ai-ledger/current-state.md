@@ -74,6 +74,21 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     palette). Two fixes: the theme-toggle content is now optically centred (Manrope
     line-box nudge), and the GM setup view's empty map hero is sized like a real battlemap so the map
     panel and the `--setup-h`-matched encounter panel are comfortably tall instead of short stubs.
+  - **Existing components conformed to the new primitives (2026-07-22, same PR).** After a
+    component audit, the clear hand-rolled duplicates of the new primitives were migrated onto them
+    (presentational only — no logic/projection/API changes): the three −/value/+ clusters (roster
+    hit-dice, exhaustion level, dice modifier) now use `Stepper` — which gained an optional
+    `format` prop for signed values (`±0`/`+3`), demoed in the styleguide; the three
+    `role="group"` aria-pressed pickers (map-kind filter, viewer presentation tool, API example
+    language) now use `SegmentedControl` (this **supersedes** the earlier "left as groups" note now
+    that the primitive exists); the actor-card monogram + presence dot became `Avatar` (domain
+    `reconnecting` maps to Avatar's `away`); the YOU / claim-status / token "Recent" pills became
+    `Badge` (tone by state); the underwater-fight and "others can move this" immediate toggles became
+    `Switch`; and the roster / integrations / token-library / replay section empties adopted the
+    shared `.nh-empty` template. Dead per-feature CSS retired. Specialized controls stay bespoke on
+    purpose (kind-colored initiative/tray avatars, save-die-mode, grid-mode cards, CharacterSheet
+    stat grids, on-canvas health SVG + dense initiative HP bar). Verified `check`+`test` (456)+
+    `build`, and Playwright dark/light/390px on every migrated surface.
 - **Combat rules engine (ADR-0020, 2026-07-18).** Server-validated action resolution per encounter
   `rulesMode` (strict/assisted/freeform) with audited one-tap overrides; compound-action instances
   (Extra Attack pool, Multiattack components); persistent effects with durations, source links,
