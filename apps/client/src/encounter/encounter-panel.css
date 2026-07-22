@@ -121,14 +121,20 @@
    ‹/Next-turn buttons (feedback #7). */
 .encounter-menu-toggle { flex: none; width: var(--control-h); height: var(--control-h); padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: 1rem; font-weight: 800; line-height: 1; cursor: pointer; }
 .encounter-menu-toggle:hover, .encounter-menu-toggle[aria-expanded="true"] { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
-.encounter-menu { position: absolute; z-index: 41; top: calc(100% + .3rem); right: 0; width: min(21rem, 92vw); max-height: min(80vh, 40rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* The options menu is a centered viewport overlay (not a dropdown anchored inside the panel), so the
+   docked tracker's own scroll container can never clip it: it scrolls on its own instead of forcing
+   the whole initiative list to scroll to reach the bottom / Add-to-the-fight (report). */
+.encounter-menu-overlay { position: fixed; inset: 0; z-index: 41; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.encounter-menu { width: min(24rem, 92vw); max-height: min(85vh, 44rem); overflow-y: auto; display: grid; gap: .6rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 /* Inside the menu the rules/underwater controls stack their label above the field so nothing crowds the narrow width. */
 .encounter-menu .rules-mode-control { flex-direction: column; align-items: stretch; gap: .3rem; margin: 0; }
 .encounter-menu .rules-mode-control select { width: 100%; }
 .encounter-menu .environment-control { margin: 0; }
 .menu-section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid var(--line); }
 .menu-section-title { margin: 0; color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.menu-add-list { display: grid; gap: .3rem; max-height: 11rem; overflow-y: auto; padding-right: .2rem; }
+/* No nested scroll here: the menu itself scrolls now, so the add list flows as part of that single
+   scroll region (was a second scrollbar-in-a-scrollbar the GM had to fight). */
+.menu-add-list { display: grid; gap: .3rem; }
 .menu-empty-note { margin: 0; color: var(--text-muted); font-size: .78rem; }
 .menu-add-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .82rem; color: var(--text-dim); }
 .menu-add-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

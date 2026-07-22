@@ -10,6 +10,10 @@
   cursor: pointer;
 }
 .nh-switch--labeled { padding: var(--space-1) 0; }
+/* Guard the toggle's internal spans from an app shell's global `button span` / `button strong`
+   rules (e.g. margin-top or font-size meant for composite buttons), which would otherwise shove
+   the absolutely-centered thumb off-center and resize the label. */
+.nh-switch span { margin: 0; font: inherit; }
 .nh-switch-track {
   position: relative;
   flex: none;
