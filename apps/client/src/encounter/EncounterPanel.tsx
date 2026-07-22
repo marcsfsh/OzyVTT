@@ -761,8 +761,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               ? <input className="initiative-score-edit" type="number" min="-1000" max="1000" autoFocus value={editScore} onChange={(event) => setEditScore(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); else if (event.key === "Escape") { cancelEditRef.current = true; event.currentTarget.blur(); } }} onBlur={() => commitEdit(entry.actorId, entry.score)} />
               : <button type="button" className="initiative-score-value" disabled={busy} title="Initiative - click to edit" onClick={() => { setEditScore(String(entry.score)); setEditingActorId(entry.actorId); }}>{entry.score}</button>}
           </div>
-          {/* The acting console rides directly under the active/top row (feedback #3). */}
-          {active && renderActingConsole()}
           {expanded && actor && <>
             <div className="encounter-overlay-backdrop" onPointerDown={() => { setExpandedActorId(null); }} />
             <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
@@ -785,6 +783,9 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               </div>
             </div>
           </>}
+          {/* The acting console rides under the row - and under the HP/tools popover when it's open, so
+              editing a combatant's HP shows those controls above its action list (feedback). */}
+          {active && renderActingConsole()}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
           {actor && actor.deathSaves && actor.hp.current <= 0 && state.combat.turnActorId !== actor.id && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
           {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode}

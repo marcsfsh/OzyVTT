@@ -103,6 +103,9 @@
 /* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
 .row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* The active row carries the acting console inline, so open its HP/tools popover in-flow ABOVE the
+   console (not floating below the whole row), so editing HP shows those controls above the actions. */
+.initiative-list.gm > li.active .row-tools-popover { position: relative; z-index: 41; top: auto; margin-top: .4rem; }
 /* Compact control bar: turn navigation + the ⋯ options menu. */
 /* One control bar, one control height: the round pill, ‹, Next, +, and ⋯ all line up as equal-height
    pills with their glyph/text centered, so nothing reads as an odd shape (report #1). */
