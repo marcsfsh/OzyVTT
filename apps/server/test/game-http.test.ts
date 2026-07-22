@@ -546,6 +546,8 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.sceneRename, "post", "scene.rename"],
       [GAME_PATHS.sceneActivate, "post", "scene.activate"],
       [GAME_PATHS.sceneCombatants, "post", "scene.set-combatants"],
+      [GAME_PATHS.sceneDuplicate, "post", "scene.duplicate"],
+      [GAME_PATHS.sceneReorder, "post", "scene.reorder"],
       [GAME_PATHS.fogEnabled, "post", "fog.set-enabled"],
       [GAME_PATHS.fogPaint, "post", "fog.paint"],
       [GAME_PATHS.fogReset, "post", "fog.reset"]

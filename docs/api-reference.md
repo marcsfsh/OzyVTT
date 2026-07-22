@@ -109,6 +109,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `scene.remove` | `scene:write` |
 | `scene.activate` | `scene:write` |
 | `scene.set-combatants` | `scene:write` |
+| `scene.duplicate` | `scene:write` |
+| `scene.reorder` | `scene:write` |
 | `fog.set-enabled` | `scene:write` |
 | `fog.paint` | `scene:write` |
 | `fog.reset` | `scene:write` |
@@ -1304,6 +1306,39 @@ Replaces a prepared scene's combatant list (GM-grade only).
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `combatantIds` | string (uuid)[] | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/{sceneId}/duplicate`
+
+Duplicates a prepared scene as a new staged copy carrying the same map and staged combatants/tokens (GM-grade only). Duplicating the live scene snapshots its current combat into the copy; the copy is always parked, next to the original. The response's `sceneId` equals the commandId.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Parameters:** `sceneId` (path) - string (uuid)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/scenes/reorder`
+
+Reorders the prepared-scene list to the given permutation of every scene id (GM-grade only). Does not change which scene is live.
+
+**Auth:** Integration credential with `scene:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `order` | string (uuid)[] | yes | Every prepared scene's id, in the new order |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

@@ -274,10 +274,13 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actorHealthDisplay), ...command("actor.set-health-display", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
   router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));
+  // Literal /scenes/reorder is registered before the {sceneId} routes so the segment can't be captured as an id.
+  router.post(expressPath(GAME_PATHS.sceneReorder), ...command("scene.reorder"));
   router.delete(expressPath(GAME_PATHS.sceneById), ...command("scene.remove", (req) => ({ sceneId: req.params.sceneId })));
   router.post(expressPath(GAME_PATHS.sceneRename), ...command("scene.rename", (req) => ({ sceneId: req.params.sceneId })));
   router.post(expressPath(GAME_PATHS.sceneActivate), ...command("scene.activate", (req) => ({ sceneId: req.params.sceneId })));
   router.post(expressPath(GAME_PATHS.sceneCombatants), ...command("scene.set-combatants", (req) => ({ sceneId: req.params.sceneId })));
+  router.post(expressPath(GAME_PATHS.sceneDuplicate), ...command("scene.duplicate", (req) => ({ sceneId: req.params.sceneId })));
   router.post(expressPath(GAME_PATHS.fogEnabled), ...command("fog.set-enabled"));
   router.post(expressPath(GAME_PATHS.fogPaint), ...command("fog.paint"));
   router.post(expressPath(GAME_PATHS.fogReset), ...command("fog.reset"));

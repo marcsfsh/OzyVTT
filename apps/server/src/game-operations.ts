@@ -16,7 +16,7 @@ import { addCombatant, endEncounter, nextInitiativeTurn, setInitiativeScore, sta
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { rollDeathSave } from "./death-saves.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
-import { activateScene, createScene, removeScene, renameScene, setSceneCombatants } from "./scenes.js";
+import { activateScene, createScene, duplicateScene, removeScene, renameScene, reorderScenes, setSceneCombatants } from "./scenes.js";
 import { buildEncounterArchive } from "./encounter-archive.js";
 import { planNextTurn, planPreviousTurn, turnLabel, type TimelineOutcome } from "./combat-history.js";
 import { CommandRejectedError, type GameStore, type JournalEntry } from "./game-store.js";
@@ -36,7 +36,7 @@ import {
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneSetCombatantsSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneReorderSchema, SceneSetCombatantsSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -1300,6 +1300,24 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "scene.set-combatants", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setSceneCombatants(state, sceneId, combatantIds, geometry));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async sceneDuplicate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can duplicate scenes.");
+      const request = parse(SceneIdSchema, raw, "The scene command is malformed.");
+      const { commandId, sceneId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "scene.duplicate", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => { duplicateScene(state, sceneId, commandId); });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate, sceneId: commandId };
+    },
+
+    async sceneReorder(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can reorder scenes.");
+      const request = parse(SceneReorderSchema, raw, "The scene order is malformed.");
+      const { commandId, order, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "scene.reorder", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => reorderScenes(state, order));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
     }
   };
 }
@@ -1374,6 +1392,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["scene.remove", "Remove a prepared scene (GM).", (p, raw) => operations.sceneRemove(p, raw)],
     ["scene.activate", "Switch the live table to a prepared scene, parking the current one (GM).", (p, raw) => operations.sceneActivate(p, raw)],
     ["scene.set-combatants", "Replace a prepared scene's combatant list (GM).", (p, raw) => operations.sceneSetCombatants(p, raw)],
+    ["scene.duplicate", "Duplicate a prepared scene as a new staged copy (GM).", (p, raw) => operations.sceneDuplicate(p, raw)],
+    ["scene.reorder", "Reorder the prepared-scene list (GM).", (p, raw) => operations.sceneReorder(p, raw)],
     ["fog.set-enabled", "Turn manual fog of war on/off for the live table or a prepared scene (GM).", (p, raw) => operations.fogSetEnabled(p, raw)],
     ["fog.paint", "Paint a reveal/hide fog rect, grid-snapped and clamped to the map (GM).", (p, raw) => operations.fogPaint(p, raw)],
     ["fog.reset", "Hide the whole map again (clear every fog stroke) (GM).", (p, raw) => operations.fogReset(p, raw)]

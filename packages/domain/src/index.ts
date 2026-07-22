@@ -516,6 +516,8 @@ export interface ClientToServerEvents {
   "scene:remove": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:activate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "scene:set-combatants": (payload: { commandId: string; sceneId: string; combatantIds: readonly string[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "scene:duplicate": (payload: { commandId: string; sceneId: string; expectedRevision?: number }, acknowledgement: (result: SceneCreateResult) => void) => void;
+  "scene:reorder": (payload: { commandId: string; order: readonly string[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "fog:set-enabled": (payload: { commandId: string; enabled: boolean; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "fog:paint": (payload: { commandId: string; op: "reveal" | "hide"; rect: { x: number; y: number; width: number; height: number }; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "fog:reset": (payload: { commandId: string; sceneId?: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

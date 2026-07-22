@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { activateScene, createScene, migrateToScene, removeScene, renameScene, setSceneCombatants } from "../src/scenes.js";
+import { activateScene, createScene, duplicateScene, migrateToScene, removeScene, renameScene, reorderScenes, setSceneCombatants } from "../src/scenes.js";
 import { startEncounter, nextInitiativeTurn } from "../src/encounter.js";
 import { moveEncounterToken, moveSceneToken } from "../src/token-placement.js";
 import { removeActor } from "../src/actor-roster.js";
@@ -183,5 +183,58 @@ describe("scene ripples on encounter start and actor removal", () => {
     startEncounter(game, { mapAssetId: IDS.map2, entries: [{ actorId: IDS.beta, score: 5 }] }, () => 10, GEOMETRY);
     activateScene(game, IDS.sceneA, IDS.implicit);
     expect(() => removeActor(game, IDS.beta)).toThrow(/paused encounter/i);
+  });
+});
+
+describe("scene duplication and reordering", () => {
+  it("duplicates a prepared scene as a parked copy next to the original, preserving map and staged tokens", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "Ambush", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.beta] }, GEOMETRY);
+    moveSceneToken(game, IDS.sceneA, IDS.alpha, { x: 120, y: 90 }, GEOMETRY);
+    const copy = duplicateScene(game, IDS.sceneA, IDS.sceneB);
+    expect(copy).toMatchObject({ id: IDS.sceneB, name: "Ambush (copy)", mapAssetId: IDS.map1 });
+    // The copy sits immediately after its source in the list.
+    expect(game.combat.scenes.map((scene) => scene.id)).toEqual([IDS.sceneA, IDS.sceneB]);
+    // Staged combatants and the placed token position are copied verbatim.
+    expect(copy.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.alpha, IDS.beta]);
+    expect(copy.combat.tokens.find((token) => token.actorId === IDS.alpha)!.position).toEqual({ x: 120, y: 90 });
+    // It's an independent copy: editing the original's combatants leaves the duplicate untouched.
+    setSceneCombatants(game, IDS.sceneA, [IDS.alpha], GEOMETRY);
+    expect(game.combat.scenes.find((scene) => scene.id === IDS.sceneB)!.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.alpha, IDS.beta]);
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+  });
+
+  it("snapshots the live fight when duplicating the active scene, and never changes which scene is live", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "Fight", mapAssetId: IDS.map1, combatantIds: [IDS.alpha, IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    startEncounter(game, { mapAssetId: IDS.map1, entries: [{ actorId: IDS.alpha, score: 18 }, { actorId: IDS.beta, score: 9 }] }, () => 10, GEOMETRY);
+    nextInitiativeTurn(game);
+    const copy = duplicateScene(game, IDS.sceneA, IDS.sceneB);
+    // The active scene's own slot is empty, so the copy must capture the top-level (live) combat, not a blank.
+    expect(copy.combat.active).toBe(true);
+    expect(copy.combat.initiative.map((entry) => entry.actorId)).toEqual(game.combat.initiative.map((entry) => entry.actorId));
+    // Duplicating never changes which scene is live.
+    expect(game.combat.activeSceneId).toBe(IDS.sceneA);
+    expect(game.combat.active).toBe(true);
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+  });
+
+  it("rejects duplicating a scene that no longer exists", () => {
+    const game = state();
+    expect(() => duplicateScene(game, IDS.sceneA, IDS.sceneB)).toThrow(/no longer exists/i);
+  });
+
+  it("reorders the prepared-scene list without touching the active scene, and rejects a non-permutation", () => {
+    const game = state();
+    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
+    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
+    activateScene(game, IDS.sceneA, IDS.implicit);
+    reorderScenes(game, [IDS.sceneB, IDS.sceneA]);
+    expect(game.combat.scenes.map((scene) => scene.id)).toEqual([IDS.sceneB, IDS.sceneA]);
+    expect(game.combat.activeSceneId).toBe(IDS.sceneA); // live scene is an id reference, untouched by reordering
+    expect(() => reorderScenes(game, [IDS.sceneA])).toThrow(/every prepared scene exactly once/i);
+    expect(() => reorderScenes(game, [IDS.sceneA, IDS.sceneA])).toThrow(/every prepared scene exactly once/i);
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
   });
 });
