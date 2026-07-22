@@ -2,6 +2,10 @@
 /* The tray floats over the map's top edge rather than reflowing the whole map when it appears (for a
    drag or unplaced tokens), so grabbing a token no longer shoves the map down (report #5). */
 .encounter-map-interaction:not(.enlarged) .encounter-token-tray { position: absolute; z-index: 4; top: 0; left: 0; right: 0; margin-bottom: 0; }
+/* Enlarged mode is a flex column, so an in-flow tray would steal height from the flex:1 stage and
+   shrink/jitter the map every time a token is grabbed (the tray mounts on pointer-down). Float it over
+   the stage top here too, inset to match the enlarged container's 1rem padding. */
+.encounter-map-interaction.enlarged .encounter-token-tray { position: absolute; z-index: 4; top: 1rem; left: 1rem; right: 1rem; margin-bottom: 0; }
 .encounter-map-help { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .4rem; padding: .4rem .7rem; border-left: 3px solid var(--magenta); border-radius: var(--radius-sm); background: var(--surface-2); font-size: .82rem; }
 .encounter-map-help strong { color: var(--text); }
 .encounter-map-help span { color: var(--text-dim); font-size: .78rem; text-align: right; }
