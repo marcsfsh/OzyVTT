@@ -69,6 +69,10 @@
 .encounter-map-interaction.enlarged .encounter-map-stage { flex: 1; min-height: 0; }
 .encounter-map-interaction.enlarged .encounter-map-stage svg { max-height: none; height: 100%; }
 .encounter-map-saving { margin: .5rem 0 0; color: var(--text-dim); font-size: .85rem; }
+/* In enlarged mode the interaction is a flex column; a "Saving move…" line mounting in-flow on token
+   release would steal height from the flex:1 stage and bounce the map. Float it over the stage (like
+   the token tray) so it never resizes the stage. */
+.encounter-map-interaction.enlarged .encounter-map-saving { position: absolute; z-index: 4; left: 1rem; bottom: 1rem; margin: 0; padding: .2rem .55rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--void) 78%, transparent); }
 .encounter-map-feedback { min-height: 1.25rem; margin: .45rem 0 0; color: var(--text-dim); font-size: .78rem; }
 
 /* Top-left overlaid tool cluster (eye ▾ · tools · ruler toggle · wrench ▾). Visible in normal,
