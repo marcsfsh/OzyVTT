@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Scene } from "@vtt/domain";
 import { Badge, Button, Menu, MenuItem } from "@vtt/ui";
 import type { MapSelection } from "../maps/MapManager";
@@ -66,15 +66,50 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
       emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed.");
     }
   };
-  // Adjacent-swap reorder from the menu (keyboard- and touch-accessible); a drag affordance is a
-  // later polish pass. Sends the full id permutation the server validates.
-  const move = (index: number, delta: -1 | 1) => {
+  // Reorder: drag a card by its grip (pointer + touch), or Move earlier/later from the ⋯ menu
+  // (keyboard). Both send the full id permutation the server validates.
+  const move = (sceneId: string, delta: -1 | 1) => {
     const order = scenes.map((scene) => scene.id);
+    const index = order.indexOf(sceneId);
     const target = index + delta;
-    if (target < 0 || target >= order.length) return;
+    if (index === -1 || target < 0 || target >= order.length) return;
     [order[index], order[target]] = [order[target], order[index]];
     emit("scene:reorder", { order }, "The scenes could not be reordered.");
   };
+  const galleryRef = useRef<HTMLUListElement>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOrder, setDragOrder] = useState<readonly string[] | null>(null);
+  const beginDrag = (sceneId: string, event: React.PointerEvent) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDragId(sceneId);
+    setDragOrder(scenes.map((scene) => scene.id));
+  };
+  const dragMove = (event: React.PointerEvent) => {
+    if (!dragId || !galleryRef.current) return;
+    const over = [...galleryRef.current.querySelectorAll<HTMLElement>("[data-scene-id]")].find((card) => {
+      const rect = card.getBoundingClientRect();
+      return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+    })?.dataset.sceneId;
+    if (!over || over === dragId) return;
+    setDragOrder((current) => {
+      if (!current) return current;
+      const next = current.filter((id) => id !== dragId);
+      next.splice(next.indexOf(over), 0, dragId);
+      return next;
+    });
+  };
+  const endDrag = () => {
+    if (dragId && dragOrder && dragOrder.join() !== scenes.map((scene) => scene.id).join()) {
+      emit("scene:reorder", { order: dragOrder as string[] }, "The scenes could not be reordered.");
+    }
+    setDragId(null);
+    setDragOrder(null);
+  };
+  // Render the optimistic order mid-drag; otherwise follow the server's order.
+  const ordered = dragOrder
+    ? dragOrder.map((id) => scenes.find((scene) => scene.id === id)).filter((scene): scene is Scene => Boolean(scene))
+    : scenes;
 
   return <section className="scene-gallery-hub" aria-labelledby="scene-gallery-heading">
     <div className="scene-gallery-head">
@@ -92,12 +127,12 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
           <span className="nh-empty-text">Prepare your first scene — choose a battlemap and who’s in it, then go live when your table is ready.</span>
           <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
         </div>
-      : <ul className="nh-gallery">
-          {scenes.map((scene, index) => {
+      : <ul className="nh-gallery" ref={galleryRef}>
+          {ordered.map((scene, index) => {
             const live = scene.id === activeSceneId;
             const staging = scene.id === previewingSceneId;
             const count = scene.combat.initiative.length;
-            return <li key={scene.id} className={`nh-card is-interactive${live ? " is-live" : ""}${staging ? " is-staging" : ""}`}>
+            return <li key={scene.id} data-scene-id={scene.id} className={`nh-card is-interactive${live ? " is-live" : ""}${staging ? " is-staging" : ""}${dragId === scene.id ? " is-dragging" : ""}`}>
               <div className="nh-card-thumb"><SceneThumb mapAssetId={scene.mapAssetId} token={token} /></div>
               <div className="nh-card-body">
                 <h3 className="nh-card-title">{scene.name}</h3>
@@ -108,10 +143,12 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
                 onClick={() => setPreviewScene(live || staging ? null : scene.id)} />
               {(live || staging) && <span className="nh-card-status">{live ? <Badge tone="primary" solid>LIVE</Badge> : <Badge>Staging</Badge>}</span>}
               <div className="nh-card-tools">
+                {scenes.length > 1 && <button type="button" className="scene-card-grip" aria-label={`Drag to reorder ${scene.name}`}
+                  onPointerDown={(event) => beginDrag(scene.id, event)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}>⠿</button>}
                 <Menu trigger="⋯" label={`${scene.name} actions`} align="end" hideCaret>
                   {!live && <MenuItem icon="🎬" onClick={() => setPreviewScene(scene.id)}>Stage privately</MenuItem>}
-                  <MenuItem icon="←" disabled={index === 0} onClick={() => move(index, -1)}>Move earlier</MenuItem>
-                  <MenuItem icon="→" disabled={index === scenes.length - 1} onClick={() => move(index, 1)}>Move later</MenuItem>
+                  <MenuItem icon="←" disabled={index === 0} onClick={() => move(scene.id, -1)}>Move earlier</MenuItem>
+                  <MenuItem icon="→" disabled={index === ordered.length - 1} onClick={() => move(scene.id, 1)}>Move later</MenuItem>
                   <MenuItem icon="✎" onClick={() => void rename(scene)}>Rename</MenuItem>
                   <MenuItem icon="⧉" onClick={() => emit("scene:duplicate", { sceneId: scene.id }, "The scene could not be duplicated.")}>Duplicate</MenuItem>
                   {!live && <MenuItem icon="🗑" tone="danger" onClick={() => void remove(scene)}>Remove</MenuItem>}

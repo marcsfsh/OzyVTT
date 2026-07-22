@@ -9,3 +9,26 @@
 /* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). */
 .scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }
 .scenes-back { align-self: flex-start; }
+
+/* Drag-to-reorder handle (pointer + touch); keyboard reorder uses the ⋯ menu's Move earlier/later. */
+.scene-card-grip {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  transition: color var(--dur-hover), background var(--dur-hover);
+}
+.scene-card-grip:hover { color: var(--text); background: var(--surface-2); }
+.scene-card-grip:active { cursor: grabbing; }
+.scene-card-grip:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.nh-card.is-dragging { opacity: .55; }
+@media (prefers-reduced-motion: reduce) { .scene-card-grip { transition: none; } }
