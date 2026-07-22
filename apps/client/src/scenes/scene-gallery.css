@@ -1,10 +1,26 @@
 /* GM scene-prep hub — the gallery of prepared scenes. The cards, grid, and live/staging states all
    come from the shared @vtt/ui `.nh-gallery` / `.nh-card` pattern; this file is just the hub frame. */
-.scene-gallery-hub { display: flex; flex-direction: column; gap: var(--space-5); }
-.scene-gallery-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); flex-wrap: wrap; }
-.scene-gallery-title { display: flex; flex-direction: column; gap: var(--space-1); }
+.scene-gallery-hub { display: flex; flex-direction: column; gap: var(--space-4); }
+.scene-gallery-head { display: flex; flex-direction: column; gap: var(--space-1); }
 .scene-gallery-head h2 { margin: 0; color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h1); }
-.scene-gallery-head p { margin: 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.scene-gallery-head p { margin: var(--space-1) 0 0; max-width: 46rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+
+/* Command bar above the gallery — the primary "New scene" action (and Manage maps) always in reach. */
+.scene-gallery-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Prepare (secondary) sits opposite Go live (primary); the shared .nh-card-actions row spaces them.
+   On a live card the actions row instead carries a quiet "live now" caption at the start. */
+.scene-live-note { color: var(--magenta); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .02em; }
+
+/* Encounter-tab launcher — a compact button (showing the live scene's name) that opens the Scenes
+   picker popup, in place of the old strip that listed every scene across the top of the map. */
+.scenes-open-row { display: flex; margin-bottom: var(--space-3); }
+.scenes-open { max-width: 100%; }
+.scenes-open .scenes-open-icon { margin-right: var(--space-1); font-size: 1.05em; line-height: 1; }
+.scenes-open .scenes-open-caret { margin-left: var(--space-1); font-size: .8em; opacity: .7; }
+
+/* The picker popup reuses the gallery; give its grid room to breathe inside the modal. */
+.scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
 
 /* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). */
 .scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }

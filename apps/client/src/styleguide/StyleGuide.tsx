@@ -308,26 +308,23 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="gallery" title="Cards & gallery" blurb="A responsive grid of thumbnail cards for browse-and-pick surfaces (scenes, maps). The whole card is one action; the ⋯ menu and Go-live button layer above it. Live is a state — the live card, and only it, glows magenta; a privately-staged card takes a quiet cyan edge. A dashed tile adds a new one.">
+          <Section id="gallery" title="Cards & gallery" blurb="A responsive grid of thumbnail cards for browse-and-pick surfaces (scenes, maps). Each card carries explicit actions — Prepare and Go live in opposite corners — with the ⋯ menu and status badge over the thumb. Live is a state: the live card, and only it, glows magenta; a privately-staged card takes a quiet cyan edge. A dashed tile the same size adds a new one.">
             <ul className="nh-gallery">
-              <li className="nh-card is-interactive is-live">
+              <li className="nh-card is-live">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
                 <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 combatants</span></div>
-                <button type="button" className="nh-card-open" aria-label="Stage Bridge Ambush" />
                 <span className="nh-card-status"><Badge tone="primary" solid>LIVE</Badge></span>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯">
-                    <MenuItem icon="🎬">Stage privately</MenuItem>
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
-                    <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
                   </Menu>
                 </div>
+                <div className="nh-card-actions"><span style={{ color: "var(--magenta)", fontSize: "var(--fs-xs)", fontWeight: 700 }}>● Live now</span></div>
               </li>
-              <li className="nh-card is-interactive is-staging">
+              <li className="nh-card is-staging">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
                 <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 combatants</span></div>
-                <button type="button" className="nh-card-open" aria-label="Stage Boss Chamber" />
                 <span className="nh-card-status"><Badge>Staging</Badge></span>
                 <div className="nh-card-tools">
                   <Menu trigger="⋯">
@@ -336,12 +333,11 @@ export function StyleGuide() {
                     <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
                   </Menu>
                 </div>
-                <div className="nh-card-actions"><Button variant="primary">Go live</Button></div>
+                <div className="nh-card-actions"><Button variant="secondary">Prepare</Button><Button variant="primary">Go live</Button></div>
               </li>
-              <li className="nh-card is-interactive">
+              <li className="nh-card">
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
                 <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 combatants</span></div>
-                <button type="button" className="nh-card-open" aria-label="Stage Escape Tunnels" />
                 <div className="nh-card-tools">
                   <Menu trigger="⋯">
                     <MenuItem icon="✎">Rename</MenuItem>
@@ -349,7 +345,7 @@ export function StyleGuide() {
                     <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
                   </Menu>
                 </div>
-                <div className="nh-card-actions"><Button variant="secondary">Go live</Button></div>
+                <div className="nh-card-actions"><Button variant="secondary">Prepare</Button><Button variant="primary">Go live</Button></div>
               </li>
               <li><button type="button" className="nh-card nh-card--new"><span className="nh-card-new-icon" aria-hidden="true">＋</span>New scene</button></li>
             </ul>

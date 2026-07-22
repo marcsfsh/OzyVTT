@@ -42,10 +42,12 @@
 .nh-empty-text { max-width: 26rem; font-size: var(--fs-sm); }
 
 /* ---- Card gallery (scene library, map library — any browse-and-pick grid of thumbnail cards) ----
-   The whole card is one primary action (a stretched, transparent `.nh-card-open` button); the status
-   badge, the ⋯ tools menu, and the action button layer above it so they stay clickable. Live is a
-   STATE, so the live card — and only it — glows magenta; a privately-staged card takes a quiet cyan
-   edge. Tokens only; theme-aware; reduced-motion-safe. */
+   A card carries its own explicit actions in a trailing `.nh-card-actions` row (e.g. Prepare / Go
+   live, sitting in opposite corners); the status badge and the ⋯ tools menu layer over the thumb.
+   For a pure picker where the whole card is one target instead, drop a stretched transparent
+   `.nh-card-open` button in and add `.is-interactive` for the hover lift. Live is a STATE, so the
+   live card — and only it — glows magenta; a privately-staged card takes a quiet cyan edge. Tokens
+   only; theme-aware; reduced-motion-safe. */
 .nh-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -88,18 +90,22 @@
 .nh-card-body { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); }
 .nh-card-title { margin: 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nh-card-meta { color: var(--text-muted); font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.nh-card-actions { position: relative; z-index: 2; display: flex; gap: var(--space-2); margin-top: auto; padding: 0 var(--space-3) var(--space-3); }
+.nh-card-actions { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: auto; padding: 0 var(--space-3) var(--space-3); }
 
 /* Stretched, transparent button = the card's hit area + focus target; content layers below (thumb/body)
    and the interactive overlays (tools/actions) layer above it. */
 .nh-card-open { position: absolute; inset: 0; z-index: 1; border: 0; background: transparent; cursor: pointer; border-radius: inherit; }
 .nh-card-open:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -2px; }
 
-/* Add-new tile — a dashed call to action sharing the gallery grid. */
+/* Add-new tile — a dashed call to action sharing the gallery grid. Fills its cell so it reads as one
+   more listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. */
 .nh-card--new {
   display: grid;
   place-items: center;
   gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   border-style: dashed;
   border-color: var(--line-strong);
   background: transparent;

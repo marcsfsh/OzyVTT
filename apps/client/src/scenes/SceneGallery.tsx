@@ -28,7 +28,7 @@ function SceneThumb({ mapAssetId, token }: Readonly<{ mapAssetId: string; token:
  * ⋯ menu to reorder, rename, duplicate, or remove it. "New scene" opens the prep flow. The live scene
  * carries a glowing LIVE badge; the one you're privately staging takes a quiet cyan edge.
  */
-export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onFeedback }: Readonly<{
+export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onClose, hideHeading, onFeedback }: Readonly<{
   scenes: readonly Scene[];
   activeSceneId: string | null;
   combatActive: boolean;
@@ -39,6 +39,10 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
   onNewScene: () => void;
   /** Open the folded-in map library / calibration surface (the retired Map Setup tab). */
   onManageMaps?: () => void;
+  /** Called after Prepare / Go live — used to close the picker popup on the Encounter tab. */
+  onClose?: () => void;
+  /** Hide the "GM PREP / Scenes" header (the picker popup carries its own title). */
+  hideHeading?: boolean;
   onFeedback?: (text: string) => void;
 }>) {
   const { confirm, dialog } = useConfirm();
@@ -54,8 +58,11 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
     if (!combatActive || (await confirm({ title: "Make scene live?", body: `Make “${scene.name}” live? Players and the shared screen switch now; the current fight is parked and resumes when you switch back.`, confirmLabel: "Make live" }))) {
       setPreviewScene(null);
       emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched.");
+      onClose?.();
     }
   };
+  // Prepare = open the scene for private staging (place tokens / edit combatants on its map).
+  const prepare = (scene: Scene) => { setPreviewScene(scene.id); onClose?.(); };
   const rename = async (scene: Scene) => {
     const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
     if (next && next !== scene.name) emit("scene:rename", { sceneId: scene.id, name: next }, "The scene could not be renamed.");
@@ -111,15 +118,16 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
     ? dragOrder.map((id) => scenes.find((scene) => scene.id === id)).filter((scene): scene is Scene => Boolean(scene))
     : scenes;
 
-  return <section className="scene-gallery-hub" aria-labelledby="scene-gallery-heading">
-    <div className="scene-gallery-head">
-      <div className="scene-gallery-title">
-        <span className="eyebrow">GM PREP</span>
-        <h2 id="scene-gallery-heading">Scenes</h2>
-        <p>Build your encounters ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
-      </div>
+  return <section className="scene-gallery-hub" aria-label="Scenes">
+    {!hideHeading && <div className="scene-gallery-head">
+      <span className="eyebrow">GM PREP</span>
+      <h2 id="scene-gallery-heading">Scenes</h2>
+      <p>Build your encounters ahead of time — pick a map, stage who’s in it, then go live. The live scene is what your players and the shared screen see.</p>
+    </div>}
+    {scenes.length > 0 && <div className="scene-gallery-bar">
+      <Button variant="primary" arrow onClick={onNewScene}>New scene</Button>
       {onManageMaps && <Button variant="secondary" onClick={onManageMaps}>Manage maps</Button>}
-    </div>
+    </div>}
     {scenes.length === 0
       ? <div className="nh-empty">
           <span className="nh-empty-icon" aria-hidden="true">🎬</span>
@@ -132,21 +140,17 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
             const live = scene.id === activeSceneId;
             const staging = scene.id === previewingSceneId;
             const count = scene.combat.initiative.length;
-            return <li key={scene.id} data-scene-id={scene.id} className={`nh-card is-interactive${live ? " is-live" : ""}${staging ? " is-staging" : ""}${dragId === scene.id ? " is-dragging" : ""}`}>
+            return <li key={scene.id} data-scene-id={scene.id} className={`nh-card${live ? " is-live" : ""}${staging ? " is-staging" : ""}${dragId === scene.id ? " is-dragging" : ""}`}>
               <div className="nh-card-thumb"><SceneThumb mapAssetId={scene.mapAssetId} token={token} /></div>
               <div className="nh-card-body">
                 <h3 className="nh-card-title">{scene.name}</h3>
                 <span className="nh-card-meta">{mapName(scene.mapAssetId)} · {count} combatant{count === 1 ? "" : "s"}</span>
               </div>
-              <button type="button" className="nh-card-open"
-                aria-label={live ? `${scene.name} (live)` : staging ? `Stop staging ${scene.name}` : `Stage ${scene.name} privately`}
-                onClick={() => setPreviewScene(live || staging ? null : scene.id)} />
               {(live || staging) && <span className="nh-card-status">{live ? <Badge tone="primary" solid>LIVE</Badge> : <Badge>Staging</Badge>}</span>}
               <div className="nh-card-tools">
                 {scenes.length > 1 && <button type="button" className="scene-card-grip" aria-label={`Drag to reorder ${scene.name}`}
                   onPointerDown={(event) => beginDrag(scene.id, event)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}>⠿</button>}
                 <Menu trigger="⋯" label={`${scene.name} actions`} align="end" hideCaret>
-                  {!live && <MenuItem icon="🎬" onClick={() => setPreviewScene(scene.id)}>Stage privately</MenuItem>}
                   <MenuItem icon="←" disabled={index === 0} onClick={() => move(scene.id, -1)}>Move earlier</MenuItem>
                   <MenuItem icon="→" disabled={index === ordered.length - 1} onClick={() => move(scene.id, 1)}>Move later</MenuItem>
                   <MenuItem icon="✎" onClick={() => void rename(scene)}>Rename</MenuItem>
@@ -154,7 +158,9 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
                   {!live && <MenuItem icon="🗑" tone="danger" onClick={() => void remove(scene)}>Remove</MenuItem>}
                 </Menu>
               </div>
-              {!live && <div className="nh-card-actions"><Button variant="primary" onClick={() => void goLive(scene)}>Go live</Button></div>}
+              {live
+                ? <div className="nh-card-actions"><span className="scene-live-note">● Live now</span></div>
+                : <div className="nh-card-actions"><Button variant="secondary" onClick={() => prepare(scene)}>Prepare</Button><Button variant="primary" onClick={() => void goLive(scene)}>Go live</Button></div>}
             </li>;
           })}
           <li><button type="button" className="nh-card nh-card--new" onClick={onNewScene}><span className="nh-card-new-icon" aria-hidden="true">＋</span>New scene</button></li>
