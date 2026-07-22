@@ -293,7 +293,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
               <span className="roll-zone-caption">manual entry</span>
               <span className="save-prompt-manual">
                 <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDieEdit} disabled={manualSubmitted} onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDieEdit.trim() !== "") submitDie(); }} />
-                {/* "Use roll" sits flush-right; once used it becomes Confirm/Re-roll, aligned under the auto-roll buttons above. */}
+                {/* "Use roll" sits on its own right-aligned row under the full-width field; once used it becomes Confirm/Re-roll. */}
                 <span className="manual-actions">{manualSubmitted
                   ? <><button type="button" className="encounter-primary" disabled={resolveBusy} onClick={() => previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={resolveBusy} title="Enter a different d20" onClick={() => { setAttackDieEdit(""); setManualSubmitted(false); }}>Re-roll</Button></>
                   : <button type="button" disabled={resolveBusy || attackDieEdit.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
