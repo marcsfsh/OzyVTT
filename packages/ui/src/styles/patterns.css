@@ -91,6 +91,10 @@
 .nh-card-title { margin: 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nh-card-meta { color: var(--text-muted); font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .nh-card-actions { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: auto; padding: 0 var(--space-3) var(--space-3); }
+/* Action buttons share the row equally so a narrow card (e.g. inside the picker popup) can never
+   push one button past the rounded corner; two of them still read as opposite corners. A non-button
+   child (a lone "live now" caption) keeps its intrinsic width and sits at the start. */
+.nh-card-actions > button { flex: 1 1 0; min-width: 0; }
 
 /* Stretched, transparent button = the card's hit area + focus target; content layers below (thumb/body)
    and the interactive overlays (tools/actions) layer above it. */
