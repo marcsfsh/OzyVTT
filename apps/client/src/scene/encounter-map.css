@@ -105,7 +105,7 @@
 .annotation-handle { fill: var(--cyan-hi); stroke: #0a0805; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; }
 .annotation-handle-move { cursor: move; }
 .annotation-handle-resize { cursor: nwse-resize; }
-.annotation-shape.selected .annotation-shape-body { stroke-width: 3.5; }
+.annotation-shape.selected .annotation-shape-body { stroke-width: 4.5; }
 .annotation-shape.live .annotation-shape-body { stroke-dasharray: 4 4; }
 
 .encounter-shape-editor { position: absolute; right: .7rem; top: .7rem; z-index: 4; width: 15rem; max-width: calc(100% - 1.4rem); display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 96%, transparent); box-shadow: var(--shadow-2); }

@@ -1,13 +1,16 @@
 /* Shared visual styling for measurement/shape annotations, used by both the encounter map
    (EncounterMap) and the shared-screen viewer (ViewerApp). Class-scoped only — no page reset. */
-.annotation-measurement line { stroke: var(--magenta); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+/* A dark halo keeps the neon line legible over bright or busy battlemap art (the same legibility
+   tool token bodies use), so annotations never wash out against the map. */
+.annotation-measurement { filter: drop-shadow(0 0 2px rgb(0 0 0 / .85)); }
+.annotation-measurement line { stroke: var(--magenta); stroke-width: 3.5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
 .annotation-measurement circle { fill: var(--magenta); }
 .annotation-arrow { fill: var(--magenta); stroke: none; }
 .annotation-measurement text, .annotation-shape-label { fill: var(--text); font: 700 13px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--void); stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
 .annotation-measurement.live line { stroke-dasharray: 6 5; }
 .annotation-measurement.expiring { animation: annotation-fade-out 5s ease-in forwards; }
 
-.annotation-shape-body { fill: color-mix(in srgb, var(--info) 18%, transparent); stroke: var(--info); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.annotation-shape-body { fill: color-mix(in srgb, var(--info) 28%, transparent); stroke: var(--info); stroke-width: 3.5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 2px rgb(0 0 0 / .85)); }
 .annotation-shape.visibility-gm-only .annotation-shape-body { stroke: var(--violet); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--violet) 14%, transparent); }
 .annotation-shape.visibility-owner-only .annotation-shape-body { stroke: var(--caution); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--caution) 14%, transparent); }
 .annotation-shape.visibility-owner-gm .annotation-shape-body { stroke: var(--magenta); stroke-dasharray: 7 5; fill: color-mix(in srgb, var(--magenta) 14%, transparent); }
@@ -17,8 +20,8 @@
 @keyframes annotation-fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Pings: an expanding, pulsing ring + core dot + the sender's name. `color` is set inline per sender. */
-.annotation-ping { color: var(--magenta); pointer-events: none; }
-.annotation-ping-ring { fill: none; stroke: currentcolor; stroke-width: 3; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: annotation-ping-pulse 1.3s ease-out infinite; }
+.annotation-ping { color: var(--magenta); pointer-events: none; filter: drop-shadow(0 0 2px rgb(0 0 0 / .85)); }
+.annotation-ping-ring { fill: none; stroke: currentcolor; stroke-width: 4; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: annotation-ping-pulse 1.3s ease-out infinite; }
 .annotation-ping-core { fill: currentcolor; }
 .annotation-ping-label { fill: var(--text); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--void); stroke-linejoin: round; font-weight: 800; }
 @keyframes annotation-ping-pulse { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.35); } }
