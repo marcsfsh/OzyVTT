@@ -11,6 +11,7 @@ import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { canInitiateForActor } from "./authorization.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
+import { setCurrency, setInventoryItem } from "./inventory.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
@@ -32,7 +33,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetPreparedSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -1050,6 +1051,30 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async characterSetInventory(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetInventorySchema, raw, "The inventory command is malformed.");
+      const { commandId, actorId, item, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-inventory", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setInventoryItem(state, actorId, item);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetCurrency(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetCurrencySchema, raw, "The currency command is malformed.");
+      const { commandId, actorId, currency, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-currency", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setCurrency(state, actorId, currency);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Fog of war ----------
 
     async fogSetEnabled(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1406,6 +1431,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["actor.spend-hit-dice", "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).", (p, raw) => operations.actorSpendHitDice(p, raw)],
     ["character.set-slot", "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).", (p, raw) => operations.characterSetSlot(p, raw)],
     ["character.set-prepared", "Prepare or un-prepare one of a character's known spells.", (p, raw) => operations.characterSetPrepared(p, raw)],
+    ["character.set-inventory", "Add, update, or remove one of a character's inventory items.", (p, raw) => operations.characterSetInventory(p, raw)],
+    ["character.set-currency", "Set a character's coin purse.", (p, raw) => operations.characterSetCurrency(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
     ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],

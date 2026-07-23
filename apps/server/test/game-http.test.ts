@@ -529,6 +529,8 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.actorSpendHitDice, "post", "actor.spend-hit-dice"],
       [GAME_PATHS.characterSetSlot, "post", "character.set-slot"],
       [GAME_PATHS.characterSetPrepared, "post", "character.set-prepared"],
+      [GAME_PATHS.characterSetInventory, "post", "character.set-inventory"],
+      [GAME_PATHS.characterSetCurrency, "post", "character.set-currency"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
       [GAME_PATHS.annotationsClear, "post", "annotation.clear"],

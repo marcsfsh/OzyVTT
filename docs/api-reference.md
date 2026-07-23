@@ -90,6 +90,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `actor.spend-hit-dice` | `actor:write` |
 | `character.set-slot` | `actor:write` |
 | `character.set-prepared` | `actor:write` |
+| `character.set-inventory` | `actor:write` |
+| `character.set-currency` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
 | `annotation.move` | `combat:write` |
@@ -975,6 +977,54 @@ Prepares or un-prepares one of a character's known spells (cantrips and always-p
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `spellId` | string | yes |  |
 | `prepared` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/inventory`
+
+Adds, updates, or removes (quantity 0) one of a character's inventory items and toggles equipped/attuned. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `item` | object | yes |  |
+| `item.id` | string (pattern) | yes |  |
+| `item.name` | string | yes |  |
+| `item.quantity` | integer (0–9999) | no | 0 removes the item |
+| `item.equipped` | boolean | no |  |
+| `item.attuned` | boolean | no |  |
+| `item.weightEach` | number (≥ 0) | no |  |
+| `item.description` | string | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/currency`
+
+Sets a character's coin purse (cp/sp/ep/gp/pp). Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `currency` | object | yes |  |
+| `currency.cp` | integer (0–1000000) | no |  |
+| `currency.sp` | integer (0–1000000) | no |  |
+| `currency.ep` | integer (0–1000000) | no |  |
+| `currency.gp` | integer (0–1000000) | no |  |
+| `currency.pp` | integer (0–1000000) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

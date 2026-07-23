@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema } from "@vtt/domain";
+import { CurrencySchema, InventoryItemSchema } from "@vtt/schemas";
 
 /**
  * Wire schemas for every game command, shared by BOTH transports: the Socket.IO handlers in
@@ -148,6 +149,8 @@ export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId:
 export const ActorSpendHitDiceSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), count: z.number().int().min(1).max(40), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetSlotSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetPreparedSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), spellId: z.string().min(1).max(80), prepared: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetInventorySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), item: InventoryItemSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetCurrencySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), currency: CurrencySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TokenMoveSchema = z.object({
   commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),

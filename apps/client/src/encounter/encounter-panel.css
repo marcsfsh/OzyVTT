@@ -359,6 +359,19 @@
 .sheet-prepare { padding: .18rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 .64rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
 .sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prepare:disabled { opacity: .6; cursor: default; }
+.sheet-item-edit li { flex-wrap: wrap; gap: .35rem .5rem; }
+.sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.sheet-remove { width: 1.4rem; height: 1.4rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text-muted); font: 700 .9rem/1 var(--font-mono); cursor: pointer; }
+.sheet-remove:hover:not(:disabled) { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+.sheet-attunement { margin: .55rem 0 0; color: var(--text-muted); font-size: .72rem; font-weight: 700; }
+.sheet-attunement.over { color: var(--danger); }
+.sheet-add-item { display: flex; gap: .4rem; margin: .55rem 0 0; }
+.sheet-add-item input { flex: 1; min-width: 0; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: .8rem; }
+.sheet-add-item button, .sheet-coins button { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .74rem; font-weight: 700; cursor: pointer; }
+.sheet-add-item button:disabled, .sheet-coins button:disabled { opacity: .6; cursor: default; }
+.sheet-coins { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4rem; margin: .55rem 0 0; }
+.sheet-coins label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; }
+.sheet-coins input { width: 4rem; padding: .25rem .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 .78rem var(--font-mono); }
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }

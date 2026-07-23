@@ -17,6 +17,8 @@ const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
 const titleizeSkill = (id: string) => id.split("-").map(titleCase).join(" ");
+const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
+const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
 /** SRD governing ability for each of the 18 skills (drives the read-only skill bonus). */
 const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
   acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
@@ -73,6 +75,8 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const [rolling, setRolling] = useState(false);
   const [busy, setBusy] = useState(false);
   const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
+  const [newItem, setNewItem] = useState("");
+  const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
   // the GM still applies damage (players never mutate another creature's HP).
@@ -111,6 +115,9 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const spellAtk = spellcasting && definition ? (spellcasting.attackBonus ?? spellAttackBonus(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
+  const attunedCount = inventory.filter((item) => item.attuned).length;
+  // Keep the coin editor in sync with the authoritative purse (re-syncs after each accepted change).
+  useEffect(() => { setCoins({ cp: currency?.cp ?? 0, sp: currency?.sp ?? 0, ep: currency?.ep ?? 0, gp: currency?.gp ?? 0, pp: currency?.pp ?? 0 }); }, [currency?.cp, currency?.sp, currency?.ep, currency?.gp, currency?.pp]);
 
   // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
   // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
@@ -174,11 +181,31 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
             </li>; })}
           </ul>}
         </section>}
-        {(inventory.length > 0 || hasCoins) && <section className="sheet-section"><h3>Inventory</h3>
-          {inventory.length > 0 && <ul className="sheet-item-list">
-            {inventory.map((item) => <li key={item.id}><span>{item.name}{item.quantity !== 1 ? ` ×${item.quantity}` : ""}</span>{(item.equipped || item.attuned) && <small>{[item.equipped ? "equipped" : null, item.attuned ? "attuned" : null].filter(Boolean).join(", ")}</small>}</li>)}
+        {actor.kind === "player-character" && <section className="sheet-section"><h3>Inventory</h3>
+          {inventory.length > 0 && <ul className="sheet-item-list sheet-item-edit">
+            {inventory.map((item) => <li key={item.id}>
+              <span>{item.name}</span>
+              <div className="sheet-item-controls">
+                <div className="sheet-slot-stepper">
+                  <button type="button" disabled={busy} aria-label={`One fewer ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: item.quantity - 1 } }, ack); }}>−</button>
+                  <span><strong>{item.quantity}</strong></span>
+                  <button type="button" disabled={busy} aria-label={`One more ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: item.quantity + 1 } }, ack); }}>+</button>
+                </div>
+                <button type="button" className={`sheet-prepare${item.equipped ? " is-prepared" : ""}`} disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "equipped" : "equip"}</button>
+                <button type="button" className={`sheet-prepare${item.attuned ? " is-prepared" : ""}`} disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } }, ack); }}>{item.attuned ? "attuned" : "attune"}</button>
+                <button type="button" className="sheet-remove" disabled={busy} aria-label={`Remove ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>×</button>
+              </div>
+            </li>)}
           </ul>}
-          {hasCoins && currency && <p className="sheet-currency">{(["pp", "gp", "ep", "sp", "cp"] as const).flatMap((coin) => currency[coin] ? [`${currency[coin]} ${coin}`] : []).join(" · ")}</p>}
+          {attunedCount > 0 && <p className={`sheet-attunement${attunedCount > 3 ? " over" : ""}`}>Attunement {attunedCount}/3</p>}
+          <form className="sheet-add-item" onSubmit={(event) => { event.preventDefault(); const name = newItem.trim(); if (!name) return; setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { id: slugify(name), name, quantity: 1 } }, ack); setNewItem(""); }}>
+            <input type="text" value={newItem} maxLength={120} placeholder="Add an item…" aria-label="New item name" onChange={(event) => setNewItem(event.target.value)} />
+            <button type="submit" disabled={busy || !newItem.trim()}>Add</button>
+          </form>
+          <div className="sheet-coins">
+            {COINS.map((coin) => <label key={coin}>{coin}<input type="number" min="0" max="1000000" value={coins[coin]} onChange={(event) => setCoins((prev) => ({ ...prev, [coin]: Math.max(0, Math.min(1000000, Math.floor(Number(event.target.value) || 0))) }))} /></label>)}
+            <button type="button" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-currency", { commandId: newId(), actorId: actor.id, currency: coins }, ack); }}>Save coins</button>
+          </div>
         </section>}
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
