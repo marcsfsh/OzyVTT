@@ -531,6 +531,8 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.characterSetPrepared, "post", "character.set-prepared"],
       [GAME_PATHS.characterSetInventory, "post", "character.set-inventory"],
       [GAME_PATHS.characterSetCurrency, "post", "character.set-currency"],
+      [GAME_PATHS.characterSetIdentity, "post", "character.set-identity"],
+      [GAME_PATHS.characterSetProficiencies, "post", "character.set-proficiencies"],
       [GAME_PATHS.annotations, "post", "annotation.add"],
       [GAME_PATHS.annotationsPing, "post", "annotation.ping"],
       [GAME_PATHS.annotationsClear, "post", "annotation.clear"],

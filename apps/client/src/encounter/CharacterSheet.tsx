@@ -26,6 +26,7 @@ const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
   nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int",
   "sleight-of-hand": "dex", stealth: "dex", survival: "wis"
 };
+const ALL_SKILLS = Object.keys(SKILL_ABILITY).sort();
 
 type SrdExtension = Partial<{
   challengeRating: number; type: string; alignment: string; armorDetail: string | null;
@@ -77,6 +78,9 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
   const [newItem, setNewItem] = useState("");
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
+  const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
+  const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
+  const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
   // the GM still applies damage (players never mutate another creature's HP).
@@ -118,6 +122,14 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const attunedCount = inventory.filter((item) => item.attuned).length;
   // Keep the coin editor in sync with the authoritative purse (re-syncs after each accepted change).
   useEffect(() => { setCoins({ cp: currency?.cp ?? 0, sp: currency?.sp ?? 0, ep: currency?.ep ?? 0, gp: currency?.gp ?? 0, pp: currency?.pp ?? 0 }); }, [currency?.cp, currency?.sp, currency?.ep, currency?.gp, currency?.pp]);
+  // Light hand-edit (owner + GM, server-enforced): edit the per-PC imported definition's identity /
+  // proficiency selections; guided creation stays in the future builder.
+  const openProfEditor = () => { setProfDraft({ saves: proficiencies?.saves ? [...proficiencies.saves] : [], skills: Object.fromEntries((proficiencies?.skills ?? []).map((skill) => [skill.id, skill.proficiency])) }); setEditMode("prof"); };
+  const toggleSave = (ability: string) => setProfDraft((prev) => ({ ...prev, saves: prev.saves.includes(ability) ? prev.saves.filter((entry) => entry !== ability) : [...prev.saves, ability] }));
+  const cycleSkill = (id: string) => setProfDraft((prev) => { const current = prev.skills[id]; const next = current === undefined ? "proficient" : current === "proficient" ? "expertise" : undefined; const skills = { ...prev.skills }; if (next) skills[id] = next; else delete skills[id]; return { ...prev, skills }; });
+  const saveProf = () => { setBusy(true); socket.emit("character:set-proficiencies", { commandId: newId(), actorId: actor.id, proficiencies: { saves: profDraft.saves as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">, skills: Object.entries(profDraft.skills).map(([id, proficiency]) => ({ id, proficiency })) } }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
+  const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
+  const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) }; setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
   // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
   // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
@@ -126,7 +138,19 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       <p className="sheet-typeline">
         {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
       </p>
-      {identity && <p className="sheet-identity">{identity}</p>}
+      {(identity || (actor.kind === "player-character" && definition)) && <div className="sheet-identity-row">
+        {editMode === "identity"
+          ? <div className="sheet-editor sheet-id-editor">
+              <label>Class<input type="text" value={idDraft.className} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, className: event.target.value }))} /></label>
+              <label>Subclass<input type="text" value={idDraft.subclass} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, subclass: event.target.value }))} /></label>
+              <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
+              <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
+              <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
+              <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveIdentity}>Save</button>
+              <button type="button" className="sheet-edit-toggle" onClick={() => setEditMode(null)}>Cancel</button>
+            </div>
+          : <><span className="sheet-identity">{identity ?? "No class set"}</span>{actor.kind === "player-character" && definition && <button type="button" className="sheet-edit-toggle" onClick={openIdEditor}>Edit</button>}</>}
+      </div>}
 
       <div className="sheet-vitals">
         <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
@@ -159,11 +183,20 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           {extension.conditionImmunities && <div><dt>Condition immunities</dt><dd>{extension.conditionImmunities}</dd></div>}
           <div><dt>Proficiency</dt><dd>{signed(definition.proficiencyBonus)}</dd></div>
         </dl>
-        {proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0) && <section className="sheet-section"><h3>Proficiencies</h3>
-          {proficiencies.saves.length > 0 && <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{proficiencies.saves.map((ability) => { const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, true); return <button type="button" key={ability} className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>}
-          {proficiencies.skills.length > 0 && <ul className="sheet-skill-list">
-            {proficiencies.skills.map((skill) => { const ability = SKILL_ABILITY[skill.id]; const bonus = ability ? skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, skill.proficiency) : null; return <li key={skill.id}><span>{titleizeSkill(skill.id)}{skill.proficiency === "expertise" ? " (expertise)" : ""}</span>{bonus === null ? <strong>-</strong> : <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "check", `${titleizeSkill(skill.id)} check`)}>{signed(bonus)}</button>}</li>; })}
-          </ul>}
+        {((proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0)) || actor.kind === "player-character") && <section className="sheet-section"><h3>Proficiencies{actor.kind === "player-character" && <button type="button" className="sheet-edit-toggle" onClick={() => editMode === "prof" ? setEditMode(null) : openProfEditor()}>{editMode === "prof" ? "Done" : "Edit"}</button>}</h3>
+          {editMode === "prof"
+            ? <div className="sheet-editor">
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => <button type="button" key={ability} className={`sheet-prepare${profDraft.saves.includes(ability) ? " is-prepared" : ""}`} onClick={() => toggleSave(ability)}>{ability.toUpperCase()}</button>)}</div>
+                <ul className="sheet-skill-list">{ALL_SKILLS.map((id) => { const tier = profDraft.skills[id]; return <li key={id}><span>{titleizeSkill(id)}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} onClick={() => cycleSkill(id)}>{tier ?? "—"}</button></li>; })}</ul>
+                <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveProf}>Save proficiencies</button>
+              </div>
+            : <>
+                {proficiencies && proficiencies.saves.length > 0 && <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{proficiencies.saves.map((ability) => { const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, true); return <button type="button" key={ability} className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>}
+                {proficiencies && proficiencies.skills.length > 0 && <ul className="sheet-skill-list">
+                  {proficiencies.skills.map((skill) => { const ability = SKILL_ABILITY[skill.id]; const bonus = ability ? skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, skill.proficiency) : null; return <li key={skill.id}><span>{titleizeSkill(skill.id)}{skill.proficiency === "expertise" ? " (expertise)" : ""}</span>{bonus === null ? <strong>-</strong> : <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "check", `${titleizeSkill(skill.id)} check`)}>{signed(bonus)}</button>}</li>; })}
+                </ul>}
+                {(!proficiencies || (proficiencies.saves.length === 0 && proficiencies.skills.length === 0)) && <p className="sheet-empty-note">No proficiencies set yet — tap Edit to choose.</p>}
+              </>}
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
           <p className="sheet-entry"><strong>{spellcasting.ability.toUpperCase()} caster.</strong> Save DC {spellDc}{spellAtk !== null ? `, ${signed(spellAtk)} to hit` : ""}.</p>

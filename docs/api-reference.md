@@ -92,6 +92,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.set-prepared` | `actor:write` |
 | `character.set-inventory` | `actor:write` |
 | `character.set-currency` | `actor:write` |
+| `character.set-identity` | `actor:write` |
+| `character.set-proficiencies` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
 | `annotation.move` | `combat:write` |
@@ -1025,6 +1027,50 @@ Sets a character's coin purse (cp/sp/ep/gp/pp). Player sessions may target only 
 | `currency.ep` | integer (0–1000000) | no |  |
 | `currency.gp` | integer (0–1000000) | no |  |
 | `currency.pp` | integer (0–1000000) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/identity`
+
+Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `character` | object | yes |  |
+| `character.classes` | object[] | no |  |
+| `character.race` | object | no |  |
+| `character.background` | object | no |  |
+| `character.feats` | object[] | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/proficiencies`
+
+Sets a character's save and skill proficiency selections on its editable imported sheet. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `proficiencies` | object | yes |  |
+| `proficiencies.saves` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | no |  |
+| `proficiencies.skills` | object[] | no |  |
+| `proficiencies.saveOverrides` | object (free-form) | no |  |
+| `proficiencies.skillOverrides` | object (free-form) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

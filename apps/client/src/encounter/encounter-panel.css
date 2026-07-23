@@ -372,6 +372,19 @@
 .sheet-coins { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4rem; margin: .55rem 0 0; }
 .sheet-coins label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; }
 .sheet-coins input { width: 4rem; padding: .25rem .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 .78rem var(--font-mono); }
+.sheet-identity-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .25rem 0 0; }
+.sheet-edit-toggle { padding: .1rem .45rem; margin-left: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-muted); font: 800 .62rem/1.4 var(--font-sans, inherit); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; vertical-align: middle; }
+.sheet-edit-toggle:hover { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-editor { margin: .5rem 0 0; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.sheet-editor .sheet-skill-list { max-height: 13rem; overflow-y: auto; margin-top: .5rem; }
+.sheet-editor .sheet-save-btn { margin-top: .6rem; }
+.sheet-id-editor { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+.sheet-id-editor label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.sheet-id-editor input { padding: .28rem .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .8rem; }
+.sheet-id-editor input[type=number] { width: 4rem; }
+.sheet-save-btn { padding: .3rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, transparent); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .74rem; font-weight: 700; cursor: pointer; }
+.sheet-save-btn:disabled { opacity: .6; cursor: default; }
+.sheet-empty-note { color: var(--text-muted); font-size: .78rem; font-style: italic; margin: .3rem 0 0; }
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }

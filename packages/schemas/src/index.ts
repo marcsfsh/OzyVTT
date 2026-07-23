@@ -243,7 +243,7 @@ const ActionSchema = z.object({
  * these fields (ADR-0007 additive; the "no-rewrite" contract). `classes` is an array so multiclass
  * is expressible; total level is derived (sum), never stored. Absent = prose only, as today.
  */
-const CharacterIdentitySchema = z.object({
+export const CharacterIdentitySchema = z.object({
   classes: z.array(z.object({
     id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60),
     subclass: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
@@ -259,7 +259,7 @@ const CharacterIdentitySchema = z.object({
  * imports that don't encode the selections; the server resolves `override ?? selection-derived ??
  * ability-only`. Absent = fall back to ability modifier / the legacy `extensions` totals.
  */
-const ProficienciesSchema = z.object({
+export const ProficienciesSchema = z.object({
   saves: z.array(AbilitySchema).max(6).default([]),
   skills: z.array(z.object({ id: SkillIdSchema, proficiency: z.enum(["proficient", "expertise"]) }).strict()).max(40).default([]),
   saveOverrides: z.record(AbilitySchema, z.number().int().min(-20).max(30)).optional(),

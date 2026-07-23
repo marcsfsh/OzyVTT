@@ -12,6 +12,7 @@ import { addActorFromDefinition, importActorDefinition, removeActor, storedDefin
 import { canInitiateForActor } from "./authorization.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { setCurrency, setInventoryItem } from "./inventory.js";
+import { setCharacterIdentity, setCharacterProficiencies } from "./character-edit.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
@@ -33,7 +34,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -1075,6 +1076,30 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async characterSetIdentity(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetIdentitySchema, raw, "The identity command is malformed.");
+      const { commandId, actorId, character, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-identity", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setCharacterIdentity(state, actorId, character);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetProficiencies(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetProficienciesSchema, raw, "The proficiencies command is malformed.");
+      const { commandId, actorId, proficiencies, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-proficiencies", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setCharacterProficiencies(state, actorId, proficiencies);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Fog of war ----------
 
     async fogSetEnabled(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1433,6 +1458,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["character.set-prepared", "Prepare or un-prepare one of a character's known spells.", (p, raw) => operations.characterSetPrepared(p, raw)],
     ["character.set-inventory", "Add, update, or remove one of a character's inventory items.", (p, raw) => operations.characterSetInventory(p, raw)],
     ["character.set-currency", "Set a character's coin purse.", (p, raw) => operations.characterSetCurrency(p, raw)],
+    ["character.set-identity", "Edit a character's identity (class/level/race/background/feats) on its imported sheet.", (p, raw) => operations.characterSetIdentity(p, raw)],
+    ["character.set-proficiencies", "Edit a character's save and skill proficiency selections on its imported sheet.", (p, raw) => operations.characterSetProficiencies(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
     ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],
