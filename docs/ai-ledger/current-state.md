@@ -254,8 +254,22 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   slots/inventory/currency; the three seed PCs migrated; and `CharacterSheet.tsx` now renders
   identity/proficiencies/spells/inventory **read-only** (guarded, so monsters/imports are
   unchanged). `check`+`build`+`test` green (server 404, schemas 8); a live browser/mobile visual
-  check is still pending (no e2e harness in-repo). Slices 2–5 (player-initiated rolls → spell
-  slots → inventory management → identity/proficiency light-edit) follow on the same branch.
+  check is still pending (no e2e harness in-repo). **Slices 2–5 then landed** (all
+  `check`+`build`+`test` green; server now 418 tests): **Slice 2** — players tap an
+  ability/save/skill/attack on the sheet to roll it via `dice.roll`, plus the centralized
+  `canInitiateForActor` authorization seam (damage stays GM-applied; a future per-table
+  "players may initiate attacks" toggle is a one-field add). **Slice 3** —
+  `character.set-slot`/`set-prepared` + long-rest slot/prepared restore + sheet slot
+  steppers and prepared toggles. **Slice 4** — `character.set-inventory`/`set-currency` +
+  inventory/currency editors + attunement soft-cap. **Slice 5** —
+  `character.set-identity`/`set-proficiencies` (edit the per-PC `import-<actorId>` definition,
+  re-validated) + sheet identity/proficiency editors, and **ADR-0021** reframing the
+  "not a character builder" boundary (CLAUDE.md scope line updated). Every new command is
+  player-allowed, owner-scoped, and flows through the shared operations layer + versioned
+  OpenAPI (docs/api-reference + docs/app-map regenerated, freshness-tested). The Phase-1
+  **interactive play sheet is feature-complete**; the full guided builder (content +
+  derivation + level-up) is the next roadmap update. **Still pending:** a live browser/mobile
+  visual smoke (no Playwright/e2e harness in the repo yet).
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
