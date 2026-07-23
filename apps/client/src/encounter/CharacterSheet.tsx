@@ -96,8 +96,10 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
   const damage = upcast?.damageRoll ?? content?.damageRoll ?? null;
   const targets = upcast?.targetCount ?? null;
   const effect = damage && targets ? `${targets}× ${damage}` : damage ?? (targets ? `${targets} targets` : null);
+  // Always render the helper cell (empty when the spell has no scaling) so the dropdown + Cast align
+  // across every row (v4 #5.1).
   return <div className="sheet-cast">
-    {effect && <span className="sheet-cast-effect" title={`Effect when cast at ${ordinal(level)} level`}>{effect}</span>}
+    <span className={`sheet-cast-effect${effect ? "" : " empty"}`} title={effect ? `Effect when cast at ${ordinal(level)} level` : undefined}>{effect ?? ""}</span>
     <select className="sheet-cast-select" aria-label={`Cast ${spell.name} at level`} value={level} disabled={busy} onChange={(event) => setCastLevel(Number(event.target.value))}>
       {options.map((slot) => <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>{ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}{slot > spell.level ? " ↑" : ""}</option>)}
     </select>
@@ -150,6 +152,14 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
   const beginLogResize = (event: ReactPointerEvent<HTMLDivElement>) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); logResize.current = { startX: event.clientX, startWidth: logWidth }; };
   const moveLogResize = (event: ReactPointerEvent<HTMLDivElement>) => { if (!logResize.current) return; const dx = event.clientX - logResize.current.startX; const delta = logSide === "left" ? dx : -dx; setLogWidth(Math.max(220, Math.min(620, logResize.current.startWidth + delta))); };
   const endLogResize = () => { logResize.current = null; };
+  // Adjustable overall sheet width when docked (v4 #2): a right-edge handle drives a --sheet-width var on
+  // the modal; centred, so the edge follows the cursor at 2x. Remembered per browser.
+  const [sheetWidth, setSheetWidth] = useState<number>(() => { const stored = Number(readSetting("vtt.sheet.width")); return Number.isFinite(stored) && stored >= 720 ? stored : 1180; });
+  useEffect(() => { writeSetting("vtt.sheet.width", String(sheetWidth)); }, [sheetWidth]);
+  const sheetResize = useRef<{ startX: number; startWidth: number } | null>(null);
+  const beginSheetResize = (event: ReactPointerEvent<HTMLDivElement>) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); sheetResize.current = { startX: event.clientX, startWidth: sheetWidth }; };
+  const moveSheetResize = (event: ReactPointerEvent<HTMLDivElement>) => { if (!sheetResize.current) return; const dx = event.clientX - sheetResize.current.startX; setSheetWidth(Math.max(720, Math.min(1600, sheetResize.current.startWidth + dx * 2))); };
+  const endSheetResize = () => { sheetResize.current = null; };
   // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
   // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
@@ -523,6 +533,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
     </div>
     {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
+    {hasLog && !standalone && presentation === "modal" && <div className="sheet-width-resize" role="separator" aria-label="Drag to resize the sheet" title="Drag to resize the sheet" onPointerDown={beginSheetResize} onPointerMove={moveSheetResize} onPointerUp={endSheetResize} onPointerCancel={endSheetResize} />}
   </div>);
 
   // Its own browser tab (feedback #9.3): fills the window, header × ends the tab.
@@ -537,5 +548,5 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
       {dialog}
     </>;
   }
-  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
+  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} style={hasLog ? ({ "--sheet-width": `${sheetWidth}px` } as CSSProperties) : undefined} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
 }

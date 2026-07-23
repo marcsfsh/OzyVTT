@@ -43,7 +43,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-5) var(--space-6);
   border-bottom: 1px solid var(--line);
 }
 .nh-modal-title { margin: 0; font: 400 var(--fs-h1) / var(--lh-snug) var(--font-display); }
@@ -68,7 +68,7 @@
 }
 .nh-modal-close:hover { color: var(--text); border-color: var(--line-strong); }
 
-.nh-modal-body { padding: var(--space-5); overflow-y: auto; }
+.nh-modal-body { padding: var(--space-6); overflow-y: auto; }
 .nh-modal-foot {
   display: flex;
   justify-content: flex-end;
