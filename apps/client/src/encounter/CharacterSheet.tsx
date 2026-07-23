@@ -273,24 +273,18 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
   const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
   const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) }; setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
-  // The sheet's own scrolling content (one column of the workspace below).
+  // The sheet's own scrolling content (one column of the workspace below). Identity + roll settings now
+  // live in the fixed header/rollbar; only the identity EDIT FORM stays inline in the scroll.
   const sheetScroll = (<div className="sheet-scroll">
-      <p className="sheet-typeline">
-        {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
-      </p>
-      {(identity || (actor.kind === "player-character" && definition)) && <div className="sheet-identity-row">
-        {editMode === "identity"
-          ? <div className="sheet-editor sheet-id-editor">
-              <label>Class<input type="text" value={idDraft.className} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, className: event.target.value }))} /></label>
-              <label>Subclass<input type="text" value={idDraft.subclass} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, subclass: event.target.value }))} /></label>
-              <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
-              <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
-              <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
-              <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveIdentity}>Save</button>
-              <button type="button" className="sheet-edit-toggle" onClick={() => setEditMode(null)}>Cancel</button>
-            </div>
-          : <><span className="sheet-identity">{identity ?? "No class set"}</span>{actor.kind === "player-character" && definition && <button type="button" className="sheet-edit-toggle" onClick={openIdEditor}>Edit</button>}</>}
-      </div>}
+      {editMode === "identity" && <div className="sheet-editor sheet-id-editor">
+          <label>Class<input type="text" value={idDraft.className} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, className: event.target.value }))} /></label>
+          <label>Subclass<input type="text" value={idDraft.subclass} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, subclass: event.target.value }))} /></label>
+          <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
+          <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
+          <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
+          <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveIdentity}>Save</button>
+          <button type="button" className="sheet-edit-toggle" onClick={() => setEditMode(null)}>Cancel</button>
+        </div>}
 
       <div className="sheet-vitals">
         <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
@@ -302,17 +296,6 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
       <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
 
       {definition && <>
-        <div className="sheet-settings" role="group" aria-label="Roll entry settings">
-          <span className="sheet-settings-label">Rolls</span>
-          <div className="sheet-seg" role="group" aria-label="Roll input mode">
-            <button type="button" className={rollInput === "digital" ? "on" : ""} aria-pressed={rollInput === "digital"} title="Tap a roll to have the app roll it" onClick={() => chooseRollInput("digital")}>Digital</button>
-            <button type="button" className={rollInput === "manual" ? "on" : ""} aria-pressed={rollInput === "manual"} title="Tap a roll, then type your physical die result" onClick={() => chooseRollInput("manual")}>Manual</button>
-          </div>
-          {rollInput === "manual" && <div className="sheet-seg" role="group" aria-label="Typed bonus handling">
-            <button type="button" className={bonusMode === "auto" ? "on" : ""} aria-pressed={bonusMode === "auto"} title="Type the die result; your bonus is added for you" onClick={() => chooseBonusMode("auto")}>Auto-add bonus</button>
-            <button type="button" className={bonusMode === "total" ? "on" : ""} aria-pressed={bonusMode === "total"} title="Type the final total, bonus already included" onClick={() => chooseBonusMode("total")}>Final total</button>
-          </div>}
-        </div>
         <div className="sheet-abilities">
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
@@ -435,48 +418,73 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
       <p className="sheet-feedback" role="status">{feedback}</p>
   </div>);
 
-  // Two-subpanel workspace (feedback #9): the sheet and, when the caller supplies live state, the shared
-  // dice log ride side by side on a wide screen (log docked left or right); on a phone a Sheet/Dice
-  // segmented control shows one pane at a time, so a roll's result is a tap away rather than a scroll away.
-  const workspace = (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`}>
-    <div className="sheet-workspace-bar">
+  // The prominent identity line (feedback #4): class/level/race for a PC, or the size/CR typeline for a
+  // monster stat block. Sits right under the name in the header instead of reading like a footnote.
+  const identityLine = identity ?? (definition
+    ? `${titleCase(definition.size)} ${extension.type ?? "creature"}${extension.alignment ? `, ${extension.alignment}` : ""}${extension.challengeRating !== undefined ? ` · CR ${formatChallenge(extension.challengeRating)}` : ""}`
+    : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`);
+
+  // One header row for every presentation (feedback #2.1/2.2): name + prominent identity on the left;
+  // on the right, the log-side toggle, Pop out / New tab, and the × close (rightmost). In the floating
+  // panel this same row is the drag handle (buttons opt out via beginDrag's closest("button") guard).
+  const header = (draggable: boolean) => (<div className={`sheet-header${draggable ? " sheet-header--drag" : ""}`} onPointerDown={draggable ? beginDrag("move") : undefined}>
+    <div className="sheet-header-id">
+      <strong className="sheet-name">{actor.name}</strong>
+      <div className="sheet-header-sub">
+        <span className="sheet-idline">{identityLine}</span>
+        {actor.kind === "player-character" && definition && editMode !== "identity" && <button type="button" className="sheet-edit-toggle" onClick={openIdEditor}>Edit</button>}
+      </div>
+    </div>
+    <div className="sheet-header-controls">
       {hasLog && <div className="sheet-mobile-tabs" role="tablist" aria-label="Show sheet or dice">
         <button type="button" role="tab" aria-selected={mobilePane === "sheet"} className={mobilePane === "sheet" ? "on" : ""} onClick={() => setMobilePane("sheet")}>Sheet</button>
         <button type="button" role="tab" aria-selected={mobilePane === "log"} className={mobilePane === "log" ? "on" : ""} onClick={() => setMobilePane("log")}>Dice</button>
       </div>}
-      <div className="sheet-workspace-tools">
-        {hasLog && <div className="sheet-dock-picker" role="group" aria-label="Dice log position">
-          <span className="sheet-dock-label">Log</span>
-          <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
-          <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
-        </div>}
-        {!standalone && <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>}
-        {!standalone && role === "player" && <button type="button" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</button>}
-        {standalone && <button type="button" className="sheet-tool" title="Close this tab" onClick={onClose}>Close</button>}
-      </div>
+      {hasLog && <div className="sheet-dock-picker" role="group" aria-label="Dice log position">
+        <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
+        <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
+      </div>}
+      {!standalone && <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>}
+      {!standalone && role === "player" && <button type="button" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</button>}
+      <button type="button" className="sheet-close" aria-label="Close" title="Close" onClick={onClose}>✕</button>
     </div>
+  </div>);
+
+  // The roll-input settings (feedback #2.6): a narrow bar pinned under the header, always visible.
+  const rollbar = definition ? (<div className="sheet-rollbar" role="group" aria-label="Roll entry settings">
+    <span className="sheet-settings-label">Rolls</span>
+    <div className="sheet-seg" role="group" aria-label="Roll input mode">
+      <button type="button" className={rollInput === "digital" ? "on" : ""} aria-pressed={rollInput === "digital"} title="Tap a roll to have the app roll it" onClick={() => chooseRollInput("digital")}>Digital</button>
+      <button type="button" className={rollInput === "manual" ? "on" : ""} aria-pressed={rollInput === "manual"} title="Tap a roll, then type your physical die result" onClick={() => chooseRollInput("manual")}>Manual</button>
+    </div>
+    {rollInput === "manual" && <div className="sheet-seg" role="group" aria-label="Typed bonus handling">
+      <button type="button" className={bonusMode === "auto" ? "on" : ""} aria-pressed={bonusMode === "auto"} title="Type the die result; your bonus is added for you" onClick={() => chooseBonusMode("auto")}>Auto-add bonus</button>
+      <button type="button" className={bonusMode === "total" ? "on" : ""} aria-pressed={bonusMode === "total"} title="Type the final total, bonus already included" onClick={() => chooseBonusMode("total")}>Final total</button>
+    </div>}
+  </div>) : null;
+
+  // Two-subpanel workspace (feedback #9): sheet + shared dice log side by side (log docked left/right),
+  // or one-at-a-time behind the Sheet/Dice toggle on a phone. Header + rollbar stay pinned; cols scroll.
+  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`}>
+    {header(draggable)}
+    {rollbar}
     <div className="sheet-workspace-cols">
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} /></div>}
     </div>
   </div>);
 
-  // Its own browser tab (feedback #9.3): no modal chrome, no popout - the tab is the panel; it fills
-  // the window and Close ends the tab.
-  if (standalone) return <><div className="sheet-standalone">{workspace}</div>{dialog}</>;
+  // Its own browser tab (feedback #9.3): fills the window, header × ends the tab.
+  if (standalone) return <><div className="sheet-standalone">{buildWorkspace(false)}</div>{dialog}</>;
 
   if (presentation === "floating") {
     return <>
       <div className={`sheet-float${hasLog ? " has-log" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} onPointerMove={continueDrag} onPointerUp={endDrag} onPointerCancel={endDrag} role="dialog" aria-label={`${actor.name} character sheet`}>
-        <div className="sheet-float-titlebar" onPointerDown={beginDrag("move")}>
-          <strong>{actor.name}</strong>
-          <button type="button" className="sheet-float-close" aria-label="Close character sheet" onClick={onClose}>✕</button>
-        </div>
-        <div className="sheet-float-body">{workspace}</div>
+        {buildWorkspace(true)}
         <div className="sheet-float-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
       </div>
       {dialog}
     </>;
   }
-  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} title={actor.name} ariaLabel={`${actor.name} character sheet`}>{workspace}</Modal>{dialog}</>;
+  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
 }

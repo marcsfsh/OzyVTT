@@ -467,39 +467,45 @@
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }
 
-/* ---- Sheet workspace (feedback #9): sheet + shared dice log as two subpanels ---- */
-/* The workspace is a flex column (pinned toolbar + scrolling columns) inside either the modal body or
-   the floating popout body; both give it a bounded height so each pane scrolls on its own. */
-.character-sheet .nh-modal-surface { max-height: min(92vh, 52rem); }
+/* ---- Sheet workspace (feedback #9 + v3): unified header, pinned rolls bar, two scrolling columns ---- */
+.character-sheet .nh-modal-surface { max-height: min(94vh, 56rem); }
 .character-sheet .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
-.character-sheet.has-log { max-width: min(100vw - 2rem, 64rem); }
+.character-sheet.has-log { max-width: min(100vw - 2rem, 76rem); }
 .sheet-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.sheet-workspace-bar { display: flex; align-items: center; gap: .6rem; padding: .45rem var(--space-5); border-bottom: 1px solid var(--line); }
+
+/* Header (v3 #2.1/2.2/#4): name + prominent identity on the left; log-dock · Pop out · New tab · × on the right. */
+.sheet-header { display: flex; align-items: flex-start; gap: .8rem; padding: .7rem var(--space-5); border-bottom: 1px solid var(--line); }
+.sheet-header--drag { cursor: move; touch-action: none; background: var(--surface-1); }
+.sheet-header-id { min-width: 0; flex: 1; }
+.sheet-name { display: block; font: 400 var(--fs-h1) / 1.1 var(--font-display); color: var(--text); }
+.sheet-header-sub { display: flex; align-items: baseline; gap: .5rem; margin-top: .2rem; flex-wrap: wrap; }
+.sheet-idline { color: var(--cyan-hi); font: 700 .82rem/1.2 var(--font-mono); }
+.sheet-header-controls { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 .sheet-mobile-tabs { display: none; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
 .sheet-mobile-tabs button { padding: .24rem .8rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .7rem/1 var(--font-mono); cursor: pointer; }
 .sheet-mobile-tabs button + button { border-left: 1px solid var(--line); }
 .sheet-mobile-tabs button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
-.sheet-workspace-tools { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
-.sheet-dock-picker { display: flex; align-items: center; gap: .3rem; }
-.sheet-dock-label { color: var(--text-muted); font: 800 .6rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; }
-.sheet-dock-picker button { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); cursor: pointer; }
+.sheet-dock-picker { display: inline-flex; align-items: center; gap: .2rem; }
+.sheet-dock-picker button { display: grid; place-items: center; width: 1.4rem; height: 1.4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); font-size: .78rem; cursor: pointer; }
 .sheet-dock-picker button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--cyan); color: var(--text); }
-.sheet-tool { padding: .26rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font: 700 .68rem/1 var(--font-mono); cursor: pointer; white-space: nowrap; }
+.sheet-tool { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font: 700 .68rem/1 var(--font-mono); cursor: pointer; white-space: nowrap; }
 .sheet-tool:hover { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.sheet-close { flex: none; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
+.sheet-close:hover { color: var(--text); border-color: var(--line-strong); }
+
+/* Rolls bar (v3 #2.6): narrow, pinned under the header, always visible while the sheet scrolls. */
+.sheet-rollbar { display: flex; align-items: center; gap: .5rem; padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }
+
 .sheet-workspace-cols { display: flex; flex: 1; min-height: 0; }
 .sheet-workspace.log-left .sheet-workspace-cols { flex-direction: row-reverse; }
 .sheet-workspace-pane { min-width: 0; overflow-y: auto; }
 .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
-.log-pane { flex: 0 0 clamp(16rem, 34%, 22rem); padding: var(--space-4); border-left: 1px solid var(--line); }
+.log-pane { flex: 0 0 clamp(18rem, 32%, 24rem); padding: var(--space-4); border-left: 1px solid var(--line); }
 .sheet-workspace.log-left .log-pane { border-left: 0; border-right: 1px solid var(--line); }
 
-/* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). */
+/* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
+   unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
 .sheet-float { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
-.sheet-float-titlebar { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem .85rem; border-bottom: 1px solid var(--line); background: var(--surface-1); cursor: move; touch-action: none; }
-.sheet-float-titlebar strong { font: 400 var(--fs-h2) / 1 var(--font-display); color: var(--text); }
-.sheet-float-close { flex: none; width: 1.8rem; height: 1.8rem; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); cursor: pointer; }
-.sheet-float-close:hover { color: var(--text); border-color: var(--line-strong); }
-.sheet-float-body { display: flex; flex: 1; min-height: 0; }
 .sheet-float-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }
 
 /* Its own browser tab: the workspace fills the window; no modal chrome. */
