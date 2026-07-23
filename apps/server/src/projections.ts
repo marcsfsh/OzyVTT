@@ -124,7 +124,7 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
       // actionUses (limited-use spending names stat-block action ids - own claimed character only),
       // conditionImmunities and legendary resources (monster defenses are GM knowledge), and
       // hitDice (a healing resource that tracks with exact HP - own claimed character only).
-      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, ...actor } = source;
+      const { notes: _notes, ownerSessionId, hp: _exactHp, effects: _effects, actionUses, conditionImmunities: _conditionImmunities, legendary: _legendary, hitDice, spellSlots, pactSlots, preparedSpellIds, inventory, currency, healthDisplay: _healthDisplay, lastUsedAt: _lastUsedAt, ...actor } = source;
       const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
       // Effective token-health display = the per-token override or the table default. The richer
       // bar/ring reaches players only when the GM aimed it at everyone (audience "all"); band stays
@@ -143,6 +143,9 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         ...(ownDefinition ? { definition: ownDefinition } : {}),
         ...(mine ? { actionUses: { ...actionUses } } : {}),
         ...(mine && hitDice ? { hitDice: { ...hitDice } } : {}),
+        // Sheet resources reach ONLY the owning player - never another player, never the viewer (which
+        // projects separately). Same owner-gate as actionUses/hitDice above; viewer safety by construction.
+        ...(mine ? { spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })), pactSlots: pactSlots === null ? null : { ...pactSlots }, preparedSpellIds: [...preparedSpellIds], inventory: inventory.map((item) => ({ ...item })), currency: { ...currency } } : {}),
         ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
       };
     }),
