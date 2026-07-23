@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
@@ -137,6 +137,23 @@ export function CharacterSheet({ actor, role, state, onClose }: Readonly<{ actor
   const [logSide, setLogSide] = useState<"left" | "right">(() => (readSetting("vtt.sheet.logSide") === "left" ? "left" : "right"));
   const chooseLogSide = (side: "left" | "right") => { setLogSide(side); writeSetting("vtt.sheet.logSide", side); };
   const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
+  // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
+  // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
+  const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
+  const [rect, setRect] = useState({ x: 48, y: 48, width: 760, height: 620 });
+  const [drag, setDrag] = useState<null | { mode: "move" | "resize"; grabX: number; grabY: number; start: typeof rect }>(null);
+  const beginDrag = (mode: "move" | "resize") => (event: ReactPointerEvent<HTMLElement>) => {
+    if ((event.target as Element).closest("button")) return; // let title-bar buttons click through
+    event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+    setDrag({ mode, grabX: event.clientX, grabY: event.clientY, start: rect });
+  };
+  const continueDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.grabX, dy = event.clientY - drag.grabY;
+    if (drag.mode === "move") setRect({ ...drag.start, x: Math.max(0, drag.start.x + dx), y: Math.max(0, drag.start.y + dy) });
+    else setRect({ ...drag.start, width: Math.max(340, drag.start.width + dx), height: Math.max(320, drag.start.height + dy) });
+  };
+  const endDrag = () => setDrag(null);
   const { prompt, dialog } = usePrompt();
   // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
   const spellRef = useSpellReference();
@@ -422,22 +439,38 @@ export function CharacterSheet({ actor, role, state, onClose }: Readonly<{ actor
   // dice log ride side by side on a wide screen (log docked left or right); on a phone a Sheet/Dice
   // segmented control shows one pane at a time, so a roll's result is a tap away rather than a scroll away.
   const workspace = (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`}>
-    {hasLog && <div className="sheet-workspace-bar">
-      <div className="sheet-mobile-tabs" role="tablist" aria-label="Show sheet or dice">
+    <div className="sheet-workspace-bar">
+      {hasLog && <div className="sheet-mobile-tabs" role="tablist" aria-label="Show sheet or dice">
         <button type="button" role="tab" aria-selected={mobilePane === "sheet"} className={mobilePane === "sheet" ? "on" : ""} onClick={() => setMobilePane("sheet")}>Sheet</button>
         <button type="button" role="tab" aria-selected={mobilePane === "log"} className={mobilePane === "log" ? "on" : ""} onClick={() => setMobilePane("log")}>Dice</button>
+      </div>}
+      <div className="sheet-workspace-tools">
+        {hasLog && <div className="sheet-dock-picker" role="group" aria-label="Dice log position">
+          <span className="sheet-dock-label">Log</span>
+          <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
+          <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
+        </div>}
+        <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>
       </div>
-      <div className="sheet-dock-picker" role="group" aria-label="Dice log position">
-        <span className="sheet-dock-label">Log</span>
-        <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
-        <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
-      </div>
-    </div>}
+    </div>
     <div className="sheet-workspace-cols">
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} /></div>}
     </div>
   </div>);
 
+  if (presentation === "floating") {
+    return <>
+      <div className={`sheet-float${hasLog ? " has-log" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} onPointerMove={continueDrag} onPointerUp={endDrag} onPointerCancel={endDrag} role="dialog" aria-label={`${actor.name} character sheet`}>
+        <div className="sheet-float-titlebar" onPointerDown={beginDrag("move")}>
+          <strong>{actor.name}</strong>
+          <button type="button" className="sheet-float-close" aria-label="Close character sheet" onClick={onClose}>✕</button>
+        </div>
+        <div className="sheet-float-body">{workspace}</div>
+        <div className="sheet-float-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
+      </div>
+      {dialog}
+    </>;
+  }
   return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} title={actor.name} ariaLabel={`${actor.name} character sheet`}>{workspace}</Modal>{dialog}</>;
 }
