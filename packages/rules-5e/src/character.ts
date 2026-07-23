@@ -53,3 +53,25 @@ export function spellSaveDc(spellcastingAbilityScore: number, proficiencyBonus: 
 export function spellAttackBonus(spellcastingAbilityScore: number, proficiencyBonus: number): number {
   return proficiencyBonus + abilityModifier(spellcastingAbilityScore);
 }
+
+/** The armor/shield fields an item carries (from the SRD catalog) that drive Armor Class. */
+export type ItemArmorStats = Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null }>;
+/** Minimal shape of an equipped inventory item this math needs (kept structural so callers can pass their own item type). */
+export type EquippedItem = Readonly<{ equipped?: boolean; category?: string; armor?: ItemArmorStats | undefined }>;
+
+/**
+ * SRD Armor Class from equipped armor + shields. Returns null when the character has no equipped armor OR
+ * shield (so the caller keeps the character's stored/base AC - natural armor, mage armor, a monster's
+ * stat-block AC). When armor IS equipped: acBase + Dex (capped for medium, none for heavy - the SRD rule
+ * is encoded directly by the item's addDexModifier / dexModifierCap). A shield adds its own acBase (+2);
+ * an unarmored character with only a shield is 10 + Dex + shield.
+ */
+export function armorClassFromEquipment(dexModifier: number, items: readonly EquippedItem[]): number | null {
+  const equippedArmor = items.find((item) => item.equipped && item.armor && item.category === "armor");
+  const shields = items.filter((item) => item.equipped && item.armor && item.category === "shield");
+  if (!equippedArmor && shields.length === 0) return null;
+  const dexAllowed = (armor: ItemArmorStats) => (armor.addDexModifier ? Math.min(dexModifier, armor.dexModifierCap ?? Number.POSITIVE_INFINITY) : 0);
+  const base = equippedArmor ? equippedArmor.armor!.acBase + dexAllowed(equippedArmor.armor!) : 10 + dexModifier;
+  const shieldBonus = shields.reduce((sum, shield) => sum + shield.armor!.acBase, 0);
+  return base + shieldBonus;
+}

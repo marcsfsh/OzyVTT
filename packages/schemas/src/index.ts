@@ -94,6 +94,11 @@ export type HealthDisplay = z.infer<typeof HealthDisplaySchema>;
 /** SRD skill id slug ("stealth", "arcana"); free-form so homebrew stays expressible. */
 const SkillIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
 /** One carried inventory item. Quantities/equipped/attuned are live state that changes during play (ADR-0007 additive). */
+/** Mechanical stats an inventory item carries when added from the SRD catalog, so equipping it has effect
+ * (weapon → a rollable attack action on the sheet; armor/shield → derived Armor Class). Additive-optional;
+ * absent for homebrew/pre-existing items, which then have no mechanical effect (display only). */
+export const ItemWeaponSchema = z.object({ category: z.enum(["simple", "martial"]), damageDice: z.string().min(1).max(20), damageType: z.string().min(1).max(40), rangeFeet: z.number().int().positive().nullable(), longRangeFeet: z.number().int().positive().nullable() }).strict();
+export const ItemArmorSchema = z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).strict();
 export const InventoryItemSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/).max(80),
   name: z.string().min(1).max(120),
@@ -102,8 +107,10 @@ export const InventoryItemSchema = z.object({
   attuned: z.boolean().default(false),
   weightEach: z.number().nonnegative().max(1_000_000).optional(),
   description: z.string().max(4000).optional(),
-  /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping only. Additive. */
-  category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional()
+  /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping and (with weapon/armor below) mechanical effect. Additive. */
+  category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional(),
+  weapon: ItemWeaponSchema.optional(),
+  armor: ItemArmorSchema.optional()
 }).strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 /** SRD coin purse; all five currencies, each defaulting to 0. */

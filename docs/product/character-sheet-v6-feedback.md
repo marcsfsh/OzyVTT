@@ -24,8 +24,16 @@ Round-6 GM feedback after v5. "Looks better." Durable checklist. _Captured 2026-
       upper-left; standardized on `✕` (U+2715) with fixed-size grid centering across the sheet/save-prompt/
       viewer close buttons. Render-verified.
 5. **Equipment should have mechanical effect:** equip a greataxe → a **greataxe action** appears; equip
-   armor → its **AC applies**. — ⏳ (LARGER: action/AC derivation; plan deferred auto-AC to builder work —
-   scope carefully)
+   armor → its **AC applies**. — ✅ (GM chose the full server version.) The SRD catalog already carries
+   weapon `{damageDice,damageType,range}` + armor `{acBase,addDexModifier,dexModifierCap}`; the inventory
+   item now stores those (additive-optional schema + JSON mirror + api-contract). **Armor → AC** is
+   server-derived and authoritative: `armorClassFromEquipment()` in rules-5e (acBase + Dex, capped for
+   medium / none for heavy, + shield), applied in `instantiate` and on every `set-inventory` (reverts to
+   the stored stat-block AC when nothing is equipped, so imports are unaffected). **Weapon → action**:
+   equipped weapons render as rollable attack actions on the sheet (to-hit = ability+PB, damage = die+mod;
+   Dex for ranged, Str for melee — finesse/versatile aren't vendored, so those approximate). Tested
+   (rules-5e AC cases + an equip→AC→unequip integration test) and render-verified. This ships a slice of
+   what ADR-0021 had parked as builder work; see the ADR note.
 6. **Proficiencies editor** is awkward: skills + buttons placed by text position, requires scrolling, bad
    layout. **"Save proficiencies" doesn't work**; a **"Done" button** next to Save is semantically
    confusing **and also doesn't work**. — ✅ Root cause of "Save doesn't work": the save *persisted fine*,

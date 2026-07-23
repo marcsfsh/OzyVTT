@@ -1006,6 +1006,9 @@ Adds, updates, or removes (quantity 0) one of a character's inventory items and 
 | `item.attuned` | boolean | no |  |
 | `item.weightEach` | number (≥ 0) | no |  |
 | `item.description` | string | no |  |
+| `item.category` | string (pattern) | no |  |
+| `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet |
+| `item.armor` | object | no | Armor/shield stats (from the SRD catalog); equipping derives Armor Class |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

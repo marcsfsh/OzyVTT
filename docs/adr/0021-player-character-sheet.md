@@ -49,6 +49,18 @@ This ADR records the decisions that reshape the prior boundary.
    `ActorDefinitionSchema`. Shared bundle content is never editable this way. Guided creation
    stays deferred to the builder.
 
+**Amendment (v6, 2026-07-23): a slice of "rules auto-derivation" ships in the play sheet.**
+Originally this ADR parked all auto-derivation (incl. AC-from-armor) for the builder. In
+response to direct GM feedback, the play sheet now derives two things from equipped gear, using
+the stats the SRD catalog already vendors (weapon `damageDice`/range; armor `acBase`/dex rules),
+stored additively on the inventory item: **(a) Armor Class** — server-authoritative via
+`armorClassFromEquipment()` in `@vtt/rules-5e`, recomputed in `instantiate` and on
+`character.set-inventory`, and falling back to the stored stat-block AC whenever no armor/shield
+is equipped (so imports and monsters are unaffected); **(b) weapon attack actions** — equipped
+weapons render as tap-to-roll to-hit/damage on the sheet (Str melee / Dex ranged; finesse,
+versatile, and per-weapon proficiency remain builder work as that data isn't vendored). The
+guided builder, point-buy, level-up, and full content/derivation are still deferred.
+
 ## Consequences
 
 - The `CLAUDE.md` scope line changes from *"not a character builder"* to *"not a character

@@ -341,6 +341,19 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
+  // Equipped weapons become rollable attack actions on the sheet (v6 #5): to-hit = ability mod + PB,
+  // damage = the weapon die + ability mod. Ranged weapons use Dex, melee uses Str (finesse isn't vendored
+  // in the SRD weapon table, so this is the common case). Client-derived + tap-to-roll like the other
+  // sheet actions; the server-authoritative attack flow is unchanged.
+  const equippedWeaponActions = (actor.kind === "player-character" && definition)
+    ? inventory.filter((item) => item.equipped && item.weapon && item.quantity > 0).map((item) => {
+        const weapon = item.weapon!;
+        const abilityMod = modifierOf(definition.abilityScores[weapon.rangeFeet != null ? "dex" : "str"]);
+        const toHit = abilityMod + definition.proficiencyBonus;
+        const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
+        return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet };
+      })
+    : [];
   // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
   // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
   // and carries the catalog's category/weight/description so the sheet can group and describe it.
@@ -352,7 +365,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       id: item.id, name: item.name, quantity: (existing?.quantity ?? 0) + 1, category: item.category,
       ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
       ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
-      ...(item.description ? { description: item.description } : {})
+      ...(item.description ? { description: item.description } : {}),
+      // Carry the mechanical stats so equipping has effect (v6 #5): weapon → a rollable attack; armor → AC.
+      ...(item.weapon ? { weapon: item.weapon } : {}),
+      ...(item.armor ? { armor: item.armor } : {})
     } }, ack);
   };
   // Keep the coin editor in sync with the authoritative purse (re-syncs after each accepted change).
@@ -525,7 +541,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
-        {definition.actions.length > 0 && <section className="sheet-section"><h3>Actions</h3>
+        {(definition.actions.length > 0 || equippedWeaponActions.length > 0) && <section className="sheet-section"><h3>Actions</h3>
           {(() => {
             type ActionT = (typeof definition.actions)[number];
             const renderAction = (action: ActionT) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
@@ -542,8 +558,15 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             for (const action of definition.actions) { const level = spellLevelByActionId.get(action.id); if (level !== undefined) { const list = spellGroups.get(level) ?? []; list.push(action); spellGroups.set(level, list); } }
             const hasSpellActions = spellGroups.size > 0;
             return <>
-              {weaponActions.length > 0 && <div className="sheet-action-group">
+              {(weaponActions.length > 0 || equippedWeaponActions.length > 0) && <div className="sheet-action-group">
                 {hasSpellActions && <h4 className="sheet-action-head">Weapon &amp; other</h4>}
+                {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
+                  <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}</span></p>
+                  <div className="sheet-roll-row">
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollD20(wa.toHit, "attack", `${wa.name} to hit`)}>{signed(wa.toHit)} to hit</button>
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>
+                  </div>
+                </div>)}
                 {weaponActions.map(renderAction)}
               </div>}
               {hasSpellActions && <div className="sheet-action-group">

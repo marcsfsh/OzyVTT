@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   abilityModifier,
+  armorClassFromEquipment,
   characterLevel,
   proficiencyBonusForLevel,
   saveBonus,
@@ -69,5 +70,37 @@ describe("spellSaveDc / spellAttackBonus", () => {
     // CHA 18 (+4), PB +3
     expect(spellSaveDc(18, 3)).toBe(15);
     expect(spellAttackBonus(18, 3)).toBe(7);
+  });
+});
+
+describe("armorClassFromEquipment", () => {
+  const armor = (acBase: number, addDexModifier: boolean, dexModifierCap: number | null) => ({ acBase, addDexModifier, dexModifierCap });
+  const item = (over: Partial<{ equipped: boolean; category: string; armor: { acBase: number; addDexModifier: boolean; dexModifierCap: number | null } }>) => ({ equipped: true, ...over });
+
+  it("returns null when nothing armor-like is equipped (keep the stored/base AC)", () => {
+    expect(armorClassFromEquipment(3, [])).toBeNull();
+    expect(armorClassFromEquipment(3, [item({ category: "weapon" })])).toBeNull();
+    // an UN-equipped suit of armor does not count
+    expect(armorClassFromEquipment(3, [item({ equipped: false, category: "armor", armor: armor(14, true, 2) })])).toBeNull();
+  });
+  it("light armor adds full Dex", () => {
+    // leather 11 + Dex +4 (uncapped)
+    expect(armorClassFromEquipment(4, [item({ category: "armor", armor: armor(11, true, null) })])).toBe(15);
+  });
+  it("medium armor caps Dex at the armor's cap", () => {
+    // half plate 15 + min(Dex +4, cap 2) = 17
+    expect(armorClassFromEquipment(4, [item({ category: "armor", armor: armor(15, true, 2) })])).toBe(17);
+  });
+  it("heavy armor ignores Dex", () => {
+    // plate 18, Dex +4 ignored (and negative Dex is not subtracted either)
+    expect(armorClassFromEquipment(4, [item({ category: "armor", armor: armor(18, false, null) })])).toBe(18);
+    expect(armorClassFromEquipment(-1, [item({ category: "armor", armor: armor(18, false, null) })])).toBe(18);
+  });
+  it("adds a shield's base on top of armor, and to unarmored 10 + Dex", () => {
+    const shield = item({ category: "shield", armor: armor(2, false, null) });
+    // chain mail 16 + shield 2
+    expect(armorClassFromEquipment(1, [item({ category: "armor", armor: armor(16, false, null) }), shield])).toBe(18);
+    // unarmored with only a shield: 10 + Dex +3 + shield 2
+    expect(armorClassFromEquipment(3, [shield])).toBe(15);
   });
 });

@@ -1068,7 +1068,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "character.set-inventory", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        setInventoryItem(state, actorId, item);
+        setInventoryItem(state, actorId, item, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
       });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
