@@ -20,6 +20,21 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   blocking): persisted server thumbnails; the Encounter quick-switch strip could slim further; a
   physical touch-device pass.
 
+- **[feature] Planned: VTT **Settings** tab (rename of "VTT Setup") with a Settings card.** Not built
+  yet — captured here so the pieces land together. Rename the **VTT Setup** tab to **VTT Settings** and
+  add a **Settings card at the top** of it, above today's setup cards (appearance/theme, integrations,
+  session controls). The Settings card holds a list of settings with a **toggle at its top to switch
+  between _Global Settings_ and _Personal Settings_**:
+  - **GM view:** the existing VTT-Setup cards **plus** the Settings card on top; the GM can flip the
+    card between **Global** (table-wide) and **Personal** (this GM's own) settings.
+  - **Player view:** the tab shows a card with the **same Personal Settings list** the GM sees, plus a
+    second card of **player-specific settings** (settings that only apply to that player).
+  - **First tenant:** the **auto-staging on/off** toggle lives under **Personal Settings**. Auto-staging
+    (open a just-created scene for private staging) ships now as always-on; this tab is where the switch
+    to disable it will go — see the `pendingStageSceneId` flow in `apps/client/src/main.tsx`.
+  Needs a real design pass (global-vs-personal storage & projection model, server authority for global
+  settings, viewer-safety review) before implementation.
+
 - **[mobile] No physical iOS/Android acceptance pass yet** — responsive layout + Pointer
   Events are built and parity is mandated (ADR-0014), but real-device acceptance and a
   degraded-browser fallback UI do not exist. `BUILD_PLAN` GAP-001. Don't claim device

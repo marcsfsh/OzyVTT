@@ -5,6 +5,7 @@
 
 .scene-create { display: grid; gap: .8rem; margin-top: 1.3rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .scene-create label { display: block; color: var(--text-dim); font-size: .8rem; }
+.scene-create-optional { color: var(--text-muted); font-weight: 400; }
 .scene-create-map { margin: 0; font-size: .85rem; color: var(--text-dim); }
 .scene-create-map em { color: var(--text-muted); }
 label.scene-create-map { display: flex; align-items: center; gap: .5rem; }

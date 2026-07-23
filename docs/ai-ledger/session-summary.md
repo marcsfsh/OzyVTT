@@ -24,6 +24,15 @@ button and the `/styleguide` gallery demo refreshed to the action-button design.
 `build` green, changed rules confirmed in the shipped CSS bundle. (Live Playwright smoke not re-run
 this round — server start declined; verified via bundle + layout.) Design record + this note updated.
 
+Follow-on batch (same round): **square scene cards on the Scenes tab too** (promoted the popup's 1:1
+rule to the whole `.scene-gallery-hub`); **optional scene name** — an unnamed scene takes its map's
+name (its image filename by default), and the map-upload name field is labelled optional (it already
+defaulted to the filename); **auto-staging** — creating a scene now opens it for private staging via a
+race-proof `pendingStageSceneId` that fires once the scene lands in state. Added a **roadmap note** for
+a future **VTT Settings** tab (rename of VTT Setup) with a Global/Personal settings card — where an
+"auto-staging on/off" personal setting will eventually gate the always-on behaviour shipped here
+(`docs/ai-ledger/known-bugs.md`). `check` + `build` green.
+
 ---
 
 ## 2026-07-22 — Scene-centric IA redesign (the deferred flow rethink; 7-slice PR)

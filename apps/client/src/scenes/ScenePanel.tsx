@@ -15,8 +15,9 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated, onManag
   actors: readonly GmActor[];
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
-  /** Called after a successful create - the launcher (scene strip modal) closes itself. */
-  onCreated?: () => void;
+  /** Called after a successful create with the new scene's id - the launcher closes itself and (by
+      default) opens the scene for private staging. */
+  onCreated?: (sceneId?: string) => void;
   /** Jump to the folded-in map library to upload/calibrate a battlemap (closes this modal). */
   onManageMaps?: () => void;
 }>) {
@@ -35,11 +36,13 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated, onManag
 
   const create = () => {
     if (!sceneMap) { setMessage("Upload a battlemap on the Map Setup tab first."); return; }
-    if (!name.trim()) { setMessage("Name the scene."); return; }
+    // The name is optional: an unnamed scene takes its map's name (its image filename by default),
+    // so "new scene on this map" is one action. SceneSchema caps names at 120 chars.
+    const sceneName = (name.trim() || sceneMap.name).slice(0, 120);
     setBusy(true); setMessage("");
-    socket.emit("scene:create", { commandId: newId(), name: name.trim(), mapAssetId: sceneMap.id, combatantIds: chosen }, (result) => {
+    socket.emit("scene:create", { commandId: newId(), name: sceneName, mapAssetId: sceneMap.id, combatantIds: chosen }, (result) => {
       setBusy(false);
-      if (result.ok) { setName(""); setChosen([]); onCreated?.(); } else setMessage(result.message ?? "The scene could not be created.");
+      if (result.ok) { setName(""); setChosen([]); onCreated?.(result.sceneId); } else setMessage(result.message ?? "The scene could not be created.");
     });
   };
   const toggle = (actorId: string) => setChosen((current) => current.includes(actorId) ? current.filter((id) => id !== actorId) : [...current, actorId]);
@@ -48,7 +51,7 @@ export function ScenePanel({ actors, selectedMap, mapLibrary, onCreated, onManag
     <div className="scene-panel-heading"><div><span className="eyebrow">GM PREP</span><h2 id="scene-panel-heading">Prepare a scene</h2></div><p>Name it, pick its battlemap and combatants - it appears in the Scenes strip, ready to stage or make live.</p></div>
 
     <form className="scene-create" onSubmit={(event) => { event.preventDefault(); create(); }}>
-      <label>Scene name<Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Goblin ambush" /></label>
+      <label>Scene name <span className="scene-create-optional">(optional)</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder={sceneMap ? sceneMap.name : "Goblin ambush"} /></label>
       {battlemaps.length > 0
         ? <label className="scene-create-map">On map
             <Select value={sceneMap?.id ?? ""} onChange={(event) => setSceneMapId(event.target.value)}>

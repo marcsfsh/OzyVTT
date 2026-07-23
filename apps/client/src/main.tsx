@@ -60,6 +60,9 @@ function App() {
   // surface (folded in from the retired Map Setup tab) without leaving the scene-prep home.
   const [scenesView, setScenesView] = useState<"gallery" | "maps">("gallery");
   const [scenesModalOpen, setScenesModalOpen] = useState(false);
+  // A freshly created scene auto-opens for private staging. We can't stage it until it lands in
+  // GameState (its id would be dropped by the preview-guard below), so hold the id and stage on arrival.
+  const [pendingStageSceneId, setPendingStageSceneId] = useState<string | null>(null);
   const [dockPosition, setDockPosition] = useState<DockPosition>(() => {
     const stored = localStorage.getItem("vtt.dock-position");
     if (stored === "top" || stored === "bottom") return "right"; // top/bottom docking was removed; nearest edge is right
@@ -219,6 +222,14 @@ function App() {
     // Drop the preview if its scene was removed or went live (it's the live map then, not a private one).
     if (previewSceneId && !(mode === "gm" && (state as GmView | null)?.combat.scenes.some((scene) => scene.id === previewSceneId && scene.id !== (state as GmView).combat.activeSceneId))) setPreviewScene(null);
   }, [previewSceneId, state, mode]);
+  useEffect(() => {
+    // Auto-stage a just-created scene the moment it appears in state. (A future "auto-staging" personal
+    // setting on the VTT Settings tab will gate this — see docs/ai-ledger/known-bugs.md.)
+    if (pendingStageSceneId && mode === "gm" && (state as GmView | null)?.combat.scenes.some((scene) => scene.id === pendingStageSceneId)) {
+      setPreviewScene(pendingStageSceneId);
+      setPendingStageSceneId(null);
+    }
+  }, [pendingStageSceneId, state, mode]);
   const activeScene = mode === "gm" && state
     ? (state as GmView).combat.scenes?.find((scene) => scene.id === (state as GmView).combat.activeSceneId) ?? null
     : null;
@@ -337,7 +348,7 @@ function App() {
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
       {mode === "gm" && gmToken && scenePrepOpen && state && <Modal open onClose={() => setScenePrepOpen(false)} size="lg" className="scene-prep-modal" title="Scene prep" ariaLabel="Scene prep">
-        <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={() => setScenePrepOpen(false)} onManageMaps={() => { setScenePrepOpen(false); setGmTab("scenes"); setScenesView("maps"); }} />
+        <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={(sceneId) => { setScenePrepOpen(false); if (sceneId) setPendingStageSceneId(sceneId); }} onManageMaps={() => { setScenePrepOpen(false); setGmTab("scenes"); setScenesView("maps"); }} />
       </Modal>}
 
       {mode === "gm" && gmToken && scenesModalOpen && state && Array.isArray((state as GmView).combat.scenes) && <Modal open onClose={() => setScenesModalOpen(false)} size="lg" className="scenes-modal" title="Scenes" ariaLabel="Scenes">
