@@ -50,6 +50,11 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
 8. **Manual roll entry** everywhere "click to roll" exists, PLUS a **sheet setting** controlling whether a
    typed roll **auto-applies the bonus** (you enter only the die result) or is **manual** (you enter the
    final total including your bonus — e.g. a 15 + 7 bonus → you type 22).
+   — ✅ done. A per-sheet **Rolls** setting (Digital / Manual, remembered per browser); Manual prompts for
+   the physical die via the styled entry dialog on every roll surface (abilities, saves, skills, attacks,
+   damage, casts). A second toggle (**Auto-add bonus** / **Final total**) controls the typed d20 value. No
+   server change — the typed value is encoded into the `dice:roll` formula the server already evaluates,
+   so a manual roll lands in the shared log with its breakdown, identical to a rolled one.
 9. **Dice-roll log placement.** The in-sheet roll log is at the **bottom** (bad — rolling an ability at the
    top means scrolling to the bottom to see the result). Redesign:
    1. **Expand** the sheet panel height and (a bit of) width, and add a **player-specific dice-log panel**
@@ -71,5 +76,5 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
 | 6 | Per-stat roll + roll-with-proficiency | ✅ done (Wave 1) | #6 |
 | 7 | **Equipment framework (full catalog + vendor SRD gear)** | ✅ done | #9 |
 | 2 | Upcasting cast-at (reference vendored SRD spells) | ✅ done | #7 |
-| 8 | Manual roll entry + auto/manual bonus mode | ▶ **next** | #8 |
-| 9 | Panel redesign: sheet + player dice-log, docking, popout | ⏳ pending | #10 |
+| 8 | Manual roll entry + auto/manual bonus mode | ✅ done | #8 |
+| 9 | Panel redesign: sheet + player dice-log, docking, popout | ▶ **next** | #10 |
