@@ -380,19 +380,14 @@
 .sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
 .sheet-roll-chip:disabled { cursor: default; opacity: .6; }
 .sheet-entry p { margin: 0 0 .3rem; }
-.sheet-slot-stepper { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .3rem; border-radius: var(--radius-md); background: var(--surface-3); }
-.sheet-slot-stepper button { display: grid; place-items: center; padding: 0; width: 1.4rem; height: 1.4rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text); font: 700 .95rem/1 var(--font-mono); cursor: pointer; }
-.sheet-slot-stepper button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.sheet-slot-stepper button:disabled { opacity: .4; cursor: default; }
-.sheet-slot-stepper > span { min-width: 1.1rem; text-align: center; font-size: .78rem; font-weight: 700; color: var(--text-dim); }
-.sheet-slot-stepper strong { color: var(--text); font-family: var(--font-mono); }
+/* inventory qty now renders as <Stepper> (.nh-stepper); the .sheet-inv-qty hook only places it in the row. */
 .sheet-prepare { padding: .18rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 .64rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
 .sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prepare:disabled { opacity: .6; cursor: default; }
 .sheet-item-edit li { flex-wrap: wrap; gap: .35rem .5rem; }
 .sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.sheet-remove { display: grid; place-items: center; padding: 0; width: 1.55rem; height: 1.55rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text-muted); font: 700 .95rem/1 var(--font-mono); cursor: pointer; }
-.sheet-remove:hover:not(:disabled) { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+/* .sheet-remove / .sheet-close now render as <IconButton> (visuals from .nh-iconbtn); the classes remain
+   only as layout hooks (grid placement / header flex). */
 .sheet-attunement { margin: .55rem 0 0; color: var(--text-muted); font-size: .72rem; font-weight: 700; }
 .sheet-attunement.over { color: var(--danger); }
 /* Inventory table (v3 #2.9.2): aligned columns with headers; display:contents lets each row's cells
@@ -404,7 +399,7 @@
 .sheet-inv-row:not(.sheet-inv-head):hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
 .sheet-inv-head span { color: var(--text-muted); font: 800 .54rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
 .sheet-inv-head .sheet-item-name { text-align: left; }
-.sheet-inv-row .sheet-slot-stepper, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
+.sheet-inv-row .sheet-inv-qty, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
 .sheet-toggle-btn { min-width: 4.8rem; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
 .sheet-toggle-btn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-toggle-btn.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
@@ -606,8 +601,7 @@
 /* v4 #7: Pop out / New tab share the dock buttons' box (same height, border, radius, surface). */
 .sheet-tool { height: 1.5rem; display: inline-flex; align-items: center; padding: 0 .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); font: 700 .66rem/1 var(--font-mono); cursor: pointer; white-space: nowrap; }
 .sheet-tool:hover { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.sheet-close { flex: none; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
-.sheet-close:hover { color: var(--text); border-color: var(--line-strong); }
+.sheet-close { flex: none; }
 
 /* Rolls bar (v3 #2.6): narrow, pinned under the header, always visible while the sheet scrolls. */
 .sheet-rollbar { display: flex; align-items: center; gap: .5rem; padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }

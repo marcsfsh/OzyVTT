@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { Modal, Stepper } from "@vtt/ui";
+import { IconButton, Modal, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
@@ -521,14 +521,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             </div>
             {inventory.map((item) => <div key={item.id} className="sheet-inv-row">
               <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}</span>
-              <div className="sheet-slot-stepper">
-                <button type="button" disabled={busy} aria-label={`One fewer ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: item.quantity - 1 } }, ack); }}>−</button>
-                <span><strong>{item.quantity}</strong></span>
-                <button type="button" disabled={busy} aria-label={`One more ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: item.quantity + 1 } }, ack); }}>+</button>
-              </div>
+              <Stepper className="sheet-inv-qty" value={item.quantity} min={0} disabled={busy} aria-label={`Quantity of ${item.name}`} onChange={(quantity) => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity } }, ack); }} />
               <button type="button" className={`sheet-toggle-btn${item.equipped ? " on" : ""}`} disabled={busy} aria-pressed={item.equipped} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "Equipped" : "Equip"}</button>
               <button type="button" className={`sheet-toggle-btn${item.attuned ? " on" : ""}`} disabled={busy} aria-pressed={item.attuned} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } }, ack); }}>{item.attuned ? "Attuned" : "Attune"}</button>
-              <button type="button" className="sheet-remove" disabled={busy} aria-label={`Remove ${item.name}`} title={`Remove ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>✕</button>
+              <IconButton label={`Remove ${item.name}`} size="sm" className="sheet-remove" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>✕</IconButton>
             </div>)}
           </div>}
           {attunedCount > 0 && <p className={`sheet-attunement${attunedCount > 3 ? " over" : ""}`}>Attunement {attunedCount}/3</p>}
@@ -614,7 +610,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       </div>}
       {!standalone && !embedded && <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>}
       {!standalone && !embedded && role === "player" && <button type="button" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</button>}
-      <button type="button" className="sheet-close" aria-label={embedded ? "Back to initiative" : "Close"} title={embedded ? "Back to initiative" : "Close"} onClick={onClose}>✕</button>
+      <IconButton label={embedded ? "Back to initiative" : "Close"} size="sm" className="sheet-close" onClick={onClose}>✕</IconButton>
     </div>
   </div>);
 
