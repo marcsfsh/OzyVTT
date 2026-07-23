@@ -95,6 +95,7 @@ export function StyleGuide() {
   const [count, setCount] = useState(3);
   const [mod, setMod] = useState(0);
   const [seg, setSeg] = useState("all");
+  const [dockSide, setDockSide] = useState("right");
 
   return (
     <ToastProvider>
@@ -368,13 +369,23 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="segmented" title="Segmented control" blurb="Inline 'pick exactly one' for filters and mode switches. Distinct from Tabs, which swap whole views — use this for in-place option toggles.">
+          <Section id="segmented" title="Segmented control" blurb="Inline 'pick exactly one' for filters and mode switches. Distinct from Tabs, which swap whole views — use this for in-place option toggles. Options may be icon-only: give each a per-option ariaLabel (and drop label) so the button announces more than a bare glyph.">
             <div className="sg-row">
               <SegmentedControl
                 ariaLabel="Map filter"
                 value={seg}
                 onChange={setSeg}
                 options={[{ value: "all", label: "All" }, { value: "battlemap", label: "Battlemaps" }, { value: "regional", label: "Regional" }, { value: "world", label: "World" }]}
+              />
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Dock side"
+                value={dockSide}
+                onChange={setDockSide}
+                options={[
+                  { value: "left", icon: "◧", ariaLabel: "Dock left", title: "Dock left" },
+                  { value: "right", icon: "◨", ariaLabel: "Dock right", title: "Dock right" },
+                ]}
               />
             </div>
           </Section>
