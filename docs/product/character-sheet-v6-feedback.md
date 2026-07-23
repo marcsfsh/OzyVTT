@@ -15,8 +15,14 @@ Round-6 GM feedback after v5. "Looks better." Durable checklist. _Captured 2026-
 4. **Dice rolling area:**
    1. The roll readout is **scattered** — to read a result you look left (faces), above-right (the `+9`
       modifier next to `1d20`), then far-right (total); and the **attack/save type isn't shown**. Group
-      it coherently and label the roll's purpose/type. — ⏳
-   2. Several **× buttons aren't centred** within their button. — ⏳
+      it coherently and label the roll's purpose/type. — ✅ each roll now leads with a color-coded **type
+      badge** (`DEX SAVE`, `ATHLETICS CHECK`, `GREATAXE TO HIT`, `FIREBALL AT 3RD`), roller/audience is a
+      muted footer, and faces · formula = total read as one line. Added an optional `label` to the roll
+      record threaded from the sheet, the save flow ("DEX save"), and action resolution (weapon name).
+      Render-verified.
+   2. Several **× buttons aren't centred** within their button. — ✅ the `×` (U+00D7) glyph renders
+      upper-left; standardized on `✕` (U+2715) with fixed-size grid centering across the sheet/save-prompt/
+      viewer close buttons. Render-verified.
 5. **Equipment should have mechanical effect:** equip a greataxe → a **greataxe action** appears; equip
    armor → its **AC applies**. — ⏳ (LARGER: action/AC derivation; plan deferred auto-AC to builder work —
    scope carefully)

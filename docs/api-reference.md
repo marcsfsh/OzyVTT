@@ -660,6 +660,7 @@ Rolls dice into the shared, auditable roll history; the response carries `rollId
 | `formula` | string | yes | e.g. 2d6+3, 4d6kh3, 2d20kl1 |
 | `purpose` | `attack` \| `save` \| `check` \| `damage` \| `manual` | yes |  |
 | `visibility` | `public` \| `gm-only` \| `blind` \| `self-only` | yes |  |
+| `label` | string | no | What was rolled, specifically (e.g. "Athletics check", "DEX save", a weapon/spell name); shown in the roll log alongside the coarse purpose |
 | `actorId` | string (uuid) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`

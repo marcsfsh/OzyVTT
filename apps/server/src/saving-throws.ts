@@ -116,7 +116,7 @@ export function createPendingSaves(state: GameState, input: Readonly<{
   state.combat = { ...state.combat, pendingSaves };
 }
 
-function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveDice>, base: Readonly<{ id: string; commandId: string; sessionId: string; role: "gm" | "player"; label: string; actorId: string; visibility: "public" | "gm-only"; createdAt: string }>) {
+function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveDice>, base: Readonly<{ id: string; commandId: string; sessionId: string; role: "gm" | "player"; label: string; saveLabel: string; actorId: string; visibility: "public" | "gm-only"; createdAt: string }>) {
   let group = 0;
   const record: RollRecord = {
     id: base.id,
@@ -124,6 +124,7 @@ function recordSaveRoll(state: GameState, resolution: ReturnType<typeof resolveD
     initiatorSessionId: base.sessionId,
     initiatorRole: base.role,
     initiatorLabel: base.label,
+    label: base.saveLabel,
     actorId: base.actorId,
     purpose: "save",
     visibility: base.visibility,
@@ -182,7 +183,8 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     if (mode !== "normal") rollMode = { mode, advantage: mode === "advantage" ? (aggregated.advantage.length > 0 ? aggregated.advantage : ["Chosen"]) : [], disadvantage: mode === "disadvantage" ? (aggregated.disadvantage.length > 0 ? aggregated.disadvantage : ["Chosen"]) : [] };
     // The save roll lands in the shared history attributed to the target; hidden targets stay GM-only.
     recordSaveRoll(state, resolution, {
-      id: deps.newRollId(), commandId, sessionId: deps.sessionId, role: deps.role, label: target.name, actorId: target.id,
+      id: deps.newRollId(), commandId, sessionId: deps.sessionId, role: deps.role, label: target.name,
+      saveLabel: `${pending.ability.toUpperCase()} save`, actorId: target.id,
       visibility: target.visibility === "gm-only" ? "gm-only" : "public", createdAt: deps.now()
     });
     total = resolution.total;

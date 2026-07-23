@@ -154,7 +154,7 @@ export const CharacterSetInventorySchema = z.object({ commandId: z.string().uuid
 export const CharacterSetCurrencySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), currency: CurrencySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetIdentitySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), character: CharacterIdentitySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetProficienciesSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), proficiencies: ProficienciesSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, label: z.string().min(1).max(80).optional(), actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TokenMoveSchema = z.object({
   commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),
   /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */

@@ -280,7 +280,7 @@
 .save-prompt-actions input { flex: 1 1 auto; min-width: 7rem; width: auto; margin: 0; padding: .4rem .6rem; text-align: left; }
 .save-prompt-actions button, .save-prompt-confirm button { padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
 .save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.save-prompt-dismiss { margin-left: auto; padding: .4rem .55rem !important; background: transparent !important; color: var(--text-muted) !important; }
+.save-prompt-dismiss { flex: none; margin-left: auto; width: 1.8rem; height: 1.8rem; display: grid !important; place-items: center; padding: 0 !important; line-height: 1; background: transparent !important; color: var(--text-muted) !important; }
 .save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .economy-movement { font-size: .74rem; color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */

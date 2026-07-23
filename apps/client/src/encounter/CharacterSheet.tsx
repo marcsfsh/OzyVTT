@@ -245,7 +245,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // the GM still applies damage (players never mutate another creature's HP).
   const emitRollFormula = (formula: string, purpose: "check" | "save" | "attack" | "damage", label: string) => {
     setRolling(true);
-    socket.emit("dice:roll", { commandId: newId(), formula, purpose, visibility: "public", actorId: actor.id }, (result: { ok: boolean; message?: string }) => {
+    // Send the specific label ("Athletics check", "DEX save", "Fireball at 3rd") so the dice log can show
+    // the roll's kind, not just the coarse purpose (v6 #4). Capped to the record's 80-char limit.
+    socket.emit("dice:roll", { commandId: newId(), formula, purpose, visibility: "public", label: label.slice(0, 80), actorId: actor.id }, (result: { ok: boolean; message?: string }) => {
       setRolling(false);
       setFeedback(result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : result.message ?? "The roll was rejected.");
     });
@@ -497,7 +499,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
               </div>
               <button type="button" className={`sheet-toggle-btn${item.equipped ? " on" : ""}`} disabled={busy} aria-pressed={item.equipped} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "Equipped" : "Equip"}</button>
               <button type="button" className={`sheet-toggle-btn${item.attuned ? " on" : ""}`} disabled={busy} aria-pressed={item.attuned} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } }, ack); }}>{item.attuned ? "Attuned" : "Attune"}</button>
-              <button type="button" className="sheet-remove" disabled={busy} aria-label={`Remove ${item.name}`} title={`Remove ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>×</button>
+              <button type="button" className="sheet-remove" disabled={busy} aria-label={`Remove ${item.name}`} title={`Remove ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>✕</button>
             </div>)}
           </div>}
           {attunedCount > 0 && <p className={`sheet-attunement${attunedCount > 3 ? " over" : ""}`}>Attunement {attunedCount}/3</p>}

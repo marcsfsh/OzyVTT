@@ -589,7 +589,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async diceRoll(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(DiceRollSchema, raw, "The roll request is malformed.");
-      const { commandId, formula, purpose, visibility, actorId, expectedRevision } = request;
+      const { commandId, formula, purpose, visibility, label, actorId, expectedRevision } = request;
       const gmGrade = isGmGrade(principal);
       if (!gmGrade && visibility === "gm-only") throw new GameAccessDeniedError("Only the GM can make a GM-only roll.");
       const initiatorSessionId = sessionIdOf(principal);
@@ -611,7 +611,7 @@ export function createGameOperations(context: GameOperationsContext) {
         });
         const initiatorLabel = initiatorRole === "gm" ? gmGradeLabelOf(principal) : state.actors.find((candidate) => candidate.ownerSessionId === initiatorSessionId)?.name ?? "A player";
         const record: RollRecord = {
-          id: rollId, commandId, initiatorSessionId, initiatorRole, initiatorLabel, actorId: actorId ?? null, purpose, visibility, formula,
+          id: rollId, commandId, initiatorSessionId, initiatorRole, initiatorLabel, ...(label ? { label } : {}), actorId: actorId ?? null, purpose, visibility, formula,
           normalizedFormula: resolution.expression.normalized,
           dice,
           modifiers: resolution.terms.filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier").map((term) => ({ value: term.value, sign: term.sign })),

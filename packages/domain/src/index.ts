@@ -20,6 +20,12 @@ export const RollRecordSchema = z.object({
    * supplies a real value for every new roll.
    */
   initiatorLabel: z.string().min(1).max(120).optional(),
+  /**
+   * What was rolled, specifically - e.g. "Athletics check", "DEX save", or a weapon/spell name - so the
+   * dice log can show the roll's kind, not just the coarse purpose. Optional: older rolls (and rolls from
+   * integrations that don't supply one) fall back to the purpose label in the UI.
+   */
+  label: z.string().min(1).max(80).optional(),
   actorId: z.string().uuid().nullable(),
   purpose: RollPurposeSchema,
   visibility: RollVisibilitySchema,
@@ -519,7 +525,7 @@ export interface ClientToServerEvents {
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-legendary": (payload: { commandId: string; actorId: string; spent: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
+  "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; label?: string; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
   "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:add-combatant": (payload: { commandId: string; actorId: string; score?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

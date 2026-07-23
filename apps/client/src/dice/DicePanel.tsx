@@ -114,8 +114,8 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
         <div className="roll-list" aria-label="Recent rolls">
           {rolls.length === 0 && <p>{rollFilter === "mine" ? "No rolls from this character yet." : "No rolls yet."}</p>}
           {rolls.slice(-30).reverse().map((roll) => <article className="roll-card" key={roll.id}>
-        <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{roll.initiatorLabel ?? "Unknown roller"} · {PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
-        <div className="roll-result"><div className="dice-faces">{roll.dice.map((die, index) => <span key={`${roll.id}-${index}`} className={die.kept ? "die" : "die discarded"} title={`d${die.sides}${die.kept ? "" : " (discarded)"}`}>{die.face}</span>)}</div><strong className="roll-total">{roll.total}</strong></div>
+        <div className="roll-card-top"><span className={`roll-badge roll-badge--${roll.purpose}`} title={PURPOSE_LABELS[roll.purpose]}>{roll.label ?? PURPOSE_LABELS[roll.purpose]}</span><span className="roll-meta">{roll.initiatorLabel ?? "Unknown roller"} · {visibilityLabel(roll.visibility)}</span></div>
+        <div className="roll-readout"><div className="dice-faces">{roll.dice.map((die, index) => <span key={`${roll.id}-${index}`} className={die.kept ? "die" : "die discarded"} title={`d${die.sides}${die.kept ? "" : " (discarded)"}`}>{die.face}</span>)}</div><span className="roll-formula">{roll.formula}</span><span className="roll-eq" aria-hidden="true">=</span><strong className="roll-total">{roll.total}</strong></div>
       </article>)}
         </div>
       </>;
