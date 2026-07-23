@@ -21,8 +21,7 @@ a widened dialog. Two correctness fixes: the **live card now counts combatants f
 combat** (the active scene's own slot is empty by invariant — it was showing "0 combatants"), and
 **Go live from the hub now lands on the Encounter tab** (live-play). Plus an a11y label on the Scenes
 button and the `/styleguide` gallery demo refreshed to the action-button design. Verified: `check` +
-`build` green, changed rules confirmed in the shipped CSS bundle. (Live Playwright smoke not re-run
-this round — server start declined; verified via bundle + layout.) Design record + this note updated.
+`build` green, changed rules confirmed in the shipped CSS bundle. Design record + this note updated.
 
 Follow-on batch (same round): **square scene cards on the Scenes tab too** (promoted the popup's 1:1
 rule to the whole `.scene-gallery-hub`); **optional scene name** — an unnamed scene takes its map's
@@ -32,6 +31,12 @@ race-proof `pendingStageSceneId` that fires once the scene lands in state. Added
 a future **VTT Settings** tab (rename of VTT Setup) with a Global/Personal settings card — where an
 "auto-staging on/off" personal setting will eventually gate the always-on behaviour shipped here
 (`docs/ai-ledger/known-bugs.md`). `check` + `build` green.
+
+Verified with a **full Playwright smoke** (GM, seeded map + 4-combatant live scene + 6 scenes):
+**29/29 checks passed** at desktop-dark, mobile 390px, and light theme — strip→button+popup, square
+cards (tab + popup), Prepare/Go-live with no overflow, the live card's real combatant count, command
+bar + matching new-scene tile, duplicate, menu-reorder, Go-live→Encounter-tab, and unnamed-scene
+auto-stage taking the map's name.
 
 ---
 
