@@ -8,6 +8,65 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-23 — Scene IA PR review round (Encounter quick-switcher → button + popup)
+
+Screenshot-review pass on the scene-centric IA PR (`claude/scene-prep-gm-notes-c1gcur`, draft #44).
+The always-on Encounter-tab `SceneSwitcher` strip overflowed the map once a table had many scenes, so
+it was retired: the Encounter tab now shows a compact **"Scenes" button** (labelled with the live
+scene) that opens the gallery in a **picker popup**, and `SceneSwitcher.tsx`/`.css` were deleted.
+Cards gained explicit **Prepare** + **Go live** buttons in opposite corners (shared `.nh-card-actions`
+now flexes them so they never overflow a narrow card), a **command bar** with New scene sits above the
+hub gallery, and the in-grid new-scene tile fills its cell. Popup cards render as **square panels** in
+a widened dialog. Two correctness fixes: the **live card now counts combatants from the top-level
+combat** (the active scene's own slot is empty by invariant — it was showing "0 combatants"), and
+**Go live from the hub now lands on the Encounter tab** (live-play). Plus an a11y label on the Scenes
+button and the `/styleguide` gallery demo refreshed to the action-button design. Verified: `check` +
+`build` green, changed rules confirmed in the shipped CSS bundle. Design record + this note updated.
+
+Follow-on batch (same round): **square scene cards on the Scenes tab too** (promoted the popup's 1:1
+rule to the whole `.scene-gallery-hub`); **optional scene name** — an unnamed scene takes its map's
+name (its image filename by default), and the map-upload name field is labelled optional (it already
+defaulted to the filename); **auto-staging** — creating a scene now opens it for private staging via a
+race-proof `pendingStageSceneId` that fires once the scene lands in state. Added a **roadmap note** for
+a future **VTT Settings** tab (rename of VTT Setup) with a Global/Personal settings card — where an
+"auto-staging on/off" personal setting will eventually gate the always-on behaviour shipped here
+(`docs/ai-ledger/known-bugs.md`). `check` + `build` green.
+
+Verified with a **full Playwright smoke** (GM, seeded map + 4-combatant live scene + 6 scenes):
+**29/29 checks passed** at desktop-dark, mobile 390px, and light theme — strip→button+popup, square
+cards (tab + popup), Prepare/Go-live with no overflow, the live card's real combatant count, command
+bar + matching new-scene tile, duplicate, menu-reorder, Go-live→Encounter-tab, and unnamed-scene
+auto-stage taking the map's name.
+
+---
+
+## 2026-07-22 — Scene-centric IA redesign (the deferred flow rethink; 7-slice PR)
+
+Turned the "Scenes hub" design (`docs/product/scene-centric-ia.md`) into shipping code, one verified
+slice per commit:
+1. **Backend** `scene:duplicate` + `scene:reorder` (shared operations layer, socket + `/api/v1`,
+   api-contract byte-identical + reference regen).
+2. **Viewer bridge** — `scene:activate` presents the scene's map to the shared screen; a live scene
+   projects its map + prepared fog pre-combat (tokens still gated on `combat.active` — no new actor
+   exposure). New `viewer-coordinator.presentMap`.
+3. **`@vtt/ui`** `.nh-gallery`/`.nh-card` pattern + `/styleguide` (live = the one magenta glow; staging
+   = cyan edge; a stretched card button so the ⋯ menu/actions layer above it).
+4. **Scenes hub** gallery tab (cards, go-live, stage, rename, duplicate, remove, empty state; map-glyph
+   thumbnail fallback for a missing/corrupt map).
+5. **Map Setup folded in** — tab retired; "Manage maps" opens the library/calibration sub-view.
+6. **Encounter start reconciled** — starts on the live scene's map (the server requires the match); the
+   map row is read-only when a scene is live.
+7. **Drag-to-reorder** the gallery (pointer + touch grip, `touch-action:none`; menu Move earlier/later
+   stays the keyboard path).
+
+Owner decisions: auto-present to the TV on go-live; new Scenes hub folding Map Setup in; duplicate +
+reorder (no persisted thumbnails); one PR. Verified per slice: `check`+`test` (462)+`build` green;
+Playwright smokes (gallery in 3 themes + 390px, ⋯ menu, thumbnail fallback, Manage-maps round trip,
+scene-first start, drag-reorder DOM+server both update). Closes the known-bugs IA item. Follow-ups:
+persisted server thumbnails; slim the Encounter quick-switch strip; a physical touch-device pass.
+
+---
+
 ## 2026-07-21 — PR #40 review round 2 (seven items, same branch)
 
 Second screenshot-review pass on `claude/vtt-combat-plan-clarify-wy9cji`. Verified green (check/test/

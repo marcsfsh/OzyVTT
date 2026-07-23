@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ViewerAccessDeniedError, type ViewerAccessMetadata, type ViewerAccessStore } from "./viewer-access.js";
-import type { ViewerCommand, ViewerEncounterScene, ViewerInitiative, ViewerPresentationProjection } from "./viewer-presentation.js";
+import type { ViewerCamera, ViewerCommand, ViewerEncounterScene, ViewerInitiative, ViewerPresentationProjection } from "./viewer-presentation.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
 type PresentationListener = (projection: ViewerPresentationProjection) => void;
@@ -126,6 +126,24 @@ export class ViewerCoordinator {
       id: `encounter-scene:${sourceRevision}:${current.revision}`,
       role: "gm",
       payload: { type: "viewer.encounter.set", ...projection }
+    }, this.now());
+    if (!result.duplicate) this.broadcast();
+    return !result.duplicate;
+  }
+
+  /**
+   * Bridge for "make a scene live": present that scene's map on the shared screen - enable presentation
+   * and switch to the map in one server-internal action (mirrors synchronize*, role "gm", no token).
+   * Skips when the map is already the enabled presentation, so re-activating avoids a needless camera
+   * reset. Private staging never reaches here (it never activates a scene).
+   */
+  async presentMap(sourceRevision: number, map: Readonly<{ assetId: string; altText: string; camera: ViewerCamera }>) {
+    const current = this.presentation.snapshot;
+    if (current.enabled && current.activeMap?.assetId === map.assetId) return false;
+    const result = await this.presentation.execute({
+      id: `scene-present:${sourceRevision}:${current.revision}`,
+      role: "gm",
+      payload: { type: "viewer.presentation.begin", assetId: map.assetId, altText: map.altText, camera: map.camera }
     }, this.now());
     if (!result.duplicate) this.broadcast();
     return !result.duplicate;

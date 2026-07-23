@@ -1,0 +1,50 @@
+<!-- Keep this short and honest. Delete any section that doesn't apply. -->
+
+## Summary
+
+<!-- What does this change do, and why? One or two sentences. -->
+
+## Type of change
+
+- [ ] Feature
+- [ ] Bug fix
+- [ ] UX / UI
+- [ ] Refactor / internal
+- [ ] Docs / tooling
+
+## What changed
+
+<!-- The notable changes, by area: client / server / domain / api-contract / ui / content / docs. -->
+
+## Screenshots / recordings
+
+<!-- Required for any UI-affecting change: show it at a desktop width AND a narrow/touch viewport,
+     and note the theme(s). Delete this section if the change isn't UI-facing. -->
+
+## Verification
+
+<!-- "Should work now" is not verification. State what you actually ran. -->
+
+- [ ] `npm run check` green
+- [ ] `npm run test` green
+- [ ] `npm run build` green
+- [ ] UI change: looked at it running (browser + narrow/touch viewport), cycled themes
+
+Notes:
+
+## Invariants (tick the ones this change touches)
+
+- [ ] **Server authority** — no game decision (snapping, visibility, dice, turn order) moved to the client; no client input trusted for authorization.
+- [ ] **Viewer safety** — the public table viewer exposes no GM-only combatants, hidden tokens, GM controls, or management metadata (re-checked any new field on a viewer projection).
+- [ ] **Role boundaries** — a player acts only on their claimed character; GM-only commands stay gated per command.
+- [ ] **Mobile parity** — works at a narrow viewport and with touch (no mouse-only control).
+- [ ] **API parity** — any new game capability goes through the shared operations layer (both transports), and the served OpenAPI doc stays byte-identical to `@vtt/api-contract`.
+
+## Docs / ledger
+
+- [ ] Updated `docs/ai-ledger/` (current-state / known-bugs / decision-log / session-summary) if this was meaningful work.
+- [ ] Regenerated `docs/api-reference.md` if the API contract changed.
+
+## Follow-ups / out of scope
+
+<!-- Anything deliberately deferred. -->

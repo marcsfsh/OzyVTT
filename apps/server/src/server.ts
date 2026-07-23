@@ -171,6 +171,16 @@ export function createServer(options: CreateServerOptions) {
     }
     broadcast();
   }
+  /** Bridge: making a scene live also presents its map on the shared screen (one action). Best-effort - a viewer hiccup must never undo the authoritative scene switch that already committed. */
+  async function presentSceneMap(mapAssetId: string) {
+    try {
+      const geometry = await tokenGeometryFor(mapAssetId);
+      const entry = mapCatalog.get(mapAssetId);
+      await viewerCoordinator.presentMap(store.snapshot.revision, { assetId: mapAssetId, altText: entry?.name ?? "Battle map", camera: { center: { x: geometry.width / 2, y: geometry.height / 2 }, zoom: 1 } });
+    } catch {
+      for (const socket of io.sockets.sockets.values()) if (auth.verify(socket.handshake.auth?.token)) socket.emit("system:error", "The scene is live, but the shared screen could not switch to its map. Present it from the Viewer tab.");
+    }
+  }
 
   // The shared game capabilities: the Socket.IO handlers below and the public HTTP API both run
   // these exact operations - same validation, authorization, dispatch, and narration (ADR-0016).
@@ -182,6 +192,7 @@ export function createServer(options: CreateServerOptions) {
     tokenCatalog,
     tokenGeometryFor,
     publishGameState,
+    presentSceneMap,
     broadcastTableEvent,
     appendLog,
     logTurnBegin,
@@ -493,6 +504,8 @@ export function createServer(options: CreateServerOptions) {
     socket.on("scene:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove scenes.", "The scene could not be removed.", (principal) => operations.sceneRemove(principal, payload)));
     socket.on("scene:activate", (payload, acknowledge) => respond(acknowledge, "Only the GM can switch scenes.", "The scene could not be switched.", (principal) => operations.sceneActivate(principal, payload)));
     socket.on("scene:set-combatants", (payload, acknowledge) => respond(acknowledge, "Only the GM can change a scene's combatants.", "The scene could not be updated.", (principal) => operations.sceneSetCombatants(principal, payload)));
+    socket.on("scene:duplicate", (payload, acknowledge) => respond(acknowledge, "Only the GM can duplicate scenes.", "The scene could not be duplicated.", (principal) => operations.sceneDuplicate(principal, payload)));
+    socket.on("scene:reorder", (payload, acknowledge) => respond(acknowledge, "Only the GM can reorder scenes.", "The scenes could not be reordered.", (principal) => operations.sceneReorder(principal, payload)));
     socket.on("fog:set-enabled", (payload, acknowledge) => respond(acknowledge, "Only the GM controls the fog of war.", "The fog could not be updated.", (principal) => operations.fogSetEnabled(principal, payload)));
     socket.on("fog:paint", (payload, acknowledge) => respond(acknowledge, "Only the GM controls the fog of war.", "The fog stroke could not be painted.", (principal) => operations.fogPaint(principal, payload)));
     socket.on("fog:reset", (payload, acknowledge) => respond(acknowledge, "Only the GM controls the fog of war.", "The fog could not be reset.", (principal) => operations.fogReset(principal, payload)));

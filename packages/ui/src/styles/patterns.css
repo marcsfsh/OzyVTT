@@ -40,3 +40,91 @@
 .nh-empty-icon { font-size: 1.8rem; line-height: 1; opacity: .8; }
 .nh-empty-title { color: var(--text); font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h3); }
 .nh-empty-text { max-width: 26rem; font-size: var(--fs-sm); }
+
+/* ---- Card gallery (scene library, map library — any browse-and-pick grid of thumbnail cards) ----
+   A card carries its own explicit actions in a trailing `.nh-card-actions` row (e.g. Prepare / Go
+   live, sitting in opposite corners); the status badge and the ⋯ tools menu layer over the thumb.
+   For a pure picker where the whole card is one target instead, drop a stretched transparent
+   `.nh-card-open` button in and add `.is-interactive` for the hover lift. Live is a STATE, so the
+   live card — and only it — glows magenta; a privately-staged card takes a quiet cyan edge. Tokens
+   only; theme-aware; reduced-motion-safe. */
+.nh-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nh-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  transition: transform var(--dur-hover) var(--ease-settle), border-color var(--dur-hover), box-shadow var(--dur-base);
+}
+/* Genuine click-target cards lift on hover — the shared motion cue map/token cards already use. */
+.nh-card.is-interactive:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+/* Live is a state, so the live card is the one neon moment in the grid. */
+.nh-card.is-live { border-color: var(--magenta); box-shadow: var(--glow-magenta); }
+/* Being privately staged by the GM: a quiet cyan selection edge, never a glow. */
+.nh-card.is-staging { border-color: var(--cyan); }
+
+.nh-card-thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+}
+.nh-card-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nh-card-thumb-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.7rem; opacity: .45; }
+
+.nh-card-status { position: absolute; top: var(--space-2); left: var(--space-2); z-index: 2; }
+/* Tools sit above the actions row (z-index 2) so the ⋯ menu's popover is never painted under the
+   Prepare / Go live buttons. The gallery also lifts a card whose menu is open above its siblings. */
+.nh-card-tools { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 4; display: flex; gap: var(--space-1); }
+
+.nh-card-body { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); }
+.nh-card-title { margin: 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nh-card-meta { color: var(--text-muted); font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.nh-card-actions { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: auto; padding: 0 var(--space-3) var(--space-3); }
+/* Action buttons share the row equally so a narrow card (e.g. inside the picker popup) can never
+   push one button past the rounded corner; two of them still read as opposite corners. A non-button
+   child (a lone "live now" caption) keeps its intrinsic width and sits at the start. */
+.nh-card-actions > button { flex: 1 1 0; min-width: 0; }
+
+/* Stretched, transparent button = the card's hit area + focus target; content layers below (thumb/body)
+   and the interactive overlays (tools/actions) layer above it. */
+.nh-card-open { position: absolute; inset: 0; z-index: 1; border: 0; background: transparent; cursor: pointer; border-radius: inherit; }
+.nh-card-open:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -2px; }
+
+/* Add-new tile — a dashed call to action sharing the gallery grid. Fills its cell so it reads as one
+   more listing (same width, same min-height as the real cards) rather than a narrow odd-one-out. */
+.nh-card--new {
+  display: grid;
+  place-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font: 700 var(--fs-sm) / 1.3 var(--font-body);
+  text-align: center;
+}
+.nh-card--new:hover { color: var(--text); border-color: var(--magenta); background: color-mix(in srgb, var(--surface-3) 40%, transparent); }
+.nh-card--new:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -2px; }
+.nh-card-new-icon { font-size: 1.6rem; line-height: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nh-card { transition: border-color var(--dur-hover), box-shadow var(--dur-base); }
+  .nh-card.is-interactive:hover { transform: none; }
+}

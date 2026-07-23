@@ -4,6 +4,7 @@
 .map-manager-heading p { max-width: 26rem; margin: 0; text-align: right; }
 .map-upload { display: grid; grid-template-columns: 1.4fr 1fr .8fr auto; gap: .8rem; align-items: end; margin-top: 1.25rem; }
 .map-upload label, .wizard-fields label, .point-editor label { color: var(--text-dim); font-size: .8rem; }
+.map-upload-optional { color: var(--text-muted); }
 .map-upload input, .map-upload select, .wizard-fields input, .wizard-fields select, .point-editor input { width: 100%; margin-top: .35rem; padding: .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); }
 .map-upload button, .grid-wizard button { padding: .75rem 1rem; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--primary); color: var(--text-on-neon); text-align: center; cursor: pointer; }
 .map-upload button:hover:not(:disabled), .grid-wizard button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }

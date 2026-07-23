@@ -492,14 +492,18 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     finally { setBusy(false); }
   };
   const start = () => void run(async () => {
-    if (!selectedMap) throw new Error("Select or upload a map before starting combat.");
-    if (selectedMap.kind !== "battlemap") throw new Error("Select a battlemap before starting combat. Regional and world maps remain available outside encounters.");
+    // Scene-first: once a scene is live its map IS the encounter's map (the server requires they match),
+    // so start on it directly. Only when no scene is live do we fall back to a picked battlemap.
+    const startMapId = state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : undefined);
+    if (!startMapId) throw new Error(selectedMap && selectedMap.kind !== "battlemap"
+      ? "Select a battlemap before starting combat. Regional and world maps remain available outside encounters."
+      : "Go live on a scene from the Scenes tab, or pick a battlemap, before starting combat.");
     const entries = state.actors.filter((actor) => selectedActors.has(actor.id)).map((actor) => {
       const value = scores[actor.id]?.trim();
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
     if (entries.length === 0) throw new Error("Choose at least one combatant.");
-    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: selectedMap.id, entries, expectedRevision: state.revision });
+    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, expectedRevision: state.revision });
   }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
   // Inline-edit an initiative score: Enter or blur commits, Escape (via cancelEditRef) discards.
   const commitEdit = (actorId: string, previous: number) => {
@@ -647,12 +651,14 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           (upload/calibration still live there). */}
       <label className="encounter-map">
         <span>Encounter map</span>
-        {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").length > 0 && onSelectMap
-          ? <Select value={selectedMap?.kind === "battlemap" ? selectedMap.id : ""} disabled={busy} onChange={(event) => { const map = (mapLibrary ?? []).find((candidate) => candidate.id === event.target.value); if (map) onSelectMap(map); }}>
-              {selectedMap?.kind !== "battlemap" && <option value="" disabled>Choose a battlemap…</option>}
-              {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
-            </Select>
-          : <strong>{selectedMap?.name ?? "Upload a battlemap on the Map Setup tab first"}</strong>}
+        {state.combat.mapAssetId
+          ? <strong>{(mapLibrary ?? []).find((map) => map.id === state.combat.mapAssetId)?.name ?? "The live scene’s map"}</strong>
+          : (mapLibrary ?? []).filter((map) => map.kind === "battlemap").length > 0 && onSelectMap
+            ? <Select value={selectedMap?.kind === "battlemap" ? selectedMap.id : ""} disabled={busy} onChange={(event) => { const map = (mapLibrary ?? []).find((candidate) => candidate.id === event.target.value); if (map) onSelectMap(map); }}>
+                {selectedMap?.kind !== "battlemap" && <option value="" disabled>Choose a battlemap…</option>}
+                {(mapLibrary ?? []).filter((map) => map.kind === "battlemap").map((map) => <option key={map.id} value={map.id}>{map.name}{map.calibration ? "" : map.scale ? " (gridless)" : " (uncalibrated)"}</option>)}
+              </Select>
+            : <strong>{selectedMap?.name ?? "Go live on a scene from the Scenes tab first"}</strong>}
       </label>
       {/* Undocked at desktop this region scrolls so the panel stays as tall as the map, not taller
           (feedback #1); the map picker above and the add/start buttons below stay pinned. */}
@@ -674,7 +680,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         </div>
       </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
-      <button className="encounter-primary" disabled={busy || !selectedMap || selectedMap.kind !== "battlemap" || selectedActors.size === 0} onClick={start}>Start encounter<span className="nav-arrow" aria-hidden="true">→</span></button>
+      <button className="encounter-primary" disabled={busy || selectedActors.size === 0 || (!state.combat.mapAssetId && (!selectedMap || selectedMap.kind !== "battlemap"))} onClick={start}>Start encounter<span className="nav-arrow" aria-hidden="true">→</span></button>
     </> : <>
       {(() => {
         const placed = state.combat.tokens.filter((token) => token.position !== null).length;

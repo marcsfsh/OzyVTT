@@ -87,6 +87,43 @@ export function setSceneCombatants(state: GameState, sceneId: string, combatantI
 }
 
 /**
+ * Duplicate a prepared scene as a new staged copy sitting next to the original. The copy carries the
+ * source's map and its frozen combat (staged combatants, token positions, fog) verbatim. Duplicating
+ * the LIVE scene snapshots the current top-level combat into the copy - the active scene's own slot is
+ * empty by invariant, so a bare copy would be blank. The copy is always parked (never the active
+ * scene), and `activeSceneId` is untouched.
+ */
+export function duplicateScene(state: GameState, sourceSceneId: string, newSceneId: string): Scene {
+  if (state.combat.scenes.length >= MAX_SCENES) throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} scenes.`);
+  const sourceIndex = state.combat.scenes.findIndex((scene) => scene.id === sourceSceneId);
+  if (sourceIndex === -1) throw new CommandRejectedError("That scene no longer exists.");
+  if (state.combat.scenes.some((scene) => scene.id === newSceneId)) throw new CommandRejectedError("That scene already exists.");
+  const source = state.combat.scenes[sourceIndex];
+  const combat = state.combat.activeSceneId === sourceSceneId ? snapshotSceneCombat(state.combat) : structuredClone(source.combat);
+  const suffix = " (copy)";
+  const name = `${source.name.length + suffix.length > 120 ? source.name.slice(0, 120 - suffix.length) : source.name}${suffix}`;
+  const copy: Scene = { id: newSceneId, name, mapAssetId: source.mapAssetId, combat };
+  const scenes = [...state.combat.scenes];
+  scenes.splice(sourceIndex + 1, 0, copy);
+  state.combat = { ...state.combat, scenes };
+  return copy;
+}
+
+/**
+ * Reorder the prepared-scene list to a permutation of the current scene ids. Which scene is live is an
+ * id reference (`activeSceneId`), independent of array position, so it is never changed by a reorder.
+ */
+export function reorderScenes(state: GameState, order: readonly string[]) {
+  const current = state.combat.scenes;
+  const ids = new Set(current.map((scene) => scene.id));
+  if (order.length !== current.length || new Set(order).size !== order.length || order.some((id) => !ids.has(id))) {
+    throw new CommandRejectedError("The new order must list every prepared scene exactly once.");
+  }
+  const byId = new Map(current.map((scene) => [scene.id, scene]));
+  state.combat = { ...state.combat, scenes: order.map((id) => byId.get(id)!) };
+}
+
+/**
  * The park-and-resume swap. Parks the current live combat into its own scene slot (or an implicit
  * scene if a pre-scenes encounter is running unbound), then resumes the target scene's frozen combat
  * verbatim while resetting the target's own slot to empty (the active scene's live copy is top-level).
