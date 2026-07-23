@@ -245,9 +245,17 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   change; (2) a generated **app map** (`npm run map` → `docs/app-map.md`: GameState shape, command
   catalog with scopes, HTTP paths, curated file index) via pure `renderAppMap()` with a
   byte-identical freshness test (`apps/server/test/app-map.test.ts`, mirroring the API-reference
-  pattern), plus a new **`vtt-orientation`** skill. `check` clean; server suite 401 tests green.
-  Slices 1–5 (additive data model → player-initiated rolls → spell slots → inventory →
-  identity/proficiency light-edit) follow on the same branch.
+  pattern), plus a new **`vtt-orientation`** skill. **Slice 1 (data model + read-only sheet)**
+  then landed: additive `ActorDefinition` fields (`character`/`proficiencies`/`spellcasting`/
+  `startingInventory`/`startingCurrency`, the "no-rewrite" selection contract) and live `Actor`
+  fields (`spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency`, seeded in
+  `instantiate()`); the JSON-Schema mirror kept in lockstep; the owner-only projection extended
+  with a leak test proving a second player and the viewer never see another PC's
+  slots/inventory/currency; the three seed PCs migrated; and `CharacterSheet.tsx` now renders
+  identity/proficiencies/spells/inventory **read-only** (guarded, so monsters/imports are
+  unchanged). `check`+`build`+`test` green (server 404, schemas 8); a live browser/mobile visual
+  check is still pending (no e2e harness in-repo). Slices 2–5 (player-initiated rolls → spell
+  slots → inventory management → identity/proficiency light-edit) follow on the same branch.
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
