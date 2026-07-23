@@ -36,6 +36,12 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
 7. **Robust SRD equipment framework.** Equipment adding is rudimentary. Support the future **homebrew**
    roadmap item: **all SRD equipment available to add**, which means building the **framework for how
    equipment exists** so homebrew can later reference it. — **Decision: full catalog + vendor SRD gear.**
+   — ✅ done. Unified `EquipmentReference` content model + a 132-entry hand-authored SRD gear bundle
+   (ammunition / adventuring gear / tools / packs / focuses / consumables) folded together with the
+   existing weapon & armor tables into one 183-item catalog (`loadEquipment`); served over a new
+   `content:equipment` socket read (public reference, like `content:spells`); `InventoryItem` additively
+   gains a `category` slug; the sheet's Inventory gains a searchable, category-filtered browse-and-add
+   picker (upsert-aware, mobile full-screen). The `wondrous` category is reserved for the homebrew update.
 8. **Manual roll entry** everywhere "click to roll" exists, PLUS a **sheet setting** controlling whether a
    typed roll **auto-applies the bonus** (you enter only the die result) or is **manual** (you enter the
    final total including your bonus — e.g. a 15 + 7 bonus → you type 22).
@@ -58,7 +64,7 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
 | 4 | All skills listed + proficiency indicator + editor works | ✅ done (Wave 1) | #6 |
 | 5 | Spell slots as pips (not wonky ±) | ✅ done (Wave 1) | #6 |
 | 6 | Per-stat roll + roll-with-proficiency | ✅ done (Wave 1) | #6 |
-| 7 | **Equipment framework (full catalog + vendor SRD gear)** | ▶ **next** | #9 |
-| 2 | Upcasting cast-at (reference vendored SRD spells) | ⏳ pending | #7 |
+| 7 | **Equipment framework (full catalog + vendor SRD gear)** | ✅ done | #9 |
+| 2 | Upcasting cast-at (reference vendored SRD spells) | ▶ **next** | #7 |
 | 8 | Manual roll entry + auto/manual bonus mode | ⏳ pending | #8 |
 | 9 | Panel redesign: sheet + player dice-log, docking, popout | ⏳ pending | #10 |

@@ -270,6 +270,23 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   **interactive play sheet is feature-complete**; the full guided builder (content +
   derivation + level-up) is the next roadmap update. **Still pending:** a live browser/mobile
   visual smoke (no Playwright/e2e harness in the repo yet).
+  - **Sheet v2 iteration (2026-07-23, same PR)** from GM playtest feedback (tracked in
+    `docs/product/character-sheet-v2-feedback.md`). **Wave 1** (readability + interaction): spells
+    grouped by level, all 18 skills listed with proficiency dots, the stale-definition edit bug
+    fixed (owner definition rides the live prop and wins), spell slots restyled as clickable pips,
+    and per-ability roll + "roll with proficiency" chips. **Equipment framework** (feedback #7,
+    decision "full catalog + vendor SRD gear"): a unified `EquipmentReference` content model +
+    a 132-entry hand-authored SRD gear bundle (ammunition / adventuring gear / tools / packs /
+    focuses / consumables) folded with the weapon & armor tables into one **183-item catalog**
+    (`loadEquipment`, sorted, uniform shape); served over a new **`content:equipment`** socket read
+    (public SRD reference, like `content:spells`, with the CC-BY line); `InventoryItem` additively
+    gains a homebrew-expressible `category` slug (JSON-Schema mirror in lockstep); and the sheet's
+    Inventory gains a searchable, category-filtered **browse-and-add picker** (upsert-aware —
+    picking an owned item increments its stack — mobile full-screen). `check`+`build`+`test` green
+    (server 419, content 18, schemas 8); a runtime `ContentLibrary` smoke served the full 183-item
+    catalog. The `wondrous` category is reserved for the homebrew update. **Remaining v2 items:**
+    upcasting "cast at" picker (#2), manual roll entry + auto/manual bonus mode (#8), and the
+    sheet + player dice-log panel redesign with docking/popout (#9).
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
