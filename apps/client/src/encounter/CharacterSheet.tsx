@@ -511,7 +511,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
     {rollbar}
     <div className="sheet-workspace-cols">
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
-      {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} /></div>}
+      {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
     </div>
     {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
   </div>);

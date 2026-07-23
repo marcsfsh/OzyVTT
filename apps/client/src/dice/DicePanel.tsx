@@ -12,10 +12,11 @@ function modifierLabel(modifier: number) { return modifier === 0 ? "±0" : modif
 
 function isBareD20(formula: string) { return /^\s*1?d20\s*$/i.test(formula); }
 
-export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmView | PlayerView }) {
+export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player"; state: GmView | PlayerView; mineActorId?: string }) {
   const [formula, setFormula] = useState("1d20");
   const [purpose, setPurpose] = useState<RollPurpose>("manual");
   const [visibility, setVisibility] = useState<RollVisibility>("public");
+  const [rollFilter, setRollFilter] = useState<"all" | "mine">("all");
   const [modifier, setModifier] = useState(0);
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
@@ -98,12 +99,24 @@ export function DicePanel({ role, state }: { role: "gm" | "player"; state: GmVie
       <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
     </details>
     <p className="dice-feedback" aria-live="polite">{feedback}</p>
-    <div className="roll-list" aria-label="Recent rolls">
-      {state.rolls.length === 0 && <p>No rolls yet.</p>}
-      {state.rolls.slice(-30).reverse().map((roll) => <article className="roll-card" key={roll.id}>
+    {(() => {
+      const rolls = mineActorId && rollFilter === "mine" ? state.rolls.filter((roll) => roll.actorId === mineActorId) : state.rolls;
+      return <>
+        <div className="roll-list-head">
+          <h3 className="roll-list-title">Recent rolls</h3>
+          {mineActorId && <div className="dice-filter" role="group" aria-label="Filter rolls">
+            <button type="button" className={rollFilter === "all" ? "on" : ""} aria-pressed={rollFilter === "all"} onClick={() => setRollFilter("all")}>Table</button>
+            <button type="button" className={rollFilter === "mine" ? "on" : ""} aria-pressed={rollFilter === "mine"} onClick={() => setRollFilter("mine")}>Mine</button>
+          </div>}
+        </div>
+        <div className="roll-list" aria-label="Recent rolls">
+          {rolls.length === 0 && <p>{rollFilter === "mine" ? "No rolls from this character yet." : "No rolls yet."}</p>}
+          {rolls.slice(-30).reverse().map((roll) => <article className="roll-card" key={roll.id}>
         <div className="roll-card-heading"><strong>{roll.formula}</strong><span>{roll.initiatorLabel ?? "Unknown roller"} · {PURPOSE_LABELS[roll.purpose]} · {visibilityLabel(roll.visibility)}</span></div>
         <div className="roll-result"><div className="dice-faces">{roll.dice.map((die, index) => <span key={`${roll.id}-${index}`} className={die.kept ? "die" : "die discarded"} title={`d${die.sides}${die.kept ? "" : " (discarded)"}`}>{die.face}</span>)}</div><strong className="roll-total">{roll.total}</strong></div>
       </article>)}
-    </div>
+        </div>
+      </>;
+    })()}
   </section>;
 }

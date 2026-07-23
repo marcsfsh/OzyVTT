@@ -544,6 +544,11 @@
 .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
 .log-pane { flex: 0 0 clamp(18rem, 32%, 24rem); padding: var(--space-4); border-left: 1px solid var(--line); }
 .sheet-workspace.log-left .log-pane { border-left: 0; border-right: 1px solid var(--line); }
+/* The shared DicePanel blends into the log column (no nested card chrome) and tightens for the narrow width (v3 #3). */
+.log-pane .dice-proof { margin: 0; padding: 0; border: 0; background: transparent; }
+.log-pane .dice-quick, .log-pane .dice-adv-row { gap: .4rem; margin-top: .7rem; }
+.log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: .5rem .7rem; }
+.log-pane .roll-list { max-height: none; }
 
 /* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
    unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
