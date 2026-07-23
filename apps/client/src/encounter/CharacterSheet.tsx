@@ -12,6 +12,7 @@ const sheetCache = new Map<string, ActorDefinition>();
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
+const d20 = (bonus: number) => bonus === 0 ? "1d20" : `1d20 ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
@@ -69,6 +70,17 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
   const [definition, setDefinition] = useState<ActorDefinition | null>(ownDefinition ?? (definitionId ? sheetCache.get(definitionId) ?? null : null));
   const [feedback, setFeedback] = useState("");
+  const [rolling, setRolling] = useState(false);
+  // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
+  // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
+  // the GM still applies damage (players never mutate another creature's HP).
+  const emitRoll = (formula: string, purpose: "check" | "save" | "attack" | "damage", label: string) => {
+    setRolling(true);
+    socket.emit("dice:roll", { commandId: newId(), formula, purpose, visibility: "public", actorId: actor.id }, (result: { ok: boolean; message?: string }) => {
+      setRolling(false);
+      setFeedback(result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : result.message ?? "The roll was rejected.");
+    });
+  };
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
@@ -121,11 +133,11 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
             const save = extension.savingThrows?.[ability];
-            return <div key={ability} className="sheet-ability">
+            return <button type="button" key={ability} className="sheet-ability sheet-rollable" disabled={rolling} onClick={() => emitRoll(d20(modifierOf(score)), "check", `${ability.toUpperCase()} check`)} title={`Roll ${ability.toUpperCase()} check`}>
               <span>{ability.toUpperCase()}</span>
               <strong>{score}</strong>
               <small>{signed(modifierOf(score))}{save !== null && save !== undefined ? ` / save ${signed(save)}` : ""}</small>
-            </div>;
+            </button>;
           })}
         </div>
         <dl className="sheet-meta">
@@ -139,9 +151,9 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           <div><dt>Proficiency</dt><dd>{signed(definition.proficiencyBonus)}</dd></div>
         </dl>
         {proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0) && <section className="sheet-section"><h3>Proficiencies</h3>
-          {proficiencies.saves.length > 0 && <p className="sheet-entry"><strong>Saving throws.</strong> {proficiencies.saves.map((ability) => `${ability.toUpperCase()} ${signed(saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, true))}`).join(", ")}</p>}
+          {proficiencies.saves.length > 0 && <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{proficiencies.saves.map((ability) => { const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, true); return <button type="button" key={ability} className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>}
           {proficiencies.skills.length > 0 && <ul className="sheet-skill-list">
-            {proficiencies.skills.map((skill) => { const ability = SKILL_ABILITY[skill.id]; const bonus = ability ? skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, skill.proficiency) : null; return <li key={skill.id}><span>{titleizeSkill(skill.id)}{skill.proficiency === "expertise" ? " (expertise)" : ""}</span><strong>{bonus === null ? "-" : signed(bonus)}</strong></li>; })}
+            {proficiencies.skills.map((skill) => { const ability = SKILL_ABILITY[skill.id]; const bonus = ability ? skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, skill.proficiency) : null; return <li key={skill.id}><span>{titleizeSkill(skill.id)}{skill.proficiency === "expertise" ? " (expertise)" : ""}</span>{bonus === null ? <strong>-</strong> : <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "check", `${titleizeSkill(skill.id)} check`)}>{signed(bonus)}</button>}</li>; })}
           </ul>}
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
@@ -161,7 +173,13 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
         {definition.actions.length > 0 && <section className="sheet-section"><h3>Actions</h3>
-          {definition.actions.map((action) => <p key={action.id} className="sheet-entry"><strong>{action.name}.</strong> <RichText text={action.description} /></p>)}
+          {definition.actions.map((action) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
+            <p><strong>{action.name}.</strong> <RichText text={action.description} /></p>
+            {(atk || action.damage.length > 0) && <div className="sheet-roll-row">
+              {atk && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(atk.bonus), "attack", `${action.name} to hit`)}>{signed(atk.bonus)} to hit</button>}
+              {action.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(part.formula, "damage", `${action.name} damage`)}>{part.formula}</button>)}
+            </div>}
+          </div>; })}
         </section>}
         <p className="sheet-attribution">Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.</p>
       </>}

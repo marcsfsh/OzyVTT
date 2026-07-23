@@ -342,6 +342,15 @@
 .sheet-slot { padding: .28rem .5rem; border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: .72rem; font-weight: 700; }
 .sheet-slot strong { color: var(--text); font-family: var(--font-mono); }
 .sheet-currency { margin: .55rem 0 0; color: var(--text-dim); font-family: var(--font-mono); font-size: .8rem; }
+.sheet-rollable { display: block; width: 100%; border: 1px solid transparent; font: inherit; cursor: pointer; transition: border-color var(--dur-1, .12s) ease, background var(--dur-1, .12s) ease; }
+.sheet-rollable:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sheet-rollable:disabled { cursor: default; opacity: .75; }
+.sheet-roll-row { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .4rem 0 0; }
+.sheet-roll-label { color: var(--text-muted); font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.sheet-roll-chip { padding: .22rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 .72rem/1 var(--font-mono); cursor: pointer; }
+.sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
+.sheet-roll-chip:disabled { cursor: default; opacity: .6; }
+.sheet-entry p { margin: 0 0 .3rem; }
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }

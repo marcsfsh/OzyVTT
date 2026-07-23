@@ -9,6 +9,7 @@ import { actionAvailability, resolveDefinitionAction } from "./action-resolution
 import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
+import { canInitiateForActor } from "./authorization.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
@@ -588,8 +589,8 @@ export function createGameOperations(context: GameOperationsContext) {
       const rollId = context.newId();
       const result = await store.execute({ id: commandId, type: "dice.roll", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         if (actorId && principal.kind === "player") {
-          const actor = state.actors.find((candidate) => candidate.id === actorId);
-          if (!actor || actor.ownerSessionId !== principal.sessionId) throw new CommandRejectedError("You may only roll for your claimed character.");
+          const verdict = canInitiateForActor({ role: "player", sessionId: principal.sessionId }, state, actorId, purpose === "save" ? "save" : purpose === "attack" || purpose === "damage" ? "attack" : "check");
+          if (!verdict.ok) throw new CommandRejectedError("You may only roll for your claimed character.");
         }
         let group = 0;
         const dice = resolution.terms.flatMap((term) => {
