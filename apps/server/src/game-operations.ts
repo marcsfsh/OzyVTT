@@ -180,6 +180,12 @@ export function createGameOperations(context: GameOperationsContext) {
       return { spells: contentLibrary.spellSummaries() };
     },
 
+    contentEquipment(_principal: GamePrincipal) {
+      // The SRD equipment catalog is public reference (like spells); the sheet's browse-and-add picker reads it.
+      // Attribution rides along so any surface that displays the gear can show the required CC-BY line.
+      return { equipment: contentLibrary.equipmentSummaries(), attribution: contentLibrary.attribution };
+    },
+
     contentMonsterActions(principal: GamePrincipal, raw: unknown) {
       requireGmGrade(principal, "Only the GM can browse stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The action lookup is malformed.");

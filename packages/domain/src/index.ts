@@ -374,6 +374,9 @@ export type ContentConditionsResult = { ok: boolean; message?: string; condition
 /** SRD spell reference (rules text + the header fields a card shows) for the in-app spell rules window; public information for any joined session. */
 export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null }>;
 export type ContentSpellsResult = { ok: boolean; message?: string; spells?: readonly ContentSpellSummary[] };
+/** One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only for those categories. */
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: "weapon" | "armor" | "shield" | "ammunition" | "adventuring-gear" | "tool" | "equipment-pack" | "consumable" | "focus" | "wondrous"; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
@@ -480,6 +483,7 @@ export interface ClientToServerEvents {
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
+  "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
   "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
