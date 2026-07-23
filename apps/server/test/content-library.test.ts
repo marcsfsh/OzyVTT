@@ -18,4 +18,19 @@ describe("bundled reference content exposed to the client", () => {
     expect(fireball?.componentsText).toBe("V, S, M (a ball of bat guano and sulfur)");
     expect(fireball?.description).toContain("bright streak");
   });
+
+  it("exposes the folded equipment catalog the sheet's browse-and-add picker reads", () => {
+    const equipment = library.equipmentSummaries();
+    // Gear bundle + weapons + armor, all in the one wire shape (see the content package's fold test).
+    expect(equipment.length).toBeGreaterThan(150);
+    const categories = new Set(equipment.map((item) => item.category));
+    for (const category of ["weapon", "armor", "shield", "ammunition", "adventuring-gear", "tool", "equipment-pack", "focus", "consumable"]) {
+      expect(categories, category).toContain(category);
+    }
+    // A weapon carries its structured block; a gear entry carries cost/weight and neither sub-object.
+    expect(equipment.find((item) => item.id === "longsword")).toMatchObject({ category: "weapon", weapon: { damageDice: "1d8", damageType: "slashing" }, armor: null });
+    expect(equipment.find((item) => item.id === "thieves-tools")).toMatchObject({ category: "tool", costGp: 25, weightLb: 1, weapon: null, armor: null });
+    // The attribution line is available for any surface that renders the catalog (CC-BY requirement).
+    expect(library.attribution).toContain("System Reference Document 5.2.1");
+  });
 });
