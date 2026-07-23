@@ -109,6 +109,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `actor.set-size` | `actor:write` |
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
+| `actor.set-archived` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
 | `scene.rename` | `scene:write` |
@@ -1318,6 +1319,24 @@ Moves a combatant between the shared layer (public) and the GM-only layer (GM-gr
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `visibility` | `public` \| `gm-only` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/archived`
+
+Archives or restores a character (GM-grade only). Archived characters are hidden from players and excluded from the encounter builder; a character in the running encounter must be removed first.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `archived` | boolean | yes | true archives (hides from players + encounter builder); false restores |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

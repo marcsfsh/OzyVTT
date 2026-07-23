@@ -547,6 +547,7 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.actorTokenImage, "post", "actor.set-token-image"],
       [GAME_PATHS.actorSize, "post", "actor.set-size"],
       [GAME_PATHS.actorVisibility, "post", "actor.set-visibility"],
+      [GAME_PATHS.actorArchived, "post", "actor.set-archived"],
       [GAME_PATHS.actorHealthDisplay, "post", "actor.set-health-display"],
       [GAME_PATHS.actorSpeed, "post", "actor.set-speed"],
       [GAME_PATHS.scenes, "post", "scene.create"],

@@ -277,6 +277,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actorTokenImage), ...command("actor.set-token-image", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSize), ...command("actor.set-size", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorVisibility), ...command("actor.set-visibility", actorIdParam));
+  router.post(expressPath(GAME_PATHS.actorArchived), ...command("actor.set-archived", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorHealthDisplay), ...command("actor.set-health-display", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpeed), ...command("actor.set-speed", actorIdParam));
   router.post(expressPath(GAME_PATHS.scenes), ...command("scene.create"));

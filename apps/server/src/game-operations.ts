@@ -40,7 +40,7 @@ import {
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneReorderSchema, SceneSetCombatantsSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -1327,6 +1327,22 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async actorSetArchived(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can archive characters.");
+      const request = parse(SetActorArchivedSchema, raw, "The archive command is malformed.");
+      const { commandId, actorId, archived, expectedRevision } = request;
+      // Archiving hides a character from players (projection) and the encounter builder; a live actor may
+      // not be archived while it's in the running fight - the GM removes it from combat first.
+      const result = await store.execute({ id: commandId, type: "actor.set-archived", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That character no longer exists.");
+        if (archived && state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Remove this character from the encounter before archiving it.");
+        actor.archived = archived;
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Scenes ----------
 
     async sceneCreate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1480,6 +1496,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["actor.set-token-image", "Set or clear a combatant's token image from the token library (GM).", (p, raw) => operations.actorSetTokenImage(p, raw)],
     ["actor.set-size", "Set a combatant's creature size; the token re-snaps to its footprint (GM).", (p, raw) => operations.actorSetSize(p, raw)],
     ["actor.set-visibility", "Move a combatant between the shared layer and the GM-only layer (GM).", (p, raw) => operations.actorSetVisibility(p, raw)],
+    ["actor.set-archived", "Archive or restore a character - archived characters are hidden from players and left out of the encounter builder (GM).", (p, raw) => operations.actorSetArchived(p, raw)],
     ["actor.set-speed", "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).", (p, raw) => operations.actorSetSpeed(p, raw)],
     ["scene.create", "Prepare a staged scene on a battlemap without touching the live table (GM).", (p, raw) => operations.sceneCreate(p, raw)],
     ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],

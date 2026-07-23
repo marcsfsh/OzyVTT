@@ -76,6 +76,25 @@ describe("owner-only character-sheet resources", () => {
   });
 });
 
+describe("archived characters (v4 #10, GM management)", () => {
+  const archived = { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16c", name: "Retired Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, archived: true };
+  const active = { id: "70a6e172-9ff5-44a3-8a8b-93f836f0d16c", name: "Active Hero", kind: "player-character", visibility: "public", hp: { current: 8, maximum: 8, temporary: 0 }, ownerSessionId: null };
+  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [archived, active] });
+
+  it("hides archived characters from players entirely, and never leaks the archived flag", () => {
+    const view = projectPlayerView(state, playerA, noPresence);
+    expect(view.actors.map((actor) => actor.name)).toEqual(["Active Hero"]);
+    expect(JSON.stringify(view)).not.toContain("Retired Hero");
+    expect(JSON.stringify(view)).not.toContain("archived");
+  });
+
+  it("keeps archived characters in the GM view (so the roster tab can manage them)", () => {
+    const gm = projectGmView(state, noPresence);
+    expect(gm.actors.map((actor) => actor.name).sort()).toEqual(["Active Hero", "Retired Hero"]);
+    expect(gm.actors.find((actor) => actor.name === "Retired Hero")?.archived).toBe(true);
+  });
+});
+
 describe("presence projection", () => {
   const actors = [
     { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16b", name: "Unclaimed", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, notes: "" },

@@ -409,7 +409,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character").map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived).map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [combatantSearch, setCombatantSearch] = useState("");
@@ -573,10 +573,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
+  // Archived characters (v4 #10) are hidden from the party list and the encounter builder.
   // Setup picker, organized: pinned PCs (the party) first, then the last-used monsters/NPCs (server-
   // tracked recency, GM-only), then a searchable list of everything else on the roster.
   const RECENT_COUNT = 10;
-  const pcs = state.actors.filter((actor) => actor.kind === "player-character");
+  const pcs = state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived);
   const nonPcs = state.actors.filter((actor) => actor.kind !== "player-character");
   const recent = nonPcs.filter((actor) => actor.lastUsedAt !== undefined).sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0)).slice(0, RECENT_COUNT);
   const recentIds = new Set(recent.map((actor) => actor.id));

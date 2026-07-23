@@ -4,6 +4,7 @@ import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "@vtt/ui/styles.css";
 import "./styles.css";
 import { ActorRoster } from "./actors/ActorRoster";
+import { PartyRosterTab } from "./actors/PartyRosterTab";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
@@ -32,10 +33,13 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "scenes" | "table" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "roster" | "viewer" | "replay" | "setup";
+// v4 #10: reordered to Encounter | Scenes | Character Roster | ... | VTT Setup; Viewer is kept (it drives
+// the shared screen) and placed after Character Roster.
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
-  { id: "scenes", label: "Scenes" },
   { id: "table", label: "Encounter" },
+  { id: "scenes", label: "Scenes" },
+  { id: "roster", label: "Character Roster" },
   { id: "viewer", label: "Viewer" },
   { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
@@ -345,6 +349,7 @@ function App() {
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
+      {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
       {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}

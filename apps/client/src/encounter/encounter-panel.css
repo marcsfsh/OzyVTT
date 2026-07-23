@@ -596,6 +596,20 @@
   .sheet-log-resize { display: none; }
 }
 
+/* GM Character Roster tab (v4 #10). */
+.party-roster { max-width: 60rem; }
+.party-heading h2 { margin: .2rem 0 .3rem; }
+.party-heading p { color: var(--text-dim); font-size: .85rem; margin: 0 0 1.1rem; }
+.party-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.party-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem .9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.party-row.archived { opacity: .6; }
+.party-id { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.party-id strong { color: var(--text); }
+.party-sub { color: var(--text-muted); font-size: .72rem; }
+.party-actions { display: flex; gap: .5rem; flex-shrink: 0; flex-wrap: wrap; }
+.party-archived-head { margin: 1.2rem 0 .5rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+.party-feedback { margin-top: .8rem; color: var(--text-dim); font-size: .82rem; }
+
 .roster-import { margin-top: 1rem; }
 .roster-import button { padding: .55rem .9rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); font-size: .82rem; color: var(--text-dim); text-align: center; }
 .roster-import button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }

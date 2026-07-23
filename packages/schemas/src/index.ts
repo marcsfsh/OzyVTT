@@ -165,7 +165,9 @@ export const ActorSchema = z.object({
   /** Carried inventory, seeded from the definition's starting loadout and mutated during play. Owner-only. Additive. */
   inventory: z.array(InventoryItemSchema).max(200).default([]),
   /** Coin purse, seeded from the definition's starting currency. Owner-only. Additive. */
-  currency: CurrencySchema.default({})
+  currency: CurrencySchema.default({}),
+  /** GM-archived: hidden from players and excluded from the encounter builder / party. GM management flag; never projected to players or the viewer. Additive. */
+  archived: z.boolean().default(false)
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
