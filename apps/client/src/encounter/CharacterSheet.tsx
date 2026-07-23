@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl, Stepper } from "@vtt/ui";
+import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
@@ -411,6 +411,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       <div className="sheet-vitals">
         <div className="sheet-vital sheet-vital-hp">
           <div className="sheet-vital-top"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
+          {exactHp && <Meter className="sheet-hp-meter" tone="health" value={exactHp.current} max={exactHp.maximum} />}
           <SheetHpControls actorId={actor.id} allowSet={role === "gm"} onFeedback={setFeedback} />
         </div>
         <div className="sheet-vital" title={extension.armorDetail ?? undefined}><span>AC</span><strong>{actor.armorClass ?? "-"}</strong></div>
@@ -527,7 +528,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
               <IconButton label={`Remove ${item.name}`} size="sm" className="sheet-remove" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>✕</IconButton>
             </div>)}
           </div>}
-          {attunedCount > 0 && <p className={`sheet-attunement${attunedCount > 3 ? " over" : ""}`}>Attunement {attunedCount}/3</p>}
+          {attunedCount > 0 && <p className="sheet-attunement"><Badge tone={attunedCount > 3 ? "danger" : "neutral"}>Attunement {attunedCount}/3</Badge></p>}
           {pickerOpen && <EquipmentPicker ownedCounts={ownedCounts} busy={busy} onAdd={addFromCatalog} onClose={() => setPickerOpen(false)} />}
           <div className="sheet-coins">
             {COINS.map((coin) => <label key={coin}>{coin}<input type="number" min="0" max="1000000" value={coins[coin]} onChange={(event) => setCoins((prev) => ({ ...prev, [coin]: Math.max(0, Math.min(1000000, Math.floor(Number(event.target.value) || 0))) }))} /></label>)}

@@ -320,6 +320,8 @@
 .sheet-vital-hp { flex: 1 1 15rem; align-items: stretch; }
 .sheet-vital-top { display: flex; flex-direction: column; align-items: center; gap: .12rem; }
 .sheet-vital-top strong { font-size: 1.3rem; }
+/* At-a-glance health band (design language §6) under the HP readout; number stays the primary display. */
+.sheet-hp-meter { margin: .3rem 0 .1rem; }
 .sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
 .sheet-hp-controls input { width: 2.9rem; margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 .8rem var(--font-mono); }
 /* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
@@ -380,8 +382,8 @@
 .sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 /* .sheet-remove / .sheet-close now render as <IconButton> (visuals from .nh-iconbtn); the classes remain
    only as layout hooks (grid placement / header flex). */
-.sheet-attunement { margin: .55rem 0 0; color: var(--text-muted); font-size: .72rem; font-weight: 700; }
-.sheet-attunement.over { color: var(--danger); }
+/* Attunement count now renders as a <Badge> (neutral, or danger over the limit of 3). */
+.sheet-attunement { margin: .55rem 0 0; }
 /* Inventory table (v3 #2.9.2): aligned columns with headers; display:contents lets each row's cells
    share the grid's column tracks. */
 .sheet-inv { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; column-gap: .6rem; margin-top: .3rem; }
