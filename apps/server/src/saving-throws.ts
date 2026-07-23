@@ -1,5 +1,5 @@
 import type { AbilityId, Actor, GameState, PendingSave, RollRecord } from "@vtt/domain";
-import { aggregateRollMode, parseDiceFormula, resolveDice, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
+import { abilityModifier as scoreModifier, aggregateRollMode, parseDiceFormula, resolveDice, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
@@ -82,8 +82,7 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
     const fromExtension = (extension as { savingThrows?: Record<string, unknown> }).savingThrows?.[ability];
     if (typeof fromExtension === "number" && Number.isInteger(fromExtension) && fromExtension >= -20 && fromExtension <= 30) return fromExtension;
   }
-  const score = definition.abilityScores[ability];
-  return Math.floor((score - 10) / 2);
+  return scoreModifier(definition.abilityScores[ability]);
 }
 
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
+import { abilityModifier as modifierOf } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
@@ -10,7 +11,6 @@ import { socket } from "../socket";
 const sheetCache = new Map<string, ActorDefinition>();
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
-const modifierOf = (score: number) => Math.floor((score - 10) / 2);
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);

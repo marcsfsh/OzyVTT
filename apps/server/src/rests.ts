@@ -1,5 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
 import { CommandRejectedError } from "./game-store.js";
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { healActor, type ActorScope } from "./hit-points.js";
@@ -27,7 +28,7 @@ export function spendHitDice(state: GameState, actorId: string, faces: readonly 
   if (!actor.hitDice) throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
   if (actor.hitDice.remaining < faces.length) throw new CommandRejectedError(`${actor.name} has ${actor.hitDice.remaining} Hit ${actor.hitDice.remaining === 1 ? "Die" : "Dice"} left.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  const conModifier = definition ? Math.floor((definition.abilityScores.con - 10) / 2) : 0;
+  const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
   const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
   const events = healActor(state, actorId, healed, scope);
   actor.hitDice = { ...actor.hitDice, remaining: actor.hitDice.remaining - faces.length };

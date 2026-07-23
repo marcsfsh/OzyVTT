@@ -1,5 +1,5 @@
 import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
-import { aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
+import { abilityModifier as scoreModifier, aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
@@ -93,8 +93,7 @@ function sizeAtMost(size: string | undefined, limit: string): boolean {
 type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 /** Ability modifier from the definition's scores; +0 when no definition is known (documented builtin fallback). */
 export function abilityModifier(definition: ActorDefinition | undefined, ability: AbilityKey): number {
-  const score = definition?.abilityScores[ability] ?? 10;
-  return Math.floor((score - 10) / 2);
+  return scoreModifier(definition?.abilityScores[ability] ?? 10);
 }
 
 /** Skill bonus from the untyped open5e extension when the import carries one (mirrors saveModifierFor). */
