@@ -4,7 +4,7 @@ import { Modal } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
-import { useSpellReference } from "./spells";
+import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
 import { usePrompt } from "../components/feedback";
@@ -90,13 +90,18 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
   if (options.length === 0) return null;
   const level = options.includes(castLevel) ? castLevel : options[0];
   const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
+  // The effect at the SELECTED level (feedback #2.8.3): always show a damaging spell's die (base or the
+  // SRD-upscaled roll); "N× die" for ray/dart-scaling; "N targets" for a spell that only adds targets.
   const upcast = level > spell.level ? content?.castingOptions.find((option) => option.level === level) : undefined;
-  const scaled = upcast?.damageRoll ?? (upcast?.targetCount != null ? `${upcast.targetCount}×` : null);
+  const damage = upcast?.damageRoll ?? content?.damageRoll ?? null;
+  const targets = upcast?.targetCount ?? null;
+  const effect = damage && targets ? `${targets}× ${damage}` : damage ?? (targets ? `${targets} targets` : null);
   return <div className="sheet-cast">
+    {effect && <span className="sheet-cast-effect" title={`Effect when cast at ${ordinal(level)} level`}>{effect}</span>}
     <select className="sheet-cast-select" aria-label={`Cast ${spell.name} at level`} value={level} disabled={busy} onChange={(event) => setCastLevel(Number(event.target.value))}>
       {options.map((slot) => <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>{ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}{slot > spell.level ? " ↑" : ""}</option>)}
     </select>
-    <button type="button" className="sheet-cast-btn" disabled={busy || remainingAt(level) === 0} onClick={() => onCast(level)}>Cast{scaled ? ` ${scaled}` : ""}</button>
+    <button type="button" className="sheet-cast-btn" disabled={busy || remainingAt(level) === 0} onClick={() => onCast(level)}>Cast</button>
   </div>;
 }
 
@@ -157,6 +162,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
   const { prompt, dialog } = usePrompt();
   // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
   const spellRef = useSpellReference();
+  const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
   // the GM still applies damage (players never mutate another creature's HP).
@@ -345,7 +351,11 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
               </>}
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
-          <p className="sheet-entry"><strong>{spellcasting.ability.toUpperCase()} caster.</strong> Save DC {spellDc}{spellAtk !== null ? `, ${signed(spellAtk)} to hit` : ""}.</p>
+          <div className="sheet-spellcast-fields">
+            <div className="sheet-spellcast-field"><span>Caster</span><strong>{spellcasting.ability.toUpperCase()}</strong></div>
+            <div className="sheet-spellcast-field"><span>Save DC</span><strong>{spellDc ?? "-"}</strong></div>
+            {spellAtk !== null && <div className="sheet-spellcast-field"><span>Spell atk</span><strong>{signed(spellAtk)}</strong></div>}
+          </div>
           {(() => {
             type Spell = (typeof spellcasting.spells)[number];
             const groups = new Map<number, Spell[]>();
@@ -367,7 +377,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
                     {spell.level === 0 ? <span className="sheet-prep-tag cantrip">Cantrip</span> : toggleable
                       ? <button type="button" className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`} disabled={busy} title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{isPrepared ? "Prepared" : "Prepare"}</button>
                       : <span className="sheet-prep-tag on">Always</span>}
-                    <span className="sheet-spell-name">{spell.name}</span>
+                    {spellIndex.get(spell.id)
+                      ? <button type="button" className="sheet-spell-name sheet-spell-link" title={`Show the ${spell.name} rules`} onClick={() => setOpenSpell(spellIndex.get(spell.id) ?? null)}>{spell.name}</button>
+                      : <span className="sheet-spell-name">{spell.name}</span>}
                     {spell.level > 0 && actor.kind === "player-character" && <SpellCastControls spell={spell} content={spellIndex.get(spell.id)} slotLevels={slotLevels} slotMaxByLevel={slotMaxByLevel} liveRemaining={liveSlotRemaining} busy={busy} onCast={(castLevel) => castSpell(spell, castLevel)} />}
                   </li>; })}
                 </ul>
@@ -477,6 +489,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} /></div>}
     </div>
+    {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
   </div>);
 
   // Its own browser tab (feedback #9.3): fills the window, header × ends the tab.
