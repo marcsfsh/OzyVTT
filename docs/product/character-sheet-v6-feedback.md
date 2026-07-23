@@ -28,7 +28,14 @@ Round-6 GM feedback after v5. "Looks better." Durable checklist. _Captured 2026-
    scope carefully)
 6. **Proficiencies editor** is awkward: skills + buttons placed by text position, requires scrolling, bad
    layout. **"Save proficiencies" doesn't work**; a **"Done" button** next to Save is semantically
-   confusing **and also doesn't work**. — ⏳
+   confusing **and also doesn't work**. — ✅ Root cause of "Save doesn't work": the save *persisted fine*,
+   but the GM's sheet renders from a module-level definition cache that nothing refreshed after an edit,
+   so no change showed; "Done" separately *discarded* the draft. Fixed: proficiency edits now **auto-save
+   on each toggle** (like slots/prepare/equip) AND sync the GM cache so the change shows at once; removed
+   the redundant "Save proficiencies" button so **"Done" just closes** (no more discard trap, no Save/Done
+   confusion). Same cache-sync applied to the identity editor. Layout: editor rows are a uniform
+   name-fills + right-pinned-toggle grid (toggles align in a column regardless of name length), 2 columns,
+   no clipped inner scroll. Render-verified.
 7. **Standalone sheet vs "My Sheet" (map) diverge** — the embedded My-Sheet view is BETTER: slot icons
    look less bad, Always/Prepare/Prepared are consistent, spell labels left-aligned. Same component →
    a CSS divergence to reconcile (fixing it likely resolves #1/#2/#3 for the standalone). — ✅ resolved by

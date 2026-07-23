@@ -360,11 +360,24 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // Light hand-edit (owner + GM, server-enforced): edit the per-PC imported definition's identity /
   // proficiency selections; guided creation stays in the future builder.
   const openProfEditor = () => { setProfDraft({ saves: proficiencies?.saves ? [...proficiencies.saves] : [], skills: Object.fromEntries((proficiencies?.skills ?? []).map((skill) => [skill.id, skill.proficiency])) }); setEditMode("prof"); };
-  const toggleSave = (ability: string) => setProfDraft((prev) => ({ ...prev, saves: prev.saves.includes(ability) ? prev.saves.filter((entry) => entry !== ability) : [...prev.saves, ability] }));
-  const cycleSkill = (id: string) => setProfDraft((prev) => { const current = prev.skills[id]; const next = current === undefined ? "proficient" : current === "proficient" ? "expertise" : undefined; const skills = { ...prev.skills }; if (next) skills[id] = next; else delete skills[id]; return { ...prev, skills }; });
-  const saveProf = () => { setBusy(true); socket.emit("character:set-proficiencies", { commandId: newId(), actorId: actor.id, proficiencies: { saves: profDraft.saves as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">, skills: Object.entries(profDraft.skills).map(([id, proficiency]) => ({ id, proficiency })) } }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
+  // Auto-save proficiency edits like the rest of the sheet (slots, Prepare, equip all emit on each tap), so
+  // there's no separate Save button to forget and no draft to lose on Done (v6 #6). Also keep the GM's
+  // cached definition in step: the GM renders from `fetched`/sheetCache, which nothing else refreshes after
+  // an edit, so a persisted change would otherwise not show (the player path already refreshes via
+  // ownDefinition). That stale cache - not the wire - was why "Save" looked like it did nothing.
+  const persistProficiencies = (draft: { saves: string[]; skills: Record<string, "proficient" | "expertise"> }) => {
+    const proficiencies = { saves: draft.saves as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">, skills: Object.entries(draft.skills).map(([id, proficiency]) => ({ id, proficiency })) };
+    if (definitionId && definition) { const next = { ...definition, proficiencies }; sheetCache.set(definitionId, next); setFetched(next); }
+    setBusy(true);
+    socket.emit("character:set-proficiencies", { commandId: newId(), actorId: actor.id, proficiencies }, ack);
+  };
+  const toggleSave = (ability: string) => { const next = { ...profDraft, saves: profDraft.saves.includes(ability) ? profDraft.saves.filter((entry) => entry !== ability) : [...profDraft.saves, ability] }; setProfDraft(next); persistProficiencies(next); };
+  const cycleSkill = (id: string) => { const current = profDraft.skills[id]; const tier = current === undefined ? "proficient" : current === "proficient" ? "expertise" : undefined; const skills = { ...profDraft.skills }; if (tier) skills[id] = tier; else delete skills[id]; const next = { ...profDraft, skills }; setProfDraft(next); persistProficiencies(next); };
   const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
-  const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) }; setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
+  const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
+    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as proficiencies).
+    if (definitionId && definition) { const nextDef = { ...definition, character: next }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
+    setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
   // The sheet's own scrolling content (one column of the workspace below). Identity + roll settings now
   // live in the fixed header/rollbar; only the identity EDIT FORM stays inline in the scroll.
@@ -426,9 +439,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         {((proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0)) || actor.kind === "player-character") && <section className="sheet-section"><h3>Proficiencies{actor.kind === "player-character" && <button type="button" className="sheet-edit-toggle" onClick={() => editMode === "prof" ? setEditMode(null) : openProfEditor()}>{editMode === "prof" ? "Done" : "Edit"}</button>}</h3>
           {editMode === "prof"
             ? <div className="sheet-editor">
-                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => <button type="button" key={ability} className={`sheet-prepare${profDraft.saves.includes(ability) ? " is-prepared" : ""}`} onClick={() => toggleSave(ability)}>{ability.toUpperCase()}</button>)}</div>
-                <ul className="sheet-skill-list">{ALL_SKILLS.map((id) => { const tier = profDraft.skills[id]; return <li key={id}><span>{titleizeSkill(id)}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} onClick={() => cycleSkill(id)}>{tier ?? "—"}</button></li>; })}</ul>
-                <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveProf}>Save proficiencies</button>
+                <p className="sheet-editor-hint">Changes save as you go. Tap a save to toggle it; tap a skill to cycle proficient → expertise → none. Press <strong>Done</strong> when finished.</p>
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => <button type="button" key={ability} className={`sheet-prepare${profDraft.saves.includes(ability) ? " is-prepared" : ""}`} disabled={busy} onClick={() => toggleSave(ability)}>{ability.toUpperCase()}</button>)}</div>
+                <ul className="sheet-skill-list sheet-skill-edit">{ALL_SKILLS.map((id) => { const tier = profDraft.skills[id]; return <li key={id}><span>{titleizeSkill(id)}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(id)}>{tier ?? "—"}</button></li>; })}</ul>
               </div>
             : <>
                 <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>

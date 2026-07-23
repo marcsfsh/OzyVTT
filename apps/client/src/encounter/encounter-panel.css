@@ -446,8 +446,11 @@
 .sheet-edit-toggle { padding: .1rem .45rem; margin-left: .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-muted); font: 800 .62rem/1.4 var(--font-sans, inherit); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; vertical-align: middle; }
 .sheet-edit-toggle:hover { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-editor { margin: .5rem 0 0; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.sheet-editor .sheet-skill-list { max-height: 13rem; overflow-y: auto; margin-top: .5rem; }
-.sheet-editor .sheet-save-btn { margin-top: .6rem; }
+/* v6 #6: the editor skill list lays out fully (no clipped inner scroll-in-a-scroll) and scrolls with the
+   sheet body. Two columns of uniform rows. */
+.sheet-editor .sheet-skill-list { margin-top: .5rem; }
+.sheet-editor-hint { margin: 0 0 .5rem; color: var(--text-muted); font-size: .74rem; line-height: 1.4; }
+.sheet-editor-hint strong { color: var(--text-dim); }
 .sheet-id-editor { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
 .sheet-id-editor label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .sheet-id-editor input { padding: .28rem .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .8rem; }
@@ -472,6 +475,11 @@
 .sheet-editor .sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .5rem; break-inside: avoid; -webkit-column-break-inside: avoid; padding: .28rem 0; }
 .sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem .5rem; font-size: .78rem; }
+/* v6 #6: editor rows are name (fills) + a fixed-width toggle pinned to the right, so every skill's toggle
+   lines up in a column instead of drifting with the skill-name length. */
+.sheet-skill-edit li { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: .2rem 0; }
+.sheet-skill-edit li > span { justify-self: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-skill-edit li > .sheet-prepare { justify-self: end; min-width: 5.6rem; text-align: center; }
 .sheet-skill-name { color: var(--text); font-size: .84rem; }
 .sheet-skill-name em { color: var(--text-muted); font-style: normal; font-size: .62rem; text-transform: uppercase; letter-spacing: .03em; margin-left: .25rem; }
 .sheet-prof-dot { width: 1.2rem; height: 1.2rem; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font: 800 .62rem/1 var(--font-mono); color: transparent; }
