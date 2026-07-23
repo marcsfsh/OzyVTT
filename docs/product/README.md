@@ -11,5 +11,6 @@ This directory holds product contracts, checkpoint outcomes, wireframes, browser
 - [Phase 0 command/persistence spike](phase-0-command-persistence-spike.md)
 - [Phase 1 starter roster and character claims](phase-1-character-roster.md)
 - [Scene-centric IA redesign — design & implementation plan](scene-centric-ia.md)
+- [Character sheets — initiative handoff & roadmap](character-sheet-initiative.md)
 
 Physical-device observations, end-to-end wireframes, and realtime multi-client convergence evidence remain to be added.
