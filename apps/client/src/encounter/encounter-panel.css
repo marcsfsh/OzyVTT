@@ -542,8 +542,11 @@
 .sheet-workspace.log-left .sheet-workspace-cols { flex-direction: row-reverse; }
 .sheet-workspace-pane { min-width: 0; overflow-y: auto; }
 .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
-.log-pane { flex: 0 0 clamp(18rem, 32%, 24rem); padding: var(--space-4); border-left: 1px solid var(--line); }
-.sheet-workspace.log-left .log-pane { border-left: 0; border-right: 1px solid var(--line); }
+.log-pane { flex: 0 0 var(--log-width, clamp(18rem, 32%, 24rem)); padding: var(--space-4); }
+/* Draggable divider between the sheet and the dice log (v3 #1.1). */
+.sheet-log-resize { flex: 0 0 9px; align-self: stretch; position: relative; cursor: col-resize; touch-action: none; }
+.sheet-log-resize::before { content: ""; position: absolute; inset: 0 calc(50% - 0.5px); background: var(--line); }
+.sheet-log-resize:hover::before { inset: 0 calc(50% - 1px); background: color-mix(in srgb, var(--cyan) 60%, var(--line-strong)); }
 /* The shared DicePanel blends into the log column (no nested card chrome) and tightens for the narrow width (v3 #3). */
 .log-pane .dice-proof { margin: 0; padding: 0; border: 0; background: transparent; }
 .log-pane .dice-quick, .log-pane .dice-adv-row { gap: .4rem; margin-top: .7rem; }
@@ -568,6 +571,7 @@
   .sheet-workspace.has-log.show-sheet .log-pane { display: none; }
   .sheet-workspace.has-log.show-log .sheet-pane { display: none; }
   .sheet-workspace.has-log .log-pane { flex: 1 1 auto; border-left: 0; border-top: 1px solid var(--line); }
+  .sheet-log-resize { display: none; }
 }
 
 .roster-import { margin-top: 1rem; }

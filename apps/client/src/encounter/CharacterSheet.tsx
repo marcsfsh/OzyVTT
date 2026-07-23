@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
@@ -142,6 +142,14 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
   const [logSide, setLogSide] = useState<"left" | "right">(() => (readSetting("vtt.sheet.logSide") === "left" ? "left" : "right"));
   const chooseLogSide = (side: "left" | "right") => { setLogSide(side); writeSetting("vtt.sheet.logSide", side); };
   const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
+  // Adjustable dice-log width (v3 #1.1): a draggable divider sets the log column's width, remembered per
+  // browser. Exposed as a CSS var so the phone media query can still collapse to one full-width pane.
+  const [logWidth, setLogWidth] = useState<number>(() => { const stored = Number(readSetting("vtt.sheet.logWidth")); return Number.isFinite(stored) && stored >= 220 ? stored : 320; });
+  useEffect(() => { writeSetting("vtt.sheet.logWidth", String(logWidth)); }, [logWidth]);
+  const logResize = useRef<{ startX: number; startWidth: number } | null>(null);
+  const beginLogResize = (event: ReactPointerEvent<HTMLDivElement>) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); logResize.current = { startX: event.clientX, startWidth: logWidth }; };
+  const moveLogResize = (event: ReactPointerEvent<HTMLDivElement>) => { if (!logResize.current) return; const dx = event.clientX - logResize.current.startX; const delta = logSide === "left" ? dx : -dx; setLogWidth(Math.max(220, Math.min(620, logResize.current.startWidth + delta))); };
+  const endLogResize = () => { logResize.current = null; };
   // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
   // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
@@ -506,11 +514,12 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
 
   // Two-subpanel workspace (feedback #9): sheet + shared dice log side by side (log docked left/right),
   // or one-at-a-time behind the Sheet/Dice toggle on a phone. Header + rollbar stay pinned; cols scroll.
-  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`}>
+  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`} style={{ "--log-width": `${logWidth}px` } as CSSProperties}>
     {header(draggable)}
     {rollbar}
     <div className="sheet-workspace-cols">
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
+      {hasLog && state && <div className="sheet-log-resize" role="separator" aria-label="Drag to resize the dice log" title="Drag to resize the dice log" onPointerDown={beginLogResize} onPointerMove={moveLogResize} onPointerUp={endLogResize} onPointerCancel={endLogResize} />}
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
     </div>
     {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
