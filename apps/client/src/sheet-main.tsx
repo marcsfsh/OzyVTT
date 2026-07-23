@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState, type ReactNode } from "react";
+import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmActor, GmView, PlayerActor, PlayerView, SessionJoinResult } from "@vtt/domain";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -20,20 +20,28 @@ const PLAYER_TOKEN_KEY = "vtt.player-token";
 function StandaloneSheet() {
   const [state, setState] = useState<GmView | PlayerView | null>(null);
   const [status, setStatus] = useState<"connecting" | "ready" | "denied">("connecting");
+  const joined = useRef(false);
   const actorId = new URLSearchParams(window.location.search).get("actor");
 
   useEffect(() => {
+    // The state listener is symmetric (add on mount, remove on cleanup) so it survives StrictMode's
+    // dev-only mount→cleanup→mount. connect + session:join must run ONCE, though - a second join would
+    // double-count this session's presence connection (server presence.connect isn't deduped) and never
+    // fully release. The ref guard persists across the StrictMode remount, so we join exactly once.
     const onState = (next: GmView | PlayerView) => setState(next);
     socket.on("state:updated", onState);
-    const token = localStorage.getItem(PLAYER_TOKEN_KEY) ?? undefined;
-    socket.auth = { token };
-    socket.connect();
-    socket.emit("session:join", { token }, (result: SessionJoinResult) => {
-      if (result.ok && (result.role === "player" || result.role === "gm")) {
-        if (result.token) localStorage.setItem(PLAYER_TOKEN_KEY, result.token);
-        setStatus("ready");
-      } else setStatus("denied");
-    });
+    if (!joined.current) {
+      joined.current = true;
+      const token = localStorage.getItem(PLAYER_TOKEN_KEY) ?? undefined;
+      socket.auth = { token };
+      socket.connect();
+      socket.emit("session:join", { token }, (result: SessionJoinResult) => {
+        if (result.ok && (result.role === "player" || result.role === "gm")) {
+          if (result.token) localStorage.setItem(PLAYER_TOKEN_KEY, result.token);
+          setStatus("ready");
+        } else setStatus("denied");
+      });
+    }
     return () => { socket.off("state:updated", onState); };
   }, []);
 

@@ -452,6 +452,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
         </div>}
         {!standalone && <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>}
         {!standalone && role === "player" && <button type="button" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</button>}
+        {standalone && <button type="button" className="sheet-tool" title="Close this tab" onClick={onClose}>Close</button>}
       </div>
     </div>
     <div className="sheet-workspace-cols">
