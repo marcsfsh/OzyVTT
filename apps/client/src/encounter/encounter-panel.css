@@ -431,16 +431,21 @@
 .sheet-ability-rolls button:disabled { opacity: .55; cursor: default; }
 
 /* dense skill grid: [bonus] [dot] [name] - value hugs the name, two columns on desktop */
-.sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .4rem; }
-.sheet-skill-list li .sheet-roll-chip { min-width: 2.7rem; text-align: center; }
-.sheet-skill-name { color: var(--text); font-size: .8rem; }
+/* Skills (v3 #2.7): CSS multi-column fills top->bottom then left->right (A-I | J-R), not across-then-down;
+   roomier rows; a lettered P/E bubble; the roll chip is the read-first value. */
+.sheet-skill-cols { display: block; columns: 15rem 2; column-gap: 1.5rem; }
+.sheet-editor .sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .5rem; break-inside: avoid; -webkit-column-break-inside: avoid; padding: .28rem 0; }
+.sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem .5rem; font-size: .78rem; }
+.sheet-skill-name { color: var(--text); font-size: .84rem; }
 .sheet-skill-name em { color: var(--text-muted); font-style: normal; font-size: .62rem; text-transform: uppercase; letter-spacing: .03em; margin-left: .25rem; }
-.sheet-prof-dot { width: .5rem; height: .5rem; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; }
-.sheet-prof-dot.proficient { background: var(--cyan); border-color: var(--cyan); }
-.sheet-prof-dot.expertise { background: var(--magenta); border-color: var(--magenta); }
+.sheet-prof-dot { width: 1.2rem; height: 1.2rem; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font: 800 .62rem/1 var(--font-mono); color: transparent; }
+.sheet-prof-dot.proficient { background: var(--cyan); border-color: var(--cyan); color: var(--text-on-neon); }
+.sheet-prof-dot.expertise { background: var(--magenta); border-color: var(--magenta); color: var(--text-on-neon); }
 .sheet-roll-chip.is-proficient { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-@media (max-width: 560px) { .sheet-skill-list { grid-template-columns: 1fr; } }
+/* Saving throws (v3 #2.7.4): larger, easier to hit than the skill chips. */
+.sheet-roll-row .sheet-roll-chip { padding: .34rem .68rem; font-size: .82rem; }
+.sheet-roll-row .sheet-roll-label { font-size: .68rem; }
 
 /* spells grouped by level + clickable slot pips */
 .sheet-spell-group { margin-top: .75rem; }

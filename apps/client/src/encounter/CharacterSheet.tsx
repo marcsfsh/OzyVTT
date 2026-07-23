@@ -335,10 +335,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
               </div>
             : <>
                 <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
-                <ul className="sheet-skill-list">
+                <ul className="sheet-skill-list sheet-skill-cols">
                   {ALL_SKILLS.map((id) => { const ability = SKILL_ABILITY[id]; const tier = proficiencies?.skills.find((skill) => skill.id === id)?.proficiency; const bonus = skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, tier ?? "none"); return <li key={id}>
                     <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => void rollD20(bonus, "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
-                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier ? `${tier}` : "not proficient"} aria-hidden="true" />
+                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"} aria-label={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
                     <span className="sheet-skill-name">{titleizeSkill(id)} <em>{ability.toUpperCase()}</em></span>
                   </li>; })}
                 </ul>
