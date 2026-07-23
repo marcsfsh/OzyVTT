@@ -64,6 +64,12 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
    3. The sheet + dice-log are two **subpanels of one main panel**; that panel needs a **popout** button →
       a **moveable in-tab panel** (like the GM's "preview what players see"), and **another** button →
       a **separate browser tab** entirely (like the viewer preview).
+   — ✅ done. The sheet is now a two-subpanel **workspace**: the sheet + the shared `DicePanel` roll log
+   side by side (wider 64rem, taller 92vh modal), the log docked **left/right** (remembered per browser);
+   a **Pop out** button detaches it into a moveable, resizable in-tab panel (viewer-preview pattern); a
+   **New tab** button (player sheets) opens it as a standalone `/sheet.html` entry that rejoins the
+   session with the persisted player token. Mobile parity: a **Sheet/Dice** segmented control shows one
+   pane at a time on a phone. (The map context-menu entry stays sheet-only — it only has state slices.)
 
 ## Status
 
@@ -77,4 +83,8 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
 | 7 | **Equipment framework (full catalog + vendor SRD gear)** | ✅ done | #9 |
 | 2 | Upcasting cast-at (reference vendored SRD spells) | ✅ done | #7 |
 | 8 | Manual roll entry + auto/manual bonus mode | ✅ done | #8 |
-| 9 | Panel redesign: sheet + player dice-log, docking, popout | ▶ **next** | #10 |
+| 9 | Panel redesign: sheet + player dice-log, docking, popout | ✅ done | #10 |
+
+_All nine v2 feedback items are landed. Remaining verification: a live browser/mobile click-through of
+the panel redesign (drag/resize, docking, mobile Sheet/Dice toggle, standalone `/sheet.html` tab) — no
+Playwright/e2e harness is available in this environment; every item is typecheck + build clean._

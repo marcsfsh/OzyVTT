@@ -284,9 +284,17 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     Inventory gains a searchable, category-filtered **browse-and-add picker** (upsert-aware —
     picking an owned item increments its stack — mobile full-screen). `check`+`build`+`test` green
     (server 419, content 18, schemas 8); a runtime `ContentLibrary` smoke served the full 183-item
-    catalog. The `wondrous` category is reserved for the homebrew update. **Remaining v2 items:**
-    upcasting "cast at" picker (#2), manual roll entry + auto/manual bonus mode (#8), and the
-    sheet + player dice-log panel redesign with docking/popout (#9).
+    catalog. The `wondrous` category is reserved for the homebrew update. **All nine v2 items then
+    landed:** the **cast-at / upcasting picker** (#2 — per-spell slot-level dropdown that spends the
+    chosen slot and auto-rolls the SRD upcast scaling; `ContentSpellSummary` gains
+    `damageRoll`/`damageTypes`/`castingOptions`); **manual roll entry + auto/manual bonus mode** (#8 — a
+    per-sheet Digital/Manual toggle that prompts for a physical die on every roll surface and encodes it
+    into the `dice:roll` formula, no server change); and the **panel redesign** (#9 — the sheet became a
+    two-subpanel workspace with the shared `DicePanel` log docked left/right, a **Pop out** to a
+    moveable/resizable in-tab panel, a **New tab** button opening a standalone `/sheet.html` entry that
+    rejoins with the persisted player token, and a mobile Sheet/Dice segmented control). Every wave is
+    `check`+`build` clean (server 419 tests). **Still pending:** a live browser/mobile click-through of
+    the workspace/popout/standalone-tab (no e2e harness in the repo).
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
