@@ -232,6 +232,22 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Player character sheets — Phase 1 initiative (2026-07-23, PR #45, branch
+  `claude/character-sheet-discovery-a14i7f`).** The player-facing half of the app: an interactive
+  character sheet used at game night, architected **builder-ready** (the full guided builder is the
+  next roadmap update). Approved roadmap + codebase orientation in
+  `docs/product/character-sheet-initiative.md`; load-bearing decisions in `decision-log.md`
+  (2026-07-23). **Slice 0 (foundations) landed & verified:** (1) the SRD ability/proficiency/spell
+  math is centralized in `packages/rules-5e/src/character.ts` (`abilityModifier`, `characterLevel`,
+  `proficiencyBonusForLevel`, `saveBonus`, `skillBonus`, `spellSaveDc`, `spellAttackBonus`) and the
+  four hand-rolled `floor((score-10)/2)` copies delegate to it (server `action-resolution`/
+  `saving-throws`/`rests`, client `CharacterSheet`; the client gains `@vtt/rules-5e`) — no behavior
+  change; (2) a generated **app map** (`npm run map` → `docs/app-map.md`: GameState shape, command
+  catalog with scopes, HTTP paths, curated file index) via pure `renderAppMap()` with a
+  byte-identical freshness test (`apps/server/test/app-map.test.ts`, mirroring the API-reference
+  pattern), plus a new **`vtt-orientation`** skill. `check` clean; server suite 401 tests green.
+  Slices 1–5 (additive data model → player-initiated rolls → spell slots → inventory →
+  identity/proficiency light-edit) follow on the same branch.
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
@@ -322,10 +338,13 @@ This repo now carries a Claude Code tooling layer (this upgrade): `CLAUDE.md` in
 `docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, the full
 `.claude/skills/` roster (`vtt-task-packet`, `vtt-context-router`, `vtt-implement`,
 `vtt-qa-check`, `vtt-ledger-update`, `vtt-ux-review`, `vtt-test-pass`, `vtt-branch-safety`,
-`vtt-schedule`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
+`vtt-schedule`, `vtt-orientation`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
 PreToolUse, `scope-guard` UserPromptSubmit, `stop-reminder` Stop — see
 `.claude/hooks/README.md`). Three optional read-only reviewer subagents live in `.claude/agents/` (`ux-reviewer`,
 `test-reviewer`, `architecture-reviewer`) for large/cross-cutting changes. A GitHub Actions
 schedule scaffold (`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** —
 its cron is commented out and the job is a placeholder until configured. Design/roadmap in
-`docs/claude-code-tooling-outline.md`.
+`docs/claude-code-tooling-outline.md`. A generated **app map** (`npm run map` → `docs/app-map.md`,
+freshness-tested in the server suite) gives humans and agents an always-current index of the
+GameState shape, command catalog (with scopes), and HTTP surface; the `vtt-orientation` skill
+routes there first.

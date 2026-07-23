@@ -22,6 +22,24 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
+  the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
+  **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.
+  A new ADR-0021 records this and the contract below (lands with the data-model slice).
+  - **No-rewrite data-model contract.** Store the builder's *choice inputs* as the durable schema
+    — proficiency/skill selections (`proficient|expertise`), spell-slot maxima + known list,
+    class/level/race/background — with optional **override totals** for imports that only know
+    final numbers. One resolver reads `override ?? selection-derived ?? ability-only`. The builder
+    later *fills the same fields*; nothing downstream changes. (Storing only derived totals in the
+    `extensions` bag, as today, would force the builder to replace them — the trap avoided.)
+  - **Definition vs live split** mirrors `hitDice`/`actionUses`: identity/proficiency/spell
+    *capability* on the immutable `ActorDefinition`; live `spellSlots`/`preparedSpellIds`/
+    `inventory`/`currency` on `Actor`, seeded in `instantiate()`, projected owner-only.
+  - **Players initiate their own rolls; the server still resolves/authorizes.** Damage to monsters
+    stays a **GM-confirmed proposal** (players never mutate another creature's HP). Authorization
+    centralizes into one `canInitiateForActor(principal, state, actorId, kind)` seam so a future
+    per-table "players may initiate attacks" toggle is a one-field add, not a refactor.
+  - Roadmap + codebase orientation: `docs/product/character-sheet-initiative.md`.
 - **UI design system: OzyVTT (2026-07-21).** A tokenized retrowave design language is the
   single source of look-and-feel, living in `packages/ui` (`design-tokens.css` + self-hosted
   `@fontsource` fonts + `nh-`-namespaced primitives), consumed as source by the client's Vite
