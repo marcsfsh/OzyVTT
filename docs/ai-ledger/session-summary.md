@@ -8,6 +8,24 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-23 — Scene IA PR review round (Encounter quick-switcher → button + popup)
+
+Screenshot-review pass on the scene-centric IA PR (`claude/scene-prep-gm-notes-c1gcur`, draft #44).
+The always-on Encounter-tab `SceneSwitcher` strip overflowed the map once a table had many scenes, so
+it was retired: the Encounter tab now shows a compact **"Scenes" button** (labelled with the live
+scene) that opens the gallery in a **picker popup**, and `SceneSwitcher.tsx`/`.css` were deleted.
+Cards gained explicit **Prepare** + **Go live** buttons in opposite corners (shared `.nh-card-actions`
+now flexes them so they never overflow a narrow card), a **command bar** with New scene sits above the
+hub gallery, and the in-grid new-scene tile fills its cell. Popup cards render as **square panels** in
+a widened dialog. Two correctness fixes: the **live card now counts combatants from the top-level
+combat** (the active scene's own slot is empty by invariant — it was showing "0 combatants"), and
+**Go live from the hub now lands on the Encounter tab** (live-play). Plus an a11y label on the Scenes
+button and the `/styleguide` gallery demo refreshed to the action-button design. Verified: `check` +
+`build` green, changed rules confirmed in the shipped CSS bundle. (Live Playwright smoke not re-run
+this round — server start declined; verified via bundle + layout.) Design record + this note updated.
+
+---
+
 ## 2026-07-22 — Scene-centric IA redesign (the deferred flow rethink; 7-slice PR)
 
 Turned the "Scenes hub" design (`docs/product/scene-centric-ia.md`) into shipping code, one verified

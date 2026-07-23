@@ -16,9 +16,14 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   pre-combat; combatant tokens still only once the fight runs — no new actor exposure). The standalone
   **Map Setup tab is retired** — the map library + 3×3 calibration fold into the hub ("Manage maps");
   the Encounter tab starts combat on the live scene's map (server requires the match). Gallery/cards use
-  a new `@vtt/ui` `.nh-gallery`/`.nh-card` pattern (in `/styleguide`, all three themes). Design record:
-  `docs/product/scene-centric-ia.md`. Built in 7 verified slices; `check`+`test` (462)+`build` green,
-  a live Playwright smoke per slice. GM tabs are now Scenes · Encounter · Viewer · Replays · VTT Setup.
+  a new `@vtt/ui` `.nh-gallery`/`.nh-card` pattern (in `/styleguide`, all three themes; each card has
+  explicit **Prepare** + **Go live** buttons). Design record: `docs/product/scene-centric-ia.md`. Built
+  in 7 verified slices; `check`+`test` (462)+`build` green, a live Playwright smoke per slice. GM tabs
+  are now Scenes · Encounter · Viewer · Replays · VTT Setup. **Encounter-tab quick-switch (review
+  2026-07-23):** a compact **"Scenes" button** (labelled with the live scene) opens the gallery in a
+  **picker popup** (square panels) — the always-on `SceneSwitcher` strip was retired as it overflowed
+  with many scenes. The live card counts combatants from the top-level combat (its own slot is empty by
+  invariant); Go live from the hub lands on the Encounter tab.
 - **UI design system — OzyVTT (2026-07-21).** A tokenized retrowave design language
   lives in `packages/ui`: `design-tokens.css` (three themes — dark default, dusk, light — via
   `data-theme` on `<html>`), self-hosted `@fontsource` fonts (Bungee/Russo One/Manrope/Space

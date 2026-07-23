@@ -219,9 +219,10 @@ function App() {
     // Drop the preview if its scene was removed or went live (it's the live map then, not a private one).
     if (previewSceneId && !(mode === "gm" && (state as GmView | null)?.combat.scenes.some((scene) => scene.id === previewSceneId && scene.id !== (state as GmView).combat.activeSceneId))) setPreviewScene(null);
   }, [previewSceneId, state, mode]);
-  const activeSceneName = mode === "gm" && state
-    ? (state as GmView).combat.scenes?.find((scene) => scene.id === (state as GmView).combat.activeSceneId)?.name ?? "Scenes"
-    : "Scenes";
+  const activeScene = mode === "gm" && state
+    ? (state as GmView).combat.scenes?.find((scene) => scene.id === (state as GmView).combat.activeSceneId) ?? null
+    : null;
+  const activeSceneName = activeScene?.name ?? "Scenes";
   useEffect(() => {
     // Staging renders on the table map - make sure the GM is looking at it, and close the pickers.
     if (previewScene) { setGmTab("table"); setScenePrepOpen(false); setScenesModalOpen(false); }
@@ -272,7 +273,7 @@ function App() {
               Guarded on the field, not just the mode - the first state after login can still be
               player-projected (no scenes) until the session join lands. */}
           {mode === "gm" && Array.isArray((state as GmView).combat.scenes) && <div className="scenes-open-row">
-            <Button variant="secondary" className="scenes-open" onClick={() => setScenesModalOpen(true)}><span className="scenes-open-icon" aria-hidden="true">🎬</span>{activeSceneName}<span className="scenes-open-caret" aria-hidden="true">▾</span></Button>
+            <Button variant="secondary" className="scenes-open" aria-label={activeScene ? `Scenes — ${activeScene.name} is live` : "Scenes"} onClick={() => setScenesModalOpen(true)}><span className="scenes-open-icon" aria-hidden="true">🎬</span>{activeSceneName}<span className="scenes-open-caret" aria-hidden="true">▾</span></Button>
           </div>}
           {previewScene ? <>
             <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> - only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
@@ -326,7 +327,7 @@ function App() {
               <Button variant="ghost" className="scenes-back" onClick={() => setScenesView("gallery")}>← Back to scenes</Button>
               <MapManager gmToken={gmToken} preferredMapId={(state as GmView).combat.mapAssetId} onSelectionChange={setSelectedMap} />
             </div>
-          : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => setScenesView("maps")} onFeedback={(text) => setNotice({ tone: "error", text })} />}
+          : <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} onNewScene={() => setScenePrepOpen(true)} onManageMaps={() => setScenesView("maps")} onClose={() => setGmTab("table")} onFeedback={(text) => setNotice({ tone: "error", text })} />}
       </div>}
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
@@ -340,7 +341,7 @@ function App() {
       </Modal>}
 
       {mode === "gm" && gmToken && scenesModalOpen && state && Array.isArray((state as GmView).combat.scenes) && <Modal open onClose={() => setScenesModalOpen(false)} size="lg" className="scenes-modal" title="Scenes" ariaLabel="Scenes">
-        <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} hideHeading onNewScene={() => { setScenesModalOpen(false); setScenePrepOpen(true); }} onManageMaps={() => { setScenesModalOpen(false); setGmTab("scenes"); setScenesView("maps"); }} onClose={() => setScenesModalOpen(false)} onFeedback={(text) => setNotice({ tone: "error", text })} />
+        <SceneGallery scenes={(state as GmView).combat.scenes} activeSceneId={(state as GmView).combat.activeSceneId ?? null} combatActive={state.combat.active} liveCombatantCount={(state as GmView).combat.initiative.length} mapLibrary={mapLibrary} previewingSceneId={previewSceneId} token={mapToken} hideHeading onNewScene={() => { setScenesModalOpen(false); setScenePrepOpen(true); }} onManageMaps={() => { setScenesModalOpen(false); setGmTab("scenes"); setScenesView("maps"); }} onClose={() => setScenesModalOpen(false)} onFeedback={(text) => setNotice({ tone: "error", text })} />
       </Modal>}
 
       {mode === "gm" && gmToken && gmTab === "setup" && <div className="anim-view">

@@ -28,10 +28,13 @@ function SceneThumb({ mapAssetId, token }: Readonly<{ mapAssetId: string; token:
  * ⋯ menu to reorder, rename, duplicate, or remove it. "New scene" opens the prep flow. The live scene
  * carries a glowing LIVE badge; the one you're privately staging takes a quiet cyan edge.
  */
-export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onClose, hideHeading, onFeedback }: Readonly<{
+export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatantCount, mapLibrary, previewingSceneId, token, onNewScene, onManageMaps, onClose, hideHeading, onFeedback }: Readonly<{
   scenes: readonly Scene[];
   activeSceneId: string | null;
   combatActive: boolean;
+  /** Combatants in the LIVE scene: its own `combat` slot is empty by invariant (the live copy is the
+      top-level combat), so the active card must count from here, not from `scene.combat.initiative`. */
+  liveCombatantCount: number;
   mapLibrary?: readonly MapSelection[];
   previewingSceneId: string | null;
   /** Bearer token for the map-content endpoint; absent = thumbnails stay as the glyph placeholder. */
@@ -139,7 +142,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, mapLibrary, 
           {ordered.map((scene, index) => {
             const live = scene.id === activeSceneId;
             const staging = scene.id === previewingSceneId;
-            const count = scene.combat.initiative.length;
+            const count = live ? liveCombatantCount : scene.combat.initiative.length;
             return <li key={scene.id} data-scene-id={scene.id} className={`nh-card${live ? " is-live" : ""}${staging ? " is-staging" : ""}${dragId === scene.id ? " is-dragging" : ""}`}>
               <div className="nh-card-thumb"><SceneThumb mapAssetId={scene.mapAssetId} token={token} /></div>
               <div className="nh-card-body">

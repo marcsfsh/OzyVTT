@@ -2,9 +2,17 @@
 
 > **Status:** ✅ IMPLEMENTED 2026-07-22 — 7 verified slices on `claude/scene-prep-gm-notes-c1gcur`.
 > **Ships as:** one PR. **Owner-approved decisions are in §4.** This doc is the design record; the
-> shipped code refines a couple of details (reorder is drag **plus** a keyboard menu path; the
-> Encounter tab keeps a scene quick-switch strip). See `docs/ai-ledger/session-summary.md`
-> (2026-07-22) for the per-slice log.
+> shipped code refines a couple of details (reorder is drag **plus** a keyboard menu path). See
+> `docs/ai-ledger/session-summary.md` (2026-07-22) for the per-slice log.
+>
+> **Post-PR review refinements (2026-07-23).** After the first look the Encounter-tab scene
+> quick-switcher changed from an always-on strip (which overflowed once a table had many scenes)
+> to a compact **"Scenes" button that opens the gallery in a picker popup** — same gallery as the
+> hub, cards shown as square panels. Each card carries explicit **Prepare** + **Go live** buttons
+> (opposite corners) instead of a whole-card click; a command bar sits above the hub gallery. Two
+> correctness fixes rode along: the **live card counts combatants from the top-level combat** (the
+> active scene's own slot is empty by invariant), and **Go live from the hub lands on the Encounter
+> tab** (live-play). See §5.1.
 >
 > **How to use this doc.** This is the single source of truth for the scene-centric
 > information-architecture (IA) redesign. It is written to be self-contained: a fresh
@@ -239,8 +247,11 @@ sceneCombatants`, `scene:read` / `scene:write` scopes, request schemas, OpenAPI 
   (folders, rename, delete, recalibrate) is reachable from the build flow's map picker and a
   "Manage maps" affordance — `MapManager`'s capability moves here; nothing is lost.
 - **Encounter (kept)** — live play: the active scene's map + initiative/turn tracker + dice + log,
-  with a **slim quick-switcher** (evolved `SceneSwitcher`) for mid-fight scene changes. Private
-  staging still renders here (unchanged mechanism).
+  with a compact **"Scenes" button** (labelled with the live scene) that opens the scene gallery in
+  a **picker popup** for mid-fight scene changes — Prepare / Go live / New scene without leaving the
+  map. (Shipped as this button + popup; the original plan's always-on `SceneSwitcher` strip was
+  retired in review because it overflowed with many scenes.) Private staging still renders here
+  (unchanged mechanism).
 - **Viewer / Replays / VTT Setup** — unchanged.
 
 ### 5.2 Scenes gallery (centerpiece)
