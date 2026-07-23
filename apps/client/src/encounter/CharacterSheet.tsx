@@ -76,35 +76,40 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
  * two-step emit so this stays a small stateful shell. Only offered for leveled spells (cantrips use no
  * slot); returns null when the character has no slot at or above the spell's level.
  */
-function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRemaining, busy, onCast }: Readonly<{
+function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRemaining, busy, onCastSlot, onCastCantrip }: Readonly<{
   spell: Readonly<{ id: string; name: string; level: number }>;
   content: ContentSpellSummary | undefined;
   slotLevels: readonly number[];
   slotMaxByLevel: ReadonlyMap<number, number>;
   liveRemaining: ReadonlyMap<number, number>;
   busy: boolean;
-  onCast: (level: number) => void;
+  onCastSlot: (level: number) => void;
+  onCastCantrip: () => void;
 }>) {
-  const options = slotLevels.filter((level) => level >= spell.level);
+  const isCantrip = spell.level === 0;
+  const options = isCantrip ? [] : slotLevels.filter((level) => level >= spell.level);
   const [castLevel, setCastLevel] = useState(options[0] ?? spell.level);
-  if (options.length === 0) return null;
-  const level = options.includes(castLevel) ? castLevel : options[0];
+  const level = options.includes(castLevel) ? castLevel : (options[0] ?? spell.level);
   const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
-  // The effect at the SELECTED level (feedback #2.8.3): always show a damaging spell's die (base or the
-  // SRD-upscaled roll); "N× die" for ray/dart-scaling; "N targets" for a spell that only adds targets.
-  const upcast = level > spell.level ? content?.castingOptions.find((option) => option.level === level) : undefined;
+  // The effect at the selected level: a damaging spell's die (base or SRD-upscaled), "N× die" for
+  // ray/dart-scaling, or "N targets" for target-only scaling; empty for utility spells. Three uniform
+  // grid cells (helper · slot · Cast) that align across every row (v5 #1/#2/#9).
+  const upcast = !isCantrip && level > spell.level ? content?.castingOptions.find((option) => option.level === level) : undefined;
   const damage = upcast?.damageRoll ?? content?.damageRoll ?? null;
   const targets = upcast?.targetCount ?? null;
   const effect = damage && targets ? `${targets}× ${damage}` : damage ?? (targets ? `${targets} targets` : null);
-  // Always render the helper cell (empty when the spell has no scaling) so the dropdown + Cast align
-  // across every row (v4 #5.1).
-  return <div className="sheet-cast">
-    <span className={`sheet-cast-effect${effect ? "" : " empty"}`} title={effect ? `Effect when cast at ${ordinal(level)} level` : undefined}>{effect ?? ""}</span>
-    <select className="sheet-cast-select" aria-label={`Cast ${spell.name} at level`} value={level} disabled={busy} onChange={(event) => setCastLevel(Number(event.target.value))}>
-      {options.map((slot) => <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>{ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}{slot > spell.level ? " ↑" : ""}</option>)}
-    </select>
-    <button type="button" className="sheet-cast-btn" disabled={busy || remainingAt(level) === 0} onClick={() => onCast(level)}>Cast</button>
-  </div>;
+  const canCast = isCantrip || (options.length > 0 && remainingAt(level) > 0);
+  return <>
+    <span className="sheet-cast-effect" aria-hidden={effect ? undefined : true} title={effect ? `Effect at ${isCantrip ? "your level" : ordinal(level)}` : undefined}>{effect ?? ""}</span>
+    {isCantrip
+      ? <span className="sheet-cast-slot at-will">At will</span>
+      : options.length > 0
+        ? <select className="sheet-cast-select" aria-label={`Cast ${spell.name} at level`} value={level} disabled={busy} onChange={(event) => setCastLevel(Number(event.target.value))}>
+            {options.map((slot) => <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>{ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}{slot > spell.level ? " ↑" : ""}</option>)}
+          </select>
+        : <span className="sheet-cast-slot">no slots</span>}
+    <button type="button" className="sheet-cast-btn" disabled={busy || !canCast} onClick={() => (isCantrip ? onCastCantrip() : onCastSlot(level))}>Cast</button>
+  </>;
 }
 
 /**
@@ -269,6 +274,13 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       else setFeedback(`Cast ${spell.name} at ${ordinal(level)}${suffix} - spent a ${ordinal(level)}-level slot.`);
     });
   };
+  // Cantrips (v5 #9) cost no slot: cast just rolls the damage die for a damaging cantrip (Toll the Dead,
+  // Sacred Flame), or notes the cast for a utility cantrip.
+  const castCantrip = (spell: Readonly<{ id: string; name: string; level: number }>) => {
+    const content = spellIndex.get(spell.id);
+    if (content?.damageRoll) void rollFlat(content.damageRoll, "damage", `${spell.name}${content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
+    else setFeedback(`Cast ${spell.name}.`);
+  };
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
@@ -390,7 +402,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                     <span className="sheet-slot-count">{remaining}/{max}</span>
                   </div>}
                 </div>
-                <ul className="sheet-spell-list">
+                <ul className={`sheet-spell-list${actor.kind === "player-character" ? " castable" : ""}`}>
                   {spells.map((spell) => { const isPrepared = preparedIds.has(spell.id) || spell.alwaysPrepared; const toggleable = spell.level > 0 && !spell.alwaysPrepared; return <li key={spell.id}>
                     {spell.level === 0 ? <span className="sheet-prep-tag cantrip">Cantrip</span> : toggleable
                       ? <button type="button" className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`} disabled={busy} title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{isPrepared ? "Prepared" : "Prepare"}</button>
@@ -398,7 +410,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                     {spellIndex.get(spell.id)
                       ? <button type="button" className="sheet-spell-name sheet-spell-link" title={`Show the ${spell.name} rules`} onClick={() => setOpenSpell(spellIndex.get(spell.id) ?? null)}>{spell.name}</button>
                       : <span className="sheet-spell-name">{spell.name}</span>}
-                    {spell.level > 0 && actor.kind === "player-character" && <SpellCastControls spell={spell} content={spellIndex.get(spell.id)} slotLevels={slotLevels} slotMaxByLevel={slotMaxByLevel} liveRemaining={liveSlotRemaining} busy={busy} onCast={(castLevel) => castSpell(spell, castLevel)} />}
+                    {actor.kind === "player-character" && <SpellCastControls spell={spell} content={spellIndex.get(spell.id)} slotLevels={slotLevels} slotMaxByLevel={slotMaxByLevel} liveRemaining={liveSlotRemaining} busy={busy} onCastSlot={(castLevel) => castSpell(spell, castLevel)} onCastCantrip={() => castCantrip(spell)} />}
                   </li>; })}
                 </ul>
               </div>;

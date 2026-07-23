@@ -488,21 +488,29 @@
 .sheet-pip:disabled { cursor: default; opacity: .7; }
 .sheet-slot-count { color: var(--text-muted); font: 700 .66rem var(--font-mono); }
 .sheet-spell-list { grid-template-columns: 1fr; }
-.sheet-spell-list li { display: grid; grid-template-columns: 5rem 1fr auto; align-items: center; gap: .5rem; padding: .18rem .35rem; border-radius: var(--radius-sm); }
+/* GM viewing a monster's spells: no cast controls, so just prep-tag + name. */
+.sheet-spell-list li { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: center; gap: .5rem; padding: .18rem .35rem; border-radius: var(--radius-sm); }
+/* A player's own castable list flattens the "cast at" controls into the SAME row grid (v5 #2): the effect
+   helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
+   so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
+.sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.4rem 6.6rem 3.6rem; }
 /* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
 .sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
 .sheet-spell-name { color: var(--text); font-size: .84rem; }
 /* Clickable spell name opens its SRD rules card (v3 #2.8.2); dashed underline signals it's clickable (v4 #5.2). */
 .sheet-spell-link { border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: var(--text); font-size: .84rem; cursor: pointer; text-decoration: underline; text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--text-muted) 65%, transparent); text-underline-offset: 3px; }
 .sheet-spell-link:hover { color: var(--cyan-hi); text-decoration-style: solid; text-decoration-color: currentColor; }
-/* "Cast at" control (v3 #2.8.1/#2.8.3): the always-on effect helper, the level dropdown, and the Cast
-   button, all the same height and vertically centred. */
-/* v4 #5.1: a fixed 3-column grid (helper · dropdown · Cast) so every spell row's controls line up. */
-.sheet-cast { display: grid; grid-template-columns: 3.4rem 6.6rem 3.4rem; gap: .35rem; align-items: center; justify-self: end; }
-.sheet-cast-effect { height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 .3rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--violet) 14%, var(--surface-3)); color: var(--text); font: 700 .66rem/1 var(--font-mono); white-space: nowrap; }
-.sheet-cast-effect.empty { background: transparent; }
-.sheet-cast-select { width: 100%; height: 1.75rem; padding: 0 .35rem; text-align: center; text-align-last: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 600 .7rem/1 var(--font-mono); cursor: pointer; }
-.sheet-cast-btn { width: 100%; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 .3rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line-strong)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--violet) 16%, var(--surface-3)); color: var(--text); font: 700 .66rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; white-space: nowrap; }
+/* "Cast at" controls (v3 #2.8 / v4 #5.1 / v5 #1,#2,#9): three uniform grid cells, each 1.75rem tall and
+   stretched to fill its fixed column, so helper / slot / Cast line up across every row. */
+.sheet-cast-effect { justify-self: stretch; height: 1.75rem; display: flex; align-items: center; justify-content: center; padding: 0 .3rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--violet) 14%, var(--surface-3)); color: var(--text); font: 700 .66rem/1 var(--font-mono); white-space: nowrap; overflow: hidden; }
+/* v5 #1: a spell with no damage die leaves the helper empty - no stray violet chip artifact. */
+.sheet-cast-effect:empty { background: transparent; }
+.sheet-cast-select { justify-self: stretch; width: 100%; height: 1.75rem; padding: 0 .35rem; text-align: center; text-align-last: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 600 .7rem/1 var(--font-mono); cursor: pointer; }
+/* the cantrip "At will" tag (and the "no slots" note) occupy the same column as the dropdown so cantrip
+   rows align with leveled rows (v5 #9). */
+.sheet-cast-slot { justify-self: stretch; height: 1.75rem; display: flex; align-items: center; justify-content: center; padding: 0 .3rem; border-radius: var(--radius-md); border: 1px dashed var(--line); background: transparent; color: var(--text-muted); font: 700 .6rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.sheet-cast-slot.at-will { border-style: solid; border-color: color-mix(in srgb, var(--cyan) 40%, transparent); color: var(--text); }
+.sheet-cast-btn { justify-self: stretch; width: 100%; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 .3rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line-strong)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--violet) 16%, var(--surface-3)); color: var(--text); font: 700 .66rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; white-space: nowrap; }
 .sheet-cast-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--violet) 65%, transparent); }
 .sheet-cast-btn:disabled { opacity: .55; cursor: default; }
 .sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 .58rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
@@ -519,8 +527,10 @@
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }
 
 /* ---- Sheet workspace (feedback #9 + v3): unified header, pinned rolls bar, two scrolling columns ---- */
-.character-sheet .nh-modal-surface { max-height: min(94vh, 56rem); }
-.character-sheet .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+/* Direct-child selectors ONLY: the equipment picker and spell-rules card render inside the sheet's own
+   dialog, so a descendant selector here would zero their padding and break their layout (v5 #3 root cause). */
+.character-sheet > .nh-modal-surface { max-height: min(94vh, 56rem); }
+.character-sheet > .nh-modal-surface > .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 /* v4 #2: a little wider by default and adjustable via a right-edge handle (drives --sheet-width). */
 .character-sheet.has-log { max-width: min(100vw - 2rem, var(--sheet-width, 82rem)); }
 .sheet-workspace { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
