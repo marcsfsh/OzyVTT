@@ -359,6 +359,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     const activeRowRef = useRef<HTMLLIElement | null>(null);
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [combat.turnActorId]);
+    // v4 #8: toggle this panel between the turn order and the player's own sheet (embedded, no dice log).
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [view, setView] = useState<"initiative" | "sheet">("initiative");
+    const myActor = props.state.actors.find((actor) => actor.id === myId) ?? null;
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
     // Active creature on top: rotate the turn order so the acting combatant leads, the rest follow in
@@ -371,11 +375,17 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
+        {myActor && <div className="player-view-toggle" role="group" aria-label="Show turn order or your sheet">
+          <button type="button" className={view === "initiative" ? "on" : ""} aria-pressed={view === "initiative"} onClick={() => setView("initiative")}>Initiative</button>
+          <button type="button" className={view === "sheet" ? "on" : ""} aria-pressed={view === "sheet"} onClick={() => setView("sheet")}>My sheet</button>
+        </div>}
         {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
-      <ol className="initiative-list player">{orderedInitiative.map((entry) => {
+      {view === "sheet" && myActor
+        ? <CharacterSheet actor={myActor} role="player" embedded onClose={() => setView("initiative")} />
+        : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
@@ -390,7 +400,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={combat.rollMode} />}
         </li>;
-      })}</ol>
+      })}</ol>}
       <DockPicker dock={props.dock} />
     </section>;
   }
