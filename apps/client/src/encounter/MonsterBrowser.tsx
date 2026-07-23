@@ -13,7 +13,7 @@ const formatChallenge = (rating: number) => {
 };
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 
-export function MonsterBrowser({ onClose }: Readonly<{ onClose: () => void }>) {
+export function MonsterBrowser({ onClose, onAdded }: Readonly<{ onClose: () => void; onAdded?: (actorId: string) => void }>) {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[] | null>(null);
   const [attribution, setAttribution] = useState("");
   const [error, setError] = useState("");
@@ -41,6 +41,7 @@ export function MonsterBrowser({ onClose }: Readonly<{ onClose: () => void }>) {
     setBusyId(monster.id);
     socket.emit("actor:add-from-definition", { commandId: newId(), definitionId: monster.id, visibility: hidden ? "gm-only" : "public" }, (result) => {
       setBusyId(null);
+      if (result.ok && result.actorId) onAdded?.(result.actorId);
       setFeedback(result.ok ? `Added ${monster.name}${hidden ? " (GM-only)" : ""} to the roster.` : result.message ?? "The monster could not be added.");
     });
   };

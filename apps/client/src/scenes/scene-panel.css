@@ -17,6 +17,8 @@ label.scene-create-map select { flex: 1 1 10rem; margin: 0; font-size: .85rem; c
 .scene-combatant-list label.hidden { color: var(--text-muted); }
 .scene-combatant-list input { width: auto; margin: 0; accent-color: var(--magenta); }
 .scene-empty-note { margin: 0; color: var(--text-muted); font-size: .85rem; }
+.scene-create-add { margin-top: .6rem; width: 100%; padding: .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-weight: 700; font-size: .85rem; text-align: center; cursor: pointer; }
+.scene-create-add:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .scene-create button { justify-self: start; background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; padding: .8rem 1.3rem; }
 .scene-create button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 

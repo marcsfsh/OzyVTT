@@ -57,4 +57,24 @@
 .scene-card-grip:active { cursor: grabbing; }
 .scene-card-grip:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
 .nh-card.is-dragging { opacity: .55; }
+
+/* Match the ⋯ menu trigger to the drag grip: a square, centered icon button (its @vtt/ui default is a
+   wider padded pill), so the two tools read as an even pair. */
+.scene-gallery-hub .nh-card-tools .nh-menu-trigger {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  gap: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  font-size: 1rem;
+  line-height: 1;
+}
+.scene-gallery-hub .nh-card-tools .nh-menu-trigger-label { display: grid; place-items: center; line-height: 1; }
+
+/* Lift a card whose ⋯ menu is open above its neighbours so the popover isn't clipped behind them. */
+.scene-gallery-hub .nh-card:has(details[open]) { z-index: 5; }
 @media (prefers-reduced-motion: reduce) { .scene-card-grip { transition: none; } }

@@ -87,35 +87,53 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
     emit("scene:reorder", { order }, "The scenes could not be reordered.");
   };
   const galleryRef = useRef<HTMLUListElement>(null);
+  const drag = useRef<{ id: string; order: string[]; start: string; commit: (order: string[]) => void } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOrder, setDragOrder] = useState<readonly string[] | null>(null);
+  // Drag-to-reorder by the grip. Pointer move/up live on the WINDOW (attached only while dragging),
+  // not on the grip element: the grip moves in the DOM as the list reorders mid-drag, which would
+  // strand pointer capture on a relocated node and leave the pointer feeling "stuck". A ref carries the
+  // live order + a commit closure so the window listeners always read fresh state and never re-subscribe.
   const beginDrag = (sceneId: string, event: React.PointerEvent) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const order = scenes.map((scene) => scene.id);
+    drag.current = { id: sceneId, order, start: order.join(), commit: (next) => emit("scene:reorder", { order: next }, "The scenes could not be reordered.") };
     setDragId(sceneId);
-    setDragOrder(scenes.map((scene) => scene.id));
+    setDragOrder(order);
   };
-  const dragMove = (event: React.PointerEvent) => {
-    if (!dragId || !galleryRef.current) return;
-    const over = [...galleryRef.current.querySelectorAll<HTMLElement>("[data-scene-id]")].find((card) => {
-      const rect = card.getBoundingClientRect();
-      return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
-    })?.dataset.sceneId;
-    if (!over || over === dragId) return;
-    setDragOrder((current) => {
-      if (!current) return current;
-      const next = current.filter((id) => id !== dragId);
-      next.splice(next.indexOf(over), 0, dragId);
-      return next;
-    });
-  };
-  const endDrag = () => {
-    if (dragId && dragOrder && dragOrder.join() !== scenes.map((scene) => scene.id).join()) {
-      emit("scene:reorder", { order: dragOrder as string[] }, "The scenes could not be reordered.");
-    }
-    setDragId(null);
-    setDragOrder(null);
-  };
+  useEffect(() => {
+    if (!dragId) return;
+    const onMove = (event: PointerEvent) => {
+      const gallery = galleryRef.current;
+      const state = drag.current;
+      if (!gallery || !state) return;
+      const over = [...gallery.querySelectorAll<HTMLElement>("[data-scene-id]")].find((card) => {
+        const rect = card.getBoundingClientRect();
+        return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+      })?.dataset.sceneId;
+      if (!over || over === state.id) return;
+      const next = state.order.filter((id) => id !== state.id);
+      next.splice(next.indexOf(over), 0, state.id);
+      state.order = next;
+      setDragOrder(next);
+    };
+    const onUp = () => {
+      const state = drag.current;
+      if (state && state.order.join() !== state.start) state.commit(state.order);
+      drag.current = null;
+      setDragId(null);
+      setDragOrder(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dragId]);
   // Render the optimistic order mid-drag; otherwise follow the server's order.
   const ordered = dragOrder
     ? dragOrder.map((id) => scenes.find((scene) => scene.id === id)).filter((scene): scene is Scene => Boolean(scene))
@@ -152,7 +170,7 @@ export function SceneGallery({ scenes, activeSceneId, combatActive, liveCombatan
               {(live || staging) && <span className="nh-card-status">{live ? <Badge tone="primary" solid>LIVE</Badge> : <Badge>Staging</Badge>}</span>}
               <div className="nh-card-tools">
                 {scenes.length > 1 && <button type="button" className="scene-card-grip" aria-label={`Drag to reorder ${scene.name}`}
-                  onPointerDown={(event) => beginDrag(scene.id, event)} onPointerMove={dragMove} onPointerUp={endDrag} onPointerCancel={endDrag}>⠿</button>}
+                  onPointerDown={(event) => beginDrag(scene.id, event)}>⠿</button>}
                 <Menu trigger="⋯" label={`${scene.name} actions`} align="end" hideCaret>
                   <MenuItem icon="←" disabled={index === 0} onClick={() => move(scene.id, -1)}>Move earlier</MenuItem>
                   <MenuItem icon="→" disabled={index === ordered.length - 1} onClick={() => move(scene.id, 1)}>Move later</MenuItem>

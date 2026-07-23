@@ -85,7 +85,9 @@
 .nh-card-thumb-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.7rem; opacity: .45; }
 
 .nh-card-status { position: absolute; top: var(--space-2); left: var(--space-2); z-index: 2; }
-.nh-card-tools { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 2; display: flex; gap: var(--space-1); }
+/* Tools sit above the actions row (z-index 2) so the ⋯ menu's popover is never painted under the
+   Prepare / Go live buttons. The gallery also lifts a card whose menu is open above its siblings. */
+.nh-card-tools { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 4; display: flex; gap: var(--space-1); }
 
 .nh-card-body { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); }
 .nh-card-title { margin: 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
