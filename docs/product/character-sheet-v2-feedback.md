@@ -23,6 +23,11 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
    level with no slots left.
    1. Upcasting a spell that **has** upcast effects should **auto-apply** those effects. (Non-upcastable
       spells cast at base only.) — **Decision: reference vendored SRD spell data.**
+   — ✅ done. Per-spell slot-level dropdown (remaining/total per level, empty levels disabled) + Cast
+   button; casting spends the chosen slot and auto-rolls the SRD upcast scaling for that level
+   (Fireball@5 → 10d6; Scorching Ray@3 → 4 rays). `ContentSpellSummary` additively gains
+   `damageRoll`/`damageTypes`/`castingOptions` (parsed from the SRD `slot_level_N` rows). Composes the
+   existing slot-spend + dice-roll commands; damage stays a GM-applied roll.
 3. **Editing proficiencies doesn't work**, and the skill name is **too far** from the skill bonus (hard
    to read).
    1. The **spell list** has the same name↔value spacing problem.
@@ -65,6 +70,6 @@ _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45
 | 5 | Spell slots as pips (not wonky ±) | ✅ done (Wave 1) | #6 |
 | 6 | Per-stat roll + roll-with-proficiency | ✅ done (Wave 1) | #6 |
 | 7 | **Equipment framework (full catalog + vendor SRD gear)** | ✅ done | #9 |
-| 2 | Upcasting cast-at (reference vendored SRD spells) | ▶ **next** | #7 |
-| 8 | Manual roll entry + auto/manual bonus mode | ⏳ pending | #8 |
+| 2 | Upcasting cast-at (reference vendored SRD spells) | ✅ done | #7 |
+| 8 | Manual roll entry + auto/manual bonus mode | ▶ **next** | #8 |
 | 9 | Panel redesign: sheet + player dice-log, docking, popout | ⏳ pending | #10 |
