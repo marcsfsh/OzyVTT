@@ -314,6 +314,14 @@
 .sheet-vital span { display: block; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .sheet-vital strong { display: block; margin-top: .15rem; font-size: .95rem; font-family: var(--font-mono); }
 .sheet-vital small { display: block; color: var(--text-muted); font-size: .68rem; }
+/* Roll-entry settings row (digital/manual + auto-add/final-total). */
+.sheet-settings { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .6rem; margin-top: .9rem; }
+.sheet-settings-label { color: var(--text-muted); font: 800 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
+.sheet-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
+.sheet-seg button { padding: .22rem .6rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .66rem/1 var(--font-mono); cursor: pointer; }
+.sheet-seg button + button { border-left: 1px solid var(--line); }
+.sheet-seg button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
+.sheet-seg button:hover:not(.on) { color: var(--text); }
 .sheet-hp-controls { display: flex; gap: .35rem; margin-top: .6rem; }
 .sheet-hp-controls input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
 .sheet-hp-controls button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }

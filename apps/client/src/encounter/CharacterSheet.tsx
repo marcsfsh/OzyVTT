@@ -6,6 +6,7 @@ import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
 import { useSpellReference } from "./spells";
 import { RichText } from "./RichText";
+import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -20,6 +21,9 @@ const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating ==
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
 const titleizeSkill = (id: string) => id.split("-").map(titleCase).join(" ");
 const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
+/** Best-effort per-browser preference storage for the sheet's roll settings (private-mode safe). */
+const readSetting = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
+const writeSetting = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable; setting stays in-session */ } };
 const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
 /** SRD governing ability for each of the 18 skills (drives the read-only skill bonus). */
 const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
@@ -119,17 +123,52 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
   const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
+  // Roll-entry settings (feedback #8), remembered per browser: "digital" click-to-roll vs "manual" (you
+  // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
+  const [rollInput, setRollInput] = useState<"digital" | "manual">(() => (readSetting("vtt.sheet.rollInput") === "manual" ? "manual" : "digital"));
+  const [bonusMode, setBonusMode] = useState<"auto" | "total">(() => (readSetting("vtt.sheet.bonusMode") === "total" ? "total" : "auto"));
+  const chooseRollInput = (mode: "digital" | "manual") => { setRollInput(mode); writeSetting("vtt.sheet.rollInput", mode); };
+  const chooseBonusMode = (mode: "auto" | "total") => { setBonusMode(mode); writeSetting("vtt.sheet.bonusMode", mode); };
+  const { prompt, dialog } = usePrompt();
   // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
   const spellRef = useSpellReference();
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
   // the GM still applies damage (players never mutate another creature's HP).
-  const emitRoll = (formula: string, purpose: "check" | "save" | "attack" | "damage", label: string) => {
+  const emitRollFormula = (formula: string, purpose: "check" | "save" | "attack" | "damage", label: string) => {
     setRolling(true);
     socket.emit("dice:roll", { commandId: newId(), formula, purpose, visibility: "public", actorId: actor.id }, (result: { ok: boolean; message?: string }) => {
       setRolling(false);
       setFeedback(result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : result.message ?? "The roll was rejected.");
     });
+  };
+  // Manual roll entry (feedback #8): in "manual" input mode the player types a physical die result and
+  // the sheet records it as a flat roll (the dice grammar accepts constants), so it lands in the shared
+  // log exactly like a rolled one. `bonusMode` decides whether a typed d20 result gets the bonus added
+  // ("auto": type 15 with a +7 → sends "15 + 7") or is already the final total ("total": type 22 → "22").
+  const manualValue = async (title: string, body: string, placeholder: string): Promise<number | null> => {
+    const entered = await prompt({ title, body, placeholder, confirmLabel: "Record" });
+    if (entered === null) return null;
+    const value = Number(entered);
+    if (!Number.isInteger(value) || value < -99 || value > 999) { setFeedback("Enter a whole number for the roll."); return null; }
+    return value;
+  };
+  const combineBonus = (die: number, bonus: number) => bonus === 0 ? String(die) : `${die} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
+  /** A d20 roll (check/save/attack) with a known bonus: digital rolls 1d20+bonus; manual prompts for the die/total. */
+  const rollD20 = async (bonus: number, purpose: "check" | "save" | "attack", label: string) => {
+    if (rollInput === "digital") { emitRollFormula(d20(bonus), purpose, label); return; }
+    const value = await manualValue(`Record ${label}`,
+      bonusMode === "auto" ? `Enter your d20 result - your ${signed(bonus)} bonus is added automatically.` : `Enter your final total (your ${signed(bonus)} bonus already included).`,
+      bonusMode === "auto" ? "d20 result" : "final total");
+    if (value === null) return;
+    emitRollFormula(bonusMode === "auto" ? combineBonus(value, bonus) : String(value), purpose, `${label} (manual)`);
+  };
+  /** A flat roll (damage): no separate bonus, so manual mode simply records the typed total. */
+  const rollFlat = async (formula: string, purpose: "damage", label: string) => {
+    if (rollInput === "digital") { emitRollFormula(formula, purpose, label); return; }
+    const value = await manualValue(`Record ${label}`, `Enter your rolled total for ${formula}.`, "rolled total");
+    if (value === null) return;
+    emitRollFormula(String(value), purpose, `${label} (manual)`);
   };
 
   useEffect(() => {
@@ -176,15 +215,9 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
     socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
       if (!result.ok) { setFeedback(result.message ?? "The slot could not be spent."); return; }
-      if (formula) {
-        setRolling(true);
-        socket.emit("dice:roll", { commandId: newId(), formula, purpose: "damage", visibility: "public", actorId: actor.id }, (roll: { ok: boolean; message?: string }) => {
-          setRolling(false);
-          setFeedback(roll.ok ? `Cast ${spell.name} at ${ordinal(level)}${suffix} - rolled ${formula}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""} (see dice log), spent a slot.` : roll.message ?? "The damage roll was rejected.");
-        });
-      } else {
-        setFeedback(`Cast ${spell.name} at ${ordinal(level)}${suffix} - spent a ${ordinal(level)}-level slot.`);
-      }
+      // Digital rolls the (upscaled) damage; manual mode prompts for the physical total - both land in the log.
+      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${suffix}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
+      else setFeedback(`Cast ${spell.name} at ${ordinal(level)}${suffix} - spent a ${ordinal(level)}-level slot.`);
     });
   };
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
@@ -218,7 +251,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
   // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
   // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
-  return <Modal open onClose={onClose} size="lg" className="character-sheet" title={actor.name} ariaLabel={`${actor.name} character sheet`}>
+  return <><Modal open onClose={onClose} size="lg" className="character-sheet" title={actor.name} ariaLabel={`${actor.name} character sheet`}>
       <p className="sheet-typeline">
         {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
       </p>
@@ -246,6 +279,17 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
 
       {definition && <>
+        <div className="sheet-settings" role="group" aria-label="Roll entry settings">
+          <span className="sheet-settings-label">Rolls</span>
+          <div className="sheet-seg" role="group" aria-label="Roll input mode">
+            <button type="button" className={rollInput === "digital" ? "on" : ""} aria-pressed={rollInput === "digital"} title="Tap a roll to have the app roll it" onClick={() => chooseRollInput("digital")}>Digital</button>
+            <button type="button" className={rollInput === "manual" ? "on" : ""} aria-pressed={rollInput === "manual"} title="Tap a roll, then type your physical die result" onClick={() => chooseRollInput("manual")}>Manual</button>
+          </div>
+          {rollInput === "manual" && <div className="sheet-seg" role="group" aria-label="Typed bonus handling">
+            <button type="button" className={bonusMode === "auto" ? "on" : ""} aria-pressed={bonusMode === "auto"} title="Type the die result; your bonus is added for you" onClick={() => chooseBonusMode("auto")}>Auto-add bonus</button>
+            <button type="button" className={bonusMode === "total" ? "on" : ""} aria-pressed={bonusMode === "total"} title="Type the final total, bonus already included" onClick={() => chooseBonusMode("total")}>Final total</button>
+          </div>}
+        </div>
         <div className="sheet-abilities">
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
@@ -255,8 +299,8 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
               <span>{ability.toUpperCase()}</span>
               <strong>{score}</strong>
               <div className="sheet-ability-rolls">
-                <button type="button" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check`} onClick={() => emitRoll(d20(mod), "check", `${ability.toUpperCase()} check`)}>{signed(mod)}</button>
-                <button type="button" className="prof" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`} onClick={() => emitRoll(d20(withProf), "check", `${ability.toUpperCase()} check w/ proficiency`)}>{signed(withProf)}<em>P</em></button>
+                <button type="button" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check`} onClick={() => void rollD20(mod, "check", `${ability.toUpperCase()} check`)}>{signed(mod)}</button>
+                <button type="button" className="prof" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`} onClick={() => void rollD20(withProf, "check", `${ability.toUpperCase()} check w/ proficiency`)}>{signed(withProf)}<em>P</em></button>
               </div>
             </div>;
           })}
@@ -279,10 +323,10 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
                 <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveProf}>Save proficiencies</button>
               </div>
             : <>
-                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => emitRoll(d20(bonus), "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
                 <ul className="sheet-skill-list">
                   {ALL_SKILLS.map((id) => { const ability = SKILL_ABILITY[id]; const tier = proficiencies?.skills.find((skill) => skill.id === id)?.proficiency; const bonus = skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, tier ?? "none"); return <li key={id}>
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => emitRoll(d20(bonus), "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => void rollD20(bonus, "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
                     <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier ? `${tier}` : "not proficient"} aria-hidden="true" />
                     <span className="sheet-skill-name">{titleizeSkill(id)} <em>{ability.toUpperCase()}</em></span>
                   </li>; })}
@@ -356,8 +400,8 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           {definition.actions.map((action) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
             <p><strong>{action.name}.</strong> <RichText text={action.description} /></p>
             {(atk || action.damage.length > 0) && <div className="sheet-roll-row">
-              {atk && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(atk.bonus), "attack", `${action.name} to hit`)}>{signed(atk.bonus)} to hit</button>}
-              {action.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(part.formula, "damage", `${action.name} damage`)}>{part.formula}</button>)}
+              {atk && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollD20(atk.bonus, "attack", `${action.name} to hit`)}>{signed(atk.bonus)} to hit</button>}
+              {action.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${action.name} damage`)}>{part.formula}</button>)}
             </div>}
           </div>; })}
         </section>}
@@ -366,5 +410,5 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet - the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
-  </Modal>;
+  </Modal>{dialog}</>;
 }
