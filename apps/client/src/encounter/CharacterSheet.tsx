@@ -71,7 +71,11 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
 export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
-  const [definition, setDefinition] = useState<ActorDefinition | null>(ownDefinition ?? (definitionId ? sheetCache.get(definitionId) ?? null : null));
+  // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
+  // live actor prop (`ownDefinition`) and must WIN so that identity/proficiency edits reflect at once
+  // (bugfix: a useState seeded from ownDefinition went stale after an edit).
+  const [fetched, setFetched] = useState<ActorDefinition | null>(definitionId ? sheetCache.get(definitionId) ?? null : null);
+  const definition = ownDefinition ?? fetched;
   const [feedback, setFeedback] = useState("");
   const [rolling, setRolling] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -95,7 +99,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
     socket.emit("content:monster-sheet", { definitionId }, (result) => {
-      if (result.ok && result.definition) { sheetCache.set(definitionId, result.definition); setDefinition(result.definition); }
+      if (result.ok && result.definition) { sheetCache.set(definitionId, result.definition); setFetched(result.definition); }
       else setFeedback(result.message ?? "The stat block could not be loaded.");
     });
   }, [definitionId, role, ownDefinition]);
@@ -165,12 +169,16 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
         <div className="sheet-abilities">
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
-            const save = extension.savingThrows?.[ability];
-            return <button type="button" key={ability} className="sheet-ability sheet-rollable" disabled={rolling} onClick={() => emitRoll(d20(modifierOf(score)), "check", `${ability.toUpperCase()} check`)} title={`Roll ${ability.toUpperCase()} check`}>
+            const mod = modifierOf(score);
+            const withProf = mod + definition.proficiencyBonus;
+            return <div key={ability} className="sheet-ability">
               <span>{ability.toUpperCase()}</span>
               <strong>{score}</strong>
-              <small>{signed(modifierOf(score))}{save !== null && save !== undefined ? ` / save ${signed(save)}` : ""}</small>
-            </button>;
+              <div className="sheet-ability-rolls">
+                <button type="button" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check`} onClick={() => emitRoll(d20(mod), "check", `${ability.toUpperCase()} check`)}>{signed(mod)}</button>
+                <button type="button" className="prof" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`} onClick={() => emitRoll(d20(withProf), "check", `${ability.toUpperCase()} check w/ proficiency`)}>{signed(withProf)}<em>P</em></button>
+              </div>
+            </div>;
           })}
         </div>
         <dl className="sheet-meta">
@@ -191,28 +199,47 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
                 <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveProf}>Save proficiencies</button>
               </div>
             : <>
-                {proficiencies && proficiencies.saves.length > 0 && <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{proficiencies.saves.map((ability) => { const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, true); return <button type="button" key={ability} className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>}
-                {proficiencies && proficiencies.skills.length > 0 && <ul className="sheet-skill-list">
-                  {proficiencies.skills.map((skill) => { const ability = SKILL_ABILITY[skill.id]; const bonus = ability ? skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, skill.proficiency) : null; return <li key={skill.id}><span>{titleizeSkill(skill.id)}{skill.proficiency === "expertise" ? " (expertise)" : ""}</span>{bonus === null ? <strong>-</strong> : <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => emitRoll(d20(bonus), "check", `${titleizeSkill(skill.id)} check`)}>{signed(bonus)}</button>}</li>; })}
-                </ul>}
-                {(!proficiencies || (proficiencies.saves.length === 0 && proficiencies.skills.length === 0)) && <p className="sheet-empty-note">No proficiencies set yet — tap Edit to choose.</p>}
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => emitRoll(d20(bonus), "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
+                <ul className="sheet-skill-list">
+                  {ALL_SKILLS.map((id) => { const ability = SKILL_ABILITY[id]; const tier = proficiencies?.skills.find((skill) => skill.id === id)?.proficiency; const bonus = skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, tier ?? "none"); return <li key={id}>
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => emitRoll(d20(bonus), "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
+                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier ? `${tier}` : "not proficient"} aria-hidden="true" />
+                    <span className="sheet-skill-name">{titleizeSkill(id)} <em>{ability.toUpperCase()}</em></span>
+                  </li>; })}
+                </ul>
               </>}
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
           <p className="sheet-entry"><strong>{spellcasting.ability.toUpperCase()} caster.</strong> Save DC {spellDc}{spellAtk !== null ? `, ${signed(spellAtk)} to hit` : ""}.</p>
-          {spellcasting.slots.length > 0 && <div className="sheet-slots">{spellcasting.slots.map((slot) => { const remaining = liveSlotRemaining.get(slot.level) ?? slot.max; return <div key={slot.level} className="sheet-slot-stepper">
-            <button type="button" disabled={busy || remaining <= 0} aria-label={`Spend a level ${slot.level} slot`} onClick={() => { setBusy(true); socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level: slot.level, remaining: remaining - 1 }, ack); }}>−</button>
-            <span>{ordinal(slot.level)} <strong>{remaining}/{slot.max}</strong></span>
-            <button type="button" disabled={busy || remaining >= slot.max} aria-label={`Restore a level ${slot.level} slot`} onClick={() => { setBusy(true); socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level: slot.level, remaining: remaining + 1 }, ack); }}>+</button>
-          </div>; })}{pact ? <span className="sheet-slot">Pact {ordinal(pact.level)} <strong>{pact.remaining}</strong></span> : null}</div>}
-          {spellcasting.spells.length > 0 && <ul className="sheet-spell-list">
-            {[...spellcasting.spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)).map((spell) => { const isPrepared = preparedIds.has(spell.id) || spell.alwaysPrepared; const toggleable = spell.level > 0 && !spell.alwaysPrepared; return <li key={spell.id}>
-              <span>{spell.name}</span>
-              {spell.level === 0 ? <small>Cantrip</small> : toggleable
-                ? <button type="button" className={`sheet-prepare${isPrepared ? " is-prepared" : ""}`} disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{ordinal(spell.level)} · {isPrepared ? "prepared" : "prepare"}</button>
-                : <small>{ordinal(spell.level)} · prepared</small>}
-            </li>; })}
-          </ul>}
+          {(() => {
+            type Spell = (typeof spellcasting.spells)[number];
+            const groups = new Map<number, Spell[]>();
+            for (const spell of spellcasting.spells) { const list = groups.get(spell.level) ?? []; list.push(spell); groups.set(spell.level, list); }
+            const slotMax = new Map(spellcasting.slots.map((slot) => [slot.level, slot.max]));
+            return [...groups.keys()].sort((a, b) => a - b).map((level) => {
+              const spells = [...groups.get(level)!].sort((a, b) => a.name.localeCompare(b.name));
+              const max = slotMax.get(level) ?? 0;
+              const remaining = liveSlotRemaining.get(level) ?? max;
+              return <div key={level} className="sheet-spell-group">
+                <div className="sheet-spell-group-head">
+                  <h4>{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h4>
+                  {level > 0 && max > 0 && <div className="sheet-slot-pips" role="group" aria-label={`Level ${level} spell slots (${remaining} of ${max} left)`}>
+                    {Array.from({ length: max }, (_, index) => <button key={index} type="button" className={`sheet-pip${index < remaining ? " filled" : ""}`} disabled={busy} aria-label={`${index < remaining ? "Spend" : "Restore"} a level ${level} slot`} onClick={() => { setBusy(true); socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: index < remaining ? index : index + 1 }, ack); }} />)}
+                    <span className="sheet-slot-count">{remaining}/{max}</span>
+                  </div>}
+                </div>
+                <ul className="sheet-spell-list">
+                  {spells.map((spell) => { const isPrepared = preparedIds.has(spell.id) || spell.alwaysPrepared; const toggleable = spell.level > 0 && !spell.alwaysPrepared; return <li key={spell.id}>
+                    {spell.level === 0 ? <span className="sheet-prep-tag cantrip">Cantrip</span> : toggleable
+                      ? <button type="button" className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`} disabled={busy} title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{isPrepared ? "Prepared" : "Prepare"}</button>
+                      : <span className="sheet-prep-tag on">Always</span>}
+                    <span className="sheet-spell-name">{spell.name}</span>
+                  </li>; })}
+                </ul>
+              </div>;
+            });
+          })()}
+          {pact ? <p className="sheet-entry">Pact Magic: {ordinal(pact.level)}-level slots, {pact.remaining} remaining.</p> : null}
         </section>}
         {actor.kind === "player-character" && <section className="sheet-section"><h3>Inventory</h3>
           {inventory.length > 0 && <ul className="sheet-item-list sheet-item-edit">

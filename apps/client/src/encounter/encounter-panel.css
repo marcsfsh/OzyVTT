@@ -385,6 +385,50 @@
 .sheet-save-btn { padding: .3rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, transparent); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .74rem; font-weight: 700; cursor: pointer; }
 .sheet-save-btn:disabled { opacity: .6; cursor: default; }
 .sheet-empty-note { color: var(--text-muted); font-size: .78rem; font-style: italic; margin: .3rem 0 0; }
+
+/* --- sheet v2: readability + tap targets --- */
+.sheet-ability { display: flex; flex-direction: column; align-items: center; gap: .1rem; }
+.sheet-ability-rolls { display: flex; gap: .25rem; margin-top: .2rem; }
+.sheet-ability-rolls button { padding: .12rem .38rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 .68rem/1 var(--font-mono); cursor: pointer; }
+.sheet-ability-rolls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.sheet-ability-rolls button.prof { color: var(--magenta); }
+.sheet-ability-rolls button.prof em { font-style: normal; font-size: .62em; opacity: .8; margin-left: .1em; vertical-align: super; }
+.sheet-ability-rolls button:disabled { opacity: .55; cursor: default; }
+
+/* dense skill grid: [bonus] [dot] [name] - value hugs the name, two columns on desktop */
+.sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .4rem; }
+.sheet-skill-list li .sheet-roll-chip { min-width: 2.7rem; text-align: center; }
+.sheet-skill-name { color: var(--text); font-size: .8rem; }
+.sheet-skill-name em { color: var(--text-muted); font-style: normal; font-size: .62rem; text-transform: uppercase; letter-spacing: .03em; margin-left: .25rem; }
+.sheet-prof-dot { width: .5rem; height: .5rem; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; }
+.sheet-prof-dot.proficient { background: var(--cyan); border-color: var(--cyan); }
+.sheet-prof-dot.expertise { background: var(--magenta); border-color: var(--magenta); }
+.sheet-roll-chip.is-proficient { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+@media (max-width: 560px) { .sheet-skill-list { grid-template-columns: 1fr; } }
+
+/* spells grouped by level + clickable slot pips */
+.sheet-spell-group { margin-top: .75rem; }
+.sheet-spell-group-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .1rem; }
+.sheet-spell-group-head h4 { margin: 0; font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+.sheet-slot-pips { display: inline-flex; align-items: center; gap: .28rem; }
+.sheet-pip { width: .82rem; height: .82rem; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; cursor: pointer; transition: background var(--dur-1, .12s) ease, border-color var(--dur-1, .12s) ease; }
+.sheet-pip.filled { background: var(--cyan); border-color: var(--cyan); }
+.sheet-pip:hover:not(:disabled) { border-color: var(--magenta); }
+.sheet-pip:disabled { cursor: default; opacity: .7; }
+.sheet-slot-count { color: var(--text-muted); font: 700 .66rem var(--font-mono); }
+.sheet-spell-list { grid-template-columns: 1fr; }
+.sheet-spell-list li { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .5rem; }
+.sheet-spell-name { color: var(--text); font-size: .82rem; }
+.sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 .58rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+.sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-prep-tag.toggle { cursor: pointer; }
+.sheet-prep-tag.toggle:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
+.sheet-prep-tag.toggle:disabled { opacity: .6; cursor: default; }
+
+/* inventory: cap the name column so controls hug it instead of drifting to the far edge */
+.sheet-item-edit li { display: grid; grid-template-columns: minmax(0, 12rem) 1fr; align-items: center; gap: .35rem .6rem; }
+@media (max-width: 560px) { .sheet-item-edit li { grid-template-columns: 1fr; } }
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }
