@@ -101,7 +101,9 @@ export const InventoryItemSchema = z.object({
   equipped: z.boolean().default(false),
   attuned: z.boolean().default(false),
   weightEach: z.number().nonnegative().max(1_000_000).optional(),
-  description: z.string().max(4000).optional()
+  description: z.string().max(4000).optional(),
+  /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping only. Additive. */
+  category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional()
 }).strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 /** SRD coin purse; all five currencies, each defaulting to 0. */

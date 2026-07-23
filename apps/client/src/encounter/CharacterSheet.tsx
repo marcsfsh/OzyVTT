@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
+import type { ActorDefinition, ContentEquipmentSummary, GmActor, PlayerActor } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
+import { EquipmentPicker } from "./equipment";
 import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -81,6 +82,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const [busy, setBusy] = useState(false);
   const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
   const [newItem, setNewItem] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
@@ -124,6 +126,20 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
+  // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
+  // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
+  // and carries the catalog's category/weight/description so the sheet can group and describe it.
+  const ownedCounts = new Map(inventory.map((item) => [item.id, item.quantity]));
+  const addFromCatalog = (item: ContentEquipmentSummary) => {
+    const existing = inventory.find((entry) => entry.id === item.id);
+    setBusy(true);
+    socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: {
+      id: item.id, name: item.name, quantity: (existing?.quantity ?? 0) + 1, category: item.category,
+      ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
+      ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
+      ...(item.description ? { description: item.description } : {})
+    } }, ack);
+  };
   // Keep the coin editor in sync with the authoritative purse (re-syncs after each accepted change).
   useEffect(() => { setCoins({ cp: currency?.cp ?? 0, sp: currency?.sp ?? 0, ep: currency?.ep ?? 0, gp: currency?.gp ?? 0, pp: currency?.pp ?? 0 }); }, [currency?.cp, currency?.sp, currency?.ep, currency?.gp, currency?.pp]);
   // Light hand-edit (owner + GM, server-enforced): edit the per-PC imported definition's identity /
@@ -244,7 +260,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
         {actor.kind === "player-character" && <section className="sheet-section"><h3>Inventory</h3>
           {inventory.length > 0 && <ul className="sheet-item-list sheet-item-edit">
             {inventory.map((item) => <li key={item.id}>
-              <span>{item.name}</span>
+              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}</span>
               <div className="sheet-item-controls">
                 <div className="sheet-slot-stepper">
                   <button type="button" disabled={busy} aria-label={`One fewer ${item.name}`} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: item.quantity - 1 } }, ack); }}>−</button>
@@ -259,9 +275,11 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           </ul>}
           {attunedCount > 0 && <p className={`sheet-attunement${attunedCount > 3 ? " over" : ""}`}>Attunement {attunedCount}/3</p>}
           <form className="sheet-add-item" onSubmit={(event) => { event.preventDefault(); const name = newItem.trim(); if (!name) return; setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { id: slugify(name), name, quantity: 1 } }, ack); setNewItem(""); }}>
-            <input type="text" value={newItem} maxLength={120} placeholder="Add an item…" aria-label="New item name" onChange={(event) => setNewItem(event.target.value)} />
+            <input type="text" value={newItem} maxLength={120} placeholder="Add a custom item…" aria-label="New item name" onChange={(event) => setNewItem(event.target.value)} />
             <button type="submit" disabled={busy || !newItem.trim()}>Add</button>
+            <button type="button" className="sheet-browse-gear" disabled={busy} onClick={() => setPickerOpen(true)}>Browse SRD gear</button>
           </form>
+          {pickerOpen && <EquipmentPicker ownedCounts={ownedCounts} busy={busy} onAdd={addFromCatalog} onClose={() => setPickerOpen(false)} />}
           <div className="sheet-coins">
             {COINS.map((coin) => <label key={coin}>{coin}<input type="number" min="0" max="1000000" value={coins[coin]} onChange={(event) => setCoins((prev) => ({ ...prev, [coin]: Math.max(0, Math.min(1000000, Math.floor(Number(event.target.value) || 0))) }))} /></label>)}
             <button type="button" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-currency", { commandId: newId(), actorId: actor.id, currency: coins }, ack); }}>Save coins</button>

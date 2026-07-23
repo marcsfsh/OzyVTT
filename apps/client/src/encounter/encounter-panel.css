@@ -369,6 +369,26 @@
 .sheet-add-item input { flex: 1; min-width: 0; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: .8rem; }
 .sheet-add-item button, .sheet-coins button { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .74rem; font-weight: 700; cursor: pointer; }
 .sheet-add-item button:disabled, .sheet-coins button:disabled { opacity: .6; cursor: default; }
+.sheet-add-item .sheet-browse-gear { white-space: nowrap; border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); }
+/* Inventory rows now carry the catalog category as a subtle badge after the name. */
+.sheet-item-name { display: inline-flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
+.sheet-item-cat { color: var(--text-muted); font: 700 .58rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
+/* Browse-and-add-from-catalog picker (Modal body). */
+.sheet-picker-controls { display: grid; gap: .5rem; margin-bottom: .6rem; }
+.sheet-picker-search { width: 100%; padding: .4rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: .85rem; }
+.sheet-picker-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
+.sheet-picker-chip { padding: .22rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 .66rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.sheet-picker-chip.is-active { color: var(--text); background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; overflow-y: auto; }
+.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .35rem .1rem; border-bottom: 1px solid var(--line); }
+.sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.sheet-picker-name { color: var(--text); font-size: .84rem; font-weight: 600; display: flex; align-items: baseline; gap: .4rem; }
+.sheet-picker-owned { color: var(--cyan); font: 700 .64rem/1 var(--font-mono); }
+.sheet-picker-meta { color: var(--text-muted); font-size: .69rem; }
+.sheet-picker-add { flex-shrink: 0; padding: .28rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .74rem; font-weight: 700; cursor: pointer; }
+.sheet-picker-add:disabled { opacity: .6; cursor: default; }
+.sheet-picker-empty { color: var(--text-muted); font-size: .8rem; padding: 1rem 0; text-align: center; }
+.sheet-picker-attribution { margin: .6rem 0 0; color: var(--text-muted); font-size: .62rem; line-height: 1.4; }
 .sheet-coins { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4rem; margin: .55rem 0 0; }
 .sheet-coins label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; }
 .sheet-coins input { width: 4rem; padding: .25rem .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 .78rem var(--font-mono); }
