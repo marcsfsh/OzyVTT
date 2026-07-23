@@ -287,13 +287,18 @@ export function CharacterSheet({ actor, role, state, standalone = false, onClose
         </div>}
 
       <div className="sheet-vitals">
-        <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
-        <div className="sheet-vital"><span>AC</span><strong>{actor.armorClass ?? "-"}</strong>{extension.armorDetail ? <small>{extension.armorDetail}</small> : null}</div>
-        <div className="sheet-vital"><span>Initiative</span><strong>{actor.initiative !== undefined ? signed(actor.initiative) : "-"}</strong></div>
+        <div className="sheet-vital sheet-vital-hp">
+          <div className="sheet-vital-top"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
+          <SheetHpControls actorId={actor.id} allowSet={role === "gm"} onFeedback={setFeedback} />
+        </div>
+        <div className="sheet-vital" title={extension.armorDetail ?? undefined}><span>AC</span><strong>{actor.armorClass ?? "-"}</strong></div>
+        <div className="sheet-vital"><span>Init</span><strong>{actor.initiative !== undefined ? signed(actor.initiative) : "-"}</strong></div>
         {speeds && <div className="sheet-vital"><span>Speed</span><strong>{speeds}</strong></div>}
       </div>
-      <SheetHpControls actorId={actor.id} allowSet={role === "gm"} onFeedback={setFeedback} />
-      <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+      <div className="sheet-conditions">
+        <span className="sheet-section-label">Conditions</span>
+        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+      </div>
 
       {definition && <>
         <div className="sheet-abilities">

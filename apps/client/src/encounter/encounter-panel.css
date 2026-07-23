@@ -309,24 +309,31 @@
 .initiative-sheet-link:hover { color: var(--cyan-hi); text-decoration-color: var(--cyan); }
 /* Character sheet renders in the shared Modal (box, head, close, scroll handled there). */
 .sheet-typeline { margin: -.2rem 0 0; color: var(--text-dim); font-size: .82rem; font-style: italic; }
-.sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
-.sheet-vital { flex: 1 1 7rem; padding: .5rem .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
-.sheet-vital span { display: block; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.sheet-vital strong { display: block; margin-top: .15rem; font-size: .95rem; font-family: var(--font-mono); }
-.sheet-vital small { display: block; color: var(--text-muted); font-size: .68rem; }
-/* Roll-entry settings row (digital/manual + auto-add/final-total). */
-.sheet-settings { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .6rem; margin-top: .9rem; }
+/* Vitals (v3 #2.3): compact stat chips; HP is a wider box holding its own Dmg/Heal/Temp controls (#2.4). */
+.sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; align-items: stretch; }
+.sheet-vital { display: flex; flex-direction: column; justify-content: center; padding: .4rem .7rem; border-radius: var(--radius-md); background: var(--surface-3); min-width: 4rem; }
+.sheet-vital span { color: var(--text-muted); font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.sheet-vital strong { margin-top: .1rem; font: 700 1.05rem/1 var(--font-mono); color: var(--text); }
+.sheet-vital-hp { flex: 1 1 17rem; }
+.sheet-vital-top { display: flex; align-items: baseline; gap: .5rem; }
+.sheet-vital-top span { align-self: center; }
+.sheet-vital-top strong { margin-top: 0; font-size: 1.2rem; }
+.sheet-hp-controls { display: flex; gap: .3rem; margin-top: .45rem; }
+.sheet-hp-controls input { width: 3.2rem; margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 .8rem var(--font-mono); }
+.sheet-hp-controls button { flex: 1; padding: .32rem .2rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .72rem; font-weight: 700; cursor: pointer; }
+.sheet-hp-controls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.sheet-hp-controls button:disabled, .sheet-hp-controls input:disabled { opacity: .5; cursor: default; }
+/* Conditions section (v3 #2.5): a labelled section instead of a bare "+ Add". */
+.sheet-conditions { margin-top: .85rem; }
+.sheet-section-label { display: block; color: var(--text-muted); font: 800 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .35rem; }
+.sheet-conditions .condition-editor { margin-top: 0; }
+/* Rolls-bar segmented controls (still used in the pinned rolls bar). */
 .sheet-settings-label { color: var(--text-muted); font: 800 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
 .sheet-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
 .sheet-seg button { padding: .22rem .6rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .66rem/1 var(--font-mono); cursor: pointer; }
 .sheet-seg button + button { border-left: 1px solid var(--line); }
 .sheet-seg button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
 .sheet-seg button:hover:not(.on) { color: var(--text); }
-.sheet-hp-controls { display: flex; gap: .35rem; margin-top: .6rem; }
-.sheet-hp-controls input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
-.sheet-hp-controls button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
-.sheet-hp-controls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.character-sheet .condition-editor { margin-top: .55rem; }
 .sheet-abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: .4rem; margin-top: .9rem; }
 .sheet-ability { padding: .45rem .25rem; border-radius: var(--radius-md); background: var(--surface-3); text-align: center; }
 .sheet-ability span { display: block; color: var(--text-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; }
