@@ -7,9 +7,14 @@ Round-5 GM feedback after v4. Durable checklist. _Captured 2026-07-23; branch
 1. Spells without damage dice show a **strange artifact** (empty helper cell). — ✅ `.sheet-cast-effect:empty`
    drops the violet chip; the helper span is empty (not `.empty`-classed) when there's no die.
 2. The damage-die label, level dropdown, and CAST button are **still non-uniform** (dropdown not on the
-   dice/CAST centre line; different shapes/gaps). — ✅ flattened the old nested `.sheet-cast` grid into the
-   row grid: helper/slot/Cast are three fixed columns (`3.4rem 6.6rem 3.6rem`), each 1.75rem tall and
-   stretched, so all three align across every row.
+   dice/CAST centre line; different shapes/gaps; damage chip unbordered/smaller-radius/higher). — ✅
+   **definitively fixed and render-verified.** Root cause the earlier CSS passes missed: (a) the damage
+   chip used `--radius-sm` + no border, the others `--radius-md` + border → different shapes; (b) the
+   native `<select>` keeps its taller UA min-height, so `height:1.75rem` didn't actually equalise it →
+   the chip/button sat higher than the dropdown. Fix: all three share ONE geometry (border-box, 1.9rem,
+   `--radius-md`, 1px border, flex-centred), only the tint varies by role, and the select is
+   `appearance:none` with a custom caret so its height is fully CSS-controlled. Verified in a headless
+   Chromium render (light + dark) that the three sit on one line as a matched set.
 3. **Browse SRD** window: margins **still too thin**, **× still not top-right** — "consistently not in the
    top-right corner." — ✅ **root cause:** nested modals (picker, spell card) render inside the sheet's
    `.character-sheet` dialog, so `.character-sheet .nh-modal-*` **descendant** selectors leaked into them

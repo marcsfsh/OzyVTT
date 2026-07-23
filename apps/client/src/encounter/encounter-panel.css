@@ -506,26 +506,46 @@
 /* A player's own castable list flattens the "cast at" controls into the SAME row grid (v5 #2): the effect
    helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
    so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
-.sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.4rem 6.6rem 3.6rem; }
+.sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.7rem 6.8rem 3.8rem; }
 /* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
 .sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
 .sheet-spell-name { color: var(--text); font-size: .84rem; }
 /* Clickable spell name opens its SRD rules card (v3 #2.8.2); dashed underline signals it's clickable (v4 #5.2). */
 .sheet-spell-link { border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: var(--text); font-size: .84rem; cursor: pointer; text-decoration: underline; text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--text-muted) 65%, transparent); text-underline-offset: 3px; }
 .sheet-spell-link:hover { color: var(--cyan-hi); text-decoration-style: solid; text-decoration-color: currentColor; }
-/* "Cast at" controls (v3 #2.8 / v4 #5.1 / v5 #1,#2,#9): three uniform grid cells, each 1.75rem tall and
-   stretched to fill its fixed column, so helper / slot / Cast line up across every row. */
-.sheet-cast-effect { justify-self: stretch; height: 1.75rem; display: flex; align-items: center; justify-content: center; padding: 0 .3rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--violet) 14%, var(--surface-3)); color: var(--text); font: 700 .66rem/1 var(--font-mono); white-space: nowrap; overflow: hidden; }
-/* v5 #1: a spell with no damage die leaves the helper empty - no stray violet chip artifact. */
-.sheet-cast-effect:empty { background: transparent; }
-.sheet-cast-select { justify-self: stretch; width: 100%; height: 1.75rem; padding: 0 .35rem; text-align: center; text-align-last: center; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 600 .7rem/1 var(--font-mono); cursor: pointer; }
-/* the cantrip "At will" tag (and the "no slots" note) occupy the same column as the dropdown so cantrip
+/* "Cast at" controls (v3 #2.8 / v4 #5.1 / v5 #2, the recurring one): the damage helper, the slot dropdown
+   (or the cantrip "At will" tag), and the Cast button share ONE geometry so they read as a matched set -
+   identical box-sizing, height, radius, 1px border, and vertical centring. Only the fill/border TINT
+   varies by role. The old version left the helper unbordered with a smaller radius, and the native
+   <select> kept its taller UA min-height, so the three sat at different heights and shapes; here every
+   cell is border-box 1.9rem with the same radius, and the select is `appearance:none` (custom caret) so
+   its height is fully CSS-controlled and lines up with the chips exactly. Verified in a headless render. */
+.sheet-cast-effect,
+.sheet-cast-select,
+.sheet-cast-slot,
+.sheet-cast-btn {
+  box-sizing: border-box; justify-self: stretch; width: 100%; height: 1.9rem; min-height: 1.9rem; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  background: var(--surface-2); color: var(--text); font: 700 .64rem/1 var(--font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Damage helper: violet-tinted, bordered like the rest. v5 #1: a spell with no die leaves it empty -
+   the border/fill drop so no stray chip artifact shows. */
+.sheet-cast-effect { border-color: color-mix(in srgb, var(--violet) 38%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 13%, var(--surface-2)); }
+.sheet-cast-effect:empty { border-color: transparent; background: transparent; }
+/* Slot dropdown: neutral surface + a custom caret (appearance:none) so its height matches the chips. */
+.sheet-cast-select { appearance: none; -webkit-appearance: none; padding: 0 1.3rem 0 .5rem; text-align: center; text-align-last: center; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a84a8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .5rem center; background-size: .55rem .34rem; }
+/* the cantrip "At will" tag (and the "no slots" note) fill the same column as the dropdown so cantrip
    rows align with leveled rows (v5 #9). */
-.sheet-cast-slot { justify-self: stretch; height: 1.75rem; display: flex; align-items: center; justify-content: center; padding: 0 .3rem; border-radius: var(--radius-md); border: 1px dashed var(--line); background: transparent; color: var(--text-muted); font: 700 .6rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
-.sheet-cast-slot.at-will { border-style: solid; border-color: color-mix(in srgb, var(--cyan) 40%, transparent); color: var(--text); }
-.sheet-cast-btn { justify-self: stretch; width: 100%; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 .3rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line-strong)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--violet) 16%, var(--surface-3)); color: var(--text); font: 700 .66rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; white-space: nowrap; }
-.sheet-cast-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--violet) 65%, transparent); }
-.sheet-cast-btn:disabled { opacity: .55; cursor: default; }
+.sheet-cast-slot { color: var(--text-dim); border-style: dashed; font-size: .58rem; text-transform: uppercase; letter-spacing: .03em; }
+.sheet-cast-slot.at-will { border-style: solid; border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); color: var(--text); }
+/* Cast: the action - a slightly stronger violet fill + border and uppercase, still in the same family. */
+.sheet-cast-btn { border-color: color-mix(in srgb, var(--violet) 55%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 20%, var(--surface-2)); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+.sheet-cast-btn:hover:not(:disabled) { border-color: var(--violet); background: color-mix(in srgb, var(--violet) 30%, var(--surface-2)); }
+.sheet-cast-btn:disabled { opacity: .5; cursor: default; }
 .sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 .58rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prep-tag.toggle { cursor: pointer; }
