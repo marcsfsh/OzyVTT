@@ -256,6 +256,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
   router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorSpendHitDice), ...command("actor.spend-hit-dice", actorIdParam));
+  router.post(expressPath(GAME_PATHS.characterSetSlot), ...command("character.set-slot", actorIdParam));
+  router.post(expressPath(GAME_PATHS.characterSetPrepared), ...command("character.set-prepared", actorIdParam));
   // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
   router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
   router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));

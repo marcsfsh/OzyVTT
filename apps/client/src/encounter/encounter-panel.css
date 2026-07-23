@@ -351,6 +351,14 @@
 .sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
 .sheet-roll-chip:disabled { cursor: default; opacity: .6; }
 .sheet-entry p { margin: 0 0 .3rem; }
+.sheet-slot-stepper { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .3rem; border-radius: var(--radius-md); background: var(--surface-3); }
+.sheet-slot-stepper button { width: 1.35rem; height: 1.35rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text); font: 700 .9rem/1 var(--font-mono); cursor: pointer; }
+.sheet-slot-stepper button:disabled { opacity: .4; cursor: default; }
+.sheet-slot-stepper > span { font-size: .72rem; font-weight: 700; color: var(--text-dim); }
+.sheet-slot-stepper strong { color: var(--text); font-family: var(--font-mono); }
+.sheet-prepare { padding: .18rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 .64rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
+.sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-prepare:disabled { opacity: .6; cursor: default; }
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }

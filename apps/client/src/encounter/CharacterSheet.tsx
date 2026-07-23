@@ -71,6 +71,8 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const [definition, setDefinition] = useState<ActorDefinition | null>(ownDefinition ?? (definitionId ? sheetCache.get(definitionId) ?? null : null));
   const [feedback, setFeedback] = useState("");
   const [rolling, setRolling] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
   // the GM still applies damage (players never mutate another creature's HP).
@@ -158,9 +160,18 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
           <p className="sheet-entry"><strong>{spellcasting.ability.toUpperCase()} caster.</strong> Save DC {spellDc}{spellAtk !== null ? `, ${signed(spellAtk)} to hit` : ""}.</p>
-          {spellcasting.slots.length > 0 && <div className="sheet-slots">{spellcasting.slots.map((slot) => <span key={slot.level} className="sheet-slot">{ordinal(slot.level)} <strong>{liveSlotRemaining.get(slot.level) ?? slot.max}/{slot.max}</strong></span>)}{pact ? <span className="sheet-slot">Pact {ordinal(pact.level)} <strong>{pact.remaining}</strong></span> : null}</div>}
+          {spellcasting.slots.length > 0 && <div className="sheet-slots">{spellcasting.slots.map((slot) => { const remaining = liveSlotRemaining.get(slot.level) ?? slot.max; return <div key={slot.level} className="sheet-slot-stepper">
+            <button type="button" disabled={busy || remaining <= 0} aria-label={`Spend a level ${slot.level} slot`} onClick={() => { setBusy(true); socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level: slot.level, remaining: remaining - 1 }, ack); }}>−</button>
+            <span>{ordinal(slot.level)} <strong>{remaining}/{slot.max}</strong></span>
+            <button type="button" disabled={busy || remaining >= slot.max} aria-label={`Restore a level ${slot.level} slot`} onClick={() => { setBusy(true); socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level: slot.level, remaining: remaining + 1 }, ack); }}>+</button>
+          </div>; })}{pact ? <span className="sheet-slot">Pact {ordinal(pact.level)} <strong>{pact.remaining}</strong></span> : null}</div>}
           {spellcasting.spells.length > 0 && <ul className="sheet-spell-list">
-            {[...spellcasting.spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)).map((spell) => <li key={spell.id}><span>{spell.name}</span><small>{spell.level === 0 ? "Cantrip" : `${ordinal(spell.level)}${preparedIds.has(spell.id) || spell.alwaysPrepared ? " · prepared" : ""}`}</small></li>)}
+            {[...spellcasting.spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)).map((spell) => { const isPrepared = preparedIds.has(spell.id) || spell.alwaysPrepared; const toggleable = spell.level > 0 && !spell.alwaysPrepared; return <li key={spell.id}>
+              <span>{spell.name}</span>
+              {spell.level === 0 ? <small>Cantrip</small> : toggleable
+                ? <button type="button" className={`sheet-prepare${isPrepared ? " is-prepared" : ""}`} disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{ordinal(spell.level)} · {isPrepared ? "prepared" : "prepare"}</button>
+                : <small>{ordinal(spell.level)} · prepared</small>}
+            </li>; })}
           </ul>}
         </section>}
         {(inventory.length > 0 || hasCoins) && <section className="sheet-section"><h3>Inventory</h3>

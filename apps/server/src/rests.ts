@@ -64,5 +64,14 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
     if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
     else actor.conditions = actor.conditions.map((condition) => condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition);
   }
+  // SRD long rest: all spell slots (and Pact Magic) refill to their maxima and prepared spells reset
+  // to the sheet's defaults. Absent spellcasting leaves these untouched (additive).
+  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (actor.spellSlots && longRestDefinition?.spellcasting) {
+    const maxByLevel = new Map(longRestDefinition.spellcasting.slots.map((entry) => [entry.level, entry.max] as const));
+    actor.spellSlots = actor.spellSlots.map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level) ?? slot.remaining }));
+  }
+  if (actor.pactSlots && longRestDefinition?.spellcasting?.pact) actor.pactSlots = { ...actor.pactSlots, remaining: longRestDefinition.spellcasting.pact.max };
+  if (longRestDefinition?.spellcasting) actor.preparedSpellIds = longRestDefinition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id);
   return events;
 }

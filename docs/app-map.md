@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 6 GameState fields · 60 commands · 93 HTTP paths
+- 6 GameState fields · 62 commands · 95 HTTP paths
 
 ## GameState shape
 
@@ -60,6 +60,8 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `death-save`, `dice`, 
 | `character.claim` | `actor:write` |
 | `character.force-release` | `actor:write` |
 | `character.release` | `actor:write` |
+| `character.set-prepared` | `actor:write` |
+| `character.set-slot` | `actor:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
 | `effect.add` | `combat:write` |
@@ -118,9 +120,11 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
 - `POST /api/v1/game/actors/{actorId}/hp`
+- `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/rest`
 - `POST /api/v1/game/actors/{actorId}/size`
 - `POST /api/v1/game/actors/{actorId}/speed`
+- `POST /api/v1/game/actors/{actorId}/spell-slot`
 - `POST /api/v1/game/actors/{actorId}/spend-hit-dice`
 - `POST /api/v1/game/actors/{actorId}/temp-hp`
 - `POST /api/v1/game/actors/{actorId}/token-image`

@@ -10,6 +10,7 @@ import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-act
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
 import { canInitiateForActor } from "./authorization.js";
+import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
@@ -31,7 +32,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetPreparedSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -75,6 +76,8 @@ function actorScopeOf(principal: GamePrincipal): ActorScope {
 }
 /** A stable UUID identity for ownership fields (annotation owners, roll initiators). Credential ids are UUIDs too. */
 function sessionIdOf(principal: GamePrincipal): string { return principal.kind === "integration" ? principal.credentialId : principal.sessionId; }
+/** The reduced initiator the authorization seam reads: GM-grade acts on anyone, a player on their own claimed actor. */
+function initiatorOf(principal: GamePrincipal): { role: "gm" } | { role: "player"; sessionId: string } { return isGmGrade(principal) ? { role: "gm" } : { role: "player", sessionId: principal.sessionId }; }
 function annotationActorOf(principal: GamePrincipal): AnnotationActor { return { sessionId: sessionIdOf(principal), role: isGmGrade(principal) ? "gm" : "player" }; }
 /** Journal attribution tag (Time Machine v2). */
 function principalTag(principal: GamePrincipal): string {
@@ -1023,6 +1026,30 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async characterSetSlot(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetSlotSchema, raw, "The spell-slot command is malformed.");
+      const { commandId, actorId, level, remaining, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-slot", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setSpellSlotRemaining(state, actorId, level, remaining, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetPrepared(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetPreparedSchema, raw, "The prepared-spell command is malformed.");
+      const { commandId, actorId, spellId, prepared, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-prepared", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setPreparedSpell(state, actorId, spellId, prepared, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Fog of war ----------
 
     async fogSetEnabled(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1377,6 +1404,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
     ["actor.rest", "Apply a long rest: full HP, cleared dying state, refreshed limited uses, one less Exhaustion level (GM).", (p, raw) => operations.actorRest(p, raw)],
     ["actor.spend-hit-dice", "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).", (p, raw) => operations.actorSpendHitDice(p, raw)],
+    ["character.set-slot", "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).", (p, raw) => operations.characterSetSlot(p, raw)],
+    ["character.set-prepared", "Prepare or un-prepare one of a character's known spells.", (p, raw) => operations.characterSetPrepared(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
     ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],
