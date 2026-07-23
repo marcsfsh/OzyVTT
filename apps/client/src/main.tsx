@@ -266,8 +266,10 @@ function App() {
       {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
           encounter it duplicates the combat tracker at several times the size, so it collapses to
           one quiet line - still one tap away for a player joining mid-fight. */}
-      {state.combat.active
-        ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
+      {/* v4 #9: a player always sees their own character header (rendered inside ActorRoster, above its
+          minimize), so their roster is never hidden behind the combat <details>; only the GM's collapses. */}
+      {state.combat.active && mode === "gm"
+        ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster role="gm" state={state as GmView} /></details>
         : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
 
       {mode === "gm" && <Tabs

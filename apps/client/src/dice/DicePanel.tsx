@@ -22,9 +22,11 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
   const [disadvantage, setDisadvantage] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [fallFeet, setFallFeet] = useState("");
+  // A player's "self-only" roll is seen by the roller AND the GM (the GM view carries every roll), but no
+  // other player - i.e. "Just me and the GM". "blind" hides the result from the roller too (GM only).
   const visibilityOptions: Array<{ value: RollVisibility; label: string }> = role === "gm"
     ? [{ value: "public", label: "Everyone" }, { value: "gm-only", label: "Just me (GM)" }, { value: "self-only", label: "Just me" }]
-    : [{ value: "public", label: "Everyone" }, { value: "blind", label: "Just the GM" }, { value: "self-only", label: "Just me" }];
+    : [{ value: "public", label: "Everyone" }, { value: "self-only", label: "Just me and the GM" }, { value: "blind", label: "Just the GM" }];
   const visibilityLabel = (value: RollVisibility) => visibilityOptions.find((option) => option.value === value)?.label ?? value;
 
   const submit = (rollFormula: string, rollPurpose: RollPurpose) => {

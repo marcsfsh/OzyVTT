@@ -107,6 +107,8 @@ export function ActorRoster(props: Props) {
   const { confirm, dialog } = useConfirm();
   const actors = props.state.actors.filter((actor) => actor.kind === "player-character");
   const ownedActor = props.role === "player" ? actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine") ?? null : null;
+  // The player's own claimed character shows in its own header (v4 #9), so it's dropped from the choose grid.
+  const chooseList = ownedActor ? actors.filter((actor) => actor.id !== ownedActor.id) : actors;
   const busy = claiming !== null || releasing;
 
   const claim = (actorId: string, name: string) => {
@@ -156,11 +158,8 @@ export function ActorRoster(props: Props) {
       {!collapsed && <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>}
       <button type="button" className="roster-minimize" aria-expanded={!collapsed} aria-controls="roster-body" onClick={toggleCollapsed}>{collapsed ? `Show roster (${actors.length})` : "Minimize"}</button>
     </div>
-    {collapsed ? null : <div id="roster-body">
-    {props.role === "gm" && <div className="roster-import">
-      <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
-      <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
-    </div>}
+    {/* v4 #9: the player's own character always shows in its own header at the top, even when the roster
+        is minimized, and is excluded from the "choose your place" grid below. */}
     {props.role === "player" && ownedActor && <div className="you-are-playing">
       <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
       <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
@@ -171,8 +170,13 @@ export function ActorRoster(props: Props) {
       </div>
     </div>}
     {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" state={props.state} onClose={() => setSheetOpen(false)} />}
-    {actors.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">No characters yet</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
-      {actors.map((actor) => {
+    {collapsed ? null : <div id="roster-body">
+    {props.role === "gm" && <div className="roster-import">
+      <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
+      <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
+    </div>}
+    {chooseList.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">{ownedActor ? "No other characters" : "No characters yet"}</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : ownedActor ? "You've claimed your character — it's shown above." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
+      {chooseList.map((actor) => {
         const playerActor = "claimStatus" in actor ? actor : null;
         const mine = playerActor?.claimStatus === "mine";
         const unavailable = playerActor?.claimStatus === "claimed";
