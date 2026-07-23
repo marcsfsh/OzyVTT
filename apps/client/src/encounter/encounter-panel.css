@@ -337,13 +337,8 @@
 .sheet-rest-pool.empty { color: var(--text-muted); font-weight: 600; }
 .sheet-rest-buttons { display: flex; gap: .4rem; }
 /* Roll & heal / Short rest / Long rest now render as <Button size="sm">. */
-/* Rolls-bar segmented controls (still used in the pinned rolls bar). */
+/* Rolls bar: label + migrated SegmentedControls (roll-input / bonus-mode now use @vtt/ui). */
 .sheet-settings-label { color: var(--text-muted); font: 800 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
-.sheet-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
-.sheet-seg button { padding: .22rem .6rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .66rem/1 var(--font-mono); cursor: pointer; }
-.sheet-seg button + button { border-left: 1px solid var(--line); }
-.sheet-seg button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
-.sheet-seg button:hover:not(.on) { color: var(--text); }
 .sheet-abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: .4rem; margin-top: .9rem; }
 .sheet-ability { padding: .45rem .25rem; border-radius: var(--radius-md); background: var(--surface-3); text-align: center; }
 .sheet-ability span { display: block; color: var(--text-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; }

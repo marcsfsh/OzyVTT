@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { Button, IconButton, Modal, Stepper } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
@@ -617,14 +617,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // The roll-input settings (feedback #2.6): a narrow bar pinned under the header, always visible.
   const rollbar = definition ? (<div className="sheet-rollbar" role="group" aria-label="Roll entry settings">
     <span className="sheet-settings-label">Rolls</span>
-    <div className="sheet-seg" role="group" aria-label="Roll input mode">
-      <button type="button" className={rollInput === "digital" ? "on" : ""} aria-pressed={rollInput === "digital"} title="Tap a roll to have the app roll it" onClick={() => chooseRollInput("digital")}>Digital</button>
-      <button type="button" className={rollInput === "manual" ? "on" : ""} aria-pressed={rollInput === "manual"} title="Tap a roll, then type your physical die result" onClick={() => chooseRollInput("manual")}>Manual</button>
-    </div>
-    {rollInput === "manual" && <div className="sheet-seg" role="group" aria-label="Typed bonus handling">
-      <button type="button" className={bonusMode === "auto" ? "on" : ""} aria-pressed={bonusMode === "auto"} title="Type the die result; your bonus is added for you" onClick={() => chooseBonusMode("auto")}>Auto-add bonus</button>
-      <button type="button" className={bonusMode === "total" ? "on" : ""} aria-pressed={bonusMode === "total"} title="Type the final total, bonus already included" onClick={() => chooseBonusMode("total")}>Final total</button>
-    </div>}
+    <SegmentedControl size="sm" ariaLabel="Roll input mode" value={rollInput} onChange={(mode) => chooseRollInput(mode as "digital" | "manual")} options={[{ value: "digital", label: "Digital" }, { value: "manual", label: "Manual" }]} />
+    {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => chooseBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
   </div>) : null;
 
   // Two-subpanel workspace (feedback #9): sheet + shared dice log side by side (log docked left/right),
