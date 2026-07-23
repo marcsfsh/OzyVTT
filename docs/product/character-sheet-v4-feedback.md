@@ -5,6 +5,12 @@ Some items reach beyond the sheet into app IA (GM tabs, roster, map-as-player) a
 
 _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45)._
 
+**Status: all 10 items landed.** Commits: sheet-polish batch (#1,2,4,5,6,7), "Just me and the GM" +
+own-character header (#3,#9), player map sheet/initiative toggle (#8), GM Character Roster tab +
+archiving (#10). `check` + `build` green; server suite 421 tests. Live browser click-through still
+pending (no e2e harness here). Note on #10: the Viewer tab was kept (it drives the shared screen),
+placed after Character Roster in the reordered tab bar.
+
 ## Items
 
 1. **Dmg / Heal / Temp buttons are far too wide.** — ⏳
