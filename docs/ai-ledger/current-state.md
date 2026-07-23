@@ -295,6 +295,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     rejoins with the persisted player token, and a mobile Sheet/Dice segmented control). Every wave is
     `check`+`build` clean (server 419 tests). **Still pending:** a live browser/mobile click-through of
     the workspace/popout/standalone-tab (no e2e harness in the repo).
+  - **Sheet v3–v6 feedback + design-system compliance pass (2026-07-23, same PR).** Iterated the sheet
+    over further GM playtest rounds (v3–v6 feedback docs), then ran a **full design-system compliance
+    audit** of the sheet + its implementation and remediated it at *Pragmatic* scope: the clear-win
+    controls now compose `@vtt/ui` primitives (`IconButton`/`Stepper`/`Button`/`SegmentedControl`, plus a
+    `Meter tone="health"` HP bar and an attunement `Badge`), and the bespoke CSS is tokenized (both
+    hardcoded colors removed — incl. the cast-`<select>` caret redrawn from `--text-dim` gradient halves;
+    radii and the custom rem type scale snapped onto tokens, render-gated). The `ActorRoster` card buttons
+    and the dice roll-card cluster were swept too. `SegmentedControl` gained backwards-compatible
+    per-option `ariaLabel`/`title` for icon-only use (dock picker). The tuned matched-set cast cluster,
+    prep tags, slot pips, dense roll chips, and cyan-active filter/toggle pills were **kept and
+    tokenized** (screenshot-gated — the primitives would regress their tuned look). `check`+`build`+server
+    `test` (422) green each phase, headless render-verified in light + dark. Record:
+    `docs/product/character-sheet-styleguide-audit.md`. **Still pending:** a live browser/mobile
+    click-through (no e2e harness in the repo).
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's

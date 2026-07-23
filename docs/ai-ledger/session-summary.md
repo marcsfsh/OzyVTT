@@ -8,6 +8,29 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-23 — Character sheet design-system compliance pass (`claude/character-sheet-discovery-a14i7f`, PR #45)
+
+Full audit of the player character sheet + its implementation against the design system, then a
+*Pragmatic*-scope remediation (GM-confirmed): migrate the clear-win controls to `@vtt/ui` primitives and
+tokenize the CSS, but **keep the elements tuned over six rounds** (re-styled onto tokens), migrating a tuned
+element only where the primitive reproduces the look cleanly. Phases: **0** new tokens (`--fs-2xs`,
+`--line-hover`) + fixed 2 phantom tokens; **1** IconButton (✕), Stepper (inventory qty), Button
+(HP/rest/identity/coins/tools + all `ActorRoster` card buttons), SegmentedControl (roll-input, bonus-mode,
+dock-picker, phone tabs, dice Table/Mine) — each deleted its bespoke CSS; **2** `Meter tone="health"` in the
+HP tile (design language §6) + attunement `Badge`; **3** CSS sweep — both hardcoded colors removed (pip sheen
+`white`→`--cyan-hi`; cast-`<select>` caret redrawn from `--text-dim` gradient halves since a data-URI can't
+hold a `var()`), `50%`→`--radius-pill`, `2px`→`--radius-sm`, and the custom rem type scale snapped onto
+`--fs-2xs/xs/sm/body` (render-gated, ≤1px shifts, no reflow); **4** same type sweep on the dice roll-card
+cluster in `styles.css`, `/styleguide` updated. `SegmentedControl` gained backwards-compatible per-option
+`ariaLabel`/`title` (+ optional `label`) so the icon-only dock picker announces a real name. Kept bespoke &
+tokenized (evidence-based, screenshot-gated): the cast cluster, prep tags, slot pips, roll chips, item-category
+tag, and the cyan-tinted filter/toggle pills (the `Chip` primitive's monochrome pressable state reads muddier).
+Every phase: `check` + `build` + server `test` (422) green + headless render diff (light + dark). Durable
+record: `docs/product/character-sheet-styleguide-audit.md`. Follow-up (future, out of scope): a `Chip`
+"selected accent" + mono variant would let the remaining pills/roll-chips migrate.
+
+---
+
 ## 2026-07-23 — Scene IA PR review round (Encounter quick-switcher → button + popup)
 
 Screenshot-review pass on the scene-centric IA PR (`claude/scene-prep-gm-notes-c1gcur`, draft #44).
