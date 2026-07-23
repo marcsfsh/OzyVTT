@@ -332,6 +332,16 @@
 .sheet-section h3 { margin: 0 0 .4rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); color: var(--text); font: 400 .95rem var(--font-display); }
 .sheet-entry { margin: 0 0 .55rem; color: var(--text-dim); font-size: .82rem; line-height: 1.45; }
 .sheet-entry strong { color: var(--text); font-style: italic; }
+.sheet-identity { margin: .25rem 0 0; color: var(--text); font-size: .82rem; font-weight: 700; }
+.sheet-skill-list, .sheet-item-list, .sheet-spell-list { list-style: none; margin: .25rem 0 0; padding: 0; display: grid; gap: .3rem; }
+.sheet-skill-list li, .sheet-item-list li, .sheet-spell-list li { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; font-size: .8rem; color: var(--text-dim); }
+.sheet-skill-list li span, .sheet-item-list li span, .sheet-spell-list li span { color: var(--text); }
+.sheet-skill-list li strong { color: var(--text); font-family: var(--font-mono); }
+.sheet-item-list li small, .sheet-spell-list li small { color: var(--text-muted); font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.sheet-slots { display: flex; flex-wrap: wrap; gap: .4rem; margin: .55rem 0 0; }
+.sheet-slot { padding: .28rem .5rem; border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: .72rem; font-weight: 700; }
+.sheet-slot strong { color: var(--text); font-family: var(--font-mono); }
+.sheet-currency { margin: .55rem 0 0; color: var(--text-dim); font-family: var(--font-mono); font-size: .8rem; }
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }

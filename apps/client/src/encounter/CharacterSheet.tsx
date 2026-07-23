@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
-import { abilityModifier as modifierOf } from "@vtt/rules-5e";
+import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
@@ -14,6 +14,15 @@ const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
+const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
+const titleizeSkill = (id: string) => id.split("-").map(titleCase).join(" ");
+/** SRD governing ability for each of the 18 skills (drives the read-only skill bonus). */
+const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
+  acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
+  history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis",
+  nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int",
+  "sleight-of-hand": "dex", stealth: "dex", survival: "wis"
+};
 
 type SrdExtension = Partial<{
   challengeRating: number; type: string; alignment: string; armorDetail: string | null;
@@ -76,6 +85,19 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
     ? (["walk", "swim", "fly", "climb", "burrow"] as const).flatMap((mode) => { const feet = extension.speeds?.[mode]; return feet ? [`${mode === "walk" ? "" : `${mode} `}${feet} ft.${mode === "fly" && extension.speeds?.hover ? " (hover)" : ""}`] : []; }).join(", ")
     : definition ? `${definition.speedFeet} ft.` : null;
 
+  const character = definition?.character;
+  const proficiencies = definition?.proficiencies;
+  const spellcasting = definition?.spellcasting;
+  const inventory = actor.inventory ?? [];
+  const currency = actor.currency ?? null;
+  const preparedIds = new Set<string>(actor.preparedSpellIds ?? []);
+  const liveSlotRemaining = new Map<number, number>((actor.spellSlots ?? []).map((slot) => [slot.level, slot.remaining]));
+  const pact = actor.pactSlots ?? null;
+  const spellDc = spellcasting && definition ? (spellcasting.saveDc ?? spellSaveDc(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  const spellAtk = spellcasting && definition ? (spellcasting.attackBonus ?? spellAttackBonus(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
+  const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
+
   // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
   // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
   // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
@@ -83,6 +105,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       <p className="sheet-typeline">
         {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
       </p>
+      {identity && <p className="sheet-identity">{identity}</p>}
 
       <div className="sheet-vitals">
         <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
@@ -115,6 +138,25 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           {extension.conditionImmunities && <div><dt>Condition immunities</dt><dd>{extension.conditionImmunities}</dd></div>}
           <div><dt>Proficiency</dt><dd>{signed(definition.proficiencyBonus)}</dd></div>
         </dl>
+        {proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0) && <section className="sheet-section"><h3>Proficiencies</h3>
+          {proficiencies.saves.length > 0 && <p className="sheet-entry"><strong>Saving throws.</strong> {proficiencies.saves.map((ability) => `${ability.toUpperCase()} ${signed(saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, true))}`).join(", ")}</p>}
+          {proficiencies.skills.length > 0 && <ul className="sheet-skill-list">
+            {proficiencies.skills.map((skill) => { const ability = SKILL_ABILITY[skill.id]; const bonus = ability ? skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, skill.proficiency) : null; return <li key={skill.id}><span>{titleizeSkill(skill.id)}{skill.proficiency === "expertise" ? " (expertise)" : ""}</span><strong>{bonus === null ? "-" : signed(bonus)}</strong></li>; })}
+          </ul>}
+        </section>}
+        {spellcasting && <section className="sheet-section"><h3>Spells</h3>
+          <p className="sheet-entry"><strong>{spellcasting.ability.toUpperCase()} caster.</strong> Save DC {spellDc}{spellAtk !== null ? `, ${signed(spellAtk)} to hit` : ""}.</p>
+          {spellcasting.slots.length > 0 && <div className="sheet-slots">{spellcasting.slots.map((slot) => <span key={slot.level} className="sheet-slot">{ordinal(slot.level)} <strong>{liveSlotRemaining.get(slot.level) ?? slot.max}/{slot.max}</strong></span>)}{pact ? <span className="sheet-slot">Pact {ordinal(pact.level)} <strong>{pact.remaining}</strong></span> : null}</div>}
+          {spellcasting.spells.length > 0 && <ul className="sheet-spell-list">
+            {[...spellcasting.spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name)).map((spell) => <li key={spell.id}><span>{spell.name}</span><small>{spell.level === 0 ? "Cantrip" : `${ordinal(spell.level)}${preparedIds.has(spell.id) || spell.alwaysPrepared ? " · prepared" : ""}`}</small></li>)}
+          </ul>}
+        </section>}
+        {(inventory.length > 0 || hasCoins) && <section className="sheet-section"><h3>Inventory</h3>
+          {inventory.length > 0 && <ul className="sheet-item-list">
+            {inventory.map((item) => <li key={item.id}><span>{item.name}{item.quantity !== 1 ? ` ×${item.quantity}` : ""}</span>{(item.equipped || item.attuned) && <small>{[item.equipped ? "equipped" : null, item.attuned ? "attuned" : null].filter(Boolean).join(", ")}</small>}</li>)}
+          </ul>}
+          {hasCoins && currency && <p className="sheet-currency">{(["pp", "gp", "ep", "sp", "cp"] as const).flatMap((coin) => currency[coin] ? [`${currency[coin]} ${coin}`] : []).join(" · ")}</p>}
+        </section>}
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
