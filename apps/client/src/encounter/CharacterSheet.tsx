@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { IconButton, Modal, Stepper } from "@vtt/ui";
+import { Button, IconButton, Modal, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
@@ -62,10 +62,10 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
   };
   return <div className="sheet-hp-controls" role="group" aria-label="Track hit points">
     <input type="number" min="0" max="1000" placeholder="0" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-    <button type="button" disabled={busy} onClick={() => send("actor:apply-damage", "Damaged")}>Dmg</button>
-    <button type="button" disabled={busy} onClick={() => send("actor:heal", "Healed")}>Heal</button>
-    <button type="button" disabled={busy} onClick={() => send("actor:set-temp-hp", "Temp set to")}>Temp</button>
-    {allowSet && <button type="button" disabled={busy} onClick={() => send("actor:set-hp", "HP set to")}>Set</button>}
+    <Button size="sm" variant="destructive" disabled={busy} onClick={() => send("actor:apply-damage", "Damaged")}>Dmg</Button>
+    <Button size="sm" disabled={busy} onClick={() => send("actor:heal", "Healed")}>Heal</Button>
+    <Button size="sm" disabled={busy} onClick={() => send("actor:set-temp-hp", "Temp set to")}>Temp</Button>
+    {allowSet && <Button size="sm" disabled={busy} onClick={() => send("actor:set-hp", "HP set to")}>Set</Button>}
   </div>;
 }
 
@@ -99,12 +99,12 @@ function SheetRest({ actorId, hitDice, onFeedback }: Readonly<{ actorId: string;
       ? <div className="sheet-rest-dice" role="group" aria-label="Spend Hit Dice">
           <span className="sheet-rest-pool" title="Hit Point Dice - spend on a short rest; each die heals its roll plus your Constitution modifier (minimum 1).">Hit Dice {hitDice.remaining}/{hitDice.maximum} ({hitDice.die})</span>
           <Stepper value={chosen} onChange={setCount} min={1} max={hitDice.remaining} disabled={busy} aria-label="Number of Hit Dice to spend" />
-          <button type="button" className="sheet-rest-btn" disabled={busy} onClick={spendDice}>Roll &amp; heal</button>
+          <Button size="sm" disabled={busy} onClick={spendDice}>Roll &amp; heal</Button>
         </div>
       : <span className="sheet-rest-pool empty">Hit Dice 0/{hitDice.maximum} — a long rest restores them.</span>)}
     <div className="sheet-rest-buttons" role="group" aria-label="Rest">
-      <button type="button" className="sheet-rest-btn" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice above." onClick={() => rest("short")}>Short rest</button>
-      <button type="button" className="sheet-rest-btn primary" disabled={busy} title="Full HP, all spell slots and Hit Dice restored, prepared spells reset, one less Exhaustion level." onClick={() => rest("long")}>Long rest</button>
+      <Button size="sm" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice above." onClick={() => rest("short")}>Short rest</Button>
+      <Button size="sm" disabled={busy} title="Full HP, all spell slots and Hit Dice restored, prepared spells reset, one less Exhaustion level." onClick={() => rest("long")}>Long rest</Button>
     </div>
   </div>;
 }
@@ -404,8 +404,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
           <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
           <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
           <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
-          <button type="button" className="sheet-save-btn" disabled={busy} onClick={saveIdentity}>Save</button>
-          <button type="button" className="sheet-edit-toggle" onClick={() => setEditMode(null)}>Cancel</button>
+          <Button size="sm" disabled={busy} onClick={saveIdentity}>Save</Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditMode(null)}>Cancel</Button>
         </div>}
 
       <div className="sheet-vitals">
@@ -452,7 +452,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
           {extension.conditionImmunities && <div><dt>Condition immunities</dt><dd>{extension.conditionImmunities}</dd></div>}
           <div><dt>Proficiency</dt><dd>{signed(definition.proficiencyBonus)}</dd></div>
         </dl>
-        {((proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0)) || actor.kind === "player-character") && <section className="sheet-section"><h3>Proficiencies{actor.kind === "player-character" && <button type="button" className="sheet-edit-toggle" onClick={() => editMode === "prof" ? setEditMode(null) : openProfEditor()}>{editMode === "prof" ? "Done" : "Edit"}</button>}</h3>
+        {((proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0)) || actor.kind === "player-character") && <section className="sheet-section"><h3>Proficiencies{actor.kind === "player-character" && <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={() => editMode === "prof" ? setEditMode(null) : openProfEditor()}>{editMode === "prof" ? "Done" : "Edit"}</Button>}</h3>
           {editMode === "prof"
             ? <div className="sheet-editor">
                 <p className="sheet-editor-hint">Changes save as you go. Tap a save to toggle it; tap a skill to cycle proficient → expertise → none. Press <strong>Done</strong> when finished.</p>
@@ -511,8 +511,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         {actor.kind === "player-character" && <section className="sheet-section"><h3>Inventory</h3>
           <form className="sheet-add-item" onSubmit={(event) => { event.preventDefault(); const name = newItem.trim(); if (!name) return; setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { id: slugify(name), name, quantity: 1 } }, ack); setNewItem(""); }}>
             <input type="text" value={newItem} maxLength={120} placeholder="Add a custom item…" aria-label="New item name" onChange={(event) => setNewItem(event.target.value)} />
-            <button type="submit" disabled={busy || !newItem.trim()}>Add</button>
-            <button type="button" className="sheet-browse-gear" disabled={busy} onClick={() => setPickerOpen(true)}>Browse SRD gear</button>
+            <Button type="submit" size="sm" disabled={busy || !newItem.trim()}>Add</Button>
+            <Button size="sm" disabled={busy} onClick={() => setPickerOpen(true)}>Browse SRD gear</Button>
           </form>
           {inventory.length > 0 && <div className="sheet-inv">
             <div className="sheet-inv-row sheet-inv-head" aria-hidden="true">
@@ -531,7 +531,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
           {pickerOpen && <EquipmentPicker ownedCounts={ownedCounts} busy={busy} onAdd={addFromCatalog} onClose={() => setPickerOpen(false)} />}
           <div className="sheet-coins">
             {COINS.map((coin) => <label key={coin}>{coin}<input type="number" min="0" max="1000000" value={coins[coin]} onChange={(event) => setCoins((prev) => ({ ...prev, [coin]: Math.max(0, Math.min(1000000, Math.floor(Number(event.target.value) || 0))) }))} /></label>)}
-            <button type="button" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-currency", { commandId: newId(), actorId: actor.id, currency: coins }, ack); }}>Save coins</button>
+            <Button size="sm" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-currency", { commandId: newId(), actorId: actor.id, currency: coins }, ack); }}>Save coins</Button>
           </div>
         </section>}
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
@@ -596,7 +596,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       <strong className="sheet-name">{actor.name}</strong>
       <div className="sheet-header-sub">
         <span className="sheet-idline">{identityLine}</span>
-        {actor.kind === "player-character" && definition && editMode !== "identity" && <button type="button" className="sheet-edit-toggle" onClick={openIdEditor}>Edit</button>}
+        {actor.kind === "player-character" && definition && editMode !== "identity" && <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={openIdEditor}>Edit</Button>}
       </div>
     </div>
     <div className="sheet-header-controls">
@@ -608,8 +608,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
         <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
       </div>}
-      {!standalone && !embedded && <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>}
-      {!standalone && !embedded && role === "player" && <button type="button" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</button>}
+      {!standalone && !embedded && <Button size="sm" variant="ghost" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</Button>}
+      {!standalone && !embedded && role === "player" && <Button size="sm" variant="ghost" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</Button>}
       <IconButton label={embedded ? "Back to initiative" : "Close"} size="sm" className="sheet-close" onClick={onClose}>✕</IconButton>
     </div>
   </div>);
