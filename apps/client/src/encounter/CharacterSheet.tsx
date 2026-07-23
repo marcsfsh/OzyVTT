@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import type { ActorDefinition, ContentEquipmentSummary, GmActor, PlayerActor } from "@vtt/domain";
+import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, PlayerActor } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
+import { useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -64,6 +65,37 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
 }
 
 /**
+ * Per-spell "Cast at" control: a slot-level dropdown (each level shows remaining/total; empty levels
+ * disabled) plus a Cast button. Casting spends the chosen slot and, for a damaging spell, auto-applies
+ * the SRD upcast scaling for that level (referenced from the vendored spell data) - the parent owns the
+ * two-step emit so this stays a small stateful shell. Only offered for leveled spells (cantrips use no
+ * slot); returns null when the character has no slot at or above the spell's level.
+ */
+function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRemaining, busy, onCast }: Readonly<{
+  spell: Readonly<{ id: string; name: string; level: number }>;
+  content: ContentSpellSummary | undefined;
+  slotLevels: readonly number[];
+  slotMaxByLevel: ReadonlyMap<number, number>;
+  liveRemaining: ReadonlyMap<number, number>;
+  busy: boolean;
+  onCast: (level: number) => void;
+}>) {
+  const options = slotLevels.filter((level) => level >= spell.level);
+  const [castLevel, setCastLevel] = useState(options[0] ?? spell.level);
+  if (options.length === 0) return null;
+  const level = options.includes(castLevel) ? castLevel : options[0];
+  const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
+  const upcast = level > spell.level ? content?.castingOptions.find((option) => option.level === level) : undefined;
+  const scaled = upcast?.damageRoll ?? (upcast?.targetCount != null ? `${upcast.targetCount}×` : null);
+  return <div className="sheet-cast">
+    <select className="sheet-cast-select" aria-label={`Cast ${spell.name} at level`} value={level} disabled={busy} onChange={(event) => setCastLevel(Number(event.target.value))}>
+      {options.map((slot) => <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>{ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}{slot > spell.level ? " ↑" : ""}</option>)}
+    </select>
+    <button type="button" className="sheet-cast-btn" disabled={busy || remainingAt(level) === 0} onClick={() => onCast(level)}>Cast{scaled ? ` ${scaled}` : ""}</button>
+  </div>;
+}
+
+/**
  * Read/track sheet: live actor state (hp, conditions) over the immutable stat block.
  * Track, never build - no editing of scores or actions here. The GM opens any combatant;
  * a player only ever receives their own actor (and no monster definition fetch succeeds
@@ -87,6 +119,8 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
   const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
+  // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
+  const spellRef = useSpellReference();
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
   // the GM still applies damage (players never mutate another creature's HP).
@@ -123,6 +157,36 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const pact = actor.pactSlots ?? null;
   const spellDc = spellcasting && definition ? (spellcasting.saveDc ?? spellSaveDc(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
   const spellAtk = spellcasting && definition ? (spellcasting.attackBonus ?? spellAttackBonus(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  // "Cast at" support: index the SRD spell data by id, and the character's slot pools by level.
+  const spellIndex = new Map(spellRef.map((entry) => [entry.id, entry]));
+  const slotMaxByLevel = new Map<number, number>((spellcasting?.slots ?? []).map((slot) => [slot.level, slot.max]));
+  const slotLevels = [...slotMaxByLevel.entries()].filter(([, max]) => max > 0).map(([level]) => level).sort((a, b) => a - b);
+  // Cast a leveled spell at a chosen slot level: spend that slot, then (for a damaging spell) auto-roll
+  // the SRD upcast scaling for that level - one composable slot-spend + one dice roll, both server-checked.
+  const castSpell = (spell: Readonly<{ id: string; name: string; level: number }>, level: number) => {
+    const max = slotMaxByLevel.get(level) ?? 0;
+    const rem = liveSlotRemaining.get(level) ?? max;
+    if (max <= 0 || rem <= 0) { setFeedback(`No ${ordinal(level)}-level slots remain.`); return; }
+    const content = spellIndex.get(spell.id);
+    const upcast = level > spell.level ? content?.castingOptions.find((entry) => entry.level === level) : undefined;
+    const formula = upcast?.damageRoll ?? content?.damageRoll ?? null;
+    const rays = upcast?.targetCount ?? null;
+    const suffix = rays ? ` ×${rays}` : "";
+    setBusy(true);
+    socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      if (!result.ok) { setFeedback(result.message ?? "The slot could not be spent."); return; }
+      if (formula) {
+        setRolling(true);
+        socket.emit("dice:roll", { commandId: newId(), formula, purpose: "damage", visibility: "public", actorId: actor.id }, (roll: { ok: boolean; message?: string }) => {
+          setRolling(false);
+          setFeedback(roll.ok ? `Cast ${spell.name} at ${ordinal(level)}${suffix} - rolled ${formula}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""} (see dice log), spent a slot.` : roll.message ?? "The damage roll was rejected.");
+        });
+      } else {
+        setFeedback(`Cast ${spell.name} at ${ordinal(level)}${suffix} - spent a ${ordinal(level)}-level slot.`);
+      }
+    });
+  };
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
   const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
   const attunedCount = inventory.filter((item) => item.attuned).length;
@@ -231,10 +295,9 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
             type Spell = (typeof spellcasting.spells)[number];
             const groups = new Map<number, Spell[]>();
             for (const spell of spellcasting.spells) { const list = groups.get(spell.level) ?? []; list.push(spell); groups.set(spell.level, list); }
-            const slotMax = new Map(spellcasting.slots.map((slot) => [slot.level, slot.max]));
             return [...groups.keys()].sort((a, b) => a - b).map((level) => {
               const spells = [...groups.get(level)!].sort((a, b) => a.name.localeCompare(b.name));
-              const max = slotMax.get(level) ?? 0;
+              const max = slotMaxByLevel.get(level) ?? 0;
               const remaining = liveSlotRemaining.get(level) ?? max;
               return <div key={level} className="sheet-spell-group">
                 <div className="sheet-spell-group-head">
@@ -250,6 +313,7 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
                       ? <button type="button" className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`} disabled={busy} title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{isPrepared ? "Prepared" : "Prepare"}</button>
                       : <span className="sheet-prep-tag on">Always</span>}
                     <span className="sheet-spell-name">{spell.name}</span>
+                    {spell.level > 0 && actor.kind === "player-character" && <SpellCastControls spell={spell} content={spellIndex.get(spell.id)} slotLevels={slotLevels} slotMaxByLevel={slotMaxByLevel} liveRemaining={liveSlotRemaining} busy={busy} onCast={(castLevel) => castSpell(spell, castLevel)} />}
                   </li>; })}
                 </ul>
               </div>;

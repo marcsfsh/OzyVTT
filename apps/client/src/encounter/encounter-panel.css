@@ -438,8 +438,14 @@
 .sheet-pip:disabled { cursor: default; opacity: .7; }
 .sheet-slot-count { color: var(--text-muted); font: 700 .66rem var(--font-mono); }
 .sheet-spell-list { grid-template-columns: 1fr; }
-.sheet-spell-list li { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .5rem; }
+.sheet-spell-list li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; }
 .sheet-spell-name { color: var(--text); font-size: .82rem; }
+/* "Cast at" control: slot-level dropdown + Cast button (auto-applies SRD upcast scaling). */
+.sheet-cast { display: inline-flex; align-items: center; gap: .3rem; justify-self: end; }
+.sheet-cast-select { padding: .16rem .3rem; max-width: 8.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 600 .68rem/1 var(--font-mono); }
+.sheet-cast-btn { padding: .2rem .5rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line-strong)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--violet) 16%, var(--surface-3)); color: var(--text); font: 700 .64rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; white-space: nowrap; }
+.sheet-cast-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--violet) 65%, transparent); }
+.sheet-cast-btn:disabled { opacity: .55; cursor: default; }
 .sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 .58rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prep-tag.toggle { cursor: pointer; }

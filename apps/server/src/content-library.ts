@@ -86,11 +86,19 @@ function spellComponentsText(components: ReturnType<typeof loadSpells>[number]["
   const material = components.material && components.materialText ? ` (${components.materialText})` : "";
   return base ? `${base}${material}` : "None";
 }
+/** SRD upcast rows are typed "slot_level_N"; keep only those (cantrip character-level scaling is not a cast-at option) and surface the slot level the sheet keys on. */
+function slotCastingOptions(options: ReturnType<typeof loadSpells>[number]["castingOptions"]): ContentSpellSummary["castingOptions"] {
+  return options.flatMap((option) => {
+    const match = /^slot_level_(\d+)$/.exec(option.type);
+    return match ? [{ level: Number(match[1]), damageRoll: option.damageRoll, targetCount: option.targetCount }] : [];
+  });
+}
 const spellSummaries: readonly ContentSpellSummary[] = loadSpells()
   .map((spell) => ({
     id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
     rangeText: spell.range.text, componentsText: spellComponentsText(spell.components), duration: spell.duration,
-    concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel
+    concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel,
+    damageRoll: spell.damage.roll, damageTypes: spell.damage.types, castingOptions: slotCastingOptions(spell.castingOptions)
   }))
   .sort((left, right) => left.name.localeCompare(right.name));
 

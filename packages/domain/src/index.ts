@@ -372,7 +372,13 @@ export type ContentMonstersResult = { ok: boolean; message?: string; monsters?: 
 export type ContentConditionSummary = Readonly<{ id: string; name: string; description: string }>;
 export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[] };
 /** SRD spell reference (rules text + the header fields a card shows) for the in-app spell rules window; public information for any joined session. */
-export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null }>;
+export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null;
+  /** Base damage/healing roll ("8d6"), or null for a spell that rolls nothing. Drives the sheet's "cast at" auto-roll. */
+  damageRoll: string | null;
+  /** Damage types for the base roll (empty for healing/none). */
+  damageTypes: readonly string[];
+  /** Per-slot-level upcast scaling parsed from the SRD (Fireball's 9d6 at 4th, Scorching Ray's 4 rays at 3rd): the sheet auto-applies the entry matching the chosen cast level. */
+  castingOptions: ReadonlyArray<{ level: number; damageRoll: string | null; targetCount: number | null }> }>;
 export type ContentSpellsResult = { ok: boolean; message?: string; spells?: readonly ContentSpellSummary[] };
 /** One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only for those categories. */
 export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: "weapon" | "armor" | "shield" | "ammunition" | "adventuring-gear" | "tool" | "equipment-pack" | "consumable" | "focus" | "wondrous"; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;

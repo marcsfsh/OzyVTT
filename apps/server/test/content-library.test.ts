@@ -17,6 +17,16 @@ describe("bundled reference content exposed to the client", () => {
     // Components fold to the "V, S, M (...)" string a card renders, never the raw booleans.
     expect(fireball?.componentsText).toBe("V, S, M (a ball of bat guano and sulfur)");
     expect(fireball?.description).toContain("bright streak");
+    // Base damage + SRD upcast scaling drive the sheet's "cast at" auto-roll (Fireball: 8d6, +1d6/level).
+    expect(fireball?.damageRoll).toBe("8d6");
+    expect(fireball?.damageTypes).toEqual(["fire"]);
+    expect(fireball?.castingOptions.find((option) => option.level === 4)).toEqual({ level: 4, damageRoll: "9d6", targetCount: null });
+    expect(fireball?.castingOptions.find((option) => option.level === 9)).toMatchObject({ damageRoll: "14d6" });
+    // Only slot-level upcasts are surfaced (cantrip character-level scaling is filtered out).
+    expect(fireball?.castingOptions.every((option) => option.level >= 4 && option.level <= 9)).toBe(true);
+    // A target-scaling spell carries the count, not a new damage roll (Scorching Ray: +1 ray/level).
+    const scorchingRay = spells.find((spell) => spell.id === "scorching-ray");
+    expect(scorchingRay?.castingOptions.find((option) => option.level === 3)).toEqual({ level: 3, damageRoll: null, targetCount: 4 });
   });
 
   it("exposes the folded equipment catalog the sheet's browse-and-add picker reads", () => {
