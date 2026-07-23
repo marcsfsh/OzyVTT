@@ -466,6 +466,39 @@
 .sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
 .sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
 .sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }
+
+/* ---- Sheet workspace (feedback #9): sheet + shared dice log as two subpanels ---- */
+/* Only the has-log case restructures the modal into flex columns; a plain sheet keeps the body scroll. */
+.character-sheet.has-log { max-width: min(100vw - 2rem, 64rem); }
+.character-sheet.has-log .nh-modal-surface { max-height: 92vh; }
+.character-sheet.has-log .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.sheet-workspace.has-log { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sheet-workspace-bar { display: flex; align-items: center; gap: .6rem; padding: .5rem var(--space-5); border-bottom: 1px solid var(--line); }
+.sheet-mobile-tabs { display: none; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
+.sheet-mobile-tabs button { padding: .24rem .8rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .7rem/1 var(--font-mono); cursor: pointer; }
+.sheet-mobile-tabs button + button { border-left: 1px solid var(--line); }
+.sheet-mobile-tabs button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
+.sheet-dock-picker { display: flex; align-items: center; gap: .3rem; margin-left: auto; }
+.sheet-dock-label { color: var(--text-muted); font: 800 .6rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; }
+.sheet-dock-picker button { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); cursor: pointer; }
+.sheet-dock-picker button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--cyan); color: var(--text); }
+.sheet-workspace.has-log .sheet-workspace-cols { display: flex; flex: 1; min-height: 0; }
+.sheet-workspace.has-log.log-left .sheet-workspace-cols { flex-direction: row-reverse; }
+.sheet-workspace.has-log .sheet-workspace-pane { min-width: 0; overflow-y: auto; }
+.sheet-workspace.has-log .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
+.sheet-workspace.has-log .log-pane { flex: 0 0 clamp(16rem, 34%, 22rem); padding: var(--space-4); border-left: 1px solid var(--line); }
+.sheet-workspace.has-log.log-left .log-pane { border-left: 0; border-right: 1px solid var(--line); }
+/* Phone: the two panes can't sit side by side - show one at a time behind the Sheet/Dice toggle. */
+@media (max-width: 680px) {
+  .character-sheet.has-log { max-width: min(100vw - 1rem, 64rem); }
+  .sheet-workspace.has-log .sheet-mobile-tabs { display: inline-flex; }
+  .sheet-workspace.has-log .sheet-dock-picker { display: none; }
+  .sheet-workspace.has-log .sheet-workspace-cols { flex-direction: column; }
+  .sheet-workspace.has-log.show-sheet .log-pane { display: none; }
+  .sheet-workspace.has-log.show-log .sheet-pane { display: none; }
+  .sheet-workspace.has-log .log-pane { flex: 1 1 auto; border-left: 0; border-top: 1px solid var(--line); }
+}
+
 .roster-import { margin-top: 1rem; }
 .roster-import button { padding: .55rem .9rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); font-size: .82rem; color: var(--text-dim); text-align: center; }
 .roster-import button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }

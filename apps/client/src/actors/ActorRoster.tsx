@@ -170,7 +170,7 @@ export function ActorRoster(props: Props) {
         <Button variant="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</Button>
       </div>
     </div>}
-    {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" onClose={() => setSheetOpen(false)} />}
+    {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" state={props.state} onClose={() => setSheetOpen(false)} />}
     {actors.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">No characters yet</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
       {actors.map((actor) => {
         const playerActor = "claimStatus" in actor ? actor : null;

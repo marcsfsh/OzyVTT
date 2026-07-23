@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, PlayerActor } from "@vtt/domain";
+import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
 import { useSpellReference } from "./spells";
 import { RichText } from "./RichText";
+import { DicePanel } from "../dice/DicePanel";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -105,7 +106,7 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
  * a player only ever receives their own actor (and no monster definition fetch succeeds
  * for them server-side).
  */
-export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; onClose: () => void }>) {
+export function CharacterSheet({ actor, role, state, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
   // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
@@ -129,6 +130,13 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const [bonusMode, setBonusMode] = useState<"auto" | "total">(() => (readSetting("vtt.sheet.bonusMode") === "total" ? "total" : "auto"));
   const chooseRollInput = (mode: "digital" | "manual") => { setRollInput(mode); writeSetting("vtt.sheet.rollInput", mode); };
   const chooseBonusMode = (mode: "auto" | "total") => { setBonusMode(mode); writeSetting("vtt.sheet.bonusMode", mode); };
+  // Panel layout (feedback #9): the shared dice log rides beside the sheet as a second subpanel. Its
+  // side (left/right of the sheet) docks like the GM tracker and is remembered per browser; on a narrow
+  // phone the two panes can't sit side by side, so a Sheet/Dice segmented control shows one at a time.
+  const hasLog = state !== undefined;
+  const [logSide, setLogSide] = useState<"left" | "right">(() => (readSetting("vtt.sheet.logSide") === "left" ? "left" : "right"));
+  const chooseLogSide = (side: "left" | "right") => { setLogSide(side); writeSetting("vtt.sheet.logSide", side); };
+  const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
   const { prompt, dialog } = usePrompt();
   // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
   const spellRef = useSpellReference();
@@ -248,10 +256,8 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
   const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
   const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) }; setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
-  // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
-  // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
-  // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
-  return <><Modal open onClose={onClose} size="lg" className="character-sheet" title={actor.name} ariaLabel={`${actor.name} character sheet`}>
+  // The sheet's own scrolling content (one column of the workspace below).
+  const sheetScroll = (<div className="sheet-scroll">
       <p className="sheet-typeline">
         {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
       </p>
@@ -410,5 +416,28 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
       {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet - the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
-  </Modal>{dialog}</>;
+  </div>);
+
+  // Two-subpanel workspace (feedback #9): the sheet and, when the caller supplies live state, the shared
+  // dice log ride side by side on a wide screen (log docked left or right); on a phone a Sheet/Dice
+  // segmented control shows one pane at a time, so a roll's result is a tap away rather than a scroll away.
+  const workspace = (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`}>
+    {hasLog && <div className="sheet-workspace-bar">
+      <div className="sheet-mobile-tabs" role="tablist" aria-label="Show sheet or dice">
+        <button type="button" role="tab" aria-selected={mobilePane === "sheet"} className={mobilePane === "sheet" ? "on" : ""} onClick={() => setMobilePane("sheet")}>Sheet</button>
+        <button type="button" role="tab" aria-selected={mobilePane === "log"} className={mobilePane === "log" ? "on" : ""} onClick={() => setMobilePane("log")}>Dice</button>
+      </div>
+      <div className="sheet-dock-picker" role="group" aria-label="Dice log position">
+        <span className="sheet-dock-label">Log</span>
+        <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
+        <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
+      </div>
+    </div>}
+    <div className="sheet-workspace-cols">
+      <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
+      {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} /></div>}
+    </div>
+  </div>);
+
+  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} title={actor.name} ariaLabel={`${actor.name} character sheet`}>{workspace}</Modal>{dialog}</>;
 }

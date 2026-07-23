@@ -824,7 +824,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
-    {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" onClose={() => setSheetActorId(null)} /> : null; })()}
+    {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" state={state} onClose={() => setSheetActorId(null)} /> : null; })()}
     {confirmDialog}
   </section>;
 }
