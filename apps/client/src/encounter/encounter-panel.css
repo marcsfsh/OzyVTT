@@ -502,6 +502,10 @@
 .sheet-float-body { display: flex; flex: 1; min-height: 0; }
 .sheet-float-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }
 
+/* Its own browser tab: the workspace fills the window; no modal chrome. */
+.sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
+.sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 2rem; color: var(--text-dim); font-size: .95rem; text-align: center; }
+
 /* Phone: the two panes can't sit side by side - show one at a time behind the Sheet/Dice toggle. */
 @media (max-width: 680px) {
   .character-sheet.has-log { max-width: min(100vw - 1rem, 64rem); }

@@ -106,7 +106,7 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
  * a player only ever receives their own actor (and no monster definition fetch succeeds
  * for them server-side).
  */
-export function CharacterSheet({ actor, role, state, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; onClose: () => void }>) {
+export function CharacterSheet({ actor, role, state, standalone = false, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
   // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
@@ -450,7 +450,8 @@ export function CharacterSheet({ actor, role, state, onClose }: Readonly<{ actor
           <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
           <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
         </div>}
-        <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>
+        {!standalone && <button type="button" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</button>}
+        {!standalone && role === "player" && <button type="button" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</button>}
       </div>
     </div>
     <div className="sheet-workspace-cols">
@@ -458,6 +459,10 @@ export function CharacterSheet({ actor, role, state, onClose }: Readonly<{ actor
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} /></div>}
     </div>
   </div>);
+
+  // Its own browser tab (feedback #9.3): no modal chrome, no popout - the tab is the panel; it fills
+  // the window and Close ends the tab.
+  if (standalone) return <><div className="sheet-standalone">{workspace}</div>{dialog}</>;
 
   if (presentation === "floating") {
     return <>
