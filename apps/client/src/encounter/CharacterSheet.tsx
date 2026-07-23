@@ -110,6 +110,23 @@ function SheetRest({ actorId, hitDice, onFeedback }: Readonly<{ actorId: string;
 }
 
 /**
+ * The damage a spell deals when cast at `level` - the ONE place both the displayed effect helper and the
+ * rolled formula come from, so they can never diverge (v6 #8). Uses the SRD upcast row for that slot if
+ * there is one, else the base damage. For target-scaling (N darts/rays), the roll `formula` repeats the
+ * die `targetCount` times so casting rolls the FULL amount - the old code only put "×N" in the label and
+ * rolled a single instance, which is why an upcast rolled the non-upcast damage.
+ */
+function spellEffectAt(content: ContentSpellSummary | undefined, baseLevel: number, level: number): { label: string | null; formula: string | null } {
+  const upcast = level > baseLevel ? content?.castingOptions.find((option) => option.level === level) : undefined;
+  const die = upcast?.damageRoll ?? content?.damageRoll ?? null;
+  const targets = upcast?.targetCount ?? null;
+  if (die && targets && targets > 1) return { label: `${targets}× ${die}`, formula: Array.from({ length: targets }, () => die).join(" + ") };
+  if (die) return { label: die, formula: die };
+  if (targets) return { label: `${targets} targets`, formula: null };
+  return { label: null, formula: null };
+}
+
+/**
  * Per-spell "Cast at" control: a slot-level dropdown (each level shows remaining/total; empty levels
  * disabled) plus a Cast button. Casting spends the chosen slot and, for a damaging spell, auto-applies
  * the SRD upcast scaling for that level (referenced from the vendored spell data) - the parent owns the
@@ -131,13 +148,10 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
   const [castLevel, setCastLevel] = useState(options[0] ?? spell.level);
   const level = options.includes(castLevel) ? castLevel : (options[0] ?? spell.level);
   const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
-  // The effect at the selected level: a damaging spell's die (base or SRD-upscaled), "N× die" for
-  // ray/dart-scaling, or "N targets" for target-only scaling; empty for utility spells. Three uniform
+  // The effect at the selected level (base or SRD-upscaled), from the same helper the Cast button rolls,
+  // so the shown "N× die"/"4d6" and the rolled damage are always the same value (v6 #8). Three uniform
   // grid cells (helper · slot · Cast) that align across every row (v5 #1/#2/#9).
-  const upcast = !isCantrip && level > spell.level ? content?.castingOptions.find((option) => option.level === level) : undefined;
-  const damage = upcast?.damageRoll ?? content?.damageRoll ?? null;
-  const targets = upcast?.targetCount ?? null;
-  const effect = damage && targets ? `${targets}× ${damage}` : damage ?? (targets ? `${targets} targets` : null);
+  const { label: effect } = spellEffectAt(content, spell.level, level);
   const canCast = isCantrip || (options.length > 0 && remainingAt(level) > 0);
   return <>
     <span className="sheet-cast-effect" aria-hidden={effect ? undefined : true} title={effect ? `Effect at ${isCantrip ? "your level" : ordinal(level)}` : undefined}>{effect ?? ""}</span>
@@ -301,24 +315,25 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     const rem = liveSlotRemaining.get(level) ?? max;
     if (max <= 0 || rem <= 0) { setFeedback(`No ${ordinal(level)}-level slots remain.`); return; }
     const content = spellIndex.get(spell.id);
-    const upcast = level > spell.level ? content?.castingOptions.find((entry) => entry.level === level) : undefined;
-    const formula = upcast?.damageRoll ?? content?.damageRoll ?? null;
-    const rays = upcast?.targetCount ?? null;
-    const suffix = rays ? ` ×${rays}` : "";
+    // Same helper the row displays, so the rolled damage equals the shown effect (v6 #8): for target
+    // scaling the formula is the die repeated N times, so an upcast rolls the full upscaled amount.
+    const { formula } = spellEffectAt(content, spell.level, level);
+    const types = content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : "";
     setBusy(true);
     socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
       if (!result.ok) { setFeedback(result.message ?? "The slot could not be spent."); return; }
       // Digital rolls the (upscaled) damage; manual mode prompts for the physical total - both land in the log.
-      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${suffix}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
-      else setFeedback(`Cast ${spell.name} at ${ordinal(level)}${suffix} - spent a ${ordinal(level)}-level slot.`);
+      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
+      else setFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
     });
   };
   // Cantrips (v5 #9) cost no slot: cast just rolls the damage die for a damaging cantrip (Toll the Dead,
-  // Sacred Flame), or notes the cast for a utility cantrip.
+  // Sacred Flame), or notes the cast for a utility cantrip. Same helper so display == rolled.
   const castCantrip = (spell: Readonly<{ id: string; name: string; level: number }>) => {
     const content = spellIndex.get(spell.id);
-    if (content?.damageRoll) void rollFlat(content.damageRoll, "damage", `${spell.name}${content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
+    const { formula } = spellEffectAt(content, spell.level, spell.level);
+    if (formula) void rollFlat(formula, "damage", `${spell.name}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
     else setFeedback(`Cast ${spell.name}.`);
   };
   const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
@@ -450,7 +465,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                   {spells.map((spell) => { const isPrepared = preparedIds.has(spell.id) || spell.alwaysPrepared; const toggleable = spell.level > 0 && !spell.alwaysPrepared; return <li key={spell.id}>
                     {spell.level === 0 ? <span className="sheet-prep-tag cantrip">Cantrip</span> : toggleable
                       ? <button type="button" className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`} disabled={busy} title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{isPrepared ? "Prepared" : "Prepare"}</button>
-                      : <span className="sheet-prep-tag on">Always</span>}
+                      : <span className="sheet-prep-tag always" title="Always prepared — doesn't count against your prepared limit">Always</span>}
                     {spellIndex.get(spell.id)
                       ? <button type="button" className="sheet-spell-name sheet-spell-link" title={`Show the ${spell.name} rules`} onClick={() => setOpenSpell(spellIndex.get(spell.id) ?? null)}>{spell.name}</button>
                       : <span className="sheet-spell-name">{spell.name}</span>}

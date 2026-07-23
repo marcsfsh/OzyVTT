@@ -494,9 +494,11 @@
 .sheet-spell-group + .sheet-spell-group { margin-top: .9rem; padding-top: .8rem; border-top: 1px dashed color-mix(in srgb, var(--line-strong) 55%, transparent); }
 .sheet-spell-group-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .1rem; }
 .sheet-spell-group-head h4 { margin: 0; font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
-.sheet-slot-pips { display: inline-flex; align-items: center; gap: .28rem; }
-.sheet-pip { width: .82rem; height: .82rem; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; cursor: pointer; transition: background var(--dur-1, .12s) ease, border-color var(--dur-1, .12s) ease; }
-.sheet-pip.filled { background: var(--cyan); border-color: var(--cyan); }
+/* Spell-slot pips (v6 #3): clean capsule "charges" - filled = available, hollow = spent - instead of the
+   old flat MS-paint circles. Same click target (spend/restore a slot). */
+.sheet-slot-pips { display: inline-flex; align-items: center; gap: .3rem; }
+.sheet-pip { width: 1.15rem; height: .58rem; padding: 0; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface-2); cursor: pointer; transition: background var(--dur-1, .12s) ease, border-color var(--dur-1, .12s) ease, box-shadow var(--dur-1, .12s) ease; }
+.sheet-pip.filled { border-color: var(--cyan); background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 88%, white), var(--cyan)); box-shadow: 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-pip:hover:not(:disabled) { border-color: var(--magenta); }
 .sheet-pip:disabled { cursor: default; opacity: .7; }
 .sheet-slot-count { color: var(--text-muted); font: 700 .66rem var(--font-mono); }
@@ -509,7 +511,9 @@
 .sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.7rem 6.8rem 3.8rem; }
 /* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
 .sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
-.sheet-spell-name { color: var(--text); font-size: .84rem; }
+/* v6 #2: names hug the left of their column (like the equipment list), not centred in a wide sheet -
+   justify-self:start shrinks the item to content at the cell start regardless of any inherited text-align. */
+.sheet-spell-name { justify-self: start; text-align: left; color: var(--text); font-size: .84rem; }
 /* Clickable spell name opens its SRD rules card (v3 #2.8.2); dashed underline signals it's clickable (v4 #5.2). */
 .sheet-spell-link { border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: var(--text); font-size: .84rem; cursor: pointer; text-decoration: underline; text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--text-muted) 65%, transparent); text-underline-offset: 3px; }
 .sheet-spell-link:hover { color: var(--cyan-hi); text-decoration-style: solid; text-decoration-color: currentColor; }
@@ -548,6 +552,10 @@
 .sheet-cast-btn:disabled { opacity: .5; cursor: default; }
 .sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 .58rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+/* v6 #1: "Always" (always-prepared, permanent, not toggleable) reads distinctly from the cyan toggleable
+   "Prepared" - a violet fill + accent so the two are never confused. Cantrip gets its own dim treatment. */
+.sheet-prep-tag.always { color: var(--text); border-color: color-mix(in srgb, var(--violet) 55%, transparent); background: color-mix(in srgb, var(--violet) 20%, var(--surface-3)); }
+.sheet-prep-tag.cantrip { color: var(--text-dim); border-style: dashed; }
 .sheet-prep-tag.toggle { cursor: pointer; }
 .sheet-prep-tag.toggle:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .sheet-prep-tag.toggle:disabled { opacity: .6; cursor: default; }
