@@ -19,8 +19,14 @@
 .scenes-open .scenes-open-icon { margin-right: var(--space-1); font-size: 1.05em; line-height: 1; }
 .scenes-open .scenes-open-caret { margin-left: var(--space-1); font-size: .8em; opacity: .7; }
 
-/* The picker popup reuses the gallery; give its grid room to breathe inside the modal. */
-.scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
+/* The picker popup shows scenes as square panels. Widen the dialog to give them room, hold each card
+   to a 1:1 box, and let the thumbnail flex to fill the space above the title + actions so the square
+   holds no matter how long the name/meta run. */
+.nh-modal.scenes-modal { max-width: min(100vw - 2rem, 68rem); }
+.scenes-modal .nh-gallery { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-items: start; }
+.scenes-modal .nh-card { aspect-ratio: 1 / 1; min-height: 0; }
+.scenes-modal .nh-card-thumb { flex: 1 1 auto; aspect-ratio: auto; min-height: 0; }
+.scenes-modal .nh-card--new { aspect-ratio: 1 / 1; height: auto; min-height: 0; }
 
 /* Map library + calibration, folded into the Scenes tab (from the retired Map Setup tab). */
 .scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }
