@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "@vtt/ui/styles.css";
 import "./styles.css";
-import { ActorRoster } from "./actors/ActorRoster";
+import { ActorRoster, YouArePlaying } from "./actors/ActorRoster";
 import { PartyRosterTab } from "./actors/PartyRosterTab";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
@@ -267,14 +267,15 @@ function App() {
       <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
     </section>}
     {mode !== "home" && state && <>
-      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
-          encounter it duplicates the combat tracker at several times the size, so it collapses to
-          one quiet line - still one tap away for a player joining mid-fight. */}
-      {/* v4 #9: a player always sees their own character header (rendered inside ActorRoster, above its
-          minimize), so their roster is never hidden behind the combat <details>; only the GM's collapses. */}
-      {state.combat.active && mode === "gm"
-        ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster role="gm" state={state as GmView} /></details>
+      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live encounter it
+          duplicates the combat tracker at several times the size, so it collapses behind one "Character
+          Roster" disclosure - the arrow is the only toggle (v5 #6.1) - still one tap away mid-fight. */}
+      {/* v5 #7: a player's own character is no longer inside the roster; it rides the always-shown
+          YouArePlaying bar below, so the roster can collapse for both roles without hiding their identity. */}
+      {state.combat.active
+        ? <details className="roster-collapsed"><summary>Character Roster</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
         : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
+      {mode === "player" && <YouArePlaying state={state as PlayerView} />}
 
       {mode === "gm" && <Tabs
         className="gm-tabs"

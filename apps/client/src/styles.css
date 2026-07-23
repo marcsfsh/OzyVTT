@@ -187,14 +187,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
    card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */
 
-/* "You're playing" banner (your claimed character = cyan selection accent) */
-.you-are-playing { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.3rem; padding: .9rem 1.2rem; border: 1px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--glow-cyan); }
+/* "You're playing" bar (v5 #7): always shown below the roster and above the dice/combat panels; your
+   claimed character = cyan selection accent. Head (name + HP) · labelled Conditions · HP tracker · buttons. */
+.you-are-playing { display: flex; align-items: center; justify-content: space-between; gap: 1rem 1.4rem; flex-wrap: wrap; margin-top: 1.3rem; padding: .9rem 1.2rem; border: 1px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--glow-cyan); }
+.you-are-playing-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
 .you-are-playing .eyebrow { color: var(--cyan-hi); }
-.you-are-playing strong { display: block; margin-top: .15rem; font: 400 1.3rem var(--font-display); color: var(--text); }
+.you-are-playing-head strong { font: 400 1.3rem var(--font-display); color: var(--text); }
+.you-are-playing-conditions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+/* v5 #7.1: the conditions control needs an explicit label so its "+ Add" isn't ambiguous. */
+.you-are-playing-cond-label { color: var(--text-muted); font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.you-are-playing-buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
 .you-are-playing button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
+.you-are-playing .roster-feedback { flex-basis: 100%; min-height: 0; margin: 0; }
 .you-badge { margin-left: .5rem; vertical-align: middle; }
 
-.own-hp { display: block; margin-top: .3rem; color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
+.own-hp { color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
 .own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
 .own-hp-tracker button { padding: .5rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
@@ -226,11 +233,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
   .table-layout.docked .table-sidebar { min-height: 100%; }
   .viewer-preview-toggle { margin-top: .6rem; }
 }
-
-.roster-minimize { flex: 0 0 auto; align-self: start; padding: .45rem .9rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: .8rem; font-weight: 700; text-align: center; }
-.roster-minimize:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
-.roster.collapsed { padding-top: 1.1rem; padding-bottom: 1.1rem; }
-.roster.collapsed .roster-heading { margin: 0; }
 
 .table-status { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
 

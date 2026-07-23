@@ -911,9 +911,9 @@ Toggles the underwater environment on the live encounter (GM-grade only; SRD Und
 
 ### `POST /api/v1/game/actors/{actorId}/rest`
 
-Applies a rest to a rostered actor outside combat (GM-grade only). Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.
+Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.
 
-**Auth:** Integration credential with `actor:write` · GM session
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `actorId` (path) - string (uuid)
 

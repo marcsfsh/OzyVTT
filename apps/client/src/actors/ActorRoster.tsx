@@ -88,9 +88,6 @@ export function ActorRoster(props: Props) {
   const [feedback, setFeedback] = useState("");
   const [claiming, setClaiming] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("vtt.roster-collapsed") === "1");
-  const toggleCollapsed = () => setCollapsed((current) => { const next = !current; localStorage.setItem("vtt.roster-collapsed", next ? "1" : "0"); return next; });
   const importFileRef = useRef<HTMLInputElement | null>(null);
 
   const importSheet = (file: File) => {
@@ -105,7 +102,10 @@ export function ActorRoster(props: Props) {
     }).catch(() => setFeedback("The file could not be read."));
   };
   const { confirm, dialog } = useConfirm();
-  const actors = props.state.actors.filter((actor) => actor.kind === "player-character");
+  // v5 #6.2: the roster grid shows ACTIVE characters only. Archived PCs are already stripped from the
+  // player projection; this drops them from the GM's roster too (the GM manages archived ones from the
+  // Character Roster tab, not here).
+  const actors = props.state.actors.filter((actor) => actor.kind === "player-character" && !("archived" in actor && actor.archived));
   const ownedActor = props.role === "player" ? actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine") ?? null : null;
   // The player's own claimed character shows in its own header (v4 #9), so it's dropped from the choose grid.
   const chooseList = ownedActor ? actors.filter((actor) => actor.id !== ownedActor.id) : actors;
@@ -152,30 +152,20 @@ export function ActorRoster(props: Props) {
     });
   };
 
-  return <section className={`roster${collapsed ? " collapsed" : ""}`} aria-labelledby="roster-heading">
+  return <section className="roster" aria-labelledby="roster-heading">
     <div className="roster-heading">
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
-      {!collapsed && <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>}
-      <button type="button" className="roster-minimize" aria-expanded={!collapsed} aria-controls="roster-body" onClick={toggleCollapsed}>{collapsed ? `Show roster (${actors.length})` : "Minimize"}</button>
+      <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
     </div>
-    {/* v4 #9: the player's own character always shows in its own header at the top, even when the roster
-        is minimized, and is excluded from the "choose your place" grid below. */}
-    {props.role === "player" && ownedActor && <div className="you-are-playing">
-      <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
-      <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
-      {ownedActor.hitDice && <HitDiceSpender actorId={ownedActor.id} hitDice={ownedActor.hitDice} onFeedback={setFeedback} />}
-      <div className="you-are-playing-buttons">
-        <Button variant="secondary" disabled={busy} onClick={() => setSheetOpen(true)}>View sheet</Button>
-        <Button variant="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</Button>
-      </div>
-    </div>}
-    {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" state={props.state} onClose={() => setSheetOpen(false)} />}
-    {collapsed ? null : <div id="roster-body">
+    {/* v5 #6.1: no inner minimize button - the roster collapses behind one "Character Roster" disclosure
+        in the app shell. v5 #7: the player's own character now lives in the always-shown YouArePlaying
+        bar (rendered outside this roster), so it's excluded from the "choose your place" grid here. */}
+    <div id="roster-body">
     {props.role === "gm" && <div className="roster-import">
       <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
       <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
     </div>}
-    {chooseList.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">{ownedActor ? "No other characters" : "No characters yet"}</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : ownedActor ? "You've claimed your character — it's shown above." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
+    {chooseList.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">{ownedActor ? "No other characters" : "No characters yet"}</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : ownedActor ? "You've claimed your character — it's shown in your player bar below." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
       {chooseList.map((actor) => {
         const playerActor = "claimStatus" in actor ? actor : null;
         const mine = playerActor?.claimStatus === "mine";
@@ -195,7 +185,49 @@ export function ActorRoster(props: Props) {
       })}
     </div>}
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
-    </div>}
+    </div>
+    {dialog}
+  </section>;
+}
+
+/**
+ * The player's own-character bar (v5 #7): hoisted OUT of the roster so it is ALWAYS visible - it sits
+ * below the roster disclosure and above the dice/combat panels, whether or not the roster is expanded.
+ * Inline HP tracking + a labelled Conditions editor; "View sheet" opens the full sheet (rests, spell
+ * slots, and inventory live there). Renders nothing until the player has claimed a character.
+ */
+export function YouArePlaying({ state }: Readonly<{ state: PlayerView }>) {
+  const [feedback, setFeedback] = useState("");
+  const [releasing, setReleasing] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const { confirm, dialog } = useConfirm();
+  const ownedActor = state.actors.find((actor) => actor.kind === "player-character" && "claimStatus" in actor && actor.claimStatus === "mine") ?? null;
+  if (!ownedActor) return null;
+  const release = async (name: string) => {
+    if (!(await confirm({ title: `Leave ${name}?`, body: "You'll release this character so someone else can play it.", confirmLabel: "Leave character" }))) return;
+    setReleasing(true);
+    setFeedback(`Leaving ${name}…`);
+    socket.emit("character:release", { commandId: newId(), expectedRevision: state.revision }, (result) => {
+      setReleasing(false);
+      setFeedback(result.ok ? `You left ${name}. Pick another when you're ready.` : result.message ?? "Couldn't release the character.");
+    });
+  };
+  return <section className="you-are-playing" aria-label={`Playing ${ownedActor.name}`}>
+    <div className="you-are-playing-head">
+      <span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong>
+      <span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span>
+    </div>
+    <div className="you-are-playing-conditions">
+      <span className="you-are-playing-cond-label">Conditions</span>
+      <ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} />
+    </div>
+    <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
+    <div className="you-are-playing-buttons">
+      <Button variant="secondary" disabled={releasing} onClick={() => setSheetOpen(true)}>View sheet</Button>
+      <Button variant="secondary" disabled={releasing} onClick={() => release(ownedActor.name)}>Leave character</Button>
+    </div>
+    <p className="roster-feedback" aria-live="polite">{feedback}</p>
+    {sheetOpen && <CharacterSheet actor={ownedActor} role="player" state={state} onClose={() => setSheetOpen(false)} />}
     {dialog}
   </section>;
 }

@@ -309,16 +309,18 @@
 .initiative-sheet-link:hover { color: var(--cyan-hi); text-decoration-color: var(--cyan); }
 /* Character sheet renders in the shared Modal (box, head, close, scroll handled there). */
 .sheet-typeline { margin: -.2rem 0 0; color: var(--text-dim); font-size: .82rem; font-style: italic; }
-/* Vitals (v3 #2.3): compact stat chips; HP is a wider box holding its own Dmg/Heal/Temp controls (#2.4). */
+/* Vitals (v3 #2.3, v5 #8): compact stat chips, all with the SAME internal layout - a centred label above
+   a centred value, tight padding, a thin border, no dead space. HP is the same chip, just wide enough to
+   also hold its Dmg/Heal/Temp controls (#2.4). */
 .sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; align-items: stretch; }
-.sheet-vital { display: flex; flex-direction: column; justify-content: center; padding: .4rem .7rem; border-radius: var(--radius-md); background: var(--surface-3); min-width: 4rem; }
-.sheet-vital span { color: var(--text-muted); font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.sheet-vital strong { margin-top: .1rem; font: 700 1.05rem/1 var(--font-mono); color: var(--text); }
-.sheet-vital-hp { flex: 0 1 auto; }
-.sheet-vital-top { display: flex; align-items: baseline; gap: .5rem; }
-.sheet-vital-top span { align-self: center; }
-.sheet-vital-top strong { margin-top: 0; font-size: 1.2rem; }
-.sheet-hp-controls { display: flex; gap: .3rem; margin-top: .45rem; }
+.sheet-vital { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem; padding: .35rem .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 3.2rem; text-align: center; }
+.sheet-vital span { color: var(--text-muted); font-size: .56rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
+.sheet-vital strong { font: 700 1.15rem/1 var(--font-mono); color: var(--text); }
+/* HP: same chip, wide enough for the controls; label+value stay centred over the buttons. */
+.sheet-vital-hp { flex: 1 1 15rem; align-items: stretch; }
+.sheet-vital-top { display: flex; flex-direction: column; align-items: center; gap: .12rem; }
+.sheet-vital-top strong { font-size: 1.3rem; }
+.sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
 .sheet-hp-controls input { width: 2.9rem; margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 .8rem var(--font-mono); }
 /* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
 .sheet-hp-controls button { flex: 0 0 auto; padding: .32rem .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .72rem; font-weight: 700; cursor: pointer; }
@@ -328,6 +330,17 @@
 .sheet-conditions { margin-top: .85rem; }
 .sheet-section-label { display: block; color: var(--text-muted); font: 800 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .35rem; }
 .sheet-conditions .condition-editor { margin-top: 0; }
+/* Rest controls (v5 #5): Hit-Dice spend + short/long rest, taken from the sheet. */
+.sheet-rest-block { margin-top: .85rem; }
+.sheet-rest { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .7rem; }
+.sheet-rest-dice { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.sheet-rest-pool { color: var(--text-dim); font: 700 .76rem var(--font-mono); }
+.sheet-rest-pool.empty { color: var(--text-muted); font-weight: 600; }
+.sheet-rest-buttons { display: flex; gap: .4rem; }
+.sheet-rest-btn { flex: 0 0 auto; padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
+.sheet-rest-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.sheet-rest-btn.primary { border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); background: color-mix(in srgb, var(--cyan) 15%, var(--surface-2)); }
+.sheet-rest-btn:disabled { opacity: .5; cursor: default; }
 /* Rolls-bar segmented controls (still used in the pinned rolls bar). */
 .sheet-settings-label { color: var(--text-muted); font: 800 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
 .sheet-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
@@ -606,18 +619,14 @@
   .sheet-log-resize { display: none; }
 }
 
-/* GM Character Roster tab (v4 #10). */
-.party-roster { max-width: 60rem; }
+/* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab. */
+.party-roster { max-width: 72rem; }
 .party-heading h2 { margin: .2rem 0 .3rem; }
 .party-heading p { color: var(--text-dim); font-size: .85rem; margin: 0 0 1.1rem; }
-.party-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
-.party-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem .9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.party-row.archived { opacity: .6; }
-.party-id { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
-.party-id strong { color: var(--text); }
-.party-sub { color: var(--text-muted); font-size: .72rem; }
-.party-actions { display: flex; gap: .5rem; flex-shrink: 0; flex-wrap: wrap; }
-.party-archived-head { margin: 1.2rem 0 .5rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+/* Character card thumb: a centred identity monogram on the card's surface (characters have no map image). */
+.party-card-thumb { display: grid; place-items: center; aspect-ratio: 16 / 10; background: linear-gradient(150deg, color-mix(in srgb, var(--violet) 22%, var(--surface-3)), var(--surface-3)); }
+.party-card.is-archived { opacity: .62; }
+.party-archived-head { margin: 1.4rem 0 .6rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
 .party-feedback { margin-top: .8rem; color: var(--text-dim); font-size: .82rem; }
 
 .roster-import { margin-top: 1rem; }
