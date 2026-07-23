@@ -7,7 +7,8 @@
     "start": "node --import tsx src/index.ts",
     "build": "tsc",
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "docs:map": "node --import tsx scripts/generate-app-map.ts"
   },
   "dependencies": {
     "@vtt/api-contract": "*",
