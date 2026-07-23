@@ -367,19 +367,36 @@
 .sheet-roll-chip:disabled { cursor: default; opacity: .6; }
 .sheet-entry p { margin: 0 0 .3rem; }
 .sheet-slot-stepper { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .3rem; border-radius: var(--radius-md); background: var(--surface-3); }
-.sheet-slot-stepper button { width: 1.35rem; height: 1.35rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text); font: 700 .9rem/1 var(--font-mono); cursor: pointer; }
+.sheet-slot-stepper button { display: grid; place-items: center; padding: 0; width: 1.4rem; height: 1.4rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text); font: 700 .95rem/1 var(--font-mono); cursor: pointer; }
+.sheet-slot-stepper button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .sheet-slot-stepper button:disabled { opacity: .4; cursor: default; }
-.sheet-slot-stepper > span { font-size: .72rem; font-weight: 700; color: var(--text-dim); }
+.sheet-slot-stepper > span { min-width: 1.1rem; text-align: center; font-size: .78rem; font-weight: 700; color: var(--text-dim); }
 .sheet-slot-stepper strong { color: var(--text); font-family: var(--font-mono); }
 .sheet-prepare { padding: .18rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 .64rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
 .sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
 .sheet-prepare:disabled { opacity: .6; cursor: default; }
 .sheet-item-edit li { flex-wrap: wrap; gap: .35rem .5rem; }
 .sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.sheet-remove { width: 1.4rem; height: 1.4rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text-muted); font: 700 .9rem/1 var(--font-mono); cursor: pointer; }
+.sheet-remove { display: grid; place-items: center; padding: 0; width: 1.55rem; height: 1.55rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text-muted); font: 700 .95rem/1 var(--font-mono); cursor: pointer; }
 .sheet-remove:hover:not(:disabled) { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
 .sheet-attunement { margin: .55rem 0 0; color: var(--text-muted); font-size: .72rem; font-weight: 700; }
 .sheet-attunement.over { color: var(--danger); }
+/* Inventory table (v3 #2.9.2): aligned columns with headers; display:contents lets each row's cells
+   share the grid's column tracks. */
+.sheet-inv { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; gap: .4rem .6rem; align-items: center; margin-top: .3rem; }
+.sheet-inv-row { display: contents; }
+.sheet-inv-head span { color: var(--text-muted); font: 800 .54rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding-bottom: .25rem; border-bottom: 1px solid var(--line); }
+.sheet-inv-head .sheet-item-name { text-align: left; }
+.sheet-inv .sheet-slot-stepper { justify-self: center; }
+.sheet-toggle-btn { min-width: 4.8rem; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 .62rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
+.sheet-toggle-btn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-toggle-btn.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sheet-toggle-btn:disabled { opacity: .55; cursor: default; }
+/* Grouped actions (v3 #2.9.3): weapon/other, then spell actions by level. */
+.sheet-action-group + .sheet-action-group { margin-top: .9rem; }
+.sheet-action-head { margin: .1rem 0 .5rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); font: 800 .66rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--cyan-hi); }
+.sheet-action-subgroup { margin-top: .55rem; }
+.sheet-action-subhead { margin: 0 0 .35rem; font: 800 .6rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
 .sheet-add-item { display: flex; gap: .4rem; margin: .55rem 0 0; }
 .sheet-add-item input { flex: 1; min-width: 0; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: .8rem; }
 .sheet-add-item button, .sheet-coins button { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: .74rem; font-weight: 700; cursor: pointer; }
@@ -395,7 +412,8 @@
 .sheet-picker-chip { padding: .22rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 .66rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
 .sheet-picker-chip.is-active { color: var(--text); background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
 .sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; overflow-y: auto; }
-.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .35rem .1rem; border-bottom: 1px solid var(--line); }
+/* v3 #2.9.1: comfortable row padding so names/buttons aren't jammed against the edges. */
+.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .5rem .4rem; border-bottom: 1px solid var(--line); }
 .sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .sheet-picker-name { color: var(--text); font-size: .84rem; font-weight: 600; display: flex; align-items: baseline; gap: .4rem; }
 .sheet-picker-owned { color: var(--cyan); font: 700 .64rem/1 var(--font-mono); }
@@ -510,7 +528,7 @@
 .sheet-mobile-tabs button + button { border-left: 1px solid var(--line); }
 .sheet-mobile-tabs button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
 .sheet-dock-picker { display: inline-flex; align-items: center; gap: .2rem; }
-.sheet-dock-picker button { display: grid; place-items: center; width: 1.4rem; height: 1.4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); font-size: .78rem; cursor: pointer; }
+.sheet-dock-picker button { display: grid; place-items: center; padding: 0; width: 1.5rem; height: 1.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); font-size: .8rem; cursor: pointer; }
 .sheet-dock-picker button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--cyan); color: var(--text); }
 .sheet-tool { padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font: 700 .68rem/1 var(--font-mono); cursor: pointer; white-space: nowrap; }
 .sheet-tool:hover { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
