@@ -5,6 +5,20 @@ Durable checklist so nothing is lost as the session grows. Update **Status** as 
 
 _Captured: 2026-07-23. Branch: `claude/character-sheet-discovery-a14i7f` (PR #45)._
 
+**Status: all items landed** across 7 commits (v3 W1–W7). `check` + `build` clean each wave.
+- **W1** header: × top-right, Pop out/New tab to its left, smaller dock buttons moved right, pinned
+  rolls bar, prominent class/level/race, wider docked modal (1.0, 2.1, 2.2, 2.6, 4).
+- **W2** compact vitals, HP Dmg/Heal/Temp inside the HP box, Conditions label (2.3, 2.4, 2.5).
+- **W3** column-major skills, roomier rows, P/E lettered bubbles, bigger saves (2.7).
+- **W4** spell name → rules popup, always-on damage helper (clear "N× die"/"N targets"), aligned cast
+  controls + centred dropdown, dashed group dividers, prominent caster fields (2.8).
+- **W5** inventory browse-row-above + aligned table w/ headers + polished buttons (fixed the global
+  `button{padding:1.3rem}` squish), grouped actions weapon/spell-by-level (2.9).
+- **W6** dice-panel cleanup + Table/Mine roll filter (3).
+- **W7** draggable dice-log width divider (1.1).
+
+Remaining verification: a live browser/mobile click-through (no e2e harness in this environment).
+
 ## Items (verbatim intent) + status
 
 **1. Width.**
