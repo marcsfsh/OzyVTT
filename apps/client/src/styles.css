@@ -79,9 +79,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .actor-card dl div { padding: .55rem .35rem; border-radius: var(--radius-sm); background: var(--surface-3); text-align: center; }
 .actor-card dt { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; }
 .actor-card dd { margin: .15rem 0 0; font-weight: 700; font-family: var(--font-mono); }
-.actor-action { width: 100%; margin-top: auto; padding: .7rem; background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; }
-.actor-action:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
-.actor-release { background: transparent; color: var(--text); border: 1px solid var(--line-strong); }
+/* Card CTA now renders as <Button variant="primary|secondary" block> (@vtt/ui);
+   only the pin-to-card-bottom layout hook stays local (block gives full width). */
+.actor-action { margin-top: auto; }
 .roster-feedback { min-height: 1.4rem; margin: .8rem 0 0; font-size: .85rem; }
 
 .renderer-proof { margin-top: 3rem; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-1); }
@@ -211,16 +211,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .own-hp { color: var(--cyan-hi); font-size: .85rem; font-weight: 700; }
 .own-hp-tracker { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .own-hp-tracker input { width: 4.2rem; margin: 0; padding: .5rem; text-align: center; }
-.own-hp-tracker button { padding: .5rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
-.own-hp-tracker button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* Damage/Heal/Temp now render as <Button size="sm"> (@vtt/ui); the flex row above places them. */
 /* Hit Point Dice (SRD short-rest healing): pool readout + stepper + one roll button. */
 .hit-dice-spender { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
 .hit-dice-pool { color: var(--text-dim); font-size: .8rem; font-weight: 700; }
-.hit-dice-roll { padding: .4rem .65rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; }
-.hit-dice-roll:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* Roll & heal now renders as <Button size="sm"> (@vtt/ui). */
 .hit-dice-empty { margin: .6rem 0 0; color: var(--text-muted); font-size: .78rem; }
 .actor-rest { display: flex; gap: .5rem; margin: .6rem 0; }
-.actor-rest button { flex: 1; padding: .5rem .6rem; font-size: .78rem; font-weight: 700; text-align: center; }
+.actor-rest .nh-btn { flex: 1; }
 
 .table-layout { display: grid; gap: 1.5rem; margin-top: 2.5rem; align-items: stretch; }
 /* .anim-view animates transform; with fill-mode:both Blink keeps .table-layout as a containing block

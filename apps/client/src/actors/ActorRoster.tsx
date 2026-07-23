@@ -41,9 +41,9 @@ function OwnHpTracker({ actorId, onFeedback }: Readonly<{ actorId: string; onFee
   };
   return <div className="own-hp-tracker" role="group" aria-label="Track your hit points">
     <Input type="number" min="0" max="1000" placeholder="0" aria-label="Hit point amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-    <button type="button" disabled={sending} onClick={() => send("actor:apply-damage", "Took")}>Damage</button>
-    <button type="button" disabled={sending} onClick={() => send("actor:heal", "Healed")}>Heal</button>
-    <button type="button" disabled={sending} onClick={() => send("actor:set-temp-hp", "Temp HP set to")}>Temp</button>
+    <Button size="sm" variant="destructive" disabled={sending} onClick={() => send("actor:apply-damage", "Took")}>Damage</Button>
+    <Button size="sm" disabled={sending} onClick={() => send("actor:heal", "Healed")}>Heal</Button>
+    <Button size="sm" disabled={sending} onClick={() => send("actor:set-temp-hp", "Temp HP set to")}>Temp</Button>
   </div>;
 }
 
@@ -64,7 +64,7 @@ function HitDiceSpender({ actorId, hitDice, onFeedback }: Readonly<{ actorId: st
   return <div className="hit-dice-spender" role="group" aria-label="Spend Hit Dice">
     <span className="hit-dice-pool" title="Hit Point Dice remaining - spend on a short rest; each die heals its roll plus the Constitution modifier (minimum 1).">Hit Dice {hitDice.remaining}/{hitDice.maximum} ({hitDice.die})</span>
     <Stepper value={chosen} onChange={setCount} min={1} max={hitDice.remaining} disabled={busy} aria-label="Number of Hit Dice to spend" />
-    <button type="button" className="hit-dice-roll" disabled={busy} onClick={spend}>Roll & heal</button>
+    <Button size="sm" disabled={busy} onClick={spend}>Roll & heal</Button>
   </div>;
 }
 
@@ -79,8 +79,8 @@ function RestButtons({ actorId, name, onFeedback }: Readonly<{ actorId: string; 
     });
   };
   return <div className="actor-rest" role="group" aria-label={`Rest ${name}`}>
-    <button type="button" className="secondary" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice." onClick={() => rest("short")}>Short rest</button>
-    <button type="button" className="secondary" disabled={busy} title="Full HP, all pools and Hit Dice restored, one less Exhaustion level." onClick={() => rest("long")}>Long rest</button>
+    <Button size="sm" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice." onClick={() => rest("short")}>Short rest</Button>
+    <Button size="sm" disabled={busy} title="Full HP, all pools and Hit Dice restored, one less Exhaustion level." onClick={() => rest("long")}>Long rest</Button>
   </div>;
 }
 
@@ -178,9 +178,9 @@ export function ActorRoster(props: Props) {
           {props.role === "gm" && "hitDice" in actor && actor.hitDice && <HitDiceSpender actorId={actor.id} hitDice={actor.hitDice} onFeedback={setFeedback} />}
           {props.role === "gm" && <RestButtons actorId={actor.id} name={actor.name} onFeedback={setFeedback} />}
           {props.role === "player" && (mine
-            ? <button className="actor-action actor-release" disabled={busy} onClick={() => release(actor.name)}>Release character</button>
-            : <button className="actor-action" disabled={unavailable || busy} onClick={() => ownedActor ? switchTo(actor.id, actor.name, ownedActor.name) : claim(actor.id, actor.name)}>{claiming === actor.id ? (ownedActor ? "Switching…" : "Claiming…") : unavailable ? "Already claimed" : ownedActor ? "Switch to this" : "Claim character"}</button>)}
-          {props.role === "gm" && "ownerSessionId" in actor && actor.ownerSessionId && <button className="actor-action actor-release" onClick={() => forceRelease(actor.id)}>Force release</button>}
+            ? <Button variant="secondary" block className="actor-action" disabled={busy} onClick={() => release(actor.name)}>Release character</Button>
+            : <Button variant="primary" block className="actor-action" disabled={unavailable || busy} onClick={() => ownedActor ? switchTo(actor.id, actor.name, ownedActor.name) : claim(actor.id, actor.name)}>{claiming === actor.id ? (ownedActor ? "Switching…" : "Claiming…") : unavailable ? "Already claimed" : ownedActor ? "Switch to this" : "Claim character"}</Button>)}
+          {props.role === "gm" && "ownerSessionId" in actor && actor.ownerSessionId && <Button variant="secondary" block className="actor-action" onClick={() => forceRelease(actor.id)}>Force release</Button>}
         </article>;
       })}
     </div>}
