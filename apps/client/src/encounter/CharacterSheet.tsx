@@ -600,14 +600,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       </div>
     </div>
     <div className="sheet-header-controls">
-      {hasLog && <div className="sheet-mobile-tabs" role="tablist" aria-label="Show sheet or dice">
-        <button type="button" role="tab" aria-selected={mobilePane === "sheet"} className={mobilePane === "sheet" ? "on" : ""} onClick={() => setMobilePane("sheet")}>Sheet</button>
-        <button type="button" role="tab" aria-selected={mobilePane === "log"} className={mobilePane === "log" ? "on" : ""} onClick={() => setMobilePane("log")}>Dice</button>
-      </div>}
-      {hasLog && <div className="sheet-dock-picker" role="group" aria-label="Dice log position">
-        <button type="button" aria-pressed={logSide === "left"} aria-label="Dice log left of the sheet" title="Dice log on the left" onClick={() => chooseLogSide("left")}>◧</button>
-        <button type="button" aria-pressed={logSide === "right"} aria-label="Dice log right of the sheet" title="Dice log on the right" onClick={() => chooseLogSide("right")}>◨</button>
-      </div>}
+      {hasLog && <SegmentedControl className="sheet-mobile-tabs" size="sm" ariaLabel="Show sheet or dice" value={mobilePane} onChange={(pane) => setMobilePane(pane as "sheet" | "log")} options={[{ value: "sheet", label: "Sheet" }, { value: "log", label: "Dice" }]} />}
+      {hasLog && <SegmentedControl className="sheet-dock-picker" size="sm" ariaLabel="Dice log position" value={logSide} onChange={(side) => chooseLogSide(side as "left" | "right")} options={[{ value: "left", icon: "◧", ariaLabel: "Dice log left of the sheet", title: "Dice log on the left" }, { value: "right", icon: "◨", ariaLabel: "Dice log right of the sheet", title: "Dice log on the right" }]} />}
       {!standalone && !embedded && <Button size="sm" variant="ghost" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</Button>}
       {!standalone && !embedded && role === "player" && <Button size="sm" variant="ghost" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</Button>}
       <IconButton label={embedded ? "Back to initiative" : "Close"} size="sm" className="sheet-close" onClick={onClose}>✕</IconButton>

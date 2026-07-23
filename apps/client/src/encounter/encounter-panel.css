@@ -579,13 +579,11 @@
 .sheet-header-sub { display: flex; align-items: baseline; gap: .5rem; margin-top: .2rem; flex-wrap: wrap; }
 .sheet-idline { color: var(--cyan-hi); font: 700 .82rem/1.2 var(--font-mono); }
 .sheet-header-controls { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-.sheet-mobile-tabs { display: none; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
-.sheet-mobile-tabs button { padding: .24rem .8rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .7rem/1 var(--font-mono); cursor: pointer; }
-.sheet-mobile-tabs button + button { border-left: 1px solid var(--line); }
-.sheet-mobile-tabs button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
-.sheet-dock-picker { display: inline-flex; align-items: center; gap: .2rem; }
-.sheet-dock-picker button { display: grid; place-items: center; padding: 0; width: 1.5rem; height: 1.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-muted); font-size: .8rem; cursor: pointer; }
-.sheet-dock-picker button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--cyan); color: var(--text); }
+/* The phone Sheet/Dice tabs and the desktop dock picker now render as SegmentedControl
+   (@vtt/ui); only the responsive show/hide swap stays local. The tabs hide on desktop —
+   scoped one class deeper than the primitive's own `.nh-segmented { display }` so it wins
+   without !important; the phone media query below re-shows them and hides the dock picker. */
+.sheet-header-controls .sheet-mobile-tabs { display: none; }
 /* v4 #7: Pop out / New tab share the dock buttons' box (same height, border, radius, surface). */
 /* Pop out / New tab now render as <Button variant="ghost" size="sm">. */
 .sheet-close { flex: none; }

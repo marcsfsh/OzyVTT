@@ -112,13 +112,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .dice-form button { background: var(--primary); color: var(--text-on-neon); border: 0; text-align: center; padding: .85rem 1.2rem; }
 .dice-form button:hover:not(:disabled) { background: var(--magenta-hi); box-shadow: var(--glow-magenta); }
 .dice-feedback { min-height: 1.2rem; margin: .8rem 0 0; font-size: .9rem; }
-/* Roll-list header + Table/Mine filter (v3 #3). */
+/* Roll-list header (Table/Mine filter now renders as a SegmentedControl from @vtt/ui). */
 .roll-list-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: 1rem; }
 .roll-list-title { margin: 0; font: 800 .7rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
-.dice-filter { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
-.dice-filter button { padding: .22rem .6rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 .64rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
-.dice-filter button + button { border-left: 1px solid var(--line); }
-.dice-filter button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
 .roll-list { display: grid; gap: .4rem; max-height: 19rem; overflow-y: auto; padding-right: .25rem; margin-top: .5rem; }
 .roll-card { padding: .5rem .7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 /* v6 #4: the roll's KIND leads (a badge), the roller/audience is a muted footer, and faces · formula = total

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
-import { Button, Input, Select, Stepper } from "@vtt/ui";
+import { Button, Input, SegmentedControl, Select, Stepper } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -106,10 +106,7 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
       return <>
         <div className="roll-list-head">
           <h3 className="roll-list-title">Recent rolls</h3>
-          {mineActorId && <div className="dice-filter" role="group" aria-label="Filter rolls">
-            <button type="button" className={rollFilter === "all" ? "on" : ""} aria-pressed={rollFilter === "all"} onClick={() => setRollFilter("all")}>Table</button>
-            <button type="button" className={rollFilter === "mine" ? "on" : ""} aria-pressed={rollFilter === "mine"} onClick={() => setRollFilter("mine")}>Mine</button>
-          </div>}
+          {mineActorId && <SegmentedControl size="sm" ariaLabel="Filter rolls" value={rollFilter} onChange={(value) => setRollFilter(value as "all" | "mine")} options={[{ value: "all", label: "Table" }, { value: "mine", label: "Mine" }]} />}
         </div>
         <div className="roll-list" aria-label="Recent rolls">
           {rolls.length === 0 && <p>{rollFilter === "mine" ? "No rolls from this character yet." : "No rolls yet."}</p>}
