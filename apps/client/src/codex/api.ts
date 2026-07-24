@@ -77,3 +77,45 @@ export const codexApi = {
 export function pageLinkKey(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, " ");
 }
+
+// ----- Atlas: maps + markers -----
+
+export type CodexMapKind = "battlemap" | "regional" | "world";
+export type CodexMap = Readonly<{
+  id: string; assetId: string; name: string; kind: CodexMapKind; parentMapId: string | null;
+  revealedToPlayers: boolean; sortKey: number; createdAt: string; updatedAt: string;
+}>;
+export type CodexMarker = Readonly<{
+  id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null;
+  revealedToPlayers: boolean; pageId: string | null; subMapId: string | null; sceneId: string | null; actorId: string | null;
+  createdAt: string; updatedAt: string;
+}>;
+export type CodexMapInput = Readonly<{ assetId?: string; name?: string; kind?: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean }>;
+export type CodexMarkerInput = Readonly<{
+  x?: number; y?: number; iconId?: string; iconColor?: string; label?: string | null; revealedToPlayers?: boolean;
+  pageId?: string | null; subMapId?: string | null; sceneId?: string | null; actorId?: string | null;
+}>;
+
+/** A map asset the GM has uploaded (from the existing map catalog); the raw material for an atlas map node. */
+export type MapAsset = Readonly<{ id: string; name: string; kind: CodexMapKind; width: number; height: number }>;
+
+export const atlasApi = {
+  listAssets: async (token: string): Promise<MapAsset[]> => {
+    const response = await fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${token}` } });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body?.ok) throw new CodexRequestError(body?.error?.message ?? "Could not load your maps.", response.status, body?.error?.code ?? "error");
+    return body.data.assets as MapAsset[];
+  },
+  listMaps: (token: string) => request<{ maps: CodexMap[] }>(token, "/maps").then((data) => data.maps),
+  createMap: (token: string, input: CodexMapInput & { assetId: string; name: string; kind: CodexMapKind }) => request<{ map: CodexMap }>(token, "/maps", { method: "POST", body: JSON.stringify(input) }).then((data) => data.map),
+  updateMap: (token: string, id: string, input: { name?: string; kind?: CodexMapKind }) => request<{ map: CodexMap }>(token, `/maps/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.map),
+  setMapParent: (token: string, id: string, parentMapId: string | null) => request<{ map: CodexMap }>(token, `/maps/${id}/parent`, { method: "POST", body: JSON.stringify({ parentMapId }) }).then((data) => data.map),
+  revealMap: (token: string, id: string, revealed: boolean) => request<{ map: CodexMap }>(token, `/maps/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.map),
+  deleteMap: (token: string, id: string) => request<{ deleted: boolean }>(token, `/maps/${id}`, { method: "DELETE" }),
+  listMarkers: (token: string, mapId: string) => request<{ markers: CodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),
+  createMarker: (token: string, mapId: string, input: CodexMarkerInput & { x: number; y: number; iconId: string; iconColor: string }) => request<{ marker: CodexMarker }>(token, `/maps/${mapId}/markers`, { method: "POST", body: JSON.stringify(input) }).then((data) => data.marker),
+  updateMarker: (token: string, id: string, input: CodexMarkerInput) => request<{ marker: CodexMarker }>(token, `/markers/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.marker),
+  moveMarker: (token: string, id: string, x: number, y: number) => request<{ marker: CodexMarker }>(token, `/markers/${id}/move`, { method: "POST", body: JSON.stringify({ x, y }) }).then((data) => data.marker),
+  revealMarker: (token: string, id: string, revealed: boolean) => request<{ marker: CodexMarker }>(token, `/markers/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.marker),
+  deleteMarker: (token: string, id: string) => request<{ deleted: boolean }>(token, `/markers/${id}`, { method: "DELETE" })
+};

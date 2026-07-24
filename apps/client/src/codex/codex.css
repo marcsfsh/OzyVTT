@@ -110,3 +110,64 @@
   .codex-workspace.has-selection .codex-back { display: block; }
   .codex-body-input, .codex-preview { min-height: 50vh; }
 }
+
+/* ----- Atlas ----- */
+.codex-root { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-modebar { display: flex; }
+
+.codex-atlas { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-atlas-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.codex-breadcrumb { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; min-width: 0; }
+.codex-crumb { background: none; border: none; color: var(--cyan); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+.codex-crumb:hover { background: var(--surface-2); }
+.codex-crumb.is-current { color: var(--text); cursor: default; }
+.codex-crumb-sep { color: var(--text-muted); }
+.codex-atlas-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+.codex-atlas-body { display: flex; gap: var(--space-3); align-items: stretch; min-height: 0; }
+.codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--void); touch-action: none; }
+.codex-mapsurface.is-placing { cursor: crosshair; }
+.codex-map-svg { display: block; width: 100%; height: 100%; min-height: 62vh; }
+.codex-map-status { display: flex; align-items: center; justify-content: center; min-height: 62vh; color: var(--text-muted); }
+.codex-map-error { color: var(--danger); }
+.codex-place-hint { position: absolute; left: 50%; bottom: var(--space-3); transform: translateX(-50%); background: var(--overlay); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: var(--space-1) var(--space-3); font-size: var(--fs-sm); pointer-events: none; }
+
+.codex-marker { cursor: pointer; }
+.codex-marker-bg { fill: var(--surface-1); stroke: currentColor; stroke-width: 1.5; }
+.codex-marker-ico { fill: currentColor; }
+.codex-marker.is-selected .codex-marker-bg { stroke-width: 2.5; }
+.codex-marker.is-hidden { opacity: 0.55; }
+.codex-marker.is-hidden .codex-marker-bg { stroke-dasharray: 3 2; }
+.codex-marker-label { fill: var(--text); paint-order: stroke; stroke: var(--void); stroke-width: 3px; stroke-linejoin: round; font-family: var(--font-display); }
+
+/* Inspector */
+.codex-inspector { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); overflow-y: auto; max-height: 72vh; }
+.codex-inspector-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.codex-inspector-head-actions { display: flex; align-items: center; gap: var(--space-2); }
+.codex-inspector-foot { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+
+/* Icon picker */
+.codex-iconpicker { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-swatches { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.codex-swatch { width: 26px; height: 26px; border-radius: var(--radius-pill); border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.codex-swatch.is-active { border-color: currentColor; }
+.codex-swatch-dot { width: 14px; height: 14px; border-radius: var(--radius-pill); background: currentColor; }
+.codex-icon-group-label { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: var(--space-1); }
+.codex-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: var(--space-1); }
+.codex-icon-btn { aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); cursor: pointer; padding: var(--space-1); }
+.codex-icon-btn:hover { border-color: var(--line-hover); }
+.codex-icon-btn.is-active { border-color: currentColor; background: var(--surface-3); }
+.codex-icon-svg { width: 100%; height: 100%; }
+
+/* Asset picker */
+.codex-asset-picker { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-asset-picker-head { display: flex; align-items: center; justify-content: space-between; }
+.codex-asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2); }
+.codex-asset-card { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; text-align: left; }
+.codex-asset-card:hover { border-color: var(--magenta); }
+.codex-asset-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .codex-atlas-body { flex-direction: column; }
+  .codex-inspector { flex-basis: auto; max-height: none; }
+}

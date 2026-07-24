@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Input } from "@vtt/ui";
+import { Badge, Button, Input, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
 import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary } from "./api";
 import { PageEditor } from "./PageEditor";
+import { AtlasView } from "./AtlasView";
 import "./codex.css";
 
 /**
@@ -11,6 +12,7 @@ import "./codex.css";
  * `codex:changed` ping arrives; the open page is owned by the editor (not clobbered by list refreshes).
  */
 export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
+  const [mode, setMode] = useState<"pages" | "atlas">("pages");
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[] } | null>(null);
@@ -73,7 +75,14 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
   }, [pages]);
 
   return (
-    <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
+    <div className="codex-root">
+      <div className="codex-modebar">
+        <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as "pages" | "atlas")}
+          options={[{ value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }]} />
+      </div>
+      {mode === "atlas"
+        ? <AtlasView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
           <Input value={query} placeholder="Search the codex…" aria-label="Search the codex" onChange={(event) => setQuery(event.target.value)} />
@@ -101,6 +110,7 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
           ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} backlinks={selected.backlinks} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} />
           : <div className="codex-main-empty"><h3>Your world, written down</h3><p>Select a page, or create one. Each page has a player-facing side and a GM-secret side - reveal it when the party earns it.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
+        </div>}
     </div>
   );
 }
