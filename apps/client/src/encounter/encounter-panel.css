@@ -285,6 +285,8 @@
 .economy-movement { font-size: var(--fs-xs); color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */
 .reaction-prompt { border-color: var(--indigo); background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo)); }
+/* Player-hit damage proposals (proposal mode): a faint magenta combat tint so the GM spots what needs applying, distinct from the indigo reaction prompt. */
+.pending-damage { border-color: color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
 .reaction-prompt .save-prompt-label { color: var(--cyan-hi); }
 .reaction-prompt .save-prompt-label strong { color: var(--text); }
 /* Adv/disadv re-roll buttons on a rolled save (and, later, other d20 prompts): a cool accent, pressed
