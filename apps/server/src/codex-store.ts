@@ -257,13 +257,16 @@ function title(value: string): string {
   if (!trimmed || trimmed.length > 160 || CONTROL_CHARS.test(trimmed)) throw new Error("A page title must be 1 to 160 printable characters.");
   return trimmed;
 }
-/** One flat level of folders, matching the map catalog convention. */
+/** A nested notebook folder PATH ("NPCs/Villains"): "/"-separated segments, normalized and bounded. */
 function folder(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  if (trimmed.length > 60 || trimmed.includes("/") || CONTROL_CHARS.test(trimmed)) throw new Error("A folder must be one level: up to 60 printable characters, no slashes.");
-  return trimmed;
+  const segments = value.split("/").map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length === 0) return null;
+  if (segments.length > 6) throw new Error("A folder path can be at most 6 levels deep.");
+  for (const segment of segments) if (segment.length > 40 || CONTROL_CHARS.test(segment)) throw new Error("Each folder name is up to 40 printable characters.");
+  const path = segments.join("/");
+  if (path.length > 160) throw new Error("That folder path is too long.");
+  return path;
 }
 function tags(value: readonly string[] | undefined): string[] {
   if (!value) return [];

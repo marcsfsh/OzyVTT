@@ -43,6 +43,14 @@ describe("CodexStore pages", () => {
     expect(store.listPages()).toHaveLength(1);
   });
 
+  it("stores nested folder paths, normalizes them, and caps depth", () => {
+    const page = store.createPage({ title: "Strahd", folder: " NPCs / Villains " });
+    expect(page.folder).toBe("NPCs/Villains"); // segments trimmed
+    expect(store.updatePage(page.id, { folder: "//Cults///Vecna//" }, page.rev, "gm").folder).toBe("Cults/Vecna"); // empty segments dropped
+    expect(store.updatePage(page.id, { folder: "   " }, undefined, "gm").folder).toBeNull(); // blank → unfiled
+    expect(() => store.createPage({ title: "Too deep", folder: "a/b/c/d/e/f/g" })).toThrow(/6 levels/);
+  });
+
   it("restores a past revision as a forward write", () => {
     const page = store.createPage({ title: "Keep", playerBody: "v1" });
     store.updatePage(page.id, { playerBody: "v2" }, page.rev, "gm");

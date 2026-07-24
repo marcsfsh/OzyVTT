@@ -40,6 +40,27 @@
 .codex-list-item.is-active { background: var(--surface-2); border-color: var(--magenta); }
 .codex-list-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Notebook tree: collapsible nested folders holding the whole campaign's notes. */
+.codex-tree { display: flex; flex-direction: column; gap: 1px; }
+.codex-tree-branch { display: flex; flex-direction: column; gap: 1px; }
+.codex-tree-folder {
+  display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left;
+  padding: var(--space-1) var(--space-2); border: none; background: transparent; cursor: pointer;
+  font-family: var(--font-display); font-size: var(--fs-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
+  border-radius: var(--radius-sm);
+}
+.codex-tree-folder:hover { background: var(--surface-2); color: var(--text); }
+.codex-tree-caret { display: inline-block; width: 0.9em; color: var(--text-muted); }
+.codex-tree-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-tree-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.codex-tree-page {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; text-align: left;
+  padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.codex-tree-page:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-tree-page.is-active { background: var(--surface-2); border-color: var(--magenta); }
+
 .codex-main {
   display: flex; flex-direction: column; min-width: 0;
   border: 1px solid var(--line); border-radius: var(--radius-lg);

@@ -19,7 +19,7 @@ const CODEX_BASE = "/api/v1/codex";
 const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 const PageCreateSchema = z.object({
   title: z.string().trim().min(1).max(160),
-  folder: z.string().max(60).nullable().optional(),
+  folder: z.string().max(160).nullable().optional(),
   tags: TagsSchema.optional(),
   playerBody: z.string().max(100_000).optional(),
   gmBody: z.string().max(100_000).optional(),
@@ -28,7 +28,7 @@ const PageCreateSchema = z.object({
 }).strict();
 const PageUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
-  folder: z.string().max(60).nullable().optional(),
+  folder: z.string().max(160).nullable().optional(),
   tags: TagsSchema.optional(),
   playerBody: z.string().max(100_000).optional(),
   gmBody: z.string().max(100_000).optional(),

@@ -233,7 +233,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
       <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadBanner(event.target.files?.[0]); event.target.value = ""; }} />
 
       <div className="codex-meta-row">
-        <Field label="Folder" htmlFor="codex-folder"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
+        <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
         <Field label="Tags" htmlFor="codex-tags" help="Comma-separated"><Input id="codex-tags" value={draft.tagsText} placeholder="town, npc" onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))} /></Field>
       </div>
 

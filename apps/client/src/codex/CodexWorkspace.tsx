@@ -6,6 +6,7 @@ import { PageEditor } from "./PageEditor";
 import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
+import { NotebookTree, buildFolderTree } from "./NotebookTree";
 import "./codex.css";
 
 /**
@@ -21,17 +22,37 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[] } | null>(null);
   const [query, setQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<CodexPageSummary[] | null>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
+  });
   const [error, setError] = useState<string | null>(null);
 
+  // The rail always holds the FULL notebook (for the folder tree + [[ autocomplete)); search is a separate overlay.
   const refreshList = useCallback(async () => {
-    try {
-      const rows = query.trim() ? await codexApi.search(gmToken, query.trim()) : await codexApi.listPages(gmToken);
-      setPages(rows);
-      setError(null);
-    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
-  }, [gmToken, query]);
+    try { setPages(await codexApi.listPages(gmToken)); setError(null); }
+    catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
+  }, [gmToken]);
 
   useEffect(() => { void refreshList(); }, [refreshList]);
+
+  // Full-text search overlays the tree while a query is active; re-runs when the notebook changes.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) { setSearchHits(null); return; }
+    let live = true;
+    void codexApi.search(gmToken, q).then((hits) => { if (live) setSearchHits(hits); }).catch(() => { if (live) setSearchHits([]); });
+    return () => { live = false; };
+  }, [query, gmToken, pages]);
+
+  const toggleFolder = useCallback((path: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      try { localStorage.setItem("codex-notebook-collapsed", JSON.stringify([...next])); } catch { /* private mode - fine */ }
+      return next;
+    });
+  }, []);
 
   // Live refresh: any codex write pings every client. Refresh the list only - the editor owns the open page.
   useEffect(() => {
@@ -102,16 +123,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
 
   const onPageDeleted = useCallback(() => { setSelectedId(null); setSelected(null); void refreshList(); }, [refreshList]);
 
-  const grouped = useMemo(() => {
-    const byFolder = new Map<string, CodexPageSummary[]>();
-    for (const page of pages) {
-      const key = page.folder ?? "";
-      const bucket = byFolder.get(key) ?? [];
-      bucket.push(page);
-      byFolder.set(key, bucket);
-    }
-    return [...byFolder.entries()].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
-  }, [pages]);
+  const tree = useMemo(() => buildFolderTree(pages), [pages]);
 
   return (
     <div className="codex-root">
@@ -136,19 +148,19 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
           <Button variant="primary" size="sm" onClick={createPage}>New page</Button>
         </div>
         {error && <p className="codex-rail-error" role="alert">{error}</p>}
-        <nav className="codex-list" aria-label="Codex pages">
-          {pages.length === 0 && !error && <p className="codex-list-empty">{query.trim() ? "No pages match." : "No pages yet. Create your first."}</p>}
-          {grouped.map(([folder, rows]) => (
-            <div key={folder || "_unfiled"} className="codex-list-group">
-              {folder && <div className="codex-list-folder">{folder}</div>}
-              {rows.map((page) => (
-                <button key={page.id} type="button" className={`codex-list-item${page.id === selectedId ? " is-active" : ""}`} onClick={() => setSelectedId(page.id)}>
-                  <span className="codex-list-title">{page.title}</span>
-                  {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
-                </button>
-              ))}
-            </div>
-          ))}
+        <nav className="codex-list" aria-label="Campaign notebook">
+          {query.trim()
+            ? (searchHits && searchHits.length > 0
+                ? searchHits.map((page) => (
+                    <button key={page.id} type="button" className={`codex-list-item${page.id === selectedId ? " is-active" : ""}`} onClick={() => setSelectedId(page.id)}>
+                      <span className="codex-list-title">{page.title}</span>
+                      {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
+                    </button>
+                  ))
+                : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
+            : pages.length === 0
+                ? (!error && <p className="codex-list-empty">No notes yet. Create your first.</p>)
+                : <NotebookTree node={tree} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} />}
         </nav>
       </aside>
       <section className="codex-main">
