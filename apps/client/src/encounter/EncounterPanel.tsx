@@ -565,6 +565,11 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
+      {/* Player-rolled initiative: a prominent, view-independent prompt so the player ALWAYS sees the
+          call to roll - not buried on their own initiative row (which can be scrolled off, or hidden
+          entirely behind the "My sheet" view). It clears itself the moment they roll (their id leaves
+          pendingInitiative). */}
+      {myId !== null && combat.pendingInitiative.includes(myId) && <InitiativePrompt actorId={myId} />}
       {view === "sheet" && myActor
         ? <CharacterSheet actor={myActor} role="player" state={props.state} embedded combat={{ revision: props.state.revision, active: combat.active, myTurn, playerDamageMode: combat.playerDamageMode, targets: combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name })) }} onJumpToInitiative={() => { setView("initiative"); setReturnToSheetAfterAttack(true); }} onClose={() => setView("initiative")} />
         : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
@@ -574,7 +579,6 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         return <li key={entry.actorId} ref={entry.active ? activeRowRef : undefined} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
           {/* Foundry-style row shared with the shared-screen viewer so the two lists never drift. */}
           <InitiativeRow entry={entry} self={isMe} />
-          {isMe && myId !== null && combat.pendingInitiative.includes(myId) && <InitiativePrompt actorId={myId} />}
           {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
           {/* On your turn, an interactive action console (the mirror of the GM's) - tap an attack, pick a
               target, roll, and confirm; the hit is handed to the GM or auto-applied per the table policy. */}
