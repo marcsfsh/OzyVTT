@@ -80,6 +80,27 @@
 }
 .codex-title-input:focus { outline: none; border-bottom-color: var(--magenta); }
 .codex-editor-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Obsidian/OneNote-style three-pane: explorer (rail) | editor center | context (outline + backlinks). */
+.codex-editor-titlewrap { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.codex-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
+.codex-crumb-sep { opacity: 0.6; }
+.codex-editor-cols { display: flex; gap: var(--space-4); align-items: flex-start; min-height: 0; }
+.codex-editor-center { display: flex; flex-direction: column; gap: var(--space-3); flex: 1 1 auto; min-width: 0; }
+.codex-editor-context { flex: 0 0 236px; display: flex; flex-direction: column; gap: var(--space-4); position: sticky; top: var(--space-2); max-height: 82vh; overflow-y: auto; }
+.codex-outline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.codex-outline-item { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--text-dim); padding: 3px var(--space-2); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-outline-item:hover { background: var(--surface-2); color: var(--text); }
+.codex-tree-folder-row { display: flex; align-items: center; }
+.codex-tree-folder-row .codex-tree-folder { flex: 1; min-width: 0; }
+.codex-tree-folder-add { opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-body); border-radius: var(--radius-sm); }
+.codex-tree-folder-row:hover .codex-tree-folder-add, .codex-tree-folder-add:focus-visible { opacity: 1; }
+.codex-tree-folder-add:hover { color: var(--cyan); background: var(--surface-2); }
+@media (max-width: 900px) {
+  /* Below three-pane width, the context pane drops beneath the editor and the folder-add is always shown (no hover on touch). */
+  .codex-editor-cols { flex-direction: column; }
+  .codex-editor-context { flex: 1 1 auto; width: auto; position: static; max-height: none; }
+  .codex-tree-folder-add { opacity: 1; }
+}
 .codex-save-status { font-size: var(--fs-xs); color: var(--text-muted); min-width: 6ch; font-family: var(--font-mono); }
 .codex-save-saving { color: var(--caution); }
 .codex-save-saved { color: var(--success); }

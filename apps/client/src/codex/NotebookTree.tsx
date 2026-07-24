@@ -38,9 +38,10 @@ type NotebookTreeProps = Readonly<{
   selectedId: string | null;
   onToggle: (path: string) => void;
   onSelect: (pageId: string) => void;
+  onNewInFolder: (path: string) => void;
 }>;
 
-export function NotebookTree({ node, depth = 0, collapsed, selectedId, onToggle, onSelect }: NotebookTreeProps) {
+export function NotebookTree({ node, depth = 0, collapsed, selectedId, onToggle, onSelect, onNewInFolder }: NotebookTreeProps) {
   const folders = [...node.folders.values()].sort((a, b) => a.name.localeCompare(b.name));
   const pages = [...node.pages].sort((a, b) => a.title.localeCompare(b.title));
   return (
@@ -49,12 +50,15 @@ export function NotebookTree({ node, depth = 0, collapsed, selectedId, onToggle,
         const open = !collapsed.has(folder.path);
         return (
           <div key={folder.path} className="codex-tree-branch" role="treeitem" aria-expanded={open}>
-            <button type="button" className="codex-tree-folder" style={{ paddingInlineStart: `${depth * 14 + 6}px` }} onClick={() => onToggle(folder.path)}>
-              <span className="codex-tree-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>
-              <span className="codex-tree-folder-name">{folder.name}</span>
-              <span className="codex-tree-count">{countPages(folder)}</span>
-            </button>
-            {open && <NotebookTree node={folder} depth={depth + 1} collapsed={collapsed} selectedId={selectedId} onToggle={onToggle} onSelect={onSelect} />}
+            <div className="codex-tree-folder-row" style={{ paddingInlineStart: `${depth * 14 + 6}px` }}>
+              <button type="button" className="codex-tree-folder" onClick={() => onToggle(folder.path)}>
+                <span className="codex-tree-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>
+                <span className="codex-tree-folder-name">{folder.name}</span>
+                <span className="codex-tree-count">{countPages(folder)}</span>
+              </button>
+              <button type="button" className="codex-tree-folder-add" aria-label={`New note in ${folder.name}`} title={`New note in ${folder.name}`} onClick={() => onNewInFolder(folder.path)}>＋</button>
+            </div>
+            {open && <NotebookTree node={folder} depth={depth + 1} collapsed={collapsed} selectedId={selectedId} onToggle={onToggle} onSelect={onSelect} onNewInFolder={onNewInFolder} />}
           </div>
         );
       })}

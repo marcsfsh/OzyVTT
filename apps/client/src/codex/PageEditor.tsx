@@ -213,13 +213,41 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
     try { await codexApi.deletePage(gmToken, page.id); onDeleted(); } catch { setStatus("error"); }
   };
 
+  // Outline of the current body's markdown headings (Obsidian-style), clickable to jump the editor there.
+  const outline = useMemo(() => {
+    const items: { level: number; text: string; offset: number }[] = [];
+    let offset = 0;
+    for (const line of body.split("\n")) {
+      const match = /^(#{1,3})\s+(.+)$/.exec(line);
+      if (match) items.push({ level: match[1].length, text: match[2].trim(), offset });
+      offset += line.length + 1;
+    }
+    return items;
+  }, [body]);
+  const jumpTo = (offset: number) => {
+    setPreview(false);
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(offset, offset);
+      const lineIndex = body.slice(0, offset).split("\n").length - 1;
+      const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20;
+      textarea.scrollTop = Math.max(0, lineIndex * lineHeight - 48);
+    });
+  };
+  const folderCrumbs = draft.folder.split("/").map((segment) => segment.trim()).filter(Boolean);
+
   const statusLabel = status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "conflict" ? "Changed elsewhere - reload" : status === "error" ? "Save failed" : "";
 
   return (
     <div className="codex-editor">
       <div className="codex-editor-head">
-        <input className="codex-title-input" value={draft.title} placeholder="Untitled page" aria-label="Page title"
-          onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
+        <div className="codex-editor-titlewrap">
+          {folderCrumbs.length > 0 && <nav className="codex-crumbs" aria-label="Folder path">{folderCrumbs.map((crumb, index) => <span key={index} className="codex-crumb-seg">{index > 0 && <span className="codex-crumb-sep">/</span>}{crumb}</span>)}</nav>}
+          <input className="codex-title-input" value={draft.title} placeholder="Untitled page" aria-label="Page title"
+            onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
+        </div>
         <div className="codex-editor-actions">
           <span className={`codex-save-status codex-save-${status}`} role="status">{statusLabel}</span>
           <Switch checked={revealed} onChange={toggleReveal} label={revealed ? "Shown to players" : "GM only"} />
@@ -228,62 +256,77 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
         </div>
       </div>
 
-      {draft.bannerAssetId
-        ? <div className="codex-banner"><CodexImage assetId={draft.bannerAssetId} token={gmToken} alt="Page banner" className="codex-banner-img" /><div className="codex-banner-actions"><Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>Change</Button><Button variant="ghost" size="sm" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>Remove banner</Button></div></div>
-        : <button type="button" className="codex-banner-add" onClick={() => bannerInputRef.current?.click()}>+ Add banner image</button>}
-      <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadBanner(event.target.files?.[0]); event.target.value = ""; }} />
+      <div className="codex-editor-cols">
+        <div className="codex-editor-center">
+          {draft.bannerAssetId
+            ? <div className="codex-banner"><CodexImage assetId={draft.bannerAssetId} token={gmToken} alt="Page banner" className="codex-banner-img" /><div className="codex-banner-actions"><Button variant="ghost" size="sm" onClick={() => bannerInputRef.current?.click()}>Change</Button><Button variant="ghost" size="sm" onClick={() => setDraft((prev) => ({ ...prev, bannerAssetId: null }))}>Remove banner</Button></div></div>
+            : <button type="button" className="codex-banner-add" onClick={() => bannerInputRef.current?.click()}>+ Add banner image</button>}
+          <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadBanner(event.target.files?.[0]); event.target.value = ""; }} />
 
-      <div className="codex-meta-row">
-        <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
-        <Field label="Tags" htmlFor="codex-tags" help="Comma-separated"><Input id="codex-tags" value={draft.tagsText} placeholder="town, npc" onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))} /></Field>
-      </div>
+          <div className="codex-meta-row">
+            <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
+            <Field label="Tags" htmlFor="codex-tags" help="Comma-separated"><Input id="codex-tags" value={draft.tagsText} placeholder="town, npc" onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))} /></Field>
+          </div>
 
-      <div className="codex-body-bar">
-        <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
-          options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM secret" }]} />
-        <Switch checked={preview} onChange={setPreview} label="Preview" aria-label="Toggle preview" />
-      </div>
+          <div className="codex-body-bar">
+            <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
+              options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM secret" }]} />
+            <Switch checked={preview} onChange={setPreview} label="Preview" aria-label="Toggle preview" />
+          </div>
 
-      {!preview && (
-        <div className="codex-toolbar" role="toolbar" aria-label="Formatting">
-          {TOOLBAR.map((tool) => <IconButton key={tool.kind} label={tool.label} size="sm" onClick={() => format(tool.kind)}><span className="codex-tool-glyph">{tool.glyph}</span></IconButton>)}
-          <IconButton label="Insert image" size="sm" onClick={() => imageInputRef.current?.click()}><span className="codex-tool-glyph">🖼</span></IconButton>
-          <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(event) => { void insertImage(event.target.files?.[0]); event.target.value = ""; }} />
+          {!preview && (
+            <div className="codex-toolbar" role="toolbar" aria-label="Formatting">
+              {TOOLBAR.map((tool) => <IconButton key={tool.kind} label={tool.label} size="sm" onClick={() => format(tool.kind)}><span className="codex-tool-glyph">{tool.glyph}</span></IconButton>)}
+              <IconButton label="Insert image" size="sm" onClick={() => imageInputRef.current?.click()}><span className="codex-tool-glyph">🖼</span></IconButton>
+              <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(event) => { void insertImage(event.target.files?.[0]); event.target.value = ""; }} />
+            </div>
+          )}
+
+          {preview
+            ? <div className="codex-preview">{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
+            : <div className={`codex-editor-body${tab === "gm" ? " is-gm" : ""}`} onDrop={onBodyDrop} onDragOver={(event) => event.preventDefault()} onPaste={onBodyPaste}>
+                <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
+                  placeholder={tab === "player" ? "What players learn about this place…" : "Secrets, plot hooks, GM notes…"}
+                  onChange={(event) => { setBody(event.target.value); syncSuggest(event.target.value, event.target.selectionStart ?? 0); }}
+                  onKeyDown={onBodyKeyDown}
+                  onKeyUp={(event) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0); }}
+                  onClick={(event) => syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0)}
+                  onBlur={() => window.setTimeout(() => setSuggest(null), 150)} />
+                {tab === "gm" && <span className="codex-gm-tag" aria-hidden="true">GM ONLY</span>}
+                {suggest && suggestions.length > 0 && (
+                  <ul className="codex-wiki-suggest" role="listbox" aria-label="Link to page">
+                    {suggestions.map((candidate, index) => (
+                      <li key={candidate.id} role="option" aria-selected={index === suggest.index}>
+                        <button type="button" className={`codex-wiki-suggest-item${index === suggest.index ? " is-active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertWiki(candidate.title)}>{candidate.title}</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>}
         </div>
-      )}
 
-      {preview
-        ? <div className="codex-preview">{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
-        : <div className={`codex-editor-body${tab === "gm" ? " is-gm" : ""}`} onDrop={onBodyDrop} onDragOver={(event) => event.preventDefault()} onPaste={onBodyPaste}>
-            <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
-              placeholder={tab === "player" ? "What players learn about this place…" : "Secrets, plot hooks, GM notes…"}
-              onChange={(event) => { setBody(event.target.value); syncSuggest(event.target.value, event.target.selectionStart ?? 0); }}
-              onKeyDown={onBodyKeyDown}
-              onKeyUp={(event) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0); }}
-              onClick={(event) => syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0)}
-              onBlur={() => window.setTimeout(() => setSuggest(null), 150)} />
-            {tab === "gm" && <span className="codex-gm-tag" aria-hidden="true">GM ONLY</span>}
-            {suggest && suggestions.length > 0 && (
-              <ul className="codex-wiki-suggest" role="listbox" aria-label="Link to page">
-                {suggestions.map((candidate, index) => (
-                  <li key={candidate.id} role="option" aria-selected={index === suggest.index}>
-                    <button type="button" className={`codex-wiki-suggest-item${index === suggest.index ? " is-active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertWiki(candidate.title)}>{candidate.title}</button>
-                  </li>
+        <aside className="codex-editor-context" aria-label="Note details">
+          {outline.length > 0 && (
+            <div className="codex-outline">
+              <h4 className="codex-backlinks-title">Outline</h4>
+              <ul className="codex-outline-list">
+                {outline.map((heading, index) => (
+                  <li key={index}><button type="button" className="codex-outline-item" style={{ paddingInlineStart: `${(heading.level - 1) * 12}px` }} onClick={() => jumpTo(heading.offset)}>{heading.text}</button></li>
                 ))}
               </ul>
-            )}
-          </div>}
-
-      {backlinks.length > 0 && (
-        <div className="codex-backlinks">
-          <h4 className="codex-backlinks-title">Linked from</h4>
-          <div className="codex-backlinks-list">
-            {backlinks.map((link) => <button key={link.sourcePageId} type="button" className="codex-md-link" onClick={() => onNavigate(link.sourceTitle)}>{link.sourceTitle}</button>)}
-          </div>
-        </div>
-      )}
-
-      <PageTimeline gmToken={gmToken} pageId={page.id} />
+            </div>
+          )}
+          {backlinks.length > 0 && (
+            <div className="codex-backlinks">
+              <h4 className="codex-backlinks-title">Linked from</h4>
+              <div className="codex-backlinks-list">
+                {backlinks.map((link) => <button key={link.sourcePageId} type="button" className="codex-md-link" onClick={() => onNavigate(link.sourceTitle)}>{link.sourceTitle}</button>)}
+              </div>
+            </div>
+          )}
+          <PageTimeline gmToken={gmToken} pageId={page.id} />
+        </aside>
+      </div>
 
       {revisionsOpen && (
         <Modal open onClose={() => setRevisionsOpen(false)} title="Revision history" size="md" ariaLabel="Revision history">

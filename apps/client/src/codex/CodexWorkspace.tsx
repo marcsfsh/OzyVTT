@@ -97,6 +97,10 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     try { const page = await codexApi.createPage(gmToken, { title: template.title, playerBody: template.player, gmBody: template.gm }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
   };
+  const createInFolder = async (folder: string) => {
+    try { const page = await codexApi.createPage(gmToken, { title: "Untitled page", folder }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
+  };
   const importInputRef = useRef<HTMLInputElement>(null);
   const exportCodex = async () => {
     try {
@@ -186,7 +190,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
                 : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
             : pages.length === 0
                 ? (!error && <p className="codex-list-empty">No notes yet. Create your first.</p>)
-                : <NotebookTree node={tree} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} />}
+                : <NotebookTree node={tree} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} />}
         </nav>
       </aside>
       <section className="codex-main">
