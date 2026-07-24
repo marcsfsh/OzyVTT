@@ -195,6 +195,19 @@ describe("CodexStore map/marker viewer safety", () => {
     const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
     expect(projectPlayerMarker(marker, { pageRevealed: true, subMapRevealed: true })).toBeNull();
   });
+
+  it("a scene links to exactly one location marker, moving the combat-bridge target on relink", () => {
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const scene = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const first = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
+    const second = store.createMarker(map.id, { x: 2, y: 2, iconId: "cave", iconColor: "#2de2ff" });
+    store.updateMarker(first.id, { sceneId: scene });
+    expect(store.markerForScene(scene)?.id).toBe(first.id);
+    // Relinking the scene to the other pin clears the first (one location per scene) and moves the bridge target.
+    store.updateMarker(second.id, { sceneId: scene });
+    expect(store.getMarker(first.id)!.sceneId).toBeNull();
+    expect(store.markerForScene(scene)?.id).toBe(second.id);
+  });
 });
 
 describe("CodexStore journal", () => {

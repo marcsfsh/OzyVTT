@@ -12,7 +12,8 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
  * map from an uploaded asset, drops markers, links them to pages / sub-maps, and reveals them to players.
  * Drill-down and breadcrumbs walk the parent chain. All state is server-owned and refreshed on codex:changed.
  */
-export function AtlasView({ gmToken, onOpenPage }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void }>) {
+type AtlasScene = Readonly<{ id: string; name: string }>;
+export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActivateScene }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void }>) {
   const [maps, setMaps] = useState<CodexMap[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -75,6 +76,19 @@ export function AtlasView({ gmToken, onOpenPage }: Readonly<{ gmToken: string; o
     try { await atlasApi.moveMarker(gmToken, markerId, point.x, point.y); } catch { void loadMarkers(currentMapId!); }
   };
   const onMarkerUpdated = (marker: CodexMarker) => setMarkers((prev) => prev.map((existing) => (existing.id === marker.id ? marker : existing)));
+  // One-tap: turn a pin into a linked page (titled from its label), then open it - no round-trip through the Pages tab.
+  const createPageForMarker = async (marker: CodexMarker) => {
+    try {
+      const page = await codexApi.createPage(gmToken, { title: marker.label?.trim() || "New location" });
+      onMarkerUpdated(await atlasApi.updateMarker(gmToken, marker.id, { pageId: page.id }));
+      await loadMeta();
+      onOpenPage(page.id);
+    } catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
+  };
+  const revealLinkedPage = async (pageId: string) => {
+    try { await codexApi.revealPage(gmToken, pageId, true); await loadMeta(); }
+    catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Could not reveal the page."); }
+  };
   const onMarkerDeleted = (markerId: string) => { setMarkers((prev) => prev.filter((marker) => marker.id !== markerId)); setSelectedMarkerId(null); };
   const onMapReplace = (map: CodexMap) => setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
   const revealMap = async (revealed: boolean) => { if (currentMap) onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); };
@@ -107,7 +121,9 @@ export function AtlasView({ gmToken, onOpenPage }: Readonly<{ gmToken: string; o
           ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
               onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
-        {selectedMarker && <MarkerInspector gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={(id) => { setSelectedMarkerId(null); setCurrentMapId(id); }} onOpenPage={onOpenPage} onClose={() => setSelectedMarkerId(null)} />}
+        {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} activeSceneId={activeSceneId}
+          onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={(id) => { setSelectedMarkerId(null); setCurrentMapId(id); }} onOpenPage={onOpenPage}
+          onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onActivateScene={onActivateScene} onClose={() => setSelectedMarkerId(null)} />}
       </div>
 
       {picking && (

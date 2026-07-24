@@ -659,6 +659,10 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_id = ?, sub_map_id = ?, scene_id = ?, actor_id = ?, updated_at = ? WHERE id = ?")
         .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_id, merged.sub_map_id, merged.scene_id, merged.actor_id, this.stamp(), markerId);
+      // A scene has one location: linking it here clears any other pin that claimed it, so the combat-history bridge (markerForScene) and the UI stay unambiguous.
+      if (input.sceneId !== undefined && merged.scene_id !== null) {
+        database.prepare("UPDATE codex_markers SET scene_id = NULL, updated_at = ? WHERE scene_id = ? AND id != ?").run(this.stamp(), merged.scene_id, markerId);
+      }
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -719,7 +723,7 @@ export class CodexStore {
   /** The location marker linked to a prepared scene, if any - the combat-history bridge pins fights here. */
   markerForScene(sceneId: string): CodexMarkerRow | null {
     if (!ID.test(sceneId)) return null;
-    const row = this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE scene_id = ? ORDER BY created_at LIMIT 1").get(sceneId) as MarkerRowRaw | undefined;
+    const row = this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE scene_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1").get(sceneId) as MarkerRowRaw | undefined;
     return row ? this.toMarker(row) : null;
   }
 

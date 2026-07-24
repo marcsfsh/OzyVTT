@@ -360,7 +360,10 @@ function App() {
 
       {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
       {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
-      {mode === "gm" && gmToken && gmTab === "codex" && <div className="anim-view"><CodexWorkspace gmToken={gmToken} /></div>}
+      {mode === "gm" && gmToken && gmTab === "codex" && <div className="anim-view"><CodexWorkspace gmToken={gmToken}
+        scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
+        activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
+        onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 

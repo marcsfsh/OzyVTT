@@ -13,7 +13,8 @@ import "./codex.css";
  * markdown editor on the right. Data is fetched over the codex REST surface and refreshed whenever a
  * `codex:changed` ping arrives; the open page is owned by the editor (not clobbered by list refreshes).
  */
-export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
+type WorkspaceScene = Readonly<{ id: string; name: string }>;
+export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
   const [mode, setMode] = useState<"pages" | "atlas" | "journal">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -122,7 +123,7 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
         </div>
       </div>
       {mode === "atlas"
-        ? <AtlasView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <AtlasView gmToken={gmToken} scenes={scenes} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "journal"
         ? <JournalView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>

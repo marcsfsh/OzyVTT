@@ -157,6 +157,10 @@
 .codex-inspector-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .codex-inspector-head-actions { display: flex; align-items: center; gap: var(--space-2); }
 .codex-inspector-foot { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+/* Launch/navigate actions lead the inspector; editing follows. */
+.codex-inspector-go { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-bottom: var(--space-2); border-bottom: 1px solid var(--line); }
+.codex-inspector-hint { font-size: var(--fs-sm); color: var(--text-muted); margin: calc(-1 * var(--space-1)) 0 0; }
+.codex-linklike { background: none; border: none; padding: 0; color: var(--cyan); cursor: pointer; text-decoration: underline; font: inherit; }
 
 /* Icon picker */
 .codex-iconpicker { display: flex; flex-direction: column; gap: var(--space-2); }
