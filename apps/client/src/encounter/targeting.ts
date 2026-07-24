@@ -7,7 +7,8 @@ import { socket } from "../socket";
  * Shared targeting state for the GM action runner. The runner may render in the sidebar OR inside the
  * docked panel, and the map is a third surface - a module store (not component state) is the only way
  * all three agree on the in-progress action, its selected targets, or its placed area template.
- * Resolution stays on the server-authoritative GM-gated action:resolve; this only coordinates UX.
+ * Resolution stays on the server-authoritative action:resolve (the GM for anyone, a player for their own
+ * claimed character - gated per-actor by canInitiateForActor, not GM-only); this only coordinates UX.
  */
 export type TargetingTemplate = Readonly<{ shape: AnnotationShapeKind; sizeFeet: number; widthFeet: number | null; placed: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }> | null }>;
 export type TargetingSession = Readonly<{

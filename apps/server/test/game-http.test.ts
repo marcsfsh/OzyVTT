@@ -205,6 +205,29 @@ describe("public game API over /api/v1", () => {
     expect(afterRevoke.status).toBe(403);
   });
 
+  it("lets a player resolve their own claimed character's action but refuses a hidden target or GM-only inputs", async () => {
+    const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
+    const playerToken = server.auth.issuePlayerSession();
+    // The player claims the public hero; the GM runs an encounter with the hero and the hidden tyrant.
+    expect((await post(base, GAME_PATHS.claims, playerToken, { actorId: HERO_ID })).status).toBe(200);
+    expect((await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 12 }, { actorId: SECRET_ID, score: 6 }] })).status).toBe(200);
+
+    // Supplying the hidden combatant's id as a target is refused (the runner never offers it, but the server
+    // must not trust client input), and the rejection must not echo the hidden actor's name (viewer safety).
+    const hiddenTarget = await post(base, GAME_PATHS.actionResolve, playerToken, { actorId: HERO_ID, actionId: "unarmed-strike", targetIds: [SECRET_ID] });
+    expect(hiddenTarget.status).toBe(409);
+    const hiddenBody = JSON.stringify(await hiddenTarget.json());
+    expect(hiddenBody).toContain("target combatants you can see");
+    expect(hiddenBody).not.toContain("Unrevealed Tyrant");
+
+    // GM-only resolve inputs are refused for a player: an area template and a strict-mode override.
+    expect((await post(base, GAME_PATHS.actionResolve, playerToken, { actorId: HERO_ID, actionId: "unarmed-strike", template: { shape: "circle", origin: { x: 10, y: 10 }, target: { x: 40, y: 40 } } })).status).toBe(403);
+    expect((await post(base, GAME_PATHS.actionResolve, playerToken, { actorId: HERO_ID, actionId: "unarmed-strike", targetIds: [HERO_ID], override: { reason: "nope" } })).status).toBe(403);
+
+    // And a player cannot resolve for a character they do not own (the GM's hidden monster).
+    expect((await post(base, GAME_PATHS.actionResolve, playerToken, { actorId: SECRET_ID, actionId: "unarmed-strike", targetIds: [HERO_ID] })).status).toBe(409);
+  });
+
   it("exposes the generic command tunnel with a discoverable catalog and per-command scopes", async () => {
     const { base, gmToken, mapAssetId } = await bootWithBattlemap();
     const bot = await issueCredential(base, gmToken, "tunnel bot", ["system:read", "combat:write", "actor:write"]);

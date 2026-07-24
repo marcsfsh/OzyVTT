@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { canInitiateForActor } from "../src/authorization.js";
+import { canInitiateForActor, canPlayerTarget } from "../src/authorization.js";
 
 const playerA = "b539ef5e-16e6-46ce-bf33-3ed4b02997c1";
 const playerB = "65cc7d6b-1150-41c4-aa9f-390439313f53";
 const mine = "60a6e172-9ff5-44a3-8a8b-93f836f0d16c";
 const monster = "60a6e172-9ff5-44a3-8a8b-93f836f0d200";
+const hidden = "60a6e172-9ff5-44a3-8a8b-93f836f0d201";
 const state = GameStateSchema.parse({
   schemaVersion: 1,
   actors: [
@@ -26,5 +27,24 @@ describe("canInitiateForActor", () => {
   });
   it("rejects an unknown actor", () => {
     expect(canInitiateForActor({ role: "player", sessionId: playerA }, state, "00000000-0000-4000-8000-000000000000", "check").ok).toBe(false);
+  });
+});
+
+describe("canPlayerTarget", () => {
+  const withHidden = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: mine, name: "Mine", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10 }, ownerSessionId: playerA },
+      { id: monster, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 7, maximum: 7 } },
+      { id: hidden, name: "Lurker", kind: "monster", visibility: "gm-only", hp: { current: 20, maximum: 20 } }
+    ]
+  });
+  it("allows targeting any public combatant", () => {
+    expect(canPlayerTarget(withHidden, monster)).toBe(true);
+    expect(canPlayerTarget(withHidden, mine)).toBe(true);
+  });
+  it("refuses a hidden (gm-only) combatant and an unknown id (no hidden-actor leak via a supplied target id)", () => {
+    expect(canPlayerTarget(withHidden, hidden)).toBe(false);
+    expect(canPlayerTarget(withHidden, "00000000-0000-4000-8000-000000000000")).toBe(false);
   });
 });

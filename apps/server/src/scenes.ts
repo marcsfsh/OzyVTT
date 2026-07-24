@@ -54,8 +54,8 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     return { actorId, score: 0, tieBreaker: actor.initiative ?? 0 };
   });
   const tokens = createEncounterTokens(initiative.map((entry) => { const source = state.actors.find((actor) => actor.id === entry.actorId); return { actorId: entry.actorId, sizeCells: source?.sizeCells ?? 1, size: source?.size }; }), geometry);
-  // A newly prepared scene inherits the table's current rules mode rather than resetting to the default.
-  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, rollMode: state.combat.rollMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
+  // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
+  return { ...emptySceneCombat(), rulesMode: state.combat.rulesMode, rollMode: state.combat.rollMode, playerDamageMode: state.combat.playerDamageMode, healthDisplay: state.combat.healthDisplay, initiative, tokens };
 }
 
 export function createScene(state: GameState, input: Readonly<{ sceneId: string; name: string; mapAssetId: string; combatantIds: readonly string[] }>, geometry: TokenMapGeometry): Scene {

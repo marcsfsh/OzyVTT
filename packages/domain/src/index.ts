@@ -269,7 +269,10 @@ const sceneCombatShape = {
   }).default({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
   /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
   rulesMode: z.enum(["strict", "assisted", "freeform"]).default("strict"),
-  /** Table-wide roll preference: "auto" rolls each encounter roll for you (with a typed override, and adv/disadv after a d20), "manual" waits for you to type your physical dice result (with a Roll button to auto-roll instead). Additive; the default preserves the prior always-auto behavior. */
+  /** DEPRECATED (2026-07-24): the old table-wide roll preference. Superseded by a per-browser dice-input
+   * preference (apps/client/src/dice/roll-preference.ts); the client no longer reads or writes this, and the
+   * GM roll-mode UI was retired. The field + `encounter:set-roll-mode` command remain (inert) so the public
+   * API contract stays stable. "auto" auto-rolled each encounter roll; "manual" waited for a typed die. */
   rollMode: z.enum(["auto", "manual"]).default("auto"),
   /** Per-table policy for how a PLAYER's confirmed hit reaches an enemy's HP: "proposal" parks a GM-confirmed
    * damage proposal (the GM taps Apply - the default, preserving "players never mutate a creature they don't

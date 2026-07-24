@@ -23,3 +23,16 @@ export function canInitiateForActor(initiator: ActorInitiator, state: GameState,
   if (actor.kind !== "player-character" || actor.ownerSessionId !== initiator.sessionId) return { ok: false, message: "You can only act on your own character." };
   return { ok: true };
 }
+
+/**
+ * May a player TARGET this combatant? Only public ones - never a hidden (gm-only) actor. The runner only
+ * ever offers public targets, but the server must not trust client-supplied target ids: resolving an
+ * action against a hidden actor would leak its name/AC/outcome back through the resolve ack (which bypasses
+ * the player projection) and, in direct-damage mode, apply damage to it. The GM may target anyone (this is
+ * only consulted for player-initiated resolves). Distinct from canInitiateForActor, which gates the acting
+ * (owned) character; this gates the acted-upon one.
+ */
+export function canPlayerTarget(state: GameState, targetId: string): boolean {
+  const target = state.actors.find((candidate) => candidate.id === targetId);
+  return target !== undefined && target.visibility === "public";
+}

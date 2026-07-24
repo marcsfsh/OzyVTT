@@ -9,7 +9,7 @@ import { actionAvailability, resolveDefinitionAction } from "./action-resolution
 import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
-import { canInitiateForActor } from "./authorization.js";
+import { canInitiateForActor, canPlayerTarget } from "./authorization.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { setCurrency, setInventoryItem } from "./inventory.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "./character-edit.js";
@@ -680,6 +680,15 @@ export function createGameOperations(context: GameOperationsContext) {
           if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
         } else {
           resolvedTargetIds = targetIds ?? [];
+        }
+        // A player may target only PUBLIC combatants. The runner offers only public targets, but the
+        // server must not trust client input: resolving against a hidden (gm-only) actor id would leak
+        // its name/AC/outcome back through the resolve ack (and, in direct mode, apply damage to it),
+        // bypassing the player projection. Mirrors the attacker-ownership gate above (viewer safety).
+        if (isPlayer) {
+          for (const targetId of resolvedTargetIds) {
+            if (!canPlayerTarget(state, targetId)) throw new CommandRejectedError("You can only target combatants you can see.");
+          }
         }
         // Footprint-aware (SRD Creature Size): a Medium attacker adjacent to a Large creature is
         // 5 ft away - center-to-center would read 10 and wrongly block the melee swing.
