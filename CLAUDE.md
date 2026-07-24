@@ -27,7 +27,7 @@ Node.js **24+** required.
 | --- | --- |
 | `npm install` | Install workspace deps. |
 | `npm run dev` | Client on `:5173` + authoritative server (dev API `:3001`). |
-| `npm run check` | Per-workspace typecheck/lint. Run before calling work done. |
+| `npm run check` | Per-workspace typecheck (`tsc --noEmit`). Run before calling work done. |
 | `npm run test` | Per-workspace tests. |
 | `npm run build` | Build all workspaces. |
 | `npm run start` | Build, then run the single LAN service on `:3001`. |
@@ -65,8 +65,8 @@ Monorepo layout (see `docs/ai-context/architecture.md` for detail):
 `docs/ai-ledger/` (living state — read at session start, update after real work):
 `current-state.md` · `decision-log.md` · `known-bugs.md` · `session-summary.md`
 
-Durable decisions and roadmap: `docs/adr/`, `docs/product/`, `BUILD_PLAN.md`,
-`ARCHITECTURE.md`. **For a task, read 2-4 relevant files, not the whole tree.**
+Durable decisions and roadmap: `docs/adr/`, `docs/product/`, `BUILD_PLAN.md`.
+**For a task, read 2-4 relevant files, not the whole tree.**
 
 ## How to work
 
@@ -79,8 +79,9 @@ Durable decisions and roadmap: `docs/adr/`, `docs/product/`, `BUILD_PLAN.md`,
   realtime): slow down, confirm scope, keep it reversible.
 
 The skill system that supports this workflow (task packets, context routing, QA,
-ledger updates, scheduling) is described in `docs/claude-code-tooling-outline.md`
-and lives in `.claude/skills/`. Use a skill when its trigger matches; don't force it.
+ledger updates, scheduling) lives in `.claude/`. See **`.claude/README.md`** for the current
+roster of skills, subagents, path-scoped rules, and hooks (design rationale in
+`docs/claude-code-tooling-outline.md`). Use a skill when its trigger matches; don't force it.
 
 Lightweight hooks in `.claude/settings.json` enforce a few of these rules
 automatically (destructive-command guard, sensitive-area reminders, a

@@ -24,7 +24,7 @@ Remember: `@vtt/web` has **no unit tests** — client correctness rides on `chec
 
 ## Live Playwright smoke (the project bar for UI PRs)
 
-Per `NEXT-STEPS.md`, UI PRs get a live smoke: **seed a map + calibration + encounter via the
+UI PRs get a live smoke: **seed a map + calibration + encounter via the
 API**, then drive the map inside the full-viewport **"Enlarge map"** overlay (so drags land
 on-screen), exercising the changed flow (e.g. dock the panel to each edge, inline-edit an
 initiative score, calibrate a gridless grid, switch scenes). Verify GM, player, and paired

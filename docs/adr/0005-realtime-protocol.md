@@ -6,7 +6,7 @@ Accepted — 2026-07-15.
 
 ## Context and decision drivers
 
-Combat state (HP, initiative, claims, dice, position) must stay consistent across a GM browser and several player browsers on a trusted LAN, survive brief disconnects, and never let a client apply a privileged mutation locally. ADR-001 and ADR-002 already commit to one authoritative server and a browser client, so the realtime channel must carry authenticated commands in and authorized, recipient-specific state out, with no client-computed authoritative state (see ARCHITECTURE.md's state and security boundary).
+Combat state (HP, initiative, claims, dice, position) must stay consistent across a GM browser and several player browsers on a trusted LAN, survive brief disconnects, and never let a client apply a privileged mutation locally. ADR-001 and ADR-002 already commit to one authoritative server and a browser client, so the realtime channel must carry authenticated commands in and authorized, recipient-specific state out, with no client-computed authoritative state (see `docs/ai-context/architecture.md`'s state and security boundary).
 
 ## Considered options
 

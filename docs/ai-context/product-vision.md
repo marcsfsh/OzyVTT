@@ -36,5 +36,5 @@ local campaign data and is git-ignored.
 ## Roadmap pointers
 
 `BUILD_PLAN.md` is the full roadmap; `README.md` describes the current milestone;
-`NEXT-STEPS.md` tracks near-term work. Phase 2 (testing-MVP vertical slice) is under
+`docs/ai-ledger/current-state.md` tracks near-term work. Phase 2 (testing-MVP vertical slice) is under
 active implementation; no phase exit gate has been claimed yet.

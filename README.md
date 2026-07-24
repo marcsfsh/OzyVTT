@@ -30,7 +30,7 @@ To run the single LAN service as a player would use it, build and launch it with
 
 ## Test the current encounter and second-screen milestone
 
-1. Enter GM mode and upload a battlemap under **Maps and grid setup**.
+1. Enter GM mode. Open the **Scenes** hub (the prep home) and add a scene; upload its battlemap and calibrate the grid under **Manage maps** (the standalone Map Setup tab was retired in the scene-centric redesign).
 2. Choose **Printed square grid** or **Gridless battlemap**. For a printed grid, press on one grid intersection, drag diagonally across exactly a 3×3 block of squares, and release on the opposite intersection. The overlay appears immediately; preview/adjust it, click a distant V intersection, verify, and save.
 3. Under **Table viewer**, open or copy the second-screen address. On a separate browser/display, pair it using a code created by the GM.
 4. Keep the intended map selected and click **Present _map name_**. This single action now starts presentation and sends the selected map/camera immediately.
@@ -38,7 +38,7 @@ To run the single LAN service as a player would use it, build and launch it with
 6. Drag tokens from the tray onto the map and drag them again to move them. Printed-grid maps snap to cell centers on the server; gridless maps place freely within the image. Drag a token back to the tray to remove it from the map. A player can move only their claimed character; the GM can move any token. Arrow keys move a focused placed token, and Delete returns it to the tray.
 7. Advance turns from the GM controls. The active-turn ring, player map, and paired viewer update automatically. GM-only combatants and their token identity/position are absent from public surfaces, which show only the generic **GM turn** cue.
 
-The current combat canvas supports authoritative token placement/movement and viewer synchronization. Manual fog, targeting, HP/actions, and physical phone/TV acceptance are the next scene/combat milestones.
+The current combat canvas supports authoritative token placement/movement, manual fog of war, and viewer synchronization. Targeting, HP/actions, and physical phone/TV acceptance are the next scene/combat milestones.
 
 ## Integrations (public HTTP API v1)
 
@@ -58,4 +58,4 @@ Webhooks/streaming push are deliberately not part of v1 core yet; polling with E
 
 This repository is intentionally not a character builder, campaign wiki, voice/video service, public SaaS, multi-tenant product, macro language, or 3D tabletop. Those boundaries prevent the core combat loop from becoming a general-purpose VTT project.
 
-The complete roadmap is [BUILD_PLAN.md](BUILD_PLAN.md). Phase 0/1 validation continues while the Phase 2 testing-MVP vertical slice is under active implementation; no phase exit gate has been claimed yet. See [ARCHITECTURE.md](ARCHITECTURE.md), [docs/adr/](docs/adr/), and [docs/product/](docs/product/) for the decisions and proof artifacts that guide implementation.
+The complete roadmap is [BUILD_PLAN.md](BUILD_PLAN.md). Phase 0/1 validation continues while the Phase 2 testing-MVP vertical slice is under active implementation; no phase exit gate has been claimed yet. See [docs/ai-context/architecture.md](docs/ai-context/architecture.md), [docs/adr/](docs/adr/), and [docs/product/](docs/product/) for the decisions and proof artifacts that guide implementation.
