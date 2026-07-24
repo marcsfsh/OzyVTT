@@ -302,10 +302,13 @@ magic-item/gear data + the derivation engine.
   GM-confirmed via `combat.pendingDamage` + `damage:resolve`) or `direct` (server-side auto-apply,
   GM-scoped) — realizing the anticipated "players may initiate attacks" toggle while keeping the hard
   rule that the client never mutates a non-owned actor's HP. Tap-to-roll abilities/saves/skills was
-  already shipped (loose `dice:roll`); attacks now route through the structured runner. Also unified
-  the manual/auto dice toggle into one per-browser preference across every surface (retiring the
-  table-wide roll-mode). **Deferred:** structured attacks from the sheet surface, player-rolled
-  initiative (below).
+  already shipped (loose `dice:roll`); attacks now route through the structured runner — from the
+  initiative list AND, on the player's turn, from their OPEN sheet (a per-browser `sheetAttackMode`
+  chooses an inline picker on the sheet or a jump to the initiative view that hops back on commit).
+  Players also **roll their own initiative** (opt-in `encounter:start { playersRollInitiative }` +
+  `initiative:roll-self`, with a GM start-now/wait policy and a "roll for the rest" affordance). Also
+  unified the manual/auto dice toggle into one per-browser preference across every surface (retiring
+  the table-wide roll-mode). **Deferred:** a live browser/mobile smoke (no e2e harness in-repo).
 - **Slice 3 — Spell slots & spell management.** Live slots + `spend/restore/set-prepared`;
   long-rest restore; Spells tab; **light-edit** of known spells & slot maxima (+ reconciliation).
 - **Slice 4 — Inventory / currency / attunement.** `set-inventory`/`set-currency`; Inventory tab;

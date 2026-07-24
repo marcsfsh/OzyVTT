@@ -53,6 +53,23 @@ load-bearing decisions in one place plus operating decisions that don't have an 
     roll surface, replacing the table-wide GM `combat.rollMode` (retired from the UI; field/command
     left inert). The preference is **per person, not per table** (product decision): each player
     controls how their own dice input works; the toggle lives on the sheet and in the DicePanel.
+  - **Attacks from the sheet too (2026-07-24).** A player's stat-block attacks resolve from their OPEN
+    sheet on their turn, not just the initiative list, via a per-browser `sheetAttackMode` in the same
+    preference store: `inline` mounts the shared `PlayerActionRunner` in the sheet's Actions section;
+    `jump` starts targeting on the shared store and hops to the initiative view to pick/confirm, then
+    jumps BACK to the sheet once the attack commits (the user's explicit round-trip). Both modes drive
+    the one server-authoritative `action:resolve` — the sheet is a second surface on the same store,
+    not a second code path. Only server-resolvable definition actions route; client-derived
+    equipped-weapon quick-rolls stay loose dice.
+  - **Player-rolled initiative (2026-07-24).** Opt-in **per encounter** via
+    `encounter:start { playersRollInitiative }`: claimed PCs are parked on `combat.pendingInitiative`
+    (seeded with a provisional auto-roll so the order is always valid/non-blocking) and each player
+    rolls their own with `initiative:roll-self` (server d20 + modifier, or a typed natural), authorized
+    through the same `canInitiateForActor` seam. A GM `combat.playerInitiativeMode` chooses
+    **start-now** (turns run on the provisional order, updating as players roll) vs **wait** (turns
+    hold until everyone has rolled, then begin on the final order); `initiative:roll-remaining` lets
+    the GM roll stragglers. All three new fields are additive-optional and GM-/viewer-safe by
+    projection construction.
   - Roadmap + codebase orientation: `docs/product/character-sheet-initiative.md`.
 - **UI design system: OzyVTT (2026-07-21).** A tokenized retrowave design language is the
   single source of look-and-feel, living in `packages/ui` (`design-tokens.css` + self-hosted
