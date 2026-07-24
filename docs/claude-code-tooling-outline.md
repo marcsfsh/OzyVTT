@@ -1,5 +1,13 @@
 # Claude Code tooling upgrade — outline
 
+> **Status (2026-07-24): historical design rationale — not the live roster.** This is the
+> original design spec for the Claude tooling system, kept for the "why" behind the skills,
+> hooks, and ledger model. For the **current** roster of skills/agents/hooks see
+> [`.claude/README.md`](../.claude/README.md); for **current build state** see
+> [`docs/ai-ledger/current-state.md`](ai-ledger/current-state.md). Some counts below predate
+> later additions — the roster grew to 10 skills (e.g. `vtt-orientation`), and the three
+> subagents and the hooks are now implemented, not optional.
+
 > **This is a tooling upgrade, not an app build.** The goal is to make Claude
 > Code cheaper, more predictable, and more disciplined when working on the VTT,
 > using Claude Code's own primitives (project memory, skills, hooks, scheduled
@@ -44,7 +52,7 @@ selectively rather than inserting a heavy meta-agent before every request.
 ### `vtt-ledger-update`
 
 * Updates the project memory after meaningful work is complete.
-* Writes concise changes into `current-state.md`, `known-bugs.md`, `decision-log.md`, or `build-plan.md`.
+* Writes concise changes into `current-state.md`, `known-bugs.md`, `decision-log.md`, or `BUILD_PLAN.md`.
 * Prevents future Claude sessions from rediscovering old decisions or re-solving closed problems.
 * Should be run after implementation or QA, not during every minor edit.
 
@@ -190,7 +198,7 @@ unit gets a small structured brief, and every review refers back to that brief.
 
 ### Split context by subsystem
 
-* Use files like `map-grid.md`, `viewer-mode.md`, `mobile-ux.md`, `realtime.md`, `auth-roles.md`, and `character-json.md`.
+* Use files like `map-grid.md`, `viewer-mode.md`, `mobile-ux.md`, `realtime.md`, `auth-roles.md`, and `design-language.md`.
 * Each file should describe decisions, constraints, expected behavior, and known edge cases for that subsystem.
 * Claude should read the subsystem file only when the task touches that subsystem.
 * This makes context retrievable rather than permanently loaded.
@@ -252,7 +260,7 @@ enforce small deterministic rules rather than run full reviews every time.
 
 ### Optional subagents: use sparingly
 
-* Add `ux-reviewer`, `test-reviewer`, and `architecture-reviewer` only after the basic skill system is working.
+* Add `ux-reviewer`, `test-reviewer`, and `architecture-reviewer` only after the basic skill system is working. *(All three are now implemented — see `.claude/agents/`.)*
 * Use subagents when their review would keep the main context cleaner, not for every change.
 * Good trigger: large UI change, realtime/state change, auth/role change, or cross-cutting refactor.
 * Bad trigger: simple copy tweak, small CSS fix, one-line bug fix.
@@ -330,6 +338,7 @@ docs/ai-ledger/
     vtt-test-pass/
     vtt-branch-safety/
     vtt-schedule/
+    vtt-orientation/
 
 .github/workflows/
   scheduled-ledger-drift.yml  # optional durable schedule (nightly), sits beside ci.yml

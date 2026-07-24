@@ -100,10 +100,14 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **2026-07-19 — "Per day" = per long rest.** The app has no calendar; every N/Day pool
   (ETL `PER_DAY`, Legendary Resistance) maps to the long-rest scope. Documented in the ADR-0020
   third amendment; revisit only if a real in-game clock ever ships.
-- **2026-07-19 — Fog of war is presentation, never the security boundary** (ADR-0021). Players
+- **2026-07-19 — Fog of war is presentation, never the security boundary** (ADR-0022). Players
   receive the mask verbatim; hiding a combatant's existence still requires `gm-only` visibility.
   Fog is also NOT combat state: excluded from the timeline's restorable slice, preserved across
   encounter start/end, carried per scene through park/resume.
+- **2026-07-19 — Guard shared-view reads on field-presence, not role/mode.** Any GM-only
+  `combat.*` field read in the shared table view must be guarded on field-presence — the first
+  post-login state can arrive player-projected (no `combat.scenes` etc.), so an unguarded read
+  boundary-crashes the shared view. (Mirrored in `viewer-safety-auditor` agent memory.)
 - **2026-07-18 — Turn time-travel snapshots live OUTSIDE `GameState`.** Per-turn-boundary
   snapshots go in a dedicated `turn_snapshots` SQLite table, not embedded in `GameState`, so
   the player/viewer projections stay byte-compatible and persisted state doesn't bloat. Only a
@@ -198,3 +202,18 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   `model` + `effortLevel` in `settings.json`; per-subagent `model:` frontmatter. The nightly
   OpenAPI Routine runs on `sonnet` (bounded, PR-reviewed increments), set in its model
   selector in the claude.ai Routines UI.
+- **2026-07-24 — Claude Cleanup & Setup: standardized the tooling to Anthropic best practices.**
+  Consolidated the Claude-facing docs and adopted newer Claude Code features. Decisions:
+  (1) **Archive, don't delete** superseded docs → `docs/archive/` (root `ARCHITECTURE.md`,
+  `NEXT-STEPS.md`, the `character-sheet-v2..v6` feedback rounds + styleguide audit) — reversible,
+  history-preserving. (2) **Persistent-memory subagents:** all five reviewers are read-only +
+  `memory: project` (committed under `.claude/agent-memory/`); added `code-reviewer` (general
+  correctness/quality) and `viewer-safety-auditor` (GM-only-leak audit) to the original three.
+  (3) **Keep `CLAUDE.md` a lean prose-pointer index AND add path-scoped `.claude/rules/`** — the
+  hard invariants live once in the rules (auto-load on matching-file edits); `scope-guard` now
+  points at them instead of duplicating the text. (4) **Fixed app-doc drift** (`check` is
+  typecheck-only, not lint; persistence is SQLite, not "Local JSON"; ADR index rebuilt).
+  `.claude/README.md` is now the canonical tooling roster; `settings.json` gained a
+  `permissions.allow` list + auto memory. **ADR-0021 collision resolved:** the player character
+  sheet keeps 0021 (fewer referrers, already bound in `CLAUDE.md`), manual fog renumbered →
+  **ADR-0022**. Verified `check` + `test` + `build` green.

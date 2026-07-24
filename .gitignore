@@ -7,3 +7,5 @@ data/
 
 # Personal, machine-local Claude Code overrides (shared config lives in .claude/settings.json)
 .claude/settings.local.json
+# Uncommitted (local-scope) subagent memory; project-scope .claude/agent-memory/ IS committed
+.claude/agent-memory-local/

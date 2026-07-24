@@ -11,7 +11,7 @@
 | Distribution direction | Open-source, self-hostable application with a documented public integration API |
 | Primary content path | Canonical player-character and monster JSON, with reviewed player-sheet PDF conversion through MarkItDown planned for Version 1 |
 | Current checkpoint | A server-authoritative token-interaction slice extends the persisted encounter (no-setup tray, direct GM/owner drag, server grid snap, freeform gridless, hidden-token omission, public-token viewer convergence). A shared annotation layer now adds live grid-snapped measurements and AoE shapes with a full visibility model (public/gm-only/owner-only/owner-gm/gm-actor + owner-delegated movement), and these plus Initiative now reach the TV and a real-`/viewer.html` in-tab preview over Channel B. The battle-map refinement round (eye-dropdown visibility, wrench clear-all, per-shape editor, dockable Initiative, inline dice modifier + recent-roll window, configurable grid-wizard crosshair, renamed tabs) is complete and live-verified; physical multi-device validation remains next |
-| Last updated | 2026-07-18 |
+| Last updated | 2026-07-24 |
 | Last implementation audit | 2026-07-19 (SRD combat-rules gap closure tiers A–D — ADR-0020 second amendment) |
 
 ## 1. Purpose of this document
@@ -87,7 +87,7 @@ This table is the fast operational view. The detailed requirements and milestone
 This queue is derived from the milestone dependencies and is updated after each checkpoint. It does not replace the milestone plan.
 
 1. Merge and physically re-run the Windows/LAN flow: calibrate a printed-grid and gridless map, pair/present to a separate viewer, start an encounter, drag GM and owned tokens by mouse and touch, verify grid snap and tray return, advance public/hidden turns, reload/revoke/restart, and record usability, firewall, 1080p, and TV-distance findings.
-2. ~~Add the smallest intuitive manual-fog/reveal slice over the same recipient-safe scene boundary~~ — **shipped 2026-07-19 (ADR-0021, PR #38)**: per-scene reveal/hide rect strokes, three GM commands with parked-scene prep, GM-dim/player-solid mask rendering on table + viewer, timeline-neutral, smoke-verified at 375 px. Fog is presentation only — hidden geometry/identities stay stripped by the projections regardless. Remaining from the original item: explicit token reveal/hide UX polish (visibility toggling exists via actor visibility; no dedicated map affordance yet) and physical-device validation.
+2. ~~Add the smallest intuitive manual-fog/reveal slice over the same recipient-safe scene boundary~~ — **shipped 2026-07-19 (ADR-0022, PR #38)**: per-scene reveal/hide rect strokes, three GM commands with parked-scene prep, GM-dim/player-solid mask rendering on table + viewer, timeline-neutral, smoke-verified at 375 px. Fog is presentation only — hidden geometry/identities stay stripped by the projections regardless. Remaining from the original item: explicit token reveal/hide UX polish (visibility toggling exists via actor visibility; no dedicated map affordance yet) and physical-device validation.
 3. Complete the live two-player Socket.IO claim/presence/reconnect/revocation convergence matrix, then repeat the encounter/join/token path on one phone and one laptop.
 4. Finish the Phase 1 external-integration proof by adding one recipient-safe game snapshot, one shared idempotent authoritative encounter command, one projected realtime event/resume path, and a tested quick start using existing scoped credentials.
 5. Continue the minimum combat loop with canonical actor JSON import, HP/temp HP/damage/healing, conditions, targeting, generic actions, End Turn, and basic undo. AI-controlled characters remain Phase 7 and do not displace this queue.
@@ -430,6 +430,7 @@ Version 1 is not defined by automating the entire SRD. It is defined by being de
 - Clickable categorized map markers with safe Markdown notes
 - Session-note and recap markers that visually locate where play occurred
 - PWA/offline-first mode
+- **VTT Settings tab** (rename of "VTT Setup"): a Settings card at the top of the tab with a Global-vs-Personal toggle — the GM sees table-wide plus personal settings; players see personal plus player-specific settings. First switch to live here: disabling auto-staging (today the always-on `pendingStageSceneId` flow in `apps/client/src/main.tsx`). Needs a design pass on the global-vs-personal storage/projection model, server authority for global settings, and a viewer-safety review before implementation.
 
 ## 6. Core user journeys
 

@@ -1,4 +1,4 @@
-# ADR-0021: Manual fog of war
+# ADR-0022: Manual fog of war
 
 ## Status
 

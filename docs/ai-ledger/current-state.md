@@ -119,6 +119,13 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   enforcement), and archive v3 `postEncounterState` (47 commands total); SRD bundle enriched
   (126/178 structured Multiattacks, 47 on-hit riders, 146 typed-defense monsters); enriched
   replay-party fixtures + a regression suite derived from the two archived encounter runs.
+- **Unified roll UX (2026-07-21, PR #38).** One recognizable preview→confirm roll experience on
+  every surface via a shared `RollControls` widget (auto-roll-on-appear or manual entry; Adv/Disadv
+  re-roll the d20; Confirm applies, Re-roll restarts). Death saves, single-target attacks, and
+  opportunity attacks preview the d20 with nothing applied until Confirm — `action:resolve` gains
+  `commit` (default true) + `attackNatural`, `death-save.roll` and `reaction.answer` gain
+  `commit`/`rollMode`/`attackNatural` — and the damage Apply step is an editable total for
+  hand-rolled numbers.
 - **SRD combat-rules gap closure, tiers A–D (ADR-0020 second amendment, 2026-07-19, same PR #38).**
   Full SRD 5.2.1 cross-audit implemented in four tiers: every condition's modifiers (frightened,
   invisible, grappled-vs-grappler, charmed-charmer, paralyzed auto-crit, physical-save auto-fail,
@@ -151,7 +158,7 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   gains the missing Short/Long rest buttons + stepper, pool owner-only in projections);
   **condition glyphs** (original SVG icons for all 15 SRD conditions on map tokens, shared
   table/replay/viewer via `conditionIds`); **scene thumbnails** (cached one-fetch-per-asset map
-  previews in the Scenes strip chips); **manual fog of war v1** (ADR-0021 — per-scene reveal/hide
+  previews in the Scenes strip chips); **manual fog of war v1** (ADR-0022 — per-scene reveal/hide
   rect strokes, three GM-only commands with parked-scene `sceneId` prep, GM-dim/player-solid
   mask, timeline-neutral, presentation-not-security-boundary; the BUILD_PLAN Phase-2 gate item).
   Regression suite now 104 tests + 7 fog tests; hit dice moved OFF the unsupported list above.
@@ -271,7 +278,7 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   derivation + level-up) is the next roadmap update. **Still pending:** a live browser/mobile
   visual smoke (no Playwright/e2e harness in the repo yet).
   - **Sheet v2 iteration (2026-07-23, same PR)** from GM playtest feedback (tracked in
-    `docs/product/character-sheet-v2-feedback.md`). **Wave 1** (readability + interaction): spells
+    `docs/archive/product/character-sheet-v2-feedback.md`). **Wave 1** (readability + interaction): spells
     grouped by level, all 18 skills listed with proficiency dots, the stale-definition edit bug
     fixed (owner definition rides the live prop and wins), spell slots restyled as clickable pips,
     and per-ability roll + "roll with proficiency" chips. **Equipment framework** (feedback #7,
@@ -307,7 +314,7 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     prep tags, slot pips, dense roll chips, and cyan-active filter/toggle pills were **kept and
     tokenized** (screenshot-gated — the primitives would regress their tuned look). `check`+`build`+server
     `test` (422) green each phase, headless render-verified in light + dark. Record:
-    `docs/product/character-sheet-styleguide-audit.md`. **Still pending:** a live browser/mobile
+    `docs/archive/product/character-sheet-styleguide-audit.md`. **Still pending:** a live browser/mobile
     click-through (no e2e harness in the repo).
   - **Sheet open-consistency + Dice toggle (2026-07-24, same PR).** Three GM-reported follow-ups: (a)
     `IconButton`'s ✕ rode high — `.nh-iconbtn` now sets `line-height: 1` so the glyph centres (all icon
@@ -381,11 +388,11 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   only, exact HP never leaves for the public screen); **PC sheet import** (GM imports a
   canonical `ActorDefinition` JSON as a claimable player-character; the stat block is stored
   in `GameState.definitions` and projected only to the owning player, `actor:import-definition`).
-- **Cycle 4 remaining PRs** (see `NEXT-STEPS.md`):
+- **Cycle 4 remaining PRs** (the original plan is in the now-archived `docs/archive/NEXT-STEPS.md`):
   - **PR D** — configurable dock position + Initiative declutter **merged as PR #32**;
     gridless saveable/toggleable grid overlay (D-3) still open.
-  - **PR E** — multi-scene staging (prepare maps privately, switch the live scene
-    non-destructively). Large data-model refactor across domain/server/projections/viewer.
+  - **PR E** — multi-scene staging **shipped 2026-07-22 as the scene-centric IA redesign**
+    (prepare maps privately, switch the live scene non-destructively).
   - **PR F** — **done on `claude/open-api-core-m75t9d`** (see "Public integration API v1" above).
     Remaining non-core follow-ups: scenes/claims/token-cosmetics over the API, SSE event stream,
     webhooks.
@@ -405,17 +412,18 @@ the map inside the full-viewport "Enlarge map" overlay). See `docs/ai-context/te
 
 ## Claude Code tooling
 
-This repo now carries a Claude Code tooling layer (this upgrade): `CLAUDE.md` index,
-`docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, the full
-`.claude/skills/` roster (`vtt-task-packet`, `vtt-context-router`, `vtt-implement`,
-`vtt-qa-check`, `vtt-ledger-update`, `vtt-ux-review`, `vtt-test-pass`, `vtt-branch-safety`,
-`vtt-schedule`, `vtt-orientation`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
-PreToolUse, `scope-guard` UserPromptSubmit, `stop-reminder` Stop — see
-`.claude/hooks/README.md`). Three optional read-only reviewer subagents live in `.claude/agents/` (`ux-reviewer`,
-`test-reviewer`, `architecture-reviewer`) for large/cross-cutting changes. A GitHub Actions
-schedule scaffold (`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** —
-its cron is commented out and the job is a placeholder until configured. Design/roadmap in
-`docs/claude-code-tooling-outline.md`. A generated **app map** (`npm run map` → `docs/app-map.md`,
-freshness-tested in the server suite) gives humans and agents an always-current index of the
-GameState shape, command catalog (with scopes), and HTTP surface; the `vtt-orientation` skill
-routes there first.
+This repo carries a Claude Code tooling layer. The **canonical roster** (skills, subagents,
+path-scoped rules, hooks) lives in `.claude/README.md`; design rationale in
+`docs/claude-code-tooling-outline.md`. In brief: `CLAUDE.md` index → `docs/ai-context/` briefs +
+this ledger + `.claude/loop.md`; **10 skills** in `.claude/skills/`; **5 read-only reviewer
+subagents** in `.claude/agents/` (`architecture-reviewer`, `ux-reviewer`, `test-reviewer`,
+`code-reviewer`, `viewer-safety-auditor`), each with committed persistent memory under
+`.claude/agent-memory/`; **6 path-scoped rules** in `.claude/rules/` that auto-load the hard
+invariants when Claude opens a matching source file; three lifecycle hooks (`danger-guard`
+PreToolUse, `scope-guard` UserPromptSubmit — now points at the matching rule, `stop-reminder`
+Stop — see `.claude/hooks/README.md`). `.claude/settings.json` adds a routine-command
+`permissions.allow` list and enables auto memory. A GitHub Actions schedule scaffold
+(`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** (cron commented out). A
+generated **app map** (`npm run map` → `docs/app-map.md`, freshness-tested in the server suite)
+indexes the GameState shape, command catalog (with scopes), and HTTP surface; the
+`vtt-orientation` skill routes there first.

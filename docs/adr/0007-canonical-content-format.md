@@ -29,7 +29,7 @@ Content is data, not code: Zod/JSON Schema validation happens before anything is
 
 ## Migration / reversibility
 
-`schemaVersion` and `schemaId` are pinned per document (see the architectural invariant in ARCHITECTURE.md/BUILD_PLAN.md §9.3 that "ruleset and schema versions are pinned to saved content/encounters and migrated deliberately"). A new schema version can be introduced alongside the old one, with explicit migration rather than in-place reinterpretation of existing content. `packages/content-srd-5.2.1` is reserved for curated, normalized SRD content bundles once conversion begins, and `packages/test-fixtures` already holds representative fixtures — both are separate from executable code, so content-format changes do not require code changes to the packages that merely consume it.
+`schemaVersion` and `schemaId` are pinned per document (see the architectural invariant in BUILD_PLAN.md §9.3 that "ruleset and schema versions are pinned to saved content/encounters and migrated deliberately"). A new schema version can be introduced alongside the old one, with explicit migration rather than in-place reinterpretation of existing content. `packages/content-srd-5.2.1` is reserved for curated, normalized SRD content bundles once conversion begins, and `packages/test-fixtures` already holds representative fixtures — both are separate from executable code, so content-format changes do not require code changes to the packages that merely consume it.
 
 ## Validation evidence
 
