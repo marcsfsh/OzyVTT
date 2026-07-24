@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema } from "@vtt/domain";
+import { CharacterIdentitySchema, CurrencySchema, InventoryItemSchema, ProficienciesSchema } from "@vtt/schemas";
 
 /**
  * Wire schemas for every game command, shared by BOTH transports: the Socket.IO handlers in
@@ -32,6 +33,7 @@ export const ActorRemoveSchema = z.object({ commandId: z.string().uuid(), actorI
 export const SetTokenImageSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), tokenAssetId: z.string().uuid().nullable(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetActorSizeSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetActorVisibilitySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), visibility: z.enum(["public", "gm-only"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const SetActorArchivedSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), archived: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const HpAmountSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), amount: z.number().int().min(1).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /**
  * Damage keeps the legacy untyped `amount` for manual adjustments; the ADR-0020 typed path adds
@@ -146,7 +148,13 @@ export const FogResetSchema = z.object({ commandId: z.string().uuid(), sceneId: 
 export const ActorRestSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), kind: z.enum(["long", "short"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), count: z.number().int().min(1).max(40), expectedRevision: z.number().int().nonnegative().optional() }).strict();
-export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetSlotSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetPreparedSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), spellId: z.string().min(1).max(80), prepared: z.boolean(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetInventorySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), item: InventoryItemSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetCurrencySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), currency: CurrencySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetIdentitySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), character: CharacterIdentitySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const CharacterSetProficienciesSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), proficiencies: ProficienciesSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, label: z.string().min(1).max(80).optional(), actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TokenMoveSchema = z.object({
   commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),
   /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */

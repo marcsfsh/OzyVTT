@@ -88,6 +88,12 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
 | `actor.spend-hit-dice` | `actor:write` |
+| `character.set-slot` | `actor:write` |
+| `character.set-prepared` | `actor:write` |
+| `character.set-inventory` | `actor:write` |
+| `character.set-currency` | `actor:write` |
+| `character.set-identity` | `actor:write` |
+| `character.set-proficiencies` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
 | `annotation.move` | `combat:write` |
@@ -103,6 +109,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `actor.set-size` | `actor:write` |
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
+| `actor.set-archived` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `scene.create` | `scene:write` |
 | `scene.rename` | `scene:write` |
@@ -653,6 +660,7 @@ Rolls dice into the shared, auditable roll history; the response carries `rollId
 | `formula` | string | yes | e.g. 2d6+3, 4d6kh3, 2d20kl1 |
 | `purpose` | `attack` \| `save` \| `check` \| `damage` \| `manual` | yes |  |
 | `visibility` | `public` \| `gm-only` \| `blind` \| `self-only` | yes |  |
+| `label` | string | no | What was rolled, specifically (e.g. "Athletics check", "DEX save", a weapon/spell name); shown in the roll log alongside the coarse purpose |
 | `actorId` | string (uuid) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
@@ -904,9 +912,9 @@ Toggles the underwater environment on the live encounter (GM-grade only; SRD Und
 
 ### `POST /api/v1/game/actors/{actorId}/rest`
 
-Applies a rest to a rostered actor outside combat (GM-grade only). Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.
+Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.
 
-**Auth:** Integration credential with `actor:write` · GM session
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
 
 **Parameters:** `actorId` (path) - string (uuid)
 
@@ -935,6 +943,139 @@ Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con mod
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `count` | integer (1–40) | yes | How many Hit Point Dice to spend; each heals its roll + Con modifier (minimum 1) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/spell-slot`
+
+Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `level` | integer (1–9) | yes |  |
+| `remaining` | integer (0–9) | yes | New remaining slots for this level; clamped to the sheet's maximum |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/prepared-spell`
+
+Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled). Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `spellId` | string | yes |  |
+| `prepared` | boolean | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/inventory`
+
+Adds, updates, or removes (quantity 0) one of a character's inventory items and toggles equipped/attuned. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `item` | object | yes |  |
+| `item.id` | string (pattern) | yes |  |
+| `item.name` | string | yes |  |
+| `item.quantity` | integer (0–9999) | no | 0 removes the item |
+| `item.equipped` | boolean | no |  |
+| `item.attuned` | boolean | no |  |
+| `item.weightEach` | number (≥ 0) | no |  |
+| `item.description` | string | no |  |
+| `item.category` | string (pattern) | no |  |
+| `item.weapon` | object | no | Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet |
+| `item.armor` | object | no | Armor/shield stats (from the SRD catalog); equipping derives Armor Class |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/currency`
+
+Sets a character's coin purse (cp/sp/ep/gp/pp). Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `currency` | object | yes |  |
+| `currency.cp` | integer (0–1000000) | no |  |
+| `currency.sp` | integer (0–1000000) | no |  |
+| `currency.ep` | integer (0–1000000) | no |  |
+| `currency.gp` | integer (0–1000000) | no |  |
+| `currency.pp` | integer (0–1000000) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/identity`
+
+Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `character` | object | yes |  |
+| `character.classes` | object[] | no |  |
+| `character.race` | object | no |  |
+| `character.background` | object | no |  |
+| `character.feats` | object[] | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/proficiencies`
+
+Sets a character's save and skill proficiency selections on its editable imported sheet. Player sessions may target only their claimed character.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `proficiencies` | object | yes |  |
+| `proficiencies.saves` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | no |  |
+| `proficiencies.skills` | object[] | no |  |
+| `proficiencies.saveOverrides` | object (free-form) | no |  |
+| `proficiencies.skillOverrides` | object (free-form) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1182,6 +1323,24 @@ Moves a combatant between the shared layer (public) and the GM-only layer (GM-gr
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `visibility` | `public` \| `gm-only` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/actors/{actorId}/archived`
+
+Archives or restores a character (GM-grade only). Archived characters are hidden from players and excluded from the encounter builder; a character in the running encounter must be removed first.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `actorId` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `archived` | boolean | yes | true archives (hides from players + encounter builder); false restores |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

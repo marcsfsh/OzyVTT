@@ -9,6 +9,10 @@ import { actionAvailability, resolveDefinitionAction } from "./action-resolution
 import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
+import { canInitiateForActor } from "./authorization.js";
+import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
+import { setCurrency, setInventoryItem } from "./inventory.js";
+import { setCharacterIdentity, setCharacterProficiencies } from "./character-edit.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
@@ -30,13 +34,13 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneReorderSchema, SceneSetCombatantsSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -74,6 +78,8 @@ function actorScopeOf(principal: GamePrincipal): ActorScope {
 }
 /** A stable UUID identity for ownership fields (annotation owners, roll initiators). Credential ids are UUIDs too. */
 function sessionIdOf(principal: GamePrincipal): string { return principal.kind === "integration" ? principal.credentialId : principal.sessionId; }
+/** The reduced initiator the authorization seam reads: GM-grade acts on anyone, a player on their own claimed actor. */
+function initiatorOf(principal: GamePrincipal): { role: "gm" } | { role: "player"; sessionId: string } { return isGmGrade(principal) ? { role: "gm" } : { role: "player", sessionId: principal.sessionId }; }
 function annotationActorOf(principal: GamePrincipal): AnnotationActor { return { sessionId: sessionIdOf(principal), role: isGmGrade(principal) ? "gm" : "player" }; }
 /** Journal attribution tag (Time Machine v2). */
 function principalTag(principal: GamePrincipal): string {
@@ -172,6 +178,12 @@ export function createGameOperations(context: GameOperationsContext) {
     contentSpells(_principal: GamePrincipal) {
       // Spell rules are public reference text (the CC-BY SRD), like conditions - any joined session may read them.
       return { spells: contentLibrary.spellSummaries() };
+    },
+
+    contentEquipment(_principal: GamePrincipal) {
+      // The SRD equipment catalog is public reference (like spells); the sheet's browse-and-add picker reads it.
+      // Attribution rides along so any surface that displays the gear can show the required CC-BY line.
+      return { equipment: contentLibrary.equipmentSummaries(), attribution: contentLibrary.attribution };
     },
 
     contentMonsterActions(principal: GamePrincipal, raw: unknown) {
@@ -577,7 +589,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async diceRoll(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(DiceRollSchema, raw, "The roll request is malformed.");
-      const { commandId, formula, purpose, visibility, actorId, expectedRevision } = request;
+      const { commandId, formula, purpose, visibility, label, actorId, expectedRevision } = request;
       const gmGrade = isGmGrade(principal);
       if (!gmGrade && visibility === "gm-only") throw new GameAccessDeniedError("Only the GM can make a GM-only roll.");
       const initiatorSessionId = sessionIdOf(principal);
@@ -588,8 +600,8 @@ export function createGameOperations(context: GameOperationsContext) {
       const rollId = context.newId();
       const result = await store.execute({ id: commandId, type: "dice.roll", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         if (actorId && principal.kind === "player") {
-          const actor = state.actors.find((candidate) => candidate.id === actorId);
-          if (!actor || actor.ownerSessionId !== principal.sessionId) throw new CommandRejectedError("You may only roll for your claimed character.");
+          const verdict = canInitiateForActor({ role: "player", sessionId: principal.sessionId }, state, actorId, purpose === "save" ? "save" : purpose === "attack" || purpose === "damage" ? "attack" : "check");
+          if (!verdict.ok) throw new CommandRejectedError("You may only roll for your claimed character.");
         }
         let group = 0;
         const dice = resolution.terms.flatMap((term) => {
@@ -599,7 +611,7 @@ export function createGameOperations(context: GameOperationsContext) {
         });
         const initiatorLabel = initiatorRole === "gm" ? gmGradeLabelOf(principal) : state.actors.find((candidate) => candidate.ownerSessionId === initiatorSessionId)?.name ?? "A player";
         const record: RollRecord = {
-          id: rollId, commandId, initiatorSessionId, initiatorRole, initiatorLabel, actorId: actorId ?? null, purpose, visibility, formula,
+          id: rollId, commandId, initiatorSessionId, initiatorRole, initiatorLabel, ...(label ? { label } : {}), actorId: actorId ?? null, purpose, visibility, formula,
           normalizedFormula: resolution.expression.normalized,
           dice,
           modifiers: resolution.terms.filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier").map((term) => ({ value: term.value, sign: term.sign })),
@@ -967,11 +979,15 @@ export function createGameOperations(context: GameOperationsContext) {
     },
 
     async actorRest(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
-      requireGmGrade(principal, "Only the GM can apply a rest.");
       const request = parse(ActorRestSchema, raw, "The rest command is malformed.");
       const { commandId, actorId, kind, expectedRevision } = request;
       let events: EffectNarration[] = [];
+      // A player may rest their own claimed character (v5 #5); the GM rests anyone. Same owner-or-GM seam
+      // as spending a slot - authorised inside the mutation against live state (applyRest itself still
+      // refuses to rest a combatant who is in a running encounter).
       const result = await store.execute({ id: commandId, type: "actor.rest", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
         events = applyRest(state, actorId, kind, resolveDefinition);
       });
       if (!result.duplicate) {
@@ -1019,6 +1035,78 @@ export function createGameOperations(context: GameOperationsContext) {
         context.appendLog({ kind: "heal", text: `${actorName(actorId)} spends ${count} Hit ${count === 1 ? "Die" : "Dice"} and regains ${healed} HP.`, actorIds: [actorId], gmOnly: actorHidden(actorId) });
         publishNarrations(events);
       }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetSlot(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetSlotSchema, raw, "The spell-slot command is malformed.");
+      const { commandId, actorId, level, remaining, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-slot", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setSpellSlotRemaining(state, actorId, level, remaining, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetPrepared(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetPreparedSchema, raw, "The prepared-spell command is malformed.");
+      const { commandId, actorId, spellId, prepared, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-prepared", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setPreparedSpell(state, actorId, spellId, prepared, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetInventory(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetInventorySchema, raw, "The inventory command is malformed.");
+      const { commandId, actorId, item, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-inventory", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setInventoryItem(state, actorId, item, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetCurrency(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetCurrencySchema, raw, "The currency command is malformed.");
+      const { commandId, actorId, currency, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-currency", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setCurrency(state, actorId, currency);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetIdentity(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetIdentitySchema, raw, "The identity command is malformed.");
+      const { commandId, actorId, character, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-identity", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setCharacterIdentity(state, actorId, character);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterSetProficiencies(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(CharacterSetProficienciesSchema, raw, "The proficiencies command is malformed.");
+      const { commandId, actorId, proficiencies, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "character.set-proficiencies", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "edit");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        setCharacterProficiencies(state, actorId, proficiencies);
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -1243,6 +1331,22 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async actorSetArchived(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can archive characters.");
+      const request = parse(SetActorArchivedSchema, raw, "The archive command is malformed.");
+      const { commandId, actorId, archived, expectedRevision } = request;
+      // Archiving hides a character from players (projection) and the encounter builder; a live actor may
+      // not be archived while it's in the running fight - the GM removes it from combat first.
+      const result = await store.execute({ id: commandId, type: "actor.set-archived", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That character no longer exists.");
+        if (archived && state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("Remove this character from the encounter before archiving it.");
+        actor.archived = archived;
+      });
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     // ---------- Scenes ----------
 
     async sceneCreate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1374,8 +1478,14 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
     ["actor.set-health-display", "Override one combatant's token health display, or clear it to follow the table default (GM).", (p, raw) => operations.actorSetHealthDisplay(p, raw)],
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
-    ["actor.rest", "Apply a long rest: full HP, cleared dying state, refreshed limited uses, one less Exhaustion level (GM).", (p, raw) => operations.actorRest(p, raw)],
+    ["actor.rest", "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.", (p, raw) => operations.actorRest(p, raw)],
     ["actor.spend-hit-dice", "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).", (p, raw) => operations.actorSpendHitDice(p, raw)],
+    ["character.set-slot", "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).", (p, raw) => operations.characterSetSlot(p, raw)],
+    ["character.set-prepared", "Prepare or un-prepare one of a character's known spells.", (p, raw) => operations.characterSetPrepared(p, raw)],
+    ["character.set-inventory", "Add, update, or remove one of a character's inventory items.", (p, raw) => operations.characterSetInventory(p, raw)],
+    ["character.set-currency", "Set a character's coin purse.", (p, raw) => operations.characterSetCurrency(p, raw)],
+    ["character.set-identity", "Edit a character's identity (class/level/race/background/feats) on its imported sheet.", (p, raw) => operations.characterSetIdentity(p, raw)],
+    ["character.set-proficiencies", "Edit a character's save and skill proficiency selections on its imported sheet.", (p, raw) => operations.characterSetProficiencies(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
     ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],
@@ -1390,6 +1500,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["actor.set-token-image", "Set or clear a combatant's token image from the token library (GM).", (p, raw) => operations.actorSetTokenImage(p, raw)],
     ["actor.set-size", "Set a combatant's creature size; the token re-snaps to its footprint (GM).", (p, raw) => operations.actorSetSize(p, raw)],
     ["actor.set-visibility", "Move a combatant between the shared layer and the GM-only layer (GM).", (p, raw) => operations.actorSetVisibility(p, raw)],
+    ["actor.set-archived", "Archive or restore a character - archived characters are hidden from players and left out of the encounter builder (GM).", (p, raw) => operations.actorSetArchived(p, raw)],
     ["actor.set-speed", "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).", (p, raw) => operations.actorSetSpeed(p, raw)],
     ["scene.create", "Prepare a staged scene on a battlemap without touching the live table (GM).", (p, raw) => operations.sceneCreate(p, raw)],
     ["scene.rename", "Rename a prepared scene (GM).", (p, raw) => operations.sceneRename(p, raw)],

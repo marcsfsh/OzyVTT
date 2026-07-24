@@ -73,6 +73,24 @@ export const ArmorReferenceSchema = z.object({
 });
 export type ArmorReference = z.infer<typeof ArmorReferenceSchema>;
 
+/**
+ * Unified equipment catalog entry - the framework the browse-&-add flow and the future homebrew
+ * update build on. `loadEquipment` maps weapons and armor in from their own bundles; the
+ * `equipment.v1.json` bundle carries adventuring gear, tools, packs, focuses, ammunition, and
+ * consumables. The `weapon`/`armor` sub-objects are present only for those categories.
+ */
+export const EquipmentReferenceSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string().min(1).max(80),
+  category: z.enum(["weapon", "armor", "shield", "ammunition", "adventuring-gear", "tool", "equipment-pack", "consumable", "focus", "wondrous"]),
+  costGp: z.number().nonnegative().max(1_000_000).nullable(),
+  weightLb: z.number().nonnegative().max(1000).nullable(),
+  description: z.string().max(2000).nullable(),
+  weapon: z.object({ category: z.enum(["simple", "martial"]), damageDice: z.string().max(20), damageType: z.string().max(40), rangeFeet: z.number().int().positive().nullable(), longRangeFeet: z.number().int().positive().nullable() }).nullable().optional(),
+  armor: z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).nullable().optional()
+}).strict();
+export type EquipmentReference = z.infer<typeof EquipmentReferenceSchema>;
+
 export const RuleReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(120),
@@ -131,6 +149,28 @@ export function loadArmor(): readonly ArmorReference[] {
 /** The 18 SRD 5.2.1 skill descriptions. */
 export function loadSkills(): readonly ConditionReference[] {
   return loadBundle("skills.v1.json", z.array(ConditionReferenceSchema));
+}
+
+/**
+ * The full addable-equipment catalog: the vendored gear/tools/packs/focus bundle plus every weapon
+ * and armor mapped from their own bundles into the unified shape. Sorted by name. Extensible - the
+ * homebrew update adds entries alongside these.
+ */
+export function loadEquipment(): readonly EquipmentReference[] {
+  // Normalize the hand-authored gear so every catalog entry has a uniform shape - `weapon`/`armor`
+  // are always present (null when absent), so a consumer can branch on `item.weapon === null`.
+  const gear: EquipmentReference[] = loadBundle("equipment.v1.json", z.array(EquipmentReferenceSchema)).map((item) => ({
+    ...item, weapon: item.weapon ?? null, armor: item.armor ?? null
+  }));
+  const weapons: EquipmentReference[] = loadWeapons().filter((weapon) => !weapon.improvised).map((weapon) => ({
+    id: weapon.id, name: weapon.name, category: "weapon", costGp: null, weightLb: null, description: null,
+    weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet }, armor: null
+  }));
+  const armor: EquipmentReference[] = loadArmor().map((piece) => ({
+    id: piece.id, name: piece.name, category: piece.acBase <= 3 ? "shield" : "armor", costGp: null, weightLb: null, description: null,
+    weapon: null, armor: { acBase: piece.acBase, addDexModifier: piece.addDexModifier, dexModifierCap: piece.dexModifierCap, stealthDisadvantage: piece.stealthDisadvantage, strengthRequired: piece.strengthRequired }
+  }));
+  return [...gear, ...weapons, ...armor].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 /** The 13 SRD 5.2.1 damage-type descriptions. */

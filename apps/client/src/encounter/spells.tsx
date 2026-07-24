@@ -108,7 +108,7 @@ export function SpellcastingText({ text }: Readonly<{ text: string }>) {
 }
 
 /** In-tab spell rules window: header, the four reference lines, full description, and upcast note. */
-function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSummary; onClose: () => void }>) {
+export function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSummary; onClose: () => void }>) {
   const levelLine = spell.level === 0 ? `${capitalize(spell.school)} cantrip` : `Level ${spell.level} ${spell.school}`;
   return <Modal open onClose={onClose} size="md" accent="violet" title={spell.name} ariaLabel={`${spell.name} spell rules`}>
     <p className="spell-card-type">{levelLine}{spell.ritual ? " · ritual" : ""}</p>

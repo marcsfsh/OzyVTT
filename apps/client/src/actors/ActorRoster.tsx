@@ -41,9 +41,9 @@ function OwnHpTracker({ actorId, onFeedback }: Readonly<{ actorId: string; onFee
   };
   return <div className="own-hp-tracker" role="group" aria-label="Track your hit points">
     <Input type="number" min="0" max="1000" placeholder="0" aria-label="Hit point amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-    <button type="button" disabled={sending} onClick={() => send("actor:apply-damage", "Took")}>Damage</button>
-    <button type="button" disabled={sending} onClick={() => send("actor:heal", "Healed")}>Heal</button>
-    <button type="button" disabled={sending} onClick={() => send("actor:set-temp-hp", "Temp HP set to")}>Temp</button>
+    <Button size="sm" variant="destructive" disabled={sending} onClick={() => send("actor:apply-damage", "Took")}>Damage</Button>
+    <Button size="sm" disabled={sending} onClick={() => send("actor:heal", "Healed")}>Heal</Button>
+    <Button size="sm" disabled={sending} onClick={() => send("actor:set-temp-hp", "Temp HP set to")}>Temp</Button>
   </div>;
 }
 
@@ -64,7 +64,7 @@ function HitDiceSpender({ actorId, hitDice, onFeedback }: Readonly<{ actorId: st
   return <div className="hit-dice-spender" role="group" aria-label="Spend Hit Dice">
     <span className="hit-dice-pool" title="Hit Point Dice remaining - spend on a short rest; each die heals its roll plus the Constitution modifier (minimum 1).">Hit Dice {hitDice.remaining}/{hitDice.maximum} ({hitDice.die})</span>
     <Stepper value={chosen} onChange={setCount} min={1} max={hitDice.remaining} disabled={busy} aria-label="Number of Hit Dice to spend" />
-    <button type="button" className="hit-dice-roll" disabled={busy} onClick={spend}>Roll & heal</button>
+    <Button size="sm" disabled={busy} onClick={spend}>Roll & heal</Button>
   </div>;
 }
 
@@ -79,8 +79,8 @@ function RestButtons({ actorId, name, onFeedback }: Readonly<{ actorId: string; 
     });
   };
   return <div className="actor-rest" role="group" aria-label={`Rest ${name}`}>
-    <button type="button" className="secondary" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice." onClick={() => rest("short")}>Short rest</button>
-    <button type="button" className="secondary" disabled={busy} title="Full HP, all pools and Hit Dice restored, one less Exhaustion level." onClick={() => rest("long")}>Long rest</button>
+    <Button size="sm" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice." onClick={() => rest("short")}>Short rest</Button>
+    <Button size="sm" disabled={busy} title="Full HP, all pools and Hit Dice restored, one less Exhaustion level." onClick={() => rest("long")}>Long rest</Button>
   </div>;
 }
 
@@ -88,9 +88,6 @@ export function ActorRoster(props: Props) {
   const [feedback, setFeedback] = useState("");
   const [claiming, setClaiming] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("vtt.roster-collapsed") === "1");
-  const toggleCollapsed = () => setCollapsed((current) => { const next = !current; localStorage.setItem("vtt.roster-collapsed", next ? "1" : "0"); return next; });
   const importFileRef = useRef<HTMLInputElement | null>(null);
 
   const importSheet = (file: File) => {
@@ -105,8 +102,13 @@ export function ActorRoster(props: Props) {
     }).catch(() => setFeedback("The file could not be read."));
   };
   const { confirm, dialog } = useConfirm();
-  const actors = props.state.actors.filter((actor) => actor.kind === "player-character");
+  // v5 #6.2: the roster grid shows ACTIVE characters only. Archived PCs are already stripped from the
+  // player projection; this drops them from the GM's roster too (the GM manages archived ones from the
+  // Character Roster tab, not here).
+  const actors = props.state.actors.filter((actor) => actor.kind === "player-character" && !("archived" in actor && actor.archived));
   const ownedActor = props.role === "player" ? actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine") ?? null : null;
+  // The player's own claimed character shows in its own header (v4 #9), so it's dropped from the choose grid.
+  const chooseList = ownedActor ? actors.filter((actor) => actor.id !== ownedActor.id) : actors;
   const busy = claiming !== null || releasing;
 
   const claim = (actorId: string, name: string) => {
@@ -150,29 +152,21 @@ export function ActorRoster(props: Props) {
     });
   };
 
-  return <section className={`roster${collapsed ? " collapsed" : ""}`} aria-labelledby="roster-heading">
+  return <section className="roster" aria-labelledby="roster-heading">
     <div className="roster-heading">
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
-      {!collapsed && <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>}
-      <button type="button" className="roster-minimize" aria-expanded={!collapsed} aria-controls="roster-body" onClick={toggleCollapsed}>{collapsed ? `Show roster (${actors.length})` : "Minimize"}</button>
+      <p>{props.role === "player" ? "Pick the character you'll play at the table." : "Claims update here live. Release a stale claim when someone changes devices."}</p>
     </div>
-    {collapsed ? null : <div id="roster-body">
+    {/* v5 #6.1: no inner minimize button - the roster collapses behind one "Character Roster" disclosure
+        in the app shell. v5 #7: the player's own character now lives in the always-shown YouArePlaying
+        bar (rendered outside this roster), so it's excluded from the "choose your place" grid here. */}
+    <div id="roster-body">
     {props.role === "gm" && <div className="roster-import">
       <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
       <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
     </div>}
-    {props.role === "player" && ownedActor && <div className="you-are-playing">
-      <div><span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong><span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span><ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} /></div>
-      <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
-      {ownedActor.hitDice && <HitDiceSpender actorId={ownedActor.id} hitDice={ownedActor.hitDice} onFeedback={setFeedback} />}
-      <div className="you-are-playing-buttons">
-        <Button variant="secondary" disabled={busy} onClick={() => setSheetOpen(true)}>View sheet</Button>
-        <Button variant="secondary" disabled={busy} onClick={() => release(ownedActor.name)}>Leave character</Button>
-      </div>
-    </div>}
-    {sheetOpen && ownedActor && <CharacterSheet actor={ownedActor} role="player" onClose={() => setSheetOpen(false)} />}
-    {actors.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">No characters yet</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
-      {actors.map((actor) => {
+    {chooseList.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">{ownedActor ? "No other characters" : "No characters yet"}</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : ownedActor ? "You've claimed your character — it's shown in your player bar below." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
+      {chooseList.map((actor) => {
         const playerActor = "claimStatus" in actor ? actor : null;
         const mine = playerActor?.claimStatus === "mine";
         const unavailable = playerActor?.claimStatus === "claimed";
@@ -184,14 +178,56 @@ export function ActorRoster(props: Props) {
           {props.role === "gm" && "hitDice" in actor && actor.hitDice && <HitDiceSpender actorId={actor.id} hitDice={actor.hitDice} onFeedback={setFeedback} />}
           {props.role === "gm" && <RestButtons actorId={actor.id} name={actor.name} onFeedback={setFeedback} />}
           {props.role === "player" && (mine
-            ? <button className="actor-action actor-release" disabled={busy} onClick={() => release(actor.name)}>Release character</button>
-            : <button className="actor-action" disabled={unavailable || busy} onClick={() => ownedActor ? switchTo(actor.id, actor.name, ownedActor.name) : claim(actor.id, actor.name)}>{claiming === actor.id ? (ownedActor ? "Switching…" : "Claiming…") : unavailable ? "Already claimed" : ownedActor ? "Switch to this" : "Claim character"}</button>)}
-          {props.role === "gm" && "ownerSessionId" in actor && actor.ownerSessionId && <button className="actor-action actor-release" onClick={() => forceRelease(actor.id)}>Force release</button>}
+            ? <Button variant="secondary" block className="actor-action" disabled={busy} onClick={() => release(actor.name)}>Release character</Button>
+            : <Button variant="primary" block className="actor-action" disabled={unavailable || busy} onClick={() => ownedActor ? switchTo(actor.id, actor.name, ownedActor.name) : claim(actor.id, actor.name)}>{claiming === actor.id ? (ownedActor ? "Switching…" : "Claiming…") : unavailable ? "Already claimed" : ownedActor ? "Switch to this" : "Claim character"}</Button>)}
+          {props.role === "gm" && "ownerSessionId" in actor && actor.ownerSessionId && <Button variant="secondary" block className="actor-action" onClick={() => forceRelease(actor.id)}>Force release</Button>}
         </article>;
       })}
     </div>}
     <p className="roster-feedback" aria-live="polite">{feedback}</p>
-    </div>}
+    </div>
+    {dialog}
+  </section>;
+}
+
+/**
+ * The player's own-character bar (v5 #7): hoisted OUT of the roster so it is ALWAYS visible - it sits
+ * below the roster disclosure and above the dice/combat panels, whether or not the roster is expanded.
+ * Inline HP tracking + a labelled Conditions editor; "View sheet" opens the full sheet (rests, spell
+ * slots, and inventory live there). Renders nothing until the player has claimed a character.
+ */
+export function YouArePlaying({ state }: Readonly<{ state: PlayerView }>) {
+  const [feedback, setFeedback] = useState("");
+  const [releasing, setReleasing] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const { confirm, dialog } = useConfirm();
+  const ownedActor = state.actors.find((actor) => actor.kind === "player-character" && "claimStatus" in actor && actor.claimStatus === "mine") ?? null;
+  if (!ownedActor) return null;
+  const release = async (name: string) => {
+    if (!(await confirm({ title: `Leave ${name}?`, body: "You'll release this character so someone else can play it.", confirmLabel: "Leave character" }))) return;
+    setReleasing(true);
+    setFeedback(`Leaving ${name}…`);
+    socket.emit("character:release", { commandId: newId(), expectedRevision: state.revision }, (result) => {
+      setReleasing(false);
+      setFeedback(result.ok ? `You left ${name}. Pick another when you're ready.` : result.message ?? "Couldn't release the character.");
+    });
+  };
+  return <section className="you-are-playing" aria-label={`Playing ${ownedActor.name}`}>
+    <div className="you-are-playing-head">
+      <span className="eyebrow">YOU'RE PLAYING</span><strong>{ownedActor.name}</strong>
+      <span className="own-hp" role="status">HP {hpLabel(ownedActor.hp)}</span>
+    </div>
+    <div className="you-are-playing-conditions">
+      <span className="you-are-playing-cond-label">Conditions</span>
+      <ConditionEditor actorId={ownedActor.id} conditions={ownedActor.conditions} onFeedback={setFeedback} />
+    </div>
+    <OwnHpTracker actorId={ownedActor.id} onFeedback={setFeedback} />
+    <div className="you-are-playing-buttons">
+      <Button variant="secondary" disabled={releasing} onClick={() => setSheetOpen(true)}>View sheet</Button>
+      <Button variant="secondary" disabled={releasing} onClick={() => release(ownedActor.name)}>Leave character</Button>
+    </div>
+    <p className="roster-feedback" aria-live="polite">{feedback}</p>
+    {sheetOpen && <CharacterSheet actor={ownedActor} role="player" state={state} onClose={() => setSheetOpen(false)} />}
     {dialog}
   </section>;
 }

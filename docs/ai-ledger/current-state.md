@@ -232,6 +232,93 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Player character sheets — Phase 1 initiative (2026-07-23, PR #45, branch
+  `claude/character-sheet-discovery-a14i7f`).** The player-facing half of the app: an interactive
+  character sheet used at game night, architected **builder-ready** (the full guided builder is the
+  next roadmap update). Approved roadmap + codebase orientation in
+  `docs/product/character-sheet-initiative.md`; load-bearing decisions in `decision-log.md`
+  (2026-07-23). **Slice 0 (foundations) landed & verified:** (1) the SRD ability/proficiency/spell
+  math is centralized in `packages/rules-5e/src/character.ts` (`abilityModifier`, `characterLevel`,
+  `proficiencyBonusForLevel`, `saveBonus`, `skillBonus`, `spellSaveDc`, `spellAttackBonus`) and the
+  four hand-rolled `floor((score-10)/2)` copies delegate to it (server `action-resolution`/
+  `saving-throws`/`rests`, client `CharacterSheet`; the client gains `@vtt/rules-5e`) — no behavior
+  change; (2) a generated **app map** (`npm run map` → `docs/app-map.md`: GameState shape, command
+  catalog with scopes, HTTP paths, curated file index) via pure `renderAppMap()` with a
+  byte-identical freshness test (`apps/server/test/app-map.test.ts`, mirroring the API-reference
+  pattern), plus a new **`vtt-orientation`** skill. **Slice 1 (data model + read-only sheet)**
+  then landed: additive `ActorDefinition` fields (`character`/`proficiencies`/`spellcasting`/
+  `startingInventory`/`startingCurrency`, the "no-rewrite" selection contract) and live `Actor`
+  fields (`spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency`, seeded in
+  `instantiate()`); the JSON-Schema mirror kept in lockstep; the owner-only projection extended
+  with a leak test proving a second player and the viewer never see another PC's
+  slots/inventory/currency; the three seed PCs migrated; and `CharacterSheet.tsx` now renders
+  identity/proficiencies/spells/inventory **read-only** (guarded, so monsters/imports are
+  unchanged). `check`+`build`+`test` green (server 404, schemas 8); a live browser/mobile visual
+  check is still pending (no e2e harness in-repo). **Slices 2–5 then landed** (all
+  `check`+`build`+`test` green; server now 418 tests): **Slice 2** — players tap an
+  ability/save/skill/attack on the sheet to roll it via `dice.roll`, plus the centralized
+  `canInitiateForActor` authorization seam (damage stays GM-applied; a future per-table
+  "players may initiate attacks" toggle is a one-field add). **Slice 3** —
+  `character.set-slot`/`set-prepared` + long-rest slot/prepared restore + sheet slot
+  steppers and prepared toggles. **Slice 4** — `character.set-inventory`/`set-currency` +
+  inventory/currency editors + attunement soft-cap. **Slice 5** —
+  `character.set-identity`/`set-proficiencies` (edit the per-PC `import-<actorId>` definition,
+  re-validated) + sheet identity/proficiency editors, and **ADR-0021** reframing the
+  "not a character builder" boundary (CLAUDE.md scope line updated). Every new command is
+  player-allowed, owner-scoped, and flows through the shared operations layer + versioned
+  OpenAPI (docs/api-reference + docs/app-map regenerated, freshness-tested). The Phase-1
+  **interactive play sheet is feature-complete**; the full guided builder (content +
+  derivation + level-up) is the next roadmap update. **Still pending:** a live browser/mobile
+  visual smoke (no Playwright/e2e harness in the repo yet).
+  - **Sheet v2 iteration (2026-07-23, same PR)** from GM playtest feedback (tracked in
+    `docs/product/character-sheet-v2-feedback.md`). **Wave 1** (readability + interaction): spells
+    grouped by level, all 18 skills listed with proficiency dots, the stale-definition edit bug
+    fixed (owner definition rides the live prop and wins), spell slots restyled as clickable pips,
+    and per-ability roll + "roll with proficiency" chips. **Equipment framework** (feedback #7,
+    decision "full catalog + vendor SRD gear"): a unified `EquipmentReference` content model +
+    a 132-entry hand-authored SRD gear bundle (ammunition / adventuring gear / tools / packs /
+    focuses / consumables) folded with the weapon & armor tables into one **183-item catalog**
+    (`loadEquipment`, sorted, uniform shape); served over a new **`content:equipment`** socket read
+    (public SRD reference, like `content:spells`, with the CC-BY line); `InventoryItem` additively
+    gains a homebrew-expressible `category` slug (JSON-Schema mirror in lockstep); and the sheet's
+    Inventory gains a searchable, category-filtered **browse-and-add picker** (upsert-aware —
+    picking an owned item increments its stack — mobile full-screen). `check`+`build`+`test` green
+    (server 419, content 18, schemas 8); a runtime `ContentLibrary` smoke served the full 183-item
+    catalog. The `wondrous` category is reserved for the homebrew update. **All nine v2 items then
+    landed:** the **cast-at / upcasting picker** (#2 — per-spell slot-level dropdown that spends the
+    chosen slot and auto-rolls the SRD upcast scaling; `ContentSpellSummary` gains
+    `damageRoll`/`damageTypes`/`castingOptions`); **manual roll entry + auto/manual bonus mode** (#8 — a
+    per-sheet Digital/Manual toggle that prompts for a physical die on every roll surface and encodes it
+    into the `dice:roll` formula, no server change); and the **panel redesign** (#9 — the sheet became a
+    two-subpanel workspace with the shared `DicePanel` log docked left/right, a **Pop out** to a
+    moveable/resizable in-tab panel, a **New tab** button opening a standalone `/sheet.html` entry that
+    rejoins with the persisted player token, and a mobile Sheet/Dice segmented control). Every wave is
+    `check`+`build` clean (server 419 tests). **Still pending:** a live browser/mobile click-through of
+    the workspace/popout/standalone-tab (no e2e harness in the repo).
+  - **Sheet v3–v6 feedback + design-system compliance pass (2026-07-23, same PR).** Iterated the sheet
+    over further GM playtest rounds (v3–v6 feedback docs), then ran a **full design-system compliance
+    audit** of the sheet + its implementation and remediated it at *Pragmatic* scope: the clear-win
+    controls now compose `@vtt/ui` primitives (`IconButton`/`Stepper`/`Button`/`SegmentedControl`, plus a
+    `Meter tone="health"` HP bar and an attunement `Badge`), and the bespoke CSS is tokenized (both
+    hardcoded colors removed — incl. the cast-`<select>` caret redrawn from `--text-dim` gradient halves;
+    radii and the custom rem type scale snapped onto tokens, render-gated). The `ActorRoster` card buttons
+    and the dice roll-card cluster were swept too. `SegmentedControl` gained backwards-compatible
+    per-option `ariaLabel`/`title` for icon-only use (dock picker). The tuned matched-set cast cluster,
+    prep tags, slot pips, dense roll chips, and cyan-active filter/toggle pills were **kept and
+    tokenized** (screenshot-gated — the primitives would regress their tuned look). `check`+`build`+server
+    `test` (422) green each phase, headless render-verified in light + dark. Record:
+    `docs/product/character-sheet-styleguide-audit.md`. **Still pending:** a live browser/mobile
+    click-through (no e2e harness in the repo).
+  - **Sheet open-consistency + Dice toggle (2026-07-24, same PR).** Three GM-reported follow-ups: (a)
+    `IconButton`'s ✕ rode high — `.nh-iconbtn` now sets `line-height: 1` so the glyph centres (all icon
+    buttons). (b) Opening a sheet from a **map token right-click** now has the shared dice log attached
+    (`state` threaded through `EncounterMap`), so players can see rolls on the map. (c) The three entry
+    points (top-row "View sheet", initiative "My sheet" toggle, map right-click) now render **identically**:
+    the sheet always fills the panel at the normal lg modal width and the dice log **swaps in behind the
+    header's Sheet/Dice toggle** (one pane at a time, every viewport) instead of docking beside the sheet.
+    This **supersedes the v6 #9 side-by-side dock** above — the dock-picker (◧/◨), sheet/log drag-resize
+    handles, and `--sheet-width`/`--log-width` machinery were removed (net −34 lines). `check`+`build`+
+    server `test` (422) green; header + ✕ centring render-verified in light + dark.
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's
@@ -322,10 +409,13 @@ This repo now carries a Claude Code tooling layer (this upgrade): `CLAUDE.md` in
 `docs/ai-context/` subsystem briefs, this ledger, `.claude/loop.md`, the full
 `.claude/skills/` roster (`vtt-task-packet`, `vtt-context-router`, `vtt-implement`,
 `vtt-qa-check`, `vtt-ledger-update`, `vtt-ux-review`, `vtt-test-pass`, `vtt-branch-safety`,
-`vtt-schedule`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
+`vtt-schedule`, `vtt-orientation`), and three lifecycle hooks in `.claude/settings.json` (`danger-guard`
 PreToolUse, `scope-guard` UserPromptSubmit, `stop-reminder` Stop — see
 `.claude/hooks/README.md`). Three optional read-only reviewer subagents live in `.claude/agents/` (`ux-reviewer`,
 `test-reviewer`, `architecture-reviewer`) for large/cross-cutting changes. A GitHub Actions
 schedule scaffold (`.github/workflows/scheduled-ledger-drift.yml`) is present but **inert** —
 its cron is commented out and the job is a placeholder until configured. Design/roadmap in
-`docs/claude-code-tooling-outline.md`.
+`docs/claude-code-tooling-outline.md`. A generated **app map** (`npm run map` → `docs/app-map.md`,
+freshness-tested in the server suite) gives humans and agents an always-current index of the
+GameState shape, command catalog (with scopes), and HTTP surface; the `vtt-orientation` skill
+routes there first.

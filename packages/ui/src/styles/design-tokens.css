@@ -28,6 +28,7 @@
   /* Lines */
   --line: #2E2A4E;
   --line-strong: #3F3970;
+  --line-hover: color-mix(in srgb, var(--cyan) 55%, transparent);   /* interactive hover-border tint; adapts per theme via --cyan */
 
   /* Neon accents (magenta leads, cyan supports) */
   --magenta: #FF2E9A;
@@ -98,6 +99,7 @@
   --fs-body: 15px;
   --fs-sm: 13px;
   --fs-xs: 11px;
+  --fs-2xs: 10px;   /* micro eyebrow / dense tile-label tier - uppercase tracked labels only, never body */
 
   --lh-tight: 1.15;
   --lh-snug: 1.3;

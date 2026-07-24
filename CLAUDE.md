@@ -15,8 +15,9 @@ share the same responsive combat experience. No accounts, no cloud, no public Sa
 Design philosophy: **combat-first, "just works," everything needed and nothing
 unnecessary.** When in doubt, favor the obvious GM action over another settings knob.
 
-**Scope boundaries (do not drift into these):** not a character builder, campaign
-wiki, voice/video service, public/multi-tenant SaaS, macro language, or 3D tabletop.
+**Scope boundaries (do not drift into these):** not a character *builder yet* (an
+interactive play sheet ships now; the guided builder is the next roadmap update — ADR-0021),
+campaign wiki, voice/video service, public/multi-tenant SaaS, macro language, or 3D tabletop.
 
 ## Commands
 

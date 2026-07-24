@@ -91,6 +91,40 @@ export type HealthDisplayStyle = z.infer<typeof HealthDisplayStyleSchema>;
 export type HealthDisplayAudience = z.infer<typeof HealthDisplayAudienceSchema>;
 export type HealthDisplay = z.infer<typeof HealthDisplaySchema>;
 
+/** SRD skill id slug ("stealth", "arcana"); free-form so homebrew stays expressible. */
+const SkillIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
+/** One carried inventory item. Quantities/equipped/attuned are live state that changes during play (ADR-0007 additive). */
+/** Mechanical stats an inventory item carries when added from the SRD catalog, so equipping it has effect
+ * (weapon → a rollable attack action on the sheet; armor/shield → derived Armor Class). Additive-optional;
+ * absent for homebrew/pre-existing items, which then have no mechanical effect (display only). */
+export const ItemWeaponSchema = z.object({ category: z.enum(["simple", "martial"]), damageDice: z.string().min(1).max(20), damageType: z.string().min(1).max(40), rangeFeet: z.number().int().positive().nullable(), longRangeFeet: z.number().int().positive().nullable() }).strict();
+export const ItemArmorSchema = z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).strict();
+export const InventoryItemSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/).max(80),
+  name: z.string().min(1).max(120),
+  quantity: z.number().int().min(0).max(9999).default(1),
+  equipped: z.boolean().default(false),
+  attuned: z.boolean().default(false),
+  weightEach: z.number().nonnegative().max(1_000_000).optional(),
+  description: z.string().max(4000).optional(),
+  /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping and (with weapon/armor below) mechanical effect. Additive. */
+  category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional(),
+  weapon: ItemWeaponSchema.optional(),
+  armor: ItemArmorSchema.optional()
+}).strict();
+export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+/** SRD coin purse; all five currencies, each defaulting to 0. */
+export const CurrencySchema = z.object({
+  cp: z.number().int().min(0).max(1_000_000).default(0),
+  sp: z.number().int().min(0).max(1_000_000).default(0),
+  ep: z.number().int().min(0).max(1_000_000).default(0),
+  gp: z.number().int().min(0).max(1_000_000).default(0),
+  pp: z.number().int().min(0).max(1_000_000).default(0)
+}).strict();
+export type Currency = z.infer<typeof CurrencySchema>;
+/** A live spell-slot pool for one slot level (remaining out of the definition's maximum). */
+export const SpellSlotSchema = z.object({ level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9) }).strict();
+
 export const ActorSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(120),
@@ -128,7 +162,19 @@ export const ActorSchema = z.object({
   /** Per-token health-display override; absent = inherit the table-wide `combat.healthDisplay`. GM knowledge - resolved and audience-gated in the player/viewer projections. Additive. */
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch-ms timestamp of when this actor last entered a fight (encounter start / add-combatant). Powers the scene-setup "Recent" list; GM-only, stripped from the player projection. Additive. */
-  lastUsedAt: z.number().int().nonnegative().optional()
+  lastUsedAt: z.number().int().nonnegative().optional(),
+  /** Live spell-slot pools by level, seeded from the definition's spellcasting and expended during play (restored by rests). null = not a modeled spellcaster. Reaches players only on their own claimed character. Additive. */
+  spellSlots: z.array(SpellSlotSchema).max(9).nullable().default(null),
+  /** Warlock Pact Magic pool (one level, uniform slots). null = none. Owner-only in projections. Additive. */
+  pactSlots: z.object({ level: z.number().int().min(1).max(5), remaining: z.number().int().min(0).max(4) }).strict().nullable().default(null),
+  /** Spell ids prepared right now, seeded from the definition's default-prepared set and re-chosen on a long rest. Owner-only. Additive. */
+  preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
+  /** Carried inventory, seeded from the definition's starting loadout and mutated during play. Owner-only. Additive. */
+  inventory: z.array(InventoryItemSchema).max(200).default([]),
+  /** Coin purse, seeded from the definition's starting currency. Owner-only. Additive. */
+  currency: CurrencySchema.default({}),
+  /** GM-archived: hidden from players and excluded from the encounter builder / party. GM management flag; never projected to players or the viewer. Additive. */
+  archived: z.boolean().default(false)
 });
 
 export type Actor = z.infer<typeof ActorSchema>;
@@ -202,6 +248,53 @@ const ActionSchema = z.object({
   /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */
   legendary: z.object({ cost: z.number().int().min(1).max(5) }).strict().optional()
 });
+
+/**
+ * Character identity - the builder's choice inputs, stored so a future guided builder fills exactly
+ * these fields (ADR-0007 additive; the "no-rewrite" contract). `classes` is an array so multiclass
+ * is expressible; total level is derived (sum), never stored. Absent = prose only, as today.
+ */
+export const CharacterIdentitySchema = z.object({
+  classes: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60),
+    subclass: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
+    level: z.number().int().min(1).max(20)
+  }).strict()).max(4).default([]),
+  race: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60), subrace: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional() }).strict().optional(),
+  background: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
+  feats: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(80), description: z.string().max(4000).optional() }).strict()).max(40).default([])
+}).strict();
+
+/**
+ * Save/skill proficiency SELECTIONS (the durable contract). `*Overrides` carry final totals for
+ * imports that don't encode the selections; the server resolves `override ?? selection-derived ??
+ * ability-only`. Absent = fall back to ability modifier / the legacy `extensions` totals.
+ */
+export const ProficienciesSchema = z.object({
+  saves: z.array(AbilitySchema).max(6).default([]),
+  skills: z.array(z.object({ id: SkillIdSchema, proficiency: z.enum(["proficient", "expertise"]) }).strict()).max(40).default([]),
+  saveOverrides: z.record(AbilitySchema, z.number().int().min(-20).max(30)).optional(),
+  skillOverrides: z.record(SkillIdSchema, z.number().int().min(-20).max(30)).optional()
+}).strict();
+
+/**
+ * Spellcasting CAPABILITY (immutable): ability, slot maxima, known/prepared list. Save DC and attack
+ * bonus derive (8+PB+mod / PB+mod) unless an override is supplied. Live slots-remaining and today's
+ * prepared set live on the Actor. `spells[].actionId` links a spell to the action that resolves it.
+ */
+const SpellcastingSchema = z.object({
+  ability: AbilitySchema,
+  saveDc: z.number().int().min(1).max(40).optional(),
+  attackBonus: z.number().int().min(-5).max(30).optional(),
+  slots: z.array(z.object({ level: z.number().int().min(1).max(9), max: z.number().int().min(0).max(9) }).strict()).max(9).default([]),
+  pact: z.object({ level: z.number().int().min(1).max(5), max: z.number().int().min(0).max(4) }).strict().optional(),
+  spells: z.array(z.object({
+    id: z.string().max(80), name: z.string().min(1).max(120), level: z.number().int().min(0).max(9),
+    prepared: z.boolean().default(true), alwaysPrepared: z.boolean().default(false),
+    actionId: z.string().regex(/^[a-z0-9-]+$/).optional()
+  }).strict()).max(400).default([])
+}).strict();
+
 export const ActorDefinitionSchema = z.object({
   schemaId: z.enum(["vtt.actor-character", "vtt.actor-monster"]), schemaVersion: z.literal(ACTOR_DEFINITION_SCHEMA_VERSION),
   source: z.object({ name: z.string().min(1).max(200), version: z.string().min(1).max(80), externalId: z.string().max(200).optional() }),
@@ -214,7 +307,17 @@ export const ActorDefinitionSchema = z.object({
   /** Reference-level for now: displayed, not yet enforced on actor.set-condition. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).optional(),
   /** Legendary creature resources (SRD 2024): `actionsPerRound` legendary actions per round (spent on other creatures' turns), `resistancesPerDay` Legendary Resistance uses (turn a failed save into a success; re-arms on a long rest - the app's day). Additive. */
-  legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional()
+  legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional(),
+  /** Character identity (class/level/race/background/feats). Character definitions in practice; additive-optional. */
+  character: CharacterIdentitySchema.optional(),
+  /** Save/skill proficiency selections (+ optional override totals). Additive. */
+  proficiencies: ProficienciesSchema.optional(),
+  /** Spellcasting capability (ability, slot maxima, known/prepared list). Additive. */
+  spellcasting: SpellcastingSchema.optional(),
+  /** Immutable starting loadout; the live actor's inventory is seeded from this. Additive. */
+  startingInventory: z.array(InventoryItemSchema).max(200).optional(),
+  /** Immutable starting coins; the live actor's currency is seeded from this. Additive. */
+  startingCurrency: CurrencySchema.optional()
 }).superRefine((actor, context) => {
   if (actor.schemaId === "vtt.actor-character" && actor.token.disposition !== "friendly") context.addIssue({ code: z.ZodIssueCode.custom, path: ["token", "disposition"], message: "Player-character definitions must use the friendly disposition." });
 });

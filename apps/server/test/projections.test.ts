@@ -43,6 +43,58 @@ describe("player-safe character claim projections", () => {
   });
 });
 
+describe("owner-only character-sheet resources", () => {
+  const owned = {
+    id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16c", name: "Mine", kind: "player-character", visibility: "public",
+    hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: playerA,
+    spellSlots: [{ level: 1, remaining: 2 }], pactSlots: { level: 1, remaining: 1 }, preparedSpellIds: ["magic-missile"],
+    inventory: [{ id: "secret-blade", name: "Secret Blade of Testing", quantity: 1, equipped: true }],
+    currency: { cp: 0, sp: 0, ep: 0, gp: 42, pp: 0 }
+  };
+  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [owned] });
+
+  it("sends spell slots, prepared spells, inventory, and currency to the owning player only", () => {
+    const mine = projectPlayerView(state, playerA, noPresence).actors[0];
+    expect(mine.spellSlots).toEqual([{ level: 1, remaining: 2 }]);
+    expect(mine.pactSlots).toEqual({ level: 1, remaining: 1 });
+    expect(mine.preparedSpellIds).toEqual(["magic-missile"]);
+    expect(mine.inventory).toHaveLength(1);
+    expect(mine.currency).toMatchObject({ gp: 42 });
+  });
+
+  it("never leaks another player's sheet resources (viewer safety / role boundary)", () => {
+    const theirs = projectPlayerView(state, playerB, noPresence).actors[0];
+    for (const field of ["spellSlots", "pactSlots", "preparedSpellIds", "inventory", "currency"]) expect(field in theirs, `leaked ${field}`).toBe(false);
+    expect(JSON.stringify(projectPlayerView(state, playerB, noPresence))).not.toContain("Secret Blade of Testing");
+  });
+
+  it("gives the GM the full live resources", () => {
+    const gm = projectGmView(state, noPresence).actors[0];
+    expect(gm.inventory).toHaveLength(1);
+    expect(gm.currency).toMatchObject({ gp: 42 });
+    expect(gm.spellSlots).toEqual([{ level: 1, remaining: 2 }]);
+  });
+});
+
+describe("archived characters (v4 #10, GM management)", () => {
+  const archived = { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16c", name: "Retired Hero", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, archived: true };
+  const active = { id: "70a6e172-9ff5-44a3-8a8b-93f836f0d16c", name: "Active Hero", kind: "player-character", visibility: "public", hp: { current: 8, maximum: 8, temporary: 0 }, ownerSessionId: null };
+  const state = GameStateSchema.parse({ schemaVersion: 1, actors: [archived, active] });
+
+  it("hides archived characters from players entirely, and never leaks the archived flag", () => {
+    const view = projectPlayerView(state, playerA, noPresence);
+    expect(view.actors.map((actor) => actor.name)).toEqual(["Active Hero"]);
+    expect(JSON.stringify(view)).not.toContain("Retired Hero");
+    expect(JSON.stringify(view)).not.toContain("archived");
+  });
+
+  it("keeps archived characters in the GM view (so the roster tab can manage them)", () => {
+    const gm = projectGmView(state, noPresence);
+    expect(gm.actors.map((actor) => actor.name).sort()).toEqual(["Active Hero", "Retired Hero"]);
+    expect(gm.actors.find((actor) => actor.name === "Retired Hero")?.archived).toBe(true);
+  });
+});
+
 describe("presence projection", () => {
   const actors = [
     { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16b", name: "Unclaimed", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, notes: "" },

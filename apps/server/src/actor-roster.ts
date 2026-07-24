@@ -1,4 +1,5 @@
 import type { ActorDefinition, GameState } from "@vtt/domain";
+import { abilityModifier, armorClassFromEquipment } from "@vtt/rules-5e";
 import { endEffectsSustainedBy } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -26,13 +27,16 @@ export function hitDiceFromDefinition(definition: ActorDefinition): { die: "d4" 
 
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
+  const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
   state.actors.push({
     id,
     name: dedupedName(state, definition.name),
     kind,
     visibility,
     hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum, temporary: 0 },
-    armorClass: definition.armorClass,
+    // AC derives from equipped armor/shields when the loadout has any (v6 #5); otherwise the stored
+    // stat-block AC stands (natural/mage armor, monsters).
+    armorClass: armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), inventory) ?? definition.armorClass,
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],
@@ -43,6 +47,12 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
     hitDice: hitDiceFromDefinition(definition),
+    spellSlots: definition.spellcasting ? definition.spellcasting.slots.map((slot) => ({ level: slot.level, remaining: slot.max })) : null,
+    pactSlots: definition.spellcasting?.pact ? { level: definition.spellcasting.pact.level, remaining: definition.spellcasting.pact.max } : null,
+    preparedSpellIds: definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [],
+    inventory,
+    currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+    archived: false,
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,

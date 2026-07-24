@@ -8,6 +8,58 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-24 — Sheet open-consistency + Dice toggle (`claude/character-sheet-discovery-a14i7f`, PR #45)
+
+Three GM-reported follow-ups on how the player sheet opens. (1) The `IconButton` ✕ rode high/off-centre —
+`.nh-iconbtn` relied on `place-items: center` but inherited a ~1.5 line-height, so the glyph's line box
+overflowed; added `line-height: 1` (matches `.nh-modal-close`), centring the × in every icon button.
+(2) Opening a sheet from a **map token right-click** now attaches the shared dice log — threaded the full
+view (`state`) through `EncounterMap` to the sheet so its Sheet/Dice toggle works on the map (where no
+other dice UI shows). (3) The three entry points (top-row "View sheet", initiative "My sheet" toggle, map
+right-click) rendered inconsistently — "View sheet" docked the dice log beside the sheet in a wide two-pane
+modal (the busier look the GM flagged), the others showed the sheet alone. Confirmed direction with the GM
+(chose "clean sheet + Dice toggle") and unified all opens: the sheet always fills the panel at the normal
+lg modal width; the dice log swaps in behind the header's **Sheet/Dice toggle** (one pane at a time, every
+viewport) instead of docking beside it. Retired the desktop side-by-side dock — removed the dock-picker
+(◧/◨), the sheet/log drag-resize handles, the `--sheet-width`/`--log-width` machinery, and the redundant
+phone media query (net −34 lines). Diagnosis was render-driven: a headless before/after showed the sheet
+content is identical at both widths, so the "worse" look was purely the docked log's presence, not a
+layout bug. `check`+`build`+server `test` (422) green; header + ✕ centring render-verified light + dark.
+
+**Follow-on (same day):** closed the toggle model's feedback gap (you had to open the Dice tab to see a roll
+you just made). Two additions — a **pinned last-roll line** under the rolls bar (undocked): the most recent
+roll from this character (label · dice · formula = total, from `state.rolls`), shown inline so tap-to-roll
+gives immediate feedback, tap to jump to the full log; and an **opt-in dice dock** (header "Dock dice" /
+"Undock dice", remembered per browser, desktop only) that pins the shared log beside the sheet as a fixed
+22rem side panel (modal capped at 68rem — not the old sprawl). Default stays the clean single pane; the
+pinned line hides when docked or on the Dice pane. `check`+`build`+`test` (422) green, both states
+render-verified.
+
+---
+
+## 2026-07-23 — Character sheet design-system compliance pass (`claude/character-sheet-discovery-a14i7f`, PR #45)
+
+Full audit of the player character sheet + its implementation against the design system, then a
+*Pragmatic*-scope remediation (GM-confirmed): migrate the clear-win controls to `@vtt/ui` primitives and
+tokenize the CSS, but **keep the elements tuned over six rounds** (re-styled onto tokens), migrating a tuned
+element only where the primitive reproduces the look cleanly. Phases: **0** new tokens (`--fs-2xs`,
+`--line-hover`) + fixed 2 phantom tokens; **1** IconButton (✕), Stepper (inventory qty), Button
+(HP/rest/identity/coins/tools + all `ActorRoster` card buttons), SegmentedControl (roll-input, bonus-mode,
+dock-picker, phone tabs, dice Table/Mine) — each deleted its bespoke CSS; **2** `Meter tone="health"` in the
+HP tile (design language §6) + attunement `Badge`; **3** CSS sweep — both hardcoded colors removed (pip sheen
+`white`→`--cyan-hi`; cast-`<select>` caret redrawn from `--text-dim` gradient halves since a data-URI can't
+hold a `var()`), `50%`→`--radius-pill`, `2px`→`--radius-sm`, and the custom rem type scale snapped onto
+`--fs-2xs/xs/sm/body` (render-gated, ≤1px shifts, no reflow); **4** same type sweep on the dice roll-card
+cluster in `styles.css`, `/styleguide` updated. `SegmentedControl` gained backwards-compatible per-option
+`ariaLabel`/`title` (+ optional `label`) so the icon-only dock picker announces a real name. Kept bespoke &
+tokenized (evidence-based, screenshot-gated): the cast cluster, prep tags, slot pips, roll chips, item-category
+tag, and the cyan-tinted filter/toggle pills (the `Chip` primitive's monochrome pressable state reads muddier).
+Every phase: `check` + `build` + server `test` (422) green + headless render diff (light + dark). Durable
+record: `docs/product/character-sheet-styleguide-audit.md`. Follow-up (future, out of scope): a `Chip`
+"selected accent" + mono variant would let the remaining pills/roll-chips migrate.
+
+---
+
 ## 2026-07-23 — Scene IA PR review round (Encounter quick-switcher → button + popup)
 
 Screenshot-review pass on the scene-centric IA PR (`claude/scene-prep-gm-notes-c1gcur`, draft #44).

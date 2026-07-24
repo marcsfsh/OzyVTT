@@ -4,8 +4,14 @@ import "./SegmentedControl.css";
 
 export interface SegmentedOption {
   value: string;
-  label: ReactNode;
+  /** Visible label. Omit for icon-only options — pair it with `ariaLabel`. */
+  label?: ReactNode;
   icon?: ReactNode;
+  /** Per-option accessible name. Required when the option is icon-only so the
+      button announces more than a bare glyph. Overrides the visible label. */
+  ariaLabel?: string;
+  /** Per-option hover tooltip. */
+  title?: string;
 }
 
 export interface SegmentedControlProps {
@@ -30,10 +36,12 @@ export function SegmentedControl({ options, value, onChange, ariaLabel, size = "
           type="button"
           className="nh-segmented-option interactive"
           aria-pressed={value === option.value}
+          aria-label={option.ariaLabel}
+          title={option.title}
           onClick={() => onChange(option.value)}
         >
           {option.icon != null && <span className="nh-segmented-icon" aria-hidden="true">{option.icon}</span>}
-          <span className="nh-segmented-label">{option.label}</span>
+          {option.label != null && <span className="nh-segmented-label">{option.label}</span>}
         </button>
       ))}
     </div>

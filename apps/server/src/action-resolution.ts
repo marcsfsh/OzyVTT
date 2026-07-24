@@ -1,5 +1,5 @@
 import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
-import { aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
+import { abilityModifier as scoreModifier, aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
@@ -66,7 +66,7 @@ function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0):
   return { source, normalized: source.replace(/\s+/g, "").toLowerCase(), terms };
 }
 
-function recordRoll(state: GameState, resolution: ReturnType<typeof resolveDice>, base: Pick<RollRecord, "id" | "commandId" | "initiatorSessionId" | "initiatorLabel" | "actorId" | "purpose" | "visibility" | "createdAt">) {
+function recordRoll(state: GameState, resolution: ReturnType<typeof resolveDice>, base: Pick<RollRecord, "id" | "commandId" | "initiatorSessionId" | "initiatorLabel" | "label" | "actorId" | "purpose" | "visibility" | "createdAt">) {
   let group = 0;
   const record: RollRecord = {
     ...base,
@@ -93,8 +93,7 @@ function sizeAtMost(size: string | undefined, limit: string): boolean {
 type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 /** Ability modifier from the definition's scores; +0 when no definition is known (documented builtin fallback). */
 export function abilityModifier(definition: ActorDefinition | undefined, ability: AbilityKey): number {
-  const score = definition?.abilityScores[ability] ?? 10;
-  return Math.floor((score - 10) / 2);
+  return scoreModifier(definition?.abilityScores[ability] ?? 10);
 }
 
 /** Skill bonus from the untyped open5e extension when the import carries one (mirrors saveModifierFor). */
@@ -541,7 +540,7 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
 
   // A hidden attacker's rolls stay GM-only; everyone else's fight in the open.
   const visibility = attacker.visibility === "gm-only" ? "gm-only" as const : "public" as const;
-  const rollBase = { commandId: input.commandId, initiatorSessionId: deps.gmSessionId, initiatorLabel: attacker.name, actorId: attacker.id, visibility, createdAt: deps.now() };
+  const rollBase = { commandId: input.commandId, initiatorSessionId: deps.gmSessionId, initiatorLabel: attacker.name, label: action.name, actorId: attacker.id, visibility, createdAt: deps.now() };
 
   // Builtin check-roll actions (Hide vs DC 15; Influence/Search/Study with the GM adjudicating):
   // one d20 + the actor's ability modifier (stealth skill bonus when the import carries one),

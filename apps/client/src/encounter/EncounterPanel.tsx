@@ -359,6 +359,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     const activeRowRef = useRef<HTMLLIElement | null>(null);
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [combat.turnActorId]);
+    // v4 #8: toggle this panel between the turn order and the player's own sheet (embedded, no dice log).
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [view, setView] = useState<"initiative" | "sheet">("initiative");
+    const myActor = props.state.actors.find((actor) => actor.id === myId) ?? null;
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
     // Active creature on top: rotate the turn order so the acting combatant leads, the rest follow in
@@ -371,11 +375,17 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     return <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
       <div className="encounter-topbar player">
         <strong className="encounter-round">Round {combat.round}</strong>
+        {myActor && <div className="player-view-toggle" role="group" aria-label="Show turn order or your sheet">
+          <button type="button" className={view === "initiative" ? "on" : ""} aria-pressed={view === "initiative"} onClick={() => setView("initiative")}>Initiative</button>
+          <button type="button" className={view === "sheet" ? "on" : ""} aria-pressed={view === "sheet"} onClick={() => setView("sheet")}>My sheet</button>
+        </div>}
         {myTurn && <span className="your-turn-flag" role="status">Your turn - act, then end it below</span>}
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
-      <ol className="initiative-list player">{orderedInitiative.map((entry) => {
+      {view === "sheet" && myActor
+        ? <CharacterSheet actor={myActor} role="player" embedded onClose={() => setView("initiative")} />
+        : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
         const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
@@ -390,7 +400,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
           {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={combat.rollMode} />}
         </li>;
-      })}</ol>
+      })}</ol>}
       <DockPicker dock={props.dock} />
     </section>;
   }
@@ -399,7 +409,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
 }
 
 function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }: Readonly<{ state: GmView; selectedMap: MapSelection | null; mapLibrary?: readonly MapSelection[]; onSelectMap?: (map: MapSelection | null) => void; dock?: DockControl }>) {
-  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character").map((actor) => actor.id)));
+  const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() => state.combat.initiative.length > 0 ? new Set(state.combat.initiative.map((entry) => entry.actorId)) : new Set(state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived).map((actor) => actor.id)));
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [combatantSearch, setCombatantSearch] = useState("");
@@ -563,10 +573,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       : emitCommand(event, { commandId: newId(), actorId, amount: value, ...(options?.nonlethal ? { nonlethal: true } : {}), expectedRevision: state.revision }), verbs[event]);
   };
 
+  // Archived characters (v4 #10) are hidden from the party list and the encounter builder.
   // Setup picker, organized: pinned PCs (the party) first, then the last-used monsters/NPCs (server-
   // tracked recency, GM-only), then a searchable list of everything else on the roster.
   const RECENT_COUNT = 10;
-  const pcs = state.actors.filter((actor) => actor.kind === "player-character");
+  const pcs = state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived);
   const nonPcs = state.actors.filter((actor) => actor.kind !== "player-character");
   const recent = nonPcs.filter((actor) => actor.lastUsedAt !== undefined).sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0)).slice(0, RECENT_COUNT);
   const recentIds = new Set(recent.map((actor) => actor.id));
@@ -824,7 +835,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
     </>}
     {message && <p className="encounter-feedback" role="status">{message}</p>}
     {browsing && <MonsterBrowser onClose={() => setBrowsing(false)} />}
-    {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" onClose={() => setSheetActorId(null)} /> : null; })()}
+    {(() => { const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined; return sheetActor ? <CharacterSheet actor={sheetActor} role="gm" state={state} onClose={() => setSheetActorId(null)} /> : null; })()}
     {confirmDialog}
   </section>;
 }

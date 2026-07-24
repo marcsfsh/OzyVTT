@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
-import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
-import { Modal } from "@vtt/ui";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
+import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
+import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
+import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { ConditionEditor } from "./conditions";
+import { EquipmentPicker } from "./equipment";
+import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
+import { DicePanel } from "../dice/DicePanel";
+import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -10,10 +15,25 @@ import { socket } from "../socket";
 const sheetCache = new Map<string, ActorDefinition>();
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
-const modifierOf = (score: number) => Math.floor((score - 10) / 2);
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
+const d20 = (bonus: number) => bonus === 0 ? "1d20" : `1d20 ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
+const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
+const titleizeSkill = (id: string) => id.split("-").map(titleCase).join(" ");
+const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
+/** Best-effort per-browser preference storage for the sheet's roll settings (private-mode safe). */
+const readSetting = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
+const writeSetting = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable; setting stays in-session */ } };
+const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
+/** SRD governing ability for each of the 18 skills (drives the read-only skill bonus). */
+const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
+  acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
+  history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis",
+  nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int",
+  "sleight-of-hand": "dex", stealth: "dex", survival: "wis"
+};
+const ALL_SKILLS = Object.keys(SKILL_ABILITY).sort();
 
 type SrdExtension = Partial<{
   challengeRating: number; type: string; alignment: string; armorDetail: string | null;
@@ -42,11 +62,108 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
   };
   return <div className="sheet-hp-controls" role="group" aria-label="Track hit points">
     <input type="number" min="0" max="1000" placeholder="0" aria-label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-    <button type="button" disabled={busy} onClick={() => send("actor:apply-damage", "Damaged")}>Dmg</button>
-    <button type="button" disabled={busy} onClick={() => send("actor:heal", "Healed")}>Heal</button>
-    <button type="button" disabled={busy} onClick={() => send("actor:set-temp-hp", "Temp set to")}>Temp</button>
-    {allowSet && <button type="button" disabled={busy} onClick={() => send("actor:set-hp", "HP set to")}>Set</button>}
+    <Button size="sm" variant="destructive" disabled={busy} onClick={() => send("actor:apply-damage", "Damaged")}>Dmg</Button>
+    <Button size="sm" disabled={busy} onClick={() => send("actor:heal", "Healed")}>Heal</Button>
+    <Button size="sm" disabled={busy} onClick={() => send("actor:set-temp-hp", "Temp set to")}>Temp</Button>
+    {allowSet && <Button size="sm" disabled={busy} onClick={() => send("actor:set-hp", "HP set to")}>Set</Button>}
   </div>;
+}
+
+/**
+ * Rest controls (v5 #5): the player takes a short or long rest on their own character straight from the
+ * sheet (the GM may rest anyone whose sheet they open). Short rest also exposes the Hit-Point-Dice spend
+ * (each die heals its roll + Con mod); the long rest restores HP, hit dice, spell slots, prepared spells,
+ * and limited uses. The server refuses either while the character is in a running encounter.
+ */
+function SheetRest({ actorId, hitDice, onFeedback }: Readonly<{ actorId: string; hitDice?: Readonly<{ die: string; maximum: number; remaining: number }> | null; onFeedback: (text: string) => void }>) {
+  const [count, setCount] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const chosen = hitDice ? Math.max(1, Math.min(count, Math.max(1, hitDice.remaining))) : 1;
+  const rest = (kind: "short" | "long") => {
+    setBusy(true);
+    socket.emit("actor:rest", { commandId: newId(), actorId, kind }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      onFeedback(result.ok ? `Completed a ${kind} rest.` : result.message ?? "The rest could not be applied.");
+    });
+  };
+  const spendDice = () => {
+    setBusy(true);
+    socket.emit("actor:spend-hit-dice", { commandId: newId(), actorId, count: chosen }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      onFeedback(result.ok ? `Spent ${chosen} Hit ${chosen === 1 ? "Die" : "Dice"} - the heal is in the dice log.` : result.message ?? "The Hit Dice could not be spent.");
+      if (result.ok) setCount(1);
+    });
+  };
+  return <div className="sheet-rest">
+    {hitDice && (hitDice.remaining > 0
+      ? <div className="sheet-rest-dice" role="group" aria-label="Spend Hit Dice">
+          <span className="sheet-rest-pool" title="Hit Point Dice - spend on a short rest; each die heals its roll plus your Constitution modifier (minimum 1).">Hit Dice {hitDice.remaining}/{hitDice.maximum} ({hitDice.die})</span>
+          <Stepper value={chosen} onChange={setCount} min={1} max={hitDice.remaining} disabled={busy} aria-label="Number of Hit Dice to spend" />
+          <Button size="sm" disabled={busy} onClick={spendDice}>Roll &amp; heal</Button>
+        </div>
+      : <span className="sheet-rest-pool empty">Hit Dice 0/{hitDice.maximum} — a long rest restores them.</span>)}
+    <div className="sheet-rest-buttons" role="group" aria-label="Rest">
+      <Button size="sm" disabled={busy} title="Re-arms short-rest and recharge pools; heal by spending Hit Dice above." onClick={() => rest("short")}>Short rest</Button>
+      <Button size="sm" disabled={busy} title="Full HP, all spell slots and Hit Dice restored, prepared spells reset, one less Exhaustion level." onClick={() => rest("long")}>Long rest</Button>
+    </div>
+  </div>;
+}
+
+/**
+ * The damage a spell deals when cast at `level` - the ONE place both the displayed effect helper and the
+ * rolled formula come from, so they can never diverge (v6 #8). Uses the SRD upcast row for that slot if
+ * there is one, else the base damage. For target-scaling (N darts/rays), the roll `formula` repeats the
+ * die `targetCount` times so casting rolls the FULL amount - the old code only put "×N" in the label and
+ * rolled a single instance, which is why an upcast rolled the non-upcast damage.
+ */
+function spellEffectAt(content: ContentSpellSummary | undefined, baseLevel: number, level: number): { label: string | null; formula: string | null } {
+  const upcast = level > baseLevel ? content?.castingOptions.find((option) => option.level === level) : undefined;
+  const die = upcast?.damageRoll ?? content?.damageRoll ?? null;
+  const targets = upcast?.targetCount ?? null;
+  if (die && targets && targets > 1) return { label: `${targets}× ${die}`, formula: Array.from({ length: targets }, () => die).join(" + ") };
+  if (die) return { label: die, formula: die };
+  if (targets) return { label: `${targets} targets`, formula: null };
+  return { label: null, formula: null };
+}
+
+/**
+ * Per-spell "Cast at" control: a slot-level dropdown (each level shows remaining/total; empty levels
+ * disabled) plus a Cast button. Casting spends the chosen slot and, for a damaging spell, auto-applies
+ * the SRD upcast scaling for that level (referenced from the vendored spell data) - the parent owns the
+ * two-step emit so this stays a small stateful shell. Only offered for leveled spells (cantrips use no
+ * slot); returns null when the character has no slot at or above the spell's level.
+ */
+function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRemaining, busy, onCastSlot, onCastCantrip }: Readonly<{
+  spell: Readonly<{ id: string; name: string; level: number }>;
+  content: ContentSpellSummary | undefined;
+  slotLevels: readonly number[];
+  slotMaxByLevel: ReadonlyMap<number, number>;
+  liveRemaining: ReadonlyMap<number, number>;
+  busy: boolean;
+  onCastSlot: (level: number) => void;
+  onCastCantrip: () => void;
+}>) {
+  const isCantrip = spell.level === 0;
+  const options = isCantrip ? [] : slotLevels.filter((level) => level >= spell.level);
+  const [castLevel, setCastLevel] = useState(options[0] ?? spell.level);
+  const level = options.includes(castLevel) ? castLevel : (options[0] ?? spell.level);
+  const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
+  // The effect at the selected level (base or SRD-upscaled), from the same helper the Cast button rolls,
+  // so the shown "N× die"/"4d6" and the rolled damage are always the same value (v6 #8). Three uniform
+  // grid cells (helper · slot · Cast) that align across every row (v5 #1/#2/#9).
+  const { label: effect } = spellEffectAt(content, spell.level, level);
+  const canCast = isCantrip || (options.length > 0 && remainingAt(level) > 0);
+  return <>
+    <span className="sheet-cast-effect" aria-hidden={effect ? undefined : true} title={effect ? `Effect at ${isCantrip ? "your level" : ordinal(level)}` : undefined}>{effect ?? ""}</span>
+    {isCantrip
+      ? <span className="sheet-cast-slot at-will">At will</span>
+      : options.length > 0
+        ? <select className="sheet-cast-select" aria-label={`Cast ${spell.name} at level`} value={level} disabled={busy} onChange={(event) => setCastLevel(Number(event.target.value))}>
+            {options.map((slot) => <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>{ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}{slot > spell.level ? " ↑" : ""}</option>)}
+          </select>
+        : <span className="sheet-cast-slot">no slots</span>}
+    <button type="button" className="sheet-cast-btn" disabled={busy || !canCast} onClick={() => (isCantrip ? onCastCantrip() : onCastSlot(level))}>Cast</button>
+  </>;
 }
 
 /**
@@ -55,16 +172,108 @@ function SheetHpControls({ actorId, allowSet, onFeedback }: Readonly<{ actorId: 
  * a player only ever receives their own actor (and no monster definition fetch succeeds
  * for them server-side).
  */
-export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; onClose: () => void }>) {
+export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
-  const [definition, setDefinition] = useState<ActorDefinition | null>(ownDefinition ?? (definitionId ? sheetCache.get(definitionId) ?? null : null));
+  // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
+  // live actor prop (`ownDefinition`) and must WIN so that identity/proficiency edits reflect at once
+  // (bugfix: a useState seeded from ownDefinition went stale after an edit).
+  const [fetched, setFetched] = useState<ActorDefinition | null>(definitionId ? sheetCache.get(definitionId) ?? null : null);
+  const definition = ownDefinition ?? fetched;
   const [feedback, setFeedback] = useState("");
+  const [rolling, setRolling] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ack = (result: { ok: boolean; message?: string }) => { setBusy(false); if (!result.ok) setFeedback(result.message ?? "That change was rejected."); };
+  const [newItem, setNewItem] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
+  const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
+  const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
+  const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
+  // Roll-entry settings (feedback #8), remembered per browser: "digital" click-to-roll vs "manual" (you
+  // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
+  const [rollInput, setRollInput] = useState<"digital" | "manual">(() => (readSetting("vtt.sheet.rollInput") === "manual" ? "manual" : "digital"));
+  const [bonusMode, setBonusMode] = useState<"auto" | "total">(() => (readSetting("vtt.sheet.bonusMode") === "total" ? "total" : "auto"));
+  const chooseRollInput = (mode: "digital" | "manual") => { setRollInput(mode); writeSetting("vtt.sheet.rollInput", mode); };
+  const chooseBonusMode = (mode: "auto" | "total") => { setBonusMode(mode); writeSetting("vtt.sheet.bonusMode", mode); };
+  // The shared dice log rides behind the header's Sheet/Dice toggle — one pane at a time on every
+  // viewport — so the sheet stays clean and full-width whichever way it's opened. Default to the sheet;
+  // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).
+  const hasLog = state !== undefined;
+  const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
+  // Optional dock (opt-in, desktop only): pin the dice log beside the sheet so rolls are always visible
+  // while you act, instead of behind the toggle. Off by default (clean sheet); remembered per browser.
+  const [docked, setDocked] = useState<boolean>(() => readSetting("vtt.sheet.docked") === "1");
+  const chooseDocked = (value: boolean) => { setDocked(value); writeSetting("vtt.sheet.docked", value ? "1" : "0"); };
+  // The most recent roll made from this character, surfaced inline under the rolls bar so a tap-to-roll
+  // shows its result without leaving the sheet (the pinned line hides when the log is docked/visible).
+  const latestRoll = state ? [...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null : null;
+  // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
+  // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
+  const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
+  const [rect, setRect] = useState({ x: 48, y: 48, width: 760, height: 620 });
+  const [drag, setDrag] = useState<null | { mode: "move" | "resize"; grabX: number; grabY: number; start: typeof rect }>(null);
+  const beginDrag = (mode: "move" | "resize") => (event: ReactPointerEvent<HTMLElement>) => {
+    if ((event.target as Element).closest("button")) return; // let title-bar buttons click through
+    event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+    setDrag({ mode, grabX: event.clientX, grabY: event.clientY, start: rect });
+  };
+  const continueDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.grabX, dy = event.clientY - drag.grabY;
+    if (drag.mode === "move") setRect({ ...drag.start, x: Math.max(0, drag.start.x + dx), y: Math.max(0, drag.start.y + dy) });
+    else setRect({ ...drag.start, width: Math.max(340, drag.start.width + dx), height: Math.max(320, drag.start.height + dy) });
+  };
+  const endDrag = () => setDrag(null);
+  const { prompt, dialog } = usePrompt();
+  // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
+  const spellRef = useSpellReference();
+  const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
+  // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
+  // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
+  // the GM still applies damage (players never mutate another creature's HP).
+  const emitRollFormula = (formula: string, purpose: "check" | "save" | "attack" | "damage", label: string) => {
+    setRolling(true);
+    // Send the specific label ("Athletics check", "DEX save", "Fireball at 3rd") so the dice log can show
+    // the roll's kind, not just the coarse purpose (v6 #4). Capped to the record's 80-char limit.
+    socket.emit("dice:roll", { commandId: newId(), formula, purpose, visibility: "public", label: label.slice(0, 80), actorId: actor.id }, (result: { ok: boolean; message?: string }) => {
+      setRolling(false);
+      setFeedback(result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : result.message ?? "The roll was rejected.");
+    });
+  };
+  // Manual roll entry (feedback #8): in "manual" input mode the player types a physical die result and
+  // the sheet records it as a flat roll (the dice grammar accepts constants), so it lands in the shared
+  // log exactly like a rolled one. `bonusMode` decides whether a typed d20 result gets the bonus added
+  // ("auto": type 15 with a +7 → sends "15 + 7") or is already the final total ("total": type 22 → "22").
+  const manualValue = async (title: string, body: string, placeholder: string): Promise<number | null> => {
+    const entered = await prompt({ title, body, placeholder, confirmLabel: "Record" });
+    if (entered === null) return null;
+    const value = Number(entered);
+    if (!Number.isInteger(value) || value < -99 || value > 999) { setFeedback("Enter a whole number for the roll."); return null; }
+    return value;
+  };
+  const combineBonus = (die: number, bonus: number) => bonus === 0 ? String(die) : `${die} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
+  /** A d20 roll (check/save/attack) with a known bonus: digital rolls 1d20+bonus; manual prompts for the die/total. */
+  const rollD20 = async (bonus: number, purpose: "check" | "save" | "attack", label: string) => {
+    if (rollInput === "digital") { emitRollFormula(d20(bonus), purpose, label); return; }
+    const value = await manualValue(`Record ${label}`,
+      bonusMode === "auto" ? `Enter your d20 result - your ${signed(bonus)} bonus is added automatically.` : `Enter your final total (your ${signed(bonus)} bonus already included).`,
+      bonusMode === "auto" ? "d20 result" : "final total");
+    if (value === null) return;
+    emitRollFormula(bonusMode === "auto" ? combineBonus(value, bonus) : String(value), purpose, `${label} (manual)`);
+  };
+  /** A flat roll (damage): no separate bonus, so manual mode simply records the typed total. */
+  const rollFlat = async (formula: string, purpose: "damage", label: string) => {
+    if (rollInput === "digital") { emitRollFormula(formula, purpose, label); return; }
+    const value = await manualValue(`Record ${label}`, `Enter your rolled total for ${formula}.`, "rolled total");
+    if (value === null) return;
+    emitRollFormula(String(value), purpose, `${label} (manual)`);
+  };
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
     socket.emit("content:monster-sheet", { definitionId }, (result) => {
-      if (result.ok && result.definition) { sheetCache.set(definitionId, result.definition); setDefinition(result.definition); }
+      if (result.ok && result.definition) { sheetCache.set(definitionId, result.definition); setFetched(result.definition); }
       else setFeedback(result.message ?? "The stat block could not be loaded.");
     });
   }, [definitionId, role, ownDefinition]);
@@ -76,32 +285,150 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
     ? (["walk", "swim", "fly", "climb", "burrow"] as const).flatMap((mode) => { const feet = extension.speeds?.[mode]; return feet ? [`${mode === "walk" ? "" : `${mode} `}${feet} ft.${mode === "fly" && extension.speeds?.hover ? " (hover)" : ""}`] : []; }).join(", ")
     : definition ? `${definition.speedFeet} ft.` : null;
 
-  // Portal to <body> so the sheet escapes any stacking context it's rendered inside - notably a
-  // docked initiative panel (.encounter-map-dock, z-index 2), which would otherwise trap this
-  // fixed overlay beneath the map's tool/zoom controls (z-index 3-6).
-  return <Modal open onClose={onClose} size="lg" className="character-sheet" title={actor.name} ariaLabel={`${actor.name} character sheet`}>
-      <p className="sheet-typeline">
-        {definition ? `${titleCase(definition.size)} ${extension.type ?? "creature"}, ${extension.alignment ?? "unaligned"}${extension.challengeRating !== undefined ? ` - CR ${formatChallenge(extension.challengeRating)}` : ""}` : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`}
-      </p>
+  const character = definition?.character;
+  const proficiencies = definition?.proficiencies;
+  const spellcasting = definition?.spellcasting;
+  const inventory = actor.inventory ?? [];
+  const currency = actor.currency ?? null;
+  const preparedIds = new Set<string>(actor.preparedSpellIds ?? []);
+  const liveSlotRemaining = new Map<number, number>((actor.spellSlots ?? []).map((slot) => [slot.level, slot.remaining]));
+  const pact = actor.pactSlots ?? null;
+  const spellDc = spellcasting && definition ? (spellcasting.saveDc ?? spellSaveDc(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  const spellAtk = spellcasting && definition ? (spellcasting.attackBonus ?? spellAttackBonus(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  // "Cast at" support: index the SRD spell data by id, and the character's slot pools by level.
+  const spellIndex = new Map(spellRef.map((entry) => [entry.id, entry]));
+  const slotMaxByLevel = new Map<number, number>((spellcasting?.slots ?? []).map((slot) => [slot.level, slot.max]));
+  const slotLevels = [...slotMaxByLevel.entries()].filter(([, max]) => max > 0).map(([level]) => level).sort((a, b) => a - b);
+  // Cast a leveled spell at a chosen slot level: spend that slot, then (for a damaging spell) auto-roll
+  // the SRD upcast scaling for that level - one composable slot-spend + one dice roll, both server-checked.
+  const castSpell = (spell: Readonly<{ id: string; name: string; level: number }>, level: number) => {
+    const max = slotMaxByLevel.get(level) ?? 0;
+    const rem = liveSlotRemaining.get(level) ?? max;
+    if (max <= 0 || rem <= 0) { setFeedback(`No ${ordinal(level)}-level slots remain.`); return; }
+    const content = spellIndex.get(spell.id);
+    // Same helper the row displays, so the rolled damage equals the shown effect (v6 #8): for target
+    // scaling the formula is the die repeated N times, so an upcast rolls the full upscaled amount.
+    const { formula } = spellEffectAt(content, spell.level, level);
+    const types = content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : "";
+    setBusy(true);
+    socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 }, (result: { ok: boolean; message?: string }) => {
+      setBusy(false);
+      if (!result.ok) { setFeedback(result.message ?? "The slot could not be spent."); return; }
+      // Digital rolls the (upscaled) damage; manual mode prompts for the physical total - both land in the log.
+      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
+      else setFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
+    });
+  };
+  // Cantrips (v5 #9) cost no slot: cast just rolls the damage die for a damaging cantrip (Toll the Dead,
+  // Sacred Flame), or notes the cast for a utility cantrip. Same helper so display == rolled.
+  const castCantrip = (spell: Readonly<{ id: string; name: string; level: number }>) => {
+    const content = spellIndex.get(spell.id);
+    const { formula } = spellEffectAt(content, spell.level, spell.level);
+    if (formula) void rollFlat(formula, "damage", `${spell.name}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
+    else setFeedback(`Cast ${spell.name}.`);
+  };
+  const identity = character ? [character.classes.map((klass) => `${klass.subclass ? `${klass.subclass.name} ` : ""}${klass.name} ${klass.level}`).join(" / "), character.race?.name, character.background?.name].filter(Boolean).join(" · ") : null;
+  const hasCoins = currency ? currency.cp + currency.sp + currency.ep + currency.gp + currency.pp > 0 : false;
+  const attunedCount = inventory.filter((item) => item.attuned).length;
+  // Equipped weapons become rollable attack actions on the sheet (v6 #5): to-hit = ability mod + PB,
+  // damage = the weapon die + ability mod. Ranged weapons use Dex, melee uses Str (finesse isn't vendored
+  // in the SRD weapon table, so this is the common case). Client-derived + tap-to-roll like the other
+  // sheet actions; the server-authoritative attack flow is unchanged.
+  const equippedWeaponActions = (actor.kind === "player-character" && definition)
+    ? inventory.filter((item) => item.equipped && item.weapon && item.quantity > 0).map((item) => {
+        const weapon = item.weapon!;
+        const abilityMod = modifierOf(definition.abilityScores[weapon.rangeFeet != null ? "dex" : "str"]);
+        const toHit = abilityMod + definition.proficiencyBonus;
+        const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
+        return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet };
+      })
+    : [];
+  // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
+  // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
+  // and carries the catalog's category/weight/description so the sheet can group and describe it.
+  const ownedCounts = new Map(inventory.map((item) => [item.id, item.quantity]));
+  const addFromCatalog = (item: ContentEquipmentSummary) => {
+    const existing = inventory.find((entry) => entry.id === item.id);
+    setBusy(true);
+    socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: {
+      id: item.id, name: item.name, quantity: (existing?.quantity ?? 0) + 1, category: item.category,
+      ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
+      ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
+      ...(item.description ? { description: item.description } : {}),
+      // Carry the mechanical stats so equipping has effect (v6 #5): weapon → a rollable attack; armor → AC.
+      ...(item.weapon ? { weapon: item.weapon } : {}),
+      ...(item.armor ? { armor: item.armor } : {})
+    } }, ack);
+  };
+  // Keep the coin editor in sync with the authoritative purse (re-syncs after each accepted change).
+  useEffect(() => { setCoins({ cp: currency?.cp ?? 0, sp: currency?.sp ?? 0, ep: currency?.ep ?? 0, gp: currency?.gp ?? 0, pp: currency?.pp ?? 0 }); }, [currency?.cp, currency?.sp, currency?.ep, currency?.gp, currency?.pp]);
+  // Light hand-edit (owner + GM, server-enforced): edit the per-PC imported definition's identity /
+  // proficiency selections; guided creation stays in the future builder.
+  const openProfEditor = () => { setProfDraft({ saves: proficiencies?.saves ? [...proficiencies.saves] : [], skills: Object.fromEntries((proficiencies?.skills ?? []).map((skill) => [skill.id, skill.proficiency])) }); setEditMode("prof"); };
+  // Auto-save proficiency edits like the rest of the sheet (slots, Prepare, equip all emit on each tap), so
+  // there's no separate Save button to forget and no draft to lose on Done (v6 #6). Also keep the GM's
+  // cached definition in step: the GM renders from `fetched`/sheetCache, which nothing else refreshes after
+  // an edit, so a persisted change would otherwise not show (the player path already refreshes via
+  // ownDefinition). That stale cache - not the wire - was why "Save" looked like it did nothing.
+  const persistProficiencies = (draft: { saves: string[]; skills: Record<string, "proficient" | "expertise"> }) => {
+    const proficiencies = { saves: draft.saves as Array<"str" | "dex" | "con" | "int" | "wis" | "cha">, skills: Object.entries(draft.skills).map(([id, proficiency]) => ({ id, proficiency })) };
+    if (definitionId && definition) { const next = { ...definition, proficiencies }; sheetCache.set(definitionId, next); setFetched(next); }
+    setBusy(true);
+    socket.emit("character:set-proficiencies", { commandId: newId(), actorId: actor.id, proficiencies }, ack);
+  };
+  const toggleSave = (ability: string) => { const next = { ...profDraft, saves: profDraft.saves.includes(ability) ? profDraft.saves.filter((entry) => entry !== ability) : [...profDraft.saves, ability] }; setProfDraft(next); persistProficiencies(next); };
+  const cycleSkill = (id: string) => { const current = profDraft.skills[id]; const tier = current === undefined ? "proficient" : current === "proficient" ? "expertise" : undefined; const skills = { ...profDraft.skills }; if (tier) skills[id] = tier; else delete skills[id]; const next = { ...profDraft, skills }; setProfDraft(next); persistProficiencies(next); };
+  const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
+  const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
+    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as proficiencies).
+    if (definitionId && definition) { const nextDef = { ...definition, character: next }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
+    setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
+
+  // The sheet's own scrolling content (one column of the workspace below). Identity + roll settings now
+  // live in the fixed header/rollbar; only the identity EDIT FORM stays inline in the scroll.
+  const sheetScroll = (<div className="sheet-scroll">
+      {editMode === "identity" && <div className="sheet-editor sheet-id-editor">
+          <label>Class<input type="text" value={idDraft.className} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, className: event.target.value }))} /></label>
+          <label>Subclass<input type="text" value={idDraft.subclass} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, subclass: event.target.value }))} /></label>
+          <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
+          <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
+          <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
+          <Button size="sm" disabled={busy} onClick={saveIdentity}>Save</Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditMode(null)}>Cancel</Button>
+        </div>}
 
       <div className="sheet-vitals">
-        <div className="sheet-vital"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
-        <div className="sheet-vital"><span>AC</span><strong>{actor.armorClass ?? "-"}</strong>{extension.armorDetail ? <small>{extension.armorDetail}</small> : null}</div>
-        <div className="sheet-vital"><span>Initiative</span><strong>{actor.initiative !== undefined ? signed(actor.initiative) : "-"}</strong></div>
+        <div className="sheet-vital sheet-vital-hp">
+          <div className="sheet-vital-top"><span>HP</span><strong>{exactHp ? `${exactHp.current}/${exactHp.maximum}${exactHp.temporary > 0 ? ` +${exactHp.temporary}` : ""}` : "-"}</strong></div>
+          {exactHp && <Meter className="sheet-hp-meter" tone="health" value={exactHp.current} max={exactHp.maximum} />}
+          <SheetHpControls actorId={actor.id} allowSet={role === "gm"} onFeedback={setFeedback} />
+        </div>
+        <div className="sheet-vital" title={extension.armorDetail ?? undefined}><span>AC</span><strong>{actor.armorClass ?? "-"}</strong></div>
+        <div className="sheet-vital"><span>Init</span><strong>{actor.initiative !== undefined ? signed(actor.initiative) : "-"}</strong></div>
         {speeds && <div className="sheet-vital"><span>Speed</span><strong>{speeds}</strong></div>}
       </div>
-      <SheetHpControls actorId={actor.id} allowSet={role === "gm"} onFeedback={setFeedback} />
-      <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+      <div className="sheet-conditions">
+        <span className="sheet-section-label">Conditions</span>
+        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+      </div>
+      {actor.kind === "player-character" && <div className="sheet-rest-block">
+        <span className="sheet-section-label">Rest</span>
+        <SheetRest actorId={actor.id} hitDice={"hitDice" in actor ? actor.hitDice : null} onFeedback={setFeedback} />
+      </div>}
 
       {definition && <>
         <div className="sheet-abilities">
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
-            const save = extension.savingThrows?.[ability];
+            const mod = modifierOf(score);
+            const withProf = mod + definition.proficiencyBonus;
             return <div key={ability} className="sheet-ability">
               <span>{ability.toUpperCase()}</span>
               <strong>{score}</strong>
-              <small>{signed(modifierOf(score))}{save !== null && save !== undefined ? ` / save ${signed(save)}` : ""}</small>
+              <div className="sheet-ability-rolls">
+                <button type="button" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check`} onClick={() => void rollD20(mod, "check", `${ability.toUpperCase()} check`)}>{signed(mod)}</button>
+                <button type="button" className="prof" disabled={rolling} title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`} onClick={() => void rollD20(withProf, "check", `${ability.toUpperCase()} check w/ proficiency`)}>{signed(withProf)}<em>P</em></button>
+              </div>
             </div>;
           })}
         </div>
@@ -115,16 +442,206 @@ export function CharacterSheet({ actor, role, onClose }: Readonly<{ actor: GmAct
           {extension.conditionImmunities && <div><dt>Condition immunities</dt><dd>{extension.conditionImmunities}</dd></div>}
           <div><dt>Proficiency</dt><dd>{signed(definition.proficiencyBonus)}</dd></div>
         </dl>
+        {((proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0)) || actor.kind === "player-character") && <section className="sheet-section"><h3>Proficiencies{actor.kind === "player-character" && <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={() => editMode === "prof" ? setEditMode(null) : openProfEditor()}>{editMode === "prof" ? "Done" : "Edit"}</Button>}</h3>
+          {editMode === "prof"
+            ? <div className="sheet-editor">
+                <p className="sheet-editor-hint">Changes save as you go. Tap a save to toggle it; tap a skill to cycle proficient → expertise → none. Press <strong>Done</strong> when finished.</p>
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => <button type="button" key={ability} className={`sheet-prepare${profDraft.saves.includes(ability) ? " is-prepared" : ""}`} disabled={busy} onClick={() => toggleSave(ability)}>{ability.toUpperCase()}</button>)}</div>
+                <ul className="sheet-skill-list sheet-skill-edit">{ALL_SKILLS.map((id) => { const tier = profDraft.skills[id]; return <li key={id}><span>{titleizeSkill(id)}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(id)}>{tier ?? "—"}</button></li>; })}</ul>
+              </div>
+            : <>
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
+                <ul className="sheet-skill-list sheet-skill-cols">
+                  {ALL_SKILLS.map((id) => { const ability = SKILL_ABILITY[id]; const tier = proficiencies?.skills.find((skill) => skill.id === id)?.proficiency; const bonus = skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, tier ?? "none"); return <li key={id}>
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => void rollD20(bonus, "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
+                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"} aria-label={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
+                    <span className="sheet-skill-name">{titleizeSkill(id)} <em>{ability.toUpperCase()}</em></span>
+                  </li>; })}
+                </ul>
+              </>}
+        </section>}
+        {spellcasting && <section className="sheet-section"><h3>Spells</h3>
+          <div className="sheet-spellcast-fields">
+            <div className="sheet-spellcast-field"><span>Caster</span><strong>{spellcasting.ability.toUpperCase()}</strong></div>
+            <div className="sheet-spellcast-field"><span>Save DC</span><strong>{spellDc ?? "-"}</strong></div>
+            {spellAtk !== null && <div className="sheet-spellcast-field"><span>Spell atk</span><strong>{signed(spellAtk)}</strong></div>}
+          </div>
+          {(() => {
+            type Spell = (typeof spellcasting.spells)[number];
+            const groups = new Map<number, Spell[]>();
+            for (const spell of spellcasting.spells) { const list = groups.get(spell.level) ?? []; list.push(spell); groups.set(spell.level, list); }
+            return [...groups.keys()].sort((a, b) => a - b).map((level) => {
+              const spells = [...groups.get(level)!].sort((a, b) => a.name.localeCompare(b.name));
+              const max = slotMaxByLevel.get(level) ?? 0;
+              const remaining = liveSlotRemaining.get(level) ?? max;
+              return <div key={level} className="sheet-spell-group">
+                <div className="sheet-spell-group-head">
+                  <h4>{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h4>
+                  {level > 0 && max > 0 && <div className="sheet-slot-pips" role="group" aria-label={`Level ${level} spell slots (${remaining} of ${max} left)`}>
+                    {Array.from({ length: max }, (_, index) => <button key={index} type="button" className={`sheet-pip${index < remaining ? " filled" : ""}`} disabled={busy} aria-label={`${index < remaining ? "Spend" : "Restore"} a level ${level} slot`} onClick={() => { setBusy(true); socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: index < remaining ? index : index + 1 }, ack); }} />)}
+                    <span className="sheet-slot-count">{remaining}/{max}</span>
+                  </div>}
+                </div>
+                <ul className={`sheet-spell-list${actor.kind === "player-character" ? " castable" : ""}`}>
+                  {spells.map((spell) => { const isPrepared = preparedIds.has(spell.id) || spell.alwaysPrepared; const toggleable = spell.level > 0 && !spell.alwaysPrepared; return <li key={spell.id}>
+                    {spell.level === 0 ? <span className="sheet-prep-tag cantrip">Cantrip</span> : toggleable
+                      ? <button type="button" className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`} disabled={busy} title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"} onClick={() => { setBusy(true); socket.emit("character:set-prepared", { commandId: newId(), actorId: actor.id, spellId: spell.id, prepared: !isPrepared }, ack); }}>{isPrepared ? "Prepared" : "Prepare"}</button>
+                      : <span className="sheet-prep-tag always" title="Always prepared — doesn't count against your prepared limit">Always</span>}
+                    {spellIndex.get(spell.id)
+                      ? <button type="button" className="sheet-spell-name sheet-spell-link" title={`Show the ${spell.name} rules`} onClick={() => setOpenSpell(spellIndex.get(spell.id) ?? null)}>{spell.name}</button>
+                      : <span className="sheet-spell-name">{spell.name}</span>}
+                    {actor.kind === "player-character" && <SpellCastControls spell={spell} content={spellIndex.get(spell.id)} slotLevels={slotLevels} slotMaxByLevel={slotMaxByLevel} liveRemaining={liveSlotRemaining} busy={busy} onCastSlot={(castLevel) => castSpell(spell, castLevel)} onCastCantrip={() => castCantrip(spell)} />}
+                  </li>; })}
+                </ul>
+              </div>;
+            });
+          })()}
+          {pact ? <p className="sheet-entry">Pact Magic: {ordinal(pact.level)}-level slots, {pact.remaining} remaining.</p> : null}
+        </section>}
+        {actor.kind === "player-character" && <section className="sheet-section"><h3>Inventory</h3>
+          <form className="sheet-add-item" onSubmit={(event) => { event.preventDefault(); const name = newItem.trim(); if (!name) return; setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { id: slugify(name), name, quantity: 1 } }, ack); setNewItem(""); }}>
+            <input type="text" value={newItem} maxLength={120} placeholder="Add a custom item…" aria-label="New item name" onChange={(event) => setNewItem(event.target.value)} />
+            <Button type="submit" size="sm" disabled={busy || !newItem.trim()}>Add</Button>
+            <Button size="sm" disabled={busy} onClick={() => setPickerOpen(true)}>Browse SRD gear</Button>
+          </form>
+          {inventory.length > 0 && <div className="sheet-inv">
+            <div className="sheet-inv-row sheet-inv-head" aria-hidden="true">
+              <span className="sheet-item-name">Item</span>
+              <span>Qty</span><span>Equip</span><span>Attune</span><span></span>
+            </div>
+            {inventory.map((item) => <div key={item.id} className="sheet-inv-row">
+              <span className="sheet-item-name">{item.name}{item.category ? <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span> : null}</span>
+              <Stepper className="sheet-inv-qty" value={item.quantity} min={0} disabled={busy} aria-label={`Quantity of ${item.name}`} onChange={(quantity) => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity } }, ack); }} />
+              <button type="button" className={`sheet-toggle-btn${item.equipped ? " on" : ""}`} disabled={busy} aria-pressed={item.equipped} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } }, ack); }}>{item.equipped ? "Equipped" : "Equip"}</button>
+              <button type="button" className={`sheet-toggle-btn${item.attuned ? " on" : ""}`} disabled={busy} aria-pressed={item.attuned} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } }, ack); }}>{item.attuned ? "Attuned" : "Attune"}</button>
+              <IconButton label={`Remove ${item.name}`} size="sm" className="sheet-remove" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-inventory", { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } }, ack); }}>✕</IconButton>
+            </div>)}
+          </div>}
+          {attunedCount > 0 && <p className="sheet-attunement"><Badge tone={attunedCount > 3 ? "danger" : "neutral"}>Attunement {attunedCount}/3</Badge></p>}
+          {pickerOpen && <EquipmentPicker ownedCounts={ownedCounts} busy={busy} onAdd={addFromCatalog} onClose={() => setPickerOpen(false)} />}
+          <div className="sheet-coins">
+            {COINS.map((coin) => <label key={coin}>{coin}<input type="number" min="0" max="1000000" value={coins[coin]} onChange={(event) => setCoins((prev) => ({ ...prev, [coin]: Math.max(0, Math.min(1000000, Math.floor(Number(event.target.value) || 0))) }))} /></label>)}
+            <Button size="sm" disabled={busy} onClick={() => { setBusy(true); socket.emit("character:set-currency", { commandId: newId(), actorId: actor.id, currency: coins }, ack); }}>Save coins</Button>
+          </div>
+        </section>}
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
-        {definition.actions.length > 0 && <section className="sheet-section"><h3>Actions</h3>
-          {definition.actions.map((action) => <p key={action.id} className="sheet-entry"><strong>{action.name}.</strong> <RichText text={action.description} /></p>)}
+        {(definition.actions.length > 0 || equippedWeaponActions.length > 0) && <section className="sheet-section"><h3>Actions</h3>
+          {(() => {
+            type ActionT = (typeof definition.actions)[number];
+            const renderAction = (action: ActionT) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
+              <p><strong>{action.name}.</strong> <RichText text={action.description} /></p>
+              {(atk || action.damage.length > 0) && <div className="sheet-roll-row">
+                {atk && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollD20(atk.bonus, "attack", `${action.name} to hit`)}>{signed(atk.bonus)} to hit</button>}
+                {action.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${action.name} damage`)}>{part.formula}</button>)}
+              </div>}
+            </div>; };
+            // Group actions (v3 #2.9.3): weapon/other first, then spell actions grouped by the linked spell's level.
+            const spellLevelByActionId = new Map<string, number>((spellcasting?.spells ?? []).filter((spell) => spell.actionId).map((spell) => [spell.actionId!, spell.level]));
+            const weaponActions = definition.actions.filter((action) => !spellLevelByActionId.has(action.id));
+            const spellGroups = new Map<number, ActionT[]>();
+            for (const action of definition.actions) { const level = spellLevelByActionId.get(action.id); if (level !== undefined) { const list = spellGroups.get(level) ?? []; list.push(action); spellGroups.set(level, list); } }
+            const hasSpellActions = spellGroups.size > 0;
+            return <>
+              {(weaponActions.length > 0 || equippedWeaponActions.length > 0) && <div className="sheet-action-group">
+                {hasSpellActions && <h4 className="sheet-action-head">Weapon &amp; other</h4>}
+                {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
+                  <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}</span></p>
+                  <div className="sheet-roll-row">
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollD20(wa.toHit, "attack", `${wa.name} to hit`)}>{signed(wa.toHit)} to hit</button>
+                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>
+                  </div>
+                </div>)}
+                {weaponActions.map(renderAction)}
+              </div>}
+              {hasSpellActions && <div className="sheet-action-group">
+                <h4 className="sheet-action-head">Spell actions</h4>
+                {[...spellGroups.keys()].sort((left, right) => left - right).map((level) => <div key={level} className="sheet-action-subgroup">
+                  <h5 className="sheet-action-subhead">{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h5>
+                  {spellGroups.get(level)!.map(renderAction)}
+                </div>)}
+              </div>}
+            </>;
+          })()}
         </section>}
         <p className="sheet-attribution">Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.</p>
       </>}
       {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && <p className="sheet-status">No imported sheet yet - the GM can import this character's JSON sheet from the roster.</p>}
       <p className="sheet-feedback" role="status">{feedback}</p>
-  </Modal>;
+  </div>);
+
+  // The prominent identity line (feedback #4): class/level/race for a PC, or the size/CR typeline for a
+  // monster stat block. Sits right under the name in the header instead of reading like a footnote.
+  const identityLine = identity ?? (definition
+    ? `${titleCase(definition.size)} ${extension.type ?? "creature"}${extension.alignment ? `, ${extension.alignment}` : ""}${extension.challengeRating !== undefined ? ` · CR ${formatChallenge(extension.challengeRating)}` : ""}`
+    : `${titleCase(actor.kind.replace("-", " "))}${actor.visibility === "gm-only" ? " · GM-only" : ""}`);
+
+  // One header row for every presentation (feedback #2.1/2.2): name + prominent identity on the left;
+  // on the right, the log-side toggle, Pop out / New tab, and the × close (rightmost). In the floating
+  // panel this same row is the drag handle (buttons opt out via beginDrag's closest("button") guard).
+  const header = (draggable: boolean) => (<div className={`sheet-header${draggable ? " sheet-header--drag" : ""}`} onPointerDown={draggable ? beginDrag("move") : undefined}>
+    <div className="sheet-header-id">
+      <strong className="sheet-name">{actor.name}</strong>
+      <div className="sheet-header-sub">
+        <span className="sheet-idline">{identityLine}</span>
+        {actor.kind === "player-character" && definition && editMode !== "identity" && <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={openIdEditor}>Edit</Button>}
+      </div>
+    </div>
+    <div className="sheet-header-controls">
+      {hasLog && <SegmentedControl className="sheet-pane-toggle" size="sm" ariaLabel="Show sheet or dice" value={mobilePane} onChange={(pane) => setMobilePane(pane as "sheet" | "log")} options={[{ value: "sheet", label: "Sheet" }, { value: "log", label: "Dice" }]} />}
+      {hasLog && !embedded && <Button size="sm" variant="ghost" className="sheet-dock-btn" title={docked ? "Collapse the dice log back behind the toggle" : "Pin the dice log beside the sheet"} onClick={() => chooseDocked(!docked)}>{docked ? "Undock dice" : "Dock dice"}</Button>}
+      {!standalone && !embedded && <Button size="sm" variant="ghost" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</Button>}
+      {!standalone && !embedded && role === "player" && <Button size="sm" variant="ghost" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</Button>}
+      <IconButton label={embedded ? "Back to initiative" : "Close"} size="sm" className="sheet-close" onClick={onClose}>✕</IconButton>
+    </div>
+  </div>);
+
+  // The roll-input settings (feedback #2.6): a narrow bar pinned under the header, always visible.
+  const rollbar = definition ? (<div className="sheet-rollbar" role="group" aria-label="Roll entry settings">
+    <span className="sheet-settings-label">Rolls</span>
+    <SegmentedControl size="sm" ariaLabel="Roll input mode" value={rollInput} onChange={(mode) => chooseRollInput(mode as "digital" | "manual")} options={[{ value: "digital", label: "Digital" }, { value: "manual", label: "Manual" }]} />
+    {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => chooseBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
+  </div>) : null;
+
+  // Workspace: the sheet fills the panel; when a shared dice log is available it swaps in behind the
+  // Sheet/Dice toggle (one pane at a time on every viewport), so the sheet keeps its clean full width.
+  // Header + rollbar stay pinned; the active pane scrolls.
+  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}${docked ? " docked" : ""}`}>
+    {header(draggable)}
+    {rollbar}
+    {latestRoll && <button type="button" className="sheet-last-roll" onClick={() => setMobilePane("log")} title="Open the dice log">
+      <span className="sheet-last-roll-label">{latestRoll.label ?? latestRoll.purpose}</span>
+      <span className="sheet-last-roll-readout">
+        <span className="sheet-last-roll-faces">{latestRoll.dice.map((die, index) => <span key={index} className={die.kept ? "sheet-last-die" : "sheet-last-die out"}>{die.face}</span>)}</span>
+        <span className="sheet-last-roll-formula">{latestRoll.formula}</span>
+        <span aria-hidden="true">=</span>
+        <strong className="sheet-last-roll-total">{latestRoll.total}</strong>
+      </span>
+    </button>}
+    <div className="sheet-workspace-cols">
+      <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
+      {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
+    </div>
+    {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
+  </div>);
+
+  // Embedded inline (v4 #8): fills its container (e.g. the player's initiative panel), no modal chrome;
+  // the header × returns to the initiative view. The caller omits state, so there's no dice log.
+  if (embedded) return <><div className="sheet-embedded">{buildWorkspace(false)}</div>{dialog}</>;
+
+  // Its own browser tab (feedback #9.3): fills the window, header × ends the tab.
+  if (standalone) return <><div className="sheet-standalone">{buildWorkspace(false)}</div>{dialog}</>;
+
+  if (presentation === "floating") {
+    return <>
+      <div className={`sheet-float${hasLog ? " has-log" : ""}`} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} onPointerMove={continueDrag} onPointerUp={endDrag} onPointerCancel={endDrag} role="dialog" aria-label={`${actor.name} character sheet`}>
+        {buildWorkspace(true)}
+        <div className="sheet-float-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
+      </div>
+      {dialog}
+    </>;
+  }
+  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}${docked ? " docked" : ""}`} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
 }

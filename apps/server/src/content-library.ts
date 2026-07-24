@@ -1,6 +1,6 @@
-import type { ContentActionSummary, ContentConditionSummary, ContentMonsterSummary, ContentSpellSummary } from "@vtt/domain";
+import type { ContentActionSummary, ContentConditionSummary, ContentEquipmentSummary, ContentMonsterSummary, ContentSpellSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { loadAttribution, loadConditions, loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
+import { loadAttribution, loadConditions, loadEquipment, loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -39,6 +39,7 @@ export class ContentLibrary {
   conditionSummaries(): readonly ContentConditionSummary[] { return conditionSummaries; }
   hasCondition(conditionId: string): boolean { return conditionIds.has(conditionId); }
   spellSummaries(): readonly ContentSpellSummary[] { return spellSummaries; }
+  equipmentSummaries(): readonly ContentEquipmentSummary[] { return equipmentSummaries; }
   monsterAction(definitionId: string, actionId: string): ActorDefinition["actions"][number] | undefined {
     return this.byId.get(definitionId)?.actions.find((action) => action.id === actionId);
   }
@@ -85,10 +86,25 @@ function spellComponentsText(components: ReturnType<typeof loadSpells>[number]["
   const material = components.material && components.materialText ? ` (${components.materialText})` : "";
   return base ? `${base}${material}` : "None";
 }
+/** SRD upcast rows are typed "slot_level_N"; keep only those (cantrip character-level scaling is not a cast-at option) and surface the slot level the sheet keys on. */
+function slotCastingOptions(options: ReturnType<typeof loadSpells>[number]["castingOptions"]): ContentSpellSummary["castingOptions"] {
+  return options.flatMap((option) => {
+    const match = /^slot_level_(\d+)$/.exec(option.type);
+    return match ? [{ level: Number(match[1]), damageRoll: option.damageRoll, targetCount: option.targetCount }] : [];
+  });
+}
 const spellSummaries: readonly ContentSpellSummary[] = loadSpells()
   .map((spell) => ({
     id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
     rangeText: spell.range.text, componentsText: spellComponentsText(spell.components), duration: spell.duration,
-    concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel
+    concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel,
+    damageRoll: spell.damage.roll, damageTypes: spell.damage.types, castingOptions: slotCastingOptions(spell.castingOptions)
   }))
   .sort((left, right) => left.name.localeCompare(right.name));
+
+// The wire shape mirrors EquipmentReference one-to-one (the content package already folds weapons/armor
+// in and sorts by name), so the server just re-emits it as the transport-owned type.
+const equipmentSummaries: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
+  id: item.id, name: item.name, category: item.category, costGp: item.costGp, weightLb: item.weightLb, description: item.description,
+  weapon: item.weapon ?? null, armor: item.armor ?? null
+}));

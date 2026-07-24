@@ -43,16 +43,21 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
+  /* Reserve room on the right for the absolutely-positioned close button so a long title never underlaps it. */
+  padding: var(--space-5) calc(var(--space-6) + 2.4rem) var(--space-5) var(--space-6);
   border-bottom: 1px solid var(--line);
 }
 .nh-modal-title { margin: 0; font: 400 var(--fs-h1) / var(--lh-snug) var(--font-display); }
 .nh-modal-close {
+  /* Pinned to the surface's actual top-right corner (position:relative on .nh-modal-surface), so the ×
+     is always in the corner regardless of whether the modal has a header/title (v5 #3). */
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 3;
   flex: none;
   width: 2rem;
   height: 2rem;
-  /* Guard against host apps whose global `button` rule sets large padding / left alignment,
-     which otherwise inflates this square and shoves the glyph into a corner. */
   padding: 0;
   margin: 0;
   display: grid;
@@ -68,7 +73,7 @@
 }
 .nh-modal-close:hover { color: var(--text); border-color: var(--line-strong); }
 
-.nh-modal-body { padding: var(--space-5); overflow-y: auto; }
+.nh-modal-body { padding: var(--space-6); overflow-y: auto; }
 .nh-modal-foot {
   display: flex;
   justify-content: flex-end;

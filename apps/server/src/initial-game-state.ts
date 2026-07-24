@@ -47,6 +47,10 @@ const BORIN: ActorDefinition = {
     { id: "action-surge", name: "Action Surge", activation: "other", damage: [],
       description: "*Once per rest:* on his turn, Borin takes one **additional action**." }
   ],
+  character: { classes: [{ id: "fighter", name: "Fighter", subclass: { id: "champion", name: "Champion" }, level: 7 }], race: { id: "dwarf", name: "Dwarf" }, background: { id: "soldier", name: "Soldier" }, feats: [] },
+  proficiencies: { saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "proficient" }, { id: "perception", proficiency: "proficient" }, { id: "intimidation", proficiency: "proficient" }] },
+  startingInventory: [{ id: "longsword", name: "Longsword", quantity: 1, equipped: true, attuned: false }, { id: "chain-mail", name: "Chain Mail", quantity: 1, equipped: true, attuned: false }, { id: "shield", name: "Shield", quantity: 1, equipped: true, attuned: false }, { id: "handaxe", name: "Handaxe", quantity: 2, equipped: false, attuned: false }],
+  startingCurrency: { cp: 0, sp: 0, ep: 0, gp: 25, pp: 0 },
   extensions: { "open5e.srd-2024": {
     type: "Fighter 7 (dwarf)", alignment: "Lawful Good", armorDetail: "chain mail, shield",
     senses: ["Darkvision 60 ft."], passivePerception: 11, languages: "Common, Dwarvish",
@@ -89,6 +93,19 @@ const MIRENA: ActorDefinition = {
     { id: "mass-healing-word", name: "Mass Healing Word (3rd)", activation: "bonus-action", damage: [],
       description: "*Bonus Action:* up to six creatures you can see each regain **1d4 + 4** hit points." }
   ],
+  character: { classes: [{ id: "cleric", name: "Cleric", subclass: { id: "life-domain", name: "Life Domain" }, level: 7 }], race: { id: "human", name: "Human" }, background: { id: "acolyte", name: "Acolyte" }, feats: [] },
+  proficiencies: { saves: ["wis", "cha"], skills: [{ id: "medicine", proficiency: "proficient" }, { id: "insight", proficiency: "proficient" }, { id: "religion", proficiency: "proficient" }, { id: "persuasion", proficiency: "proficient" }] },
+  spellcasting: { ability: "wis", saveDc: 15, attackBonus: 7, slots: [{ level: 1, max: 4 }, { level: 2, max: 3 }, { level: 3, max: 3 }, { level: 4, max: 1 }], spells: [
+    { id: "sacred-flame", name: "Sacred Flame", level: 0, prepared: true, alwaysPrepared: true, actionId: "sacred-flame" },
+    { id: "guiding-bolt", name: "Guiding Bolt", level: 1, prepared: true, alwaysPrepared: false, actionId: "guiding-bolt" },
+    { id: "cure-wounds", name: "Cure Wounds", level: 1, prepared: true, alwaysPrepared: false, actionId: "cure-wounds" },
+    { id: "spiritual-weapon", name: "Spiritual Weapon", level: 2, prepared: true, alwaysPrepared: false, actionId: "spiritual-weapon" },
+    { id: "hold-person", name: "Hold Person", level: 2, prepared: true, alwaysPrepared: false, actionId: "hold-person" },
+    { id: "spirit-guardians", name: "Spirit Guardians", level: 3, prepared: true, alwaysPrepared: false, actionId: "spirit-guardians" },
+    { id: "mass-healing-word", name: "Mass Healing Word", level: 3, prepared: true, alwaysPrepared: false, actionId: "mass-healing-word" }
+  ] },
+  startingInventory: [{ id: "mace", name: "Mace", quantity: 1, equipped: true, attuned: false }, { id: "chain-mail", name: "Chain Mail", quantity: 1, equipped: true, attuned: false }, { id: "shield", name: "Shield", quantity: 1, equipped: true, attuned: false }, { id: "holy-symbol", name: "Holy Symbol", quantity: 1, equipped: true, attuned: false }],
+  startingCurrency: { cp: 0, sp: 0, ep: 0, gp: 15, pp: 0 },
   extensions: { "open5e.srd-2024": {
     type: "Cleric 7 (human)", alignment: "Lawful Good", armorDetail: "chain mail, shield",
     passivePerception: 14, languages: "Common, Celestial",
@@ -127,6 +144,17 @@ const LYRA: ActorDefinition = {
     { id: "misty-step", name: "Misty Step (2nd)", activation: "bonus-action", damage: [],
       description: "*Bonus Action:* teleport up to 30 ft to an unoccupied space you can see." }
   ],
+  character: { classes: [{ id: "wizard", name: "Wizard", subclass: { id: "evocation", name: "Evocation" }, level: 7 }], race: { id: "elf", name: "High Elf" }, background: { id: "sage", name: "Sage" }, feats: [] },
+  proficiencies: { saves: ["int", "wis"], skills: [{ id: "arcana", proficiency: "proficient" }, { id: "investigation", proficiency: "proficient" }, { id: "history", proficiency: "proficient" }] },
+  spellcasting: { ability: "int", saveDc: 15, attackBonus: 7, slots: [{ level: 1, max: 4 }, { level: 2, max: 3 }, { level: 3, max: 3 }, { level: 4, max: 1 }], spells: [
+    { id: "fire-bolt", name: "Fire Bolt", level: 0, prepared: true, alwaysPrepared: true, actionId: "fire-bolt" },
+    { id: "shield", name: "Shield", level: 1, prepared: true, alwaysPrepared: false, actionId: "shield" },
+    { id: "scorching-ray", name: "Scorching Ray", level: 2, prepared: true, alwaysPrepared: false, actionId: "scorching-ray" },
+    { id: "misty-step", name: "Misty Step", level: 2, prepared: true, alwaysPrepared: false, actionId: "misty-step" },
+    { id: "fireball", name: "Fireball", level: 3, prepared: true, alwaysPrepared: false, actionId: "fireball" }
+  ] },
+  startingInventory: [{ id: "dagger", name: "Dagger", quantity: 2, equipped: true, attuned: false }, { id: "spellbook", name: "Spellbook", quantity: 1, equipped: false, attuned: false }, { id: "arcane-focus", name: "Arcane Focus", quantity: 1, equipped: true, attuned: false }],
+  startingCurrency: { cp: 0, sp: 0, ep: 0, gp: 20, pp: 5 },
   extensions: { "open5e.srd-2024": {
     type: "Wizard 7 (elf)", alignment: "Neutral Good", armorDetail: "Mage Armor",
     senses: ["Darkvision 60 ft."], passivePerception: 14, languages: "Common, Elvish, Draconic",
@@ -159,6 +187,11 @@ function actorFor(member: (typeof PARTY)[number]) {
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],
+    spellSlots: definition.spellcasting ? definition.spellcasting.slots.map((slot) => ({ level: slot.level, remaining: slot.max })) : null,
+    pactSlots: definition.spellcasting?.pact ? { level: definition.spellcasting.pact.level, remaining: definition.spellcasting.pact.max } : null,
+    preparedSpellIds: definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [],
+    inventory: (definition.startingInventory ?? []).map((item) => ({ ...item })),
+    currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     ...(definition.summary ? { notes: definition.summary } : {}),
     definitionId,
     size: definition.size,

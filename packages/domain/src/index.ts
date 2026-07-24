@@ -20,6 +20,12 @@ export const RollRecordSchema = z.object({
    * supplies a real value for every new roll.
    */
   initiatorLabel: z.string().min(1).max(120).optional(),
+  /**
+   * What was rolled, specifically - e.g. "Athletics check", "DEX save", or a weapon/spell name - so the
+   * dice log can show the roll's kind, not just the coarse purpose. Optional: older rolls (and rolls from
+   * integrations that don't supply one) fall back to the purpose label in the UI.
+   */
+  label: z.string().min(1).max(80).optional(),
   actorId: z.string().uuid().nullable(),
   purpose: RollPurposeSchema,
   visibility: RollVisibilitySchema,
@@ -338,7 +344,7 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool - only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }>; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool - only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }>; /** Sheet resources (spell slots, prepared spells, inventory, currency) - only on the requesting player's own claimed character. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand; /** Active condition ids + parallel display labels ("Prone", "Exhaustion 3"): public info, so players and the shared screen render the same dots from one source. */ conditionIds: readonly string[]; conditions: readonly string[] }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
@@ -372,8 +378,17 @@ export type ContentMonstersResult = { ok: boolean; message?: string; monsters?: 
 export type ContentConditionSummary = Readonly<{ id: string; name: string; description: string }>;
 export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[] };
 /** SRD spell reference (rules text + the header fields a card shows) for the in-app spell rules window; public information for any joined session. */
-export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null }>;
+export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null;
+  /** Base damage/healing roll ("8d6"), or null for a spell that rolls nothing. Drives the sheet's "cast at" auto-roll. */
+  damageRoll: string | null;
+  /** Damage types for the base roll (empty for healing/none). */
+  damageTypes: readonly string[];
+  /** Per-slot-level upcast scaling parsed from the SRD (Fireball's 9d6 at 4th, Scorching Ray's 4 rays at 3rd): the sheet auto-applies the entry matching the chosen cast level. */
+  castingOptions: ReadonlyArray<{ level: number; damageRoll: string | null; targetCount: number | null }> }>;
 export type ContentSpellsResult = { ok: boolean; message?: string; spells?: readonly ContentSpellSummary[] };
+/** One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only for those categories. */
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: "weapon" | "armor" | "shield" | "ammunition" | "adventuring-gear" | "tool" | "equipment-pack" | "consumable" | "focus" | "wondrous"; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
@@ -472,6 +487,7 @@ export interface ClientToServerEvents {
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-size": (payload: { commandId: string; actorId: string; size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-visibility": (payload: { commandId: string; actorId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "actor:set-archived": (payload: { commandId: string; actorId: string; archived: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-speed": (payload: { commandId: string; actorId: string; speedFeet: number | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:apply-damage": (payload: { commandId: string; actorId: string; amount: number; parts?: ReadonlyArray<{ amount: number; type: string }>; sourceActorId?: string; sourceActionId?: string; sourceName?: string; critical?: boolean; nonlethal?: boolean; expectedRevision?: number }, acknowledgement: (result: DamageApplyResult) => void) => void;
   "actor:heal": (payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -480,6 +496,7 @@ export interface ClientToServerEvents {
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
+  "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
   "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
@@ -493,6 +510,12 @@ export interface ClientToServerEvents {
   "encounter:set-environment": (payload: { commandId: string; underwater: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:rest": (payload: { commandId: string; actorId: string; kind: "long" | "short"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:spend-hit-dice": (payload: { commandId: string; actorId: string; count: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:set-slot": (payload: { commandId: string; actorId: string; level: number; remaining: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:set-prepared": (payload: { commandId: string; actorId: string; spellId: string; prepared: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:set-inventory": (payload: { commandId: string; actorId: string; item: { id: string; name: string; quantity?: number; equipped?: boolean; attuned?: boolean; weightEach?: number; description?: string; category?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:set-currency": (payload: { commandId: string; actorId: string; currency: { cp?: number; sp?: number; ep?: number; gp?: number; pp?: number }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:set-identity": (payload: { commandId: string; actorId: string; character: { classes: ReadonlyArray<{ id: string; name: string; subclass?: { id: string; name: string }; level: number }>; race?: { id: string; name: string; subrace?: { id: string; name: string } }; background?: { id: string; name: string }; feats: ReadonlyArray<{ id: string; name: string; description?: string }> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:set-proficiencies": (payload: { commandId: string; actorId: string; proficiencies: { saves: ReadonlyArray<"str" | "dex" | "con" | "int" | "wis" | "cha">; skills: ReadonlyArray<{ id: string; proficiency: "proficient" | "expertise" }>; saveOverrides?: Record<string, number>; skillOverrides?: Record<string, number> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; rollMode?: "advantage" | "disadvantage" | "normal"; commit?: boolean; legendaryResistance?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "reaction:answer": (payload: { commandId: string; reactionId: string; use: boolean; actionId?: string; commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; attackNatural?: number; expectedRevision?: number }, acknowledgement: (result: ReactionAnswerResult) => void) => void;
@@ -502,7 +525,7 @@ export interface ClientToServerEvents {
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-legendary": (payload: { commandId: string; actorId: string; spent: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
+  "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; label?: string; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
   "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:add-combatant": (payload: { commandId: string; actorId: string; score?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

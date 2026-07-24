@@ -3,7 +3,8 @@ import { createRoot } from "react-dom/client";
 import type { GmView, PlayerView, SessionJoinResult } from "@vtt/domain";
 import "@vtt/ui/styles.css";
 import "./styles.css";
-import { ActorRoster } from "./actors/ActorRoster";
+import { ActorRoster, YouArePlaying } from "./actors/ActorRoster";
+import { PartyRosterTab } from "./actors/PartyRosterTab";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
@@ -32,10 +33,13 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "scenes" | "table" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "roster" | "viewer" | "replay" | "setup";
+// v4 #10: reordered to Encounter | Scenes | Character Roster | ... | VTT Setup; Viewer is kept (it drives
+// the shared screen) and placed after Character Roster.
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
-  { id: "scenes", label: "Scenes" },
   { id: "table", label: "Encounter" },
+  { id: "scenes", label: "Scenes" },
+  { id: "roster", label: "Character Roster" },
   { id: "viewer", label: "Viewer" },
   { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
@@ -263,12 +267,15 @@ function App() {
       <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
     </section>}
     {mode !== "home" && state && <>
-      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live
-          encounter it duplicates the combat tracker at several times the size, so it collapses to
-          one quiet line - still one tap away for a player joining mid-fight. */}
+      {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live encounter it
+          duplicates the combat tracker at several times the size, so it collapses behind one "Character
+          Roster" disclosure - the arrow is the only toggle (v5 #6.1) - still one tap away mid-fight. */}
+      {/* v5 #7: a player's own character is no longer inside the roster; it rides the always-shown
+          YouArePlaying bar below, so the roster can collapse for both roles without hiding their identity. */}
       {state.combat.active
-        ? <details className="roster-collapsed"><summary>Characters &amp; claims</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
+        ? <details className="roster-collapsed"><summary>Character Roster</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
         : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
+      {mode === "player" && <YouArePlaying state={state as PlayerView} />}
 
       {mode === "gm" && <Tabs
         className="gm-tabs"
@@ -288,7 +295,7 @@ function App() {
           </div>}
           {previewScene ? <>
             <div className="scene-preview-banner" role="status">Staging <strong>{previewScene.name}</strong> - only you see this. Drag tokens from the tray to place them, then use the map buttons to go back or make it live.</div>
-            <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} fog={previewScene.combat.fog} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} healthDisplay={previewScene.combat.healthDisplay} />
+            <EncounterMap assetId={previewScene.mapAssetId} token={mapToken} altText={`Staging ${previewScene.name}`} role="gm" actors={state.actors} tokens={previewScene.combat.tokens} annotations={[]} revision={state.revision} activeActorId={null} fog={previewScene.combat.fog} moveSceneId={previewScene.id} onScenePrep={() => setScenePrepOpen(true)} staging={{ onBackToLive: () => setPreviewScene(null), onMakeLive: () => makeSceneLive(previewScene.id) }} healthDisplay={previewScene.combat.healthDisplay} state={state} />
           </> : <>
           {!state.combat.active && state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "Scene is live - add combatants and start the encounter from the panel below." : "Waiting for the GM to start combat."}</p>}
           {!state.combat.active && !state.combat.mapAssetId && <p className="table-status">{mode === "gm" ? "No encounter running yet. Start one from the Encounter panel." : "No encounter running yet. The GM will start combat when everyone's ready."}</p>}
@@ -310,6 +317,7 @@ function App() {
             dock={mapDock}
             onScenePrep={mode === "gm" ? () => setScenePrepOpen(true) : undefined}
             healthDisplay={mode === "gm" ? (state as GmView).combat.healthDisplay : undefined}
+            state={state}
           /> : <div className="empty map-empty-hero scanlines"><div className="empty-atmos" aria-hidden="true"><span className="home-hero-bloom" /><span className="home-hero-grid grid-floor" /></div><strong>No map loaded yet</strong><span>{mode === "gm" ? "Prepare a scene from the Scenes tab - pick a map and who's in it, then go live." : "The GM will load the battle map when combat begins."}</span>{mode === "gm" && <button type="button" className="empty-scene-prep" onClick={() => setScenePrepOpen(true)}>🎬 Scene prep</button>}</div>}
           </>}
           {mode === "gm" && gmToken && !previewScene && <Button variant="secondary" className="viewer-preview-toggle" aria-pressed={showViewerPreview} onClick={() => setShowViewerPreview((current) => !current)}>{showViewerPreview ? "Hide viewer preview" : "Preview what players see"}</Button>}
@@ -343,6 +351,7 @@ function App() {
 
       {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
+      {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
       {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}

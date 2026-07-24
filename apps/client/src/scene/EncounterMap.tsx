@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation } from "@vtt/domain";
+import type { Annotation, AnnotationAddResult, AnnotationShapeKind, AnnotationVisibility, ClientToServerEvents, EncounterToken, EncounterTokenPosition, GmActor, GmView, HealthDisplay, MutationResult, PlayerActor, PlayerAnnotation, PlayerView } from "@vtt/domain";
 import { Button, Switch, useToastMute } from "@vtt/ui";
 import { FogOverlay, footprintCells, hpFillFraction, imagePointFromClient, initialsOf, occupiedPathCost, snapCellCenterPreview, snapMeasurementPreview, snapShapePreview, TokenHealthAura, TokenStatusBadges, useAuthorizedMapImage, useMapCalibration, type SnappedGeometry } from "./mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
@@ -95,7 +95,7 @@ function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
 }
 
 export function EncounterMap({
-  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging, healthDisplay
+  assetId, token, altText = "Active encounter battlemap", role, actors, tokens, annotations, revision, activeActorId, reactionsUsed = [], fog, dock, moveSceneId, onScenePrep, staging, healthDisplay, state
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -118,6 +118,8 @@ export function EncounterMap({
   staging?: Readonly<{ onBackToLive: () => void; onMakeLive: () => void }>;
   /** Table-wide health-display default (read only for the GM view; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style server-side, so this is unused for them. */
   healthDisplay?: HealthDisplay;
+  /** Full view, threaded to a token's character sheet so its dice log (Sheet/Dice toggle) works when opened from the map. */
+  state?: GmView | PlayerView;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -766,7 +768,7 @@ export function EncounterMap({
     })()}
     {sheetActorId && (() => {
       const actor = actorsById.get(sheetActorId);
-      return actor ? <CharacterSheet actor={actor} role={role} onClose={() => setSheetActorId(null)} /> : null;
+      return actor ? <CharacterSheet actor={actor} role={role} state={state} onClose={() => setSheetActorId(null)} /> : null;
     })()}
   </div>;
 }

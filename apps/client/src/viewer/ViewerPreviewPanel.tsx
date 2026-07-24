@@ -50,7 +50,7 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
       <strong>Viewer preview</strong>
       <span className="viewer-preview-hint">What players see</span>
       <button type="button" className="viewer-preview-action" onClick={popOut}>Pop out</button>
-      <button type="button" className="viewer-preview-close" aria-label="Close viewer preview" onClick={onClose}>×</button>
+      <button type="button" className="viewer-preview-close" aria-label="Close viewer preview" onClick={onClose}>✕</button>
     </div>
     <div className="viewer-preview-body">
       {session === "error"

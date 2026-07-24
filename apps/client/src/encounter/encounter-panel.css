@@ -7,16 +7,16 @@
 .encounter-panel > p { color: var(--text-dim); }
 .encounter-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .encounter-heading h2 { font-size: var(--fs-h2); line-height: var(--lh-tight); font-family: var(--font-display); }
-.encounter-round { flex: none; padding: .4rem .7rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--magenta-hi); font-size: .8rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.encounter-round { flex: none; padding: .4rem .7rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Dock picker sits on its own compact row so it never competes with the title for width. */
 .encounter-dock-picker { display: flex; align-items: center; gap: .3rem; margin-top: .7rem; }
-.encounter-dock-label { margin-right: .1rem; color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.encounter-dock-label { margin-right: .1rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
 .encounter-dock-choice { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: 1rem; line-height: 1; cursor: pointer; }
 .encounter-dock-choice:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-dock-choice[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
 .encounter-map { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; margin: 1rem 0; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.encounter-map span { color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.encounter-map select { flex: 1 1 12rem; margin: 0; font-size: .85rem; color: var(--text); }
+.encounter-map span { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.encounter-map select { flex: 1 1 12rem; margin: 0; font-size: var(--fs-sm); color: var(--text); }
 /* Undocked setup at desktop: the panel is the EXACT height of the map/scene panel to its left (its
    bottom lines up), and the Party/Recent/Search combatant lists scroll internally instead of a long
    roster pushing the panel past the map. `--setup-h` is measured live from the map panel (main.tsx);
@@ -29,17 +29,17 @@
 }
 .combatant-scroll { display: flex; flex-direction: column; }
 .combatant-setup { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.combatant-search { width: 100%; margin-top: .1rem; padding: .5rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .85rem; }
+.combatant-search { width: 100%; margin-top: .1rem; padding: .5rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); }
 .combatant-setup li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .75rem 0; border-bottom: 1px solid var(--line); }
 .combatant-tools { display: flex; align-items: center; gap: .5rem; }
 .combatant-tools .initiative-score { width: 8rem; }
-.combatant-remove { flex: none; width: 1.9rem; height: 1.9rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); font-size: .8rem; cursor: pointer; }
+.combatant-remove { flex: none; width: 1.9rem; height: 1.9rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); cursor: pointer; }
 .combatant-remove:hover:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 80%, var(--danger)); color: var(--danger-hi); }
 .combatant-choice { display: flex; gap: .7rem; align-items: center; cursor: pointer; }
 .combatant-choice input { width: 1.2rem; height: 1.2rem; accent-color: var(--magenta); }
 .combatant-choice span, .combatant-choice strong, .combatant-choice small { display: block; }
 .combatant-choice small, .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
-.initiative-score { color: var(--text-dim); font-size: .75rem; }
+.initiative-score { color: var(--text-dim); font-size: var(--fs-sm); }
 .initiative-score input { width: 100%; margin-top: .3rem; padding: .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); }
 .encounter-primary, .turn-controls button { padding: .7rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); cursor: pointer; }
 .encounter-primary, .turn-controls .encounter-primary { background: var(--primary); color: var(--text-on-neon); border-color: transparent; }
@@ -65,20 +65,20 @@
 .initiative-list > li > strong { color: var(--text); font-family: var(--font-mono); }
 .your-turn { margin-top: 1rem; padding: .85rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--cyan); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); color: var(--text); }
 .your-turn strong { color: var(--cyan-hi); }
-.encounter-place-nudge { margin: .5rem 0 0; padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: .74rem; }
+.encounter-place-nudge { margin: .5rem 0 0; padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: var(--fs-xs); }
 .initiative-list.gm { margin-top: .8rem; }
 .initiative-list.gm > li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .18rem .2rem; position: relative; }
 .initiative-name { display: flex; align-items: center; gap: .45rem; min-width: 0; }
 .initiative-name > span:not(.initiative-caret):not(.initiative-tag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.initiative-caret { flex: none; color: var(--text-dim); font-size: .7rem; }
-.initiative-tag { flex: none; padding: .05rem .4rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-dim); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-.initiative-score-value { flex: none; min-width: 1.9rem; padding: .2rem .15rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-dim); font-weight: 800; font-size: .78rem; text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.initiative-caret { flex: none; color: var(--text-dim); font-size: var(--fs-xs); }
+.initiative-tag { flex: none; padding: .05rem .4rem; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.initiative-score-value { flex: none; min-width: 1.9rem; padding: .2rem .15rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-dim); font-weight: 800; font-size: var(--fs-sm); text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .initiative-score-value:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .initiative-score-value:disabled { opacity: .7; cursor: default; }
-.initiative-score-edit { flex: none; width: 4.2rem; margin: 0; padding: .45rem; border: 1px solid var(--cyan); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .95rem; text-align: center; font-family: var(--font-mono); }
+.initiative-score-edit { flex: none; width: 4.2rem; margin: 0; padding: .45rem; border: 1px solid var(--cyan); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-body); text-align: center; font-family: var(--font-mono); }
 .turn-controls { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: 1rem; }
 /* End encounter is destructive, so it sits apart on its own row and stays visually quiet. */
-.encounter-end { width: 100%; margin-top: .6rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: transparent; color: var(--danger-hi); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.encounter-end { width: 100%; margin-top: .6rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .encounter-end:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
 .encounter-end:disabled { opacity: .45; cursor: not-allowed; }
 /* Hidden actor's turn = a GM-only caution (violet). */
@@ -89,7 +89,7 @@
 .initiative-row-main { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .initiative-row-side { display: flex; align-items: center; gap: .4rem; flex: none; }
 /* Per-row reaction chip: reactions are off-turn resources, so every combatant gets a quick toggle. */
-.initiative-reaction { flex: none; width: 1.6rem; padding: .26rem 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 800; text-align: center; cursor: pointer; }
+.initiative-reaction { flex: none; width: 1.6rem; padding: .26rem 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 800; text-align: center; cursor: pointer; }
 .initiative-reaction:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .initiative-reaction[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); text-decoration: line-through; }
 .initiative-list.gm > li.down .initiative-name { opacity: .55; text-decoration: line-through; }
@@ -97,11 +97,11 @@
    tools card over the list (see .row-tools-popover) so rows never shift while the GM works. */
 .initiative-expand { display: flex; align-items: center; gap: .4rem; min-width: 0; flex: 1 1 auto; padding: .2rem .3rem; margin: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
 .initiative-expand:hover, .initiative-expand[aria-expanded="true"] { background: var(--surface-2); }
-.initiative-name-text { color: var(--text); font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
+.initiative-name-text { color: var(--text); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
 .initiative-list.gm > li.down .initiative-name-text { opacity: .55; text-decoration: line-through; }
 .initiative-expand .condition-chips { margin-left: 0; flex: 0 1 auto; overflow: hidden; flex-wrap: nowrap; }
 .initiative-row-tools { display: flex; justify-content: flex-end; gap: .4rem; }
-.initiative-row-tools .secondary { padding: .3rem .7rem; font-size: .74rem; }
+.initiative-row-tools .secondary { padding: .3rem .7rem; font-size: var(--fs-xs); }
 /* Floating tools card + shared click-away backdrop (also used by the ⋯ menu). */
 .encounter-overlay-backdrop { position: fixed; inset: 0; z-index: 40; background: transparent; }
 .row-tools-popover { position: absolute; z-index: 41; top: calc(100% - .2rem); left: 0; right: 0; display: grid; gap: .45rem; padding: .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
@@ -115,7 +115,7 @@
 .encounter-topbar { --control-h: 2rem; position: relative; display: flex; align-items: center; gap: .35rem; margin-top: .6rem; }
 .encounter-topbar > .encounter-round { display: inline-flex; align-items: center; height: var(--control-h); margin: 0; padding: 0 .7rem; }
 .encounter-topbar .turn-controls { flex: 1 1 auto; margin-top: 0; display: grid; grid-template-columns: var(--control-h) 1fr; gap: .35rem; }
-.encounter-topbar .turn-controls button { height: var(--control-h); padding: 0 .6rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: .82rem; }
+.encounter-topbar .turn-controls button { height: var(--control-h); padding: 0 .6rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: var(--fs-sm); }
 .encounter-topbar .turn-controls button:first-child { padding: 0; font-size: 1.05rem; } /* the ‹ chevron is a centered square */
 /* Turn controls share the active magenta accent so the topbar reads as one turn cluster rather than
    a bright button pasted onto the muted panel (report #2). */
@@ -139,28 +139,28 @@
 .encounter-menu .rules-mode-control select { width: 100%; }
 .encounter-menu .environment-control { margin: 0; }
 .menu-section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid var(--line); }
-.menu-section-title { margin: 0; color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.menu-section-title { margin: 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 /* No nested scroll here: the menu itself scrolls now, so the add list flows as part of that single
    scroll region (was a second scrollbar-in-a-scrollbar the GM had to fight). */
 .menu-add-list { display: grid; gap: .3rem; }
-.menu-empty-note { margin: 0; color: var(--text-muted); font-size: .78rem; }
-.menu-add-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .82rem; color: var(--text-dim); }
+.menu-empty-note { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.menu-add-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: var(--fs-sm); color: var(--text-dim); }
 .menu-add-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menu-add-row button { flex: none; padding: .3rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .76rem; font-weight: 700; text-align: center; cursor: pointer; }
+.menu-add-row button { flex: none; padding: .3rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .menu-add-row button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-menu .encounter-add-monsters { margin: 0; }
 .encounter-menu .encounter-end { margin-top: 0; }
-.initiative-hp { flex: none; padding: .2rem .3rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: .78rem; font-weight: 700; text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.initiative-hp small { margin-left: .2rem; font-size: .68rem; color: var(--violet-hi); }
+.initiative-hp { flex: none; padding: .2rem .3rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: var(--fs-sm); font-weight: 700; text-align: right; cursor: pointer; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.initiative-hp small { margin-left: .2rem; font-size: var(--fs-xs); color: var(--violet-hi); }
 .initiative-hp.hp-healthy { color: var(--cyan-hi); }
 .initiative-hp.hp-bloodied { color: var(--magenta-hi); }
 .initiative-hp.hp-down { color: var(--danger-hi); }
 .initiative-hp:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .hp-editor { display: flex; gap: .35rem; }
 .hp-editor input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
-.hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
+.hp-editor button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .hp-editor button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.health-chip { display: inline-block; margin-left: .5rem; padding: .1rem .45rem; border-radius: var(--radius-pill); font: 800 .62rem/1.5 var(--font-body); letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
+.health-chip { display: inline-block; margin-left: .5rem; padding: .1rem .45rem; border-radius: var(--radius-pill); font: 800 var(--fs-2xs)/1.5 var(--font-body); letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
 .health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
 .health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
 /* Conditions: tracked reference state — chips everywhere (violet-coded), a compact picker where editable. */
@@ -177,23 +177,23 @@
 .you-are-playing .condition-editor { margin-top: .4rem; }
 /* Turn economy: pressed = spent. */
 .turn-economy { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .45rem; padding: .3rem .45rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
-.economy-slot { padding: .24rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.turn-economy-name { margin-right: .15rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 9rem; }
+.economy-slot { padding: .24rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .economy-slot:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .economy-slot[aria-pressed="true"] { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); text-decoration: line-through; }
 /* Same pill shape + size as the Action/Bonus/Reaction slots, keeping the primary magenta fill. */
-.turn-end { margin-left: auto; padding: .24rem .8rem; border-radius: var(--radius-pill); font-size: .78rem; font-weight: 700; }
-.economy-feedback { width: 100%; color: var(--text-dim); font-size: .78rem; }
+.turn-end { margin-left: auto; padding: .24rem .8rem; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: 700; }
+.economy-feedback { width: 100%; color: var(--text-dim); font-size: var(--fs-sm); }
 /* Action runner: stat-block actions -> targets -> server-rolled result -> explicit apply. */
 .action-runner { margin-top: .6rem; display: flex; flex-direction: column; }
 /* Every resolution card (attack preview, damage, save DC, apply-damage) sits directly under the
    creature's name like the attack roll does, instead of dropping below the action list once the
    targeting session clears on commit. */
 .action-runner > .action-result { order: -1; }
-.action-runner-status { color: var(--text-muted); font-size: .8rem; margin: .4rem 0; }
+.action-runner-status { color: var(--text-muted); font-size: var(--fs-sm); margin: .4rem 0; }
 /* Read-only player attack reference (#5.2): the GM's action rows without the interactivity. */
 .player-actions { margin-top: .45rem; }
-.player-actions-label { margin: 0 0 .3rem; color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.player-actions-label { margin: 0 0 .3rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .player-actions-label span { color: var(--text-muted); font-weight: 700; text-transform: none; letter-spacing: normal; }
 .action-row.action-row-readonly, .action-row.action-row-readonly:hover { cursor: default; background: var(--surface-2); border-color: var(--line); border-left-color: var(--magenta); }
 .action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
@@ -202,26 +202,26 @@
    bullets beneath it, so nothing is crammed onto one truncated line (owner feedback). */
 .action-row { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: .3rem; padding: .55rem .65rem; border: 1px solid var(--line); border-left: 3px solid var(--magenta); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer; }
 .action-row:hover:not(:disabled) { background: var(--surface-3); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); border-left-color: var(--magenta-hi); }
-.action-row-name { font-size: .88rem; font-weight: 800; color: var(--text); }
+.action-row-name { font-size: var(--fs-body); font-weight: 800; color: var(--text); }
 .action-row-summary { list-style: none; margin: 0; padding: 0; display: grid; gap: .18rem; }
 /* Bullet as a flex item (not absolute) so it always sits BEFORE the text with a real gap - an
    absolute "•" overlapped a leading "+7 to hit" at some widths. */
-.action-row-summary li { display: flex; align-items: baseline; gap: .35rem; color: var(--text-dim); font-size: .74rem; line-height: 1.35; }
+.action-row-summary li { display: flex; align-items: baseline; gap: .35rem; color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.35; }
 .action-row-summary li::before { content: "•"; flex: none; color: var(--magenta); font-weight: 800; }
-.action-row-summary-note { color: var(--text-muted); font-size: .74rem; font-style: italic; }
-.action-row .action-hint { display: block; margin-top: .05rem; font-size: .73rem; }
+.action-row-summary-note { color: var(--text-muted); font-size: var(--fs-xs); font-style: italic; }
+.action-row .action-hint { display: block; margin-top: .05rem; font-size: var(--fs-xs); }
 /* Reference-only actions (no structured attack/save/damage): flat, quiet, and single-line so the
    button-styled rollable actions above stand out. Tap to reveal the rules text. */
 .action-row-static { flex-direction: row; align-items: baseline; gap: .5rem; border: 0; border-left: 2px solid transparent; background: transparent; padding: .26rem .45rem; opacity: .75; }
 .action-row-static:hover:not(:disabled) { background: var(--surface-2); border-color: transparent; border-left-color: var(--line-strong); }
 .action-row-static[aria-expanded="true"] { background: var(--surface-2); opacity: 1; }
-.action-row-static strong { flex: none; font-size: .82rem; }
-.action-row-static small { flex: 1 1 auto; min-width: 0; color: var(--text-muted); font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.action-reference-text { margin: .35rem 0 .1rem; padding: .5rem .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: .78rem; line-height: 1.45; }
+.action-row-static strong { flex: none; font-size: var(--fs-sm); }
+.action-row-static small { flex: 1 1 auto; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.action-reference-text { margin: .35rem 0 .1rem; padding: .5rem .65rem; border-left: 2px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .action-targeting { margin-top: .4rem; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
-.action-targeting-head { margin: 0 0 .45rem; font-size: .82rem; color: var(--text-dim); }
+.action-targeting-head { margin: 0 0 .45rem; font-size: var(--fs-sm); color: var(--text-dim); }
 .action-target-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; max-height: 11rem; overflow-y: auto; }
-.action-target { display: flex; align-items: center; gap: .5rem; font-size: .85rem; cursor: pointer; }
+.action-target { display: flex; align-items: center; gap: .5rem; font-size: var(--fs-sm); cursor: pointer; }
 .action-target input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--magenta); }
 .action-targeting-buttons { display: flex; gap: .5rem; margin-top: .6rem; }
 .action-targeting-buttons button { flex: 1; padding: .5rem; text-align: center; }
@@ -229,24 +229,24 @@
 .action-result-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .action-result-actions { display: flex; align-items: center; gap: .4rem; flex: none; }
 /* Multiattack / Extra Attack: roll the same action again without dismissing the result first. */
-.action-again { flex: none; padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.action-again { flex: none; padding: .3rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; white-space: nowrap; }
 .action-again:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .action-result-close { flex: none; width: 1.8rem; height: 1.8rem; padding: 0; display: grid; place-items: center; border-radius: var(--radius-sm); }
-.action-result-hint { margin: .5rem 0 0; font-size: .74rem; color: var(--text-muted); line-height: 1.35; }
+.action-result-hint { margin: .5rem 0 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
 .action-result-hint strong { color: var(--text); }
-.action-outcome { margin: .4rem 0 0; font-size: .85rem; font-weight: 700; }
+.action-outcome { margin: .4rem 0 0; font-size: var(--fs-sm); font-weight: 700; }
 .outcome-crit { color: var(--cyan-hi); }
 .outcome-hit { color: var(--cyan-hi); }
 .outcome-miss, .outcome-fumble { color: var(--text-muted); }
 .outcome-unknown { color: var(--text-dim); }
-.action-damage { margin: .35rem 0 0; font-size: .82rem; color: var(--danger-hi); }
+.action-damage { margin: .35rem 0 0; font-size: var(--fs-sm); color: var(--danger-hi); }
 .action-damage strong { font-size: 1rem; color: var(--danger-hi); }
 /* Attack preview: reuses the saving-throw widget's button row + manual field for a recognizable roll. */
 .action-preview { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; padding: .4rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
 .roll-zone { display: flex; flex-direction: column; gap: .35rem; }
-.roll-zone-caption { align-self: center; color: var(--text-muted); font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.roll-zone-caption { align-self: center; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 /* A centered "or" flanked by a solid divider line, separating the auto-roll and manual-entry zones. */
-.roll-or { display: flex; align-items: center; gap: .55rem; margin: .05rem 0; color: var(--text-muted); font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.roll-or { display: flex; align-items: center; gap: .55rem; margin: .05rem 0; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .roll-or::before, .roll-or::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line-strong); }
 /* Stack the manual roll: a full-width number field on its own row, then the action button(s) on a
    right-aligned row beneath it. "Use roll" - and the Confirm/Re-roll it becomes once a die is entered -
@@ -258,45 +258,45 @@
 .action-preview .manual-actions { flex: none; align-self: flex-end; display: inline-flex; gap: .3rem; }
 .action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .action-preview .save-prompt-manual input { width: 100%; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
-.action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
-.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: .95rem; font-family: var(--font-mono); }
+.action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
 .action-apply { width: 100%; margin-top: .5rem; padding: .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 78%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; cursor: pointer; }
 .action-apply:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--text-on-neon); box-shadow: var(--glow-danger); }
-.action-applied { color: var(--cyan-hi); font-size: .8rem; font-weight: 700; }
+.action-applied { color: var(--cyan-hi); font-size: var(--fs-sm); font-weight: 700; }
 .action-save-targets { list-style: none; margin: .45rem 0 0; padding: 0; display: grid; gap: .3rem; }
-.action-save-targets li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .82rem; }
+.action-save-targets li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: var(--fs-sm); }
 .action-save-buttons { display: inline-flex; gap: .3rem; }
-.action-save-buttons button { padding: .35rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .72rem; font-weight: 700; cursor: pointer; }
+.action-save-buttons button { padding: .35rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-save-buttons button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 /* Saving-throw prompts inside the target's initiative row (auto-apply on answer). */
 .save-prompt { display: flex; flex-direction: column; gap: .3rem; margin-top: .3rem; padding: .35rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); }
-.save-prompt-label { font-size: .78rem; color: var(--text-dim); }
+.save-prompt-label { font-size: var(--fs-sm); color: var(--text-dim); }
 .save-prompt-label strong { color: var(--text); }
 .save-prompt-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .save-prompt-roll { flex: 0 0 auto; }
 .save-prompt-manual { display: inline-flex; align-items: stretch; gap: .3rem; flex: 1 1 12rem; }
 .save-prompt-actions input { flex: 1 1 auto; min-width: 7rem; width: auto; margin: 0; padding: .4rem .6rem; text-align: left; }
-.save-prompt-actions button, .save-prompt-confirm button { padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
+.save-prompt-actions button, .save-prompt-confirm button { padding: .4rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .save-prompt-actions button:hover:not(:disabled), .save-prompt-confirm button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.save-prompt-dismiss { margin-left: auto; padding: .4rem .55rem !important; background: transparent !important; color: var(--text-muted) !important; }
+.save-prompt-dismiss { flex: none; margin-left: auto; width: 1.8rem; height: 1.8rem; display: grid !important; place-items: center; padding: 0 !important; line-height: 1; background: transparent !important; color: var(--text-muted) !important; }
 .save-prompt-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-.economy-movement { font-size: .74rem; color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
+.economy-movement { font-size: var(--fs-xs); color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */
 .reaction-prompt { border-color: var(--indigo); background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo)); }
 .reaction-prompt .save-prompt-label { color: var(--cyan-hi); }
 .reaction-prompt .save-prompt-label strong { color: var(--text); }
 /* Adv/disadv re-roll buttons on a rolled save (and, later, other d20 prompts): a cool accent, pressed
    when that mode produced the shown roll. */
-.save-die-mode { padding: .35rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: .74rem; font-weight: 700; cursor: pointer; }
+.save-die-mode { padding: .35rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .save-die-mode:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .save-die-mode.active { background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); border-color: var(--cyan); color: var(--text); }
 .save-prompt-confirm .save-pass { color: var(--cyan-hi); }
 .save-prompt-confirm .save-fail { color: var(--danger-hi); }
-.save-prompt-effect { color: var(--text-dim); font-size: .76rem; }
+.save-prompt-effect { color: var(--text-dim); font-size: var(--fs-sm); }
 .save-prompt-confirm .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); margin-left: auto; }
-.save-prompt-outcome, .action-save-note { margin: .3rem 0 0; color: var(--text-dim); font-size: .78rem; }
+.save-prompt-outcome, .action-save-note { margin: .3rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
 .action-save-note.resolved { color: var(--cyan-hi); }
 .own-save-prompts { margin-top: .4rem; }
 /* Player initiative rows stack the name/score row above any owed-save prompts. */
@@ -308,45 +308,368 @@
 .initiative-sheet-link { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted transparent; }
 .initiative-sheet-link:hover { color: var(--cyan-hi); text-decoration-color: var(--cyan); }
 /* Character sheet renders in the shared Modal (box, head, close, scroll handled there). */
-.sheet-typeline { margin: -.2rem 0 0; color: var(--text-dim); font-size: .82rem; font-style: italic; }
-.sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
-.sheet-vital { flex: 1 1 7rem; padding: .5rem .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
-.sheet-vital span { display: block; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.sheet-vital strong { display: block; margin-top: .15rem; font-size: .95rem; font-family: var(--font-mono); }
-.sheet-vital small { display: block; color: var(--text-muted); font-size: .68rem; }
-.sheet-hp-controls { display: flex; gap: .35rem; margin-top: .6rem; }
-.sheet-hp-controls input { width: 4.2rem; margin: 0; padding: .45rem; text-align: center; }
-.sheet-hp-controls button { flex: 1; padding: .45rem .3rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: .78rem; font-weight: 700; text-align: center; cursor: pointer; }
-.sheet-hp-controls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
-.character-sheet .condition-editor { margin-top: .55rem; }
+.sheet-typeline { margin: -.2rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); font-style: italic; }
+/* Vitals (v3 #2.3, v5 #8): compact stat chips, all with the SAME internal layout - a centred label above
+   a centred value, tight padding, a thin border, no dead space. HP is the same chip, just wide enough to
+   also hold its Dmg/Heal/Temp controls (#2.4). */
+.sheet-vitals { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; align-items: stretch; }
+.sheet-vital { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .12rem; padding: .35rem .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 3.2rem; text-align: center; }
+.sheet-vital span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
+.sheet-vital strong { font: 700 1.15rem/1 var(--font-mono); color: var(--text); }
+/* HP: same chip, wide enough for the controls; label+value stay centred over the buttons. */
+.sheet-vital-hp { flex: 1 1 15rem; align-items: stretch; }
+.sheet-vital-top { display: flex; flex-direction: column; align-items: center; gap: .12rem; }
+.sheet-vital-top strong { font-size: 1.3rem; }
+/* At-a-glance health band (design language §6) under the HP readout; number stays the primary display. */
+.sheet-hp-meter { margin: .3rem 0 .1rem; }
+.sheet-hp-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
+.sheet-hp-controls input { width: 2.9rem; margin: 0; padding: .3rem; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
+/* v4 #1: Dmg/Heal/Temp are natural width (was flex:1, far too wide in the roomy HP box). */
+.sheet-hp-controls input:disabled { opacity: .5; cursor: default; }
+/* Dmg/Heal/Temp/Set now render as <Button size="sm"> (Dmg destructive). */
+/* Conditions section (v3 #2.5): a labelled section instead of a bare "+ Add". */
+.sheet-conditions { margin-top: .85rem; }
+.sheet-section-label { display: block; color: var(--text-muted); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .35rem; }
+.sheet-conditions .condition-editor { margin-top: 0; }
+/* Rest controls (v5 #5): Hit-Dice spend + short/long rest, taken from the sheet. */
+.sheet-rest-block { margin-top: .85rem; }
+.sheet-rest { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .7rem; }
+.sheet-rest-dice { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.sheet-rest-pool { color: var(--text-dim); font: 700 var(--fs-sm) var(--font-mono); }
+.sheet-rest-pool.empty { color: var(--text-muted); font-weight: 600; }
+.sheet-rest-buttons { display: flex; gap: .4rem; }
+/* Roll & heal / Short rest / Long rest now render as <Button size="sm">. */
+/* Rolls bar: label + migrated SegmentedControls (roll-input / bonus-mode now use @vtt/ui). */
+.sheet-settings-label { color: var(--text-muted); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; }
 .sheet-abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: .4rem; margin-top: .9rem; }
 .sheet-ability { padding: .45rem .25rem; border-radius: var(--radius-md); background: var(--surface-3); text-align: center; }
-.sheet-ability span { display: block; color: var(--text-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; }
+.sheet-ability span { display: block; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .05em; }
 .sheet-ability strong { display: block; font-size: 1rem; font-family: var(--font-mono); }
-.sheet-ability small { display: block; color: var(--text-dim); font-size: .62rem; }
+.sheet-ability small { display: block; color: var(--text-dim); font-size: var(--fs-2xs); }
 .sheet-meta { display: grid; gap: .3rem; margin: .9rem 0 0; }
-.sheet-meta div { display: flex; gap: .5rem; font-size: .8rem; }
+.sheet-meta div { display: flex; gap: .5rem; font-size: var(--fs-sm); }
 .sheet-meta dt { flex: none; min-width: 7.5rem; color: var(--text-muted); font-weight: 700; }
 .sheet-meta dd { margin: 0; color: var(--text-dim); }
 .sheet-section { margin-top: 1rem; }
-.sheet-section h3 { margin: 0 0 .4rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); color: var(--text); font: 400 .95rem var(--font-display); }
-.sheet-entry { margin: 0 0 .55rem; color: var(--text-dim); font-size: .82rem; line-height: 1.45; }
+.sheet-section h3 { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 0 .4rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); color: var(--text); font: 400 var(--fs-body) var(--font-display); }
+.sheet-section-edit { flex: none; }
+.sheet-entry { margin: 0 0 .55rem; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .sheet-entry strong { color: var(--text); font-style: italic; }
-.sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
-.sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: .82rem; }
-.sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: .8rem; }
+.sheet-identity { margin: .25rem 0 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
+.sheet-skill-list, .sheet-item-list, .sheet-spell-list { list-style: none; margin: .25rem 0 0; padding: 0; display: grid; gap: .3rem; }
+.sheet-skill-list li, .sheet-item-list li, .sheet-spell-list li { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; font-size: var(--fs-sm); color: var(--text-dim); }
+.sheet-skill-list li span, .sheet-item-list li span, .sheet-spell-list li span { color: var(--text); }
+.sheet-skill-list li strong { color: var(--text); font-family: var(--font-mono); }
+.sheet-item-list li small, .sheet-spell-list li small { color: var(--text-muted); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.sheet-slots { display: flex; flex-wrap: wrap; gap: .4rem; margin: .55rem 0 0; }
+.sheet-slot { padding: .28rem .5rem; border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; }
+.sheet-slot strong { color: var(--text); font-family: var(--font-mono); }
+.sheet-currency { margin: .55rem 0 0; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.sheet-rollable { display: block; width: 100%; border: 1px solid transparent; font: inherit; cursor: pointer; transition: border-color var(--dur-hover) ease, background var(--dur-hover) ease; }
+.sheet-rollable:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sheet-rollable:disabled { cursor: default; opacity: .75; }
+.sheet-roll-row { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .4rem 0 0; }
+.sheet-roll-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.sheet-roll-chip { padding: .22rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
+.sheet-roll-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); }
+.sheet-roll-chip:disabled { cursor: default; opacity: .6; }
+.sheet-entry p { margin: 0 0 .3rem; }
+/* inventory qty now renders as <Stepper> (.nh-stepper); the .sheet-inv-qty hook only places it in the row. */
+.sheet-prepare { padding: .18rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; }
+.sheet-prepare.is-prepared { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-prepare:disabled { opacity: .6; cursor: default; }
+.sheet-item-edit li { flex-wrap: wrap; gap: .35rem .5rem; }
+.sheet-item-controls { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+/* .sheet-remove / .sheet-close now render as <IconButton> (visuals from .nh-iconbtn); the classes remain
+   only as layout hooks (grid placement / header flex). */
+/* Attunement count now renders as a <Badge> (neutral, or danger over the limit of 3). */
+.sheet-attunement { margin: .55rem 0 0; }
+/* Inventory table (v3 #2.9.2): aligned columns with headers; display:contents lets each row's cells
+   share the grid's column tracks. */
+.sheet-inv { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; column-gap: .6rem; margin-top: .3rem; }
+/* v4 #6: real row elements via subgrid (not display:contents) so a hovered row highlights end-to-end,
+   making it obvious which Equip/Attune/× belongs to which item. */
+.sheet-inv-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; padding: .3rem .35rem; border-radius: var(--radius-sm); }
+.sheet-inv-row:not(.sheet-inv-head):hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
+.sheet-inv-head span { color: var(--text-muted); font: 800 .54rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding-bottom: .3rem; border-bottom: 1px solid var(--line); }
+.sheet-inv-head .sheet-item-name { text-align: left; }
+.sheet-inv-row .sheet-inv-qty, .sheet-inv-row .sheet-toggle-btn, .sheet-inv-row .sheet-remove { justify-self: center; }
+.sheet-toggle-btn { min-width: 4.8rem; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; text-align: center; cursor: pointer; white-space: nowrap; }
+.sheet-toggle-btn:hover:not(:disabled) { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-toggle-btn.on { color: var(--text); background: color-mix(in srgb, var(--cyan) 18%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sheet-toggle-btn:disabled { opacity: .55; cursor: default; }
+/* Grouped actions (v3 #2.9.3): weapon/other, then spell actions by level. */
+.sheet-action-group + .sheet-action-group { margin-top: .9rem; }
+.sheet-action-head { margin: .1rem 0 .5rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--cyan-hi); }
+.sheet-action-subgroup { margin-top: .55rem; }
+.sheet-action-subhead { margin: 0 0 .35rem; font: 800 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+/* v6 #5: a derived-from-equipment weapon action - a quiet meta line marking it as one, not a stat-block action. */
+.sheet-weapon-meta { color: var(--text-muted); font-size: var(--fs-xs); font-style: normal; }
+.sheet-add-item { display: flex; gap: .4rem; margin: .55rem 0 0; }
+.sheet-add-item input { flex: 1; min-width: 0; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
+/* Add / Browse SRD gear / Save coins now render as <Button size="sm">. */
+/* Inventory rows now carry the catalog category as a subtle badge after the name. */
+.sheet-item-name { display: inline-flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
+.sheet-item-cat { color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
+/* Browse-and-add-from-catalog picker (Modal body). */
+.sheet-picker-controls { display: grid; gap: .5rem; margin-bottom: .6rem; }
+.sheet-picker-search { width: 100%; padding: .4rem .6rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); }
+.sheet-picker-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
+.sheet-picker-chip { padding: .22rem .55rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.sheet-picker-chip.is-active { color: var(--text); background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sheet-picker-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; max-height: 52vh; overflow-y: auto; }
+/* v3 #2.9.1: comfortable row padding so names/buttons aren't jammed against the edges. */
+.sheet-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .5rem .4rem; border-bottom: 1px solid var(--line); }
+.sheet-picker-item { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.sheet-picker-name { color: var(--text); font-size: var(--fs-sm); font-weight: 600; display: flex; align-items: baseline; gap: .4rem; }
+.sheet-picker-owned { color: var(--cyan); font: 700 var(--fs-2xs)/1 var(--font-mono); }
+.sheet-picker-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+.sheet-picker-add { flex-shrink: 0; padding: .28rem .7rem; border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.sheet-picker-add:disabled { opacity: .6; cursor: default; }
+.sheet-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: 1rem 0; text-align: center; }
+.sheet-picker-attribution { margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-2xs); line-height: 1.4; }
+.sheet-coins { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4rem; margin: .55rem 0 0; }
+.sheet-coins label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; }
+.sheet-coins input { width: 4rem; padding: .25rem .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-sm) var(--font-mono); }
+.sheet-identity-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .25rem 0 0; }
+/* Section Edit/Done + identity Edit now render as <Button variant="ghost" size="sm">. */
+.sheet-editor { margin: .5rem 0 0; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+/* v6 #6: the editor skill list lays out fully (no clipped inner scroll-in-a-scroll) and scrolls with the
+   sheet body. Two columns of uniform rows. */
+.sheet-editor .sheet-skill-list { margin-top: .5rem; }
+.sheet-editor-hint { margin: 0 0 .5rem; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
+.sheet-editor-hint strong { color: var(--text-dim); }
+.sheet-id-editor { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+.sheet-id-editor label { display: flex; flex-direction: column; gap: .1rem; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.sheet-id-editor input { padding: .28rem .45rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); }
+.sheet-id-editor input[type=number] { width: 4rem; }
+/* identity Save now renders as <Button size="sm">. */
+.sheet-empty-note { color: var(--text-muted); font-size: var(--fs-sm); font-style: italic; margin: .3rem 0 0; }
+
+/* --- sheet v2: readability + tap targets --- */
+.sheet-ability { display: flex; flex-direction: column; align-items: center; gap: .1rem; }
+.sheet-ability-rolls { display: flex; gap: .25rem; margin-top: .2rem; }
+.sheet-ability-rolls button { padding: .12rem .38rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font: 700 var(--fs-xs)/1 var(--font-mono); cursor: pointer; }
+.sheet-ability-rolls button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+.sheet-ability-rolls button.prof { color: var(--magenta); }
+.sheet-ability-rolls button.prof em { font-style: normal; font-size: .62em; opacity: .8; margin-left: .1em; vertical-align: super; }
+.sheet-ability-rolls button:disabled { opacity: .55; cursor: default; }
+
+/* dense skill grid: [bonus] [dot] [name] - value hugs the name, two columns on desktop */
+/* Skills (v3 #2.7): CSS multi-column fills top->bottom then left->right (A-I | J-R), not across-then-down;
+   roomier rows; a lettered P/E bubble; the roll chip is the read-first value. */
+.sheet-skill-cols { display: block; columns: 15rem 2; column-gap: 1.5rem; }
+.sheet-editor .sheet-skill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sheet-skill-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .5rem; break-inside: avoid; -webkit-column-break-inside: avoid; padding: .28rem 0; }
+.sheet-skill-list li .sheet-roll-chip { min-width: 3rem; text-align: center; padding: .3rem .5rem; font-size: var(--fs-sm); }
+/* v6 #6: editor rows are name (fills) + a fixed-width toggle pinned to the right, so every skill's toggle
+   lines up in a column instead of drifting with the skill-name length. */
+.sheet-skill-edit li { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: .2rem 0; }
+.sheet-skill-edit li > span { justify-self: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-skill-edit li > .sheet-prepare { justify-self: end; min-width: 5.6rem; text-align: center; }
+.sheet-skill-name { color: var(--text); font-size: var(--fs-sm); }
+.sheet-skill-name em { color: var(--text-muted); font-style: normal; font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .03em; margin-left: .25rem; }
+.sheet-prof-dot { width: 1.2rem; height: 1.2rem; border-radius: var(--radius-pill); border: 1.5px solid var(--line); display: grid; place-items: center; font: 800 var(--fs-2xs)/1 var(--font-mono); color: transparent; }
+.sheet-prof-dot.proficient { background: var(--cyan); border-color: var(--cyan); color: var(--text-on-neon); }
+.sheet-prof-dot.expertise { background: var(--magenta); border-color: var(--magenta); color: var(--text-on-neon); }
+.sheet-roll-chip.is-proficient { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* Saving throws (v3 #2.7.4): larger, easier to hit than the skill chips. */
+.sheet-roll-row .sheet-roll-chip { padding: .34rem .68rem; font-size: var(--fs-sm); }
+.sheet-roll-row .sheet-roll-label { font-size: var(--fs-xs); }
+
+/* spells grouped by level + clickable slot pips */
+/* Prominent spellcasting header fields (v3 #2.8.5). */
+.sheet-spellcast-fields { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 .7rem; }
+/* v4 #4: bordered fields with centred label + value. */
+.sheet-spellcast-field { display: flex; flex-direction: column; align-items: center; padding: .32rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-3); min-width: 4.5rem; }
+.sheet-spellcast-field span { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.sheet-spellcast-field strong { margin-top: .1rem; font: 700 1rem/1 var(--font-mono); color: var(--text); }
+.sheet-spell-group { margin-top: .75rem; }
+/* A subtle dashed divider between spell-level groups (v3 #2.8.4) - distinct from the solid section rules. */
+.sheet-spell-group + .sheet-spell-group { margin-top: .9rem; padding-top: .8rem; border-top: 1px dashed color-mix(in srgb, var(--line-strong) 55%, transparent); }
+.sheet-spell-group-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .1rem; }
+.sheet-spell-group-head h4 { margin: 0; font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+/* Spell-slot pips (v6 #3): clean capsule "charges" - filled = available, hollow = spent - instead of the
+   old flat MS-paint circles. Same click target (spend/restore a slot). */
+.sheet-slot-pips { display: inline-flex; align-items: center; gap: .3rem; }
+.sheet-pip { width: 1.15rem; height: .58rem; padding: 0; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); background: var(--surface-2); cursor: pointer; transition: background var(--dur-hover) ease, border-color var(--dur-hover) ease, box-shadow var(--dur-hover) ease; }
+.sheet-pip.filled { border-color: var(--cyan); background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 88%, var(--cyan-hi)), var(--cyan)); box-shadow: 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent); }
+.sheet-pip:hover:not(:disabled) { border-color: var(--magenta); }
+.sheet-pip:disabled { cursor: default; opacity: .7; }
+.sheet-slot-count { color: var(--text-muted); font: 700 var(--fs-2xs) var(--font-mono); }
+.sheet-spell-list { grid-template-columns: 1fr; }
+/* GM viewing a monster's spells: no cast controls, so just prep-tag + name. */
+.sheet-spell-list li { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: center; gap: .5rem; padding: .18rem .35rem; border-radius: var(--radius-sm); }
+/* A player's own castable list flattens the "cast at" controls into the SAME row grid (v5 #2): the effect
+   helper, the slot dropdown (or the cantrip "At will" tag), and the Cast button are three fixed columns,
+   so on every row the helper / dropdown / Cast sit on identical vertical lines - cantrips included. */
+.sheet-spell-list.castable li { grid-template-columns: 5rem minmax(0, 1fr) 3.7rem 6.8rem 3.8rem; }
+/* v4 #6: hover lights the whole row so it's obvious which dropdown/CAST belongs to which spell. */
+.sheet-spell-list li:hover { background: color-mix(in srgb, var(--surface-3) 55%, transparent); }
+/* v6 #2: names hug the left of their column (like the equipment list), not centred in a wide sheet -
+   justify-self:start shrinks the item to content at the cell start regardless of any inherited text-align. */
+.sheet-spell-name { justify-self: start; text-align: left; color: var(--text); font-size: var(--fs-sm); }
+/* Clickable spell name opens its SRD rules card (v3 #2.8.2); dashed underline signals it's clickable (v4 #5.2). */
+.sheet-spell-link { border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: var(--text); font-size: var(--fs-sm); cursor: pointer; text-decoration: underline; text-decoration-style: dashed; text-decoration-color: color-mix(in srgb, var(--text-muted) 65%, transparent); text-underline-offset: 3px; }
+.sheet-spell-link:hover { color: var(--cyan-hi); text-decoration-style: solid; text-decoration-color: currentColor; }
+/* "Cast at" controls (v3 #2.8 / v4 #5.1 / v5 #2, the recurring one): the damage helper, the slot dropdown
+   (or the cantrip "At will" tag), and the Cast button share ONE geometry so they read as a matched set -
+   identical box-sizing, height, radius, 1px border, and vertical centring. Only the fill/border TINT
+   varies by role. The old version left the helper unbordered with a smaller radius, and the native
+   <select> kept its taller UA min-height, so the three sat at different heights and shapes; here every
+   cell is border-box 1.9rem with the same radius, and the select is `appearance:none` (custom caret) so
+   its height is fully CSS-controlled and lines up with the chips exactly. Verified in a headless render. */
+.sheet-cast-effect,
+.sheet-cast-select,
+.sheet-cast-slot,
+.sheet-cast-btn {
+  box-sizing: border-box; justify-self: stretch; width: 100%; height: 1.9rem; min-height: 1.9rem; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  background: var(--surface-2); color: var(--text); font: 700 var(--fs-2xs)/1 var(--font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Damage helper: violet-tinted, bordered like the rest. v5 #1: a spell with no die leaves it empty -
+   the border/fill drop so no stray chip artifact shows. */
+.sheet-cast-effect { border-color: color-mix(in srgb, var(--violet) 38%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 13%, var(--surface-2)); }
+.sheet-cast-effect:empty { border-color: transparent; background: transparent; }
+/* Slot dropdown: neutral surface + a custom caret (appearance:none) so its height matches the chips. */
+.sheet-cast-select { appearance: none; -webkit-appearance: none; padding: 0 1.3rem 0 .5rem; text-align: center; text-align-last: center; cursor: pointer;
+  /* Caret as two token-driven gradient halves: a data-URI stroke can't hold a var(), and the matched-set
+     grid geometry rules out a masked pseudo-element, so draw the chevron from --text-dim (theme-aware). */
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-repeat: no-repeat; background-position: calc(100% - .8rem) center, calc(100% - .55rem) center; background-size: .28rem .28rem, .28rem .28rem; }
+/* the cantrip "At will" tag (and the "no slots" note) fill the same column as the dropdown so cantrip
+   rows align with leveled rows (v5 #9). */
+.sheet-cast-slot { color: var(--text-dim); border-style: dashed; font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .03em; }
+.sheet-cast-slot.at-will { border-style: solid; border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong)); color: var(--text); }
+/* Cast: the action - a slightly stronger violet fill + border and uppercase, still in the same family. */
+.sheet-cast-btn { border-color: color-mix(in srgb, var(--violet) 55%, var(--line-strong)); background: color-mix(in srgb, var(--violet) 20%, var(--surface-2)); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+.sheet-cast-btn:hover:not(:disabled) { border-color: var(--violet); background: color-mix(in srgb, var(--violet) 30%, var(--surface-2)); }
+.sheet-cast-btn:disabled { opacity: .5; cursor: default; }
+.sheet-prep-tag { min-width: 4.8rem; text-align: center; padding: .18rem .4rem; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface-3); color: var(--text-muted); font: 700 var(--fs-2xs)/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+.sheet-prep-tag.on { color: var(--text); border-color: color-mix(in srgb, var(--cyan) 45%, transparent); }
+/* v6 #1: "Always" (always-prepared, permanent, not toggleable) reads distinctly from the cyan toggleable
+   "Prepared" - a violet fill + accent so the two are never confused. Cantrip gets its own dim treatment. */
+.sheet-prep-tag.always { color: var(--text); border-color: color-mix(in srgb, var(--violet) 55%, transparent); background: color-mix(in srgb, var(--violet) 20%, var(--surface-3)); }
+.sheet-prep-tag.cantrip { color: var(--text-dim); border-style: dashed; }
+.sheet-prep-tag.toggle { cursor: pointer; }
+.sheet-prep-tag.toggle:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
+.sheet-prep-tag.toggle:disabled { opacity: .6; cursor: default; }
+
+/* inventory: cap the name column so controls hug it instead of drifting to the far edge */
+.sheet-item-edit li { display: grid; grid-template-columns: minmax(0, 12rem) 1fr; align-items: center; gap: .35rem .6rem; }
+@media (max-width: 560px) { .sheet-item-edit li { grid-template-columns: 1fr; } }
+.sheet-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
+.sheet-status { margin: .9rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.sheet-feedback { min-height: 1.1rem; margin: .5rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
+
+/* ---- Sheet workspace (feedback #9 + v3): unified header, pinned rolls bar, two scrolling columns ---- */
+/* Direct-child selectors ONLY: the equipment picker and spell-rules card render inside the sheet's own
+   dialog, so a descendant selector here would zero their padding and break their layout (v5 #3 root cause). */
+.character-sheet > .nh-modal-surface { max-height: min(94vh, 56rem); }
+.character-sheet > .nh-modal-surface > .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+/* The sheet keeps the same width with or without the dice log (the log swaps in, not beside), so
+   .has-log inherits the lg modal width — no bespoke widening. */
+.sheet-workspace { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* Header (v3 #2.1/2.2/#4): name + prominent identity on the left; log-dock · Pop out · New tab · × on the right. */
+.sheet-header { display: flex; align-items: flex-start; gap: .8rem; padding: .7rem var(--space-5); border-bottom: 1px solid var(--line); }
+.sheet-header--drag { cursor: move; touch-action: none; background: var(--surface-1); }
+.sheet-header-id { min-width: 0; flex: 1; }
+.sheet-name { display: block; font: 400 var(--fs-h1) / 1.1 var(--font-display); color: var(--text); }
+.sheet-header-sub { display: flex; align-items: baseline; gap: .5rem; margin-top: .2rem; flex-wrap: wrap; }
+.sheet-idline { color: var(--cyan-hi); font: 700 var(--fs-sm)/1.2 var(--font-mono); }
+.sheet-header-controls { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+/* The Sheet/Dice toggle (a SegmentedControl) shows on every viewport now — it's how you reach the
+   shared dice log, which no longer docks beside the sheet. Pop out / New tab render as ghost Buttons. */
+.sheet-close { flex: none; }
+
+/* Rolls bar (v3 #2.6): narrow, pinned under the header, always visible while the sheet scrolls. */
+.sheet-rollbar { display: flex; align-items: center; gap: .5rem; padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }
+
+/* One pane at a time: the sheet fills the workspace; when a shared dice log is available it swaps in
+   behind the Sheet/Dice toggle instead of docking beside the sheet, so the sheet keeps its clean full
+   width whichever way it's opened (map right-click / "View sheet" / initiative toggle all match). */
+.sheet-workspace-cols { display: flex; flex: 1; min-height: 0; }
+.sheet-workspace-pane { min-width: 0; overflow-y: auto; }
+.sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
+.log-pane { flex: 1 1 auto; padding: var(--space-4); }
+.sheet-workspace.has-log.show-sheet .log-pane { display: none; }
+.sheet-workspace.has-log.show-log .sheet-pane { display: none; }
+/* The shared DicePanel blends into the pane (no nested card chrome). */
+.log-pane .dice-proof { margin: 0; padding: 0; border: 0; background: transparent; }
+.log-pane .dice-quick, .log-pane .dice-adv-row { gap: .4rem; margin-top: .7rem; }
+.log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: .5rem .7rem; }
+.log-pane .roll-list { max-height: none; }
+
+/* Pinned "last roll" line (undocked): the most recent roll made from this sheet, so a tap-to-roll shows
+   its result without leaving the Sheet pane. Hidden on the Dice pane and when the log is docked (visible). */
+.sheet-last-roll { display: flex; align-items: baseline; gap: .5rem; width: 100%; padding: .3rem var(--space-5); border: 0; border-bottom: 1px solid var(--line); background: var(--surface-1); color: var(--text-dim); text-align: left; cursor: pointer; }
+.sheet-last-roll:hover { background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1)); }
+.sheet-last-roll-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 700 var(--fs-2xs)/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+.sheet-last-roll-readout { display: inline-flex; align-items: baseline; gap: .35rem; margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.sheet-last-roll-faces { display: inline-flex; gap: .25rem; }
+.sheet-last-die { color: var(--text); }
+.sheet-last-die.out { opacity: .4; text-decoration: line-through; }
+.sheet-last-roll-formula { color: var(--text-muted); }
+.sheet-last-roll-total { color: var(--cyan-hi); font-size: var(--fs-body); }
+.sheet-workspace.show-log .sheet-last-roll { display: none; }
+
+/* Optional dice dock (opt-in, desktop only): pin the log beside the sheet as a fixed side panel so rolls
+   stay visible while you act. Off by default (the toggle collapses it); a phone has no room — stays toggle. */
+@media (min-width: 681px) {
+  .character-sheet.has-log.docked { max-width: min(100vw - 2rem, 68rem); }
+  .sheet-workspace.has-log.docked .sheet-workspace-cols { flex-direction: row; }
+  .sheet-workspace.has-log.docked.show-sheet .log-pane { display: block; }
+  .sheet-workspace.has-log.docked.show-log .sheet-pane { display: block; }
+  .sheet-workspace.has-log.docked .sheet-pane { flex: 1 1 auto; }
+  .sheet-workspace.has-log.docked .log-pane { flex: 0 0 22rem; border-left: 1px solid var(--line); }
+  .sheet-workspace.has-log.docked .sheet-pane-toggle { display: none; }
+  .sheet-workspace.has-log.docked .sheet-last-roll { display: none; }
+}
+/* No room to dock two panes on a phone — hide the control there (it stays the Sheet/Dice toggle). */
+@media (max-width: 680px) { .sheet-dock-btn { display: none; } }
+
+/* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
+   unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
+.sheet-float { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
+.sheet-float-resize { position: absolute; right: 0; bottom: 0; z-index: 2; width: 1.2rem; height: 1.2rem; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%); }
+
+/* Embedded inline in a panel (v4 #8): fills its container, panel chrome, no modal. */
+.sheet-embedded { display: flex; flex-direction: column; min-height: 0; max-height: 78vh; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); overflow: hidden; }
+.sheet-embedded .sheet-workspace { flex: 1; min-height: 0; }
+/* Player map view: Initiative / My sheet toggle (v4 #8). */
+.player-view-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); overflow: hidden; }
+.player-view-toggle button { padding: .22rem .7rem; border: 0; background: var(--surface-2); color: var(--text-muted); font: 700 var(--fs-2xs)/1 var(--font-mono); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.player-view-toggle button + button { border-left: 1px solid var(--line); }
+.player-view-toggle button.on { background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3)); color: var(--text); }
+/* Its own browser tab: the workspace fills the window; no modal chrome. */
+.sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
+.sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 2rem; color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
+
+/* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab. */
+.party-roster { max-width: 72rem; }
+.party-heading h2 { margin: .2rem 0 .3rem; }
+.party-heading p { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 1.1rem; }
+/* Character card thumb: a centred identity monogram on the card's surface (characters have no map image). */
+.party-card-thumb { display: grid; place-items: center; aspect-ratio: 16 / 10; background: linear-gradient(150deg, color-mix(in srgb, var(--violet) 22%, var(--surface-3)), var(--surface-3)); }
+.party-card.is-archived { opacity: .62; }
+.party-archived-head { margin: 1.4rem 0 .6rem; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+.party-feedback { margin-top: .8rem; color: var(--text-dim); font-size: var(--fs-sm); }
+
 .roster-import { margin-top: 1rem; }
-.roster-import button { padding: .55rem .9rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); font-size: .82rem; color: var(--text-dim); text-align: center; }
+.roster-import button { padding: .55rem .9rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); font-size: var(--fs-sm); color: var(--text-dim); text-align: center; }
 .roster-import button:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .you-are-playing-buttons { display: flex; gap: .5rem; }
 .you-are-playing-buttons button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
-.encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: .85rem; font-weight: 700; text-align: center; cursor: pointer; }
+.encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); color: var(--text); }
 /* Monster browser renders in the shared Modal, sized for a scrollable list. */
 .monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
 .monster-browser-controls input[type="search"] { margin-top: 0; padding: .6rem .8rem; }
-.monster-browser-hidden { display: flex; align-items: center; gap: .5rem; color: var(--text-dim); font-size: .8rem; cursor: pointer; }
+.monster-browser-hidden { display: flex; align-items: center; gap: .5rem; color: var(--text-dim); font-size: var(--fs-sm); cursor: pointer; }
 .monster-browser-hidden input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: var(--magenta); }
 .monster-browser-list { flex: 1 1 auto; overflow-y: auto; list-style: none; margin: .8rem 0 0; padding: 0 .25rem 0 0; border-top: 1px solid var(--line); }
 .monster-browser-list li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .1rem; border-bottom: 1px solid var(--line); }
@@ -357,21 +680,21 @@
 .monster-browser-add:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .monster-browser-none { color: var(--text-muted); }
 .monster-browser-status { color: var(--text-dim); margin: 1rem 0 0; }
-.monster-browser-feedback { min-height: 1.2rem; margin: .6rem 0 0; color: var(--text-dim); font-size: .85rem; }
-.monster-browser-attribution { margin: .5rem 0 0; color: var(--text-muted); font-size: .68rem; line-height: 1.4; }
+.monster-browser-feedback { min-height: 1.2rem; margin: .6rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.monster-browser-attribution { margin: .5rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.4; }
 @media (max-width: 560px) { .combatant-setup li { grid-template-columns: 1fr; } .combatant-tools { justify-content: space-between; } .combatant-tools .initiative-score { flex: 1; } .initiative-score { width: 100%; } .monster-browser { max-height: 92vh; } }
 
-.scene-switch { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; color: var(--text-muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; }
-.scene-switch select { width: auto; margin-top: 0; flex: 1 1 auto; text-transform: none; letter-spacing: normal; font-size: .95rem; color: var(--text); }
+.scene-switch { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; color: var(--text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
+.scene-switch select { width: auto; margin-top: 0; flex: 1 1 auto; text-transform: none; letter-spacing: normal; font-size: var(--fs-body); color: var(--text); }
 
 .encounter-add-combatant { margin-top: .8rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); padding: .5rem .75rem; }
-.encounter-add-combatant summary { cursor: pointer; color: var(--text-dim); font-size: .85rem; font-weight: 700; }
+.encounter-add-combatant summary { cursor: pointer; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; }
 .add-combatant-list { list-style: none; margin: .6rem 0; padding: 0; display: grid; gap: .35rem; max-height: 14rem; overflow-y: auto; }
-.add-combatant-list li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .85rem; }
+.add-combatant-list li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: var(--fs-sm); }
 .add-combatant-list button { flex: 0 0 auto; padding: .35rem .8rem; background: var(--primary); color: var(--text-on-neon); border: 0; border-radius: var(--radius-sm); text-align: center; font-weight: 700; }
 
 .encounter-heading-tools { display: flex; align-items: center; gap: .5rem; flex: none; }
-.encounter-scenes-toggle { flex: none; padding: .45rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .8rem; font-weight: 700; text-align: center; cursor: pointer; white-space: nowrap; }
+.encounter-scenes-toggle { flex: none; padding: .45rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; white-space: nowrap; }
 .encounter-scenes-toggle:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .encounter-scenes-toggle[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
 .encounter-scenes-panel .scene-panel { margin-top: 1rem; }
@@ -379,14 +702,14 @@
 /* Turn time-travel (#12): the review banner, the confirm bar, and the player's paused notice. */
 .turn-review { margin: .6rem 0 .4rem; padding: .55rem .7rem; border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: var(--surface-2); display: grid; gap: .25rem; }
 .turn-review.dirty { border-left-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); }
-.turn-review strong { color: var(--text); font-size: .9rem; }
-.turn-review span { color: var(--text-dim); font-size: .78rem; line-height: 1.4; }
+.turn-review strong { color: var(--text); font-size: var(--fs-body); }
+.turn-review span { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.4; }
 .turn-controls .encounter-primary.resume { background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan)); border-color: var(--cyan); }
 .turn-confirm { margin: .5rem 0 0; padding: .6rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: .5rem; }
-.turn-confirm span { color: var(--text); font-size: .82rem; line-height: 1.4; }
+.turn-confirm span { color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
 .turn-confirm-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .turn-confirm-actions button { flex: 0 0 auto; padding: .4rem .9rem; }
-.table-rewound { margin: .4rem 0 0; padding: .5rem .7rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; }
+.table-rewound { margin: .4rem 0 0; padding: .5rem .7rem; border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* Rules engine (ADR-0020): effect chips, the dying tracker, the rules-mode control, and the
    action runner's availability hints / blocked-override bar. */
@@ -397,44 +720,44 @@
 .dying-tracker { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .35rem 0 0; padding: .35rem .55rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 84%, var(--danger)); }
 /* The shared roll widget sits after the pips and wraps to its own line on a phone. */
 .dying-tracker .save-prompt-actions, .dying-tracker .save-prompt-confirm { flex: 1 1 12rem; }
-.dying-label { color: var(--danger-hi); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.dying-label { color: var(--danger-hi); font-size: var(--fs-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .dying-label.dead { color: var(--danger); }
 .dying-pips { display: inline-flex; align-items: center; gap: .22rem; }
-.pip { width: .55rem; height: .55rem; border-radius: 50%; border: 1px solid var(--line-strong); }
+.pip { width: .55rem; height: .55rem; border-radius: var(--radius-pill); border: 1px solid var(--line-strong); }
 .pip.success.filled { background: var(--success); border-color: var(--success); }
 .pip.failure.filled { background: var(--danger); border-color: var(--danger); }
 .pip-divider { width: 1px; height: .7rem; background: var(--line); margin: 0 .2rem; }
 .own-dying { margin-top: .25rem; }
-.rules-mode-control { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 0; color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
-.rules-mode-control select { width: auto; flex: 1 1 auto; margin: 0; text-transform: none; letter-spacing: normal; font-size: .8rem; color: var(--text-dim); }
+.rules-mode-control { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.rules-mode-control select { width: auto; flex: 1 1 auto; margin: 0; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); color: var(--text-dim); }
 .environment-control { align-self: start; margin: .35rem 0 0; }
 .action-hint { color: var(--text-dim); font-weight: 700; }
 .action-row-hinted { opacity: .82; }
-.action-instance-note { margin: .3rem 0; color: var(--text); font-size: .8rem; font-weight: 700; }
+.action-instance-note { margin: .3rem 0; color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
 .action-blocked { margin: .4rem 0; padding: .55rem .7rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); display: grid; gap: .5rem; }
-.action-blocked span { color: var(--text); font-size: .82rem; line-height: 1.4; }
+.action-blocked span { color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
 .action-blocked-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .action-blocked-actions button { flex: 0 0 auto; padding: .35rem .8rem; }
-.action-rollmode { margin: .2rem 0; color: var(--cyan-hi); font-size: .78rem; }
-.action-overridden { margin: .2rem 0; color: var(--text-dim); font-size: .78rem; font-weight: 700; }
-.action-effect-granted, .action-effect-applied { margin: .2rem 0; color: var(--cyan-hi); font-size: .82rem; }
-.action-warning { margin: .2rem 0; color: var(--text-dim); font-size: .78rem; }
+.action-rollmode { margin: .2rem 0; color: var(--cyan-hi); font-size: var(--fs-sm); }
+.action-overridden { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; }
+.action-effect-granted, .action-effect-applied { margin: .2rem 0; color: var(--cyan-hi); font-size: var(--fs-sm); }
+.action-warning { margin: .2rem 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* The shared builtin catalog as one wrapped chip cluster — never 16 full rows. */
 .builtin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin-top: .4rem; }
-.builtin-actions-label { color: var(--text-muted); font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-right: .15rem; }
-.builtin-chip { padding: .16rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: .68rem; font-weight: 700; cursor: pointer; }
+.builtin-actions-label { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-right: .15rem; }
+.builtin-chip { padding: .16rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .builtin-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); color: var(--text); }
 .builtin-chip.hinted { opacity: .55; }
 
 /* Collapsed prose reference under the rollable actions. */
 /* Spellcasting: always-open reference block above the collapsed traits (report #10). */
 .action-spellcasting { margin-top: .45rem; padding: .1rem .1rem .2rem; border-top: 1px solid var(--line); }
-.action-spellcasting-head { display: flex; align-items: center; gap: .35rem; margin: .35rem 0 .1rem; color: var(--violet-hi); font-size: .78rem; font-weight: 800; }
+.action-spellcasting-head { display: flex; align-items: center; gap: .35rem; margin: .35rem 0 .1rem; color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 800; }
 .action-spellcasting-head span { color: var(--violet-hi); }
 /* Spellcasting prose: each line its own paragraph with breathing room; recognized spell names are
    buttons that open the spell's SRD rules in an in-tab card (owner feedback). */
-.spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem .75rem; border-left: 2px solid var(--violet); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: .8rem; line-height: 1.5; }
+.spellcasting-text { margin: .35rem 0 .1rem; padding: .6rem .75rem; border-left: 2px solid var(--violet); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
 .spellcasting-line { margin: 0; }
 .spellcasting-line + .spellcasting-line { margin-top: .55rem; }
 .spellcasting-bullet { padding-left: .4rem; }
@@ -442,15 +765,15 @@
 .spell-link { display: inline; width: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--violet-hi); font: inherit; text-decoration: underline dotted var(--violet); text-underline-offset: 2px; cursor: pointer; }
 .spell-link:hover { color: var(--text); text-decoration-style: solid; border-color: transparent; }
 /* Spell rules card renders in the shared Modal (accent="violet" keeps its violet identity). */
-.spell-card-type { margin: -.2rem 0 0; color: var(--violet-hi); font-size: .82rem; font-style: italic; }
+.spell-card-type { margin: -.2rem 0 0; color: var(--violet-hi); font-size: var(--fs-sm); font-style: italic; }
 .spell-card-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; margin: .9rem 0 0; }
 .spell-card-meta div { padding: .5rem .6rem; border-radius: var(--radius-md); background: var(--surface-3); }
-.spell-card-meta dt { color: var(--text-muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.spell-card-meta dd { margin: .15rem 0 0; font-size: .85rem; color: var(--text); }
-.spell-card-desc { margin: 1rem 0 0; color: var(--text-dim); font-size: .85rem; line-height: 1.5; }
-.spell-card-higher { margin: .8rem 0 0; color: var(--text-dim); font-size: .82rem; line-height: 1.45; }
+.spell-card-meta dt { color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.spell-card-meta dd { margin: .15rem 0 0; font-size: var(--fs-sm); color: var(--text); }
+.spell-card-desc { margin: 1rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; }
+.spell-card-higher { margin: .8rem 0 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.45; }
 .spell-card-higher strong { color: var(--violet-hi); }
-.spell-card-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: .66rem; }
+.spell-card-attribution { margin: 1rem 0 0; color: var(--text-muted); font-size: var(--fs-2xs); }
 @media (max-width: 560px) { .spell-card-meta { grid-template-columns: 1fr; } }
 /* Shared RichText blocks (spell cards + trait "click to read"): spaced paragraphs, bullets, and the
    flattened pipe tables a few spells carry (report #6). Callers wrap RichText in a block element. */
@@ -459,12 +782,12 @@
 .rt-bullet { padding-left: .4rem; }
 .rt-line em { font-style: italic; }
 .rt-table-wrap { margin-top: .5rem; overflow-x: auto; }
-.rt-table { border-collapse: collapse; font-size: .78rem; }
+.rt-table { border-collapse: collapse; font-size: var(--fs-sm); }
 .rt-table caption { text-align: left; font-weight: 800; color: var(--text-dim); padding: .1rem .1rem .3rem; }
 .rt-table th, .rt-table td { border: 1px solid var(--line); padding: .22rem .55rem; text-align: left; vertical-align: top; }
 .rt-table th { background: var(--surface-3); color: var(--text-dim); white-space: nowrap; }
 .action-reference-group { margin-top: .35rem; }
-.action-reference-group > summary { padding: .25rem .2rem; color: var(--text-muted); font-size: .74rem; font-weight: 700; cursor: pointer; }
+.action-reference-group > summary { padding: .25rem .2rem; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
 .action-reference-group > summary:hover { color: var(--text-dim); }
 .action-reference-group .action-list { margin-top: .25rem; }
 
@@ -474,16 +797,16 @@
 /* A down creature (0 HP): dim the console (the server blocks its actions; clicking one still surfaces
    the audited override), with its death saves / down note lifted above it. */
 .acting-console.down { opacity: .5; border-left-color: var(--danger); }
-.acting-down-note { margin: .5rem 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: .82rem; }
+.acting-down-note { margin: .5rem 0 0; padding: .45rem .7rem; border-left: 3px solid var(--danger); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
 /* Row 1: name (left) and movement (right) share a line; row 2: the resource buttons, left-aligned. */
 .acting-console-head { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
-.acting-console-head strong { color: var(--text); font-size: .86rem; }
+.acting-console-head strong { color: var(--text); font-size: var(--fs-sm); }
 .acting-console-title { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
 .acting-console-name { min-width: 0; line-height: 1.25; }
-.acting-console-sub { color: var(--text-muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.acting-console-sub { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
 .acting-console-economy-row { display: flex; align-items: center; gap: .3rem; }
 /* Movement rides the name row, right-aligned; read it a touch brighter than the muted default. */
-.acting-console-title .economy-movement { flex: none; margin: 0; padding: 0; align-self: baseline; font-size: .82rem; font-weight: 700; color: var(--text-dim); white-space: nowrap; }
+.acting-console-title .economy-movement { flex: none; margin: 0; padding: 0; align-self: baseline; font-size: var(--fs-sm); font-weight: 700; color: var(--text-dim); white-space: nowrap; }
 .acting-console-title .legendary-pill { flex: none; }
 .acting-console .turn-economy { margin-top: 0; padding: 0; border: 0; background: transparent; }
 .acting-console .action-runner { margin-top: .45rem; }
@@ -492,38 +815,38 @@
 /* Legendary actions (SRD): a one-tap console switch per off-turn legendary creature, and the
    off-turn console variant showing the per-round pool instead of the turn actor's economy. Violet = special. */
 .legendary-strip { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
-.legendary-offer { padding: .28rem .6rem; border: 1px dashed var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.legendary-offer { padding: .28rem .6rem; border: 1px dashed var(--violet); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .legendary-offer:hover:not(:disabled) { border-color: var(--violet-hi); border-style: solid; }
 .legendary-offer:disabled { color: var(--text-muted); border-color: var(--line); cursor: default; }
 .acting-console.legendary-acting { border-left-color: var(--violet); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); background: color-mix(in srgb, var(--surface-2) 86%, var(--violet)); }
 .acting-console.legendary-acting .acting-console-head strong { color: var(--violet-hi); }
 .legendary-pill { cursor: default; color: var(--violet-hi); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); }
-.legendary-done { margin-left: auto; padding: .24rem .55rem; font-size: .78rem; }
-.save-legendary { padding: .3rem .6rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-3) 78%, var(--violet)); color: var(--violet-hi); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.legendary-done { margin-left: auto; padding: .24rem .55rem; font-size: var(--fs-sm); }
+.save-legendary { padding: .3rem .6rem; border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface-3) 78%, var(--violet)); color: var(--violet-hi); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 .save-legendary:hover:not(:disabled) { border-color: var(--violet); }
 
 /* Row hover keeps the plain score/HP tappable-looking without permanent chrome. */
 .initiative-score-value:hover:not(:disabled), .initiative-hp:hover:not(:disabled) { background: var(--surface-2); }
 /* Minimal per-row markers: condition dots + a dim R only when the reaction is SPENT. */
 .condition-dots { display: inline-flex; align-items: center; gap: .2rem; margin-left: .1rem; }
-.condition-dot { width: .44rem; height: .44rem; border-radius: 50%; background: var(--violet-hi); box-shadow: 0 0 0 1px var(--surface-3); }
-.condition-dot-more { color: var(--violet-hi); font-size: .62rem; font-weight: 800; }
-.reaction-spent-dot { flex: none; color: var(--text-muted); font-size: .62rem; font-weight: 800; text-decoration: line-through; }
-.encounter-topbar .encounter-round { align-self: center; font-size: .72rem; padding: .3rem .55rem; }
+.condition-dot { width: .44rem; height: .44rem; border-radius: var(--radius-pill); background: var(--violet-hi); box-shadow: 0 0 0 1px var(--surface-3); }
+.condition-dot-more { color: var(--violet-hi); font-size: var(--fs-2xs); font-weight: 800; }
+.reaction-spent-dot { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); font-weight: 800; text-decoration: line-through; }
+.encounter-topbar .encounter-round { align-self: center; font-size: var(--fs-xs); padding: .3rem .55rem; }
 
 /* Player tracker: identical dense language to the GM list — one 30px line per combatant, the
    player's own details grouped under their row, economy in its own quiet card below the list. */
 .initiative-list.player { margin-top: .6rem; }
 .initiative-list.player > li { flex-direction: column; align-items: stretch; gap: .1rem; padding: .18rem .2rem; }
 .initiative-list.player .initiative-row-main { gap: .5rem; }
-.initiative-score-plain { flex: none; min-width: 1.9rem; color: var(--text-dim); font-weight: 800; font-size: .78rem; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.initiative-score-plain { flex: none; min-width: 1.9rem; color: var(--text-dim); font-weight: 800; font-size: var(--fs-sm); text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .initiative-player-name { display: flex; align-items: center; gap: .4rem; min-width: 0; flex: 1 1 auto; overflow: hidden; }
-.player-health { flex: none; font-size: .74rem; font-weight: 800; font-family: var(--font-mono); }
+.player-health { flex: none; font-size: var(--fs-xs); font-weight: 800; font-family: var(--font-mono); }
 .player-health.hp-bloodied { color: var(--magenta-hi); }
 .player-health.hp-down { color: var(--danger-hi); }
 .encounter-topbar.player { align-items: center; flex-wrap: wrap; }
-.your-turn-flag { color: var(--cyan-hi); font-size: .8rem; font-weight: 800; }
-.encounter-quiet-note { color: var(--text-muted); font-size: .74rem; }
+.your-turn-flag { color: var(--cyan-hi); font-size: var(--fs-sm); font-weight: 800; }
+.encounter-quiet-note { color: var(--text-muted); font-size: var(--fs-xs); }
 /* The player's economy now rides their own initiative row (feedback #3): quiet card, tight top gap. */
 .initiative-list.player .turn-economy { margin-top: .3rem; }
 
@@ -538,19 +861,19 @@
 
 /* Foundry-style rows: [avatar | name + HP bar | initiative]. Team coding (§6.6): allies cyan,
    enemies magenta, neutrals indigo — subtle so the token art stays clear. */
-.initiative-avatar { flex: none; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; border-radius: 50%; background: var(--surface-3); color: var(--text); font-size: .58rem; font-weight: 800; letter-spacing: .02em; }
+.initiative-avatar { flex: none; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text); font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .02em; }
 .initiative-avatar.monster { background: color-mix(in srgb, var(--surface-3) 55%, var(--magenta)); color: var(--text); }
 .initiative-avatar.npc { background: color-mix(in srgb, var(--surface-3) 58%, var(--indigo)); color: var(--text); }
 .initiative-avatar.gm-hidden { outline: 2px dashed var(--line-strong); outline-offset: 1px; opacity: .8; }
 .initiative-main-col { display: grid; gap: .2rem; min-width: 0; flex: 1 1 auto; }
 .initiative-name-line { display: flex; align-items: center; gap: .35rem; min-width: 0; }
-.initiative-hp-text { margin-left: auto; flex: none; font-size: .72rem; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.initiative-hp-text small { font-size: .62rem; color: var(--violet-hi); margin-left: .12rem; }
+.initiative-hp-text { margin-left: auto; flex: none; font-size: var(--fs-xs); font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.initiative-hp-text small { font-size: var(--fs-2xs); color: var(--violet-hi); margin-left: .12rem; }
 .initiative-hp-text.hp-healthy { color: var(--cyan-hi); }
 .initiative-hp-text.hp-bloodied { color: var(--magenta-hi); }
 .initiative-hp-text.hp-down { color: var(--danger-hi); }
-.initiative-hpbar { display: block; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
-.initiative-hpbar-fill { display: block; height: 100%; border-radius: 2px; transition: width .25s ease; }
+.initiative-hpbar { display: block; height: 3px; border-radius: var(--radius-sm); background: var(--surface-3); overflow: hidden; }
+.initiative-hpbar-fill { display: block; height: 100%; border-radius: var(--radius-sm); transition: width .25s ease; }
 .initiative-hpbar-fill.hp-healthy { background: var(--cyan); }
 .initiative-hpbar-fill.hp-bloodied { background: var(--magenta); }
 .initiative-hpbar-fill.hp-down { background: var(--danger); }

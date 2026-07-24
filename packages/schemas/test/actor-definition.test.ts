@@ -25,4 +25,17 @@ describe("actor definition v1", () => {
     const invalid = structuredClone(character); invalid.token.disposition = "hostile";
     expect(ActorDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
+  // The new character-sheet fields (class/proficiencies/spellcasting/inventory/currency) must parse
+  // under BOTH schemas so the JSON twin can't drift from the Zod source.
+  it("accepts a definition carrying the new character-sheet fields", () => {
+    const withSheet = structuredClone(character) as Record<string, unknown>;
+    withSheet.character = { classes: [{ id: "wizard", name: "Wizard", subclass: { id: "evocation", name: "Evocation" }, level: 5 }], race: { id: "human", name: "Human" }, background: { id: "sage", name: "Sage" }, feats: [{ id: "alert", name: "Alert" }] };
+    withSheet.proficiencies = { saves: ["int", "wis"], skills: [{ id: "arcana", proficiency: "expertise" }, { id: "stealth", proficiency: "proficient" }], saveOverrides: { con: 4 } };
+    withSheet.spellcasting = { ability: "int", slots: [{ level: 1, max: 4 }, { level: 2, max: 3 }], spells: [{ id: "magic-missile", name: "Magic Missile", level: 1, prepared: true, actionId: "magic-missile" }, { id: "shield", name: "Shield", level: 1, alwaysPrepared: true }] };
+    withSheet.startingInventory = [{ id: "spellbook", name: "Spellbook", quantity: 1 }, { id: "dagger", name: "Dagger", quantity: 2, equipped: true }];
+    withSheet.startingCurrency = { gp: 15, sp: 4 };
+    const parsed = ActorDefinitionSchema.safeParse(withSheet);
+    expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
+    expect(jsonValidate(withSheet), JSON.stringify(jsonValidate.errors)).toBe(true);
+  });
 });

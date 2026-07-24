@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import {
-  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadMonsterDefinitions,
+  loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadEquipment, loadMonsterDefinitions,
   loadRules, loadSkills, loadSpells, loadWeaponProperties, loadWeapons
 } from "../src/index.js";
 
@@ -175,6 +175,38 @@ describe("SRD 5.2.1 reference bundles", () => {
     const armor = loadArmor();
     expect(armor.length).toBe(13);
     expect(armor.find((piece) => piece.id === "breastplate")).toMatchObject({ acBase: 14, addDexModifier: true, dexModifierCap: 2 });
+  });
+
+  it("folds the vendored gear bundle together with weapons and armor into one addable catalog", () => {
+    const equipment = loadEquipment();
+    // The gear bundle (ammunition/gear/tools/packs/focuses/consumables) plus every non-improvised
+    // weapon and every armor piece, mapped into the unified shape.
+    const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
+    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length);
+    expect(equipment.length).toBeGreaterThan(150);
+
+    // Every category the framework promises is represented (the homebrew update extends these).
+    const categories = new Set(equipment.map((item) => item.category));
+    for (const category of ["weapon", "armor", "shield", "ammunition", "adventuring-gear", "tool", "equipment-pack", "focus", "consumable"]) {
+      expect(categories, category).toContain(category);
+    }
+
+    // Ids are unique across the folded-in bundles so an add-from-catalog pick is unambiguous.
+    const ids = equipment.map((item) => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    // Sorted by name for a stable browse order.
+    expect(equipment.map((item) => item.name)).toEqual([...equipment.map((item) => item.name)].sort((a, b) => a.localeCompare(b)));
+
+    // A weapon mapped in from weapons.v1.json carries its structured weapon sub-object, no armor.
+    const longsword = equipment.find((item) => item.id === "longsword");
+    expect(longsword).toMatchObject({ category: "weapon", weapon: { category: "martial", damageDice: "1d8", damageType: "slashing" }, armor: null });
+    // The shield row is classified from its low base AC; body armor keeps its own category.
+    expect(equipment.find((item) => item.id === "shield")).toMatchObject({ category: "shield", armor: { acBase: 2 } });
+    expect(equipment.find((item) => item.id === "plate-armor")).toMatchObject({ category: "armor", armor: { acBase: 18 } });
+    // A hand-authored gear entry keeps its cost/weight and has neither sub-object.
+    expect(equipment.find((item) => item.id === "potion-of-healing")).toMatchObject({ category: "consumable", costGp: 50, weightLb: 0.5, weapon: null, armor: null });
+    expect(equipment.find((item) => item.id === "thieves-tools")).toMatchObject({ category: "tool", costGp: 25 });
   });
 
   it("carries skills, damage types, and the rules glossary", () => {
