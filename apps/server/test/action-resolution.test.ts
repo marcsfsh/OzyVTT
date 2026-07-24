@@ -44,6 +44,26 @@ describe("definition action resolution", () => {
     expect(game.combat.turn.actionUsed).toBe(true); // attacker holds the current turn
   });
 
+  it("attributes recorded rolls to the GM by default and to a player when one resolves their own action", () => {
+    // Default deps carry no initiator identity: GM/integration-driven resolves stay attributed to the GM.
+    const gmGame = combatState();
+    resolveDefinitionAction(gmGame, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-00000000000b" }, deps([15, 3, 4]));
+    expect(gmGame.rolls.length).toBe(2);
+    expect(gmGame.rolls.every((roll) => roll.initiatorRole === "gm")).toBe(true);
+    expect(gmGame.rolls.every((roll) => roll.initiatorSessionId === IDS.gmSession)).toBe(true);
+
+    // When a player resolves their own claimed character's action, the recorded rolls attribute to that
+    // player (session + role) while staying public with the acting character's label. (The handler's
+    // canInitiateForActor enforces ownership; resolveDefinitionAction just carries the attribution.)
+    const playerSession = "30000000-0000-4000-8000-00000000000b";
+    const playerGame = combatState();
+    resolveDefinitionAction(playerGame, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-00000000000c" }, { ...deps([15, 3, 4]), initiatorRole: "player", initiatorSessionId: playerSession });
+    expect(playerGame.rolls.length).toBe(2);
+    expect(playerGame.rolls.every((roll) => roll.initiatorRole === "player")).toBe(true);
+    expect(playerGame.rolls.every((roll) => roll.initiatorSessionId === playerSession)).toBe(true);
+    expect(playerGame.rolls.every((roll) => roll.visibility === "public")).toBe(true);
+  });
+
   it("doubles only the dice on a natural 20 and skips damage on a natural 1", () => {
     const crit = combatState();
     const critResolution = resolveDefinitionAction(crit, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-000000000002" }, deps([20, 6, 6, 6, 6]));

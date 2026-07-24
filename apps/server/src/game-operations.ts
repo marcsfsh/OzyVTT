@@ -628,10 +628,20 @@ export function createGameOperations(context: GameOperationsContext) {
     // ---------- Stat-block actions & saving throws ----------
 
     async actionResolve(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
-      requireGmGrade(principal, "Only the GM can resolve stat-block actions.");
       const request = parse(ActionResolveSchema, raw, "The action command is malformed.", true);
       const { commandId, actorId, actionId, targetIds, template, conditionId, rollMode, override, commit, attackNatural, expectedRevision } = request;
-      if (conditionId !== undefined && !contentLibrary.hasCondition(conditionId)) throw new CommandRejectedError("That condition is not in the bundled reference.");
+      // A player may resolve actions only for their own claimed character (re-checked against live state
+      // inside the mutation). GM-only inputs - area templates (map calibration + a GM-authored annotation),
+      // strict-mode overrides, cover, and applied conditions/notes - are refused or stripped for players,
+      // who act through explicit target ids only.
+      const initiator = initiatorOf(principal);
+      const isPlayer = initiator.role === "player";
+      if (isPlayer && template) throw new GameAccessDeniedError("Your GM places area templates.");
+      if (isPlayer && override) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
+      const effectiveConditionId = isPlayer ? null : (conditionId ?? null);
+      const effectiveCover = isPlayer ? null : (request.cover ?? null);
+      const effectiveNote = isPlayer ? null : (request.note ?? null);
+      if (effectiveConditionId !== null && !contentLibrary.hasCondition(effectiveConditionId)) throw new CommandRejectedError("That condition is not in the bundled reference.");
       // The map grid is fetched up front (async) so template containment AND token-distance rules
       // (prone within 5 ft, unconscious auto-crit) can run inside the synchronous mutation.
       const mapAssetId = store.snapshot.combat.mapAssetId;
@@ -642,6 +652,11 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const attacker = state.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
+        // Authorize against live state (mirrors diceRoll): a player acts only on their own claimed
+        // character; the GM (and integrations) may act on anyone. The seam is the intended per-table
+        // policy hook (ADR-0021), so pass the action kind even though it is not read yet.
+        const verdict = canInitiateForActor(initiator, state, actorId, "attack");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
         const definition = attacker.definitionId ? storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId) : undefined;
         // The stat block wins on id collision; the builtin catalog (Dodge, Dash, Unarmed Strike, ...)
         // covers every combatant - including one without a definition.
@@ -668,7 +683,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: conditionId ?? null, rollMode: rollMode ?? null, override: override ?? null, builtin: isBuiltin, note: request.note ?? null, effectId: request.effectId ?? null, cover: request.cover ?? null, commit, attackNatural }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
