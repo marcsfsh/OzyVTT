@@ -44,6 +44,16 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   (3) No orphan-asset GC on `codexAssets` and no `DELETE /codex-assets/:id` (mirrors `map-http`'s
   existing gap); (4) `codex_page_revisions` snapshots every autosave with no prune. All low-severity at
   home-campaign scale; do not treat their absence as a bug to "fix" without a real trigger.
+- **Worldbuilding is now a core pillar, not out-of-scope (2026-07-24, product-owner directive).** The
+  original constitution listed "campaign wiki" as a do-not-drift boundary. The product owner
+  (garrettpstrand) explicitly redefined the product as a D&D VTT **and** a full worldbuilding platform
+  (World Anvil / Kanka / LegendKeeper class), scoped to a single home group. In flight / planned on top
+  of the existing Codex: **typed entities** (a page has a type - character/location/faction/item/
+  species/religion/event - with structured fields), **typed relationships** (directional, e.g.
+  rules/member-of/enemy-of) + a relationship graph, a **fantasy calendar + timeline**, and a **world
+  home** with tag browsing. Constraints unchanged: two-layer secrecy + viewer-safety on every new
+  surface, server authority, mobile parity, and the codex stays off the `GameState` broadcast. Combat
+  remains combat-first; the two pillars coexist. CLAUDE.md updated to match.
 - **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
   the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
   **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.
