@@ -296,7 +296,7 @@ function OwnDyingTracker({ actorId, name, deathSaves, rollMode, isActingTurn }: 
 
 /** Map a player's own stat-block action onto the ContentActionSummary the shared targeting store consumes.
  *  Area templates are dropped in v1 (players target by explicit ids; the GM still places AoE templates). */
-function summaryOfOwnAction(action: ActorDefinition["actions"][number]): ContentActionSummary {
+export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): ContentActionSummary {
   return {
     id: action.id, name: action.name, activation: action.activation, description: action.description,
     attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
@@ -327,7 +327,7 @@ function ownActionSummaryParts(action: ContentActionSummary): string[] {
  * never applies damage themselves, so the role boundary stays intact. Reuses the shared targeting store and
  * the GM runner's styles so both surfaces read and behave identically.
  */
-function PlayerActionRunner({ actorId, definition, revision, rollMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
+export function PlayerActionRunner({ actorId, definition, revision, rollMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
   const actions = useMemo(() => definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0).map(summaryOfOwnAction), [definition]);
@@ -528,13 +528,22 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     const activeRowRef = useRef<HTMLLIElement | null>(null);
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [combat.turnActorId]);
-    // v4 #8: toggle this panel between the turn order and the player's own sheet (embedded, no dice log).
+    // v4 #8: toggle this panel between the turn order and the player's own sheet. The embedded sheet now
+    // carries live state + combat context so its Actions resolve as real attacks and its rolls show inline.
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [view, setView] = useState<"initiative" | "sheet">("initiative");
     // Every roll surface reads the one per-browser dice-input preference (auto vs manual), not the old
     // table-wide combat.rollMode - so this player's saves, death saves, attacks, and sheet all agree.
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const { rollMode } = useRollPreference();
+    // "Jump" sheet-attack mode: tapping an attack on the sheet hops here to pick/confirm, then jumps BACK
+    // to the sheet once the attack commits. The flag survives the round-trip; the result effect returns us.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const jumpAttackResult = useTargetingResult();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => { if (returnToSheetAfterAttack && jumpAttackResult && !jumpAttackResult.preview) { setView("sheet"); setReturnToSheetAfterAttack(false); } }, [returnToSheetAfterAttack, jumpAttackResult]);
     const myActor = props.state.actors.find((actor) => actor.id === myId) ?? null;
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
@@ -557,7 +566,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
       {view === "sheet" && myActor
-        ? <CharacterSheet actor={myActor} role="player" embedded onClose={() => setView("initiative")} />
+        ? <CharacterSheet actor={myActor} role="player" state={props.state} embedded combat={{ revision: props.state.revision, active: combat.active, myTurn, playerDamageMode: combat.playerDamageMode, targets: combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name })) }} onJumpToInitiative={() => { setView("initiative"); setReturnToSheetAfterAttack(true); }} onClose={() => setView("initiative")} />
         : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);

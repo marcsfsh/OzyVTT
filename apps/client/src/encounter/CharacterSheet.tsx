@@ -8,6 +8,8 @@ import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
 import { useRollPreference } from "../dice/roll-preference";
+import { PlayerActionRunner, summaryOfOwnAction } from "./EncounterPanel";
+import { beginTargeting, setTargetingResult } from "./targeting";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -173,7 +175,7 @@ function SpellCastControls({ spell, content, slotLevels, slotMaxByLevel, liveRem
  * a player only ever receives their own actor (and no monster definition fetch succeeds
  * for them server-side).
  */
-export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; onClose: () => void }>) {
+export function CharacterSheet({ actor, role, state, standalone = false, embedded = false, combat, onJumpToInitiative, onClose }: Readonly<{ actor: GmActor | PlayerActor; role: "gm" | "player"; state?: GmView | PlayerView; standalone?: boolean; embedded?: boolean; /** Combat context for the player's OWN sheet, enabling structured attacks from the Actions section on their turn. */ combat?: { revision: number; active: boolean; myTurn: boolean; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }; /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void; onClose: () => void }>) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
   const ownDefinition = "definition" in actor ? actor.definition ?? null : null;
   // The GM fetches immutable bundled definitions into `fetched`; a player's own definition rides the
@@ -181,6 +183,11 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // (bugfix: a useState seeded from ownDefinition went stale after an edit).
   const [fetched, setFetched] = useState<ActorDefinition | null>(definitionId ? sheetCache.get(definitionId) ?? null : null);
   const definition = ownDefinition ?? fetched;
+  // On the player's own turn in an active fight, their stat-block ATTACK actions resolve through the shared
+  // structured flow (pick target -> roll -> hit) rather than loose dice: "inline" renders the runner here on
+  // the sheet, "jump" hops to the initiative view and back. Only definition actions (server-resolvable) route;
+  // client-derived equipped-weapon / spell chips stay loose quick-rolls.
+  const structuredAttacks = combat?.active === true && combat.myTurn === true && actor.kind === "player-character" && definition !== null;
   const [feedback, setFeedback] = useState("");
   const [rolling, setRolling] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -195,7 +202,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
   // The one per-browser dice-input preference, shared with every other roll surface (saves, attacks, the
   // initiative runner, the dice panel) so the sheet's toggle and those surfaces always agree.
-  const { rollInput, bonusMode, setRollInput: chooseRollInput, setBonusMode: chooseBonusMode } = useRollPreference();
+  const { rollInput, bonusMode, sheetAttackMode, rollMode, setRollInput: chooseRollInput, setBonusMode: chooseBonusMode, setSheetAttackMode: chooseSheetAttackMode } = useRollPreference();
   // The shared dice log rides behind the header's Sheet/Dice toggle — one pane at a time on every
   // viewport — so the sheet stays clean and full-width whichever way it's opened. Default to the sheet;
   // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).
@@ -533,7 +540,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             const renderAction = (action: ActionT) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
               <p><strong>{action.name}.</strong> <RichText text={action.description} /></p>
               {(atk || action.damage.length > 0) && <div className="sheet-roll-row">
-                {atk && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollD20(atk.bonus, "attack", `${action.name} to hit`)}>{signed(atk.bonus)} to hit</button>}
+                {atk && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => { if (structuredAttacks && sheetAttackMode === "jump" && combat) { setTargetingResult(null); beginTargeting(summaryOfOwnAction(action), actor.id); onJumpToInitiative?.(); } else void rollD20(atk.bonus, "attack", `${action.name} to hit`); }}>{signed(atk.bonus)} to hit</button>}
                 {action.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${action.name} damage`)}>{part.formula}</button>)}
               </div>}
             </div>; };
@@ -543,9 +550,14 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             const spellGroups = new Map<number, ActionT[]>();
             for (const action of definition.actions) { const level = spellLevelByActionId.get(action.id); if (level !== undefined) { const list = spellGroups.get(level) ?? []; list.push(action); spellGroups.set(level, list); } }
             const hasSpellActions = spellGroups.size > 0;
+            // On the player's turn with the "keep picker on the sheet" preference, the interactive runner
+            // (its own action list + inline target picker + result) OWNS the server-resolvable stat-block
+            // actions here; the loose weapon/spell chips below are hidden so an action isn't offered twice.
+            const inlineRunner = structuredAttacks && sheetAttackMode === "inline";
             return <>
-              {(weaponActions.length > 0 || equippedWeaponActions.length > 0) && <div className="sheet-action-group">
-                {hasSpellActions && <h4 className="sheet-action-head">Weapon &amp; other</h4>}
+              {inlineRunner && combat && <PlayerActionRunner actorId={actor.id} definition={definition} revision={combat.revision} rollMode={rollMode} playerDamageMode={combat.playerDamageMode} targets={combat.targets} />}
+              {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
+                {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
                 {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
                   <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}</span></p>
                   <div className="sheet-roll-row">
@@ -553,9 +565,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                     <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>
                   </div>
                 </div>)}
-                {weaponActions.map(renderAction)}
+                {!inlineRunner && weaponActions.map(renderAction)}
               </div>}
-              {hasSpellActions && <div className="sheet-action-group">
+              {!inlineRunner && hasSpellActions && <div className="sheet-action-group">
                 <h4 className="sheet-action-head">Spell actions</h4>
                 {[...spellGroups.keys()].sort((left, right) => left - right).map((level) => <div key={level} className="sheet-action-subgroup">
                   <h5 className="sheet-action-subhead">{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h5>
@@ -603,6 +615,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     <span className="sheet-settings-label">Rolls</span>
     <SegmentedControl size="sm" ariaLabel="Roll input mode" value={rollInput} onChange={(mode) => chooseRollInput(mode as "digital" | "manual")} options={[{ value: "digital", label: "Digital" }, { value: "manual", label: "Manual" }]} />
     {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => chooseBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
+    {/* Only meaningful mid-fight: where an attack tapped here resolves - inline on the sheet, or over on the initiative view (which then hops back once you confirm). */}
+    {combat?.active === true && actor.kind === "player-character" && <><span className="sheet-settings-label">Attacks</span>
+      <SegmentedControl size="sm" ariaLabel="Where attacks tapped on the sheet resolve" value={sheetAttackMode} onChange={(mode) => chooseSheetAttackMode(mode as "jump" | "inline")} options={[{ value: "inline", label: "On sheet" }, { value: "jump", label: "In initiative" }]} /></>}
   </div>) : null;
 
   // Workspace: the sheet fills the panel; when a shared dice log is available it swaps in behind the
