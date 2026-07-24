@@ -7,6 +7,7 @@ import { EquipmentPicker } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
+import { useRollPreference } from "../dice/roll-preference";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -192,10 +193,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
   // Roll-entry settings (feedback #8), remembered per browser: "digital" click-to-roll vs "manual" (you
   // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
-  const [rollInput, setRollInput] = useState<"digital" | "manual">(() => (readSetting("vtt.sheet.rollInput") === "manual" ? "manual" : "digital"));
-  const [bonusMode, setBonusMode] = useState<"auto" | "total">(() => (readSetting("vtt.sheet.bonusMode") === "total" ? "total" : "auto"));
-  const chooseRollInput = (mode: "digital" | "manual") => { setRollInput(mode); writeSetting("vtt.sheet.rollInput", mode); };
-  const chooseBonusMode = (mode: "auto" | "total") => { setBonusMode(mode); writeSetting("vtt.sheet.bonusMode", mode); };
+  // The one per-browser dice-input preference, shared with every other roll surface (saves, attacks, the
+  // initiative runner, the dice panel) so the sheet's toggle and those surfaces always agree.
+  const { rollInput, bonusMode, setRollInput: chooseRollInput, setBonusMode: chooseBonusMode } = useRollPreference();
   // The shared dice log rides behind the header's Sheet/Dice toggle — one pane at a time on every
   // viewport — so the sheet stays clean and full-width whichever way it's opened. Default to the sheet;
   // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).

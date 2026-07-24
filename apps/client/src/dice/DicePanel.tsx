@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
 import { Button, Input, SegmentedControl, Select, Stepper } from "@vtt/ui";
 import { newId } from "../lib/ids";
+import { useRollPreference } from "./roll-preference";
 import { socket } from "../socket";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = { manual: "Roll", attack: "Attack", damage: "Damage", save: "Save", check: "Check" };
@@ -22,6 +23,8 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
   const [disadvantage, setDisadvantage] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [fallFeet, setFallFeet] = useState("");
+  // The one per-browser dice-input preference, shared with the sheet and every combat roll surface.
+  const { rollInput, bonusMode, setRollInput, setBonusMode } = useRollPreference();
   // A player's "self-only" roll is seen by the roller AND the GM (the GM view carries every roll), but no
   // other player - i.e. "Just me and the GM". "blind" hides the result from the roller too (GM only).
   const visibilityOptions: Array<{ value: RollVisibility; label: string }> = role === "gm"
@@ -73,6 +76,12 @@ export function DicePanel({ role, state, mineActorId }: { role: "gm" | "player";
     <div className="dice-heading">
       <div><span className="eyebrow">DICE</span><h2 id="dice-proof-heading">Roll dice</h2></div>
       <label className="dice-visibility">Who sees it?<Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>{visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
+    </div>
+    {/* The per-browser roll-input preference, mirrored from (and in lockstep with) the character sheet's
+        toggle - so a player sets "digital vs physical dice" once and every surface obeys it. */}
+    <div className="dice-roll-pref" role="group" aria-label="How you roll">
+      <SegmentedControl size="sm" ariaLabel="Roll input mode" value={rollInput} onChange={(mode) => setRollInput(mode as "digital" | "manual")} options={[{ value: "digital", label: "Digital" }, { value: "manual", label: "Manual" }]} />
+      {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => setBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
     </div>
     <div className="dice-quick" role="group" aria-label="Quick rolls">
       {QUICK_DICE.map((sides) => <button key={sides} onClick={() => quickRoll(sides)}>d{sides}</button>)}

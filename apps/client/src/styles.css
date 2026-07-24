@@ -100,6 +100,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .dice-quick button { padding: .65rem 1rem; text-align: center; background: var(--surface-2); }
 .dice-quick button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }
 .dice-armed { margin: .6rem 0 0; padding: .5rem .75rem; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--magenta-hi); font-size: var(--fs-sm); font-weight: 700; }
+.dice-roll-pref { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; align-items: center; }
 .dice-adv-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; align-items: stretch; }
 .dice-adv-row .secondary { padding: .65rem 1rem; text-align: center; }
 .dice-adv-row .secondary[aria-pressed="true"] { background: var(--surface-3); border-color: var(--magenta); color: var(--text); box-shadow: var(--glow-magenta); }

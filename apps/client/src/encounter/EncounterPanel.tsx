@@ -6,6 +6,7 @@ import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
 import { beginTargeting, clearTargeting, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
+import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
@@ -493,6 +494,10 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     // v4 #8: toggle this panel between the turn order and the player's own sheet (embedded, no dice log).
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [view, setView] = useState<"initiative" | "sheet">("initiative");
+    // Every roll surface reads the one per-browser dice-input preference (auto vs manual), not the old
+    // table-wide combat.rollMode - so this player's saves, death saves, attacks, and sheet all agree.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { rollMode } = useRollPreference();
     const myActor = props.state.actors.find((actor) => actor.id === myId) ?? null;
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
@@ -526,11 +531,11 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
           {/* On your turn, an interactive action console (the mirror of the GM's) - tap an attack, pick a
               target, roll, and confirm; the hit is handed to the GM or auto-applied per the table policy. */}
-          {isMe && myTurn && myId !== null && rowActor?.definition && <PlayerActionRunner actorId={myId} definition={rowActor.definition} revision={props.state.revision} rollMode={combat.rollMode} playerDamageMode={combat.playerDamageMode} targets={combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name }))} />}
+          {isMe && myTurn && myId !== null && rowActor?.definition && <PlayerActionRunner actorId={myId} definition={rowActor.definition} revision={props.state.revision} rollMode={rollMode} playerDamageMode={combat.playerDamageMode} targets={combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name }))} />}
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
-          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
-          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
-          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={combat.rollMode} />}
+          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={rollMode} isActingTurn={myTurn} />}
+          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={rollMode} />}
+          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={rollMode} />}
         </li>;
       })}</ol>}
       <DockPicker dock={props.dock} />
@@ -547,6 +552,9 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [combatantSearch, setCombatantSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // The GM's own rolls (monster saves, death saves, attack previews) follow the same per-browser
+  // dice-input preference every surface reads - not a separate table-wide setting.
+  const { rollMode } = useRollPreference();
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{ message: string; run: () => Promise<MutationResult>; success: string } | null>(null);
   const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
@@ -754,7 +762,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
       </div>}
       {down && (actor.deathSaves
-        ? <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />
+        ? <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={rollMode} isActingTurn={state.combat.turnActorId === actor.id} />
         : <p className="acting-down-note" role="status"><strong>{actor.name} is down (0 HP).</strong> Actions are disabled — click one to force it through a rules override.</p>)}
       <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}${down ? " down" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
         <header className="acting-console-head">
@@ -852,12 +860,6 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="strict">Strict - block invalid actions (override available)</option>
                 <option value="assisted">Assisted - allow with warnings</option>
                 <option value="freeform">Freeform - no checks</option>
-              </Select>
-            </label>
-            <label className="rules-mode-control">Rolls
-              <Select value={state.combat.rollMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "auto" | "manual"; socket.emit("encounter:set-roll-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Roll mode: ${mode === "auto" ? "auto-roll" : "manual entry"}.` : result.message ?? "The roll mode could not be changed.")); }}>
-                <option value="auto">Auto-roll - type to override</option>
-                <option value="manual">Manual entry - Roll to auto</option>
               </Select>
             </label>
             <label className="rules-mode-control">Players' hits
@@ -964,10 +966,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               editing a combatant's HP shows those controls above its action list (feedback). */}
           {active && renderActingConsole()}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
-          {actor && actor.deathSaves && actor.hp.current <= 0 && state.combat.turnActorId !== actor.id && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
-          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode}
+          {actor && actor.deathSaves && actor.hp.current <= 0 && state.combat.turnActorId !== actor.id && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
+          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={rollMode}
             legendaryResistanceLeft={actor.legendary?.resistancesPerDay !== undefined ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0)) : undefined} />)}
-          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode} />)}
+          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} rollMode={rollMode} />)}
           {actor && state.combat.pendingDamage.filter((proposal) => proposal.targetActorId === actor.id).map((proposal) => <PendingDamagePrompt key={proposal.id} proposal={proposal} onFeedback={setMessage} />)}
         </li>;
       })}</ol>
