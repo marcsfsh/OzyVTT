@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectPlayerBacklinks, projectPlayerPage, projectPlayerPageSummary } from "../src/codex-projections.js";
+import { projectGmMarker, projectPlayerBacklinks, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -120,5 +120,70 @@ describe("CodexStore viewer safety (the leak matrix)", () => {
     store.createPage({ title: "Draft", playerBody: "mentions [[Bree]]", revealedToPlayers: false }); // player-layer but unrevealed
     const playerBacklinks = projectPlayerBacklinks(store.backlinksToPage(bree.id));
     expect(playerBacklinks.map((b) => b.sourceTitle)).toEqual(["Road"]);
+  });
+});
+
+const ASSET = "11111111-1111-4111-8111-111111111111";
+
+describe("CodexStore maps + markers", () => {
+  it("builds a map tree and rejects self-parenting and cycles", () => {
+    const world = store.createMap({ assetId: ASSET, name: "Faerûn", kind: "world" });
+    const region = store.createMap({ assetId: ASSET, name: "Sword Coast", kind: "regional", parentMapId: world.id });
+    expect(region.parentMapId).toBe(world.id);
+    expect(() => store.setMapParent(world.id, world.id)).toThrow(/own parent/);
+    expect(() => store.setMapParent(world.id, region.id)).toThrow(/loop/);
+    expect(store.listMaps()).toHaveLength(2);
+  });
+
+  it("deletes a map: cascades its markers, orphans children, and nulls drill-down links", () => {
+    const world = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const city = store.createMap({ assetId: ASSET, name: "City", kind: "regional", parentMapId: world.id });
+    const drill = store.createMarker(world.id, { x: 10, y: 20, iconId: "castle", iconColor: "#ff2e9a", subMapId: city.id });
+    store.createMarker(city.id, { x: 5, y: 5, iconId: "town", iconColor: "#2de2ff" });
+    store.deleteMap(city.id);
+    expect(store.getMap(city.id)).toBeNull();
+    expect(store.getMap(world.id)).not.toBeNull();               // parent survives
+    expect(store.getMarker(drill.id)?.subMapId).toBeNull();       // drill-down link nulled, marker survives
+    expect(store.listMarkers(city.id)).toHaveLength(0);           // city's own markers cascade-deleted
+  });
+
+  it("creates, updates, moves, reveals, and deletes markers, rejecting malformed input", () => {
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const marker = store.createMarker(map.id, { x: 100, y: 200, iconId: "town", iconColor: "#a45cff", label: "Bree" });
+    expect(marker).toMatchObject({ x: 100, y: 200, iconId: "town", label: "Bree", revealedToPlayers: false });
+    expect(store.moveMarker(marker.id, 150, 250)).toMatchObject({ x: 150, y: 250 });
+    expect(store.updateMarker(marker.id, { label: "Bree-under-Hill", iconColor: "#2de2ff" })).toMatchObject({ label: "Bree-under-Hill", iconColor: "#2de2ff" });
+    expect(store.setMarkerRevealed(marker.id, true).revealedToPlayers).toBe(true);
+    store.deleteMarker(marker.id);
+    expect(store.getMarker(marker.id)).toBeNull();
+    expect(() => store.createMarker(map.id, { x: -5, y: 0, iconId: "town", iconColor: "#a45cff" })).toThrow(/within the map/);
+    expect(() => store.createMarker(map.id, { x: 0, y: 0, iconId: "Bad Icon", iconColor: "#a45cff" })).toThrow(/slug/);
+    expect(() => store.createMarker(map.id, { x: 0, y: 0, iconId: "town", iconColor: "red" })).toThrow(/hex/);
+  });
+});
+
+describe("CodexStore map/marker viewer safety", () => {
+  it("player map projection hides unrevealed maps", () => {
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    expect(projectPlayerMap(map)).toBeNull();
+    expect(projectPlayerMap(store.setMapRevealed(map.id, true))).toMatchObject({ name: "World" });
+  });
+
+  it("player marker projection strips scene/actor links and hides links to unrevealed targets", () => {
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const secret = store.createPage({ title: "Secret lair" });
+    const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff", pageId: secret.id, sceneId: ASSET, actorId: ASSET, revealedToPlayers: true });
+    expect(projectGmMarker(marker)).toMatchObject({ sceneId: ASSET, actorId: ASSET, pageId: secret.id });
+    const stripped = projectPlayerMarker(marker, { pageRevealed: false, subMapRevealed: false })!;
+    expect(stripped).not.toHaveProperty("sceneId");
+    expect(stripped).not.toHaveProperty("actorId");
+    expect(stripped.pageId).toBeNull();                            // secret page not revealed → link hidden
+    expect(projectPlayerMarker(marker, { pageRevealed: true, subMapRevealed: false })!.pageId).toBe(secret.id);
+  });
+
+  it("an unrevealed marker is null for players regardless of link state", () => {
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
+    expect(projectPlayerMarker(marker, { pageRevealed: true, subMapRevealed: true })).toBeNull();
   });
 });

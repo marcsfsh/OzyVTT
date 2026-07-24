@@ -60,6 +60,34 @@ export type CodexBacklinkRow = Readonly<{
   section: string | null;
 }>;
 
+export type CodexMapKind = "battlemap" | "regional" | "world";
+export type CodexMapRow = Readonly<{
+  id: string;
+  assetId: string;
+  name: string;
+  kind: CodexMapKind;
+  parentMapId: string | null;
+  revealedToPlayers: boolean;
+  sortKey: number;
+  createdAt: string;
+  updatedAt: string;
+}>;
+export type CodexMarkerLinks = Readonly<{ pageId: string | null; subMapId: string | null; sceneId: string | null; actorId: string | null }>;
+export type CodexMarkerRow = Readonly<{
+  id: string;
+  mapId: string;
+  x: number;
+  y: number;
+  iconId: string;
+  iconColor: string;
+  label: string | null;
+  revealedToPlayers: boolean;
+} & CodexMarkerLinks & { createdAt: string; updatedAt: string }>;
+
+export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean }>;
+export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageId?: string | null; subMapId?: string | null; sceneId?: string | null; actorId?: string | null }>;
+export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
+
 export type CodexPageCreateInput = Readonly<{
   title: string;
   folder?: string | null;
@@ -194,6 +222,8 @@ type PageRow = {
   id: string; title: string; folder: string | null; tags_json: string; player_body: string;
   gm_body: string; revealed: number; banner_asset_id: string | null; rev: number; created_at: string; updated_at: string;
 };
+type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; created_at: string; updated_at: string };
+type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_id: string | null; sub_map_id: string | null; scene_id: string | null; actor_id: string | null; created_at: string; updated_at: string };
 
 function id(value: string): string {
   if (!ID.test(value)) throw new Error("Codex id is malformed.");
@@ -223,6 +253,38 @@ function body(value: string | undefined): string {
   const text = value ?? "";
   if (text.length > MAX_BODY) throw new Error("A page body is limited to 100000 characters.");
   return text;
+}
+const MAP_KINDS = new Set<CodexMapKind>(["battlemap", "regional", "world"]);
+function mapName(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new Error("A map name must be 1 to 120 printable characters.");
+  return trimmed;
+}
+function mapKind(value: string): CodexMapKind {
+  if (!MAP_KINDS.has(value as CodexMapKind)) throw new Error("Map kind must be battlemap, regional, or world.");
+  return value as CodexMapKind;
+}
+function iconId(value: string): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(value) || value.length > 60) throw new Error("An icon id must be a lowercase slug.");
+  return value;
+}
+function hexColor(value: string): string {
+  if (!/^#[0-9a-fA-F]{6}$/.test(value)) throw new Error("A color must be a #rrggbb hex value.");
+  return value;
+}
+function coord(value: number): number {
+  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error("A marker position must sit within the map.");
+  return value;
+}
+function markerLabel(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (trimmed.length > 120 || CONTROL_CHARS.test(trimmed)) throw new Error("A marker label is up to 120 printable characters.");
+  return trimmed;
+}
+function optionalId(value: string | null | undefined): string | null {
+  return value === null || value === undefined ? null : id(value);
 }
 
 /** A page title reduced to a stable link target: lowercased, trimmed, whitespace collapsed. */
@@ -421,6 +483,185 @@ export class CodexStore {
       return (this.requireDatabase().prepare(`SELECT page_id FROM ${table} WHERE ${table} MATCH ? ORDER BY rank LIMIT 50`).all(match) as Array<{ page_id: string }>)
         .map((row) => ({ pageId: row.page_id }));
     } catch { return []; }
+  }
+
+  // ----- Maps (the atlas tree) -----
+
+  createMap(input: CodexMapCreateInput): CodexMapRow {
+    const database = this.requireDatabase();
+    const mapId = this.freshId();
+    const stamp = this.stamp();
+    const parent = optionalId(input.parentMapId);
+    if (parent && !this.mapRowRaw(parent)) throw new CodexNotFoundError("The parent map no longer exists.");
+    const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_maps").get() as { m: number | null }).m ?? 0) + 1;
+    this.transaction(() => {
+      database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(mapId, id(input.assetId), mapName(input.name), mapKind(input.kind), parent, input.revealedToPlayers ? 1 : 0, sortKey, stamp, stamp);
+      this.bumpRevision();
+    });
+    return this.getMap(mapId)!;
+  }
+
+  updateMap(mapId: string, input: Readonly<{ name?: string; kind?: CodexMapKind }>): CodexMapRow {
+    const database = this.requireDatabase();
+    const existing = this.mapRowRaw(mapId);
+    if (!existing) throw new CodexNotFoundError("That map no longer exists.");
+    const name = input.name === undefined ? existing.name : mapName(input.name);
+    const kind = input.kind === undefined ? existing.kind : mapKind(input.kind);
+    this.transaction(() => {
+      database.prepare("UPDATE codex_maps SET name = ?, kind = ?, updated_at = ? WHERE id = ?").run(name, kind, this.stamp(), mapId);
+      this.bumpRevision();
+    });
+    return this.getMap(mapId)!;
+  }
+
+  /** Re-parent a map in the tree, rejecting self-parenting and cycles (world → region → city stays acyclic). */
+  setMapParent(mapId: string, parentMapId: string | null): CodexMapRow {
+    const database = this.requireDatabase();
+    if (!this.mapRowRaw(mapId)) throw new CodexNotFoundError("That map no longer exists.");
+    const parent = optionalId(parentMapId);
+    if (parent !== null) {
+      if (parent === mapId) throw new Error("A map cannot be its own parent.");
+      let cursor: string | null = parent;
+      const seen = new Set<string>([mapId]);
+      while (cursor !== null) {
+        if (seen.has(cursor)) throw new Error("That would create a loop in the map tree.");
+        seen.add(cursor);
+        const row: MapRowRaw | undefined = this.mapRowRaw(cursor);
+        if (!row) throw new CodexNotFoundError("The parent map no longer exists.");
+        cursor = row.parent_map_id;
+      }
+    }
+    this.transaction(() => {
+      database.prepare("UPDATE codex_maps SET parent_map_id = ?, updated_at = ? WHERE id = ?").run(parent, this.stamp(), mapId);
+      this.bumpRevision();
+    });
+    return this.getMap(mapId)!;
+  }
+
+  setMapRevealed(mapId: string, revealed: boolean): CodexMapRow {
+    const database = this.requireDatabase();
+    if (!this.mapRowRaw(mapId)) throw new CodexNotFoundError("That map no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_maps SET revealed = ?, updated_at = ? WHERE id = ?").run(revealed ? 1 : 0, this.stamp(), mapId);
+      this.bumpRevision();
+    });
+    return this.getMap(mapId)!;
+  }
+
+  deleteMap(mapId: string): void {
+    const database = this.requireDatabase();
+    if (!ID.test(mapId)) return;
+    this.transaction(() => {
+      // Markers on OTHER maps that drilled into this one become label-only rather than dangling.
+      database.prepare("UPDATE codex_markers SET sub_map_id = NULL, updated_at = ? WHERE sub_map_id = ?").run(this.stamp(), mapId);
+      // Own markers cascade; child maps' parent_map_id is set null by the FK.
+      database.prepare("DELETE FROM codex_maps WHERE id = ?").run(mapId);
+      this.bumpRevision();
+    });
+  }
+
+  getMap(mapId: string): CodexMapRow | null {
+    const row = this.mapRowRaw(mapId);
+    return row ? this.toMap(row) : null;
+  }
+
+  listMaps(): CodexMapRow[] {
+    return (this.requireDatabase().prepare("SELECT id, asset_id, name, kind, parent_map_id, revealed, sort_key, created_at, updated_at FROM codex_maps ORDER BY sort_key, name COLLATE NOCASE").all() as MapRowRaw[]).map((row) => this.toMap(row));
+  }
+
+  // ----- Markers -----
+
+  createMarker(mapId: string, input: CodexMarkerCreateInput): CodexMarkerRow {
+    const database = this.requireDatabase();
+    if (!this.mapRowRaw(mapId)) throw new CodexNotFoundError("That map no longer exists.");
+    const markerId = this.freshId();
+    const stamp = this.stamp();
+    this.transaction(() => {
+      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(markerId, mapId, coord(input.x), coord(input.y), iconId(input.iconId), hexColor(input.iconColor), markerLabel(input.label), input.revealedToPlayers ? 1 : 0,
+          optionalId(input.pageId), optionalId(input.subMapId), optionalId(input.sceneId), optionalId(input.actorId), stamp, stamp);
+      this.bumpRevision();
+    });
+    return this.getMarker(markerId)!;
+  }
+
+  updateMarker(markerId: string, input: CodexMarkerUpdateInput): CodexMarkerRow {
+    const database = this.requireDatabase();
+    const existing = this.markerRowRaw(markerId);
+    if (!existing) throw new CodexNotFoundError("That marker no longer exists.");
+    const merged = {
+      x: input.x === undefined ? existing.x : coord(input.x),
+      y: input.y === undefined ? existing.y : coord(input.y),
+      icon_id: input.iconId === undefined ? existing.icon_id : iconId(input.iconId),
+      icon_color: input.iconColor === undefined ? existing.icon_color : hexColor(input.iconColor),
+      label: input.label === undefined ? existing.label : markerLabel(input.label),
+      revealed: input.revealedToPlayers === undefined ? existing.revealed : (input.revealedToPlayers ? 1 : 0),
+      page_id: input.pageId === undefined ? existing.page_id : optionalId(input.pageId),
+      sub_map_id: input.subMapId === undefined ? existing.sub_map_id : optionalId(input.subMapId),
+      scene_id: input.sceneId === undefined ? existing.scene_id : optionalId(input.sceneId),
+      actor_id: input.actorId === undefined ? existing.actor_id : optionalId(input.actorId)
+    };
+    this.transaction(() => {
+      database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_id = ?, sub_map_id = ?, scene_id = ?, actor_id = ?, updated_at = ? WHERE id = ?")
+        .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_id, merged.sub_map_id, merged.scene_id, merged.actor_id, this.stamp(), markerId);
+      this.bumpRevision();
+    });
+    return this.getMarker(markerId)!;
+  }
+
+  /** The drag path: position only, server-validated. */
+  moveMarker(markerId: string, x: number, y: number): CodexMarkerRow {
+    const database = this.requireDatabase();
+    if (!this.markerRowRaw(markerId)) throw new CodexNotFoundError("That marker no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_markers SET x = ?, y = ?, updated_at = ? WHERE id = ?").run(coord(x), coord(y), this.stamp(), markerId);
+      this.bumpRevision();
+    });
+    return this.getMarker(markerId)!;
+  }
+
+  setMarkerRevealed(markerId: string, revealed: boolean): CodexMarkerRow {
+    const database = this.requireDatabase();
+    if (!this.markerRowRaw(markerId)) throw new CodexNotFoundError("That marker no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_markers SET revealed = ?, updated_at = ? WHERE id = ?").run(revealed ? 1 : 0, this.stamp(), markerId);
+      this.bumpRevision();
+    });
+    return this.getMarker(markerId)!;
+  }
+
+  deleteMarker(markerId: string): void {
+    if (!ID.test(markerId)) return;
+    this.transaction(() => {
+      this.requireDatabase().prepare("DELETE FROM codex_markers WHERE id = ?").run(markerId);
+      this.bumpRevision();
+    });
+  }
+
+  getMarker(markerId: string): CodexMarkerRow | null {
+    const row = this.markerRowRaw(markerId);
+    return row ? this.toMarker(row) : null;
+  }
+
+  listMarkers(mapId: string): CodexMarkerRow[] {
+    if (!ID.test(mapId)) return [];
+    return (this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE map_id = ? ORDER BY created_at").all(mapId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
+  }
+
+  private toMap(row: MapRowRaw): CodexMapRow {
+    return { id: row.id, assetId: row.asset_id, name: row.name, kind: mapKind(row.kind), parentMapId: row.parent_map_id, revealedToPlayers: row.revealed === 1, sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at };
+  }
+  private toMarker(row: MarkerRowRaw): CodexMarkerRow {
+    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageId: row.page_id, subMapId: row.sub_map_id, sceneId: row.scene_id, actorId: row.actor_id, createdAt: row.created_at, updatedAt: row.updated_at };
+  }
+  private mapRowRaw(mapId: string): MapRowRaw | undefined {
+    if (!ID.test(mapId)) return undefined;
+    return this.requireDatabase().prepare("SELECT id, asset_id, name, kind, parent_map_id, revealed, sort_key, created_at, updated_at FROM codex_maps WHERE id = ?").get(mapId) as MapRowRaw | undefined;
+  }
+  private markerRowRaw(markerId: string): MarkerRowRaw | undefined {
+    if (!ID.test(markerId)) return undefined;
+    return this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE id = ?").get(markerId) as MarkerRowRaw | undefined;
   }
 
   // ----- internals -----
