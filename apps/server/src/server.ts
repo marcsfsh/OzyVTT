@@ -208,7 +208,18 @@ export function createServer(options: CreateServerOptions) {
     gmView: (state) => gmView(state),
     playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
     random: (sides) => randomInt(1, sides + 1),
-    newId: randomUUID
+    newId: randomUUID,
+    onEncounterArchived: ({ sceneId, turnCount }) => {
+      // Combat-history bridge: log the fight to the codex timeline, pinned to its location marker if one links this scene.
+      try {
+        const latest = store.listEncounterArchives()[0];
+        if (!latest) return;
+        const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
+        const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
+        codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageId ?? null, playerText: `A battle was fought here${turns}.` });
+        notifyCodexChanged("journal");
+      } catch { /* best-effort - a codex hiccup must never affect ending a fight */ }
+    }
   });
   const commandRegistry = gameCommandRegistry(operations);
 

@@ -171,3 +171,23 @@
   .codex-atlas-body { flex-direction: column; }
   .codex-inspector { flex-basis: auto; max-height: none; }
 }
+
+/* ----- Journal ----- */
+.codex-journal { display: flex; flex-direction: column; gap: var(--space-4); max-width: 820px; margin: 0 auto; width: 100%; }
+.codex-composer { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-composer-head { display: flex; align-items: center; justify-content: space-between; }
+.codex-composer-body { min-height: 4.5rem; resize: vertical; }
+.codex-composer-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.codex-composer-meta > * { flex: 1 1 130px; }
+.codex-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+
+.codex-timeline { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-entry { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-entry.is-combat { border-left-color: var(--caution); }
+.codex-entry-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); }
+.codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.codex-entry-body { color: var(--text); }
+.codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; }
+.codex-entry-gm-tag { display: inline-block; font-family: var(--font-display); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet); margin-right: var(--space-2); }
+.codex-entry-foot { display: flex; gap: var(--space-1); flex-wrap: wrap; }

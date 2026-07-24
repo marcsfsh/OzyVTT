@@ -3,7 +3,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectPlayerBacklinks, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -65,6 +65,17 @@ const MarkerUpdateSchema = z.object({
   label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), ...MarkerLinks
 }).strict();
 const MarkerMoveSchema = z.object({ x: Coord, y: Coord }).strict();
+
+const JournalWriteSchema = z.object({
+  playerText: z.string().max(20_000).optional(),
+  gmText: z.string().max(20_000).nullable().optional(),
+  revealedToPlayers: z.boolean().optional(),
+  attachMarkerId: z.string().uuid().nullable().optional(),
+  attachPageId: z.string().uuid().nullable().optional(),
+  sessionNumber: z.number().int().min(0).max(100_000).nullable().optional(),
+  realDate: z.string().max(40).nullable().optional(),
+  inWorldLabel: z.string().max(120).nullable().optional()
+}).strict();
 
 type CodexRouterOptions = Readonly<{
   store: CodexStore;
@@ -298,6 +309,39 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.delete(`${CODEX_BASE}/markers/:id`, requireGm, (request, response) => {
     store.deleteMarker(pathParam(request, "id"));
     options.notifyChanged("markers");
+    return envelope(response, 200, { deleted: true });
+  });
+
+  // ----- Journal / timeline -----
+
+  router.get(`${CODEX_BASE}/journal`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the journal.");
+    const markerId = typeof request.query.markerId === "string" ? request.query.markerId : undefined;
+    const pageId = typeof request.query.pageId === "string" ? request.query.pageId : undefined;
+    const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
+    const entries = role === "gm" ? rows.map(projectGmJournalEntry) : rows.map(projectPlayerJournalEntry).filter((entry) => entry !== null);
+    return envelope(response, 200, { entries });
+  });
+
+  router.post(`${CODEX_BASE}/journal`, requireGm, (request, response) => {
+    try { const entry = store.createEntry(JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  router.patch(`${CODEX_BASE}/journal/:id`, requireGm, (request, response) => {
+    try { const entry = store.updateEntry(pathParam(request, "id"), JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  router.post(`${CODEX_BASE}/journal/:id/reveal`, requireGm, (request, response) => {
+    try { const entry = store.setEntryRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("journal"); return envelope(response, 200, { entry: projectGmJournalEntry(entry) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  router.delete(`${CODEX_BASE}/journal/:id`, requireGm, (request, response) => {
+    store.deleteEntry(pathParam(request, "id"));
+    options.notifyChanged("journal");
     return envelope(response, 200, { deleted: true });
   });
 

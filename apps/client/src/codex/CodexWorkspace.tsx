@@ -4,6 +4,7 @@ import { socket } from "../socket";
 import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView } from "./AtlasView";
+import { JournalView } from "./JournalView";
 import "./codex.css";
 
 /**
@@ -12,7 +13,7 @@ import "./codex.css";
  * `codex:changed` ping arrives; the open page is owned by the editor (not clobbered by list refreshes).
  */
 export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
-  const [mode, setMode] = useState<"pages" | "atlas">("pages");
+  const [mode, setMode] = useState<"pages" | "atlas" | "journal">("pages");
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[] } | null>(null);
@@ -77,11 +78,13 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
   return (
     <div className="codex-root">
       <div className="codex-modebar">
-        <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as "pages" | "atlas")}
-          options={[{ value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }]} />
+        <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as "pages" | "atlas" | "journal")}
+          options={[{ value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
       </div>
       {mode === "atlas"
         ? <AtlasView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        : mode === "journal"
+        ? <JournalView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">

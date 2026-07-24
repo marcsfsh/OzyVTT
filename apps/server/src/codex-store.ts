@@ -88,6 +88,28 @@ export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind
 export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageId?: string | null; subMapId?: string | null; sceneId?: string | null; actorId?: string | null }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
+export type CodexJournalKind = "note" | "combat";
+export type CodexJournalRow = Readonly<{
+  id: string;
+  playerText: string;
+  gmText: string | null;
+  revealedToPlayers: boolean;
+  attachMarkerId: string | null;
+  attachPageId: string | null;
+  kind: CodexJournalKind;
+  sourceEncounterId: number | null;
+  sessionNumber: number | null;
+  realDate: string | null;
+  inWorldLabel: string | null;
+  calendarInstant: number | null;
+  sortKey: number;
+  createdAt: string;
+  updatedAt: string;
+}>;
+export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null }>;
+export type CodexJournalUpdateInput = CodexJournalCreateInput;
+export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attachMarkerId?: string | null; attachPageId?: string | null; playerText: string; gmText?: string | null; revealedToPlayers?: boolean }>;
+
 export type CodexPageCreateInput = Readonly<{
   title: string;
   folder?: string | null;
@@ -224,6 +246,7 @@ type PageRow = {
 };
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; created_at: string; updated_at: string };
 type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_id: string | null; sub_map_id: string | null; scene_id: string | null; actor_id: string | null; created_at: string; updated_at: string };
+type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; sort_key: number; created_at: string; updated_at: string };
 
 function id(value: string): string {
   if (!ID.test(value)) throw new Error("Codex id is malformed.");
@@ -285,6 +308,29 @@ function markerLabel(value: string | null | undefined): string | null {
 }
 function optionalId(value: string | null | undefined): string | null {
   return value === null || value === undefined ? null : id(value);
+}
+const MAX_ENTRY = 20_000;
+function entryText(value: string | undefined): string {
+  const text = value ?? "";
+  if (text.length > MAX_ENTRY) throw new Error("A journal entry is limited to 20000 characters.");
+  return text;
+}
+function entryGmText(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  if (value.length > MAX_ENTRY) throw new Error("A journal entry is limited to 20000 characters.");
+  return value === "" ? null : value;
+}
+function shortLabel(value: string | null | undefined, max: number, what: string): string | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (trimmed.length > max || CONTROL_CHARS.test(trimmed)) throw new Error(`A ${what} is up to ${max} printable characters.`);
+  return trimmed;
+}
+function sessionNo(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (!Number.isInteger(value) || value < 0 || value > 100_000) throw new Error("A session number must be a non-negative integer.");
+  return value;
 }
 
 /** A page title reduced to a stable link target: lowercased, trimmed, whitespace collapsed. */
@@ -647,6 +693,119 @@ export class CodexStore {
   listMarkers(mapId: string): CodexMarkerRow[] {
     if (!ID.test(mapId)) return [];
     return (this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE map_id = ? ORDER BY created_at").all(mapId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
+  }
+
+  /** The location marker linked to a prepared scene, if any - the combat-history bridge pins fights here. */
+  markerForScene(sceneId: string): CodexMarkerRow | null {
+    if (!ID.test(sceneId)) return null;
+    const row = this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE scene_id = ? ORDER BY created_at LIMIT 1").get(sceneId) as MarkerRowRaw | undefined;
+    return row ? this.toMarker(row) : null;
+  }
+
+  // ----- Journal / timeline -----
+
+  createEntry(input: CodexJournalCreateInput): CodexJournalRow {
+    return this.insertEntry({
+      playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
+      attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
+      sourceEncounterId: null, sessionNumber: sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
+      inWorldLabel: shortLabel(input.inWorldLabel, 120, "in-world date")
+    });
+  }
+
+  /** The combat-history bridge: a logged encounter drops a timeline entry, optionally pinned to a location. Best-effort. */
+  appendCombatEntry(input: CodexCombatEntryInput): CodexJournalRow {
+    return this.insertEntry({
+      playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
+      attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
+      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null, inWorldLabel: null
+    });
+  }
+
+  updateEntry(entryId: string, input: CodexJournalUpdateInput): CodexJournalRow {
+    const database = this.requireDatabase();
+    const existing = this.journalRowRaw(entryId);
+    if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
+    const next = {
+      player_text: input.playerText === undefined ? existing.player_text : entryText(input.playerText),
+      gm_text: input.gmText === undefined ? existing.gm_text : entryGmText(input.gmText),
+      attach_marker_id: input.attachMarkerId === undefined ? existing.attach_marker_id : optionalId(input.attachMarkerId),
+      attach_page_id: input.attachPageId === undefined ? existing.attach_page_id : optionalId(input.attachPageId),
+      session_number: input.sessionNumber === undefined ? existing.session_number : sessionNo(input.sessionNumber),
+      real_date: input.realDate === undefined ? existing.real_date : shortLabel(input.realDate, 40, "date"),
+      in_world_label: input.inWorldLabel === undefined ? existing.in_world_label : shortLabel(input.inWorldLabel, 120, "in-world date")
+    };
+    this.transaction(() => {
+      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, updated_at = ? WHERE id = ?")
+        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, this.stamp(), entryId);
+      this.bumpRevision();
+    });
+    return this.getEntry(entryId)!;
+  }
+
+  setEntryRevealed(entryId: string, revealed: boolean): CodexJournalRow {
+    const database = this.requireDatabase();
+    if (!this.journalRowRaw(entryId)) throw new CodexNotFoundError("That journal entry no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_journal SET revealed = ?, updated_at = ? WHERE id = ?").run(revealed ? 1 : 0, this.stamp(), entryId);
+      this.bumpRevision();
+    });
+    return this.getEntry(entryId)!;
+  }
+
+  deleteEntry(entryId: string): void {
+    if (!ID.test(entryId)) return;
+    this.transaction(() => {
+      this.requireDatabase().prepare("DELETE FROM codex_journal WHERE id = ?").run(entryId);
+      this.bumpRevision();
+    });
+  }
+
+  getEntry(entryId: string): CodexJournalRow | null {
+    const row = this.journalRowRaw(entryId);
+    return row ? this.toEntry(row) : null;
+  }
+
+  /** The global campaign timeline, ordered by in-world instant (later), then session number, then time. */
+  listTimeline(): CodexJournalRow[] {
+    return (this.requireDatabase().prepare(
+      "SELECT id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at FROM codex_journal ORDER BY (calendar_instant IS NULL), calendar_instant, (session_number IS NULL), session_number, created_at"
+    ).all() as JournalRowRaw[]).map((row) => this.toEntry(row));
+  }
+
+  /** Entries pinned to a specific marker or page (the per-entity mini-timeline). */
+  listEntriesFor(attach: Readonly<{ markerId?: string; pageId?: string }>): CodexJournalRow[] {
+    const database = this.requireDatabase();
+    const columns = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at";
+    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${columns} FROM codex_journal WHERE attach_marker_id = ? ORDER BY created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${columns} FROM codex_journal WHERE attach_page_id = ? ORDER BY created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    return [];
+  }
+
+  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null }>): CodexJournalRow {
+    const database = this.requireDatabase();
+    const entryId = this.freshId();
+    const stamp = this.stamp();
+    const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
+    this.transaction(() => {
+      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)")
+        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, sortKey, stamp, stamp);
+      this.bumpRevision();
+    });
+    return this.getEntry(entryId)!;
+  }
+
+  private toEntry(row: JournalRowRaw): CodexJournalRow {
+    return {
+      id: row.id, playerText: row.player_text, gmText: row.gm_text, revealedToPlayers: row.revealed === 1,
+      attachMarkerId: row.attach_marker_id, attachPageId: row.attach_page_id, kind: row.kind === "combat" ? "combat" : "note",
+      sourceEncounterId: row.source_encounter_id, sessionNumber: row.session_number, realDate: row.real_date,
+      inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant, sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at
+    };
+  }
+  private journalRowRaw(entryId: string): JournalRowRaw | undefined {
+    if (!ID.test(entryId)) return undefined;
+    return this.requireDatabase().prepare("SELECT id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at FROM codex_journal WHERE id = ?").get(entryId) as JournalRowRaw | undefined;
   }
 
   private toMap(row: MapRowRaw): CodexMapRow {

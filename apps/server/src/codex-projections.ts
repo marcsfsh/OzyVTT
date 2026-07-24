@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -87,6 +87,20 @@ export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ pag
     pageId: context.pageRevealed ? row.pageId : null,
     subMapId: context.subMapRevealed ? row.subMapId : null
   };
+}
+
+// ----- Journal -----
+
+export type GmCodexJournalEntry = CodexJournalRow;
+/** A journal entry as a player sees it: player text only, no gmText, no GM-only linkage, only when revealed. */
+export type PlayerCodexJournalEntry = Readonly<{
+  id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; createdAt: string;
+}>;
+
+export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
+export function projectPlayerJournalEntry(row: CodexJournalRow): PlayerCodexJournalEntry | null {
+  if (!row.revealedToPlayers) return null;
+  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, createdAt: row.createdAt };
 }
 
 export function projectGmBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmMarker, projectPlayerBacklinks, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "../src/codex-projections.js";
+import { projectGmMarker, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -185,5 +185,38 @@ describe("CodexStore map/marker viewer safety", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
     const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
     expect(projectPlayerMarker(marker, { pageRevealed: true, subMapRevealed: true })).toBeNull();
+  });
+});
+
+describe("CodexStore journal", () => {
+  it("creates, updates, reveals, and orders a timeline; combat entries auto-tag their kind", () => {
+    const page = store.createPage({ title: "Bree" });
+    const first = store.createEntry({ playerText: "We arrived in Bree.", gmText: "The spy watched them.", sessionNumber: 1, attachPageId: page.id });
+    expect(first).toMatchObject({ kind: "note", revealedToPlayers: false, sessionNumber: 1 });
+    store.createEntry({ playerText: "We left at dawn.", sessionNumber: 2 });
+    const combat = store.appendCombatEntry({ sourceEncounterId: 7, playerText: "A brawl broke out.", attachPageId: page.id });
+    expect(combat.kind).toBe("combat");
+
+    const timeline = store.listTimeline();
+    expect(timeline).toHaveLength(3);
+    expect(timeline[0].sessionNumber).toBe(1); // session order
+
+    expect(store.listEntriesFor({ pageId: page.id })).toHaveLength(2); // the arrival note + the brawl
+
+    const updated = store.updateEntry(first.id, { playerText: "We rode into Bree at dusk." });
+    expect(updated.playerText).toBe("We rode into Bree at dusk.");
+    expect(store.setEntryRevealed(first.id, true).revealedToPlayers).toBe(true);
+    store.deleteEntry(combat.id);
+    expect(store.listTimeline()).toHaveLength(2);
+  });
+
+  it("player journal projection hides unrevealed entries and strips gmText", () => {
+    const secret = store.createEntry({ playerText: "The gate stood open.", gmText: "It was a trap set by the cult." });
+    expect(projectPlayerJournalEntry(secret)).toBeNull();
+    const shown = store.setEntryRevealed(secret.id, true);
+    const projected = projectPlayerJournalEntry(shown)!;
+    expect(projected.text).toBe("The gate stood open.");
+    expect(Object.keys(projected)).not.toContain("gmText");
+    expect(JSON.stringify(projected)).not.toContain("cult");
   });
 });
