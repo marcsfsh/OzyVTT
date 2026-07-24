@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Field, IconButton, Input, Modal, SegmentedControl, Switch, Textarea } from "@vtt/ui";
-import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision } from "./api";
+import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 
@@ -48,17 +48,29 @@ const TOOLBAR: ReadonlyArray<{ kind: string; label: string; glyph: string }> = [
 type PageEditorProps = Readonly<{
   gmToken: string;
   page: CodexPage;
+  pages: readonly CodexPageSummary[];
   backlinks: readonly CodexBacklink[];
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
   onNavigate: (target: string) => void;
 }>;
 
-export function PageEditor({ gmToken, page, backlinks, onChange, onDeleted, onNavigate }: PageEditorProps) {
+/** When the caret sits inside an unclosed `[[…`, return the open bracket's offset + the typed query. */
+function wikiContext(value: string, caret: number): { start: number; query: string } | null {
+  const prefix = value.slice(0, caret);
+  const open = prefix.lastIndexOf("[[");
+  if (open === -1) return null;
+  const query = prefix.slice(open + 2);
+  if (/[[\]\n]/.test(query)) return null; // a bracket or newline since `[[` means it's not an open wiki-link
+  return { start: open, query };
+}
+
+export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDeleted, onNavigate }: PageEditorProps) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
   const [tab, setTab] = useState<BodyTab>("player");
   const [preview, setPreview] = useState(false);
+  const [suggest, setSuggest] = useState<{ start: number; query: string; index: number } | null>(null);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
@@ -130,6 +142,48 @@ export function PageEditor({ gmToken, page, backlinks, onChange, onDeleted, onNa
   const uploadBanner = async (file: File | undefined) => { if (!file) return; try { const asset = await uploadCodexAsset(gmToken, file); setDraft((prev) => ({ ...prev, bannerAssetId: asset.id })); } catch { setStatus("error"); } };
   const insertImage = async (file: File | undefined) => { if (!file) return; try { const asset = await uploadCodexAsset(gmToken, file); insertAtCursor(`\n![${file.name.replace(/\.[^.]+$/, "")}](codex-asset:${asset.id})\n`); } catch { setStatus("error"); } };
 
+  // Wiki-link autocomplete: while the caret sits inside an open `[[`, suggest existing page titles so a
+  // typo can't silently fork a second page for the same place.
+  const suggestions = useMemo(() => {
+    if (!suggest) return [];
+    const query = suggest.query.trim().toLowerCase();
+    return pages.filter((candidate) => candidate.id !== page.id && candidate.title.toLowerCase().includes(query)).slice(0, 6);
+  }, [suggest, pages, page.id]);
+  const syncSuggest = (value: string, caret: number) => {
+    const context = wikiContext(value, caret);
+    setSuggest(context ? { start: context.start, query: context.query, index: 0 } : null);
+  };
+  const insertWiki = (title: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea || !suggest) return;
+    const before = body.slice(0, suggest.start);
+    const after = body.slice(textarea.selectionStart);
+    const closing = after.startsWith("]]") ? "" : "]]";
+    setBody(`${before}[[${title}${closing}${after}`);
+    setSuggest(null);
+    const caret = before.length + 2 + title.length + 2; // land just past the (existing or added) ]]
+    requestAnimationFrame(() => { textarea.focus(); textarea.setSelectionRange(caret, caret); });
+  };
+  const onBodyKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!suggest || suggestions.length === 0) return;
+    if (event.key === "ArrowDown") { event.preventDefault(); setSuggest((prev) => prev && { ...prev, index: Math.min(prev.index + 1, suggestions.length - 1) }); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); setSuggest((prev) => prev && { ...prev, index: Math.max(prev.index - 1, 0) }); }
+    else if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); insertWiki(suggestions[Math.min(suggest.index, suggestions.length - 1)].title); }
+    else if (event.key === "Escape") { event.preventDefault(); setSuggest(null); }
+  };
+
+  // Drop or paste an image straight into the body - how a GM actually collects reference art mid-prep.
+  const onBodyDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    const file = event.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith("image/")) { event.preventDefault(); void insertImage(file); }
+  };
+  const onBodyPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = event.clipboardData?.items;
+    for (let i = 0; items && i < items.length; i += 1) {
+      if (items[i].type.startsWith("image/")) { const file = items[i].getAsFile(); if (file) { event.preventDefault(); void insertImage(file); return; } }
+    }
+  };
+
   const toggleReveal = async (next: boolean) => {
     setRevealed(next);
     // Flush any pending edit first, so revealing never briefly publishes the pre-edit body.
@@ -199,8 +253,25 @@ export function PageEditor({ gmToken, page, backlinks, onChange, onDeleted, onNa
 
       {preview
         ? <div className="codex-preview">{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
-        : <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
-            placeholder={tab === "player" ? "What players learn about this place…" : "Secrets, plot hooks, GM notes…"} onChange={(event) => setBody(event.target.value)} />}
+        : <div className={`codex-editor-body${tab === "gm" ? " is-gm" : ""}`} onDrop={onBodyDrop} onDragOver={(event) => event.preventDefault()} onPaste={onBodyPaste}>
+            <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
+              placeholder={tab === "player" ? "What players learn about this place…" : "Secrets, plot hooks, GM notes…"}
+              onChange={(event) => { setBody(event.target.value); syncSuggest(event.target.value, event.target.selectionStart ?? 0); }}
+              onKeyDown={onBodyKeyDown}
+              onKeyUp={(event) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0); }}
+              onClick={(event) => syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0)}
+              onBlur={() => window.setTimeout(() => setSuggest(null), 150)} />
+            {tab === "gm" && <span className="codex-gm-tag" aria-hidden="true">GM ONLY</span>}
+            {suggest && suggestions.length > 0 && (
+              <ul className="codex-wiki-suggest" role="listbox" aria-label="Link to page">
+                {suggestions.map((candidate, index) => (
+                  <li key={candidate.id} role="option" aria-selected={index === suggest.index}>
+                    <button type="button" className={`codex-wiki-suggest-item${index === suggest.index ? " is-active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertWiki(candidate.title)}>{candidate.title}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>}
 
       {backlinks.length > 0 && (
         <div className="codex-backlinks">

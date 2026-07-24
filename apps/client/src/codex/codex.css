@@ -222,6 +222,13 @@
 .codex-banner-actions { position: absolute; top: var(--space-2); right: var(--space-2); display: flex; gap: var(--space-1); background: var(--overlay); border-radius: var(--radius-pill); padding: 2px; }
 .codex-banner-add { align-self: flex-start; background: var(--surface-2); border: 1px dashed var(--line); border-radius: var(--radius-md); color: var(--text-dim); padding: var(--space-2) var(--space-3); cursor: pointer; }
 .codex-banner-add:hover { border-color: var(--magenta); color: var(--text); }
+/* Body editor: GM-secret pane is unmistakably marked; wiki-link autocomplete floats under the textarea. */
+.codex-editor-body { position: relative; }
+.codex-editor-body.is-gm .codex-body-input { border-left: 3px solid var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 7%, var(--surface-2)); }
+.codex-gm-tag { position: absolute; top: var(--space-2); right: var(--space-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 16%, transparent); padding: 2px 6px; border-radius: var(--radius-pill); pointer-events: none; }
+.codex-wiki-suggest { position: absolute; top: 100%; left: var(--space-2); margin-top: 4px; z-index: 20; min-width: 220px; max-width: calc(100% - 2 * var(--space-2)); list-style: none; padding: var(--space-1); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: 0 12px 32px color-mix(in srgb, var(--void) 55%, transparent); }
+.codex-wiki-suggest-item { display: block; width: 100%; text-align: left; padding: var(--space-1) var(--space-2); border: none; background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; }
+.codex-wiki-suggest-item.is-active { background: var(--surface-3); }
 .codex-md-img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-md); margin: var(--space-2) 0; border: 1px solid var(--line); }
 .codex-img-loading { display: inline-block; min-height: 1.2em; min-width: 3em; background: var(--surface-2); border-radius: var(--radius-sm); }
 .codex-img-failed { color: var(--text-muted); font-style: italic; }

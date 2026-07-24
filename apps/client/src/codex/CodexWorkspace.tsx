@@ -154,7 +154,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
       <section className="codex-main">
         {selectedId && <button type="button" className="codex-back" onClick={() => setSelectedId(null)}>‹ All pages</button>}
         {selected
-          ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} backlinks={selected.backlinks} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} />
+          ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} pages={pages} backlinks={selected.backlinks} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} />
           : <div className="codex-main-empty"><h3>Your world, written down</h3><p>Select a page, or create one. Each page has a player-facing side and a GM-secret side - reveal it when the party earns it.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}
