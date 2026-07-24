@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRelationshipView } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -15,6 +15,8 @@ export type GmCodexPage = CodexPageRow;
 export type PlayerCodexPage = Readonly<{
   id: string;
   title: string;
+  entityType: CodexEntityType;
+  fields: Readonly<Record<string, string>>;
   folder: string | null;
   tags: readonly string[];
   body: string;
@@ -26,6 +28,7 @@ export type GmCodexPageSummary = CodexPageSummaryRow;
 export type PlayerCodexPageSummary = Readonly<{
   id: string;
   title: string;
+  entityType: CodexEntityType;
   folder: string | null;
   tags: readonly string[];
   bannerAssetId: string | null;
@@ -41,8 +44,9 @@ export function projectGmPage(row: CodexPageRow): GmCodexPage {
 /** null when the page is not revealed to players; otherwise the player-facing projection (no gmBody). */
 export function projectPlayerPage(row: CodexPageRow): PlayerCodexPage | null {
   if (!row.revealedToPlayers) return null;
-  // Explicit destructure-and-omit: gmBody and rev never enter the returned object.
-  return { id: row.id, title: row.title, folder: row.folder, tags: row.tags, body: row.playerBody, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
+  // Explicit destructure-and-omit: gmBody and rev never enter the returned object. Structured fields are
+  // player-facing lore (revealed with the page); a GM keeps secret attributes in gmBody instead.
+  return { id: row.id, title: row.title, entityType: row.entityType, fields: row.fields, folder: row.folder, tags: row.tags, body: row.playerBody, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
 }
 
 export function projectGmPageSummary(row: CodexPageSummaryRow): GmCodexPageSummary {
@@ -51,7 +55,17 @@ export function projectGmPageSummary(row: CodexPageSummaryRow): GmCodexPageSumma
 
 export function projectPlayerPageSummary(row: CodexPageSummaryRow): PlayerCodexPageSummary | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, title: row.title, folder: row.folder, tags: row.tags, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
+  return { id: row.id, title: row.title, entityType: row.entityType, folder: row.folder, tags: row.tags, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
+}
+
+// ----- Relationships -----
+
+export function projectGmRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
+  return [...views];
+}
+/** A player sees an edge only when the OTHER endpoint is revealed (the page they're on already is). */
+export function projectPlayerRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
+  return views.filter((view) => view.otherRevealed);
 }
 
 // ----- Maps -----

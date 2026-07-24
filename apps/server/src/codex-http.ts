@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -17,8 +17,12 @@ import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarke
 const CODEX_BASE = "/api/v1/codex";
 
 const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
+const EntityTypeSchema = z.enum(["note", "character", "location", "faction", "item", "species", "religion", "event"]);
+const FieldsSchema = z.record(z.string().max(40), z.string().max(2000));
 const PageCreateSchema = z.object({
   title: z.string().trim().min(1).max(160),
+  entityType: EntityTypeSchema.optional(),
+  fields: FieldsSchema.optional(),
   folder: z.string().max(160).nullable().optional(),
   tags: TagsSchema.optional(),
   playerBody: z.string().max(100_000).optional(),
@@ -28,6 +32,8 @@ const PageCreateSchema = z.object({
 }).strict();
 const PageUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
+  entityType: EntityTypeSchema.optional(),
+  fields: FieldsSchema.optional(),
   folder: z.string().max(160).nullable().optional(),
   tags: TagsSchema.optional(),
   playerBody: z.string().max(100_000).optional(),
@@ -35,6 +41,7 @@ const PageUpdateSchema = z.object({
   bannerAssetId: z.string().uuid().nullable().optional(),
   expectedRev: z.number().int().nonnegative().optional()
 }).strict();
+const RelationshipCreateSchema = z.object({ toPageId: z.string().uuid(), type: z.string().trim().min(1).max(40) }).strict();
 const RevealSchema = z.object({ revealed: z.boolean() }).strict();
 
 const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
@@ -168,10 +175,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
     const page = store.getPage(pathParam(request, "id"));
     if (!page) return failure(response, 404, "not_found", "That page was not found.");
-    if (role === "gm") return envelope(response, 200, { page: projectGmPage(page), backlinks: projectGmBacklinks(store.backlinksToPage(page.id)) });
+    if (role === "gm") return envelope(response, 200, { page: projectGmPage(page), backlinks: projectGmBacklinks(store.backlinksToPage(page.id)), relationships: projectGmRelationships(store.listRelationshipsFor(page.id)) });
     const projected = projectPlayerPage(page);
     if (!projected) return failure(response, 404, "not_found", "That page was not found.");
-    return envelope(response, 200, { page: projected, backlinks: projectPlayerBacklinks(store.backlinksToPage(page.id)) });
+    return envelope(response, 200, { page: projected, backlinks: projectPlayerBacklinks(store.backlinksToPage(page.id)), relationships: projectPlayerRelationships(store.listRelationshipsFor(page.id)) });
   });
 
   // ----- Pages: authoring (GM only) -----
@@ -233,6 +240,29 @@ export function createCodexRouter(options: CodexRouterOptions) {
       if (error instanceof CodexNotFoundError) return failure(response, 404, "not_found", error.message);
       return malformed(response, error);
     }
+  });
+
+  // ----- Relationships (typed entity edges) -----
+
+  router.post(`${CODEX_BASE}/pages/:id/relationships`, requireGm, (request, response) => {
+    try { const { toPageId, type } = RelationshipCreateSchema.parse(request.body); const relationship = store.createRelationship(pathParam(request, "id"), toPageId, type); options.notifyChanged("pages"); return envelope(response, 201, { relationship }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  router.delete(`${CODEX_BASE}/relationships/:id`, requireGm, (request, response) => {
+    store.deleteRelationship(pathParam(request, "id"));
+    options.notifyChanged("pages");
+    return envelope(response, 200, { deleted: true });
+  });
+
+  router.get(`${CODEX_BASE}/relationships`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
+    const all = store.listAllRelationships();
+    if (role === "gm") return envelope(response, 200, { relationships: all });
+    // Player graph: only edges whose BOTH endpoints are revealed pages.
+    const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+    return envelope(response, 200, { relationships: all.filter((edge) => revealed.has(edge.fromPageId) && revealed.has(edge.toPageId)) });
   });
 
   // ----- Maps (the atlas tree) -----

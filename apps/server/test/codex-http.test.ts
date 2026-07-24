@@ -160,4 +160,24 @@ describe("codex HTTP viewer-safety boundary", () => {
     await post(base, `/api/v1/codex/pages/${page.data.page.id}/reveal`, GM, { revealed: true });
     expect((await get(base, contentPath, PLAYER)).status).toBe(200);        // now the banner of a revealed page
   });
+
+  it("exposes entity type + fields on reveal, and hides relationships to unrevealed entities", async () => {
+    const { base } = await fixture();
+    const strahd = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd", entityType: "character", fields: { race: "Vampire", age: "400" } }));
+    const strahdId = strahd.data.page.id as string;
+    const cult = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult" })); // stays secret
+    const barovia = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Barovia" }));
+    await post(base, `/api/v1/codex/pages/${strahdId}/relationships`, GM, { toPageId: cult.data.page.id, type: "leads" });
+    await post(base, `/api/v1/codex/pages/${strahdId}/relationships`, GM, { toPageId: barovia.data.page.id, type: "rules" });
+    await post(base, `/api/v1/codex/pages/${barovia.data.page.id}/reveal`, GM, { revealed: true });
+    await post(base, `/api/v1/codex/pages/${strahdId}/reveal`, GM, { revealed: true });
+
+    const view = await body(await get(base, `/api/v1/codex/pages/${strahdId}`, PLAYER));
+    expect(view.data.page.entityType).toBe("character");
+    expect(view.data.page.fields).toEqual({ race: "Vampire", age: "400" });
+    const rels = view.data.relationships as Json[];
+    expect(rels).toHaveLength(1);                       // only the edge to revealed Barovia
+    expect(rels[0].otherTitle).toBe("Barovia");
+    expect(JSON.stringify(view)).not.toContain("Cult"); // the secret entity never leaks via a relationship
+  });
 });

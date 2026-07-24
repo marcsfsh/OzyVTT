@@ -14,9 +14,16 @@ import { DatabaseSync } from "node:sqlite";
  * GM-only half for players happens in `codex-projections.ts`, the single audited boundary - never here.
  */
 
+/** A page's worldbuilding entity type. `note` is a plain page; the rest carry structured `fields`. */
+export type CodexEntityType = "note" | "character" | "location" | "faction" | "item" | "species" | "religion" | "event";
+export const ENTITY_TYPES: readonly CodexEntityType[] = ["note", "character", "location", "faction", "item", "species", "religion", "event"];
+
 export type CodexPageRow = Readonly<{
   id: string;
   title: string;
+  entityType: CodexEntityType;
+  /** Structured, type-specific attributes (key -> value); player-facing when the page is revealed. */
+  fields: Readonly<Record<string, string>>;
   folder: string | null;
   tags: readonly string[];
   playerBody: string;
@@ -29,6 +36,11 @@ export type CodexPageRow = Readonly<{
 }>;
 
 export type CodexPageSummaryRow = Omit<CodexPageRow, "playerBody" | "gmBody">;
+
+/** A directional typed relationship between two pages (Strahd --rules--> Barovia). */
+export type CodexRelationshipRow = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
+/** A relationship as listed against one page: the OTHER endpoint resolved, with the edge direction. */
+export type CodexRelationshipView = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: CodexEntityType; otherRevealed: boolean }>;
 
 export type CodexLinkRow = Readonly<{
   sourcePageId: string;
@@ -112,6 +124,8 @@ export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attach
 
 export type CodexPageCreateInput = Readonly<{
   title: string;
+  entityType?: CodexEntityType;
+  fields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
@@ -122,6 +136,8 @@ export type CodexPageCreateInput = Readonly<{
 
 export type CodexPageUpdateInput = Readonly<{
   title?: string;
+  entityType?: CodexEntityType;
+  fields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
@@ -238,12 +254,30 @@ const MIGRATIONS = [{
     CREATE VIRTUAL TABLE codex_fts_player USING fts5(page_id UNINDEXED, title, body);
     CREATE VIRTUAL TABLE codex_fts_gm USING fts5(page_id UNINDEXED, title, body);
   `
+}, {
+  version: 3,
+  sql: `
+    ALTER TABLE codex_pages ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'note';
+    ALTER TABLE codex_pages ADD COLUMN fields_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE codex_page_revisions ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'note';
+    ALTER TABLE codex_page_revisions ADD COLUMN fields_json TEXT NOT NULL DEFAULT '{}';
+    CREATE TABLE codex_relationships (
+      id TEXT PRIMARY KEY,
+      from_page_id TEXT NOT NULL REFERENCES codex_pages(id) ON DELETE CASCADE,
+      to_page_id TEXT NOT NULL REFERENCES codex_pages(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX codex_rel_from ON codex_relationships (from_page_id);
+    CREATE INDEX codex_rel_to ON codex_relationships (to_page_id);
+  `
 }];
 
 type PageRow = {
-  id: string; title: string; folder: string | null; tags_json: string; player_body: string;
+  id: string; title: string; entity_type: string; fields_json: string; folder: string | null; tags_json: string; player_body: string;
   gm_body: string; revealed: number; banner_asset_id: string | null; rev: number; created_at: string; updated_at: string;
 };
+type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; created_at: string; updated_at: string };
 type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_id: string | null; sub_map_id: string | null; scene_id: string | null; actor_id: string | null; created_at: string; updated_at: string };
 type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; sort_key: number; created_at: string; updated_at: string };
@@ -279,6 +313,36 @@ function body(value: string | undefined): string {
   const text = value ?? "";
   if (text.length > MAX_BODY) throw new Error("A page body is limited to 100000 characters.");
   return text;
+}
+function entityType(value: string | undefined): CodexEntityType {
+  if (value === undefined) return "note";
+  if (!ENTITY_TYPES.includes(value as CodexEntityType)) throw new Error("Unknown entity type.");
+  return value as CodexEntityType;
+}
+/** Structured entity attributes: a flat {slug: string} map, empties dropped, bounded in size. */
+function entityFields(value: Readonly<Record<string, string>> | undefined): Record<string, string> {
+  if (value === undefined) return {};
+  const entries = Object.entries(value);
+  if (entries.length > 40) throw new Error("An entity may carry at most 40 fields.");
+  const out: Record<string, string> = {};
+  for (const [key, raw] of entries) {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(key) || key.length > 40) throw new Error("A field key must be a lowercase slug.");
+    if (typeof raw !== "string" || raw.length > 2000 || CONTROL_CHARS.test(raw.replace(/[\n\r\t]/g, ""))) throw new Error("A field value is up to 2000 printable characters.");
+    if (raw.trim() !== "") out[key] = raw;
+  }
+  if (JSON.stringify(out).length > 10_000) throw new Error("Entity fields are too large.");
+  return out;
+}
+const REL_TYPE = /^[a-z0-9][a-z0-9-]*$/;
+function relationshipType(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+  if (!REL_TYPE.test(trimmed) || trimmed.length > 40) throw new Error("A relationship type must be a lowercase slug.");
+  return trimmed;
+}
+function parseFields(json: string | null | undefined): Record<string, string> {
+  if (!json) return {};
+  try { const parsed = JSON.parse(json) as unknown; return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, string>) : {}; }
+  catch { return {}; }
 }
 const MAP_KINDS = new Set<CodexMapKind>(["battlemap", "regional", "world"]);
 function mapName(value: string): string {
@@ -407,13 +471,14 @@ export class CodexStore {
     const pageId = this.freshId();
     const stamp = this.stamp();
     const row: PageRow = {
-      id: pageId, title: title(input.title), folder: folder(input.folder), tags_json: JSON.stringify(tags(input.tags)),
+      id: pageId, title: title(input.title), entity_type: entityType(input.entityType), fields_json: JSON.stringify(entityFields(input.fields)),
+      folder: folder(input.folder), tags_json: JSON.stringify(tags(input.tags)),
       player_body: body(input.playerBody), gm_body: body(input.gmBody), revealed: input.revealedToPlayers ? 1 : 0,
       banner_asset_id: input.bannerAssetId ? id(input.bannerAssetId) : null, rev: 1, created_at: stamp, updated_at: stamp
     };
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_pages (id, title, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(row.id, row.title, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(row.id, row.title, row.entity_type, row.fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
       this.rebuildFts(pageId, row.title, row.player_body, row.gm_body);
       this.snapshotRevision(pageId, row, "codex:create");
@@ -430,6 +495,8 @@ export class CodexStore {
     const next: PageRow = {
       ...existing,
       title: input.title === undefined ? existing.title : title(input.title),
+      entity_type: input.entityType === undefined ? existing.entity_type : entityType(input.entityType),
+      fields_json: input.fields === undefined ? existing.fields_json : JSON.stringify(entityFields(input.fields)),
       folder: input.folder === undefined ? existing.folder : folder(input.folder),
       tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       player_body: input.playerBody === undefined ? existing.player_body : body(input.playerBody),
@@ -439,8 +506,8 @@ export class CodexStore {
       updated_at: this.stamp()
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_pages SET title = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
-        .run(next.title, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
+      database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(next.title, next.entity_type, next.fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
       this.rebuildFts(pageId, next.title, next.player_body, next.gm_body);
       this.snapshotRevision(pageId, next, authorTag);
@@ -481,22 +548,75 @@ export class CodexStore {
 
   listPages(filter?: Readonly<{ folder?: string | null; tag?: string }>): CodexPageSummaryRow[] {
     const rows = this.requireDatabase()
-      .prepare("SELECT id, title, folder, tags_json, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE")
+      .prepare("SELECT id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE")
       .all() as Array<Omit<PageRow, "player_body" | "gm_body">>;
     return rows
       .map((row) => ({
-        id: row.id, title: row.title, folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
+        id: row.id, title: row.title, entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json),
+        folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
         revealedToPlayers: row.revealed === 1, bannerAssetId: row.banner_asset_id, rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
       }))
       .filter((page) => (filter?.folder === undefined || page.folder === filter.folder) && (filter?.tag === undefined || page.tags.includes(filter.tag)));
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[] }> {
-    const pages = (this.requireDatabase().prepare("SELECT id, title, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE").all() as PageRow[]).map((row) => this.toPage(row));
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[] }> {
+    const pages = (this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE").all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
-    return { pages, maps, markers, journal: this.listTimeline() };
+    return { pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships() };
+  }
+
+  // ----- Relationships (typed entity edges) -----
+
+  createRelationship(fromPageId: string, toPageId: string, type: string): CodexRelationshipRow {
+    const database = this.requireDatabase();
+    const from = id(fromPageId);
+    const to = id(toPageId);
+    if (from === to) throw new Error("An entity can't relate to itself.");
+    if (!this.pageRow(from) || !this.pageRow(to)) throw new CodexNotFoundError("One of those pages no longer exists.");
+    const relType = relationshipType(type);
+    // Same from/to/type is idempotent - return the existing edge rather than duplicate it.
+    const existing = database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?").get(from, to, relType) as RelationshipRowRaw | undefined;
+    if (existing) return this.toRel(existing);
+    const relId = this.freshId();
+    this.transaction(() => {
+      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, ?)").run(relId, from, to, relType, this.stamp());
+      this.bumpRevision();
+    });
+    return this.toRel(database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE id = ?").get(relId) as RelationshipRowRaw);
+  }
+
+  deleteRelationship(relId: string): void {
+    if (!ID.test(relId)) return;
+    this.transaction(() => {
+      this.requireDatabase().prepare("DELETE FROM codex_relationships WHERE id = ?").run(relId);
+      this.bumpRevision();
+    });
+  }
+
+  /** Every relationship touching this page, the OTHER endpoint resolved (title/type/reveal) with direction. */
+  listRelationshipsFor(pageId: string): CodexRelationshipView[] {
+    if (!ID.test(pageId)) return [];
+    const database = this.requireDatabase();
+    const view = (rows: Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>, direction: "out" | "in"): CodexRelationshipView[] =>
+      rows.map((row) => ({ id: row.id, type: row.type, direction, otherPageId: row.other_id, otherTitle: row.other_title, otherType: (row.other_type as CodexEntityType) ?? "note", otherRevealed: row.other_revealed === 1 }));
+    const outgoing = database.prepare(
+      "SELECT r.id, r.type, r.to_page_id AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed FROM codex_relationships r JOIN codex_pages p ON p.id = r.to_page_id WHERE r.from_page_id = ? ORDER BY r.type, p.title COLLATE NOCASE"
+    ).all(pageId) as Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
+    const incoming = database.prepare(
+      "SELECT r.id, r.type, r.from_page_id AS other_id, p.title AS other_title, p.entity_type AS other_type, p.revealed AS other_revealed FROM codex_relationships r JOIN codex_pages p ON p.id = r.from_page_id WHERE r.to_page_id = ? ORDER BY r.type, p.title COLLATE NOCASE"
+    ).all(pageId) as Array<{ id: string; type: string; other_id: string; other_title: string; other_type: string; other_revealed: number }>;
+    return [...view(outgoing, "out"), ...view(incoming, "in")];
+  }
+
+  /** All relationship edges (for the graph). */
+  listAllRelationships(): CodexRelationshipRow[] {
+    return (this.requireDatabase().prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships").all() as RelationshipRowRaw[]).map((row) => this.toRel(row));
+  }
+
+  private toRel(row: RelationshipRowRaw): CodexRelationshipRow {
+    return { id: row.id, fromPageId: row.from_page_id, toPageId: row.to_page_id, type: row.type, createdAt: row.created_at };
   }
 
   // ----- Revisions -----
@@ -510,9 +630,9 @@ export class CodexStore {
 
   /** Restore a past revision by writing it forward as a new revision (history is never rewritten). */
   restoreRevision(pageId: string, revisionId: number, authorTag: string): CodexPageRow {
-    const snap = this.requireDatabase().prepare("SELECT title, player_body, gm_body, banner_asset_id, tags_json FROM codex_page_revisions WHERE id = ? AND page_id = ?").get(revisionId, pageId) as { title: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string } | undefined;
+    const snap = this.requireDatabase().prepare("SELECT title, entity_type, fields_json, player_body, gm_body, banner_asset_id, tags_json FROM codex_page_revisions WHERE id = ? AND page_id = ?").get(revisionId, pageId) as { title: string; entity_type: string; fields_json: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string } | undefined;
     if (!snap) throw new CodexNotFoundError("That revision no longer exists.");
-    return this.updatePage(pageId, { title: snap.title, playerBody: snap.player_body, gmBody: snap.gm_body, bannerAssetId: snap.banner_asset_id, tags: JSON.parse(snap.tags_json) as string[] }, undefined, authorTag);
+    return this.updatePage(pageId, { title: snap.title, entityType: snap.entity_type as CodexEntityType, fields: parseFields(snap.fields_json), playerBody: snap.player_body, gmBody: snap.gm_body, bannerAssetId: snap.banner_asset_id, tags: JSON.parse(snap.tags_json) as string[] }, undefined, authorTag);
   }
 
   // ----- Links / backlinks -----
@@ -864,12 +984,13 @@ export class CodexStore {
 
   private pageRow(pageId: string): PageRow | undefined {
     if (!ID.test(pageId)) return undefined;
-    return this.requireDatabase().prepare("SELECT id, title, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages WHERE id = ?").get(pageId) as PageRow | undefined;
+    return this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages WHERE id = ?").get(pageId) as PageRow | undefined;
   }
 
   private toPage(row: PageRow): CodexPageRow {
     return {
-      id: row.id, title: row.title, folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
+      id: row.id, title: row.title, entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json),
+      folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
       playerBody: row.player_body, gmBody: row.gm_body, revealedToPlayers: row.revealed === 1,
       bannerAssetId: row.banner_asset_id, rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
     };
@@ -893,8 +1014,8 @@ export class CodexStore {
   }
 
   private snapshotRevision(pageId: string, row: PageRow, authorTag: string) {
-    this.requireDatabase().prepare("INSERT INTO codex_page_revisions (page_id, rev, title, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(pageId, row.rev, row.title, row.player_body, row.gm_body, row.banner_asset_id, row.tags_json, row.updated_at, authorTag);
+    this.requireDatabase().prepare("INSERT INTO codex_page_revisions (page_id, rev, title, entity_type, fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(pageId, row.rev, row.title, row.entity_type, row.fields_json, row.player_body, row.gm_body, row.banner_asset_id, row.tags_json, row.updated_at, authorTag);
   }
 
   private bumpRevision() {

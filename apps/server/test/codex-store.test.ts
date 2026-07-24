@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmMarker, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "../src/codex-projections.js";
+import { projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -221,6 +221,50 @@ describe("CodexStore map/marker viewer safety", () => {
     store.updateMarker(second.id, { sceneId: scene });
     expect(store.getMarker(first.id)!.sceneId).toBeNull();
     expect(store.markerForScene(scene)?.id).toBe(second.id);
+  });
+});
+
+describe("CodexStore entities + relationships", () => {
+  it("stores an entity type and structured fields, dropping empties, rejecting bad types", () => {
+    const page = store.createPage({ title: "Strahd", entityType: "character", fields: { race: "Vampire", age: "400", title: "" } });
+    expect(page.entityType).toBe("character");
+    expect(page.fields).toEqual({ race: "Vampire", age: "400" }); // the empty "title" is dropped
+    expect(store.updatePage(page.id, { fields: { race: "Dhampir" } }, page.rev, "gm").fields).toEqual({ race: "Dhampir" });
+    expect(() => store.createPage({ title: "Bad", entityType: "dragon" as never })).toThrow(/entity type/i);
+    // A default page is a plain "note" with no fields, and history round-trips the type.
+    const plain = store.createPage({ title: "Note" });
+    expect(plain.entityType).toBe("note");
+    const rev1 = store.listRevisions(page.id).find((r) => r.rev === 1)!;
+    expect(store.restoreRevision(page.id, rev1.id, "gm").entityType).toBe("character");
+  });
+
+  it("creates typed relationships, resolves both directions, dedupes, and cascades on page delete", () => {
+    const strahd = store.createPage({ title: "Strahd", entityType: "character" });
+    const barovia = store.createPage({ title: "Barovia", entityType: "location", revealedToPlayers: true });
+    const rel = store.createRelationship(strahd.id, barovia.id, "Rules");
+    expect(rel).toMatchObject({ fromPageId: strahd.id, toPageId: barovia.id, type: "rules" }); // slugged
+    expect(store.createRelationship(strahd.id, barovia.id, "rules").id).toBe(rel.id); // idempotent
+    expect(() => store.createRelationship(strahd.id, strahd.id, "rules")).toThrow(/itself/);
+
+    const fromStrahd = store.listRelationshipsFor(strahd.id);
+    expect(fromStrahd).toEqual([{ id: rel.id, type: "rules", direction: "out", otherPageId: barovia.id, otherTitle: "Barovia", otherType: "location", otherRevealed: true }]);
+    expect(store.listRelationshipsFor(barovia.id)[0]).toMatchObject({ direction: "in", otherPageId: strahd.id, otherTitle: "Strahd", otherRevealed: false });
+
+    store.deletePage(strahd.id); // cascades the edge
+    expect(store.listRelationshipsFor(barovia.id)).toHaveLength(0);
+  });
+
+  it("player relationship projection hides edges to unrevealed entities", () => {
+    const town = store.createPage({ title: "Town", revealedToPlayers: true });
+    const secret = store.createPage({ title: "Secret cult" });
+    const temple = store.createPage({ title: "Temple", revealedToPlayers: true });
+    store.createRelationship(town.id, secret.id, "near");
+    store.createRelationship(town.id, temple.id, "near");
+    const views = store.listRelationshipsFor(town.id);
+    expect(projectGmRelationships(views)).toHaveLength(2);
+    const playerViews = projectPlayerRelationships(views);
+    expect(playerViews).toHaveLength(1);
+    expect(playerViews[0].otherTitle).toBe("Temple");
   });
 });
 
