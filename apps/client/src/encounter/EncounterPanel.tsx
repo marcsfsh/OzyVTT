@@ -486,6 +486,38 @@ function PendingDamagePrompt({ proposal, onFeedback }: Readonly<{ proposal: Pend
   </div>;
 }
 
+/**
+ * A player's "roll for initiative" prompt, shown on their own row while their id is in
+ * combat.pendingInitiative (the encounter started with player-rolled initiative). Honors the per-browser
+ * dice preference: digital rolls on the server (with Adv/Disadv); manual takes a typed physical d20. The
+ * server adds the character's initiative modifier and, in wait mode, begins turns once everyone has rolled.
+ */
+function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
+  const { rollInput } = useRollPreference();
+  const [busy, setBusy] = useState(false);
+  const [manual, setManual] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const roll = (payload: { natural?: number; rollMode?: DieMode }) => {
+    setBusy(true);
+    socket.emit("initiative:roll-self", { commandId: newId(), actorId, ...(payload.natural !== undefined ? { natural: payload.natural } : {}), ...(payload.rollMode ? { rollMode: payload.rollMode } : {}) }, (result: MutationResult) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
+    });
+  };
+  const submitManual = () => { const value = Number(manual.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { setFeedback("Enter your d20 (1-20)."); return; } roll({ natural: value }); };
+  return <div className="save-prompt initiative-prompt" role="group" aria-label="Roll your initiative">
+    <p className="save-prompt-label"><strong>Roll for initiative</strong></p>
+    {rollInput === "manual"
+      ? <span className="save-prompt-actions"><span className="save-prompt-manual"><Input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type your d20" aria-label="Initiative d20" value={manual} disabled={busy} onChange={(event) => setManual(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && manual.trim() !== "") submitManual(); }} /><Button type="button" variant="secondary" disabled={busy || manual.trim() === ""} onClick={submitManual}>Set</Button></span></span>
+      : <span className="save-prompt-confirm">
+          <button type="button" className="save-die-mode" disabled={busy} title="Roll two d20s and keep the higher" onClick={() => roll({ rollMode: "advantage" })}>Adv</button>
+          <button type="button" className="save-die-mode" disabled={busy} title="Roll two d20s and keep the lower" onClick={() => roll({ rollMode: "disadvantage" })}>Disadv</button>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({})}>Roll initiative</button>
+        </span>}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
+  </div>;
+}
+
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
@@ -533,6 +565,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         return <li key={entry.actorId} ref={entry.active ? activeRowRef : undefined} className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()} aria-current={entry.active ? "step" : undefined}>
           {/* Foundry-style row shared with the shared-screen viewer so the two lists never drift. */}
           <InitiativeRow entry={entry} self={isMe} />
+          {isMe && myId !== null && combat.pendingInitiative.includes(myId) && <InitiativePrompt actorId={myId} />}
           {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
           {/* On your turn, an interactive action console (the mirror of the GM's) - tap an attack, pick a
               target, roll, and confirm; the hit is handed to the GM or auto-applied per the table policy. */}
@@ -560,6 +593,8 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   // The GM's own rolls (monster saves, death saves, attack previews) follow the same per-browser
   // dice-input preference every surface reads - not a separate table-wide setting.
   const { rollMode } = useRollPreference();
+  // Encounter-setup opt-in: let claimed players roll their own initiative (per-encounter, not persisted).
+  const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{ message: string; run: () => Promise<MutationResult>; success: string } | null>(null);
   const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
@@ -658,7 +693,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
     if (entries.length === 0) throw new Error("Choose at least one combatant.");
-    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, expectedRevision: state.revision });
+    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, playersRollInitiative, expectedRevision: state.revision });
   }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
   // Inline-edit an initiative score: Enter or blur commits, Escape (via cancelEditRef) discards.
   const commitEdit = (actorId: string, previous: number) => {
@@ -836,6 +871,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         </div>
       </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
+      <label className="encounter-players-roll-init"><input type="checkbox" checked={playersRollInitiative} disabled={busy} onChange={(event) => setPlayersRollInitiative(event.target.checked)} /> Let players roll their own initiative</label>
       <button className="encounter-primary" disabled={busy || selectedActors.size === 0 || (!state.combat.mapAssetId && (!selectedMap || selectedMap.kind !== "battlemap"))} onClick={start}>Start encounter<span className="nav-arrow" aria-hidden="true">→</span></button>
     </> : <>
       {(() => {
@@ -871,6 +907,12 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               <Select value={state.combat.playerDamageMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "proposal" | "direct"; socket.emit("encounter:set-player-damage-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Players' hits ${mode === "direct" ? "apply directly." : "wait for your OK."}` : result.message ?? "The player damage mode could not be changed.")); }}>
                 <option value="proposal">GM confirms - apply on your tap</option>
                 <option value="direct">Direct - players apply damage</option>
+              </Select>
+            </label>
+            <label className="rules-mode-control">Player initiative
+              <Select value={state.combat.playerInitiativeMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "immediate" | "wait"; socket.emit("encounter:set-player-initiative-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Player initiative ${mode === "wait" ? "waits for everyone." : "begins immediately."}` : result.message ?? "The player initiative mode could not be changed.")); }}>
+                <option value="immediate">Start now - players roll in</option>
+                <option value="wait">Wait for all players</option>
               </Select>
             </label>
             <label className="rules-mode-control">Health
@@ -917,6 +959,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
         </div>
+      </div>}
+      {state.combat.pendingInitiative.length > 0 && <div className="initiative-gathering" role="status">
+        <span>Waiting on {state.combat.pendingInitiative.length} player{state.combat.pendingInitiative.length === 1 ? "" : "s"} to roll initiative{state.combat.playerInitiativeMode === "wait" ? " - turns begin once everyone has" : ""}.</span>
+        <button type="button" className="encounter-primary" disabled={busy} onClick={() => { setBusy(true); socket.emit("initiative:roll-remaining", { commandId: newId() }, (result: MutationResult) => { setBusy(false); setMessage(result.ok ? "Rolled initiative for the rest of the table." : result.message ?? "Initiative could not be rolled."); }); }}>Roll for the rest</button>
       </div>}
       <ol className="initiative-list gm">{orderedInitiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);

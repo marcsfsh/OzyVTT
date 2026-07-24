@@ -287,6 +287,14 @@
 .reaction-prompt { border-color: var(--indigo); background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo)); }
 /* Player-hit damage proposals (proposal mode): a faint magenta combat tint so the GM spots what needs applying, distinct from the indigo reaction prompt. */
 .pending-damage { border-color: color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+/* "Roll for initiative" prompt on the player's own row: a cyan "your move" accent, distinct from the magenta damage prompt. */
+.initiative-prompt { border-color: color-mix(in srgb, var(--line-strong) 55%, var(--cyan)); }
+/* GM encounter-setup opt-in for player-rolled initiative. */
+.encounter-players-roll-init { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 0; font-size: var(--fs-sm); color: var(--text-dim); cursor: pointer; }
+.encounter-players-roll-init input { width: 1rem; height: 1rem; margin: 0; }
+/* GM "waiting on players to roll initiative" banner above the initiative list, with the roll-for-the-rest action. */
+.initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; padding: .5rem .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
+.initiative-gathering span { flex: 1 1 12rem; }
 .reaction-prompt .save-prompt-label { color: var(--cyan-hi); }
 .reaction-prompt .save-prompt-label strong { color: var(--text); }
 /* Adv/disadv re-roll buttons on a rolled save (and, later, other d20 prompts): a cool accent, pressed
