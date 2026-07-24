@@ -26,6 +26,15 @@ phone media query (net −34 lines). Diagnosis was render-driven: a headless bef
 content is identical at both widths, so the "worse" look was purely the docked log's presence, not a
 layout bug. `check`+`build`+server `test` (422) green; header + ✕ centring render-verified light + dark.
 
+**Follow-on (same day):** closed the toggle model's feedback gap (you had to open the Dice tab to see a roll
+you just made). Two additions — a **pinned last-roll line** under the rolls bar (undocked): the most recent
+roll from this character (label · dice · formula = total, from `state.rolls`), shown inline so tap-to-roll
+gives immediate feedback, tap to jump to the full log; and an **opt-in dice dock** (header "Dock dice" /
+"Undock dice", remembered per browser, desktop only) that pins the shared log beside the sheet as a fixed
+22rem side panel (modal capped at 68rem — not the old sprawl). Default stays the clean single pane; the
+pinned line hides when docked or on the Dice pane. `check`+`build`+`test` (422) green, both states
+render-verified.
+
 ---
 
 ## 2026-07-23 — Character sheet design-system compliance pass (`claude/character-sheet-discovery-a14i7f`, PR #45)
