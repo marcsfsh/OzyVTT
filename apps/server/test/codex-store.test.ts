@@ -165,8 +165,17 @@ describe("CodexStore maps + markers", () => {
 describe("CodexStore map/marker viewer safety", () => {
   it("player map projection hides unrevealed maps", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
-    expect(projectPlayerMap(map)).toBeNull();
-    expect(projectPlayerMap(store.setMapRevealed(map.id, true))).toMatchObject({ name: "World" });
+    expect(projectPlayerMap(map, { parentRevealed: false })).toBeNull();
+    expect(projectPlayerMap(store.setMapRevealed(map.id, true), { parentRevealed: false })).toMatchObject({ name: "World" });
+  });
+
+  it("a revealed child map never leaks the id of an unrevealed parent", () => {
+    const world = store.createMap({ assetId: ASSET, name: "World", kind: "world" }); // secret by default
+    const region = store.setMapRevealed(store.createMap({ assetId: ASSET, name: "Region", kind: "regional", parentMapId: world.id }).id, true);
+    // The parent (world) is not revealed → its id must be stripped from the child's player projection.
+    expect(projectPlayerMap(region, { parentRevealed: false })!.parentMapId).toBeNull();
+    // Once the parent is revealed too, the link may survive.
+    expect(projectPlayerMap(region, { parentRevealed: true })!.parentMapId).toBe(world.id);
   });
 
   it("player marker projection strips scene/actor links and hides links to unrevealed targets", () => {

@@ -241,7 +241,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = roleOf(request);
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the atlas.");
     const rows = store.listMaps();
-    const maps = role === "gm" ? rows.map(projectGmMap) : rows.map(projectPlayerMap).filter((map) => map !== null);
+    // A player's map keeps its parent link only when that parent is itself revealed - resolve per row (mirrors the marker route below).
+    const revealed = new Set(rows.filter((row) => row.revealedToPlayers).map((row) => row.id));
+    const maps = role === "gm"
+      ? rows.map(projectGmMap)
+      : rows.map((row) => projectPlayerMap(row, { parentRevealed: row.parentMapId ? revealed.has(row.parentMapId) : false })).filter((map) => map !== null);
     return envelope(response, 200, { maps });
   });
 
@@ -324,6 +328,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the journal.");
     const markerId = typeof request.query.markerId === "string" ? request.query.markerId : undefined;
     const pageId = typeof request.query.pageId === "string" ? request.query.pageId : undefined;
+    // A player may read a location's mini-timeline only when the location (marker/page) is itself revealed -
+    // otherwise a hidden pin/page id (however obtained) could be probed. Entry-level reveal is still enforced below.
+    if (role !== "gm") {
+      if (markerId && !store.getMarker(markerId)?.revealedToPlayers) return failure(response, 404, "not_found", "That was not found.");
+      if (pageId && !store.getPage(pageId)?.revealedToPlayers) return failure(response, 404, "not_found", "That was not found.");
+    }
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
     const entries = role === "gm" ? rows.map(projectGmJournalEntry) : rows.map(projectPlayerJournalEntry).filter((entry) => entry !== null);
     return envelope(response, 200, { entries });

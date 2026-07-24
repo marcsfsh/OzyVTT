@@ -60,9 +60,15 @@ export type GmCodexMap = CodexMapRow;
 export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: CodexMapRow["kind"]; parentMapId: string | null }>;
 
 export function projectGmMap(row: CodexMapRow): GmCodexMap { return row; }
-export function projectPlayerMap(row: CodexMapRow): PlayerCodexMap | null {
+/**
+ * null unless the map is revealed. `parentMapId` survives ONLY when the parent map is itself revealed -
+ * otherwise a revealed child would leak the id of a still-secret ancestor (the same target-reveal
+ * discipline the marker projection applies to page/sub-map links, on the reverse edge). The caller
+ * resolves the parent's reveal flag and passes it in.
+ */
+export function projectPlayerMap(row: CodexMapRow, context: Readonly<{ parentRevealed: boolean }>): PlayerCodexMap | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, assetId: row.assetId, name: row.name, kind: row.kind, parentMapId: row.parentMapId };
+  return { id: row.id, assetId: row.assetId, name: row.name, kind: row.kind, parentMapId: context.parentRevealed ? row.parentMapId : null };
 }
 
 // ----- Markers -----
