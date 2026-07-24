@@ -3,6 +3,7 @@ import { Badge, Button, Field, IconButton, Input, Modal, SegmentedControl, Switc
 import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
+import { PageTimeline } from "./PageTimeline";
 
 type BodyTab = "player" | "gm";
 type SaveStatus = "idle" | "saving" | "saved" | "conflict" | "error";
@@ -281,6 +282,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
           </div>
         </div>
       )}
+
+      <PageTimeline gmToken={gmToken} pageId={page.id} />
 
       {revisionsOpen && (
         <Modal open onClose={() => setRevisionsOpen(false)} title="Revision history" size="md" ariaLabel="Revision history">

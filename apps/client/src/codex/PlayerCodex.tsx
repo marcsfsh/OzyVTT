@@ -26,11 +26,15 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
   const [currentMapId, setCurrentMapId] = useState<string | null>(null);
   const [markers, setMarkers] = useState<PlayerCodexMarker[]>([]);
   const [timeline, setTimeline] = useState<PlayerCodexJournalEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [nextPages, nextMaps, nextTimeline] = await Promise.all([playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token)]);
-    setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline);
-    setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
+    try {
+      const [nextPages, nextMaps, nextTimeline] = await Promise.all([playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token)]);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline);
+      setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
+      setError(null);
+    } catch { setError("Couldn't load the codex - check your connection to the table."); }
   }, [token]);
 
   useEffect(() => { void load().catch(() => undefined); }, [load]);
@@ -61,6 +65,8 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
           options={[{ value: "lore", label: "Lore" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
         {onClose && <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>}
       </div>
+
+      {error && <p className="codex-rail-error" role="alert">{error}</p>}
 
       {view === "lore" && (
         <div className={`codex-workspace${selectedPageId ? " has-selection" : ""}`}>

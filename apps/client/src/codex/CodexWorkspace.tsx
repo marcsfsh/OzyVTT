@@ -14,10 +14,19 @@ import "./codex.css";
  * markdown editor on the right. Data is fetched over the codex REST surface and refreshed whenever a
  * `codex:changed` ping arrives; the open page is owned by the editor (not clobbered by list refreshes).
  */
+/** New-page starters: content scaffolding only (a few headers per layer), not a template manager. */
+const TEMPLATES: ReadonlyArray<{ key: string; label: string; title: string; player: string; gm: string }> = [
+  { key: "blank", label: "Blank page", title: "Untitled page", player: "", gm: "" },
+  { key: "npc", label: "NPC", title: "Untitled NPC", player: "## Appearance\n\n## Personality\n\n## What they want\n", gm: "## Secrets\n\n## Plot hooks\n\n## Stat block\n" },
+  { key: "location", label: "Location", title: "Untitled location", player: "## Description\n\n## Who you'll meet\n\n## Points of interest\n", gm: "## Secrets\n\n## Encounters\n\n## Loot\n" },
+  { key: "faction", label: "Faction", title: "Untitled faction", player: "## Goals\n\n## Notable members\n\n## Reputation\n", gm: "## True agenda\n\n## Assets & allies\n\n## Plot hooks\n" }
+];
+
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
   const [mode, setMode] = useState<"pages" | "atlas" | "journal">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [templateMenu, setTemplateMenu] = useState(false);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[] } | null>(null);
@@ -83,6 +92,11 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     try { const page = await codexApi.createPage(gmToken, { title }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
   };
+  const createFromTemplate = async (template: (typeof TEMPLATES)[number]) => {
+    setTemplateMenu(false);
+    try { const page = await codexApi.createPage(gmToken, { title: template.title, playerBody: template.player, gmBody: template.gm }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
+  };
   const importInputRef = useRef<HTMLInputElement>(null);
   const exportCodex = async () => {
     try {
@@ -144,8 +158,20 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
-          <Input value={query} placeholder="Search the codex…" aria-label="Search the codex" onChange={(event) => setQuery(event.target.value)} />
-          <Button variant="primary" size="sm" onClick={createPage}>New page</Button>
+          <Input value={query} placeholder="Search the notebook…" aria-label="Search the notebook" onChange={(event) => setQuery(event.target.value)} />
+          <div className="codex-newpage">
+            <Button variant="primary" size="sm" aria-haspopup="menu" aria-expanded={templateMenu} onClick={() => setTemplateMenu((open) => !open)}>New ▾</Button>
+            {templateMenu && (
+              <>
+                <button type="button" className="codex-menu-scrim" aria-hidden="true" tabIndex={-1} onClick={() => setTemplateMenu(false)} />
+                <div className="codex-template-menu" role="menu">
+                  {TEMPLATES.map((template) => (
+                    <button key={template.key} type="button" role="menuitem" className="codex-template-item" onClick={() => void createFromTemplate(template)}>{template.label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
         {error && <p className="codex-rail-error" role="alert">{error}</p>}
         <nav className="codex-list" aria-label="Campaign notebook">

@@ -219,7 +219,10 @@ export function createServer(options: CreateServerOptions) {
         const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
         codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageId ?? null, playerText: `A battle was fought here${turns}.` });
         notifyCodexChanged("journal");
-      } catch { /* best-effort - a codex hiccup must never affect ending a fight */ }
+      } catch (error) {
+        // Best-effort - a codex hiccup must never affect ending a fight - but don't fail silently.
+        console.error("codex combat-history bridge failed to log the encounter:", error instanceof Error ? error.message : error);
+      }
     }
   });
   const commandRegistry = gameCommandRegistry(operations);
