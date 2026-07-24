@@ -33,6 +33,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   player marker projection drops scene/actor + unrevealed page/sub-map links; page media gated on a
   revealed reference). Mirrors the maps/tokens satellite-store pattern; the public OpenAPI
   game-command surface is untouched.
+- **Codex satellite-store follow-ups deliberately deferred (2026-07-24).** A four-lens audit of the
+  codex confirmed the off-`GameState` design is sound, and flagged gaps that are **known and accepted
+  for now**, not oversights: (1) the codex has **no integration-API surface** - it wires only
+  `authorizeGm`/`authorizePlayer`, no `credentials.verify()`, no `codex:read/write` `IntegrationScope`,
+  no OpenAPI paths (the token-asset library already has this same gap). Revisit if/when a campaign tool
+  needs scoped codex access; until then the LAN GM UI is the only consumer. (2) Codex **create** routes
+  take no `commandId` - a retried create can duplicate a page/marker/entry, unlike the `expectedRev`
+  path on updates. Accepted for a single-GM tool; add a dedupe window if it bites on flaky mobile.
+  (3) No orphan-asset GC on `codexAssets` and no `DELETE /codex-assets/:id` (mirrors `map-http`'s
+  existing gap); (4) `codex_page_revisions` snapshots every autosave with no prune. All low-severity at
+  home-campaign scale; do not treat their absence as a bug to "fix" without a real trigger.
 - **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
   the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
   **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.

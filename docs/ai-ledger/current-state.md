@@ -26,9 +26,42 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   refetch. Secret-by-default; `gmBody`/unrevealed content never reaches players (player FTS indexes
   only player bodies; player marker projection strips scene/actor links + unrevealed page/sub-map
   links; page media served to players only when used by a revealed page). Built in 7 slices, each
-  `check` + `test` (466) + `build` green with live API + player-session smokes. **Not yet:** mind-map
-  graph, fantasy calendar (schema reserves `calendarInstant`), page templates, page transclusion,
-  a direct atlas→shared-TV push (the GM Viewer tab still presents any asset). Deferred by discovery.
+  `check` + `test` (466) + `build` green with live API + player-session smokes. Deferred by discovery.
+- **Codex review + bring-to-life pass (2026-07-24, same branch).** After a four-lens audit
+  (viewer-safety / correctness / architecture / UX, each in its own subagent), a round of fixes +
+  features landed on top of the codex:
+  - **Viewer-safety (audited):** fixed a real leak - `projectPlayerMap` returned `parentMapId` even
+    when the parent map was unrevealed (a revealed child leaked a secret ancestor's id); the parent
+    link now resolves reveal-state at the router like markers already did. Hardened the
+    journal-by-attachment route to 404 a hidden marker/page for players. Added **`codex-http.test.ts`**
+    (8 tests) exercising the real network boundary - the audit flagged its absence; it now regression-
+    guards both leaks. Audit verdict otherwise clean; off-`GameState` design judged sound.
+  - **Atlas ↔ combat (the payoff):** a marker can link a prepared **Scene** and **"▶ Go live here"**
+    launches it from the pin (jumps to the table). This armed the previously-dead combat-history
+    bridge (nothing set `marker.sceneId` before). One-tap **"＋ New page"** from a pin; **"reveal the
+    page too"** nudge when a shown pin links a secret page. `markerForScene` now targets the current
+    pin (one scene = one location, enforced on link).
+  - **Notebook (user ask):** Pages became a Notion/Obsidian/OneNote-style space - **nested folder
+    paths** (`NPCs/Villains`) rendered as a collapsible **tree** (`NotebookTree`), collapse state
+    persisted, search overlays a flat list.
+  - **Editor:** `[[` **wiki-link autocomplete** (prevents canon forks), **drag/paste images**, an
+    unmistakable **GM-secret pane** (violet border + "GM ONLY" tag), **New ▾ templates**
+    (NPC/Location/Faction), inline **"Logged here"** page timeline (pins now read back).
+  - **Correctness (from the code review):** MapSurface dropped a spurious marker on any pan in
+    place-mode (compared vs last move sample, not gesture start) - fixed, + pointer-cancel discards;
+    PageEditor autosave could 409 against itself and wedge - saves are serialized + resync on conflict;
+    deletes release journal pins instead of dangling; stale marker-label on pin switch; player FTS no
+    longer crowded by unrevealed drafts.
+  - Verified: client+server typecheck, **31 codex server tests** (store+http), full build, and a **real
+    Chromium smoke** (GM login → Codex → nested-folder notes render in the tree → `[[` autocomplete →
+    zero console errors).
+  - **Deferred (recorded, not built):** present-atlas-map→shared-TV (touches the viewer boundary -
+    needs the `authorizeViewer` seam); map legend / marker-list panel; atlas reset/fit-view dock;
+    `useConfirm` for the 4 codex delete flows (still raw `window.confirm`); tag-chip filtering;
+    new-session prefill; `commandId` idempotency on codex creates; `DELETE /codex-assets/:id` + orphan
+    GC; revision-snapshot coalescing; FTS5 boot-resilience; ETag on list reads; integration-API
+    (`codex:read/write`) scopes. Still not built from the original vision: mind-map graph (UX-rejected -
+    no combat payoff), fantasy calendar (schema reserves `calendarInstant`), page transclusion.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
