@@ -226,6 +226,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.encounterEnd), ...command("encounter.end"));
   router.post(expressPath(GAME_PATHS.encounterCombatants), ...command("encounter.add-combatant"));
   router.post(expressPath(GAME_PATHS.initiativeSet), ...command("initiative.set"));
+  router.post(expressPath(GAME_PATHS.initiativeRollSelf), ...command("initiative.roll-self"));
+  router.post(expressPath(GAME_PATHS.initiativeRollRemaining), ...command("initiative.roll-remaining"));
   router.post(expressPath(GAME_PATHS.initiativeNext), ...command("initiative.next"));
   router.post(expressPath(GAME_PATHS.initiativePrevious), ...command("initiative.previous"));
   router.post(expressPath(GAME_PATHS.turnEnd), ...command("turn.end"));
@@ -254,6 +256,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
   router.post(expressPath(GAME_PATHS.rollMode), ...command("encounter.set-roll-mode"));
   router.post(expressPath(GAME_PATHS.playerDamageMode), ...command("encounter.set-player-damage-mode"));
+  router.post(expressPath(GAME_PATHS.playerInitiativeMode), ...command("encounter.set-player-initiative-mode"));
   router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
   router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
   router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));

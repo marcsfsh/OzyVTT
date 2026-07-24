@@ -23,9 +23,17 @@ export const EncounterStartSchema = z.object({
   entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), /** 2024 surprise: the combatant rolls initiative with disadvantage (SRD Surprise). */ surprised: z.boolean().optional() }).strict()).min(1).max(200),
   /** Rules-engine enforcement for this fight (ADR-0020); omitted keeps the table's current mode. */
   rulesMode: z.enum(["strict", "assisted", "freeform"]).optional(),
+  /** When true, claimed player-characters roll their own initiative (a provisional auto-roll parks them until they do). */
+  playersRollInitiative: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 export const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** A player rolls their own initiative (server rolls unless a manual d20 `natural` is given; adv/disadv supported). */
+export const InitiativeRollSelfSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), natural: z.number().int().min(1).max(20).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM rolls initiative for everyone still pending (begins a wait-mode fight). */
+export const InitiativeRollRemainingSchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Table-wide policy for player-rolled initiative: begin immediately (roll in) or wait for all players first (GM). */
+export const SetPlayerInitiativeModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["immediate", "wait"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorImportDefinitionSchema = z.object({ commandId: z.string().uuid(), definition: z.unknown(), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();

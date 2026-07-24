@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 6 GameState fields · 69 commands · 102 HTTP paths
+- 6 GameState fields · 72 commands · 105 HTTP paths
 
 ## GameState shape
 
@@ -77,6 +77,7 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`
 | `encounter.set-environment` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
+| `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-roll-mode` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.start` | `combat:write` |
@@ -85,6 +86,8 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`
 | `fog.set-enabled` | `scene:write` |
 | `initiative.next` | `combat:write` |
 | `initiative.previous` | `combat:write` |
+| `initiative.roll-remaining` | `combat:write` |
+| `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
@@ -160,6 +163,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/encounter/environment`
 - `POST /api/v1/game/encounter/health-display`
 - `POST /api/v1/game/encounter/player-damage-mode`
+- `POST /api/v1/game/encounter/player-initiative-mode`
 - `POST /api/v1/game/encounter/roll-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`
@@ -168,6 +172,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/fog/reset`
 - `POST /api/v1/game/initiative/next`
 - `POST /api/v1/game/initiative/previous`
+- `POST /api/v1/game/initiative/roll-remaining`
+- `POST /api/v1/game/initiative/roll-self`
 - `POST /api/v1/game/initiative/set`
 - `GET /api/v1/game/log`
 - `POST /api/v1/game/reactions/{reactionId}/answer`

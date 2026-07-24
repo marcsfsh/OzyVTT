@@ -16,7 +16,7 @@ import { setCharacterIdentity, setCharacterProficiencies } from "./character-edi
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
 import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
-import { addCombatant, endEncounter, nextInitiativeTurn, setInitiativeScore, startEncounter } from "./encounter.js";
+import { addCombatant, endEncounter, nextInitiativeTurn, rollRemainingInitiative, rollSelfInitiative, setInitiativeScore, startEncounter } from "./encounter.js";
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { rollDeathSave } from "./death-saves.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "./movement-narration.js";
@@ -39,7 +39,8 @@ import {
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
-  InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
+  InitiativeRollRemainingSchema, InitiativeRollSelfSchema, InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
+  SetPlayerInitiativeModeSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
   SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
@@ -219,10 +220,10 @@ export function createGameOperations(context: GameOperationsContext) {
       const request = parse(EncounterStartSchema, raw, "The encounter setup is malformed.");
       const encounterMap = context.mapCatalog.get(request.mapAssetId);
       if (!encounterMap || encounterMap.kind !== "battlemap") throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
-      const { commandId, mapAssetId, entries, rulesMode, expectedRevision } = request;
+      const { commandId, mapAssetId, entries, rulesMode, playersRollInitiative, expectedRevision } = request;
       const tokenGeometry = await context.tokenGeometryFor(mapAssetId);
       const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
-        startEncounter(state, { mapAssetId, entries, rulesMode }, () => context.random(20), tokenGeometry, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        startEncounter(state, { mapAssetId, entries, rulesMode, playersRollInitiative }, () => context.random(20), tokenGeometry, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
         // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
         // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
         timeline.truncateAll();
@@ -310,6 +311,34 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, actorId, score, expectedRevision } = request;
       const result = await store.execute({ id: commandId, type: "initiative.set", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => setInitiativeScore(state, actorId, score));
       if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async initiativeRollSelf(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      const request = parse(InitiativeRollSelfSchema, raw, "The initiative roll is malformed.");
+      const { commandId, actorId, natural, rollMode, expectedRevision } = request;
+      const initiator = initiatorOf(principal);
+      let score: number | undefined;
+      const result = await store.execute({ id: commandId, type: "initiative.roll-self", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        // A player rolls only their own claimed character's initiative; the GM (integration) anyone's.
+        const verdict = canInitiateForActor(initiator, state, actorId, "check");
+        if (!verdict.ok) throw new CommandRejectedError(verdict.message);
+        score = rollSelfInitiative(state, actorId, { natural, rollMode }, () => context.random(20));
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        if (score !== undefined) context.broadcastTableEvent({ kind: "action", text: `${actorName(actorId)} rolled ${score} for initiative.`, actorIds: [actorId] });
+        if (score !== undefined) context.appendLog({ kind: "action", text: `${actorName(actorId)} rolled ${score} for initiative.`, actorIds: [actorId] });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async initiativeRollRemaining(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can roll initiative for the rest of the table.");
+      const request = parse(InitiativeRollRemainingSchema, raw, "The initiative command is malformed.");
+      const { commandId, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "initiative.roll-remaining", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => rollRemainingInitiative(state, () => context.random(20)));
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "action", text: "The GM rolled initiative for the remaining players.", gmOnly: false }); }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -996,6 +1025,17 @@ export function createGameOperations(context: GameOperationsContext) {
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
+    async encounterSetPlayerInitiativeMode(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can change how player initiative works.");
+      const request = parse(SetPlayerInitiativeModeSchema, raw, "The initiative-mode command is malformed.");
+      const { commandId, mode, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "encounter.set-player-initiative-mode", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.combat = { ...state.combat, playerInitiativeMode: mode };
+      });
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Player initiative now ${mode === "wait" ? "waits for everyone to roll" : "begins immediately"}.`, gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
     async damageResolve(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can apply proposed damage.");
       const request = parse(DamageResolveSchema, raw, "The damage-resolution command is malformed.");
@@ -1528,6 +1568,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.end", "End the encounter and archive it permanently (GM).", (p, raw) => operations.encounterEnd(p, raw)],
     ["encounter.add-combatant", "Add a rostered actor to the running encounter (GM).", (p, raw) => operations.encounterAddCombatant(p, raw)],
     ["initiative.set", "Set a combatant's initiative score (GM).", (p, raw) => operations.initiativeSet(p, raw)],
+    ["initiative.roll-self", "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.", (p, raw) => operations.initiativeRollSelf(p, raw)],
+    ["initiative.roll-remaining", "Roll initiative for every player still pending, beginning a wait-mode fight (GM).", (p, raw) => operations.initiativeRollRemaining(p, raw)],
     ["initiative.next", "Advance the turn; steps forward through recorded history while rewound (GM).", (p, raw) => operations.initiativeNext(p, raw)],
     ["initiative.previous", "Rewind the whole table to the previous turn boundary (GM).", (p, raw) => operations.initiativePrevious(p, raw)],
     ["turn.end", "End the current turn (GM anyone; a player only their own turn).", (p, raw) => operations.turnEnd(p, raw)],
@@ -1556,6 +1598,7 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["encounter.set-rules-mode", "Set the rules-engine enforcement mode: strict, assisted, or freeform (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
     ["encounter.set-roll-mode", "Set the table's roll preference: auto-roll or manual entry first (GM).", (p, raw) => operations.encounterSetRollMode(p, raw)],
     ["encounter.set-player-damage-mode", "Set how a player's own hit reaches an enemy's HP: a GM-confirmed proposal or direct server-side apply (GM).", (p, raw) => operations.encounterSetPlayerDamageMode(p, raw)],
+    ["encounter.set-player-initiative-mode", "Set whether player-rolled initiative begins turns immediately or waits for all players to roll (GM).", (p, raw) => operations.encounterSetPlayerInitiativeMode(p, raw)],
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
     ["actor.set-health-display", "Override one combatant's token health display, or clear it to follow the table default (GM).", (p, raw) => operations.actorSetHealthDisplay(p, raw)],
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],

@@ -60,6 +60,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `initiative.set` | `combat:write` |
 | `initiative.next` | `combat:write` |
 | `initiative.previous` | `combat:write` |
+| `initiative.roll-self` | `combat:write` |
+| `initiative.roll-remaining` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
@@ -86,6 +88,7 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.set-roll-mode` | `combat:write` |
 | `encounter.set-player-damage-mode` | `combat:write` |
+| `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
@@ -319,6 +322,7 @@ Starts an encounter on a calibrated battlemap with initial combatants (GM-grade 
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mapAssetId` | string (uuid) | yes |  |
 | `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted keeps the table's current mode |
+| `playersRollInitiative` | boolean | no | When true, claimed player-characters (without an explicit score) roll their own initiative; a provisional auto-roll parks them until they do |
 | `entries` | object[] | yes |  |
 | `entries[].actorId` | string (uuid) | yes |  |
 | `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
@@ -372,6 +376,39 @@ Sets a combatant's initiative score (GM-grade only).
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `actorId` | string (uuid) | yes |  |
 | `score` | integer (-1000–1000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/roll-self`
+
+Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `natural` | integer (1–20) | no | a hand-rolled physical d20 (1-20); omit to have the server roll |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/roll-remaining`
+
+Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -910,6 +947,22 @@ Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `pr
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mode` | `proposal` \| `direct` | yes | proposal parks a GM-confirmed damage proposal for a player's hit; direct applies the typed damage immediately server-side |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/player-initiative-mode`
+
+Sets how player-rolled initiative behaves (GM-grade only): `immediate` begins turns at once on a provisional order that re-sorts as players roll in, `wait` holds turn advancement until every player has rolled (or the GM rolls the rest).
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `mode` | `immediate` \| `wait` | yes | immediate begins turns at once on a provisional order; wait holds turns until every player has rolled |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
