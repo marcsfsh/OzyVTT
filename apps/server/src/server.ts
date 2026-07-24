@@ -18,6 +18,8 @@ import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
 import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
+import { CodexStore } from "./codex-store.js";
+import { createCodexRouter } from "./codex-http.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -70,6 +72,7 @@ export function createServer(options: CreateServerOptions) {
   const tokenCatalog = new TokenCatalogStore(options.databasePath);
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
+  const codexStore = new CodexStore(options.databasePath);
   const contentLibrary = new ContentLibrary();
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
@@ -108,6 +111,10 @@ export function createServer(options: CreateServerOptions) {
       if (token && !gm && !player) { socket.disconnect(true); continue; }
       socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
+  }
+  /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
+  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal") {
+    io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
   }
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
@@ -333,6 +340,12 @@ export function createServer(options: CreateServerOptions) {
       catch { return false; }
     }
   }));
+  app.use(createCodexRouter({
+    store: codexStore,
+    authorizeGm,
+    authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+    notifyChanged: notifyCodexChanged
+  }));
   const gameApiRouter = createGameApiRouter({
     operations,
     registry: commandRegistry,
@@ -534,7 +547,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
