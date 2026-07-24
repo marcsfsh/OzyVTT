@@ -39,6 +39,20 @@ load-bearing decisions in one place plus operating decisions that don't have an 
     stays a **GM-confirmed proposal** (players never mutate another creature's HP). Authorization
     centralizes into one `canInitiateForActor(principal, state, actorId, kind)` seam so a future
     per-table "players may initiate attacks" toggle is a one-field add, not a refactor.
+  - **Player combat integration shipped (2026-07-24).** `action:resolve` is un-gated for a player's
+    own claimed character (the `canInitiateForActor` seam; templates/cover/overrides stay GM-only).
+    Damage policy is now a **GM-controlled per-table toggle** `combat.playerDamageMode`:
+    `proposal` (default — a hit parks a GM-only `combat.pendingDamage` proposal the GM applies) OR
+    `direct` (auto-apply, still server-side and GM-scoped). This realizes the "players may initiate
+    attacks" toggle the seam anticipated **without ever letting the client mutate a non-owned actor's
+    HP** — the direct path applies through the server inside `action:resolve`, never a player
+    `actor:apply-damage`. The read-only player action list became an interactive runner mirroring the
+    GM's.
+  - **One per-browser dice-input preference (2026-07-24).** The character sheet's manual/auto + bonus
+    toggle is now a shared per-browser store (`apps/client/src/dice/roll-preference.ts`) read by every
+    roll surface, replacing the table-wide GM `combat.rollMode` (retired from the UI; field/command
+    left inert). The preference is **per person, not per table** (product decision): each player
+    controls how their own dice input works; the toggle lives on the sheet and in the DicePanel.
   - Roadmap + codebase orientation: `docs/product/character-sheet-initiative.md`.
 - **UI design system: OzyVTT (2026-07-21).** A tokenized retrowave design language is the
   single source of look-and-feel, living in `packages/ui` (`design-tokens.css` + self-hosted

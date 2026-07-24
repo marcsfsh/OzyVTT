@@ -294,9 +294,18 @@ magic-item/gear data + the derivation engine.
 - **Slice 1 — Data model + richer read-only sheet.** All additive schema fields + JSON-Schema
   mirror; seed live fields in `instantiate()`; extend `ownDefinition`/`PlayerActor` allowlists;
   migrate the 6 example characters. Sheet *displays* everything. No new commands.
-- **Slice 2 — Player-initiated rolls (the core).** `canInitiateForActor`; `action.resolve`
-  player-allowed with GM-confirmed damage + role-aware attribution; tap-to-roll
-  abilities/saves/skills/attacks; interactive `EncounterPanel` runner.
+- **Slice 2 — Player-initiated rolls (the core). ✅ Landed 2026-07-24** (branch
+  `claude/character-sheet-combat-3uwp2t`). `canInitiateForActor` un-gates `action.resolve` for a
+  player's own claimed character with role-aware roll attribution; the read-only player action list
+  became an interactive `PlayerActionRunner` (tap → target → preview → confirm) mirroring the GM's.
+  Damage is a **GM-controlled per-table policy** `combat.playerDamageMode` — `proposal` (default,
+  GM-confirmed via `combat.pendingDamage` + `damage:resolve`) or `direct` (server-side auto-apply,
+  GM-scoped) — realizing the anticipated "players may initiate attacks" toggle while keeping the hard
+  rule that the client never mutates a non-owned actor's HP. Tap-to-roll abilities/saves/skills was
+  already shipped (loose `dice:roll`); attacks now route through the structured runner. Also unified
+  the manual/auto dice toggle into one per-browser preference across every surface (retiring the
+  table-wide roll-mode). **Deferred:** structured attacks from the sheet surface, player-rolled
+  initiative (below).
 - **Slice 3 — Spell slots & spell management.** Live slots + `spend/restore/set-prepared`;
   long-rest restore; Spells tab; **light-edit** of known spells & slot maxima (+ reconciliation).
 - **Slice 4 — Inventory / currency / attunement.** `set-inventory`/`set-currency`; Inventory tab;
