@@ -5,9 +5,13 @@
  * use the same routes with a player token and receive the stripped shapes.
  */
 
+import { type EntityType } from "./entities";
+
 export type CodexPageSummary = Readonly<{
   id: string;
   title: string;
+  entityType: EntityType;
+  fields: Readonly<Record<string, string>>;
   folder: string | null;
   tags: readonly string[];
   revealedToPlayers: boolean;
@@ -19,6 +23,9 @@ export type CodexPageSummary = Readonly<{
 
 export type CodexPage = CodexPageSummary & Readonly<{ playerBody: string; gmBody: string }>;
 export type CodexBacklink = Readonly<{ sourcePageId: string; sourceTitle: string; section: string | null }>;
+/** A relationship as listed against one page: the OTHER endpoint resolved, plus which way the edge points. */
+export type CodexRelationship = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: EntityType; otherRevealed: boolean }>;
+export type CodexRelationshipEdge = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
 export type CodexPageRevision = Readonly<{
   id: number;
   pageId: string;
@@ -34,6 +41,8 @@ export type CodexPageRevision = Readonly<{
 
 export type CodexPageInput = Readonly<{
   title?: string;
+  entityType?: EntityType;
+  fields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
@@ -64,7 +73,10 @@ async function request<T>(token: string, path: string, init: RequestInit = {}): 
 export const codexApi = {
   listPages: (token: string) => request<{ pages: CodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
   search: (token: string, query: string) => request<{ results: CodexPageSummary[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.results),
-  getPage: (token: string, id: string) => request<{ page: CodexPage; backlinks: CodexBacklink[] }>(token, `/pages/${id}`),
+  getPage: (token: string, id: string) => request<{ page: CodexPage; backlinks: CodexBacklink[]; relationships: CodexRelationship[] }>(token, `/pages/${id}`),
+  addRelationship: (token: string, pageId: string, toPageId: string, type: string) => request<{ relationship: CodexRelationshipEdge }>(token, `/pages/${pageId}/relationships`, { method: "POST", body: JSON.stringify({ toPageId, type }) }).then((data) => data.relationship),
+  removeRelationship: (token: string, relId: string) => request<{ deleted: boolean }>(token, `/relationships/${relId}`, { method: "DELETE" }),
+  listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
   createPage: (token: string, input: CodexPageInput) => request<{ page: CodexPage }>(token, "/pages", { method: "POST", body: JSON.stringify(input) }).then((data) => data.page),
   updatePage: (token: string, id: string, input: CodexPageInput) => request<{ page: CodexPage }>(token, `/pages/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.page),
   revealPage: (token: string, id: string, revealed: boolean) => request<{ page: CodexPage }>(token, `/pages/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.page),
@@ -93,16 +105,17 @@ export async function uploadCodexAsset(token: string, file: File): Promise<{ id:
 
 // ----- Player-facing projections (same endpoints, stripped by the server for a player token) -----
 
-export type PlayerCodexPageSummary = Readonly<{ id: string; title: string; folder: string | null; tags: readonly string[]; bannerAssetId: string | null; updatedAt: string }>;
-export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ body: string }>;
+export type PlayerCodexPageSummary = Readonly<{ id: string; title: string; entityType: EntityType; folder: string | null; tags: readonly string[]; bannerAssetId: string | null; updatedAt: string }>;
+export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ fields: Readonly<Record<string, string>>; body: string }>;
 export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null }>;
 export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageId: string | null; subMapId: string | null }>;
 export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; createdAt: string }>;
 
 export const playerCodexApi = {
   listPages: (token: string) => request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
-  getPage: (token: string, id: string) => request<{ page: PlayerCodexPage; backlinks: CodexBacklink[] }>(token, `/pages/${id}`),
+  getPage: (token: string, id: string) => request<{ page: PlayerCodexPage; backlinks: CodexBacklink[]; relationships: CodexRelationship[] }>(token, `/pages/${id}`),
   search: (token: string, query: string) => request<{ results: PlayerCodexPageSummary[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.results),
+  listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
   listMaps: (token: string) => request<{ maps: PlayerCodexMap[] }>(token, "/maps").then((data) => data.maps),
   listMarkers: (token: string, mapId: string) => request<{ markers: PlayerCodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),
   timeline: (token: string) => request<{ entries: PlayerCodexJournalEntry[] }>(token, "/journal").then((data) => data.entries)

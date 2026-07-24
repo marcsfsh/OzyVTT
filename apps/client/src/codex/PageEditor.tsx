@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Field, IconButton, Input, Modal, SegmentedControl, Switch, Textarea } from "@vtt/ui";
-import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary } from "./api";
+import { Badge, Button, Field, IconButton, Input, Modal, SegmentedControl, Select, Switch, Textarea } from "@vtt/ui";
+import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
+import { RelationshipsPanel } from "./RelationshipsPanel";
+import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, type EntityType } from "./entities";
 
 type BodyTab = "player" | "gm";
 type SaveStatus = "idle" | "saving" | "saved" | "conflict" | "error";
 
-type Draft = { title: string; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null };
+type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null };
 
 function draftOf(page: CodexPage): Draft {
-  return { title: page.title, folder: page.folder ?? "", tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId };
+  return { title: page.title, entityType: page.entityType, fields: { ...page.fields }, folder: page.folder ?? "", tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId };
 }
 function serialize(draft: Draft): string { return JSON.stringify(draft); }
 function parseTags(text: string): string[] {
@@ -51,9 +53,11 @@ type PageEditorProps = Readonly<{
   page: CodexPage;
   pages: readonly CodexPageSummary[];
   backlinks: readonly CodexBacklink[];
+  relationships: readonly CodexRelationship[];
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
   onNavigate: (target: string) => void;
+  onRelationshipsChanged: () => void;
 }>;
 
 /** When the caret sits inside an unclosed `[[…`, return the open bracket's offset + the typed query. */
@@ -66,7 +70,7 @@ function wikiContext(value: string, caret: number): { start: number; query: stri
   return { start: open, query };
 }
 
-export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDeleted, onNavigate }: PageEditorProps) {
+export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onRelationshipsChanged }: PageEditorProps) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
   const [tab, setTab] = useState<BodyTab>("player");
@@ -97,7 +101,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
     try {
       const draftNow = draftRef.current;
       const updated = await codexApi.updatePage(gmToken, page.id, {
-        title: draftNow.title.trim() || "Untitled", folder: draftNow.folder.trim() || null, tags: parseTags(draftNow.tagsText),
+        title: draftNow.title.trim() || "Untitled", entityType: draftNow.entityType, fields: draftNow.fields,
+        folder: draftNow.folder.trim() || null, tags: parseTags(draftNow.tagsText),
         playerBody: draftNow.playerBody, gmBody: draftNow.gmBody, bannerAssetId: draftNow.bannerAssetId, expectedRev: revRef.current
       });
       savedRef.current = snapshot;
@@ -124,6 +129,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
 
   const body = tab === "player" ? draft.playerBody : draft.gmBody;
   const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
+  const setField = (key: string, value: string) => setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
+  const typeDef = entityDef(draft.entityType);
 
   const format = (kind: string) => {
     const textarea = textareaRef.current;
@@ -264,9 +271,26 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
           <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { void uploadBanner(event.target.files?.[0]); event.target.value = ""; }} />
 
           <div className="codex-meta-row">
+            <Field label="Entity type" htmlFor="codex-type">
+              <Select id="codex-type" value={draft.entityType} onChange={(event) => setDraft((prev) => ({ ...prev, entityType: event.target.value as EntityType }))}>
+                {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].icon} {ENTITY_DEFS[type].label}</option>)}
+              </Select>
+            </Field>
             <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
             <Field label="Tags" htmlFor="codex-tags" help="Comma-separated"><Input id="codex-tags" value={draft.tagsText} placeholder="town, npc" onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))} /></Field>
           </div>
+
+          {typeDef.fields.length > 0 && (
+            <div className="codex-fields">
+              {typeDef.fields.map((field) => (
+                <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`}>
+                  {field.kind === "textarea"
+                    ? <Textarea id={`codex-field-${field.key}`} className="codex-field-area" value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />
+                    : <Input id={`codex-field-${field.key}`} value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />}
+                </Field>
+              ))}
+            </div>
+          )}
 
           <div className="codex-body-bar">
             <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
@@ -316,6 +340,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, onChange, onDelete
               </ul>
             </div>
           )}
+          <RelationshipsPanel gmToken={gmToken} pageId={page.id} relationships={relationships} pages={pages} onChanged={onRelationshipsChanged} onOpen={onNavigate} />
           {backlinks.length > 0 && (
             <div className="codex-backlinks">
               <h4 className="codex-backlinks-title">Linked from</h4>

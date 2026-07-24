@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
-import { playerCodexApi, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { playerCodexApi, type CodexRelationship, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
+import { entityDef, entityIcon, relationshipLabel } from "./entities";
 import "./codex.css";
 
 /**
@@ -22,6 +23,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
   const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [page, setPage] = useState<PlayerCodexPage | null>(null);
+  const [pageRels, setPageRels] = useState<CodexRelationship[]>([]);
   const [maps, setMaps] = useState<PlayerCodexMap[]>([]);
   const [currentMapId, setCurrentMapId] = useState<string | null>(null);
   const [markers, setMarkers] = useState<PlayerCodexMarker[]>([]);
@@ -39,7 +41,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
 
   useEffect(() => { void load().catch(() => undefined); }, [load]);
   useEffect(() => { const onChanged = () => { void load().catch(() => undefined); if (currentMapId) void playerCodexApi.listMarkers(token, currentMapId).then(setMarkers).catch(() => undefined); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load, token, currentMapId]);
-  useEffect(() => { if (!selectedPageId) { setPage(null); return; } let live = true; void playerCodexApi.getPage(token, selectedPageId).then((result) => { if (live) setPage(result.page); }).catch(() => { if (live) setPage(null); }); return () => { live = false; }; }, [token, selectedPageId]);
+  useEffect(() => { if (!selectedPageId) { setPage(null); setPageRels([]); return; } let live = true; void playerCodexApi.getPage(token, selectedPageId).then((result) => { if (live) { setPage(result.page); setPageRels(result.relationships); } }).catch(() => { if (live) { setPage(null); setPageRels([]); } }); return () => { live = false; }; }, [token, selectedPageId]);
   useEffect(() => { if (!currentMapId) { setMarkers([]); return; } void playerCodexApi.listMarkers(token, currentMapId).then(setMarkers).catch(() => setMarkers([])); }, [token, currentMapId]);
 
   const openPage = useCallback((pageId: string) => { setSelectedPageId(pageId); setView("lore"); }, []);
@@ -79,7 +81,32 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
           <section className="codex-main">
             {selectedPageId && <button type="button" className="codex-back" onClick={() => setSelectedPageId(null)}>‹ All lore</button>}
             {page
-              ? <article className="codex-reader">{page.bannerAssetId && <CodexImage assetId={page.bannerAssetId} token={token} alt="" className="codex-banner-img" />}<h2 className="codex-reader-title">{page.title}</h2><div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} token={token} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div></article>
+              ? <article className="codex-reader">
+                  {page.bannerAssetId && <CodexImage assetId={page.bannerAssetId} token={token} alt="" className="codex-banner-img" />}
+                  <h2 className="codex-reader-title">{page.entityType !== "note" && <span aria-hidden="true">{entityIcon(page.entityType)} </span>}{page.title}</h2>
+                  {Object.entries(page.fields).length > 0 && (
+                    <dl className="codex-reader-fields">
+                      {Object.entries(page.fields).map(([key, value]) => {
+                        const def = entityDef(page.entityType).fields.find((field) => field.key === key);
+                        return <div key={key} className="codex-reader-field"><dt>{def?.label ?? key}</dt><dd>{value}</dd></div>;
+                      })}
+                    </dl>
+                  )}
+                  <div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} token={token} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div>
+                  {pageRels.length > 0 && (
+                    <div className="codex-reader-rels">
+                      <h3 className="codex-backlinks-title">Connections</h3>
+                      <ul className="codex-rels-list">
+                        {pageRels.map((rel) => (
+                          <li key={rel.id} className="codex-rels-item">
+                            <span className="codex-rels-label">{relationshipLabel(rel.type, rel.direction)}</span>
+                            <button type="button" className="codex-md-link" onClick={() => navigate(rel.otherTitle)}>{entityIcon(rel.otherType)} {rel.otherTitle}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </article>
               : <div className="codex-main-empty"><h3>The world, as you know it</h3><p>Select a page to read what your party has learned.</p></div>}
           </section>
         </div>

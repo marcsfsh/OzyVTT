@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Input, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
-import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary } from "./api";
+import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
 import { NotebookTree, buildFolderTree } from "./NotebookTree";
+import { type EntityType } from "./entities";
 import "./codex.css";
 
 /**
@@ -14,12 +15,14 @@ import "./codex.css";
  * markdown editor on the right. Data is fetched over the codex REST surface and refreshed whenever a
  * `codex:changed` ping arrives; the open page is owned by the editor (not clobbered by list refreshes).
  */
-/** New-page starters: content scaffolding only (a few headers per layer), not a template manager. */
-const TEMPLATES: ReadonlyArray<{ key: string; label: string; title: string; player: string; gm: string }> = [
-  { key: "blank", label: "Blank page", title: "Untitled page", player: "", gm: "" },
-  { key: "npc", label: "NPC", title: "Untitled NPC", player: "## Appearance\n\n## Personality\n\n## What they want\n", gm: "## Secrets\n\n## Plot hooks\n\n## Stat block\n" },
-  { key: "location", label: "Location", title: "Untitled location", player: "## Description\n\n## Who you'll meet\n\n## Points of interest\n", gm: "## Secrets\n\n## Encounters\n\n## Loot\n" },
-  { key: "faction", label: "Faction", title: "Untitled faction", player: "## Goals\n\n## Notable members\n\n## Reputation\n", gm: "## True agenda\n\n## Assets & allies\n\n## Plot hooks\n" }
+/** New-entity starters: pick a type (which brings its structured fields) + a light prose scaffold. */
+const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; title: string; player: string; gm: string }> = [
+  { key: "blank", label: "📄 Blank page", type: "note", title: "Untitled page", player: "", gm: "" },
+  { key: "character", label: "🧑 Character", type: "character", title: "Untitled character", player: "## Description\n", gm: "## Secrets & hooks\n" },
+  { key: "location", label: "🏰 Location", type: "location", title: "Untitled location", player: "## Description\n\n## Points of interest\n", gm: "## Secrets\n\n## Encounters\n" },
+  { key: "faction", label: "⚔️ Faction", type: "faction", title: "Untitled faction", player: "## Overview\n", gm: "## True agenda\n\n## Assets & allies\n" },
+  { key: "item", label: "🗡️ Item", type: "item", title: "Untitled item", player: "## Description\n", gm: "## Secrets\n" },
+  { key: "religion", label: "🕯️ Religion", type: "religion", title: "Untitled religion", player: "## Tenets\n", gm: "## Secrets\n" }
 ];
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
@@ -29,7 +32,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   const [templateMenu, setTemplateMenu] = useState(false);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[] } | null>(null);
+  const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[]; relationships: readonly CodexRelationship[] } | null>(null);
   const [query, setQuery] = useState("");
   const [searchHits, setSearchHits] = useState<CodexPageSummary[] | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
@@ -84,6 +87,12 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     return () => { live = false; };
   }, [gmToken, selectedId]);
 
+  // Refetch the open page (e.g. after a relationship edit) to pull its fresh backlinks + relationships.
+  const refreshSelected = useCallback(() => {
+    if (!selectedId) return;
+    void codexApi.getPage(gmToken, selectedId).then(setSelected).catch(() => undefined);
+  }, [gmToken, selectedId]);
+
   const createPage = async () => {
     try { const page = await codexApi.createPage(gmToken, { title: "Untitled page" }); await refreshList(); setSelectedId(page.id); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
@@ -94,7 +103,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   };
   const createFromTemplate = async (template: (typeof TEMPLATES)[number]) => {
     setTemplateMenu(false);
-    try { const page = await codexApi.createPage(gmToken, { title: template.title, playerBody: template.player, gmBody: template.gm }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    try { const page = await codexApi.createPage(gmToken, { title: template.title, entityType: template.type, playerBody: template.player, gmBody: template.gm }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
   };
   const createInFolder = async (folder: string) => {
@@ -196,7 +205,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
       <section className="codex-main">
         {selectedId && <button type="button" className="codex-back" onClick={() => setSelectedId(null)}>‹ All pages</button>}
         {selected
-          ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} pages={pages} backlinks={selected.backlinks} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} />
+          ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} pages={pages} backlinks={selected.backlinks} relationships={selected.relationships} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} onRelationshipsChanged={refreshSelected} />
           : <div className="codex-main-empty"><h3>Your world, written down</h3><p>Select a page, or create one. Each page has a player-facing side and a GM-secret side - reveal it when the party earns it.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}
