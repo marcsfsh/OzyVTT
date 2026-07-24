@@ -91,7 +91,11 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
   };
   const onMarkerDeleted = (markerId: string) => { setMarkers((prev) => prev.filter((marker) => marker.id !== markerId)); setSelectedMarkerId(null); };
   const onMapReplace = (map: CodexMap) => setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
-  const revealMap = async (revealed: boolean) => { if (currentMap) onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); };
+  const revealMap = async (revealed: boolean) => {
+    if (!currentMap) return;
+    try { onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); }
+    catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Couldn't change who can see this map."); }
+  };
   const deleteMap = async () => { if (currentMap && confirm(`Delete map "${currentMap.name}"? Its markers are removed.`)) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); setCurrentMapId(parent); } };
 
   return (

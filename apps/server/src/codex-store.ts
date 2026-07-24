@@ -462,8 +462,9 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("DELETE FROM codex_fts_player WHERE page_id = ?").run(pageId);
       database.prepare("DELETE FROM codex_fts_gm WHERE page_id = ?").run(pageId);
-      // Markers that pointed here become label-only rather than dangling.
+      // Markers and journal pins that pointed here become label-only rather than dangling.
       database.prepare("UPDATE codex_markers SET page_id = NULL, updated_at = ? WHERE page_id = ?").run(this.stamp(), pageId);
+      database.prepare("UPDATE codex_journal SET attach_page_id = NULL, updated_at = ? WHERE attach_page_id = ?").run(this.stamp(), pageId);
       database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades links + revisions
       this.bumpRevision();
     });
@@ -528,14 +529,17 @@ export class CodexStore {
 
   // ----- Search -----
 
-  /** Full-text search over one audience's index. Player queries can only ever hit `player_body` text. */
+  /** Full-text search over one audience's index. Player queries can only ever hit `player_body` text, and
+   *  are pre-filtered to revealed pages so unrevealed drafts don't crowd the result cap (they'd be
+   *  projected out anyway - this keeps genuinely-visible matches from being truncated behind them). */
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
-    const table = audience === "gm" ? "codex_fts_gm" : "codex_fts_player";
     const match = ftsQuery(query);
     if (!match) return [];
+    const sql = audience === "gm"
+      ? "SELECT page_id FROM codex_fts_gm WHERE codex_fts_gm MATCH ? ORDER BY rank LIMIT 50"
+      : "SELECT codex_fts_player.page_id FROM codex_fts_player JOIN codex_pages p ON p.id = codex_fts_player.page_id WHERE codex_fts_player MATCH ? AND p.revealed = 1 ORDER BY codex_fts_player.rank LIMIT 50";
     try {
-      return (this.requireDatabase().prepare(`SELECT page_id FROM ${table} WHERE ${table} MATCH ? ORDER BY rank LIMIT 50`).all(match) as Array<{ page_id: string }>)
-        .map((row) => ({ pageId: row.page_id }));
+      return (this.requireDatabase().prepare(sql).all(match) as Array<{ page_id: string }>).map((row) => ({ pageId: row.page_id }));
     } catch { return []; }
   }
 
@@ -609,6 +613,8 @@ export class CodexStore {
     this.transaction(() => {
       // Markers on OTHER maps that drilled into this one become label-only rather than dangling.
       database.prepare("UPDATE codex_markers SET sub_map_id = NULL, updated_at = ? WHERE sub_map_id = ?").run(this.stamp(), mapId);
+      // Journal pins to this map's own (about-to-cascade) markers are released first, so they don't dangle.
+      database.prepare("UPDATE codex_journal SET attach_marker_id = NULL, updated_at = ? WHERE attach_marker_id IN (SELECT id FROM codex_markers WHERE map_id = ?)").run(this.stamp(), mapId);
       // Own markers cascade; child maps' parent_map_id is set null by the FK.
       database.prepare("DELETE FROM codex_maps WHERE id = ?").run(mapId);
       this.bumpRevision();
@@ -692,7 +698,10 @@ export class CodexStore {
   deleteMarker(markerId: string): void {
     if (!ID.test(markerId)) return;
     this.transaction(() => {
-      this.requireDatabase().prepare("DELETE FROM codex_markers WHERE id = ?").run(markerId);
+      const database = this.requireDatabase();
+      // Journal pins to this marker become label-only rather than dangling.
+      database.prepare("UPDATE codex_journal SET attach_marker_id = NULL, updated_at = ? WHERE attach_marker_id = ?").run(this.stamp(), markerId);
+      database.prepare("DELETE FROM codex_markers WHERE id = ?").run(markerId);
       this.bumpRevision();
     });
   }

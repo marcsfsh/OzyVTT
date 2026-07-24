@@ -19,7 +19,7 @@ const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 
 type Gesture =
   | { mode: "idle" }
-  | { mode: "pan"; pointerId: number; lastX: number; lastY: number }
+  | { mode: "pan"; pointerId: number; startX: number; startY: number; lastX: number; lastY: number }
   | { mode: "marker"; pointerId: number; markerId: string; moved: boolean }
   | { mode: "pinch"; startDist: number; startZoom: number };
 
@@ -85,7 +85,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
     const markerId = (event.target as Element).closest("[data-marker-id]")?.getAttribute("data-marker-id") ?? null;
     (event.currentTarget as SVGSVGElement).setPointerCapture(event.pointerId);
     if (markerId) gesture.current = { mode: "marker", pointerId: event.pointerId, markerId, moved: false };
-    else gesture.current = { mode: "pan", pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+    else gesture.current = { mode: "pan", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY };
   }, [camera?.zoom]);
 
   const onPointerMove = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
@@ -116,14 +116,18 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
     pointers.current.delete(event.pointerId);
     const state = gesture.current;
     const svg = svgRef.current;
+    // A cancelled gesture (a system/OS gesture stole the pointer) must discard, not commit its last preview.
+    const cancelled = event.type === "pointercancel";
     if (state.mode === "marker" && state.pointerId === event.pointerId) {
-      if (!state.moved) onMarkerClick(state.markerId);
-      else if (dragPreview && dragPreview.id === state.markerId) onMarkerDragEnd(state.markerId, { x: dragPreview.x, y: dragPreview.y });
+      if (!cancelled) {
+        if (!state.moved) onMarkerClick(state.markerId);
+        else if (dragPreview && dragPreview.id === state.markerId) onMarkerDragEnd(state.markerId, { x: dragPreview.x, y: dragPreview.y });
+      }
       setDragPreview(null);
-    } else if (state.mode === "pan" && state.pointerId === event.pointerId && svg && placing) {
-      // A tap on the background in place-mode drops a marker (no drag happened → treat as a click).
+    } else if (!cancelled && state.mode === "pan" && state.pointerId === event.pointerId && svg && placing) {
+      // Drop a marker only when the pointer barely moved SINCE IT WENT DOWN - a real pan (many move samples) is never a drop.
       const point = imagePointFromClient(svg, event.clientX, event.clientY);
-      if (point && Math.hypot(event.clientX - state.lastX, event.clientY - state.lastY) < 4 && width) onBackgroundClick(clampPoint(point, width, height));
+      if (point && Math.hypot(event.clientX - state.startX, event.clientY - state.startY) < 4 && width) onBackgroundClick(clampPoint(point, width, height));
     }
     if (pointers.current.size < 2) gesture.current = { mode: "idle" };
   }, [dragPreview, placing, width, height, onMarkerClick, onMarkerDragEnd, onBackgroundClick]);

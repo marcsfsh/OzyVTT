@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Field, IconButton, Input, Modal, SegmentedControl, Switch, Textarea } from "@vtt/ui";
 import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -64,31 +64,50 @@ export function PageEditor({ gmToken, page, backlinks, onChange, onDeleted, onNa
   const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
   const revRef = useRef(page.rev);
   const savedRef = useRef(serialize(draftOf(page)));
+  const draftRef = useRef(draft);
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
 
-  // Debounced autosave: fire ~800ms after the last edit, guarding against no-op saves and stale revs.
-  useEffect(() => {
-    const current = serialize(draft);
-    if (current === savedRef.current) return;
+  // Serialized autosave: only ever ONE PATCH in flight. Overlapping saves would race the same expectedRev
+  // and 409 against *themselves*, then wedge the editor (revRef never resyncs). A fresh edit mid-save sets
+  // dirtyRef and re-runs on completion; a genuine 409 resyncs revRef so the next edit saves cleanly.
+  const flush = useCallback(async () => {
+    if (savingRef.current) { dirtyRef.current = true; return; }
+    const snapshot = serialize(draftRef.current);
+    if (snapshot === savedRef.current) return;
+    savingRef.current = true;
     setStatus("saving");
-    const timer = setTimeout(async () => {
-      try {
-        const updated = await codexApi.updatePage(gmToken, page.id, {
-          title: draft.title.trim() || "Untitled", folder: draft.folder.trim() || null, tags: parseTags(draft.tagsText),
-          playerBody: draft.playerBody, gmBody: draft.gmBody, bannerAssetId: draft.bannerAssetId, expectedRev: revRef.current
-        });
-        savedRef.current = current;
-        revRef.current = updated.rev;
-        setStatus("saved");
-        onChange(updated);
-      } catch (error) {
-        setStatus(error instanceof CodexRequestError && error.status === 409 ? "conflict" : "error");
-      }
-    }, 800);
+    try {
+      const draftNow = draftRef.current;
+      const updated = await codexApi.updatePage(gmToken, page.id, {
+        title: draftNow.title.trim() || "Untitled", folder: draftNow.folder.trim() || null, tags: parseTags(draftNow.tagsText),
+        playerBody: draftNow.playerBody, gmBody: draftNow.gmBody, bannerAssetId: draftNow.bannerAssetId, expectedRev: revRef.current
+      });
+      savedRef.current = snapshot;
+      revRef.current = updated.rev;
+      setStatus("saved");
+      onChange(updated);
+    } catch (error) {
+      if (error instanceof CodexRequestError && error.status === 409) {
+        try { revRef.current = (await codexApi.getPage(gmToken, page.id)).page.rev; } catch { /* keep stale rev; a later flush retries */ }
+        setStatus("conflict");
+      } else { setStatus("error"); }
+    } finally {
+      savingRef.current = false;
+      if (dirtyRef.current) { dirtyRef.current = false; void flush(); }
+    }
+  }, [gmToken, page.id, onChange]);
+
+  // Debounce: ~800ms after the last edit, ask flush() to run (it self-serializes).
+  useEffect(() => {
+    if (serialize(draft) === savedRef.current) return;
+    const timer = setTimeout(() => { void flush(); }, 800);
     return () => clearTimeout(timer);
-  }, [draft, gmToken, page.id, onChange]);
+  }, [draft, flush]);
 
   const body = tab === "player" ? draft.playerBody : draft.gmBody;
   const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
@@ -113,7 +132,8 @@ export function PageEditor({ gmToken, page, backlinks, onChange, onDeleted, onNa
 
   const toggleReveal = async (next: boolean) => {
     setRevealed(next);
-    try { const updated = await codexApi.revealPage(gmToken, page.id, next); onChange(updated); }
+    // Flush any pending edit first, so revealing never briefly publishes the pre-edit body.
+    try { await flush(); const updated = await codexApi.revealPage(gmToken, page.id, next); onChange(updated); }
     catch { setRevealed(!next); setStatus("error"); }
   };
 

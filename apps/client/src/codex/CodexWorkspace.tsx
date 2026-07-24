@@ -74,14 +74,17 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   };
   const importFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    try {
-      for (const file of Array.from(files)) {
+    let imported = 0; const failed: string[] = [];
+    for (const file of Array.from(files)) {
+      try {
         const text = await file.text();
         const title = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
         await codexApi.createPage(gmToken, { title: title || "Imported page", playerBody: text });
-      }
-      await refreshList();
-    } catch (importError) { setError(importError instanceof Error ? importError.message : "Import failed."); }
+        imported += 1;
+      } catch { failed.push(file.name); }
+    }
+    await refreshList();
+    setError(failed.length ? `Imported ${imported} of ${files.length}. Couldn't import: ${failed.join(", ")}.` : null);
   };
 
   const navigate = useCallback(async (target: string) => {

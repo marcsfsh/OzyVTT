@@ -113,6 +113,12 @@ describe("CodexStore viewer safety (the leak matrix)", () => {
     expect(store.searchPages("player", "crossroads")).toHaveLength(1);
   });
 
+  it("player search excludes unrevealed pages even when their player body matches", () => {
+    store.createPage({ title: "Hidden cove", playerBody: "a secret smugglers cove", revealedToPlayers: false });
+    expect(store.searchPages("player", "smugglers")).toHaveLength(0); // unrevealed → never in a player's results
+    expect(store.searchPages("gm", "smugglers")).toHaveLength(1);     // the GM still finds it
+  });
+
   it("player backlinks exclude gm-layer references and unrevealed sources", () => {
     const bree = store.createPage({ title: "Bree" });
     store.createPage({ title: "Road", playerBody: "to [[Bree]]", revealedToPlayers: true });   // visible
@@ -240,6 +246,18 @@ describe("CodexStore journal", () => {
     expect(projected.text).toBe("The gate stood open.");
     expect(Object.keys(projected)).not.toContain("gmText");
     expect(JSON.stringify(projected)).not.toContain("cult");
+  });
+
+  it("deleting a page, marker, or map releases journal pins instead of leaving them dangling", () => {
+    const page = store.createPage({ title: "Bree" });
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
+    const pinnedToPage = store.createEntry({ playerText: "at Bree", attachPageId: page.id });
+    const pinnedToMarker = store.createEntry({ playerText: "at the pin", attachMarkerId: marker.id });
+    store.deletePage(page.id);
+    expect(store.getEntry(pinnedToPage.id)!.attachPageId).toBeNull();
+    store.deleteMap(map.id); // cascades the marker; its journal pin must be released first
+    expect(store.getEntry(pinnedToMarker.id)!.attachMarkerId).toBeNull();
   });
 });
 
