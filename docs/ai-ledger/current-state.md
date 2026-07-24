@@ -43,7 +43,10 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     pin (one scene = one location, enforced on link).
   - **Notebook (user ask):** Pages became a Notion/Obsidian/OneNote-style space - **nested folder
     paths** (`NPCs/Villains`) rendered as a collapsible **tree** (`NotebookTree`), collapse state
-    persisted, search overlays a flat list.
+    persisted, search overlays a flat list. Then a **three-pane notes layout** (2nd user ask): file
+    explorer (tree, with a per-folder "＋ new note here") | editor (with a folder **breadcrumb**) |
+    context pane (a live **Outline** of the note's headings + backlinks + pinned timeline); panes stack
+    to master-detail on narrow/touch. Verified in-browser at 1360px and 460px.
   - **Editor:** `[[` **wiki-link autocomplete** (prevents canon forks), **drag/paste images**, an
     unmistakable **GM-secret pane** (violet border + "GM ONLY" tag), **New ▾ templates**
     (NPC/Location/Faction), inline **"Logged here"** page timeline (pins now read back).
