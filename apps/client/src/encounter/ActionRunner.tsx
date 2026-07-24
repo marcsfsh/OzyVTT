@@ -5,6 +5,7 @@ import { Button } from "@vtt/ui";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
 import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBlocked, useTargetingBusy, useTargetingResult, type ResolveOptions } from "./targeting";
+import { useRollPreference } from "../dice/roll-preference";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
@@ -86,6 +87,8 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
   const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
   const { prompt, dialog } = usePrompt();
+  // Manual-vs-auto follows the one per-browser dice-input preference every surface reads.
+  const { rollMode } = useRollPreference();
   // A strict-mode rejection awaiting the GM's call - store state, so a resolve rolled from the
   // map's confirm bar surfaces the same override dialog here (ADR-0020).
   const blockedPrompt = useTargetingBlocked();
@@ -275,7 +278,7 @@ export function ActionRunner({ state, actor, onFeedback }: Readonly<{ state: GmV
         const mode = result.rollMode?.mode;
         // Roll mode drives the layout: auto shows just the roll controls; manual adds a labeled
         // "type the d20" zone under an "or" divider so the two paths read distinctly (feedback #1).
-        const manualEntry = state.combat.rollMode === "manual";
+        const manualEntry = rollMode === "manual";
         const submitDie = () => { const value = Number(attackDieEdit.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setManualSubmitted(true); previewResolve({ commit: false, attackNatural: value }); };
         return <div className="action-preview">
           <div className="roll-zone">

@@ -60,6 +60,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `initiative.set` | `combat:write` |
 | `initiative.next` | `combat:write` |
 | `initiative.previous` | `combat:write` |
+| `initiative.roll-self` | `combat:write` |
+| `initiative.roll-remaining` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
@@ -79,11 +81,14 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `save.dismiss` | `combat:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
+| `damage.resolve` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.set-roll-mode` | `combat:write` |
+| `encounter.set-player-damage-mode` | `combat:write` |
+| `encounter.set-player-initiative-mode` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
@@ -317,6 +322,7 @@ Starts an encounter on a calibrated battlemap with initial combatants (GM-grade 
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mapAssetId` | string (uuid) | yes |  |
 | `rulesMode` | `strict` \| `assisted` \| `freeform` | no | Rules-engine enforcement for this fight; omitted keeps the table's current mode |
+| `playersRollInitiative` | boolean | no | When true, claimed player-characters (without an explicit score) roll their own initiative; a provisional auto-roll parks them until they do |
 | `entries` | object[] | yes |  |
 | `entries[].actorId` | string (uuid) | yes |  |
 | `entries[].score` | integer (-1000–1000) | no | Omit to roll initiative server-side |
@@ -370,6 +376,39 @@ Sets a combatant's initiative score (GM-grade only).
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `actorId` | string (uuid) | yes |  |
 | `score` | integer (-1000–1000) | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/roll-self`
+
+Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.
+
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `actorId` | string (uuid) | yes |  |
+| `natural` | integer (1–20) | no | a hand-rolled physical d20 (1-20); omit to have the server roll |
+| `rollMode` | `advantage` \| `disadvantage` \| `normal` | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/initiative/roll-remaining`
+
+Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -667,9 +706,9 @@ Rolls dice into the shared, auditable roll history; the response carries `rollId
 
 ### `POST /api/v1/game/actions/resolve`
 
-Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.
+Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.
 
-**Auth:** Integration credential with `combat:write` · GM session
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
 
 **Request body** (JSON):
 
@@ -693,6 +732,8 @@ Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit dou
 | `cover` | `half` \| `three-quarters` \| `total` | no | GM-adjudicated cover for the target: +2/+5 to AC and Dex saves; total blocks targeting (overridable) |
 | `commit` | boolean | no | false previews a single-target attack's d20 only (no damage/riders/prompts/economy) so the answerer can re-roll adv/disadv or confirm; confirm with commit=true and the shown attackNatural. Non-attack actions ignore it. Default: `true`. |
 | `attackNatural` | integer (1–20) | no | Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die |
+| `attackTotal` | integer (-50–100) | no | Hand-entered final attack total ("final total" manual mode) - used verbatim vs AC; pair with critical for a nat 20 |
+| `critical` | boolean | no | Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -771,6 +812,24 @@ Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade
 | --- | --- | --- | --- |
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/damage/resolve`
+
+Applies or dismisses a parked player-hit damage proposal (proposal mode; GM-grade only). `apply: true` reduces the target's HP through the typed-defense pipeline (an optional `amount` overrides the total as a bare number, no defense math); `apply: false` discards it. Either way the proposal clears.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `proposalId` | string (uuid) | yes |  |
+| `apply` | boolean | yes | true applies the parked damage; false dismisses it |
+| `amount` | integer (0–1000) | no | optional override total (bare number, no defense math) |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -874,6 +933,38 @@ Sets the table's roll preference (GM-grade only): `auto` rolls each encounter ro
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mode` | `auto` \| `manual` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/player-damage-mode`
+
+Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `proposal` parks a GM-confirmed damage proposal (the default), `direct` applies the typed damage immediately server-side.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `mode` | `proposal` \| `direct` | yes | proposal parks a GM-confirmed damage proposal for a player's hit; direct applies the typed damage immediately server-side |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/player-initiative-mode`
+
+Sets how player-rolled initiative behaves (GM-grade only): `immediate` begins turns at once on a provisional order that re-sorts as players roll in, `wait` holds turn advancement until every player has rolled (or the GM rolls the rest).
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `mode` | `immediate` \| `wait` | yes | immediate begins turns at once on a provisional order; wait holds turns until every player has rolled |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

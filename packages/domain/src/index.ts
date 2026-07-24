@@ -192,6 +192,31 @@ export const PendingReactionSchema = z.object({
 export type PendingReaction = z.infer<typeof PendingReactionSchema>;
 
 /**
+ * A player-initiated hit awaiting the GM's Apply tap (proposal mode - the default player damage policy).
+ * When a player resolves their own attack and it hits, the server rolls the typed damage but parks it here
+ * instead of touching the enemy's HP, so the GM confirms applying it (keeping "players never mutate a
+ * creature they don't own"). GM-only - never projected to players or the viewer. The GM applies it through
+ * the shared typed-defense pipeline (resistances, dying) via `damage.resolve`, or dismisses it.
+ */
+export const PendingDamageSchema = z.object({
+  id: z.string().uuid(),
+  /** The attacking (owned) character. */
+  sourceActorId: z.string().uuid(),
+  sourceName: z.string().min(1).max(120),
+  actionName: z.string().min(1).max(120),
+  /** The struck combatant whose HP the GM will reduce. */
+  targetActorId: z.string().uuid(),
+  targetName: z.string().min(1).max(120),
+  /** Typed components so the GM's apply runs the resistance/immunity/vulnerability pipeline. */
+  proposedDamageParts: z.array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict()).max(18).default([]),
+  proposedTotal: z.number().int().nonnegative().max(10000).default(0),
+  /** The hit was a critical (drives death-save failure ticks when the damage lands). */
+  critical: z.boolean().default(false),
+  createdAt: z.number().int().nonnegative()
+}).strict();
+export type PendingDamage = z.infer<typeof PendingDamageSchema>;
+
+/**
  * Shared invariants for a combat context - the live top-level combat AND each parked scene's frozen
  * copy. Extracted so a scene's stored combat is validated with exactly the same rules as the active
  * one. Paths are relative to whichever combat object owns the refine, so Zod nests them correctly
@@ -244,8 +269,21 @@ const sceneCombatShape = {
   }).default({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
   /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
   rulesMode: z.enum(["strict", "assisted", "freeform"]).default("strict"),
-  /** Table-wide roll preference: "auto" rolls each encounter roll for you (with a typed override, and adv/disadv after a d20), "manual" waits for you to type your physical dice result (with a Roll button to auto-roll instead). Additive; the default preserves the prior always-auto behavior. */
+  /** DEPRECATED (2026-07-24): the old table-wide roll preference. Superseded by a per-browser dice-input
+   * preference (apps/client/src/dice/roll-preference.ts); the client no longer reads or writes this, and the
+   * GM roll-mode UI was retired. The field + `encounter:set-roll-mode` command remain (inert) so the public
+   * API contract stays stable. "auto" auto-rolled each encounter roll; "manual" waited for a typed die. */
   rollMode: z.enum(["auto", "manual"]).default("auto"),
+  /** Per-table policy for how a PLAYER's confirmed hit reaches an enemy's HP: "proposal" parks a GM-confirmed
+   * damage proposal (the GM taps Apply - the default, preserving "players never mutate a creature they don't
+   * own"); "direct" applies the typed damage immediately, server-side, when the GM opts the table in. The GM's
+   * own resolves always use the runner's explicit Apply regardless. Additive; default preserves prior behavior. */
+  playerDamageMode: z.enum(["proposal", "direct"]).default("proposal"),
+  /** Per-table policy for player-rolled initiative when an encounter starts with `playersRollInitiative`:
+   * "immediate" begins turns at once on a provisional order that re-sorts as players roll in; "wait" holds
+   * turn advancement until every claimed player has rolled (or the GM rolls for the rest). Additive; the
+   * default preserves the prior immediate behavior. */
+  playerInitiativeMode: z.enum(["immediate", "wait"]).default("immediate"),
   /** How a token's current health shows on the map (table-wide default; a per-token `actor.healthDisplay` overrides it). `band` is the coarse badge shown to everyone (today's behavior); `bar`/`ring` are richer indicators gated by `audience` ("gm" = GM map only, "all" = everyone with a band-fraction for non-owners). Additive; the default preserves the prior badge-only behavior. */
   healthDisplay: HealthDisplaySchema.default({ style: "band", audience: "gm" }),
   /** GM-set underwater environment (SRD Underwater Combat): melee disadvantage unless piercing, ranged auto-miss beyond normal range, everyone resists fire. Additive. */
@@ -277,7 +315,12 @@ const sceneCombatShape = {
   /** Saving throws still owed by targets (see PendingSaveSchema). */
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   /** Reaction prompts still owed an answer (see PendingReactionSchema). */
-  pendingReactions: z.array(PendingReactionSchema).max(20).default([])
+  pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
+  /** Player-initiated hits awaiting the GM's Apply tap in proposal mode (see PendingDamageSchema). GM-only. */
+  pendingDamage: z.array(PendingDamageSchema).max(50).default([]),
+  /** Claimed-PC actorIds whose owner still owes an initiative roll (when the encounter started with
+   * `playersRollInitiative`). Cleared as each player rolls (initiative:roll-self) or the GM rolls the rest. */
+  pendingInitiative: z.array(z.string().uuid()).max(200).default([])
 };
 
 /** A parked scene's frozen combat - same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -316,7 +359,7 @@ export const CombatStateSchema = z.object({
   }
   if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["activeSceneId"], message: "The active scene must be one of the prepared scenes." });
   const active = combat.activeSceneId === null ? undefined : combat.scenes.find((scene) => scene.id === combat.activeSceneId);
-  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.fog.enabled || active.combat.fog.shapes.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0)) {
+  if (active && (active.combat.active || active.combat.initiative.length > 0 || active.combat.tokens.length > 0 || active.combat.annotations.length > 0 || active.combat.reactionsUsed.length > 0 || Object.keys(active.combat.legendaryUsed).length > 0 || active.combat.fog.enabled || active.combat.fog.shapes.length > 0 || active.combat.pendingSaves.length > 0 || active.combat.pendingReactions.length > 0 || active.combat.pendingDamage.length > 0 || active.combat.pendingInitiative.length > 0)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes"], message: "The active scene's stored combat must be empty - its live copy is the top-level combat." });
   }
 });
@@ -351,7 +394,7 @@ export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: bool
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
 /** A player's own pending reaction prompts only; same masking rules as saves. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
-export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; rollMode: "auto" | "manual"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
+export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; rollMode: "auto" | "manual"; /** Per-table policy for a player's own hits (see CombatState.playerDamageMode); lets the player runner label the outcome ("handed to the GM" vs "applied"). The pendingDamage proposals themselves stay GM-only. */ playerDamageMode: "proposal" | "direct"; /** Public claimed-PC actorIds still owing an initiative roll - a player checks whether their own id is here to show the "Roll initiative" prompt. */ pendingInitiative: readonly string[]; /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode: "immediate" | "wait"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
 export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
@@ -499,12 +542,14 @@ export interface ClientToServerEvents {
   "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
-  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
+  "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; commit?: boolean; attackNatural?: number; attackTotal?: number; critical?: boolean; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
   "effect:add": (payload: { commandId: string; actorId: string; name: string; tags?: readonly string[]; duration?: { type: "rounds"; rounds: number } | { type: "until-source-next-turn" } | { type: "encounter" } | { type: "manual" }; modifiers?: readonly EffectModifier[]; expectedRevision?: number }, acknowledgement: (result: MutationResult & { effectId?: string }) => void) => void;
   "effect:end": (payload: { commandId: string; actorId: string; effectId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "death-save:roll": (payload: { commandId: string; actorId: string; commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; naturalRoll?: number; expectedRevision?: number }, acknowledgement: (result: DeathSaveResult) => void) => void;
   "encounter:set-rules-mode": (payload: { commandId: string; mode: "strict" | "assisted" | "freeform"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-roll-mode": (payload: { commandId: string; mode: "auto" | "manual"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "encounter:set-player-damage-mode": (payload: { commandId: string; mode: "proposal" | "direct"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "encounter:set-player-initiative-mode": (payload: { commandId: string; mode: "immediate" | "wait"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-health-display": (payload: { commandId: string; style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-health-display": (payload: { commandId: string; actorId: string; display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:set-environment": (payload: { commandId: string; underwater: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -520,16 +565,19 @@ export interface ClientToServerEvents {
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "reaction:answer": (payload: { commandId: string; reactionId: string; use: boolean; actionId?: string; commit?: boolean; rollMode?: "advantage" | "disadvantage" | "normal"; attackNatural?: number; expectedRevision?: number }, acknowledgement: (result: ReactionAnswerResult) => void) => void;
   "reaction:dismiss": (payload: { commandId: string; reactionId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "damage:resolve": (payload: { commandId: string; proposalId: string; apply: boolean; amount?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:available-actions": (payload: { actorId: string }, acknowledgement: (result: ActorActionsAvailabilityResult) => void) => void;
   "turn:use": (payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-reaction": (payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:use-legendary": (payload: { commandId: string; actorId: string; spent: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "turn:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "dice:roll": (payload: { commandId: string; formula: string; purpose: RollPurpose; visibility: RollVisibility; label?: string; actorId?: string; expectedRevision?: number }, acknowledgement: (result: DiceRollResult) => void) => void;
-  "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "encounter:start": (payload: { commandId: string; mapAssetId: string; entries: readonly EncounterStartEntry[]; playersRollInitiative?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:end": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "encounter:add-combatant": (payload: { commandId: string; actorId: string; score?: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:set": (payload: { commandId: string; actorId: string; score: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "initiative:roll-self": (payload: { commandId: string; actorId: string; natural?: number; rollMode?: "advantage" | "disadvantage" | "normal"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "initiative:roll-remaining": (payload: { commandId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:next": (payload: { commandId: string; confirmRewrite?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "initiative:previous": (payload: { commandId: string; confirmDiscard?: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "log:read": (payload: Record<string, never>, acknowledgement: (result: { ok: boolean; message?: string; entries?: readonly CombatLogEntry[] }) => void) => void;

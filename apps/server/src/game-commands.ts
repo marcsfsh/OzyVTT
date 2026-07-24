@@ -23,9 +23,17 @@ export const EncounterStartSchema = z.object({
   entries: z.array(z.object({ actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), /** 2024 surprise: the combatant rolls initiative with disadvantage (SRD Surprise). */ surprised: z.boolean().optional() }).strict()).min(1).max(200),
   /** Rules-engine enforcement for this fight (ADR-0020); omitted keeps the table's current mode. */
   rulesMode: z.enum(["strict", "assisted", "freeform"]).optional(),
+  /** When true, claimed player-characters roll their own initiative (a provisional auto-roll parks them until they do). */
+  playersRollInitiative: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
 }).strict();
 export const InitiativeScoreSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** A player rolls their own initiative (server rolls unless a manual d20 `natural` is given; adv/disadv supported). */
+export const InitiativeRollSelfSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), natural: z.number().int().min(1).max(20).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM rolls initiative for everyone still pending (begins a wait-mode fight). */
+export const InitiativeRollRemainingSchema = z.object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Table-wide policy for player-rolled initiative: begin immediately (roll in) or wait for all players first (GM). */
+export const SetPlayerInitiativeModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["immediate", "wait"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const AddCombatantSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), score: z.number().int().min(-1000).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorAddFromDefinitionSchema = z.object({ commandId: z.string().uuid(), definitionId: z.string().regex(/^[a-z0-9-]+$/).max(200), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const ActorImportDefinitionSchema = z.object({ commandId: z.string().uuid(), definition: z.unknown(), visibility: z.enum(["public", "gm-only"]).default("public"), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -78,8 +86,13 @@ export const ActionResolveSchema = z.object({
   commit: z.boolean().default(true),
   /** Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die. */
   attackNatural: z.number().int().min(1).max(20).optional(),
+  /** Hand-entered final attack TOTAL ("final total" manual mode) - used verbatim vs AC; pair with `critical` for a nat 20. */
+  attackTotal: z.number().int().min(-50).max(100).optional(),
+  /** Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred. */
+  critical: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
-}).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." });
+}).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." })
+  .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, { message: "Supply either a natural d20 or a final total, not both." });
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
@@ -130,6 +143,10 @@ export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId:
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), commit: z.boolean().default(true), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), naturalRoll: z.number().int().min(1).max(20).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRollModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["auto", "manual"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Table-wide policy for how a player's own confirmed hit reaches an enemy's HP (GM): a GM-confirmed proposal, or direct server-side apply. */
+export const SetPlayerDamageModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["proposal", "direct"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM resolves a parked player-hit damage proposal: apply it (optionally overriding the total) or dismiss it. */
+export const DamageResolveSchema = z.object({ commandId: z.string().uuid(), proposalId: z.string().uuid(), apply: z.boolean(), amount: z.number().int().min(0).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Table-wide default for how token health shows on the map (GM). */
 export const SetHealthDisplaySchema = z.object({ commandId: z.string().uuid(), style: z.enum(["band", "bar", "ring", "aura"]), audience: z.enum(["gm", "all"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Per-token health-display override (GM); `display: null` clears the override so the token follows the table default. */

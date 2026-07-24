@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ActionResolution, ActorDefinition, ClientToServerEvents, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
+import type { ActionResolution, ActorDefinition, ClientToServerEvents, ContentActionSummary, DeathSaveResult, DeathSaves, GmView, MutationResult, PendingDamage, PendingReaction, PendingSave, PlayerEffect, PlayerPendingReaction, PlayerPendingSave, ReactionAnswerResult, SaveAnswerResult, PlayerView } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
+import { beginTargeting, clearTargeting, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
+import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
 import { CharacterSheet } from "./CharacterSheet";
 import { ConditionChips, ConditionDots, ConditionEditor } from "./conditions";
@@ -292,39 +294,166 @@ function OwnDyingTracker({ actorId, name, deathSaves, rollMode, isActingTurn }: 
   </div>;
 }
 
-/**
- * A player's read-only view of their own attacks on their turn - the same rows the GM's action console
- * shows (name + to-hit / reach / range / damage), sourced from their projected stat block. No rolling
- * here: the GM still resolves attacks (the server authorizes that), so this is a reference, not a
- * control surface.
- */
-function PlayerActionList({ definition }: Readonly<{ definition: ActorDefinition }>) {
-  const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
-  const nameOf = (id: string) => definition.actions.find((candidate) => candidate.id === id)?.name ?? id;
-  const linesFor = (action: ActorDefinition["actions"][number]): string[] => {
-    const parts: string[] = [];
-    if (action.attack) parts.push(`${signed(action.attack.bonus)} to hit${action.attack.reachFeet ? `, reach ${action.attack.reachFeet} ft` : action.attack.rangeFeet ? `, range ${action.attack.rangeFeet} ft` : ""}`);
-    if (action.attack?.count && action.attack.count > 1) parts.push(`${action.attack.count} attacks`);
-    if (action.multiattack) parts.push(action.multiattack.map((component) => `${component.count}× ${nameOf(component.actionId)}`).join(" + "));
-    if (action.save) parts.push(`DC ${action.save.dc} ${action.save.ability.toUpperCase()} save`);
-    for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
-    return parts;
+/** Map a player's own stat-block action onto the ContentActionSummary the shared targeting store consumes.
+ *  Area templates are dropped in v1 (players target by explicit ids; the GM still places AoE templates). */
+export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): ContentActionSummary {
+  return {
+    id: action.id, name: action.name, activation: action.activation, description: action.description,
+    attackBonus: action.attack?.bonus ?? null, reachFeet: action.attack?.reachFeet ?? null, rangeFeet: action.attack?.rangeFeet ?? null, rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
+    saveAbility: action.save?.ability ?? null, saveDc: action.save?.dc ?? null,
+    damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
+    area: null, attackCount: action.attack?.count ?? null,
+    usesLimit: action.uses?.limit ?? null, usesPer: action.uses?.per ?? null, usesRecharge: action.uses?.recharge ?? null, usesPool: action.uses?.pool ?? null,
+    requiresEffectTag: action.requiresEffectTag ?? null,
+    multiattack: action.multiattack ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count })) : null,
+    grants: action.grants !== undefined, reaction: action.reaction ?? null
   };
-  const combatActions = definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0 || action.multiattack);
-  if (combatActions.length === 0) return null;
+}
+const signedBonus = (value: number) => (value >= 0 ? `+${value}` : String(value));
+function ownActionSummaryParts(action: ContentActionSummary): string[] {
+  const parts: string[] = [];
+  if (action.attackBonus !== null) parts.push(`${signedBonus(action.attackBonus)} to hit${action.reachFeet ? `, reach ${action.reachFeet} ft` : action.rangeFeet ? `, range ${action.rangeFeet} ft` : ""}`);
+  if (action.attackCount !== null && action.attackCount > 1) parts.push(`${action.attackCount} attacks`);
+  if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
+  for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
+  return parts;
+}
+
+/**
+ * A player's interactive action console on their own turn - the mirror of the GM's ActionRunner, scoped to
+ * their claimed character. Tap a weapon attack or save action, pick the target(s), preview the d20
+ * (Adv/Disadv, or a typed physical die), and confirm: the server records the roll and, per the table's
+ * player-damage policy, either hands the damage to the GM (proposal) or applies it directly. The player
+ * never applies damage themselves, so the role boundary stays intact. Reuses the shared targeting store and
+ * the GM runner's styles so both surfaces read and behave identically.
+ */
+export function PlayerActionRunner({ actorId, definition, revision, rollMode, bonusMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; bonusMode: "auto" | "total"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
+  const [feedback, setFeedback] = useState("");
+  const onFeedback = setFeedback;
+  const actions = useMemo(() => definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0).map(summaryOfOwnAction), [definition]);
+  const session = useTargeting();
+  const result = useTargetingResult();
+  const busy = useTargetingBusy();
+  const [attackDie, setAttackDie] = useState("");
+  const [manualSubmitted, setManualSubmitted] = useState(false);
+  // "Final total" manual mode: the player types their whole total, so a natural 20 (crit) can't be read off
+  // the number and is declared with this checkbox (their bonus could make any total a nat-20 crit, or not).
+  const [attackNat20, setAttackNat20] = useState(false);
+  // Whether the CURRENT preview came from a hand-entered total (vs a rolled/typed natural), so the shared
+  // Confirm re-commits with the matching inputs (attackTotal+critical vs attackNatural).
+  const [previewIsTotal, setPreviewIsTotal] = useState(false);
+  // This runner owns the shared targeting only when the in-progress session is for this character.
+  const picking = session && session.attackerId === actorId ? session : null;
+  // The turn moved off this character (or the panel closed): drop any in-progress targeting/result.
+  useEffect(() => () => { clearTargeting(); setTargetingResult(null); }, []);
+  // Reset the manual d20 field only when a NEW preview first appears (not on every adv/disadv re-preview).
+  const previewShownRef = useRef(false);
+  useEffect(() => {
+    const showing = Boolean(result?.preview);
+    if (showing && !previewShownRef.current) { setAttackDie(""); setManualSubmitted(false); setAttackNat20(false); setPreviewIsTotal(false); }
+    previewShownRef.current = showing;
+  }, [result]);
+
+  if (actions.length === 0) return null;
+  const onOutcome = (ok: boolean, message?: string) => { if (!ok && message) onFeedback(message); };
+  const roll = (opts?: Parameters<typeof resolveTargeting>[2]) => resolveTargeting(revision, onOutcome, opts);
+
   return <div className="action-runner player-actions">
-    <p className="player-actions-label">Your actions <span>· the GM rolls these</span></p>
-    <ul className="action-list">
-      {combatActions.map((action) => {
-        const parts = linesFor(action);
-        return <li key={action.id}>
-          <div className="action-row action-row-readonly" title={action.description}>
-            <strong className="action-row-name">{action.name}</strong>
-            {parts.length > 0 && <ul className="action-row-summary">{parts.map((part) => <li key={part}>{part}</li>)}</ul>}
-          </div>
+    {!picking && !result && <>
+      <p className="player-actions-label">Your actions <span>· your turn</span></p>
+      <ul className="action-list">
+        {actions.map((action) => {
+          const parts = ownActionSummaryParts(action);
+          return <li key={action.id}>
+            <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => { setTargetingResult(null); beginTargeting(action, actorId); }}>
+              <strong className="action-row-name">{action.name}</strong>
+              {parts.length > 0 ? <ul className="action-row-summary">{parts.map((part) => <li key={part}>{part}</li>)}</ul> : <span className="action-row-summary-note">Tap to use</span>}
+            </button>
+          </li>;
+        })}
+      </ul>
+    </>}
+    {picking && !result?.preview && <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
+      <p className="action-targeting-head"><strong>{picking.action.name}</strong> - {picking.mode === "single" ? "choose one target" : "choose targets"}</p>
+      <ul className="action-target-list">{targets.filter((target) => target.actorId !== actorId).map((target) => {
+        const checked = picking.selected.includes(target.actorId);
+        return <li key={target.actorId}>
+          <label className="action-target">
+            <input type={picking.mode === "single" ? "radio" : "checkbox"} name="player-action-target" checked={checked} onChange={() => toggleTarget(target.actorId)} />
+            <span>{target.name}</span>
+          </label>
         </li>;
-      })}
-    </ul>
+      })}</ul>
+      <div className="action-targeting-buttons">
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>Back</Button>
+        <button type="button" className="encounter-primary" disabled={busy || picking.selected.length === 0} onClick={() => roll()}>Roll {picking.action.name}</button>
+      </div>
+    </div>}
+    {result && <div className="action-result" role="status">
+      <div className="action-result-head">
+        <strong>{result.actionName}</strong>
+        <button type="button" className="secondary action-result-close" aria-label={result.preview ? "Cancel roll" : "Dismiss"} onClick={() => { setTargetingResult(null); if (result.preview) clearTargeting(); }}>✕</button>
+      </div>
+      {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
+        {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} - {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "HIT" : result.attack.outcome.toUpperCase()}{result.attack.naturalRoll >= 1 ? ` (nat ${result.attack.naturalRoll})` : ""} vs {result.attack.targetName}
+      </p>}
+      {result.preview && result.attack && (() => {
+        const mode = result.rollMode?.mode;
+        const manualEntry = rollMode === "manual";
+        // Manual entry honors the same auto/total bonus toggle as every other roll surface: "auto" types the
+        // natural d20 (the server adds the bonus); "total" types the final total (used verbatim vs AC) with a
+        // Natural 20 checkbox, since a crit can't be read off a hand-computed total.
+        const submitDie = () => { const value = Number(attackDie.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setPreviewIsTotal(false); setManualSubmitted(true); roll({ commit: false, attackNatural: value }); };
+        const submitTotal = () => { const value = Number(attackDie.trim()); if (!Number.isInteger(value) || value < -50 || value > 100) { onFeedback("Enter your final attack total."); return; } setPreviewIsTotal(true); setManualSubmitted(true); roll({ commit: false, attackTotal: value, critical: attackNat20 }); };
+        // Confirm the SHOWN preview with the inputs that produced it (a hand total keeps its total + crit flag).
+        const confirmShown = () => previewIsTotal ? roll({ commit: true, attackTotal: Number(attackDie.trim()), critical: attackNat20 }) : roll({ commit: true, attackNatural: result.attack!.naturalRoll });
+        return <div className="action-preview">
+          <div className="roll-zone">
+            <span className="save-prompt-confirm">
+              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => { setPreviewIsTotal(false); setManualSubmitted(false); roll({ commit: false, rollMode: "advantage" }); }}>Adv</button>
+              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => { setPreviewIsTotal(false); setManualSubmitted(false); roll({ commit: false, rollMode: "disadvantage" }); }}>Disadv</button>
+              <button type="button" className="encounter-primary" disabled={busy} onClick={confirmShown}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : "miss"}</button>
+              <Button type="button" variant="secondary" disabled={busy} title="Roll the attack again" onClick={() => { setPreviewIsTotal(false); setManualSubmitted(false); roll({ commit: false }); }}>Re-roll</Button>
+            </span>
+            {manualEntry && <span className="roll-zone-caption">auto-roll</span>}
+          </div>
+          {manualEntry && <>
+            <div className="roll-or"><span>or</span></div>
+            <div className="roll-zone">
+              <span className="roll-zone-caption">manual entry</span>
+              {bonusMode === "total"
+                ? <span className="save-prompt-manual">
+                    <input type="text" inputMode="numeric" placeholder="type your total" aria-label="Attack total" value={attackDie} disabled={manualSubmitted} onChange={(event) => setAttackDie(event.target.value.replace(/[^0-9-]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDie.trim() !== "") submitTotal(); }} />
+                    <label className="manual-nat20"><input type="checkbox" checked={attackNat20} disabled={manualSubmitted} onChange={(event) => setAttackNat20(event.target.checked)} /> Natural 20</label>
+                    <span className="manual-actions">{manualSubmitted
+                      ? <><button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({ commit: true, attackTotal: Number(attackDie.trim()), critical: attackNat20 })}>Confirm roll</button><Button type="button" variant="secondary" disabled={busy} title="Enter a different total" onClick={() => { setAttackDie(""); setManualSubmitted(false); setAttackNat20(false); }}>Re-roll</Button></>
+                      : <button type="button" disabled={busy || attackDie.trim() === ""} onClick={submitTotal}>Use roll</button>}</span>
+                  </span>
+                : <span className="save-prompt-manual">
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDie} disabled={manualSubmitted} onChange={(event) => setAttackDie(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDie.trim() !== "") submitDie(); }} />
+                    <span className="manual-actions">{manualSubmitted
+                      ? <><button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({ commit: true, attackNatural: Number(attackDie.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={busy} title="Enter a different d20" onClick={() => { setAttackDie(""); setManualSubmitted(false); }}>Re-roll</Button></>
+                      : <button type="button" disabled={busy || attackDie.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
+                  </span>}
+            </div>
+          </>}
+        </div>;
+      })()}
+      {result.save && <p className="action-outcome">Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save - the GM answers these.</p>}
+      {result.damage.length > 0 && !result.preview && (() => {
+        const breakdown = [...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`), ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)].join(" + ");
+        return <p className="action-damage">Damage: <strong>{result.damageTotal}</strong>{breakdown ? ` (${breakdown})` : ""}{result.crit ? " - crit dice doubled" : ""}</p>;
+      })()}
+      {/* Players never apply damage: a committed hit is handed to the GM (proposal) or auto-applied (direct)
+          - UNLESS the target's reaction (Uncanny Dodge) intercepted it, in which case the server parked a
+          reaction prompt instead and the damage resolves in the turn order (mirrors the GM runner). */}
+      {!result.preview && result.attack && (result.attack.outcome === "hit" || result.attack.outcome === "crit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
+        const reactionPrompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+        if (reactionPrompt) return <p className="action-save-note">Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong> - it resolves in the turn order.</p>;
+        return <p className="action-save-note">{playerDamageMode === "direct" ? `Applied to ${result.attack!.targetName}.` : `Handed to the GM to apply to ${result.attack!.targetName}.`}</p>;
+      })()}
+    </div>}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
 }
 
@@ -349,6 +478,66 @@ function PlayerTurnEconomy({ combat, myId, myTurn, mySpeedFeet }: Readonly<{ com
   </div>;
 }
 
+/**
+ * A player's hit awaiting the GM's Apply tap (proposal mode, the default player-damage policy). The rolled
+ * total is pre-filled and editable for a hand-rolled number; Apply reduces the target's HP through the
+ * typed-defense pipeline (resistances, dying), ✕ dismisses without applying. Renders under the target's row
+ * beside the save/reaction prompts, so the GM answers every player-initiated consequence in one place.
+ */
+function PendingDamagePrompt({ proposal, onFeedback }: Readonly<{ proposal: PendingDamage; onFeedback: (text: string) => void }>) {
+  const [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState<string | null>(null);
+  const emit = (apply: boolean) => {
+    setBusy(true);
+    const typed = amount !== null && amount.trim() !== "" ? Number(amount) : undefined;
+    const override = apply && typed !== undefined && Number.isFinite(typed) && typed !== proposal.proposedTotal ? typed : undefined;
+    socket.emit("damage:resolve", { commandId: newId(), proposalId: proposal.id, apply, ...(override !== undefined ? { amount: override } : {}) }, (result: MutationResult) => {
+      setBusy(false);
+      if (!result.ok) onFeedback(result.message ?? "The damage could not be resolved.");
+    });
+  };
+  return <div className="save-prompt pending-damage" role="group" aria-label={`Apply ${proposal.sourceName}'s ${proposal.actionName} to ${proposal.targetName}`}>
+    <p className="action-save-note"><strong>{proposal.sourceName}</strong>'s {proposal.actionName} hit {proposal.targetName} for {proposal.proposedTotal}{proposal.critical ? " (crit)" : ""}.</p>
+    <span className="action-apply-group">
+      <input type="text" inputMode="numeric" pattern="[0-9]*" className="action-damage-edit" aria-label="Damage to apply" value={amount ?? String(proposal.proposedTotal)} disabled={busy} onChange={(event) => setAmount(event.target.value.replace(/[^0-9]/g, ""))} />
+      <button type="button" className="action-apply" disabled={busy} onClick={() => emit(true)}>Apply to {proposal.targetName}</button>
+      <button type="button" className="save-prompt-dismiss" disabled={busy} title="Dismiss without applying" onClick={() => emit(false)}>✕</button>
+    </span>
+  </div>;
+}
+
+/**
+ * A player's "roll for initiative" prompt, shown on their own row while their id is in
+ * combat.pendingInitiative (the encounter started with player-rolled initiative). Honors the per-browser
+ * dice preference: digital rolls on the server (with Adv/Disadv); manual takes a typed physical d20. The
+ * server adds the character's initiative modifier and, in wait mode, begins turns once everyone has rolled.
+ */
+function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
+  const { rollInput } = useRollPreference();
+  const [busy, setBusy] = useState(false);
+  const [manual, setManual] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const roll = (payload: { natural?: number; rollMode?: DieMode }) => {
+    setBusy(true);
+    socket.emit("initiative:roll-self", { commandId: newId(), actorId, ...(payload.natural !== undefined ? { natural: payload.natural } : {}), ...(payload.rollMode ? { rollMode: payload.rollMode } : {}) }, (result: MutationResult) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
+    });
+  };
+  const submitManual = () => { const value = Number(manual.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { setFeedback("Enter your d20 (1-20)."); return; } roll({ natural: value }); };
+  return <div className="save-prompt initiative-prompt" role="group" aria-label="Roll your initiative">
+    <p className="save-prompt-label"><strong>Roll for initiative</strong></p>
+    {rollInput === "manual"
+      ? <span className="save-prompt-actions"><span className="save-prompt-manual"><Input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type your d20" aria-label="Initiative d20" value={manual} disabled={busy} onChange={(event) => setManual(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && manual.trim() !== "") submitManual(); }} /><Button type="button" variant="secondary" disabled={busy || manual.trim() === ""} onClick={submitManual}>Set</Button></span></span>
+      : <span className="save-prompt-confirm">
+          <button type="button" className="save-die-mode" disabled={busy} title="Roll two d20s and keep the higher" onClick={() => roll({ rollMode: "advantage" })}>Adv</button>
+          <button type="button" className="save-die-mode" disabled={busy} title="Roll two d20s and keep the lower" onClick={() => roll({ rollMode: "disadvantage" })}>Disadv</button>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({})}>Roll initiative</button>
+        </span>}
+    {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
+  </div>;
+}
+
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player") {
     const { combat } = props.state;
@@ -359,9 +548,22 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     const activeRowRef = useRef<HTMLLIElement | null>(null);
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [combat.turnActorId]);
-    // v4 #8: toggle this panel between the turn order and the player's own sheet (embedded, no dice log).
+    // v4 #8: toggle this panel between the turn order and the player's own sheet. The embedded sheet now
+    // carries live state + combat context so its Actions resolve as real attacks and its rolls show inline.
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [view, setView] = useState<"initiative" | "sheet">("initiative");
+    // Every roll surface reads the one per-browser dice-input preference (auto vs manual), not the old
+    // table-wide combat.rollMode - so this player's saves, death saves, attacks, and sheet all agree.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { rollMode, bonusMode } = useRollPreference();
+    // "Jump" sheet-attack mode: tapping an attack on the sheet hops here to pick/confirm, then jumps BACK
+    // to the sheet once the attack commits. The flag survives the round-trip; the result effect returns us.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const jumpAttackResult = useTargetingResult();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => { if (returnToSheetAfterAttack && jumpAttackResult && !jumpAttackResult.preview) { setView("sheet"); setReturnToSheetAfterAttack(false); } }, [returnToSheetAfterAttack, jumpAttackResult]);
     const myActor = props.state.actors.find((actor) => actor.id === myId) ?? null;
     if (!combat.active) return <section className="encounter-panel compact" aria-labelledby="player-initiative-title"><span className="eyebrow">ENCOUNTER</span><h2 id="player-initiative-title">Waiting for combat</h2><p>The GM hasn't started an encounter yet.</p></section>;
     const myTurn = myId !== null && combat.turnActorId === myId;
@@ -383,8 +585,13 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
         {combat.hiddenTurn && !myTurn && <span className="encounter-quiet-note" role="status">The GM is taking a hidden turn.</span>}
         {combat.rewound && <span className="encounter-quiet-note" role="status">The GM is reviewing an earlier turn.</span>}
       </div>
+      {/* Player-rolled initiative: a prominent, view-independent prompt so the player ALWAYS sees the
+          call to roll - not buried on their own initiative row (which can be scrolled off, or hidden
+          entirely behind the "My sheet" view). It clears itself the moment they roll (their id leaves
+          pendingInitiative). */}
+      {myId !== null && (combat.pendingInitiative ?? []).includes(myId) && <InitiativePrompt actorId={myId} />}
       {view === "sheet" && myActor
-        ? <CharacterSheet actor={myActor} role="player" embedded onClose={() => setView("initiative")} />
+        ? <CharacterSheet actor={myActor} role="player" state={props.state} embedded combat={{ revision: props.state.revision, active: combat.active, myTurn, playerDamageMode: combat.playerDamageMode, targets: combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name })) }} onJumpToInitiative={() => { setView("initiative"); setReturnToSheetAfterAttack(true); }} onClose={() => setView("initiative")} />
         : <ol className="initiative-list player">{orderedInitiative.map((entry) => {
         const isMe = entry.actorId === myId;
         const rowActor = props.state.actors.find((actor) => actor.id === entry.actorId);
@@ -393,12 +600,13 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {/* Foundry-style row shared with the shared-screen viewer so the two lists never drift. */}
           <InitiativeRow entry={entry} self={isMe} />
           {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
-          {/* On your turn, the same read-only attack list the GM sees for the active creature (#5.2, read-only). */}
-          {isMe && myTurn && rowActor?.definition && <PlayerActionList definition={rowActor.definition} />}
+          {/* On your turn, an interactive action console (the mirror of the GM's) - tap an attack, pick a
+              target, roll, and confirm; the hit is handed to the GM or auto-applied per the table policy. */}
+          {isMe && myTurn && myId !== null && rowActor?.definition && <PlayerActionRunner actorId={myId} definition={rowActor.definition} revision={props.state.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={combat.playerDamageMode} targets={combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name }))} />}
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
-          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={combat.rollMode} isActingTurn={myTurn} />}
-          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={combat.rollMode} />}
-          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={combat.rollMode} />}
+          {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={rollMode} isActingTurn={myTurn} />}
+          {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={rollMode} />}
+          {isMe && <OwnReactionPrompts reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)} actorName={entry.name} rollMode={rollMode} />}
         </li>;
       })}</ol>}
       <DockPicker dock={props.dock} />
@@ -415,6 +623,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
   const [combatantSearch, setCombatantSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // The GM's own rolls (monster saves, death saves, attack previews) follow the same per-browser
+  // dice-input preference every surface reads - not a separate table-wide setting.
+  const { rollMode } = useRollPreference();
+  // Encounter-setup opt-in: let claimed players roll their own initiative (per-encounter, not persisted).
+  const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // A pending history-rewrite/discard the GM must confirm before it applies (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{ message: string; run: () => Promise<MutationResult>; success: string } | null>(null);
   const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
@@ -513,7 +726,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
       return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
     });
     if (entries.length === 0) throw new Error("Choose at least one combatant.");
-    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, expectedRevision: state.revision });
+    return emitCommand("encounter:start", { commandId: newId(), mapAssetId: startMapId, entries, playersRollInitiative, expectedRevision: state.revision });
   }, "Encounter started. Blank Initiative scores were rolled, and every combatant is ready in the token tray above.");
   // Inline-edit an initiative score: Enter or blur commits, Escape (via cancelEditRef) discards.
   const commitEdit = (actorId: string, previous: number) => {
@@ -622,7 +835,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           onClick={() => setLegendaryActingId(candidate.id)}>⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}</button>)}
       </div>}
       {down && (actor.deathSaves
-        ? <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />
+        ? <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={rollMode} isActingTurn={state.combat.turnActorId === actor.id} />
         : <p className="acting-down-note" role="status"><strong>{actor.name} is down (0 HP).</strong> Actions are disabled — click one to force it through a rules override.</p>)}
       <section className={`acting-console${legendaryActor ? " legendary-acting" : ""}${down ? " down" : ""}`} aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}>
         <header className="acting-console-head">
@@ -691,6 +904,7 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
         </div>
       </div>
       <button type="button" className="encounter-add-monsters" disabled={busy} onClick={() => setBrowsing(true)}>+ Add monsters (SRD)</button>
+      <label className="encounter-players-roll-init"><input type="checkbox" checked={playersRollInitiative} disabled={busy} onChange={(event) => setPlayersRollInitiative(event.target.checked)} /> Let players roll their own initiative</label>
       <button className="encounter-primary" disabled={busy || selectedActors.size === 0 || (!state.combat.mapAssetId && (!selectedMap || selectedMap.kind !== "battlemap"))} onClick={start}>Start encounter<span className="nav-arrow" aria-hidden="true">→</span></button>
     </> : <>
       {(() => {
@@ -722,10 +936,16 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
                 <option value="freeform">Freeform - no checks</option>
               </Select>
             </label>
-            <label className="rules-mode-control">Rolls
-              <Select value={state.combat.rollMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "auto" | "manual"; socket.emit("encounter:set-roll-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Roll mode: ${mode === "auto" ? "auto-roll" : "manual entry"}.` : result.message ?? "The roll mode could not be changed.")); }}>
-                <option value="auto">Auto-roll - type to override</option>
-                <option value="manual">Manual entry - Roll to auto</option>
+            <label className="rules-mode-control">Players' hits
+              <Select value={state.combat.playerDamageMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "proposal" | "direct"; socket.emit("encounter:set-player-damage-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Players' hits ${mode === "direct" ? "apply directly." : "wait for your OK."}` : result.message ?? "The player damage mode could not be changed.")); }}>
+                <option value="proposal">GM confirms - apply on your tap</option>
+                <option value="direct">Direct - players apply damage</option>
+              </Select>
+            </label>
+            <label className="rules-mode-control">Player initiative
+              <Select value={state.combat.playerInitiativeMode} disabled={busy} onChange={(event) => { const mode = event.target.value as "immediate" | "wait"; socket.emit("encounter:set-player-initiative-mode", { commandId: newId(), mode }, (result: MutationResult) => setMessage(result.ok ? `Player initiative ${mode === "wait" ? "waits for everyone." : "begins immediately."}` : result.message ?? "The player initiative mode could not be changed.")); }}>
+                <option value="immediate">Start now - players roll in</option>
+                <option value="wait">Wait for all players</option>
               </Select>
             </label>
             <label className="rules-mode-control">Health
@@ -772,6 +992,10 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
           <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button>
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => { const pending = confirm; setConfirm(null); void runTurn(pending.run, pending.success); }}>Confirm</button>
         </div>
+      </div>}
+      {(state.combat.pendingInitiative ?? []).length > 0 && <div className="initiative-gathering" role="status">
+        <span>Waiting on {state.combat.pendingInitiative.length} player{state.combat.pendingInitiative.length === 1 ? "" : "s"} to roll initiative{state.combat.playerInitiativeMode === "wait" ? " - turns begin once everyone has" : ""}.</span>
+        <button type="button" className="encounter-primary" disabled={busy} onClick={() => { setBusy(true); socket.emit("initiative:roll-remaining", { commandId: newId() }, (result: MutationResult) => { setBusy(false); setMessage(result.ok ? "Rolled initiative for the rest of the table." : result.message ?? "Initiative could not be rolled."); }); }}>Roll for the rest</button>
       </div>}
       <ol className="initiative-list gm">{orderedInitiative.map((entry) => {
         const actor = actorsById.get(entry.actorId);
@@ -826,10 +1050,11 @@ function GmEncounterPanel({ state, selectedMap, mapLibrary, onSelectMap, dock }:
               editing a combatant's HP shows those controls above its action list (feedback). */}
           {active && renderActingConsole()}
           {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
-          {actor && actor.deathSaves && actor.hp.current <= 0 && state.combat.turnActorId !== actor.id && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={state.combat.rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
-          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode}
+          {actor && actor.deathSaves && actor.hp.current <= 0 && state.combat.turnActorId !== actor.id && <DyingTracker actorId={actor.id} name={actor.name} deathSaves={actor.deathSaves} canRoll onFeedback={setMessage} rollMode={rollMode} isActingTurn={state.combat.turnActorId === actor.id} />}
+          {actor && state.combat.pendingSaves.filter((save) => save.targetActorId === actor.id).map((save) => <SavePrompt key={save.id} save={save} targetName={actor.name} canDismiss onFeedback={setMessage} rollMode={rollMode}
             legendaryResistanceLeft={actor.legendary?.resistancesPerDay !== undefined ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0)) : undefined} />)}
-          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} rollMode={state.combat.rollMode} />)}
+          {actor && state.combat.pendingReactions.filter((reaction) => reaction.actorId === actor.id).map((reaction) => <ReactionPrompt key={reaction.id} reaction={reaction} actorName={actor.name} canDismiss onFeedback={setMessage} rollMode={rollMode} />)}
+          {actor && (state.combat.pendingDamage ?? []).filter((proposal) => proposal.targetActorId === actor.id).map((proposal) => <PendingDamagePrompt key={proposal.id} proposal={proposal} onFeedback={setMessage} />)}
         </li>;
       })}</ol>
     </>}

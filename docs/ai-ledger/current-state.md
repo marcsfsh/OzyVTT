@@ -239,6 +239,57 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Player-driven combat + unified dice input (2026-07-24, branch
+  `claude/character-sheet-combat-3uwp2t`).** Finishes the specced-but-lighter "Slice 2" of
+  `docs/product/character-sheet-initiative.md`: players now run their own combat rolls, and the
+  character sheet's manual/auto dice toggle is one consistent per-browser experience everywhere.
+  **Server:** `action:resolve` is un-gated for a player's own claimed character via the existing
+  `canInitiateForActor` seam (rolls attribute to the player; hidden/gm-only actors stay GM-only;
+  area templates / cover / rules overrides remain GM-only). Damage stays server-authoritative under a
+  **GM-controlled per-table policy** `combat.playerDamageMode` (`proposal` default | `direct`): a
+  player hit parks a GM-only `combat.pendingDamage` proposal the GM applies with one tap
+  (`damage:resolve`), or — when the GM opts in — auto-applies server-side (GM-scoped, so the player
+  never mutates a non-owned creature; ADR-0021 #4 holds). Pure `player-damage.ts`
+  (`settlePlayerHit`/`resolvePendingDamage`) carries the logic; both new commands walk the full
+  pipeline (domain → zod → api-contract/OpenAPI → operation+registry → socket + HTTP). **Client:** the
+  read-only `PlayerActionList` is replaced by an interactive `PlayerActionRunner` under the player's
+  own initiative row on their turn — tap a weapon/save action, pick target(s), preview the d20
+  (Adv/Disadv or a typed die), confirm; the hit shows "Handed to the GM" or "Applied" per policy. It
+  reuses the shared `targeting.ts` store and the GM runner's styles, and sources actions from the
+  player's own on-the-wire `definition` (no GM-only fetch). The GM sees `PendingDamagePrompt`s beside
+  the save/reaction prompts plus a "Players' hits" GM-confirms/direct toggle. **Sheet attacks:** a
+  player's stat-block attacks also resolve from their OPEN sheet on their turn via a per-browser
+  `sheetAttackMode` — `inline` mounts the same `PlayerActionRunner` in the sheet's Actions section, or
+  `jump` hops to the initiative view to pick/confirm and jumps back once the attack commits.
+  **Player-rolled initiative:** an opt-in `encounter:start { playersRollInitiative }` parks claimed PCs
+  on `combat.pendingInitiative` (seeded with a provisional auto-roll so order stays valid); each player
+  rolls their own via `initiative:roll-self` (die+modifier or a typed natural), and a GM
+  `combat.playerInitiativeMode` picks start-now vs wait-for-all (`initiative:roll-remaining` covers
+  stragglers). **Dice unification:** a new per-browser `dice/roll-preference.ts` store (backed by the
+  sheet's existing localStorage keys) drives auto-vs-manual on every surface — sheet, saves, death
+  saves, reactions, attacks, the runner, and the GM's ActionRunner — with the toggle mirrored in the
+  DicePanel; the table-wide GM roll-mode UI is retired (the `combat.rollMode` field/command are left
+  inert). `check`+`build` green all workspaces; **server suite 447** (adds player-damage settlement, a
+  pendingDamage projection-leak test, and player-rolled-initiative coverage); api-reference + app-map
+  regenerated. **Deferred (documented follow-up):** a live browser/mobile smoke (no e2e harness in-repo).
+  **Post-testing fixes (2026-07-24):** (1) the player-initiative prompt was buried on the player's own
+  initiative row (invisible on the "My sheet" view or when scrolled off) — it's now a prominent
+  view-independent banner at the top of the player panel; server seeding/projection were already correct.
+  (2) attacks tapped from a sheet surface OUTSIDE the on-turn runner (an equipped-weapon chip, or casting
+  an attack spell from the Spells tab) fired a bare die with no target — they now route through one shared
+  `routeAttack()` seam to the same `action:resolve` (weapons matched to a stat-block action by name, attack
+  spells by their linked `actionId` after the slot is spent); inventory-only weapons and save/AoE spells,
+  which have no single server action to resolve, intentionally stay loose.
+  **Follow-up round (2026-07-24):** (3) a client version-skew guard — a missing newly-added GM field
+  (`pendingDamage`/`pendingInitiative`) no longer white-screens the whole table (`?? []` at the reads);
+  the real fix is restarting a stale server, which the schema/spreads already keep correct. (4) structured
+  attacks now resolve from ANY sheet surface (standalone tab, roster, map), deriving the combat context
+  from the player's own view `state` and forcing the inline picker where there's no initiative view to jump
+  to; the "Cast" button routes EVERY creature-targeting spell (attack/save/damage), not just attack spells.
+  (5) a player's manual attack entry now honors the same auto/total bonus toggle as every roll surface, and
+  "final total" mode adds a **Natural 20 checkbox** (a crit can't be inferred from a hand-computed total) —
+  `action:resolve` gained `attackTotal` + `critical` (contract regen; server compares the total to AC and
+  owns the crit doubling). `check`+`build`+`test` green; **server suite 448**.
 - **Player character sheets — Phase 1 initiative (2026-07-23, PR #45, branch
   `claude/character-sheet-discovery-a14i7f`).** The player-facing half of the app: an interactive
   character sheet used at game night, architected **builder-ready** (the full guided builder is the

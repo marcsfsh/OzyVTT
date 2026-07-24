@@ -95,6 +95,43 @@ describe("archived characters (v4 #10, GM management)", () => {
   });
 });
 
+describe("player-hit damage proposals stay GM-only (viewer safety / role boundary)", () => {
+  const attacker = "60000000-0000-4000-8000-000000000001";
+  const target = "60000000-0000-4000-8000-000000000002";
+  const proposal = { id: "80000000-0000-4000-8000-000000000001", sourceActorId: attacker, sourceName: "Alpha", actionName: "Claw", targetActorId: target, targetName: "Goblin", proposedDamageParts: [{ amount: 7, type: "slashing" }], proposedTotal: 7, critical: false, createdAt: 1000 };
+  const state = GameStateSchema.parse({
+    schemaVersion: 1,
+    actors: [
+      { id: attacker, name: "Alpha", kind: "player-character", visibility: "public", hp: { current: 20, maximum: 20 }, ownerSessionId: playerA },
+      { id: target, name: "Goblin", kind: "monster", visibility: "public", hp: { current: 15, maximum: 15 } }
+    ],
+    combat: { active: true, round: 1, turnActorId: attacker, mapAssetId: "70000000-0000-5000-8000-000000000001", initiative: [{ actorId: attacker, score: 20 }, { actorId: target, score: 5 }], playerDamageMode: "proposal", pendingDamage: [proposal] }
+  });
+
+  it("never sends pendingDamage to the acting player, another player, or an anonymous viewer", () => {
+    for (const session of [playerA, playerB, undefined]) {
+      const view = projectPlayerView(state, session, noPresence);
+      expect("pendingDamage" in view.combat).toBe(false);
+    }
+  });
+
+  it("exposes only the harmless playerDamageMode policy to players (so the runner can label the outcome)", () => {
+    expect(projectPlayerView(state, playerA, noPresence).combat.playerDamageMode).toBe("proposal");
+  });
+
+  it("gives the GM the full pendingDamage list", () => {
+    const gm = projectGmView(state, noPresence);
+    expect(gm.combat.pendingDamage).toHaveLength(1);
+    expect(gm.combat.pendingDamage[0]).toMatchObject({ targetActorId: target, proposedTotal: 7 });
+  });
+
+  it("defaults playerDamageMode to proposal and pendingDamage to empty on a pre-existing combat (additive schema)", () => {
+    const legacy = GameStateSchema.parse({ schemaVersion: 1, combat: { active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [], tokens: [], annotations: [] } });
+    expect(legacy.combat.playerDamageMode).toBe("proposal");
+    expect(legacy.combat.pendingDamage).toEqual([]);
+  });
+});
+
 describe("presence projection", () => {
   const actors = [
     { id: "60a6e172-9ff5-44a3-8a8b-93f836f0d16b", name: "Unclaimed", kind: "player-character", visibility: "public", hp: { current: 10, maximum: 10, temporary: 0 }, ownerSessionId: null, notes: "" },

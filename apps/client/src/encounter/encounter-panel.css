@@ -259,6 +259,10 @@
 .action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .action-preview .save-prompt-manual input { width: 100%; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
 .action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+/* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
+   be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
+.action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: .35rem; align-self: flex-start; color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.action-preview .manual-nat20 input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--magenta); }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
 .action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
@@ -285,6 +289,18 @@
 .economy-movement { font-size: var(--fs-xs); color: var(--text-dim); align-self: center; padding: 0 .35rem; white-space: nowrap; }
 /* Reaction prompts (Uncanny Dodge) reuse the save-prompt frame with a cooler indigo accent so the two owed-answer kinds read apart. */
 .reaction-prompt { border-color: var(--indigo); background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo)); }
+/* Player-hit damage proposals (proposal mode): a faint magenta combat tint so the GM spots what needs applying, distinct from the indigo reaction prompt. */
+.pending-damage { border-color: color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); }
+/* "Roll for initiative" prompt on the player's own row: a cyan "your move" accent, distinct from the magenta damage prompt. */
+/* Now a top-of-panel call-to-action (not a per-row detail): a cyan-tinted banner, a touch more padding,
+   and bottom margin so it sits clearly above the turn order / sheet in either view. */
+.initiative-prompt { margin: 0 0 .6rem; padding: .55rem .7rem; border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan)); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); }
+/* GM encounter-setup opt-in for player-rolled initiative. */
+.encounter-players-roll-init { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 0; font-size: var(--fs-sm); color: var(--text-dim); cursor: pointer; }
+.encounter-players-roll-init input { width: 1rem; height: 1rem; margin: 0; }
+/* GM "waiting on players to roll initiative" banner above the initiative list, with the roll-for-the-rest action. */
+.initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; padding: .5rem .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
+.initiative-gathering span { flex: 1 1 12rem; }
 .reaction-prompt .save-prompt-label { color: var(--cyan-hi); }
 .reaction-prompt .save-prompt-label strong { color: var(--text); }
 /* Adv/disadv re-roll buttons on a rolled save (and, later, other d20 prompts): a cool accent, pressed
