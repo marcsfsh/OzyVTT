@@ -569,11 +569,9 @@
    dialog, so a descendant selector here would zero their padding and break their layout (v5 #3 root cause). */
 .character-sheet > .nh-modal-surface { max-height: min(94vh, 56rem); }
 .character-sheet > .nh-modal-surface > .nh-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
-/* v4 #2: a little wider by default and adjustable via a right-edge handle (drives --sheet-width). */
-.character-sheet.has-log { max-width: min(100vw - 2rem, var(--sheet-width, 82rem)); }
+/* The sheet keeps the same width with or without the dice log (the log swaps in, not beside), so
+   .has-log inherits the lg modal width — no bespoke widening. */
 .sheet-workspace { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.sheet-width-resize { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 4; cursor: col-resize; touch-action: none; }
-.sheet-width-resize:hover { background: linear-gradient(to left, color-mix(in srgb, var(--cyan) 30%, transparent), transparent); }
 
 /* Header (v3 #2.1/2.2/#4): name + prominent identity on the left; log-dock · Pop out · New tab · × on the right. */
 .sheet-header { display: flex; align-items: flex-start; gap: .8rem; padding: .7rem var(--space-5); border-bottom: 1px solid var(--line); }
@@ -583,28 +581,23 @@
 .sheet-header-sub { display: flex; align-items: baseline; gap: .5rem; margin-top: .2rem; flex-wrap: wrap; }
 .sheet-idline { color: var(--cyan-hi); font: 700 var(--fs-sm)/1.2 var(--font-mono); }
 .sheet-header-controls { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-/* The phone Sheet/Dice tabs and the desktop dock picker now render as SegmentedControl
-   (@vtt/ui); only the responsive show/hide swap stays local. The tabs hide on desktop —
-   scoped one class deeper than the primitive's own `.nh-segmented { display }` so it wins
-   without !important; the phone media query below re-shows them and hides the dock picker. */
-.sheet-header-controls .sheet-mobile-tabs { display: none; }
-/* v4 #7: Pop out / New tab share the dock buttons' box (same height, border, radius, surface). */
-/* Pop out / New tab now render as <Button variant="ghost" size="sm">. */
+/* The Sheet/Dice toggle (a SegmentedControl) shows on every viewport now — it's how you reach the
+   shared dice log, which no longer docks beside the sheet. Pop out / New tab render as ghost Buttons. */
 .sheet-close { flex: none; }
 
 /* Rolls bar (v3 #2.6): narrow, pinned under the header, always visible while the sheet scrolls. */
 .sheet-rollbar { display: flex; align-items: center; gap: .5rem; padding: .35rem var(--space-5); border-bottom: 1px solid var(--line); }
 
+/* One pane at a time: the sheet fills the workspace; when a shared dice log is available it swaps in
+   behind the Sheet/Dice toggle instead of docking beside the sheet, so the sheet keeps its clean full
+   width whichever way it's opened (map right-click / "View sheet" / initiative toggle all match). */
 .sheet-workspace-cols { display: flex; flex: 1; min-height: 0; }
-.sheet-workspace.log-left .sheet-workspace-cols { flex-direction: row-reverse; }
 .sheet-workspace-pane { min-width: 0; overflow-y: auto; }
 .sheet-pane { flex: 1 1 auto; padding: var(--space-5); }
-.log-pane { flex: 0 0 var(--log-width, clamp(18rem, 32%, 24rem)); padding: var(--space-4); }
-/* Draggable divider between the sheet and the dice log (v3 #1.1). */
-.sheet-log-resize { flex: 0 0 9px; align-self: stretch; position: relative; cursor: col-resize; touch-action: none; }
-.sheet-log-resize::before { content: ""; position: absolute; inset: 0 calc(50% - 0.5px); background: var(--line); }
-.sheet-log-resize:hover::before { inset: 0 calc(50% - 1px); background: color-mix(in srgb, var(--cyan) 60%, var(--line-strong)); }
-/* The shared DicePanel blends into the log column (no nested card chrome) and tightens for the narrow width (v3 #3). */
+.log-pane { flex: 1 1 auto; padding: var(--space-4); }
+.sheet-workspace.has-log.show-sheet .log-pane { display: none; }
+.sheet-workspace.has-log.show-log .sheet-pane { display: none; }
+/* The shared DicePanel blends into the pane (no nested card chrome). */
 .log-pane .dice-proof { margin: 0; padding: 0; border: 0; background: transparent; }
 .log-pane .dice-quick, .log-pane .dice-adv-row { gap: .4rem; margin-top: .7rem; }
 .log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: .5rem .7rem; }
@@ -626,19 +619,6 @@
 /* Its own browser tab: the workspace fills the window; no modal chrome. */
 .sheet-standalone { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--surface-2); }
 .sheet-standalone-msg { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 2rem; color: var(--text-dim); font-size: var(--fs-body); text-align: center; }
-
-/* Phone: the two panes can't sit side by side - show one at a time behind the Sheet/Dice toggle. */
-@media (max-width: 680px) {
-  .character-sheet.has-log { max-width: calc(100vw - 1rem); }
-  .sheet-width-resize { display: none; }
-  .sheet-workspace.has-log .sheet-mobile-tabs { display: inline-flex; }
-  .sheet-workspace.has-log .sheet-dock-picker { display: none; }
-  .sheet-workspace.has-log .sheet-workspace-cols { flex-direction: column; }
-  .sheet-workspace.has-log.show-sheet .log-pane { display: none; }
-  .sheet-workspace.has-log.show-log .sheet-pane { display: none; }
-  .sheet-workspace.has-log .log-pane { flex: 1 1 auto; border-left: 0; border-top: 1px solid var(--line); }
-  .sheet-log-resize { display: none; }
-}
 
 /* GM Character Roster tab (v4 #10, v5 #4): a gallery grid of character cards, like the Scenes tab. */
 .party-roster { max-width: 72rem; }

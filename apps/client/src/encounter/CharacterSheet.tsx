@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
@@ -196,29 +196,11 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const [bonusMode, setBonusMode] = useState<"auto" | "total">(() => (readSetting("vtt.sheet.bonusMode") === "total" ? "total" : "auto"));
   const chooseRollInput = (mode: "digital" | "manual") => { setRollInput(mode); writeSetting("vtt.sheet.rollInput", mode); };
   const chooseBonusMode = (mode: "auto" | "total") => { setBonusMode(mode); writeSetting("vtt.sheet.bonusMode", mode); };
-  // Panel layout (feedback #9): the shared dice log rides beside the sheet as a second subpanel. Its
-  // side (left/right of the sheet) docks like the GM tracker and is remembered per browser; on a narrow
-  // phone the two panes can't sit side by side, so a Sheet/Dice segmented control shows one at a time.
+  // The shared dice log rides behind the header's Sheet/Dice toggle — one pane at a time on every
+  // viewport — so the sheet stays clean and full-width whichever way it's opened. Default to the sheet;
+  // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).
   const hasLog = state !== undefined;
-  const [logSide, setLogSide] = useState<"left" | "right">(() => (readSetting("vtt.sheet.logSide") === "left" ? "left" : "right"));
-  const chooseLogSide = (side: "left" | "right") => { setLogSide(side); writeSetting("vtt.sheet.logSide", side); };
   const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
-  // Adjustable dice-log width (v3 #1.1): a draggable divider sets the log column's width, remembered per
-  // browser. Exposed as a CSS var so the phone media query can still collapse to one full-width pane.
-  const [logWidth, setLogWidth] = useState<number>(() => { const stored = Number(readSetting("vtt.sheet.logWidth")); return Number.isFinite(stored) && stored >= 220 ? stored : 320; });
-  useEffect(() => { writeSetting("vtt.sheet.logWidth", String(logWidth)); }, [logWidth]);
-  const logResize = useRef<{ startX: number; startWidth: number } | null>(null);
-  const beginLogResize = (event: ReactPointerEvent<HTMLDivElement>) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); logResize.current = { startX: event.clientX, startWidth: logWidth }; };
-  const moveLogResize = (event: ReactPointerEvent<HTMLDivElement>) => { if (!logResize.current) return; const dx = event.clientX - logResize.current.startX; const delta = logSide === "left" ? dx : -dx; setLogWidth(Math.max(220, Math.min(620, logResize.current.startWidth + delta))); };
-  const endLogResize = () => { logResize.current = null; };
-  // Adjustable overall sheet width when docked (v4 #2): a right-edge handle drives a --sheet-width var on
-  // the modal; centred, so the edge follows the cursor at 2x. Remembered per browser.
-  const [sheetWidth, setSheetWidth] = useState<number>(() => { const stored = Number(readSetting("vtt.sheet.width")); return Number.isFinite(stored) && stored >= 720 ? stored : 1180; });
-  useEffect(() => { writeSetting("vtt.sheet.width", String(sheetWidth)); }, [sheetWidth]);
-  const sheetResize = useRef<{ startX: number; startWidth: number } | null>(null);
-  const beginSheetResize = (event: ReactPointerEvent<HTMLDivElement>) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); sheetResize.current = { startX: event.clientX, startWidth: sheetWidth }; };
-  const moveSheetResize = (event: ReactPointerEvent<HTMLDivElement>) => { if (!sheetResize.current) return; const dx = event.clientX - sheetResize.current.startX; setSheetWidth(Math.max(720, Math.min(1600, sheetResize.current.startWidth + dx * 2))); };
-  const endSheetResize = () => { sheetResize.current = null; };
   // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
   // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
@@ -601,8 +583,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       </div>
     </div>
     <div className="sheet-header-controls">
-      {hasLog && <SegmentedControl className="sheet-mobile-tabs" size="sm" ariaLabel="Show sheet or dice" value={mobilePane} onChange={(pane) => setMobilePane(pane as "sheet" | "log")} options={[{ value: "sheet", label: "Sheet" }, { value: "log", label: "Dice" }]} />}
-      {hasLog && <SegmentedControl className="sheet-dock-picker" size="sm" ariaLabel="Dice log position" value={logSide} onChange={(side) => chooseLogSide(side as "left" | "right")} options={[{ value: "left", icon: "◧", ariaLabel: "Dice log left of the sheet", title: "Dice log on the left" }, { value: "right", icon: "◨", ariaLabel: "Dice log right of the sheet", title: "Dice log on the right" }]} />}
+      {hasLog && <SegmentedControl className="sheet-pane-toggle" size="sm" ariaLabel="Show sheet or dice" value={mobilePane} onChange={(pane) => setMobilePane(pane as "sheet" | "log")} options={[{ value: "sheet", label: "Sheet" }, { value: "log", label: "Dice" }]} />}
       {!standalone && !embedded && <Button size="sm" variant="ghost" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</Button>}
       {!standalone && !embedded && role === "player" && <Button size="sm" variant="ghost" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</Button>}
       <IconButton label={embedded ? "Back to initiative" : "Close"} size="sm" className="sheet-close" onClick={onClose}>✕</IconButton>
@@ -616,18 +597,17 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => chooseBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
   </div>) : null;
 
-  // Two-subpanel workspace (feedback #9): sheet + shared dice log side by side (log docked left/right),
-  // or one-at-a-time behind the Sheet/Dice toggle on a phone. Header + rollbar stay pinned; cols scroll.
-  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace log-${logSide}${hasLog ? " has-log" : " no-log"} show-${mobilePane}`} style={{ "--log-width": `${logWidth}px` } as CSSProperties}>
+  // Workspace: the sheet fills the panel; when a shared dice log is available it swaps in behind the
+  // Sheet/Dice toggle (one pane at a time on every viewport), so the sheet keeps its clean full width.
+  // Header + rollbar stay pinned; the active pane scrolls.
+  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}`}>
     {header(draggable)}
     {rollbar}
     <div className="sheet-workspace-cols">
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
-      {hasLog && state && <div className="sheet-log-resize" role="separator" aria-label="Drag to resize the dice log" title="Drag to resize the dice log" onPointerDown={beginLogResize} onPointerMove={moveLogResize} onPointerUp={endLogResize} onPointerCancel={endLogResize} />}
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
     </div>
     {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
-    {hasLog && !standalone && presentation === "modal" && <div className="sheet-width-resize" role="separator" aria-label="Drag to resize the sheet" title="Drag to resize the sheet" onPointerDown={beginSheetResize} onPointerMove={moveSheetResize} onPointerUp={endSheetResize} onPointerCancel={endSheetResize} />}
   </div>);
 
   // Embedded inline (v4 #8): fills its container (e.g. the player's initiative panel), no modal chrome;
@@ -646,5 +626,5 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       {dialog}
     </>;
   }
-  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} style={hasLog ? ({ "--sheet-width": `${sheetWidth}px` } as CSSProperties) : undefined} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
+  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
 }
