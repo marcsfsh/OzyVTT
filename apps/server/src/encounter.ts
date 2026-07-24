@@ -84,6 +84,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     legendaryUsed: {},
     pendingSaves: [],
     pendingReactions: [],
+    pendingDamage: [],
     // A fresh fight starts live on the timeline; the handler wipes any prior fight's snapshots and
     // captures this start state as the baseline the GM can rewind all the way back to.
     historyCursor: null,
@@ -115,7 +116,7 @@ export function endEncounter(state: GameState) {
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null) throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
   // Fog persists through the spread below: what the party has revealed stays revealed after the fight.
-  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], historyCursor: null, historyDirty: false };
+  state.combat = { ...state.combat, active: false, turnActorId: null, turn: { ...EMPTY_TURN }, underwater: false, reactionsUsed: [], legendaryUsed: {}, pendingSaves: [], pendingReactions: [], pendingDamage: [], historyCursor: null, historyDirty: false };
 }
 
 export function setInitiativeScore(state: GameState, actorId: string, score: number) {

@@ -247,11 +247,13 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.saveDismiss), ...command("save.dismiss", saveIdParam));
   router.post(expressPath(GAME_PATHS.reactionAnswer), ...command("reaction.answer", (req: Request) => ({ reactionId: req.params.reactionId })));
   router.post(expressPath(GAME_PATHS.reactionDismiss), ...command("reaction.dismiss", (req: Request) => ({ reactionId: req.params.reactionId })));
+  router.post(expressPath(GAME_PATHS.damageResolve), ...command("damage.resolve"));
   router.post(expressPath(GAME_PATHS.effects), ...command("effect.add", actorIdParam));
   router.post(expressPath(GAME_PATHS.effectEnd), ...command("effect.end", (req: Request) => ({ actorId: req.params.actorId, effectId: req.params.effectId })));
   router.post(expressPath(GAME_PATHS.deathSaveRoll), ...command("death-save.roll", actorIdParam));
   router.post(expressPath(GAME_PATHS.rulesMode), ...command("encounter.set-rules-mode"));
   router.post(expressPath(GAME_PATHS.rollMode), ...command("encounter.set-roll-mode"));
+  router.post(expressPath(GAME_PATHS.playerDamageMode), ...command("encounter.set-player-damage-mode"));
   router.post(expressPath(GAME_PATHS.healthDisplay), ...command("encounter.set-health-display"));
   router.post(expressPath(GAME_PATHS.environment), ...command("encounter.set-environment"));
   router.post(expressPath(GAME_PATHS.actorRest), ...command("actor.rest", actorIdParam));

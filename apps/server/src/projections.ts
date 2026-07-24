@@ -76,6 +76,9 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
       : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
     rulesMode: state.combat.rulesMode,
     rollMode: state.combat.rollMode,
+    // The policy (not the GM-only pendingDamage proposals) rides to players so the runner can say
+    // whether a hit is handed to the GM or applied directly.
+    playerDamageMode: state.combat.playerDamageMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
     // The fog mask travels verbatim - it IS what players render, and it carries geometry only.

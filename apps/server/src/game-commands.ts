@@ -130,6 +130,10 @@ export const EffectEndSchema = z.object({ commandId: z.string().uuid(), actorId:
 export const DeathSaveRollSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), commit: z.boolean().default(true), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), naturalRoll: z.number().int().min(1).max(20).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRulesModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["strict", "assisted", "freeform"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const SetRollModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["auto", "manual"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** Table-wide policy for how a player's own confirmed hit reaches an enemy's HP (GM): a GM-confirmed proposal, or direct server-side apply. */
+export const SetPlayerDamageModeSchema = z.object({ commandId: z.string().uuid(), mode: z.enum(["proposal", "direct"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/** GM resolves a parked player-hit damage proposal: apply it (optionally overriding the total) or dismiss it. */
+export const DamageResolveSchema = z.object({ commandId: z.string().uuid(), proposalId: z.string().uuid(), apply: z.boolean(), amount: z.number().int().min(0).max(1000).optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Table-wide default for how token health shows on the map (GM). */
 export const SetHealthDisplaySchema = z.object({ commandId: z.string().uuid(), style: z.enum(["band", "bar", "ring", "aura"]), audience: z.enum(["gm", "all"]), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 /** Per-token health-display override (GM); `display: null` clears the override so the token follows the table default. */

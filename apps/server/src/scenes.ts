@@ -25,19 +25,21 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     turn: combat.turn,
     rulesMode: combat.rulesMode,
     rollMode: combat.rollMode,
+    playerDamageMode: combat.playerDamageMode,
     healthDisplay: combat.healthDisplay,
     underwater: combat.underwater,
     reactionsUsed: combat.reactionsUsed,
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
     pendingSaves: combat.pendingSaves,
-    pendingReactions: combat.pendingReactions
+    pendingReactions: combat.pendingReactions,
+    pendingDamage: combat.pendingDamage
   };
 }
 
 /** The empty combat an inactive/active-slot scene holds (the single-source-of-truth invariant for the active scene). */
 function emptySceneCombat(): SceneCombat {
-  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [] };
+  return { active: false, round: 1, turnActorId: null, initiative: [], tokens: [], annotations: [], turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }, rulesMode: "strict", rollMode: "auto", playerDamageMode: "proposal", healthDisplay: { style: "band", audience: "gm" }, underwater: false, reactionsUsed: [], legendaryUsed: {}, fog: { enabled: false, shapes: [] }, pendingSaves: [], pendingReactions: [], pendingDamage: [] };
 }
 
 /** Builds a prepared (inactive) combat context from a combatant list: initiative at score 0, tokens at default (unplaced) positions. */

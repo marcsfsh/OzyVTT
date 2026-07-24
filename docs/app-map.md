@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 6 GameState fields · 67 commands · 100 HTTP paths
+- 6 GameState fields · 69 commands · 102 HTTP paths
 
 ## GameState shape
 
@@ -29,7 +29,7 @@ pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map
 operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`
 route -> projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `character`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `save`, `scene`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `save`, `scene`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -67,6 +67,7 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `death-save`, `dice`, 
 | `character.set-prepared` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
+| `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
 | `effect.add` | `combat:write` |
@@ -75,6 +76,7 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `death-save`, `dice`, 
 | `encounter.end` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
+| `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-roll-mode` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.start` | `combat:write` |
@@ -151,11 +153,13 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/claims/{actorId}/force-release`
 - `POST /api/v1/game/claims/release`
 - `GET POST /api/v1/game/commands`
+- `POST /api/v1/game/damage/resolve`
 - `POST /api/v1/game/definitions/import`
 - `POST /api/v1/game/encounter/combatants`
 - `POST /api/v1/game/encounter/end`
 - `POST /api/v1/game/encounter/environment`
 - `POST /api/v1/game/encounter/health-display`
+- `POST /api/v1/game/encounter/player-damage-mode`
 - `POST /api/v1/game/encounter/roll-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`

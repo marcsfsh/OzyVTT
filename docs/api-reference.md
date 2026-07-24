@@ -79,11 +79,13 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `save.dismiss` | `combat:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
+| `damage.resolve` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `encounter.set-rules-mode` | `combat:write` |
 | `encounter.set-roll-mode` | `combat:write` |
+| `encounter.set-player-damage-mode` | `combat:write` |
 | `encounter.set-health-display` | `combat:write` |
 | `encounter.set-environment` | `combat:write` |
 | `actor.rest` | `actor:write` |
@@ -667,9 +669,9 @@ Rolls dice into the shared, auditable roll history; the response carries `rollId
 
 ### `POST /api/v1/game/actions/resolve`
 
-Runs a stat-block action (GM-grade only): attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.
+Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.
 
-**Auth:** Integration credential with `combat:write` · GM session
+**Auth:** Integration credential with `combat:write` · GM session · Player session (own-character limits apply)
 
 **Request body** (JSON):
 
@@ -774,6 +776,24 @@ Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/damage/resolve`
+
+Applies or dismisses a parked player-hit damage proposal (proposal mode; GM-grade only). `apply: true` reduces the target's HP through the typed-defense pipeline (an optional `amount` overrides the total as a bare number, no defense math); `apply: false` discards it. Either way the proposal clears.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `proposalId` | string (uuid) | yes |  |
+| `apply` | boolean | yes | true applies the parked damage; false dismisses it |
+| `amount` | integer (0–1000) | no | optional override total (bare number, no defense math) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `GET /api/v1/game/actors/{actorId}/available-actions`
 
 Server-computed action availability for one combatant: per stat-block action, whether strict mode would allow resolving it right now, every violated rule (machine-readable rule ids + messages), and the remaining limited uses / open compound-action rolls. Runs the exact evaluation `action.resolve` enforces, so this report can never drift from enforcement. GM-grade any combatant; a player session only their claimed character. Target-specific rules (e.g. grapple targeting) need a target and are not pre-checked here.
@@ -874,6 +894,22 @@ Sets the table's roll preference (GM-grade only): `auto` rolls each encounter ro
 | `commandId` | string (uuid) | no |  |
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `mode` | `auto` \| `manual` | yes |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/encounter/player-damage-mode`
+
+Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `proposal` parks a GM-confirmed damage proposal (the default), `direct` applies the typed damage immediately server-side.
+
+**Auth:** Integration credential with `combat:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `mode` | `proposal` \| `direct` | yes | proposal parks a GM-confirmed damage proposal for a player's hit; direct applies the typed damage immediately server-side |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

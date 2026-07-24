@@ -28,6 +28,7 @@ import { applyMovementRules } from "./movement-rules.js";
 import { applyRest, spendHitDice } from "./rests.js";
 import { paintFog, resetFog, setFogEnabled } from "./fog.js";
 import { applyDamage, applyDamageDetailed, healActor, setCurrentHp, setTemporaryHp, type ActorScope } from "./hit-points.js";
+import { settlePlayerHit, resolvePendingDamage, type AppliedDamage } from "./player-damage.js";
 import { narrateTokenMove, type MovementNarration } from "./movement-narration.js";
 import { moveEncounterToken, moveSceneToken, setActorSize, setActorVisibility, type TokenMapGeometry } from "./token-placement.js";
 import { answerSave, dismissSave } from "./saving-throws.js";
@@ -37,10 +38,10 @@ import {
   ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
-  DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
+  DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
   InitiativeScoreSchema, ReactionAnswerSchema, ReactionDismissSchema, SaveAnswerSchema, SaveDismissSchema, SceneCreateSchema, SceneIdSchema, SceneRenameSchema,
   FogPaintSchema, FogResetSchema, FogSetEnabledSchema,
-  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
+  SceneReorderSchema, SceneSetCombatantsSchema, SetActorArchivedSchema, SetActorHealthDisplaySchema, SetActorSizeSchema, SetActorVisibilitySchema, SetConditionSchema, SetEnvironmentSchema, SetHealthDisplaySchema, SetHpSchema, SetPlayerDamageModeSchema, SetRollModeSchema, SetRulesModeSchema, SetTokenImageSchema, TempHpSchema,
   TokenMoveSchema, TurnLegendarySchema, TurnReactionSchema, TurnUseSchema, type GameCommandType
 } from "./game-commands.js";
 
@@ -649,6 +650,9 @@ export function createGameOperations(context: GameOperationsContext) {
       if (template && !geometry?.calibration) throw new CommandRejectedError("Calibrate this map before placing an area template.");
       const gmSessionId = sessionIdOf(principal);
       let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
+      // A player's confirmed hit in "direct" mode applies server-side (GM-scoped) inside the mutation;
+      // captured here so its damage narrates to the table after the state publishes (like actor:apply-damage).
+      let playerDamageApplied: AppliedDamage | undefined;
       const result = await store.execute({ id: commandId, type: "action.resolve", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const attacker = state.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
@@ -684,6 +688,10 @@ export function createGameOperations(context: GameOperationsContext) {
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
         resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
+        // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
+        // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.
+        if (isPlayer) playerDamageApplied = settlePlayerHit(state, resolution, attacker.name, actorId, state.combat.playerDamageMode, { resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId), newId: context.newId, now: () => Date.now() }) ?? undefined;
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
@@ -721,6 +729,17 @@ export function createGameOperations(context: GameOperationsContext) {
         for (const ended of resolution.effectsEnded ?? []) {
           context.appendLog({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
           context.broadcastTableEvent({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
+        }
+        if (playerDamageApplied) {
+          // Direct-mode auto-apply narrates its damage exactly like actor:apply-damage (with any typed-defense breakdown).
+          const { outcome, targetId, label } = playerDamageApplied;
+          const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
+          const detail = adjustments.length > 0
+            ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})`
+            : "";
+          context.broadcastTableEvent({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId] });
+          context.appendLog({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId] });
+          publishNarrations(outcome.events);
         }
         }
       }
@@ -952,6 +971,40 @@ export function createGameOperations(context: GameOperationsContext) {
         state.combat = { ...state.combat, rollMode: mode };
       });
       if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Roll mode set to ${mode === "auto" ? "auto-roll" : "manual entry"}.`, gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async encounterSetPlayerDamageMode(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can change how players' hits apply damage.");
+      const request = parse(SetPlayerDamageModeSchema, raw, "The player-damage-mode command is malformed.");
+      const { commandId, mode, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "encounter.set-player-damage-mode", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.combat = { ...state.combat, playerDamageMode: mode };
+      });
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Players' hits now ${mode === "direct" ? "apply damage directly" : "wait for the GM to confirm"}.`, gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async damageResolve(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can apply proposed damage.");
+      const request = parse(DamageResolveSchema, raw, "The damage-resolution command is malformed.");
+      const { commandId, proposalId, apply, amount, expectedRevision } = request;
+      let applied: AppliedDamage | undefined;
+      const result = await store.execute({ id: commandId, type: "damage.resolve", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        applied = resolvePendingDamage(state, proposalId, apply, amount, { resolveDefinition, newId: context.newId, now: () => Date.now() }) ?? undefined;
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        if (applied) {
+          const { outcome, targetId, label } = applied;
+          const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
+          const detail = adjustments.length > 0 ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})` : "";
+          const text = `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;
+          context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId] });
+          context.appendLog({ kind: "damage", text, actorIds: [targetId] });
+          publishNarrations(outcome.events);
+        }
+      }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
@@ -1480,16 +1533,18 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["actor.set-hp", "Set current hit points directly (GM).", (p, raw) => operations.actorSetHp(p, raw)],
     ["actor.set-condition", "Apply or clear an SRD condition, with exhaustion levels.", (p, raw) => operations.actorSetCondition(p, raw)],
     ["dice.roll", "Roll dice into the shared, auditable roll history.", (p, raw) => operations.diceRoll(p, raw)],
-    ["action.resolve", "Run a stat-block action: attack vs AC or save-DC with typed damage (GM).", (p, raw) => operations.actionResolve(p, raw)],
+    ["action.resolve", "Run a stat-block action: attack vs AC or save-DC with typed damage (GM anyone; a player their own claimed character).", (p, raw) => operations.actionResolve(p, raw)],
     ["save.answer", "Answer a pending saving throw by rolling or entering a total.", (p, raw) => operations.saveAnswer(p, raw)],
     ["save.dismiss", "Dismiss a pending saving throw without resolving it.", (p, raw) => operations.saveDismiss(p, raw)],
     ["reaction.answer", "Answer a pending reaction prompt: use it (spend the reaction, halve the parked damage) or decline (apply it in full).", (p, raw) => operations.reactionAnswer(p, raw)],
     ["reaction.dismiss", "Dismiss a pending reaction prompt without applying its damage (GM).", (p, raw) => operations.reactionDismiss(p, raw)],
+    ["damage.resolve", "Apply or dismiss a player-hit damage proposal parked in proposal mode (GM).", (p, raw) => operations.damageResolve(p, raw)],
     ["effect.add", "Add a rules-engine effect to a combatant (GM).", (p, raw) => operations.effectAdd(p, raw)],
     ["effect.end", "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.", (p, raw) => operations.effectEnd(p, raw)],
     ["death-save.roll", "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).", (p, raw) => operations.deathSaveRoll(p, raw)],
     ["encounter.set-rules-mode", "Set the rules-engine enforcement mode: strict, assisted, or freeform (GM).", (p, raw) => operations.encounterSetRulesMode(p, raw)],
     ["encounter.set-roll-mode", "Set the table's roll preference: auto-roll or manual entry first (GM).", (p, raw) => operations.encounterSetRollMode(p, raw)],
+    ["encounter.set-player-damage-mode", "Set how a player's own hit reaches an enemy's HP: a GM-confirmed proposal or direct server-side apply (GM).", (p, raw) => operations.encounterSetPlayerDamageMode(p, raw)],
     ["encounter.set-health-display", "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).", (p, raw) => operations.encounterSetHealthDisplay(p, raw)],
     ["actor.set-health-display", "Override one combatant's token health display, or clear it to follow the table default (GM).", (p, raw) => operations.actorSetHealthDisplay(p, raw)],
     ["encounter.set-environment", "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).", (p, raw) => operations.encounterSetEnvironment(p, raw)],
