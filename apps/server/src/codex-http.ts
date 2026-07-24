@@ -82,7 +82,13 @@ const JournalWriteSchema = z.object({
   attachPageId: z.string().uuid().nullable().optional(),
   sessionNumber: z.number().int().min(0).max(100_000).nullable().optional(),
   realDate: z.string().max(40).nullable().optional(),
-  inWorldLabel: z.string().max(120).nullable().optional()
+  inWorldLabel: z.string().max(120).nullable().optional(),
+  inWorldDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional()
+}).strict();
+const CalendarSchema = z.object({
+  yearName: z.string().max(20),
+  months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
+  weekdays: z.array(z.string().trim().min(1).max(40)).max(20)
 }).strict();
 
 type CodexRouterOptions = Readonly<{
@@ -388,6 +394,19 @@ export function createCodexRouter(options: CodexRouterOptions) {
     store.deleteEntry(pathParam(request, "id"));
     options.notifyChanged("journal");
     return envelope(response, 200, { deleted: true });
+  });
+
+  // ----- Calendar (the world's own months / weekdays / era) -----
+
+  router.get(`${CODEX_BASE}/calendar`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the calendar.");
+    return envelope(response, 200, { calendar: store.getCalendar() });
+  });
+
+  router.put(`${CODEX_BASE}/calendar`, requireGm, (request, response) => {
+    try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { calendar }); }
+    catch (error) { return malformed(response, error); }
   });
 
   // ----- Export (GM backup / round-trip) -----

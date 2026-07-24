@@ -313,6 +313,27 @@ describe("CodexStore journal", () => {
   });
 });
 
+describe("CodexStore calendar + timeline", () => {
+  it("dates entries by the world calendar and orders the timeline chronologically", () => {
+    expect(store.getCalendar().months).toHaveLength(12); // default: 12 x 30 = 360 days/year
+    const later = store.createEntry({ playerText: "The siege ends.", inWorldDate: { year: 1492, month: 5, day: 10 } });
+    const earlier = store.createEntry({ playerText: "The siege begins.", inWorldDate: { year: 1491, month: 0, day: 1 } });
+    expect(earlier.calendarInstant!).toBeLessThan(later.calendarInstant!);
+    expect(later.inWorldLabel).toContain("1492");
+    const dated = store.listTimeline().filter((entry) => entry.calendarInstant !== null);
+    expect(dated.map((entry) => entry.playerText)).toEqual(["The siege begins.", "The siege ends."]); // earlier first, though created second
+  });
+
+  it("a custom calendar changes days-per-year and the formatted label", () => {
+    store.setCalendar({ yearName: "AE", months: [{ name: "Rise", days: 100 }, { name: "Fall", days: 100 }], weekdays: [] });
+    const entry = store.createEntry({ playerText: "A new era.", inWorldDate: { year: 1, month: 1, day: 5 } });
+    expect(entry.inWorldLabel).toBe("Fall 5, 1 AE");
+    expect(entry.calendarInstant).toBe(1 * 200 + 100 + 4); // year*perYear + month offset + (day-1)
+    expect(store.dateForInstant(entry.calendarInstant!)).toEqual({ year: 1, month: 1, day: 5 }); // round-trips
+    expect(() => store.setCalendar({ yearName: "", months: [], weekdays: [] })).toThrow(/1 to 24 months/);
+  });
+});
+
 describe("CodexStore media visibility (page images)", () => {
   const banner = "22222222-2222-4222-8222-222222222222";
   const inline = "33333333-3333-4333-8333-333333333333";

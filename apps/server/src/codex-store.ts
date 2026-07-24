@@ -100,6 +100,23 @@ export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind
 export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageId?: string | null; subMapId?: string | null; sceneId?: string | null; actorId?: string | null }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
+/** The world's calendar: ordered months (each with a length), weekday names, and an era suffix. */
+export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
+export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[] }>;
+/** A structured in-world date (month is a 0-based index into the calendar's months). */
+export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
+
+const DEFAULT_CALENDAR: CodexCalendar = {
+  yearName: "",
+  months: [
+    { name: "Deepwinter", days: 30 }, { name: "The Claw", days: 30 }, { name: "Melting", days: 30 },
+    { name: "Greengrass", days: 30 }, { name: "Mirtul", days: 30 }, { name: "Flamerule", days: 30 },
+    { name: "Highsun", days: 30 }, { name: "Harvest", days: 30 }, { name: "Fading", days: 30 },
+    { name: "Leaffall", days: 30 }, { name: "The Rotting", days: 30 }, { name: "Deadwinter", days: 30 }
+  ],
+  weekdays: ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
+};
+
 export type CodexJournalKind = "note" | "combat";
 export type CodexJournalRow = Readonly<{
   id: string;
@@ -118,7 +135,7 @@ export type CodexJournalRow = Readonly<{
   createdAt: string;
   updatedAt: string;
 }>;
-export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null }>;
+export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null }>;
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
 export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attachMarkerId?: string | null; attachPageId?: string | null; playerText: string; gmText?: string | null; revealedToPlayers?: boolean }>;
 
@@ -271,6 +288,9 @@ const MIGRATIONS = [{
     CREATE INDEX codex_rel_from ON codex_relationships (from_page_id);
     CREATE INDEX codex_rel_to ON codex_relationships (to_page_id);
   `
+}, {
+  version: 4,
+  sql: `ALTER TABLE codex_meta ADD COLUMN calendar_json TEXT;`
 }];
 
 type PageRow = {
@@ -343,6 +363,27 @@ function parseFields(json: string | null | undefined): Record<string, string> {
   if (!json) return {};
   try { const parsed = JSON.parse(json) as unknown; return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, string>) : {}; }
   catch { return {}; }
+}
+function normalizeCalendar(input: CodexCalendar): CodexCalendar {
+  const months = (input.months ?? []).map((month) => ({ name: shortLabel(month.name, 40, "month name") ?? "Month", days: Math.max(1, Math.min(Math.trunc(month.days), 400)) }));
+  if (months.length < 1 || months.length > 24) throw new Error("A calendar needs 1 to 24 months.");
+  const weekdays = (input.weekdays ?? []).slice(0, 20).map((day) => shortLabel(day, 40, "weekday") ?? "Day");
+  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", months, weekdays };
+}
+function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
+/** An absolute, monotonically-increasing day number for chronological sorting (negative years allowed). */
+function calendarInstantOf(calendar: CodexCalendar, date: CodexInWorldDate): number {
+  const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
+  let dayOfYear = 0;
+  for (let i = 0; i < monthIdx; i += 1) dayOfYear += calendar.months[i].days;
+  const day = Math.max(1, Math.min(Math.trunc(date.day), calendar.months[monthIdx].days));
+  return Math.trunc(date.year) * calendarDaysPerYear(calendar) + dayOfYear + (day - 1);
+}
+function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
+  const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
+  const month = calendar.months[monthIdx];
+  const day = Math.max(1, Math.min(Math.trunc(date.day), month.days));
+  return `${month.name} ${day}, ${Math.trunc(date.year)}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
 }
 const MAP_KINDS = new Set<CodexMapKind>(["battlemap", "regional", "world"]);
 function mapName(value: string): string {
@@ -859,14 +900,52 @@ export class CodexStore {
     return row ? this.toMarker(row) : null;
   }
 
+  // ----- Calendar -----
+
+  getCalendar(): CodexCalendar {
+    const row = this.requireDatabase().prepare("SELECT calendar_json FROM codex_meta WHERE id = 1").get() as { calendar_json: string | null } | undefined;
+    if (!row?.calendar_json) return DEFAULT_CALENDAR;
+    try { return normalizeCalendar(JSON.parse(row.calendar_json) as CodexCalendar); } catch { return DEFAULT_CALENDAR; }
+  }
+
+  setCalendar(input: CodexCalendar): CodexCalendar {
+    const calendar = normalizeCalendar(input);
+    this.transaction(() => {
+      this.requireDatabase().prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(calendar));
+      this.bumpRevision();
+    });
+    return calendar;
+  }
+
+  /** Convert a stored instant back to calendar date parts, for re-editing a dated entry. */
+  dateForInstant(instant: number): CodexInWorldDate {
+    const calendar = this.getCalendar();
+    const perYear = calendarDaysPerYear(calendar);
+    const year = Math.floor(instant / perYear);
+    let remainder = instant - year * perYear;
+    let month = 0;
+    while (month < calendar.months.length - 1 && remainder >= calendar.months[month].days) { remainder -= calendar.months[month].days; month += 1; }
+    return { year, month, day: remainder + 1 };
+  }
+
+  /** Resolve a journal entry's date: a structured in-world date wins (computes instant + label); else free-text label, no instant. */
+  private resolveDate(date: CodexInWorldDate | null | undefined, label: string | null | undefined): { instant: number | null; label: string | null } {
+    if (date && Number.isFinite(date.year) && Number.isFinite(date.month) && Number.isFinite(date.day)) {
+      const calendar = this.getCalendar();
+      return { instant: calendarInstantOf(calendar, date), label: formatInWorldDate(calendar, date) };
+    }
+    return { instant: null, label: shortLabel(label, 120, "in-world date") };
+  }
+
   // ----- Journal / timeline -----
 
   createEntry(input: CodexJournalCreateInput): CodexJournalRow {
+    const dated = this.resolveDate(input.inWorldDate, input.inWorldLabel);
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
       sourceEncounterId: null, sessionNumber: sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
-      inWorldLabel: shortLabel(input.inWorldLabel, 120, "in-world date")
+      inWorldLabel: dated.label, calendarInstant: dated.instant
     });
   }
 
@@ -875,7 +954,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
-      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null, inWorldLabel: null
+      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null
     });
   }
 
@@ -883,6 +962,8 @@ export class CodexStore {
     const database = this.requireDatabase();
     const existing = this.journalRowRaw(entryId);
     if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
+    // A structured date (or a changed free-text label) recomputes the sort instant + display label together.
+    const dated = (input.inWorldDate !== undefined || input.inWorldLabel !== undefined) ? this.resolveDate(input.inWorldDate ?? null, input.inWorldLabel) : null;
     const next = {
       player_text: input.playerText === undefined ? existing.player_text : entryText(input.playerText),
       gm_text: input.gmText === undefined ? existing.gm_text : entryGmText(input.gmText),
@@ -890,11 +971,12 @@ export class CodexStore {
       attach_page_id: input.attachPageId === undefined ? existing.attach_page_id : optionalId(input.attachPageId),
       session_number: input.sessionNumber === undefined ? existing.session_number : sessionNo(input.sessionNumber),
       real_date: input.realDate === undefined ? existing.real_date : shortLabel(input.realDate, 40, "date"),
-      in_world_label: input.inWorldLabel === undefined ? existing.in_world_label : shortLabel(input.inWorldLabel, 120, "in-world date")
+      in_world_label: dated ? dated.label : existing.in_world_label,
+      calendar_instant: dated ? dated.instant : existing.calendar_instant
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, updated_at = ? WHERE id = ?")
-        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, this.stamp(), entryId);
+      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, updated_at = ? WHERE id = ?")
+        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, this.stamp(), entryId);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -939,14 +1021,14 @@ export class CodexStore {
     return [];
   }
 
-  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null }>): CodexJournalRow {
+  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null }>): CodexJournalRow {
     const database = this.requireDatabase();
     const entryId = this.freshId();
     const stamp = this.stamp();
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)")
-        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, sortKey, stamp, stamp);
+      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, sortKey, stamp, stamp);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;

@@ -172,10 +172,31 @@ export type CodexJournalEntry = Readonly<{
   sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null;
   sortKey: number; createdAt: string; updatedAt: string;
 }>;
+export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 export type CodexJournalInput = Readonly<{
   playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null;
   attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null;
+  inWorldDate?: CodexInWorldDate | null;
 }>;
+
+// ----- Calendar (the world's own months / weekdays / era) -----
+export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
+export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[] }>;
+export function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
+export function calendarYearOf(calendar: CodexCalendar, instant: number): number { const perYear = calendarDaysPerYear(calendar) || 1; return Math.floor(instant / perYear); }
+export function formatWorldYear(calendar: CodexCalendar, year: number): string { return `${year}${calendar.yearName ? ` ${calendar.yearName}` : ""}`; }
+export function instantToDate(calendar: CodexCalendar, instant: number): CodexInWorldDate {
+  const perYear = calendarDaysPerYear(calendar) || 1;
+  const year = Math.floor(instant / perYear);
+  let remainder = instant - year * perYear;
+  let month = 0;
+  while (month < calendar.months.length - 1 && remainder >= calendar.months[month].days) { remainder -= calendar.months[month].days; month += 1; }
+  return { year, month, day: remainder + 1 };
+}
+export const calendarApi = {
+  get: (token: string) => request<{ calendar: CodexCalendar }>(token, "/calendar").then((data) => data.calendar),
+  set: (token: string, calendar: CodexCalendar) => request<{ calendar: CodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then((data) => data.calendar)
+};
 
 export const journalApi = {
   timeline: (token: string) => request<{ entries: CodexJournalEntry[] }>(token, "/journal").then((data) => data.entries),
