@@ -280,6 +280,16 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   `routeAttack()` seam to the same `action:resolve` (weapons matched to a stat-block action by name, attack
   spells by their linked `actionId` after the slot is spent); inventory-only weapons and save/AoE spells,
   which have no single server action to resolve, intentionally stay loose.
+  **Follow-up round (2026-07-24):** (3) a client version-skew guard — a missing newly-added GM field
+  (`pendingDamage`/`pendingInitiative`) no longer white-screens the whole table (`?? []` at the reads);
+  the real fix is restarting a stale server, which the schema/spreads already keep correct. (4) structured
+  attacks now resolve from ANY sheet surface (standalone tab, roster, map), deriving the combat context
+  from the player's own view `state` and forcing the inline picker where there's no initiative view to jump
+  to; the "Cast" button routes EVERY creature-targeting spell (attack/save/damage), not just attack spells.
+  (5) a player's manual attack entry now honors the same auto/total bonus toggle as every roll surface, and
+  "final total" mode adds a **Natural 20 checkbox** (a crit can't be inferred from a hand-computed total) —
+  `action:resolve` gained `attackTotal` + `critical` (contract regen; server compares the total to AC and
+  owns the crit doubling). `check`+`build`+`test` green; **server suite 448**.
 - **Player character sheets — Phase 1 initiative (2026-07-23, PR #45, branch
   `claude/character-sheet-discovery-a14i7f`).** The player-facing half of the app: an interactive
   character sheet used at game night, architected **builder-ready** (the full guided builder is the
