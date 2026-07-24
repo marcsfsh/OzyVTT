@@ -13,6 +13,7 @@ import { CombatLogPanel } from "./encounter/CombatLog";
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
+import { CodexWorkspace } from "./codex/CodexWorkspace";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { SceneGallery } from "./scenes/SceneGallery";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
@@ -33,13 +34,14 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "scenes" | "table" | "roster" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "roster" | "codex" | "viewer" | "replay" | "setup";
 // v4 #10: reordered to Encounter | Scenes | Character Roster | ... | VTT Setup; Viewer is kept (it drives
 // the shared screen) and placed after Character Roster.
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "table", label: "Encounter" },
   { id: "scenes", label: "Scenes" },
   { id: "roster", label: "Character Roster" },
+  { id: "codex", label: "Codex" },
   { id: "viewer", label: "Viewer" },
   { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
@@ -353,6 +355,7 @@ function App() {
 
       {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
       {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
+      {mode === "gm" && gmToken && gmTab === "codex" && <div className="anim-view"><CodexWorkspace gmToken={gmToken} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
