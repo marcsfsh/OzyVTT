@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { GameStateSchema, type ActionResolution, type GameState } from "@vtt/domain";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
-import { playerHitOwesDamage, resolvePendingDamage, settlePlayerHit } from "../src/player-damage.js";
+import { playerHitOwesDamage, resolutionDamageParts, resolvePendingDamage, settlePlayerHit } from "../src/player-damage.js";
 
 const IDS = {
   attacker: "10000000-0000-4000-8000-000000000001",
@@ -91,5 +91,39 @@ describe("player damage settlement", () => {
     expect(playerHitOwesDamage(resolution)).toBe(false);
     expect(settlePlayerHit(game, resolution, "Alpha", IDS.attacker, "proposal", damageDeps())).toBeNull();
     expect(game.combat.pendingDamage).toHaveLength(0);
+  });
+});
+
+describe("player damage part/reaction helpers", () => {
+  const resolutionOf = (over: Partial<ActionResolution>): ActionResolution => ({
+    actionName: "Claw", activation: "action",
+    attack: { targetId: IDS.monster, targetName: "Goblin", total: 18, naturalRoll: 13, targetAc: 10, outcome: "hit" },
+    save: null, damage: [{ formula: "1d6", type: "slashing", total: 5 }], damageTotal: 5, crit: false,
+    bonusDamage: [], reactionPrompts: [], preview: false, ...over
+  });
+
+  it("combines attack damage with bonus-damage parts and drops zero amounts", () => {
+    const parts = resolutionDamageParts(resolutionOf({
+      damage: [{ formula: "1d6", type: "slashing", total: 5 }],
+      bonusDamage: [{ amount: 3, type: "necrotic", source: "Hex" }, { amount: 0, type: "fire", source: "spark" }]
+    }));
+    expect(parts).toEqual([{ amount: 5, type: "slashing" }, { amount: 3, type: "necrotic" }]);
+  });
+
+  it("owes damage on a committed hit but NOT when the target has a reaction prompt (Uncanny Dodge), nor on a preview/miss", () => {
+    expect(playerHitOwesDamage(resolutionOf({}))).toBe(true);
+    expect(playerHitOwesDamage(resolutionOf({ attack: { targetId: IDS.monster, targetName: "Goblin", total: 7, naturalRoll: 12, targetAc: null, outcome: "unknown" } }))).toBe(true);
+    // A parked reaction means the damage resolves in the turn order, not here - do not park/apply it.
+    expect(playerHitOwesDamage(resolutionOf({ reactionPrompts: [{ id: "90000000-0000-4000-8000-000000000001", actorId: IDS.monster, actionName: "Uncanny Dodge" }] as ActionResolution["reactionPrompts"] }))).toBe(false);
+    expect(playerHitOwesDamage(resolutionOf({ preview: true }))).toBe(false);
+    expect(playerHitOwesDamage(resolutionOf({ attack: { targetId: IDS.monster, targetName: "Goblin", total: 3, naturalRoll: 2, targetAc: 10, outcome: "miss" }, damage: [], damageTotal: 0 }))).toBe(false);
+  });
+
+  it("settlePlayerHit parks nothing and applies nothing when the hit is reaction-owned", () => {
+    const game = combat();
+    const reactionOwned = resolutionOf({ reactionPrompts: [{ id: "90000000-0000-4000-8000-000000000002", actorId: IDS.monster, actionName: "Uncanny Dodge" }] as ActionResolution["reactionPrompts"] });
+    expect(settlePlayerHit(game, reactionOwned, "Alpha", IDS.attacker, "direct", damageDeps())).toBeNull();
+    expect(game.combat.pendingDamage).toHaveLength(0);
+    expect(goblinHp(game)).toBe(15); // untouched - the reaction handles it in the turn order
   });
 });

@@ -17,8 +17,10 @@ export type PlayerDamageDeps = Readonly<{
   now: () => number;
 }>;
 
-/** The applied result surfaced for table narration (direct mode / GM apply). */
-export type AppliedDamage = Readonly<{ outcome: DamageOutcome; targetId: string; label: string }>;
+/** The applied result surfaced for table narration (direct mode / GM apply). `sourceActorId` (the attacker)
+ *  travels so the narration can include it in `actorIds` - the gm-only-ness of the toast/log is re-derived
+ *  from the referenced actors, so a hidden attacker's name in the label stays protected. */
+export type AppliedDamage = Readonly<{ outcome: DamageOutcome; targetId: string; sourceActorId: string; label: string }>;
 
 /** Typed damage components (attack dice + bonus lines) of a resolution, for parking or applying. */
 export function resolutionDamageParts(resolution: ActionResolution): Array<{ amount: number; type: string }> {
@@ -57,7 +59,7 @@ export function settlePlayerHit(state: GameState, resolution: ActionResolution, 
   const label = `${attackerName}'s ${resolution.actionName}`;
   if (mode === "direct") {
     const outcome = applyDamageDetailed(state, attack.targetId, { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label }, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now) });
-    return { outcome, targetId: attack.targetId, label };
+    return { outcome, targetId: attack.targetId, sourceActorId, label };
   }
   state.combat = { ...state.combat, pendingDamage: [...state.combat.pendingDamage, { id: deps.newId(), sourceActorId, sourceName: attackerName, actionName: resolution.actionName, targetActorId: attack.targetId, targetName: attack.targetName, proposedDamageParts: parts, proposedTotal: resolution.damageTotal, critical: resolution.crit, createdAt: deps.now() }] };
   return null;
@@ -79,7 +81,7 @@ export function resolvePendingDamage(state: GameState, proposalId: string, apply
       ? { amount, critical: proposal.critical, sourceName: label }
       : { amount: proposal.proposedTotal, parts: proposal.proposedDamageParts, critical: proposal.critical, sourceName: label };
     const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, { resolveDefinition: deps.resolveDefinition, newId: deps.newId, now: isoOf(deps.now) });
-    applied = { outcome, targetId: proposal.targetActorId, label };
+    applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };
   }
   state.combat = { ...state.combat, pendingDamage: state.combat.pendingDamage.filter((entry) => entry.id !== proposalId) };
   return applied;

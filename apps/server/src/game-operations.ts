@@ -740,14 +740,16 @@ export function createGameOperations(context: GameOperationsContext) {
           context.broadcastTableEvent({ kind: "effect", text: `${ended.name} ended on ${ended.actorName}.`, actorIds: [ended.actorId], gmOnly: hidden || actorHidden(ended.actorId) });
         }
         if (playerDamageApplied) {
-          // Direct-mode auto-apply narrates its damage exactly like actor:apply-damage (with any typed-defense breakdown).
-          const { outcome, targetId, label } = playerDamageApplied;
+          // Direct-mode auto-apply narrates its damage exactly like actor:apply-damage (with any typed-defense
+          // breakdown). Both actors ride actorIds so gm-only-ness is re-derived correctly - the label names the
+          // attacker, so a hidden attacker (unusual for a PC) must gate the line too.
+          const { outcome, targetId, sourceActorId, label } = playerDamageApplied;
           const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
           const detail = adjustments.length > 0
             ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})`
             : "";
-          context.broadcastTableEvent({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId] });
-          context.appendLog({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId] });
+          context.broadcastTableEvent({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
+          context.appendLog({ kind: "damage", text: `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`, actorIds: [targetId, sourceActorId] });
           publishNarrations(outcome.events);
         }
         }
@@ -1005,12 +1007,12 @@ export function createGameOperations(context: GameOperationsContext) {
       if (!result.duplicate) {
         await context.publishGameState(result.state);
         if (applied) {
-          const { outcome, targetId, label } = applied;
+          const { outcome, targetId, sourceActorId, label } = applied;
           const adjustments = outcome.application.parts.filter((part) => part.adjustment !== null);
           const detail = adjustments.length > 0 ? ` (${adjustments.map((part) => `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`).join("; ")})` : "";
           const text = `${label} hit ${actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;
-          context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId] });
-          context.appendLog({ kind: "damage", text, actorIds: [targetId] });
+          context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
+          context.appendLog({ kind: "damage", text, actorIds: [targetId, sourceActorId] });
           publishNarrations(outcome.events);
         }
       }

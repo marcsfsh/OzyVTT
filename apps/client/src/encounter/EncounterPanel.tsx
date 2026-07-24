@@ -424,9 +424,14 @@ function PlayerActionRunner({ actorId, definition, revision, rollMode, playerDam
         const breakdown = [...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`), ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)].join(" + ");
         return <p className="action-damage">Damage: <strong>{result.damageTotal}</strong>{breakdown ? ` (${breakdown})` : ""}{result.crit ? " - crit dice doubled" : ""}</p>;
       })()}
-      {/* Players never apply damage: a committed hit is handed to the GM (proposal) or auto-applied (direct). */}
-      {!result.preview && result.attack && (result.attack.outcome === "hit" || result.attack.outcome === "crit" || result.attack.outcome === "unknown") && result.damageTotal > 0 &&
-        <p className="action-save-note">{playerDamageMode === "direct" ? `Applied to ${result.attack.targetName}.` : `Handed to the GM to apply to ${result.attack.targetName}.`}</p>}
+      {/* Players never apply damage: a committed hit is handed to the GM (proposal) or auto-applied (direct)
+          - UNLESS the target's reaction (Uncanny Dodge) intercepted it, in which case the server parked a
+          reaction prompt instead and the damage resolves in the turn order (mirrors the GM runner). */}
+      {!result.preview && result.attack && (result.attack.outcome === "hit" || result.attack.outcome === "crit" || result.attack.outcome === "unknown") && result.damageTotal > 0 && (() => {
+        const reactionPrompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+        if (reactionPrompt) return <p className="action-save-note">Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong> - it resolves in the turn order.</p>;
+        return <p className="action-save-note">{playerDamageMode === "direct" ? `Applied to ${result.attack!.targetName}.` : `Handed to the GM to apply to ${result.attack!.targetName}.`}</p>;
+      })()}
     </div>}
     {feedback && <p className="save-prompt-outcome" role="status">{feedback}</p>}
   </div>;
