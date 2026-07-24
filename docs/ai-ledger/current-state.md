@@ -309,6 +309,16 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     `test` (422) green each phase, headless render-verified in light + dark. Record:
     `docs/product/character-sheet-styleguide-audit.md`. **Still pending:** a live browser/mobile
     click-through (no e2e harness in the repo).
+  - **Sheet open-consistency + Dice toggle (2026-07-24, same PR).** Three GM-reported follow-ups: (a)
+    `IconButton`'s ✕ rode high — `.nh-iconbtn` now sets `line-height: 1` so the glyph centres (all icon
+    buttons). (b) Opening a sheet from a **map token right-click** now has the shared dice log attached
+    (`state` threaded through `EncounterMap`), so players can see rolls on the map. (c) The three entry
+    points (top-row "View sheet", initiative "My sheet" toggle, map right-click) now render **identically**:
+    the sheet always fills the panel at the normal lg modal width and the dice log **swaps in behind the
+    header's Sheet/Dice toggle** (one pane at a time, every viewport) instead of docking beside the sheet.
+    This **supersedes the v6 #9 side-by-side dock** above — the dock-picker (◧/◨), sheet/log drag-resize
+    handles, and `--sheet-width`/`--log-width` machinery were removed (net −34 lines). `check`+`build`+
+    server `test` (422) green; header + ✕ centring render-verified in light + dark.
 - **Turn time-travel + persistent combat log (owner item #12)** — on branch
   `claude/pr34-work-6wg8n6`. The store keeps a turn-boundary snapshot at every advance in a
   new out-of-`GameState` `turn_snapshots` table (migration v3), written inside the command's

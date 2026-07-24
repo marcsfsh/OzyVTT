@@ -8,6 +8,26 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-24 — Sheet open-consistency + Dice toggle (`claude/character-sheet-discovery-a14i7f`, PR #45)
+
+Three GM-reported follow-ups on how the player sheet opens. (1) The `IconButton` ✕ rode high/off-centre —
+`.nh-iconbtn` relied on `place-items: center` but inherited a ~1.5 line-height, so the glyph's line box
+overflowed; added `line-height: 1` (matches `.nh-modal-close`), centring the × in every icon button.
+(2) Opening a sheet from a **map token right-click** now attaches the shared dice log — threaded the full
+view (`state`) through `EncounterMap` to the sheet so its Sheet/Dice toggle works on the map (where no
+other dice UI shows). (3) The three entry points (top-row "View sheet", initiative "My sheet" toggle, map
+right-click) rendered inconsistently — "View sheet" docked the dice log beside the sheet in a wide two-pane
+modal (the busier look the GM flagged), the others showed the sheet alone. Confirmed direction with the GM
+(chose "clean sheet + Dice toggle") and unified all opens: the sheet always fills the panel at the normal
+lg modal width; the dice log swaps in behind the header's **Sheet/Dice toggle** (one pane at a time, every
+viewport) instead of docking beside it. Retired the desktop side-by-side dock — removed the dock-picker
+(◧/◨), the sheet/log drag-resize handles, the `--sheet-width`/`--log-width` machinery, and the redundant
+phone media query (net −34 lines). Diagnosis was render-driven: a headless before/after showed the sheet
+content is identical at both widths, so the "worse" look was purely the docked log's presence, not a
+layout bug. `check`+`build`+server `test` (422) green; header + ✕ centring render-verified light + dark.
+
+---
+
 ## 2026-07-23 — Character sheet design-system compliance pass (`claude/character-sheet-discovery-a14i7f`, PR #45)
 
 Full audit of the player character sheet + its implementation against the design system, then a
