@@ -732,6 +732,8 @@ Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-D
 | `cover` | `half` \| `three-quarters` \| `total` | no | GM-adjudicated cover for the target: +2/+5 to AC and Dex saves; total blocks targeting (overridable) |
 | `commit` | boolean | no | false previews a single-target attack's d20 only (no damage/riders/prompts/economy) so the answerer can re-roll adv/disadv or confirm; confirm with commit=true and the shown attackNatural. Non-attack actions ignore it. Default: `true`. |
 | `attackNatural` | integer (1–20) | no | Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die |
+| `attackTotal` | integer (-50–100) | no | Hand-entered final attack total ("final total" manual mode) - used verbatim vs AC; pair with critical for a nat 20 |
+| `critical` | boolean | no | Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 

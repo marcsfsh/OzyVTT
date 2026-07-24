@@ -259,6 +259,10 @@
 .action-preview .save-prompt-manual .encounter-primary { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .action-preview .save-prompt-manual input { width: 100%; min-width: 0; height: 1.9rem; margin: 0; padding: 0 .6rem; box-sizing: border-box; }
 .action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+/* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
+   be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
+.action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: .35rem; align-self: flex-start; color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.action-preview .manual-nat20 input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--magenta); }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
 .action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }

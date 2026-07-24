@@ -80,6 +80,35 @@ describe("definition action resolution", () => {
     expect(missResolution.damage).toEqual([]);
   });
 
+  it("takes a hand-entered final total verbatim vs AC, with the crit declared (not inferred)", () => {
+    // "Final total" manual mode: the total is used as-is, the natural die is unknown (naturalRoll 0 = hidden).
+    const hit = combatState();
+    const hitResolution = resolveDefinitionAction(hit, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000a1", attackTotal: 18 }, deps([3, 4]));
+    expect(hitResolution.attack).toEqual({ targetId: IDS.pc, targetName: "Alpha", total: 18, naturalRoll: 0, targetAc: 17, outcome: "hit" });
+    expect(hitResolution.crit).toBe(false);
+    expect(hitResolution.damage).toEqual([{ formula: "2d6 + 5", type: "piercing", total: 12 }]);
+
+    const miss = combatState();
+    const missResolution = resolveDefinitionAction(miss, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000a2", attackTotal: 10 }, deps([]));
+    expect(missResolution.attack?.outcome).toBe("miss");
+    expect(missResolution.damage).toEqual([]);
+
+    // A declared crit auto-hits and doubles the dice even when the entered total is BELOW AC.
+    const crit = combatState();
+    const critResolution = resolveDefinitionAction(crit, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000a3", attackTotal: 12, critical: true }, deps([6, 6, 6, 6]));
+    expect(critResolution.attack?.outcome).toBe("crit");
+    expect(critResolution.attack?.naturalRoll).toBe(20);
+    expect(critResolution.crit).toBe(true);
+    expect(critResolution.damage).toEqual([{ formula: "4d6 + 5", type: "piercing", total: 29 }]);
+
+    // The crit is the FLAG, not the number: a total that equals nat-20-plus-bonus is a normal hit unless declared.
+    const notCrit = combatState();
+    const notCritResolution = resolveDefinitionAction(notCrit, BITE, { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000a4", attackTotal: 29, critical: false }, deps([3, 4]));
+    expect(notCritResolution.attack?.outcome).toBe("hit");
+    expect(notCritResolution.crit).toBe(false);
+    expect(notCritResolution.damage).toEqual([{ formula: "2d6 + 5", type: "piercing", total: 12 }]);
+  });
+
   it("reports unknown outcomes against AC-less targets but still proposes damage", () => {
     const game = combatState();
     const resolution = resolveDefinitionAction(game, BITE, { actorId: IDS.attacker, targetIds: [IDS.second], commandId: "50000000-0000-4000-8000-000000000005" }, deps([10, 2, 2]));

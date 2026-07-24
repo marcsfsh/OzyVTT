@@ -86,8 +86,13 @@ export const ActionResolveSchema = z.object({
   commit: z.boolean().default(true),
   /** Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die. */
   attackNatural: z.number().int().min(1).max(20).optional(),
+  /** Hand-entered final attack TOTAL ("final total" manual mode) - used verbatim vs AC; pair with `critical` for a nat 20. */
+  attackTotal: z.number().int().min(-50).max(100).optional(),
+  /** Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred. */
+  critical: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative().optional()
-}).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." });
+}).strict().refine((payload) => payload.targetIds === undefined || payload.template === undefined, { message: "Provide either explicit targets or an area template, not both." })
+  .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, { message: "Supply either a natural d20 or a final total, not both." });
 export const SaveAnswerSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), method: z.enum(["roll", "manual"]), total: z.number().int().min(-20).max(60).optional(), rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(), commit: z.boolean().default(true), legendaryResistance: z.boolean().default(false), expectedRevision: z.number().int().nonnegative().optional() }).strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, { message: "A manual answer needs the rolled total." });
 export const SaveDismissSchema = z.object({ commandId: z.string().uuid(), saveId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() }).strict();

@@ -30,6 +30,11 @@ export type ResolveInput = Readonly<{
   commit?: boolean;
   /** A confirmed or hand-rolled natural d20 for the attack - used instead of rolling (the preview→confirm reuse, and the manual path). */
   attackNatural?: number;
+  /** The final attack TOTAL, hand-entered ("final total" manual mode) - used verbatim vs AC. When set, the natural
+   * die can't be inferred, so a crit is DECLARED via `critical` rather than read off a nat 20 (and no fumble). */
+  attackTotal?: number;
+  /** Explicit "this was a natural 20" (critical hit) for the hand-entered-total path. Ignored when a natural is supplied. */
+  critical?: boolean;
 }>;
 export type ResolveDependencies = Readonly<{
   random: RandomSource;
@@ -627,9 +632,22 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     // A preview (or a hand-rolled/confirmed d20) supplies the natural roll; otherwise roll it. The die is
     // recorded on the preview or the legacy one-shot, but NOT on a confirm (which reuses the shown roll).
     const isPreview = input.commit === false;
+    const manualTotal = input.attackTotal !== undefined;
     let naturalRoll: number;
     let attackTotal: number;
-    if (input.attackNatural !== undefined) {
+    let declaredCrit = false;
+    if (manualTotal) {
+      // "Final total" manual entry: the player computed the whole total physically (bonuses and all), so it's
+      // used verbatim vs AC and the natural die - hence a crit - can't be inferred; the crit is an explicit
+      // flag. naturalRoll stays a sentinel (0 = "not a rolled die") so the result shows no misleading "nat".
+      attackTotal = input.attackTotal!;
+      declaredCrit = input.critical === true;
+      naturalRoll = declaredCrit ? 20 : 0;
+      if (isPreview) {
+        const manual = resolveDice(parseDiceFormula(String(attackTotal)), () => attackTotal);
+        recordRoll(state, manual, { ...rollBase, id: deps.newRollId(), purpose: "attack" });
+      }
+    } else if (input.attackNatural !== undefined) {
       naturalRoll = input.attackNatural;
       attackTotal = naturalRoll + bonus;
       if (isPreview) {
@@ -645,9 +663,11 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     }
     // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), shown in the result.
     const targetAc = target.armorClass !== undefined ? target.armorClass + coverBonus : null;
-    crit = naturalRoll === 20;
-    let outcome = naturalRoll === 20 ? "crit" as const
-      : naturalRoll === 1 ? "fumble" as const
+    // A declared crit (total mode) or a natural 20 (rolled/natural mode) crits; a nat 1 fumbles, but only when
+    // a natural die is known (total mode has none, so it can only hit or miss on the total vs AC).
+    crit = declaredCrit || (!manualTotal && naturalRoll === 20);
+    let outcome = crit ? "crit" as const
+      : (!manualTotal && naturalRoll === 1) ? "fumble" as const
       : targetAc === null ? "unknown" as const
       : attackTotal >= targetAc ? "hit" as const : "miss" as const;
     // 2024: hitting an Unconscious OR Paralyzed creature from within 5 feet is a critical hit.

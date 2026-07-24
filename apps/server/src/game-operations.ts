@@ -659,7 +659,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async actionResolve(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(ActionResolveSchema, raw, "The action command is malformed.", true);
-      const { commandId, actorId, actionId, targetIds, template, conditionId, rollMode, override, commit, attackNatural, expectedRevision } = request;
+      const { commandId, actorId, actionId, targetIds, template, conditionId, rollMode, override, commit, attackNatural, attackTotal, critical, expectedRevision } = request;
       // A player may resolve actions only for their own claimed character (re-checked against live state
       // inside the mutation). GM-only inputs - area templates (map calibration + a GM-authored annotation),
       // strict-mode overrides, cover, and applied conditions/notes - are refused or stripped for players,
@@ -725,7 +725,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
         // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
         // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
         // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.

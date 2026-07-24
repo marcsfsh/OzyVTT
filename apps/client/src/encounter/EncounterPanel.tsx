@@ -327,7 +327,7 @@ function ownActionSummaryParts(action: ContentActionSummary): string[] {
  * never applies damage themselves, so the role boundary stays intact. Reuses the shared targeting store and
  * the GM runner's styles so both surfaces read and behave identically.
  */
-export function PlayerActionRunner({ actorId, definition, revision, rollMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
+export function PlayerActionRunner({ actorId, definition, revision, rollMode, bonusMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; bonusMode: "auto" | "total"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
   const actions = useMemo(() => definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0).map(summaryOfOwnAction), [definition]);
@@ -336,6 +336,12 @@ export function PlayerActionRunner({ actorId, definition, revision, rollMode, pl
   const busy = useTargetingBusy();
   const [attackDie, setAttackDie] = useState("");
   const [manualSubmitted, setManualSubmitted] = useState(false);
+  // "Final total" manual mode: the player types their whole total, so a natural 20 (crit) can't be read off
+  // the number and is declared with this checkbox (their bonus could make any total a nat-20 crit, or not).
+  const [attackNat20, setAttackNat20] = useState(false);
+  // Whether the CURRENT preview came from a hand-entered total (vs a rolled/typed natural), so the shared
+  // Confirm re-commits with the matching inputs (attackTotal+critical vs attackNatural).
+  const [previewIsTotal, setPreviewIsTotal] = useState(false);
   // This runner owns the shared targeting only when the in-progress session is for this character.
   const picking = session && session.attackerId === actorId ? session : null;
   // The turn moved off this character (or the panel closed): drop any in-progress targeting/result.
@@ -344,7 +350,7 @@ export function PlayerActionRunner({ actorId, definition, revision, rollMode, pl
   const previewShownRef = useRef(false);
   useEffect(() => {
     const showing = Boolean(result?.preview);
-    if (showing && !previewShownRef.current) { setAttackDie(""); setManualSubmitted(false); }
+    if (showing && !previewShownRef.current) { setAttackDie(""); setManualSubmitted(false); setAttackNat20(false); setPreviewIsTotal(false); }
     previewShownRef.current = showing;
   }, [result]);
 
@@ -389,19 +395,25 @@ export function PlayerActionRunner({ actorId, definition, revision, rollMode, pl
         <button type="button" className="secondary action-result-close" aria-label={result.preview ? "Cancel roll" : "Dismiss"} onClick={() => { setTargetingResult(null); if (result.preview) clearTargeting(); }}>✕</button>
       </div>
       {result.attack && <p className={`action-outcome outcome-${result.attack.outcome}`}>
-        {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} - {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "HIT" : result.attack.outcome.toUpperCase()} (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
+        {result.attack.total}{result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} - {result.attack.outcome === "crit" ? "CRITICAL HIT" : result.attack.outcome === "fumble" ? "NATURAL 1" : result.attack.outcome === "unknown" ? "HIT" : result.attack.outcome.toUpperCase()}{result.attack.naturalRoll >= 1 ? ` (nat ${result.attack.naturalRoll})` : ""} vs {result.attack.targetName}
       </p>}
       {result.preview && result.attack && (() => {
         const mode = result.rollMode?.mode;
         const manualEntry = rollMode === "manual";
-        const submitDie = () => { const value = Number(attackDie.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setManualSubmitted(true); roll({ commit: false, attackNatural: value }); };
+        // Manual entry honors the same auto/total bonus toggle as every other roll surface: "auto" types the
+        // natural d20 (the server adds the bonus); "total" types the final total (used verbatim vs AC) with a
+        // Natural 20 checkbox, since a crit can't be read off a hand-computed total.
+        const submitDie = () => { const value = Number(attackDie.trim()); if (!Number.isInteger(value) || value < 1 || value > 20) { onFeedback("Enter the attack d20 (1-20)."); return; } setPreviewIsTotal(false); setManualSubmitted(true); roll({ commit: false, attackNatural: value }); };
+        const submitTotal = () => { const value = Number(attackDie.trim()); if (!Number.isInteger(value) || value < -50 || value > 100) { onFeedback("Enter your final attack total."); return; } setPreviewIsTotal(true); setManualSubmitted(true); roll({ commit: false, attackTotal: value, critical: attackNat20 }); };
+        // Confirm the SHOWN preview with the inputs that produced it (a hand total keeps its total + crit flag).
+        const confirmShown = () => previewIsTotal ? roll({ commit: true, attackTotal: Number(attackDie.trim()), critical: attackNat20 }) : roll({ commit: true, attackNatural: result.attack!.naturalRoll });
         return <div className="action-preview">
           <div className="roll-zone">
             <span className="save-prompt-confirm">
-              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => { setManualSubmitted(false); roll({ commit: false, rollMode: "advantage" }); }}>Adv</button>
-              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => { setManualSubmitted(false); roll({ commit: false, rollMode: "disadvantage" }); }}>Disadv</button>
-              <button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({ commit: true, attackNatural: result.attack!.naturalRoll })}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : "miss"}</button>
-              <Button type="button" variant="secondary" disabled={busy} title="Roll the attack again" onClick={() => { setManualSubmitted(false); roll({ commit: false }); }}>Re-roll</Button>
+              <button type="button" className={`save-die-mode${mode === "advantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the higher" onClick={() => { setPreviewIsTotal(false); setManualSubmitted(false); roll({ commit: false, rollMode: "advantage" }); }}>Adv</button>
+              <button type="button" className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`} disabled={busy} title="Roll two d20s and keep the lower" onClick={() => { setPreviewIsTotal(false); setManualSubmitted(false); roll({ commit: false, rollMode: "disadvantage" }); }}>Disadv</button>
+              <button type="button" className="encounter-primary" disabled={busy} onClick={confirmShown}>Confirm {result.attack!.outcome === "crit" ? "crit" : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown" ? "hit" : "miss"}</button>
+              <Button type="button" variant="secondary" disabled={busy} title="Roll the attack again" onClick={() => { setPreviewIsTotal(false); setManualSubmitted(false); roll({ commit: false }); }}>Re-roll</Button>
             </span>
             {manualEntry && <span className="roll-zone-caption">auto-roll</span>}
           </div>
@@ -409,12 +421,20 @@ export function PlayerActionRunner({ actorId, definition, revision, rollMode, pl
             <div className="roll-or"><span>or</span></div>
             <div className="roll-zone">
               <span className="roll-zone-caption">manual entry</span>
-              <span className="save-prompt-manual">
-                <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDie} disabled={manualSubmitted} onChange={(event) => setAttackDie(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDie.trim() !== "") submitDie(); }} />
-                <span className="manual-actions">{manualSubmitted
-                  ? <><button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({ commit: true, attackNatural: Number(attackDie.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={busy} title="Enter a different d20" onClick={() => { setAttackDie(""); setManualSubmitted(false); }}>Re-roll</Button></>
-                  : <button type="button" disabled={busy || attackDie.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
-              </span>
+              {bonusMode === "total"
+                ? <span className="save-prompt-manual">
+                    <input type="text" inputMode="numeric" placeholder="type your total" aria-label="Attack total" value={attackDie} disabled={manualSubmitted} onChange={(event) => setAttackDie(event.target.value.replace(/[^0-9-]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDie.trim() !== "") submitTotal(); }} />
+                    <label className="manual-nat20"><input type="checkbox" checked={attackNat20} disabled={manualSubmitted} onChange={(event) => setAttackNat20(event.target.checked)} /> Natural 20</label>
+                    <span className="manual-actions">{manualSubmitted
+                      ? <><button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({ commit: true, attackTotal: Number(attackDie.trim()), critical: attackNat20 })}>Confirm roll</button><Button type="button" variant="secondary" disabled={busy} title="Enter a different total" onClick={() => { setAttackDie(""); setManualSubmitted(false); setAttackNat20(false); }}>Re-roll</Button></>
+                      : <button type="button" disabled={busy || attackDie.trim() === ""} onClick={submitTotal}>Use roll</button>}</span>
+                  </span>
+                : <span className="save-prompt-manual">
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="type the d20" aria-label="Attack d20" value={attackDie} disabled={manualSubmitted} onChange={(event) => setAttackDie(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter" && !manualSubmitted && attackDie.trim() !== "") submitDie(); }} />
+                    <span className="manual-actions">{manualSubmitted
+                      ? <><button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({ commit: true, attackNatural: Number(attackDie.trim()) })}>Confirm roll</button><Button type="button" variant="secondary" disabled={busy} title="Enter a different d20" onClick={() => { setAttackDie(""); setManualSubmitted(false); }}>Re-roll</Button></>
+                      : <button type="button" disabled={busy || attackDie.trim() === ""} onClick={submitDie}>Use roll</button>}</span>
+                  </span>}
             </div>
           </>}
         </div>;
@@ -535,7 +555,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
     // Every roll surface reads the one per-browser dice-input preference (auto vs manual), not the old
     // table-wide combat.rollMode - so this player's saves, death saves, attacks, and sheet all agree.
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { rollMode } = useRollPreference();
+    const { rollMode, bonusMode } = useRollPreference();
     // "Jump" sheet-attack mode: tapping an attack on the sheet hops here to pick/confirm, then jumps BACK
     // to the sheet once the attack commits. The flag survives the round-trip; the result effect returns us.
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -582,7 +602,7 @@ export function EncounterPanel(props: GmProps | PlayerProps) {
           {isMe && myId !== null && <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />}
           {/* On your turn, an interactive action console (the mirror of the GM's) - tap an attack, pick a
               target, roll, and confirm; the hit is handed to the GM or auto-applied per the table policy. */}
-          {isMe && myTurn && myId !== null && rowActor?.definition && <PlayerActionRunner actorId={myId} definition={rowActor.definition} revision={props.state.revision} rollMode={rollMode} playerDamageMode={combat.playerDamageMode} targets={combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name }))} />}
+          {isMe && myTurn && myId !== null && rowActor?.definition && <PlayerActionRunner actorId={myId} definition={rowActor.definition} revision={props.state.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={combat.playerDamageMode} targets={combat.initiative.map((initiativeEntry) => ({ actorId: initiativeEntry.actorId, name: initiativeEntry.name }))} />}
           {isMe && rowActor && <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />}
           {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && <OwnDyingTracker actorId={entry.actorId} name={entry.name} deathSaves={rowActor.deathSaves} rollMode={rollMode} isActingTurn={myTurn} />}
           {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={rollMode} />}

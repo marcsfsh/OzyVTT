@@ -74,6 +74,10 @@ export type ResolveOptions = Readonly<{
   rollMode?: "advantage" | "disadvantage" | "normal";
   /** A confirmed or hand-rolled natural d20, used instead of rolling. */
   attackNatural?: number;
+  /** A hand-entered FINAL total ("final total" manual mode) - used verbatim vs AC instead of a natural die. */
+  attackTotal?: number;
+  /** Declares a natural 20 (crit) for the hand-entered-total path, where the natural die is unknown. */
+  critical?: boolean;
 }>;
 
 export function resolveTargeting(revision: number | undefined, onResult: (ok: boolean, message?: string) => void, opts: ResolveOptions = {}) {
@@ -84,7 +88,7 @@ export function resolveTargeting(revision: number | undefined, onResult: (ok: bo
   // save/utility actions resolve straight through. An explicit commit in opts wins (the Confirm tap).
   const isAttack = action.attackBonus !== null && mode === "single";
   const commit = opts.commit ?? !isAttack;
-  const extra = { ...(opts.override ? { override: opts.override } : {}), ...(opts.rollMode ? { rollMode: opts.rollMode } : {}), ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}), commit, ...(revision !== undefined ? { expectedRevision: revision } : {}) };
+  const extra = { ...(opts.override ? { override: opts.override } : {}), ...(opts.rollMode ? { rollMode: opts.rollMode } : {}), ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}), ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}), ...(opts.critical !== undefined ? { critical: opts.critical } : {}), commit, ...(revision !== undefined ? { expectedRevision: revision } : {}) };
   const payload = mode === "template"
     ? (template?.placed ? { commandId: newId(), actorId: attackerId, actionId: action.id, template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target }, ...extra } : null)
     : (selected.length > 0 ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra } : null);

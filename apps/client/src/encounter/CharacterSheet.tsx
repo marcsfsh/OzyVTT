@@ -601,7 +601,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             // actions here; the loose weapon/spell chips below are hidden so an action isn't offered twice.
             const inlineRunner = structuredAttacks && effectiveAttackMode === "inline";
             return <>
-              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={liveCombat.revision} rollMode={rollMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
+              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
               {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
                 {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
                 {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
