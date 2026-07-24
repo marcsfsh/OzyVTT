@@ -22,6 +22,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **Worldbuilding codex lives OUTSIDE `GameState` (2026-07-24).** The living atlas + two-layer wiki +
+  campaign journal persist in a dedicated `CodexStore` (own tables in `data/vtt.sqlite`), fetched on
+  demand over a `/api/v1/codex` REST router — NOT in the projected `GameState` blob (which
+  re-serializes + rebroadcasts whole on every command). Mutations still walk
+  validate→authorize(GM)→persist and emit a content-free `codex:changed` ping that clients refetch on;
+  `codex-projections.ts` is a second, explicit security boundary for the two-layer (player-facing +
+  GM-secret) model — because player-facing content DOES reach players, this is **not "safe by
+  construction"**, so every player-facing read is an audited strip (player FTS = player body only;
+  player marker projection drops scene/actor + unrevealed page/sub-map links; page media gated on a
+  revealed reference). Mirrors the maps/tokens satellite-store pattern; the public OpenAPI
+  game-command surface is untouched.
 - **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
   the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
   **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.

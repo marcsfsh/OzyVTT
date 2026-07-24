@@ -8,6 +8,27 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Worldbuilding codex (2026-07-24, branch `claude/world-maps-geospatial-db-1kiqez`).** A GM
+  worldbuilding suite + campaign journal + living atlas, on a new **Codex** GM tab (Pages | Atlas |
+  Journal) plus a read-only **player Codex** (Lore | Atlas | Journal, behind a player "Codex" button).
+  Freeform **two-layer markdown pages** (player-facing + GM-secret body, secret by default) with
+  `[[wiki-links]]`, backlinks, tags, folders, FTS search, revisions/restore, autosave, banner + inline
+  images. A nested **atlas** (world→region→local map tree, cycle-guarded) of an uploaded map asset,
+  with polymorphic **markers** (link a page / sub-map / scene / actor) placed in image-pixel space on a
+  pan/zoom/pinch/drag SVG surface (mirrors `EncounterMap` gestures, `touch-action:none`) + a curated
+  recolorable icon set. A **journal** timeline (two-layer, session/in-world dating, per-page pinning)
+  with an automatic **combat-history bridge** — a logged encounter posts a "battle fought here" entry
+  pinned to the location marker (`onEncounterArchived` hook in `encounterEnd`, best-effort). Plus a
+  **command palette** (Cmd/Ctrl-K), markdown import + JSON export. **Architecture:** a dedicated
+  `CodexStore` (own tables in `data/vtt.sqlite`) + `codex-projections.ts` (viewer-safety boundary) +
+  `/api/v1/codex` REST router + `codex-assets` media store, deliberately **off the GameState
+  broadcast** (mirrors maps/tokens); every write emits a content-free `codex:changed` ping and clients
+  refetch. Secret-by-default; `gmBody`/unrevealed content never reaches players (player FTS indexes
+  only player bodies; player marker projection strips scene/actor links + unrevealed page/sub-map
+  links; page media served to players only when used by a revealed page). Built in 7 slices, each
+  `check` + `test` (466) + `build` green with live API + player-session smokes. **Not yet:** mind-map
+  graph, fantasy calendar (schema reserves `calendarInstant`), page templates, page transclusion,
+  a direct atlas→shared-TV push (the GM Viewer tab still presents any asset). Deferred by discovery.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
