@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
 import { iconChildren } from "./icons";
-import type { CodexMarker } from "./api";
+
+/** The minimal marker shape the surface renders - satisfied by both the GM marker and the player projection. */
+export type SurfaceMarker = Readonly<{ id: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; revealedToPlayers?: boolean }>;
 
 /**
  * The interactive, out-of-combat atlas surface. Mirrors EncounterMap's approach - an SVG viewBox camera
@@ -22,18 +24,19 @@ type Gesture =
   | { mode: "pinch"; startDist: number; startZoom: number };
 
 type MapSurfaceProps = Readonly<{
-  gmToken: string;
+  token: string;
   assetId: string;
-  markers: readonly CodexMarker[];
+  markers: readonly SurfaceMarker[];
   placing: boolean;
   selectedMarkerId: string | null;
+  readOnly?: boolean;
   onBackgroundClick: (point: { x: number; y: number }) => void;
   onMarkerClick: (markerId: string) => void;
   onMarkerDragEnd: (markerId: string, point: { x: number; y: number }) => void;
 }>;
 
-export function MapSurface({ gmToken, assetId, markers, placing, selectedMarkerId, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
-  const image = useAuthorizedMapImage(assetId, gmToken);
+export function MapSurface({ token, assetId, markers, placing, selectedMarkerId, readOnly = false, onBackgroundClick, onMarkerClick, onMarkerDragEnd }: MapSurfaceProps) {
+  const image = useAuthorizedMapImage(assetId, token);
   const svgRef = useRef<SVGSVGElement>(null);
   const gesture = useRef<Gesture>({ mode: "idle" });
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -103,11 +106,11 @@ export function MapSurface({ gmToken, assetId, markers, placing, selectedMarkerI
       setCamera((prev) => (prev ? { cx: prev.cx - dx, cy: prev.cy - dy, zoom: prev.zoom } : prev));
       return;
     }
-    if (state.mode === "marker" && state.pointerId === event.pointerId) {
+    if (state.mode === "marker" && state.pointerId === event.pointerId && !readOnly) {
       const point = imagePointFromClient(svg, event.clientX, event.clientY);
       if (point) { state.moved = true; setDragPreview({ id: state.markerId, ...clampPoint(point, width, height) }); }
     }
-  }, [camera, width, height]);
+  }, [camera, width, height, readOnly]);
 
   const endPointer = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
     pointers.current.delete(event.pointerId);
@@ -140,7 +143,7 @@ export function MapSurface({ gmToken, assetId, markers, placing, selectedMarkerI
           const s = glyphSize;
           return (
             <g key={marker.id} data-marker-id={marker.id} transform={`translate(${pos.x} ${pos.y})`}
-              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers ? " is-shown" : " is-hidden"}`}>
+              className={`codex-marker${marker.id === selectedMarkerId ? " is-selected" : ""}${marker.revealedToPlayers === false ? " is-hidden" : " is-shown"}`}>
               <g transform={`translate(${-s / 2} ${-s / 2}) scale(${s / 24})`} style={{ color: marker.iconColor }}>
                 <circle cx={12} cy={12} r={11.5} className="codex-marker-bg" />
                 <g className="codex-marker-ico">{iconChildren(marker.iconId)}</g>

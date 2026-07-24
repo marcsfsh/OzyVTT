@@ -328,8 +328,10 @@ export function createServer(options: CreateServerOptions) {
     catalog: mapCatalog,
     authorizeGm,
     authorizePlayer: (token, assetId) => {
+      if (auth.verifyPlayer(token) === null) return false;
       const combat = store.snapshot.combat;
-      return auth.verifyPlayer(token) !== null && combat.active && combat.mapAssetId === assetId;
+      // A player may load the active battle map's image, or the image of any revealed atlas map.
+      return (combat.active && combat.mapAssetId === assetId) || codexStore.isAssetRevealedToPlayers(assetId);
     },
     authorizeViewer: (token, assetId) => {
       if (!token) return false;

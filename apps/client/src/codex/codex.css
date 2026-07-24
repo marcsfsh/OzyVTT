@@ -191,3 +191,11 @@
 .codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; }
 .codex-entry-gm-tag { display: inline-block; font-family: var(--font-display); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet); margin-right: var(--space-2); }
 .codex-entry-foot { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+/* ----- Player Codex ----- */
+.player-codex-row { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }
+.codex-player .codex-atlas-body { min-height: 0; }
+.codex-player .codex-mapsurface, .codex-player .codex-map-svg, .codex-player .codex-map-status { min-height: 52vh; }
+.codex-reader { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-reader-title { font-family: var(--font-display); color: var(--text); margin: 0; }
+.codex-reader-body { color: var(--text); line-height: var(--lh-body); }

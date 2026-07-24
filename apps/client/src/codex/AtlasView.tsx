@@ -104,7 +104,7 @@ export function AtlasView({ gmToken, onOpenPage }: Readonly<{ gmToken: string; o
 
       <div className="codex-atlas-body">
         {currentMap
-          ? <MapSurface gmToken={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
+          ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
               onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         {selectedMarker && <MarkerInspector gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={(id) => { setSelectedMarkerId(null); setCurrentMapId(id); }} onOpenPage={onOpenPage} onClose={() => setSelectedMarkerId(null)} />}

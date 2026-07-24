@@ -78,6 +78,23 @@ export function pageLinkKey(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+// ----- Player-facing projections (same endpoints, stripped by the server for a player token) -----
+
+export type PlayerCodexPageSummary = Readonly<{ id: string; title: string; folder: string | null; tags: readonly string[]; bannerAssetId: string | null; updatedAt: string }>;
+export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ body: string }>;
+export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null }>;
+export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageId: string | null; subMapId: string | null }>;
+export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; createdAt: string }>;
+
+export const playerCodexApi = {
+  listPages: (token: string) => request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
+  getPage: (token: string, id: string) => request<{ page: PlayerCodexPage; backlinks: CodexBacklink[] }>(token, `/pages/${id}`),
+  search: (token: string, query: string) => request<{ results: PlayerCodexPageSummary[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.results),
+  listMaps: (token: string) => request<{ maps: PlayerCodexMap[] }>(token, "/maps").then((data) => data.maps),
+  listMarkers: (token: string, mapId: string) => request<{ markers: PlayerCodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),
+  timeline: (token: string) => request<{ entries: PlayerCodexJournalEntry[] }>(token, "/journal").then((data) => data.entries)
+};
+
 // ----- Atlas: maps + markers -----
 
 export type CodexMapKind = "battlemap" | "regional" | "world";

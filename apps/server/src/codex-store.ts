@@ -695,6 +695,12 @@ export class CodexStore {
     return (this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE map_id = ? ORDER BY created_at").all(mapId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
   }
 
+  /** Whether any revealed codex map uses this image asset - lets players fetch a revealed world map's image. */
+  isAssetRevealedToPlayers(assetId: string): boolean {
+    if (!ID.test(assetId)) return false;
+    return this.requireDatabase().prepare("SELECT 1 FROM codex_maps WHERE asset_id = ? AND revealed = 1 LIMIT 1").get(assetId) !== undefined;
+  }
+
   /** The location marker linked to a prepared scene, if any - the combat-history bridge pins fights here. */
   markerForScene(sceneId: string): CodexMarkerRow | null {
     if (!ID.test(sceneId)) return null;

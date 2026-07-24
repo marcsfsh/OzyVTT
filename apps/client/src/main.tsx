@@ -14,6 +14,7 @@ import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { CodexWorkspace } from "./codex/CodexWorkspace";
+import { PlayerCodex } from "./codex/PlayerCodex";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { SceneGallery } from "./scenes/SceneGallery";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
@@ -59,6 +60,7 @@ function App() {
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
+  const [playerCodexOpen, setPlayerCodexOpen] = useState(false);
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const previewSceneId = usePreviewScene();
   const [scenePrepOpen, setScenePrepOpen] = useState(false);
@@ -286,6 +288,9 @@ function App() {
         activeId={gmTab}
         onChange={(id) => setGmTab(id as GmTab)}
       />}
+
+      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => setPlayerCodexOpen(true)}>📖 Codex</Button></div>}
+      {mode === "player" && playerCodexOpen && mapToken && <Modal open onClose={() => setPlayerCodexOpen(false)} size="lg" title="Codex" ariaLabel="Codex"><PlayerCodex token={mapToken} onClose={() => setPlayerCodexOpen(false)} /></Modal>}
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
