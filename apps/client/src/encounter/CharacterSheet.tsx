@@ -201,6 +201,13 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).
   const hasLog = state !== undefined;
   const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
+  // Optional dock (opt-in, desktop only): pin the dice log beside the sheet so rolls are always visible
+  // while you act, instead of behind the toggle. Off by default (clean sheet); remembered per browser.
+  const [docked, setDocked] = useState<boolean>(() => readSetting("vtt.sheet.docked") === "1");
+  const chooseDocked = (value: boolean) => { setDocked(value); writeSetting("vtt.sheet.docked", value ? "1" : "0"); };
+  // The most recent roll made from this character, surfaced inline under the rolls bar so a tap-to-roll
+  // shows its result without leaving the sheet (the pinned line hides when the log is docked/visible).
+  const latestRoll = state ? [...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null : null;
   // Popout (feedback #9.3): "modal" is the docked main panel; "floating" detaches it into a moveable,
   // resizable in-tab panel (like the GM's viewer preview) so the player can keep it open while they play.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
@@ -584,6 +591,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     </div>
     <div className="sheet-header-controls">
       {hasLog && <SegmentedControl className="sheet-pane-toggle" size="sm" ariaLabel="Show sheet or dice" value={mobilePane} onChange={(pane) => setMobilePane(pane as "sheet" | "log")} options={[{ value: "sheet", label: "Sheet" }, { value: "log", label: "Dice" }]} />}
+      {hasLog && !embedded && <Button size="sm" variant="ghost" className="sheet-dock-btn" title={docked ? "Collapse the dice log back behind the toggle" : "Pin the dice log beside the sheet"} onClick={() => chooseDocked(!docked)}>{docked ? "Undock dice" : "Dock dice"}</Button>}
       {!standalone && !embedded && <Button size="sm" variant="ghost" className="sheet-tool" title={presentation === "floating" ? "Dock the panel back into place" : "Pop out into a moveable panel"} onClick={() => setPresentation((current) => (current === "floating" ? "modal" : "floating"))}>{presentation === "floating" ? "Dock" : "Pop out"}</Button>}
       {!standalone && !embedded && role === "player" && <Button size="sm" variant="ghost" className="sheet-tool" title="Open this sheet in its own browser tab" onClick={() => window.open(`/sheet.html?actor=${encodeURIComponent(actor.id)}`, `vtt-sheet-${actor.id}`)}>New tab</Button>}
       <IconButton label={embedded ? "Back to initiative" : "Close"} size="sm" className="sheet-close" onClick={onClose}>✕</IconButton>
@@ -600,9 +608,18 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // Workspace: the sheet fills the panel; when a shared dice log is available it swaps in behind the
   // Sheet/Dice toggle (one pane at a time on every viewport), so the sheet keeps its clean full width.
   // Header + rollbar stay pinned; the active pane scrolls.
-  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}`}>
+  const buildWorkspace = (draggable: boolean) => (<div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}${docked ? " docked" : ""}`}>
     {header(draggable)}
     {rollbar}
+    {latestRoll && <button type="button" className="sheet-last-roll" onClick={() => setMobilePane("log")} title="Open the dice log">
+      <span className="sheet-last-roll-label">{latestRoll.label ?? latestRoll.purpose}</span>
+      <span className="sheet-last-roll-readout">
+        <span className="sheet-last-roll-faces">{latestRoll.dice.map((die, index) => <span key={index} className={die.kept ? "sheet-last-die" : "sheet-last-die out"}>{die.face}</span>)}</span>
+        <span className="sheet-last-roll-formula">{latestRoll.formula}</span>
+        <span aria-hidden="true">=</span>
+        <strong className="sheet-last-roll-total">{latestRoll.total}</strong>
+      </span>
+    </button>}
     <div className="sheet-workspace-cols">
       <div className="sheet-workspace-pane sheet-pane">{sheetScroll}</div>
       {hasLog && state && <div className="sheet-workspace-pane log-pane"><DicePanel role={role} state={state} mineActorId={actor.id} /></div>}
@@ -626,5 +643,5 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       {dialog}
     </>;
   }
-  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}`} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
+  return <><Modal open onClose={onClose} size="lg" className={`character-sheet${hasLog ? " has-log" : ""}${docked ? " docked" : ""}`} ariaLabel={`${actor.name} character sheet`}>{buildWorkspace(false)}</Modal>{dialog}</>;
 }

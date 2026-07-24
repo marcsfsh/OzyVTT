@@ -603,6 +603,34 @@
 .log-pane .dice-quick button, .log-pane .dice-adv-row .secondary { padding: .5rem .7rem; }
 .log-pane .roll-list { max-height: none; }
 
+/* Pinned "last roll" line (undocked): the most recent roll made from this sheet, so a tap-to-roll shows
+   its result without leaving the Sheet pane. Hidden on the Dice pane and when the log is docked (visible). */
+.sheet-last-roll { display: flex; align-items: baseline; gap: .5rem; width: 100%; padding: .3rem var(--space-5); border: 0; border-bottom: 1px solid var(--line); background: var(--surface-1); color: var(--text-dim); text-align: left; cursor: pointer; }
+.sheet-last-roll:hover { background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1)); }
+.sheet-last-roll-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 700 var(--fs-2xs)/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+.sheet-last-roll-readout { display: inline-flex; align-items: baseline; gap: .35rem; margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.sheet-last-roll-faces { display: inline-flex; gap: .25rem; }
+.sheet-last-die { color: var(--text); }
+.sheet-last-die.out { opacity: .4; text-decoration: line-through; }
+.sheet-last-roll-formula { color: var(--text-muted); }
+.sheet-last-roll-total { color: var(--cyan-hi); font-size: var(--fs-body); }
+.sheet-workspace.show-log .sheet-last-roll { display: none; }
+
+/* Optional dice dock (opt-in, desktop only): pin the log beside the sheet as a fixed side panel so rolls
+   stay visible while you act. Off by default (the toggle collapses it); a phone has no room — stays toggle. */
+@media (min-width: 681px) {
+  .character-sheet.has-log.docked { max-width: min(100vw - 2rem, 68rem); }
+  .sheet-workspace.has-log.docked .sheet-workspace-cols { flex-direction: row; }
+  .sheet-workspace.has-log.docked.show-sheet .log-pane { display: block; }
+  .sheet-workspace.has-log.docked.show-log .sheet-pane { display: block; }
+  .sheet-workspace.has-log.docked .sheet-pane { flex: 1 1 auto; }
+  .sheet-workspace.has-log.docked .log-pane { flex: 0 0 22rem; border-left: 1px solid var(--line); }
+  .sheet-workspace.has-log.docked .sheet-pane-toggle { display: none; }
+  .sheet-workspace.has-log.docked .sheet-last-roll { display: none; }
+}
+/* No room to dock two panes on a phone — hide the control there (it stays the Sheet/Dice toggle). */
+@media (max-width: 680px) { .sheet-dock-btn { display: none; } }
+
 /* Popout: a moveable, resizable in-tab panel (fixed, above the app; no scrim so play continues). The
    unified header doubles as the drag handle (.sheet-header--drag), so there is no separate title bar. */
 .sheet-float { position: fixed; z-index: 60; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: var(--shadow-2); }
