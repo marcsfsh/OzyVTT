@@ -3,6 +3,7 @@ import { Button, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
 import { playerCodexApi, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
+import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
 import "./codex.css";
 
@@ -72,7 +73,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
           <section className="codex-main">
             {selectedPageId && <button type="button" className="codex-back" onClick={() => setSelectedPageId(null)}>‹ All lore</button>}
             {page
-              ? <article className="codex-reader"><h2 className="codex-reader-title">{page.title}</h2><div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div></article>
+              ? <article className="codex-reader">{page.bannerAssetId && <CodexImage assetId={page.bannerAssetId} token={token} alt="" className="codex-banner-img" />}<h2 className="codex-reader-title">{page.title}</h2><div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} token={token} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div></article>
               : <div className="codex-main-empty"><h3>The world, as you know it</h3><p>Select a page to read what your party has learned.</p></div>}
           </section>
         </div>
@@ -99,7 +100,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
             {timeline.map((entry) => (
               <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
                 <header className="codex-entry-head"><span className="codex-entry-when">{whenLabel(entry)}</span></header>
-                <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} /></div>
+                <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} token={token} /></div>
               </article>
             ))}
           </div>

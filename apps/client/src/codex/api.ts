@@ -70,12 +70,25 @@ export const codexApi = {
   revealPage: (token: string, id: string, revealed: boolean) => request<{ page: CodexPage }>(token, `/pages/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.page),
   deletePage: (token: string, id: string) => request<{ deleted: boolean }>(token, `/pages/${id}`, { method: "DELETE" }),
   listRevisions: (token: string, id: string) => request<{ revisions: CodexPageRevision[] }>(token, `/pages/${id}/revisions`).then((data) => data.revisions),
-  restoreRevision: (token: string, id: string, revisionId: number) => request<{ page: CodexPage }>(token, `/pages/${id}/revisions/${revisionId}/restore`, { method: "POST" }).then((data) => data.page)
+  restoreRevision: (token: string, id: string, revisionId: number) => request<{ page: CodexPage }>(token, `/pages/${id}/revisions/${revisionId}/restore`, { method: "POST" }).then((data) => data.page),
+  exportBundle: (token: string) => request<{ codex: unknown; exportedAt: string }>(token, "/export")
 };
 
 /** A page title reduced to a stable [[wiki-link]] key (must match the server's `pageLinkKey`). */
 export function pageLinkKey(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Upload a page image (banner or inline). Sends raw bytes with the file's content-type (never JSON, so express.raw handles it). */
+export async function uploadCodexAsset(token: string, file: File): Promise<{ id: string; width: number; height: number }> {
+  const response = await fetch(`/api/v1/codex-assets?filename=${encodeURIComponent(file.name)}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": file.type || "application/octet-stream" },
+    body: file
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.ok) throw new CodexRequestError(body?.error?.message ?? "The image upload failed.", response.status, body?.error?.code ?? "error");
+  return body.data.asset as { id: string; width: number; height: number };
 }
 
 // ----- Player-facing projections (same endpoints, stripped by the server for a player token) -----

@@ -73,6 +73,7 @@ export function createServer(options: CreateServerOptions) {
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
   const codexStore = new CodexStore(options.databasePath);
+  const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), { maxBytes: 10 * 1024 * 1024, maxDimensionPx: 4096, maxPixels: 4096 * 4096 });
   const contentLibrary = new ContentLibrary();
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
@@ -355,6 +356,7 @@ export function createServer(options: CreateServerOptions) {
   }));
   app.use(createCodexRouter({
     store: codexStore,
+    assets: codexAssets,
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
     notifyChanged: notifyCodexChanged
@@ -560,7 +562,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize(), codexAssets.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {

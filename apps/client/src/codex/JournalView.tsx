@@ -85,8 +85,8 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
               </div>
               <Switch checked={entry.revealedToPlayers} onChange={(revealed) => reveal(entry, revealed)} aria-label="Reveal to players" label={entry.revealedToPlayers ? "Shown" : "Secret"} />
             </header>
-            {entry.playerText.trim() && <div className="codex-entry-body"><CodexMarkdown text={entry.playerText} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
-            {entry.gmText && <div className="codex-entry-gm"><span className="codex-entry-gm-tag">GM</span><CodexMarkdown text={entry.gmText} /></div>}
+            {entry.playerText.trim() && <div className="codex-entry-body"><CodexMarkdown text={entry.playerText} token={gmToken} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
+            {entry.gmText && <div className="codex-entry-gm"><span className="codex-entry-gm-tag">GM</span><CodexMarkdown text={entry.gmText} token={gmToken} /></div>}
             <footer className="codex-entry-foot">
               {entry.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(entry.attachPageId!)}>Open page</Button>}
               <Button variant="ghost" size="sm" onClick={() => edit(entry)}>Edit</Button>

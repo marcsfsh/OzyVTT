@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { CodexImage } from "./CodexImage";
 
 /**
  * The codex page renderer: a display-only, injection-safe markdown subset (headings, ***bold-italic***,
@@ -57,7 +58,9 @@ function inline(text: string, keyBase: string, onNavigate?: (target: string) => 
   return nodes;
 }
 
-export function CodexMarkdown({ text, onNavigate }: Readonly<{ text: string; onNavigate?: (target: string) => void }>) {
+const IMAGE_LINE = /^!\[([^\]]*)\]\(codex-asset:([0-9a-fA-F-]{36})\)$/;
+
+export function CodexMarkdown({ text, onNavigate, token }: Readonly<{ text: string; onNavigate?: (target: string) => void; token?: string }>) {
   const normalized = text.replace(/\s*—\s*/g, " - ");
   const lines = normalized.split("\n");
   const blocks: ReactNode[] = [];
@@ -72,6 +75,14 @@ export function CodexMarkdown({ text, onNavigate }: Readonly<{ text: string; onN
     const line = raw.trim();
     const key = `l-${lineIndex}`;
     if (line === "") { flush(); return; }
+    const image = IMAGE_LINE.exec(line);
+    if (image) {
+      flush();
+      // Only ever render an app-served codex asset URL - the injection-safety guarantee (anything else falls through to text).
+      if (token) blocks.push(<CodexImage key={key} assetId={image[2]} token={token} alt={image[1]} className="codex-md-img" />);
+      else blocks.push(<p key={key} className="codex-md-p codex-preview-empty">[image: {image[1] || "image"}]</p>);
+      return;
+    }
     const heading = /^(#{1,3})\s+(.*)$/.exec(line);
     if (heading) {
       flush();

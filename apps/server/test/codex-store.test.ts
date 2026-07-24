@@ -220,3 +220,17 @@ describe("CodexStore journal", () => {
     expect(JSON.stringify(projected)).not.toContain("cult");
   });
 });
+
+describe("CodexStore media visibility (page images)", () => {
+  const banner = "22222222-2222-4222-8222-222222222222";
+  const inline = "33333333-3333-4333-8333-333333333333";
+  const gmOnly = "44444444-4444-4444-8444-444444444444";
+  it("exposes page media to players only when the page is revealed and the reference is player-facing", () => {
+    const page = store.createPage({ title: "Bree", bannerAssetId: banner, playerBody: `See ![m](codex-asset:${inline})`, gmBody: `secret ![s](codex-asset:${gmOnly})` });
+    expect(store.isPageAssetVisibleToPlayers(banner)).toBe(false); // page not revealed yet
+    store.setPageRevealed(page.id, true);
+    expect(store.isPageAssetVisibleToPlayers(banner)).toBe(true);   // banner of a revealed page
+    expect(store.isPageAssetVisibleToPlayers(inline)).toBe(true);   // inline in the revealed player body
+    expect(store.isPageAssetVisibleToPlayers(gmOnly)).toBe(false);  // referenced only in gmBody → stays hidden
+  });
+});

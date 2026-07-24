@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Input, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
 import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
+import { CommandPalette } from "./CommandPalette";
 import "./codex.css";
 
 /**
@@ -14,6 +15,7 @@ import "./codex.css";
  */
 export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
   const [mode, setMode] = useState<"pages" | "atlas" | "journal">("pages");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[] } | null>(null);
@@ -37,6 +39,13 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
     return () => { socket.off("codex:changed", onChanged); };
   }, [refreshList]);
 
+  // Cmd/Ctrl-K toggles the quick-switcher.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   useEffect(() => {
     if (!selectedId) { setSelected(null); return; }
     let live = true;
@@ -47,6 +56,31 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
   const createPage = async () => {
     try { const page = await codexApi.createPage(gmToken, { title: "Untitled page" }); await refreshList(); setSelectedId(page.id); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
+  };
+  const createPageTitled = async (title: string) => {
+    try { const page = await codexApi.createPage(gmToken, { title }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
+  };
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const exportCodex = async () => {
+    try {
+      const data = await codexApi.exportBundle(gmToken);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = "codex-export.json"; link.click();
+      URL.revokeObjectURL(url);
+    } catch (exportError) { setError(exportError instanceof Error ? exportError.message : "Export failed."); }
+  };
+  const importFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      for (const file of Array.from(files)) {
+        const text = await file.text();
+        const title = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
+        await codexApi.createPage(gmToken, { title: title || "Imported page", playerBody: text });
+      }
+      await refreshList();
+    } catch (importError) { setError(importError instanceof Error ? importError.message : "Import failed."); }
   };
 
   const navigate = useCallback(async (target: string) => {
@@ -80,6 +114,12 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
       <div className="codex-modebar">
         <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as "pages" | "atlas" | "journal")}
           options={[{ value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
+        <div className="codex-modebar-ops">
+          <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
+          <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
+          <Button variant="ghost" size="sm" onClick={exportCodex}>Export</Button>
+          <input ref={importInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.target.value = ""; }} />
+        </div>
       </div>
       {mode === "atlas"
         ? <AtlasView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
@@ -114,6 +154,7 @@ export function CodexWorkspace({ gmToken }: Readonly<{ gmToken: string }>) {
           : <div className="codex-main-empty"><h3>Your world, written down</h3><p>Select a page, or create one. Each page has a player-facing side and a GM-secret side - reveal it when the party earns it.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}
+      {paletteOpen && <CommandPalette gmToken={gmToken} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }} onCreatePage={createPageTitled} onGoto={(target) => setMode(target)} onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 }

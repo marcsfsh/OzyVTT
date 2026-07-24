@@ -487,6 +487,14 @@ export class CodexStore {
       .filter((page) => (filter?.folder === undefined || page.folder === filter.folder) && (filter?.tag === undefined || page.tags.includes(filter.tag)));
   }
 
+  /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[] }> {
+    const pages = (this.requireDatabase().prepare("SELECT id, title, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE").all() as PageRow[]).map((row) => this.toPage(row));
+    const maps = this.listMaps();
+    const markers = maps.flatMap((map) => this.listMarkers(map.id));
+    return { pages, maps, markers, journal: this.listTimeline() };
+  }
+
   // ----- Revisions -----
 
   listRevisions(pageId: string): CodexPageRevisionRow[] {
@@ -699,6 +707,13 @@ export class CodexStore {
   isAssetRevealedToPlayers(assetId: string): boolean {
     if (!ID.test(assetId)) return false;
     return this.requireDatabase().prepare("SELECT 1 FROM codex_maps WHERE asset_id = ? AND revealed = 1 LIMIT 1").get(assetId) !== undefined;
+  }
+
+  /** Whether a codex media asset (banner or inline image) is used by any REVEALED page's player-facing content - the gate for a player fetching page media. */
+  isPageAssetVisibleToPlayers(assetId: string): boolean {
+    if (!ID.test(assetId)) return false;
+    // A revealed page's banner, or a revealed page whose PLAYER body references the asset id (inline image).
+    return this.requireDatabase().prepare("SELECT 1 FROM codex_pages WHERE revealed = 1 AND (banner_asset_id = ? OR player_body LIKE ?) LIMIT 1").get(assetId, `%${assetId}%`) !== undefined;
   }
 
   /** The location marker linked to a prepared scene, if any - the combat-history bridge pins fights here. */

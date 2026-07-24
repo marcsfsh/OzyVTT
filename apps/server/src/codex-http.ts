@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { Router, type NextFunction, type Request, type Response } from "express";
+import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
+import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexStore } from "./codex-store.js";
 import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary } from "./codex-projections.js";
 
@@ -79,11 +80,15 @@ const JournalWriteSchema = z.object({
 
 type CodexRouterOptions = Readonly<{
   store: CodexStore;
+  /** Content-addressed store for page media (banners + inline images), separate from map/token assets. */
+  assets: MapAssetStore;
   authorizeGm: (token: string | undefined) => boolean;
   authorizePlayer: (token: string | undefined) => boolean;
   /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
   notifyChanged: (scope: "pages" | "maps" | "markers" | "journal") => void;
 }>;
+
+const CODEX_ASSET_BASE = "/api/v1/codex-assets";
 
 function bearer(request: Request): string | undefined {
   return request.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
@@ -343,6 +348,41 @@ export function createCodexRouter(options: CodexRouterOptions) {
     store.deleteEntry(pathParam(request, "id"));
     options.notifyChanged("journal");
     return envelope(response, 200, { deleted: true });
+  });
+
+  // ----- Export (GM backup / round-trip) -----
+
+  router.get(`${CODEX_BASE}/export`, requireGm, (_request, response) => {
+    return envelope(response, 200, { codex: store.exportBundle(), exportedAt: new Date().toISOString() });
+  });
+
+  // ----- Media (page banners + inline images) -----
+
+  router.post(CODEX_ASSET_BASE, requireGm, express.raw({ type: () => true, limit: "11mb" }), async (request, response) => {
+    try {
+      if (!Buffer.isBuffer(request.body) || request.body.length === 0) return failure(response, 400, "validation_failed", "Upload the image as the request body.");
+      const filename = typeof request.query.filename === "string" ? request.query.filename : "image";
+      const imported = await options.assets.import(request.body, filename);
+      return envelope(response, imported.duplicate ? 200 : 201, { asset: { id: imported.metadata.id, width: imported.metadata.width, height: imported.metadata.height, mediaType: imported.metadata.mediaType } });
+    } catch (error) { return failure(response, 400, "validation_failed", error instanceof Error ? error.message : "The image upload failed."); }
+  });
+
+  router.get(`${CODEX_ASSET_BASE}/:id/content`, async (request, response) => {
+    const id = pathParam(request, "id");
+    const token = bearer(request);
+    // GM always; a player only when the asset is used by a revealed page (banner or inline image).
+    const allowed = options.authorizeGm(token) || (options.authorizePlayer(token) && store.isPageAssetVisibleToPlayers(id));
+    if (!allowed) return failure(response, 403, "forbidden", "That image is not available to this session.");
+    const metadata = await options.assets.get(id);
+    const content = metadata ? await options.assets.readOriginal(id) : null;
+    if (!metadata || !content) return failure(response, 404, "not_found", "That image was not found.");
+    const etag = `"${id}"`;
+    response.setHeader("etag", etag);
+    response.setHeader("content-type", metadata.mediaType);
+    response.setHeader("cache-control", "private, no-store");
+    if (request.header("if-none-match") === etag) return response.status(304).end();
+    response.setHeader("content-length", content.length);
+    return response.send(content);
   });
 
   router.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
