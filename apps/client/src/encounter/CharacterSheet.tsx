@@ -183,11 +183,16 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // (bugfix: a useState seeded from ownDefinition went stale after an edit).
   const [fetched, setFetched] = useState<ActorDefinition | null>(definitionId ? sheetCache.get(definitionId) ?? null : null);
   const definition = ownDefinition ?? fetched;
-  // On the player's own turn in an active fight, their stat-block ATTACK actions resolve through the shared
-  // structured flow (pick target -> roll -> hit) rather than loose dice: "inline" renders the runner here on
-  // the sheet, "jump" hops to the initiative view and back. Only definition actions (server-resolvable) route;
-  // client-derived equipped-weapon / spell chips stay loose quick-rolls.
-  const structuredAttacks = combat?.active === true && combat.myTurn === true && actor.kind === "player-character" && definition !== null;
+  // On the player's own turn in an active fight, their stat-block actions that target a creature (weapon &
+  // spell attacks, save/damage spells) resolve through the shared structured flow (pick target -> roll ->
+  // resolve) rather than loose dice. The live combat context is the explicit `combat` prop when the sheet is
+  // embedded in the initiative panel (which can also jump there and back), otherwise it's derived from the
+  // player's own view `state` so this works from ANY sheet surface - the standalone tab, the roster, the map
+  // - not only the panel. Player-only; the GM acts through their own runner.
+  const liveCombat = combat ?? (role === "player" && state
+    ? (() => { const pv = state as PlayerView; return { revision: pv.revision, active: pv.combat.active, myTurn: pv.combat.turnActorId === actor.id, playerDamageMode: pv.combat.playerDamageMode, targets: pv.combat.initiative.map((entry) => ({ actorId: entry.actorId, name: entry.name })) }; })()
+    : undefined);
+  const structuredAttacks = liveCombat?.active === true && liveCombat.myTurn === true && actor.kind === "player-character" && definition !== null;
   const [feedback, setFeedback] = useState("");
   const [rolling, setRolling] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -203,6 +208,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // The one per-browser dice-input preference, shared with every other roll surface (saves, attacks, the
   // initiative runner, the dice panel) so the sheet's toggle and those surfaces always agree.
   const { rollInput, bonusMode, sheetAttackMode, rollMode, setRollInput: chooseRollInput, setBonusMode: chooseBonusMode, setSheetAttackMode: chooseSheetAttackMode } = useRollPreference();
+  // Only the embedded panel can hop to the initiative view and back; every other surface renders the picker
+  // inline on the sheet, so the stored jump/inline preference only applies when a jump target actually exists.
+  const effectiveAttackMode = onJumpToInitiative ? sheetAttackMode : "inline";
   // The shared dice log rides behind the header's Sheet/Dice toggle — one pane at a time on every
   // viewport — so the sheet stays clean and full-width whichever way it's opened. Default to the sheet;
   // the log is one tap away (and the map right-click / "View sheet" / initiative toggle all match).
@@ -283,7 +291,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const routeAttack = (action: ActorDefinition["actions"][number]) => {
     setTargetingResult(null);
     beginTargeting(summaryOfOwnAction(action), actor.id);
-    if (sheetAttackMode === "jump") onJumpToInitiative?.();
+    if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
   // The player's OWN stat-block action that an equipped weapon (matched by name) or a spell (matched by its
   // linked actionId) resolves as - but only when it's actually server-resolvable (has an attack, a save, or
@@ -302,8 +310,8 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const runnerRef = useRef<HTMLDivElement | null>(null);
   const targetingSession = useTargeting();
   useEffect(() => {
-    if (sheetAttackMode === "inline" && targetingSession?.attackerId === actor.id) runnerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [sheetAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
+    if (effectiveAttackMode === "inline" && targetingSession?.attackerId === actor.id) runnerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [effectiveAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
@@ -349,11 +357,12 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     socket.emit("character:set-slot", { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 }, (result: { ok: boolean; message?: string }) => {
       setBusy(false);
       if (!result.ok) { setFeedback(result.message ?? "The slot could not be spent."); return; }
-      // The slot is spent; on your turn a spell ATTACK (Eldritch Blast and friends) hands off to the structured
-      // flow to pick a target and resolve vs AC instead of a bare damage roll. Save/AoE spells keep the quick
-      // damage roll (the runner still offers their multi-target resolution, and upcast scaling stays intact).
+      // The slot is spent; on your turn a spell that targets a creature (an attack roll, a saving throw, or
+      // direct damage) hands off to the structured flow to pick the target(s) and resolve, instead of a bare
+      // damage roll. Only a utility spell with no combat action stays a plain note. (An upcast leveled spell
+      // resolves at its base dice here - the GM can adjust the parked damage; the loose path kept full upcast.)
       const structured = structuredAttacks ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name }) : null;
-      if (structured?.attack) { routeAttack(structured); return; }
+      if (structured) { routeAttack(structured); return; }
       // Digital rolls the (upscaled) damage; manual mode prompts for the physical total - both land in the log.
       if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
       else setFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
@@ -362,10 +371,10 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   // Cantrips (v5 #9) cost no slot: cast just rolls the damage die for a damaging cantrip (Toll the Dead,
   // Sacred Flame), or notes the cast for a utility cantrip. Same helper so display == rolled.
   const castCantrip = (spell: Readonly<{ id: string; name: string; level: number; actionId?: string | null }>) => {
-    // An attack cantrip on your turn routes through the structured flow (pick target -> roll vs AC -> resolve);
-    // a save/utility cantrip keeps its quick roll.
+    // A cantrip that targets a creature (attack, save, or direct damage) routes through the structured flow
+    // (pick target -> roll -> resolve) on your turn; a pure-utility cantrip keeps its quick note.
     const structured = structuredAttacks ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name }) : null;
-    if (structured?.attack) { routeAttack(structured); return; }
+    if (structured) { routeAttack(structured); return; }
     const content = spellIndex.get(spell.id);
     const { formula } = spellEffectAt(content, spell.level, spell.level);
     if (formula) void rollFlat(formula, "damage", `${spell.name}${content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : ""}`);
@@ -590,9 +599,9 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             // On the player's turn with the "keep picker on the sheet" preference, the interactive runner
             // (its own action list + inline target picker + result) OWNS the server-resolvable stat-block
             // actions here; the loose weapon/spell chips below are hidden so an action isn't offered twice.
-            const inlineRunner = structuredAttacks && sheetAttackMode === "inline";
+            const inlineRunner = structuredAttacks && effectiveAttackMode === "inline";
             return <>
-              {inlineRunner && combat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={combat.revision} rollMode={rollMode} playerDamageMode={combat.playerDamageMode} targets={combat.targets} /></div>}
+              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={liveCombat.revision} rollMode={rollMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
               {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
                 {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
                 {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
@@ -653,7 +662,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     <SegmentedControl size="sm" ariaLabel="Roll input mode" value={rollInput} onChange={(mode) => chooseRollInput(mode as "digital" | "manual")} options={[{ value: "digital", label: "Digital" }, { value: "manual", label: "Manual" }]} />
     {rollInput === "manual" && <SegmentedControl size="sm" ariaLabel="Typed bonus handling" value={bonusMode} onChange={(mode) => chooseBonusMode(mode as "auto" | "total")} options={[{ value: "auto", label: "Auto-add bonus" }, { value: "total", label: "Final total" }]} />}
     {/* Only meaningful mid-fight: where an attack tapped here resolves - inline on the sheet, or over on the initiative view (which then hops back once you confirm). */}
-    {combat?.active === true && actor.kind === "player-character" && <><span className="sheet-settings-label">Attacks</span>
+    {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && <><span className="sheet-settings-label">Attacks</span>
       <SegmentedControl size="sm" ariaLabel="Where attacks tapped on the sheet resolve" value={sheetAttackMode} onChange={(mode) => chooseSheetAttackMode(mode as "jump" | "inline")} options={[{ value: "inline", label: "On sheet" }, { value: "jump", label: "In initiative" }]} /></>}
   </div>) : null;
 
