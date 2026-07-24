@@ -272,6 +272,14 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   inert). `check`+`build` green all workspaces; **server suite 447** (adds player-damage settlement, a
   pendingDamage projection-leak test, and player-rolled-initiative coverage); api-reference + app-map
   regenerated. **Deferred (documented follow-up):** a live browser/mobile smoke (no e2e harness in-repo).
+  **Post-testing fixes (2026-07-24):** (1) the player-initiative prompt was buried on the player's own
+  initiative row (invisible on the "My sheet" view or when scrolled off) — it's now a prominent
+  view-independent banner at the top of the player panel; server seeding/projection were already correct.
+  (2) attacks tapped from a sheet surface OUTSIDE the on-turn runner (an equipped-weapon chip, or casting
+  an attack spell from the Spells tab) fired a bare die with no target — they now route through one shared
+  `routeAttack()` seam to the same `action:resolve` (weapons matched to a stat-block action by name, attack
+  spells by their linked `actionId` after the slot is spent); inventory-only weapons and save/AoE spells,
+  which have no single server action to resolve, intentionally stay loose.
 - **Player character sheets — Phase 1 initiative (2026-07-23, PR #45, branch
   `claude/character-sheet-discovery-a14i7f`).** The player-facing half of the app: an interactive
   character sheet used at game night, architected **builder-ready** (the full guided builder is the
