@@ -43,7 +43,11 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   get the revealed-only projection), never integration-scope `bearerAuth`; every write is GM-only, and
   folders/revisions/export stay GM-only even for reads. No route/behavior change — the server still serves the
   same literal byte-identical (`app-map.md`: 94→132 HTTP paths). The codex is a first-party UI surface, so this
-  is documentation completeness, not an invitation to drive it as an external integration.
+  is documentation completeness, not an invitation to drive it as an external integration. **Footgun for future
+  edits:** the endpoint *grouping* is duplicated in THREE places that must stay in sync — `reference.ts`
+  (`docs/api-reference.md`), the in-app `apps/client/src/integrations/ApiReference.tsx` panel (VTT Setup tab),
+  and this narrative. A new path group (like codex was) is invisible in the docs/UI until a matching `GROUPS`
+  entry is added to the first two, even though it's already in the served document.
 - **A map marker links MANY pages + MANY scenes; a scene is no longer owned by one marker (2026-07-25).**
   Markers began as one-of-each polymorphic links (`pageId`/`subMapId`/`sceneId`/`actorId`). Pages and
   scenes became **arrays** (`pageIds`/`sceneIds`, JSON id-array columns, migration v8 backfills the old
