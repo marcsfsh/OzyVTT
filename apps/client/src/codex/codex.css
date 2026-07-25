@@ -202,6 +202,24 @@
 .codex-filter-chip { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; padding: 2px var(--space-2); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); margin-bottom: var(--space-2); }
 .codex-filter-chip button { border: none; background: transparent; color: var(--text-muted); cursor: pointer; }
 .codex-filter-chip button:hover { color: var(--danger); }
+
+/* Relationship graph */
+.codex-graph { display: flex; flex-direction: column; min-height: 64vh; gap: var(--space-2); }
+.codex-graph-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.codex-graph-hint { font-size: var(--fs-sm); color: var(--text-muted); }
+.codex-graph-legend { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
+.codex-graph-legenditem { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); }
+.codex-graph-legenditem i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.codex-graph-svg { flex: 1 1 auto; min-height: 62vh; width: 100%; background: radial-gradient(circle at 50% 40%, var(--surface-1), var(--void)); border: 1px solid var(--line); border-radius: var(--radius-lg); cursor: grab; }
+.codex-graph-svg:active { cursor: grabbing; }
+.codex-graph-edge line { stroke: var(--line-strong, #3a4152); stroke-width: 1.2; opacity: 0.5; }
+.codex-graph-edge.is-lit line { stroke: var(--cyan); opacity: 0.95; }
+.codex-graph-edgelabel { fill: var(--text-dim); font-size: 9px; font-family: var(--font-mono); pointer-events: none; }
+.codex-graph-node { cursor: pointer; }
+.codex-graph-node circle { stroke: var(--void); stroke-width: 2; }
+.codex-graph-node.is-hover circle { stroke: #fff; }
+.codex-graph-nodeicon { font-size: 13px; pointer-events: none; }
+.codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }
 .codex-editor-foot { display: flex; }
 
 .codex-revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }

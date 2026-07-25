@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Input, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
-import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship } from "./api";
+import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
 import { NotebookTree, buildFolderTree } from "./NotebookTree";
 import { WorldHome } from "./WorldHome";
+import { RelationshipGraph } from "./RelationshipGraph";
 import { ENTITY_DEFS, type EntityType } from "./entities";
 import "./codex.css";
 
@@ -28,11 +29,12 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
-  const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal">("pages");
+  const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal" | "graph">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [templateMenu, setTemplateMenu] = useState(false);
   const [pageFilter, setPageFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
+  const [edges, setEdges] = useState<CodexRelationshipEdge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[]; relationships: readonly CodexRelationship[] } | null>(null);
   const [query, setQuery] = useState("");
@@ -44,7 +46,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
 
   // The rail always holds the FULL notebook (for the folder tree + [[ autocomplete)); search is a separate overlay.
   const refreshList = useCallback(async () => {
-    try { setPages(await codexApi.listPages(gmToken)); setError(null); }
+    try { const [nextPages, nextEdges] = await Promise.all([codexApi.listPages(gmToken), codexApi.listRelationships(gmToken)]); setPages(nextPages); setEdges(nextEdges); setError(null); }
     catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
   }, [gmToken]);
 
@@ -159,7 +161,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     <div className="codex-root">
       <div className="codex-modebar">
         <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as typeof mode)}
-          options={[{ value: "world", label: "World" }, { value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
+          options={[{ value: "world", label: "World" }, { value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }, { value: "graph", label: "Graph" }]} />
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
@@ -175,6 +177,8 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
         ? <AtlasView gmToken={gmToken} scenes={scenes} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "journal"
         ? <JournalView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        : mode === "graph"
+        ? <RelationshipGraph nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
