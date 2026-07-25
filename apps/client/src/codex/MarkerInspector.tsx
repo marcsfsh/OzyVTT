@@ -1,16 +1,16 @@
 import { Badge, Button, Field, IconButton, Input, Select } from "@vtt/ui";
 import { atlasApi, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
-import { IconPicker } from "./icons";
+import { IconPicker, EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
 import { RevealSwitch } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { useState } from "react";
 
 /**
- * The marker inspector: launch/navigate from a pin, edit its icon/color/label, wire its links (a wiki
- * page, a drill-down sub-map, a prepared Scene), reveal it to players, or delete it. The "go" actions
- * lead - during prep a GM taps a placed pin to open its page or to *run the fight staged there* - with
- * editing below. All writes go through the atlas REST surface; the parent refreshes from the result.
+ * The marker inspector: edit a pin's icon/color/label, wire its links, reveal it, or delete it. A pin can
+ * link to MANY pages (open each) and MANY prepared scenes (launch each), plus one drill-down sub-map. The
+ * launch/open actions live inline on each linked item - the GM taps a pin mid-prep to open a page or run
+ * the fight staged there. All writes go through the atlas REST surface; the parent refreshes from the result.
  */
 type MarkerScene = Readonly<{ id: string; name: string }>;
 type MarkerInspectorProps = Readonly<{
@@ -54,9 +54,12 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
   };
 
   const subMaps = maps.filter((map) => map.id !== marker.mapId);
-  const linkedPage = pages.find((page) => page.id === marker.pageId) ?? null;
-  const linkedScene = scenes.find((scene) => scene.id === marker.sceneId) ?? null;
-  const hasGo = Boolean(marker.pageId || marker.subMapId || marker.sceneId);
+  const linkedPages = marker.pageIds.map((id) => pages.find((page) => page.id === id)).filter((page): page is CodexPageSummary => Boolean(page));
+  const unlinkedPages = pages.filter((page) => !marker.pageIds.includes(page.id));
+  const linkedScenes = marker.sceneIds.map((id) => scenes.find((scene) => scene.id === id)).filter((scene): scene is MarkerScene => Boolean(scene));
+  const availableScenes = scenes.filter((scene) => !marker.sceneIds.includes(scene.id));
+  const danglingScenes = marker.sceneIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
+  const secretLinkedPages = linkedPages.filter((page) => marker.revealedToPlayers && !page.revealedToPlayers);
 
   return (
     <aside className="codex-inspector" aria-label="Marker">
@@ -70,16 +73,6 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
 
       {error && <p className="codex-inspector-hint" role="alert">{error}</p>}
 
-      {hasGo && (
-        <div className="codex-inspector-go">
-          {marker.sceneId && (activeSceneId === marker.sceneId
-            ? <Badge tone="success">● Live now</Badge>
-            : <Button variant="primary" size="sm" onClick={() => onActivateScene(marker.sceneId!)}>▶ Go live here</Button>)}
-          {marker.subMapId && <Button variant="secondary" size="sm" arrow onClick={() => onOpenMap(marker.subMapId!)}>Enter map</Button>}
-          {marker.pageId && <Button variant="secondary" size="sm" onClick={() => onOpenPage(marker.pageId!)}>Open page</Button>}
-        </div>
-      )}
-
       <Field label="Label" htmlFor="marker-label">
         <Input id="marker-label" value={label} placeholder="Unnamed" disabled={busy}
           onChange={(event) => setLabel(event.target.value)} onBlur={() => label !== (marker.label ?? "") && patch({ label: label.trim() || null })} />
@@ -87,32 +80,58 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
 
       <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
 
-      <Field label="Links to page" htmlFor="marker-page">
-        <EntityPicker id="marker-page" pages={pages} value={marker.pageId ?? null} onChange={(id) => patch({ pageId: id })} ariaLabel="Links to page" placeholder="Search entities…" />
+      <Field label="Linked pages">
+        <div className="codex-marker-links">
+          {linkedPages.map((page) => (
+            <div key={page.id} className="codex-marker-link">
+              <button type="button" className="codex-marker-link-open" onClick={() => onOpenPage(page.id)}>
+                <EntityIcon type={page.entityType} /> <span className="codex-list-title">{page.title}</span>
+              </button>
+              <button type="button" className="codex-marker-link-x" aria-label={`Unlink ${page.title}`} disabled={busy} onClick={() => patch({ pageIds: marker.pageIds.filter((id) => id !== page.id) })}>✕</button>
+            </div>
+          ))}
+          <EntityPicker pages={unlinkedPages} value={null} onChange={(id) => id && patch({ pageIds: [...marker.pageIds, id] })} ariaLabel="Link a page" placeholder="Link a page…" />
+          <Button variant="ghost" size="sm" onClick={onCreatePage}>＋ New page{marker.label ? ` “${marker.label}”` : ""}</Button>
+        </div>
       </Field>
-      {!marker.pageId && <Button variant="ghost" size="sm" onClick={onCreatePage}>＋ New page{marker.label ? ` “${marker.label}”` : ""}</Button>}
-      {linkedPage && marker.revealedToPlayers && !linkedPage.revealedToPlayers && (
-        <p className="codex-inspector-hint">This pin is shown, but its page is still secret — <button type="button" className="codex-linklike" onClick={() => onRevealPage(linkedPage.id)}>reveal the page too</button>.</p>
-      )}
+      {secretLinkedPages.map((page) => (
+        <p key={page.id} className="codex-inspector-hint">This pin is shown, but <strong>{page.title}</strong> is still secret — <button type="button" className="codex-linklike" onClick={() => onRevealPage(page.id)}>reveal it too</button>.</p>
+      ))}
 
       {subMaps.length > 0 && (
         <Field label="Drills into map" htmlFor="marker-submap">
-          <Select id="marker-submap" value={marker.subMapId ?? ""} disabled={busy} onChange={(event) => patch({ subMapId: event.target.value || null })}>
-            <option value="">— none —</option>
-            {subMaps.map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
-          </Select>
+          <div className="codex-marker-submap">
+            <Select id="marker-submap" value={marker.subMapId ?? ""} disabled={busy} onChange={(event) => patch({ subMapId: event.target.value || null })}>
+              <option value="">— none —</option>
+              {subMaps.map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
+            </Select>
+            {marker.subMapId && <Button variant="secondary" size="sm" arrow onClick={() => onOpenMap(marker.subMapId!)}>Enter</Button>}
+          </div>
         </Field>
       )}
 
       {scenes.length > 0 && (
-        <Field label="Runs scene" htmlFor="marker-scene" help="Link the encounter you prepared here, then launch it from this pin.">
-          <Select id="marker-scene" value={marker.sceneId ?? ""} disabled={busy} onChange={(event) => patch({ sceneId: event.target.value || null })}>
-            <option value="">— none —</option>
-            {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
-          </Select>
+        <Field label="Linked scenes" help="Link the encounters prepared here, then launch any of them from this pin.">
+          <div className="codex-marker-links">
+            {linkedScenes.map((scene) => (
+              <div key={scene.id} className="codex-marker-link">
+                {activeSceneId === scene.id
+                  ? <Badge tone="success">● Live</Badge>
+                  : <Button variant="primary" size="sm" onClick={() => onActivateScene(scene.id)}>▶ Go live</Button>}
+                <span className="codex-marker-link-name codex-list-title">{scene.name}</span>
+                <button type="button" className="codex-marker-link-x" aria-label={`Unlink ${scene.name}`} disabled={busy} onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => id !== scene.id) })}>✕</button>
+              </div>
+            ))}
+            {availableScenes.length > 0 && (
+              <Select aria-label="Link a scene" value="" disabled={busy} onChange={(event) => event.target.value && patch({ sceneIds: [...marker.sceneIds, event.target.value] })}>
+                <option value="">Link a scene…</option>
+                {availableScenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+              </Select>
+            )}
+          </div>
         </Field>
       )}
-      {marker.sceneId && !linkedScene && <p className="codex-inspector-hint">The linked scene was removed. Pick another, or clear it.</p>}
+      {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist — <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>clear</button>.</p>}
 
       <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete marker</Button></div>
       {confirmDialog}

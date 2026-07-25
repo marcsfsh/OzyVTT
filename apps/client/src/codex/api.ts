@@ -110,7 +110,7 @@ export async function uploadCodexAsset(token: string, file: File): Promise<{ id:
 export type PlayerCodexPageSummary = Readonly<{ id: string; title: string; entityType: EntityType; folder: string | null; tags: readonly string[]; bannerAssetId: string | null; updatedAt: string }>;
 export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ fields: Readonly<Record<string, string>>; body: string }>;
 export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null }>;
-export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageId: string | null; subMapId: string | null }>;
+export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null }>;
 export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; createdAt: string }>;
 
 export const playerCodexApi = {
@@ -132,13 +132,13 @@ export type CodexMap = Readonly<{
 }>;
 export type CodexMarker = Readonly<{
   id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null;
-  revealedToPlayers: boolean; pageId: string | null; subMapId: string | null; sceneId: string | null; actorId: string | null;
+  revealedToPlayers: boolean; pageIds: string[]; subMapId: string | null; sceneIds: string[]; actorId: string | null;
   createdAt: string; updatedAt: string;
 }>;
 export type CodexMapInput = Readonly<{ assetId?: string; name?: string; kind?: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean }>;
 export type CodexMarkerInput = Readonly<{
   x?: number; y?: number; iconId?: string; iconColor?: string; label?: string | null; revealedToPlayers?: boolean;
-  pageId?: string | null; subMapId?: string | null; sceneId?: string | null; actorId?: string | null;
+  pageIds?: string[]; subMapId?: string | null; sceneIds?: string[]; actorId?: string | null;
 }>;
 
 /** A map asset the GM has uploaded (from the existing map catalog); the raw material for an atlas map node. */

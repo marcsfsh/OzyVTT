@@ -83,7 +83,7 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
   const createPageForMarker = async (marker: CodexMarker) => {
     try {
       const page = await codexApi.createPage(gmToken, { title: marker.label?.trim() || "New location" });
-      onMarkerUpdated(await atlasApi.updateMarker(gmToken, marker.id, { pageId: page.id }));
+      onMarkerUpdated(await atlasApi.updateMarker(gmToken, marker.id, { pageIds: [...marker.pageIds, page.id] }));
       await loadMeta();
       onOpenPage(page.id);
     } catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }

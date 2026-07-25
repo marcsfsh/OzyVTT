@@ -33,6 +33,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   player marker projection drops scene/actor + unrevealed page/sub-map links; page media gated on a
   revealed reference). Mirrors the maps/tokens satellite-store pattern; the public OpenAPI
   game-command surface is untouched.
+- **A map marker links MANY pages + MANY scenes; a scene is no longer owned by one marker (2026-07-25).**
+  Markers began as one-of-each polymorphic links (`pageId`/`subMapId`/`sceneId`/`actorId`). Pages and
+  scenes became **arrays** (`pageIds`/`sceneIds`, JSON id-array columns, migration v8 backfills the old
+  singular columns which are now dormant; sub-map + actor stay single). This **relaxes the earlier
+  "a scene has one location, so linking it clears any other pin that claimed it" rule** (removed from
+  `updateMarker`): a prepared scene may now sit on several pins, and `markerForScene` — the combat-history
+  bridge's lookup — resolves to the most recently-touched marker (`ORDER BY updated_at DESC`). The reason:
+  the owner wants flexible worldbuilding links (one battle staged in several places; a pin gathering many
+  notes/encounters), and nothing depends on a scene mapping to exactly one marker. **Viewer-safety
+  boundary unchanged in kind:** `projectPlayerMarker` still returns only the revealed subset of a pin's
+  pages and strips scene/actor entirely — the array just moved the filter from one id to a set.
 - **Codex satellite-store follow-ups deliberately deferred (2026-07-24).** A four-lens audit of the
   codex confirmed the off-`GameState` design is sound, and flagged gaps that are **known and accepted
   for now**, not oversights: (1) the codex has **no integration-API surface** - it wires only

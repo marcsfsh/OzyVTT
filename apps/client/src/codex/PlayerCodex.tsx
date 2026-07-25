@@ -57,7 +57,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
     const marker = markers.find((candidate) => candidate.id === markerId);
     if (!marker) return;
     if (marker.subMapId && maps.some((map) => map.id === marker.subMapId)) setCurrentMapId(marker.subMapId);
-    else if (marker.pageId) openPage(marker.pageId);
+    else if (marker.pageIds[0]) openPage(marker.pageIds[0]);
   }, [markers, maps, openPage]);
 
   const filteredPages = useMemo(() => pages.filter((summary) => (!filter.type || summary.entityType === filter.type) && (!filter.tag || summary.tags.includes(filter.tag))), [pages, filter]);

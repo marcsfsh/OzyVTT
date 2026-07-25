@@ -95,21 +95,22 @@ export function projectPlayerMap(row: CodexMapRow, context: Readonly<{ parentRev
 export type GmCodexMarker = CodexMarkerRow;
 /** A marker as a player sees it: no scene/actor links (GM-only), and page/sub-map links only when those targets are themselves revealed. */
 export type PlayerCodexMarker = Readonly<{
-  id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageId: string | null; subMapId: string | null;
+  id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null;
 }>;
 
 export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker { return row; }
 
 /**
- * null unless the marker is revealed. Page and sub-map links survive only when the linked target is
- * itself revealed (so a pin never advertises a still-secret page or map); scene and actor links are
- * GM-only and always stripped. The caller resolves the two reveal flags and passes them in.
+ * null unless the marker is revealed. Of a marker's linked pages, only the ones that are themselves
+ * revealed survive (so a pin never advertises a still-secret page); the sub-map link survives only when
+ * that map is revealed; scene and actor links are GM-only and always stripped. The caller resolves which
+ * targets are revealed and passes them in.
  */
-export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ pageRevealed: boolean; subMapRevealed: boolean }>): PlayerCodexMarker | null {
+export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ revealedPageIds: ReadonlySet<string>; subMapRevealed: boolean }>): PlayerCodexMarker | null {
   if (!row.revealedToPlayers) return null;
   return {
     id: row.id, mapId: row.mapId, x: row.x, y: row.y, iconId: row.iconId, iconColor: row.iconColor, label: row.label,
-    pageId: context.pageRevealed ? row.pageId : null,
+    pageIds: row.pageIds.filter((pageId) => context.revealedPageIds.has(pageId)),
     subMapId: context.subMapRevealed ? row.subMapId : null
   };
 }

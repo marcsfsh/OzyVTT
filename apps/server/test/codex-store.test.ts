@@ -189,6 +189,21 @@ describe("CodexStore maps + markers", () => {
     expect(() => store.createMarker(map.id, { x: 0, y: 0, iconId: "Bad Icon", iconColor: "#a45cff" })).toThrow(/slug/);
     expect(() => store.createMarker(map.id, { x: 0, y: 0, iconId: "town", iconColor: "red" })).toThrow(/hex/);
   });
+
+  it("markers link to MANY pages and scenes; markerForScene matches any; deletePage drops the page from every marker", () => {
+    const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
+    const keep = store.createPage({ title: "Keep" });
+    const cellar = store.createPage({ title: "Cellar" });
+    const scene1 = "11111111-1111-4111-8111-111111111111";
+    const scene2 = "22222222-2222-4222-8222-222222222222";
+    const marker = store.createMarker(map.id, { x: 10, y: 10, iconId: "castle", iconColor: "#ff2e9a", pageIds: [keep.id, cellar.id], sceneIds: [scene1, scene2] });
+    expect(marker.pageIds).toEqual([keep.id, cellar.id]);
+    expect(marker.sceneIds).toEqual([scene1, scene2]);
+    expect(store.markerForScene(scene2)?.id).toBe(marker.id);                 // found by any linked scene
+    expect(store.updateMarker(marker.id, { pageIds: [cellar.id] }).pageIds).toEqual([cellar.id]); // remove one
+    store.deletePage(cellar.id);
+    expect(store.getMarker(marker.id)?.pageIds).toEqual([]);                  // deleted page dropped, no dangling
+  });
 });
 
 describe("CodexStore map/marker viewer safety", () => {
@@ -196,6 +211,20 @@ describe("CodexStore map/marker viewer safety", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
     expect(projectPlayerMap(map, { parentRevealed: false })).toBeNull();
     expect(projectPlayerMap(store.setMapRevealed(map.id, true), { parentRevealed: false })).toMatchObject({ name: "World" });
+  });
+
+  it("a player marker shows ONLY the linked pages that are themselves revealed, and never a scene id", () => {
+    const shown = store.createPage({ title: "Shown" });
+    const secret = store.createPage({ title: "Secret" });
+    store.setPageRevealed(shown.id, true);
+    const map = store.createMap({ assetId: ASSET, name: "M", kind: "world" });
+    const marker = store.createMarker(map.id, { x: 5, y: 5, iconId: "pin", iconColor: "#2de2ff", revealedToPlayers: true,
+      pageIds: [shown.id, secret.id], sceneIds: ["33333333-3333-4333-8333-333333333333"] });
+    const revealedPageIds = new Set(marker.pageIds.filter((id) => store.getPage(id)?.revealedToPlayers));
+    const projected = projectPlayerMarker(marker, { revealedPageIds, subMapRevealed: false });
+    expect(projected?.pageIds).toEqual([shown.id]);                        // only the revealed page survives
+    expect(JSON.stringify(projected)).not.toContain(secret.id);            // the secret page id never leaks
+    expect(JSON.stringify(projected)).not.toContain("3333");               // scene links are GM-only
   });
 
   it("a revealed child map never leaks the id of an unrevealed parent", () => {
@@ -207,35 +236,33 @@ describe("CodexStore map/marker viewer safety", () => {
     expect(projectPlayerMap(region, { parentRevealed: true })!.parentMapId).toBe(world.id);
   });
 
-  it("player marker projection strips scene/actor links and hides links to unrevealed targets", () => {
+  it("player marker projection strips scene/actor links and hides links to unrevealed pages", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
     const secret = store.createPage({ title: "Secret lair" });
-    const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff", pageId: secret.id, sceneId: ASSET, actorId: ASSET, revealedToPlayers: true });
-    expect(projectGmMarker(marker)).toMatchObject({ sceneId: ASSET, actorId: ASSET, pageId: secret.id });
-    const stripped = projectPlayerMarker(marker, { pageRevealed: false, subMapRevealed: false })!;
-    expect(stripped).not.toHaveProperty("sceneId");
+    const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff", pageIds: [secret.id], sceneIds: [ASSET], actorId: ASSET, revealedToPlayers: true });
+    expect(projectGmMarker(marker)).toMatchObject({ sceneIds: [ASSET], actorId: ASSET, pageIds: [secret.id] });
+    const stripped = projectPlayerMarker(marker, { revealedPageIds: new Set<string>(), subMapRevealed: false })!;
+    expect(stripped).not.toHaveProperty("sceneIds");
     expect(stripped).not.toHaveProperty("actorId");
-    expect(stripped.pageId).toBeNull();                            // secret page not revealed → link hidden
-    expect(projectPlayerMarker(marker, { pageRevealed: true, subMapRevealed: false })!.pageId).toBe(secret.id);
+    expect(stripped.pageIds).toEqual([]);                          // secret page not revealed → link hidden
+    expect(projectPlayerMarker(marker, { revealedPageIds: new Set([secret.id]), subMapRevealed: false })!.pageIds).toEqual([secret.id]);
   });
 
   it("an unrevealed marker is null for players regardless of link state", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
     const marker = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
-    expect(projectPlayerMarker(marker, { pageRevealed: true, subMapRevealed: true })).toBeNull();
+    expect(projectPlayerMarker(marker, { revealedPageIds: new Set<string>(), subMapRevealed: true })).toBeNull();
   });
 
-  it("a scene links to exactly one location marker, moving the combat-bridge target on relink", () => {
+  it("a scene may sit on several markers; markerForScene resolves to one of them (none is cleared on relink)", () => {
     const map = store.createMap({ assetId: ASSET, name: "World", kind: "world" });
     const scene = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const first = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff" });
+    const first = store.createMarker(map.id, { x: 1, y: 1, iconId: "town", iconColor: "#a45cff", sceneIds: [scene] });
     const second = store.createMarker(map.id, { x: 2, y: 2, iconId: "cave", iconColor: "#2de2ff" });
-    store.updateMarker(first.id, { sceneId: scene });
-    expect(store.markerForScene(scene)?.id).toBe(first.id);
-    // Relinking the scene to the other pin clears the first (one location per scene) and moves the bridge target.
-    store.updateMarker(second.id, { sceneId: scene });
-    expect(store.getMarker(first.id)!.sceneId).toBeNull();
-    expect(store.markerForScene(scene)?.id).toBe(second.id);
+    store.updateMarker(second.id, { sceneIds: [scene] });
+    expect(store.getMarker(first.id)!.sceneIds).toContain(scene);   // first keeps the link (no clearing)
+    expect(store.getMarker(second.id)!.sceneIds).toContain(scene);
+    expect([first.id, second.id]).toContain(store.markerForScene(scene)?.id);
   });
 });
 

@@ -111,7 +111,9 @@ describe("codex HTTP viewer-safety boundary", () => {
     const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: asset, name: "World", kind: "world" }));
     const mapId = map.data.map.id as string;
     const secretPage = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Lair" }));
-    const marker = await body(await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, { x: 1, y: 1, iconId: "skull", iconColor: "#ff2e9a", pageId: secretPage.data.page.id, sceneId: randomUUID(), actorId: randomUUID(), revealedToPlayers: true }));
+    // A pin may link MANY pages + MANY scenes; here one secret page + one scene, plus an actor.
+    const secretScene = randomUUID();
+    await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, { x: 1, y: 1, iconId: "skull", iconColor: "#ff2e9a", pageIds: [secretPage.data.page.id], sceneIds: [secretScene], actorId: randomUUID(), revealedToPlayers: true });
 
     // Map still secret → player 404 on its markers.
     expect((await get(base, `/api/v1/codex/maps/${mapId}/markers`, PLAYER)).status).toBe(404);
@@ -119,10 +121,12 @@ describe("codex HTTP viewer-safety boundary", () => {
     await post(base, `/api/v1/codex/maps/${mapId}/reveal`, GM, { revealed: true });
     const playerMarkers = (await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, PLAYER))).data.markers as Json[];
     expect(playerMarkers).toHaveLength(1);
-    expect(playerMarkers[0]).not.toHaveProperty("sceneId");
+    expect(playerMarkers[0]).not.toHaveProperty("sceneIds");
     expect(playerMarkers[0]).not.toHaveProperty("actorId");
-    expect(playerMarkers[0].pageId).toBeNull();               // linked page not revealed → link hidden
-    expect((await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, GM))).data.markers[0].sceneId).not.toBeNull();
+    expect(playerMarkers[0].pageIds).toEqual([]);             // linked page not revealed → link hidden
+    expect(JSON.stringify(playerMarkers)).not.toContain(secretScene);            // GM-only scene id never leaks
+    expect(JSON.stringify(playerMarkers)).not.toContain(secretPage.data.page.id); // nor the unrevealed page id
+    expect((await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, GM))).data.markers[0].sceneIds).toEqual([secretScene]);
   });
 
   it("404s a player reading a hidden location's journal-by-attachment", async () => {

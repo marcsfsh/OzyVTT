@@ -86,7 +86,7 @@ export type CodexMapRow = Readonly<{
   createdAt: string;
   updatedAt: string;
 }>;
-export type CodexMarkerLinks = Readonly<{ pageId: string | null; subMapId: string | null; sceneId: string | null; actorId: string | null }>;
+export type CodexMarkerLinks = Readonly<{ pageIds: string[]; subMapId: string | null; sceneIds: string[]; actorId: string | null }>;
 export type CodexMarkerRow = Readonly<{
   id: string;
   mapId: string;
@@ -99,7 +99,7 @@ export type CodexMarkerRow = Readonly<{
 } & CodexMarkerLinks & { createdAt: string; updatedAt: string }>;
 
 export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean }>;
-export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageId?: string | null; subMapId?: string | null; sceneId?: string | null; actorId?: string | null }>;
+export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageIds?: readonly string[]; subMapId?: string | null; sceneIds?: readonly string[]; actorId?: string | null }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
 /** The world's calendar: ordered months (each with a length), weekday names, and an era suffix. */
@@ -321,6 +321,17 @@ export const MIGRATIONS = [{
         fields_json = json_remove(fields_json, '$.goals')
     WHERE fields_json IS NOT NULL AND json_extract(fields_json, '$.goals') IS NOT NULL;
   `
+}, {
+  version: 8,
+  // Markers link to MANY pages + MANY scenes: add JSON id-array columns, backfilling the single page_id/
+  // scene_id into one-element arrays. The old single columns become dormant (kept, no longer read/written).
+  sql: `
+    ALTER TABLE codex_markers ADD COLUMN page_ids_json TEXT;
+    ALTER TABLE codex_markers ADD COLUMN scene_ids_json TEXT;
+    UPDATE codex_markers SET
+      page_ids_json = CASE WHEN page_id IS NOT NULL THEN json_array(page_id) ELSE '[]' END,
+      scene_ids_json = CASE WHEN scene_id IS NOT NULL THEN json_array(scene_id) ELSE '[]' END;
+  `
 }];
 
 type PageRow = {
@@ -329,7 +340,8 @@ type PageRow = {
 };
 type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; created_at: string; updated_at: string };
-type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_id: string | null; sub_map_id: string | null; scene_id: string | null; actor_id: string | null; created_at: string; updated_at: string };
+type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; created_at: string; updated_at: string };
+const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, created_at, updated_at";
 type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; created_at: string; updated_at: string };
 const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, created_at, updated_at";
 
@@ -475,6 +487,18 @@ function markerLabel(value: string | null | undefined): string | null {
 }
 function optionalId(value: string | null | undefined): string | null {
   return value === null || value === undefined ? null : id(value);
+}
+/** Validate + dedupe an array of ids (for a marker's multiple page/scene links). Caps at 24. */
+function idArray(value: readonly string[] | null | undefined): string[] {
+  if (!value) return [];
+  const out: string[] = [];
+  for (const raw of value) { const v = id(raw); if (!out.includes(v)) out.push(v); if (out.length >= 24) break; }
+  return out;
+}
+/** Parse a JSON id-array column (null/garbage → []). */
+function parseIdArray(json: string | null | undefined): string[] {
+  if (!json) return [];
+  try { const arr: unknown = JSON.parse(json); return Array.isArray(arr) ? arr.filter((v): v is string => typeof v === "string") : []; } catch { return []; }
 }
 const MAX_ENTRY = 20_000;
 function entryText(value: string | undefined): string {
@@ -671,7 +695,8 @@ export class CodexStore {
       database.prepare("DELETE FROM codex_fts_player WHERE page_id = ?").run(pageId);
       database.prepare("DELETE FROM codex_fts_gm WHERE page_id = ?").run(pageId);
       // Markers and journal pins that pointed here become label-only rather than dangling.
-      database.prepare("UPDATE codex_markers SET page_id = NULL, updated_at = ? WHERE page_id = ?").run(this.stamp(), pageId);
+      // Drop the deleted page from every marker's page_ids array (json_group_array is NULL for an empty set).
+      database.prepare("UPDATE codex_markers SET page_ids_json = COALESCE((SELECT json_group_array(value) FROM json_each(codex_markers.page_ids_json) WHERE value != ?), '[]'), updated_at = ? WHERE EXISTS (SELECT 1 FROM json_each(codex_markers.page_ids_json) WHERE value = ?)").run(pageId, this.stamp(), pageId);
       database.prepare("UPDATE codex_journal SET attach_page_id = NULL, updated_at = ? WHERE attach_page_id = ?").run(this.stamp(), pageId);
       database.prepare("DELETE FROM codex_pages WHERE id = ?").run(pageId); // cascades links + revisions
       this.bumpRevision();
@@ -901,9 +926,9 @@ export class CodexStore {
     const markerId = this.freshId();
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(markerId, mapId, coord(input.x), coord(input.y), iconId(input.iconId), hexColor(input.iconColor), markerLabel(input.label), input.revealedToPlayers ? 1 : 0,
-          optionalId(input.pageId), optionalId(input.subMapId), optionalId(input.sceneId), optionalId(input.actorId), stamp, stamp);
+          JSON.stringify(idArray(input.pageIds)), optionalId(input.subMapId), JSON.stringify(idArray(input.sceneIds)), optionalId(input.actorId), stamp, stamp);
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -920,18 +945,14 @@ export class CodexStore {
       icon_color: input.iconColor === undefined ? existing.icon_color : hexColor(input.iconColor),
       label: input.label === undefined ? existing.label : markerLabel(input.label),
       revealed: input.revealedToPlayers === undefined ? existing.revealed : (input.revealedToPlayers ? 1 : 0),
-      page_id: input.pageId === undefined ? existing.page_id : optionalId(input.pageId),
+      page_ids_json: input.pageIds === undefined ? existing.page_ids_json ?? "[]" : JSON.stringify(idArray(input.pageIds)),
       sub_map_id: input.subMapId === undefined ? existing.sub_map_id : optionalId(input.subMapId),
-      scene_id: input.sceneId === undefined ? existing.scene_id : optionalId(input.sceneId),
+      scene_ids_json: input.sceneIds === undefined ? existing.scene_ids_json ?? "[]" : JSON.stringify(idArray(input.sceneIds)),
       actor_id: input.actorId === undefined ? existing.actor_id : optionalId(input.actorId)
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_id = ?, sub_map_id = ?, scene_id = ?, actor_id = ?, updated_at = ? WHERE id = ?")
-        .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_id, merged.sub_map_id, merged.scene_id, merged.actor_id, this.stamp(), markerId);
-      // A scene has one location: linking it here clears any other pin that claimed it, so the combat-history bridge (markerForScene) and the UI stay unambiguous.
-      if (input.sceneId !== undefined && merged.scene_id !== null) {
-        database.prepare("UPDATE codex_markers SET scene_id = NULL, updated_at = ? WHERE scene_id = ? AND id != ?").run(this.stamp(), merged.scene_id, markerId);
-      }
+      database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_ids_json = ?, sub_map_id = ?, scene_ids_json = ?, actor_id = ?, updated_at = ? WHERE id = ?")
+        .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_ids_json, merged.sub_map_id, merged.scene_ids_json, merged.actor_id, this.stamp(), markerId);
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -976,7 +997,7 @@ export class CodexStore {
 
   listMarkers(mapId: string): CodexMarkerRow[] {
     if (!ID.test(mapId)) return [];
-    return (this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE map_id = ? ORDER BY created_at").all(mapId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
+    return (this.requireDatabase().prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE map_id = ? ORDER BY created_at`).all(mapId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
   }
 
   /** Whether any revealed codex map uses this image asset - lets players fetch a revealed world map's image. */
@@ -995,7 +1016,7 @@ export class CodexStore {
   /** The location marker linked to a prepared scene, if any - the combat-history bridge pins fights here. */
   markerForScene(sceneId: string): CodexMarkerRow | null {
     if (!ID.test(sceneId)) return null;
-    const row = this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE scene_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1").get(sceneId) as MarkerRowRaw | undefined;
+    const row = this.requireDatabase().prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE EXISTS (SELECT 1 FROM json_each(codex_markers.scene_ids_json) WHERE value = ?) ORDER BY updated_at DESC, created_at DESC LIMIT 1`).get(sceneId) as MarkerRowRaw | undefined;
     return row ? this.toMarker(row) : null;
   }
 
@@ -1162,7 +1183,7 @@ export class CodexStore {
     return { id: row.id, assetId: row.asset_id, name: row.name, kind: mapKind(row.kind), parentMapId: row.parent_map_id, revealedToPlayers: row.revealed === 1, sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at };
   }
   private toMarker(row: MarkerRowRaw): CodexMarkerRow {
-    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageId: row.page_id, subMapId: row.sub_map_id, sceneId: row.scene_id, actorId: row.actor_id, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageIds: parseIdArray(row.page_ids_json), subMapId: row.sub_map_id, sceneIds: parseIdArray(row.scene_ids_json), actorId: row.actor_id, createdAt: row.created_at, updatedAt: row.updated_at };
   }
   private mapRowRaw(mapId: string): MapRowRaw | undefined {
     if (!ID.test(mapId)) return undefined;
@@ -1170,7 +1191,7 @@ export class CodexStore {
   }
   private markerRowRaw(markerId: string): MarkerRowRaw | undefined {
     if (!ID.test(markerId)) return undefined;
-    return this.requireDatabase().prepare("SELECT id, map_id, x, y, icon_id, icon_color, label, revealed, page_id, sub_map_id, scene_id, actor_id, created_at, updated_at FROM codex_markers WHERE id = ?").get(markerId) as MarkerRowRaw | undefined;
+    return this.requireDatabase().prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE id = ?`).get(markerId) as MarkerRowRaw | undefined;
   }
 
   // ----- internals -----

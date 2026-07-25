@@ -217,7 +217,7 @@ export function createServer(options: CreateServerOptions) {
         if (!latest) return;
         const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
         const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
-        codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageId ?? null, playerText: `A battle was fought here${turns}.` });
+        codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageIds[0] ?? null, playerText: `A battle was fought here${turns}.` });
         notifyCodexChanged("journal");
       } catch (error) {
         // Best-effort - a codex hiccup must never affect ending a fight - but don't fail silently.

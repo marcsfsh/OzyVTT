@@ -62,9 +62,9 @@ const Coord = z.number().finite().min(0).max(1_000_000);
 const IconColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const IconId = z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(60);
 const MarkerLinks = {
-  pageId: z.string().uuid().nullable().optional(),
+  pageIds: z.array(z.string().uuid()).max(24).optional(),
   subMapId: z.string().uuid().nullable().optional(),
-  sceneId: z.string().uuid().nullable().optional(),
+  sceneIds: z.array(z.string().uuid()).max(24).optional(),
   actorId: z.string().uuid().nullable().optional()
 };
 const MarkerCreateSchema = z.object({
@@ -337,7 +337,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!map.revealedToPlayers) return failure(response, 404, "not_found", "That map was not found.");
     const markers = rows
       .map((row) => projectPlayerMarker(row, {
-        pageRevealed: row.pageId ? (store.getPage(row.pageId)?.revealedToPlayers ?? false) : false,
+        revealedPageIds: new Set(row.pageIds.filter((pageId) => store.getPage(pageId)?.revealedToPlayers ?? false)),
         subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
       }))
       .filter((marker) => marker !== null);

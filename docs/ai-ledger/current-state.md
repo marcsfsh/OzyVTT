@@ -189,6 +189,17 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     toolbar's link/image. This **supersedes the "kept the emoji" note above** — the owner found them cheap.
     Also professionalized the corny helper copy (empty states, journal prompts, "Logged here"→"Journal",
     etc.). The world+graph reviewer's color-by-category idea remains an option; colours are unchanged.
+  - **Marker multi-linking (follow-up, at the owner's request).** A map pin can now link **many pages**
+    and **many prepared scenes** (was one each) alongside its single drill-down sub-map. The
+    `MarkerInspector` shows each linked page (open) and scene (**▶ Go live**) as its own removable row with
+    an adder below; storage moved to JSON id-array columns (`page_ids_json` / `scene_ids_json`, **migration
+    v8** backfills the old single `page_id`/`scene_id` into one-element arrays — those columns are now
+    dormant), each validated, deduped, and capped at 24. Relaxed the old **"one marker per scene"** rule: a
+    scene may sit on several pins, and the combat-history bridge (`markerForScene`) resolves to the most
+    recently-touched one. Viewer-safety held — the player marker projection ships only the *revealed* subset
+    of a pin's pages and still strips every scene/actor link (`codex-store` + `codex-http` unit tests, plus
+    a live GM-link→player-read check). `check` + `test` (**573**) + `build` green; browser-verified linking
+    2 pages + 2 scenes on one pin with the player seeing only the revealed page, 390px mobile clean.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
