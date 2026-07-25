@@ -1,77 +1,47 @@
 # OzyVTT
 
-A private, LAN-hosted D&D 5e virtual tabletop and worldbuilding tool for one GM and a small home group. Players join from a phone or laptop on the same network and claim a character. There are no accounts and no cloud service; access comes from being on the same LAN.
+A private, LAN-hosted D&D 5e virtual tabletop and worldbuilding tool for one GM and a small home group. Players join from a phone or laptop on the same network. No accounts, no cloud.
 
-It does two things:
+Two parts:
 
-- **Combat.** Upload a battlemap, calibrate the grid, run initiative and turns, and move tokens with the server as the authority. Players use an interactive character sheet and roll on their own turn. A second screen mirrors a player-safe view for a TV at the table.
-- **Worldbuilding (the Codex).** A wiki of typed pages (characters, locations, factions, items, …), an atlas of nested maps, a journal on a custom calendar, and a relationship graph. Every page has a player-facing layer and a GM-only layer; GM-only content is never sent to players.
+- **Combat** — battlemaps, grid setup, initiative and turns, token movement, character sheets, and a second screen for the table.
+- **Codex** — a wiki of typed pages, an atlas of nested maps, a journal with a custom calendar, and a relationship graph. Pages have a player-facing layer and a GM-only layer.
 
 ## Requirements
 
 Node.js 24 or newer.
 
-## Running it
+## Run
 
 ```bash
 npm install
 cp .env.example .env
-npm run dev
+npm run dev        # client on :5173, dev API on :3001
 ```
 
-Open `http://localhost:5173` for development. Vite also prints a `Network` address like `http://192.168.1.50:5173` that other devices on the LAN use while `npm run dev` is running. Port 3001 is the development API.
-
-To run the single service the way players use it:
+To run the single service players use:
 
 ```bash
-npm run start
+npm run start      # builds, then serves on :3001
 ```
 
-This builds the client and serves everything on `:3001`. Open `http://localhost:3001` on the host; players join at `http://HOST-IP:3001`. On Windows, allow Node.js on private networks only.
+Players join at `http://HOST-IP:3001`. `data/` holds the password hash and campaign data; it is git-ignored.
 
-`data/` holds the password hash and campaign data. It is git-ignored; back it up separately.
+## Commands
 
 | Command | What it does |
 | --- | --- |
-| `npm install` | Install dependencies. |
-| `npm run dev` | Client on `:5173` plus the server (dev API `:3001`). |
+| `npm run dev` | Client plus server in development. |
 | `npm run check` | Typecheck each workspace. |
 | `npm run test` | Run tests. |
 | `npm run build` | Build all workspaces. |
 | `npm run start` | Build, then serve on `:3001`. |
 
-## Running combat
+## More
 
-1. Enter GM mode. Open **Scenes**, add a scene, and upload its battlemap under **Manage maps**.
-2. Choose a printed square grid or a gridless map. For a printed grid, drag diagonally across a 3×3 block of squares to set the scale, then confirm and save.
-3. Under **Table viewer**, open the second-screen address and pair it with a code from the GM.
-4. Select the map and click **Present**. This starts presentation and sends the map to the second screen.
-5. Under **Encounter and Initiative**, pick combatants, optionally enter initiative scores (blanks are rolled on the server), and start. Tokens appear in the tray above the map.
-6. Drag tokens onto the map and drag them to move. Printed grids snap to cell centers; gridless maps place freely. Players move only their own character; the GM moves any token.
-7. Advance turns from the GM controls. The player map and second screen update automatically. GM-only combatants do not appear on player screens.
+- HTTP API — [docs/api-reference.md](docs/api-reference.md)
+- Architecture — [docs/ai-context/](docs/ai-context/)
+- Decisions — [docs/adr/](docs/adr/)
+- Roadmap — [BUILD_PLAN.md](BUILD_PLAN.md)
 
-## Using the Codex
-
-1. As GM, open the **Codex** tab and go to **Pages**. Create a page, pick its type, fill its fields, and write the body. Each page has a player-facing section and a GM-only section. Link pages with `[[wiki-links]]` and typed relationships.
-2. Open **Atlas**, upload a map, and place markers. A marker can link a page, a nested sub-map, or a prepared scene.
-3. Open **Journal**, set the campaign calendar, and post dated entries. The timeline groups by in-world year.
-4. Reveal the pages and markers players should see. Players open the Codex to read them; GM-only content stays hidden.
-
-## HTTP API
-
-The combat commands are also available over a REST API at `/api/v1`. The full reference is [docs/api-reference.md](docs/api-reference.md); a running server serves the machine-readable spec at `/api/v1/openapi.json`.
-
-- Mint a scoped credential with `POST /api/v1/gm/integration-credentials` (requires a GM session token). The token is shown once.
-- Read game state with `GET /api/v1/game` (add `?view=player` for the player-safe projection); poll with the returned `ETag`.
-- Send commands with typed routes (for example `POST /api/v1/game/encounter/start`) or the generic `POST /api/v1/game/commands`. Writes use the same validation and authorization as the UI, are idempotent by `commandId`, and honor `expectedRevision`.
-- List and read archived encounters under `GET /api/v1/encounters`.
-
-The Codex has its own routes under `/api/v1/codex/*`, authorized by a GM or player session rather than an integration credential.
-
-## Not in scope
-
-Not a guided character builder (the play sheet exists; the builder with level-up is planned — see [ADR-0021](docs/adr/0021-player-character-sheet.md)), voice/video, a public or multi-tenant service, a scripting language, or a 3D tabletop.
-
-## Layout
-
-TypeScript monorepo: `apps/client` (React/Vite) and `apps/server` (Express + Socket.IO, authoritative), with shared packages under `packages/` (`domain`, `rules-5e`, `schemas`, `api-contract`, `ui`, `content-srd-5.2.1`, `test-fixtures`). Game state lives on the server in SQLite. More detail is in [docs/](docs/): architecture in [docs/ai-context/](docs/ai-context/), decisions in [docs/adr/](docs/adr/), and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
+Not a character builder, voice/video, a public or multi-tenant service, a scripting language, or a 3D tabletop.
