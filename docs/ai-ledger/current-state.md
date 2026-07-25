@@ -200,6 +200,19 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     of a pin's pages and still strips every scene/actor link (`codex-store` + `codex-http` unit tests, plus
     a live GM-link→player-read check). `check` + `test` (**573**) + `build` green; browser-verified linking
     2 pages + 2 scenes on one pin with the player seeing only the revealed page, 390px mobile clean.
+  - **Page-editor header fix + notebook subfolders (follow-up, at the owner's request).** Two GM-reported
+    issues in the Codex editor. (1) The title `<input>` was rendering **240px tall** — `.codex-title-input`
+    kept `flex: 1 1 240px` from when it was a row child, but it now sits in the *column* `.codex-editor-
+    titlewrap`, so that basis became 240px of HEIGHT (a huge empty band above the form). Fixed to
+    `width: 100%` (one line, 39px). (2) The typed-entity fields didn't line up: Entity type/Folder/Tags was
+    flexbox (3 cols) while When/Where/Participants below was an auto-fit grid that made **4** cols — nothing
+    aligned. Both rows now share ONE grid (`repeat(auto-fit, minmax(min(220px,100%),1fr))`), so columns line
+    up and collapse 3→2→1 as the panel narrows. (3) **Subfolders**: the notebook already stored/rendered
+    nested folders, but a subfolder could only be made by typing a full `Parent/Child` path; each folder row
+    now has a **New subfolder** action (a `folder-plus` glyph beside Rename + New note) that creates the
+    child under that folder's path. `check` + `test` (573) + `build` green; verified at 1440px (columns
+    align, `NPCs`→`Villains` nests one level deeper) and 390px (fields stack, no overflow, folder actions
+    always shown for touch).
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
