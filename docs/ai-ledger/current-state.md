@@ -213,6 +213,22 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     child under that folder's path. `check` + `test` (573) + `build` green; verified at 1440px (columns
     align, `NPCs`→`Villains` nests one level deeper) and 390px (fields stack, no overflow, folder actions
     always shown for touch).
+  - **Persistent folders + reliable note moves + richer markdown (follow-up, at the owner's request).**
+    Folders used to live ONLY in each page's `folder` path, so a folder vanished the moment its last note
+    left, and moving the OPEN note wedged the editor. Now **folders are first-class records** (`codex_folders`,
+    migration v9): the tree unions records with page-derived paths, any folder a page is saved into
+    auto-registers (with ancestors), and New folder / New subfolder create an empty one directly. Added
+    `listFolders`/`createFolder`/`deleteFolder` store ops + GM routes; `moveFolder` (rename) carries records
+    along; **Delete folder** re-homes every note under it to the top level (a note is never deleted) behind a
+    themed confirm. Fixed the **open-page move revert**: `PageEditor` now adopts an external change to the
+    same page (a tree move repaths folder + rev) when it holds no unsaved edits, so its Folder field updates
+    and its next autosave no longer 409s. **Markdown** got real substance: `CodexMarkdown` now also renders
+    `~~strike~~`, `` `code` ``, numbered lists (`<ol>`), blockquotes, and `---` dividers (bullets/numbers group
+    into real `<ul>`/`<ol>`; still display-only + injection-safe), the toolbar gained Strikethrough / Inline
+    code / Numbered list / Quote / Divider, and the easy-to-miss Preview switch became a clear **Edit | View**
+    segmented toggle. `check` + `test` (**574**, +1 folder-record store test) + `build` green; live-verified at
+    1440px (open-note move saves cleanly, empty subfolder persists, create+delete folder, every new markdown
+    format renders, Edit/View round-trips) and 390px (4 folder actions + 12 toolbar buttons fit, no overflow).
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,

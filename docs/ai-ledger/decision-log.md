@@ -44,6 +44,15 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   notes/encounters), and nothing depends on a scene mapping to exactly one marker. **Viewer-safety
   boundary unchanged in kind:** `projectPlayerMarker` still returns only the revealed subset of a pin's
   pages and strips scene/actor entirely — the array just moved the filter from one id to a set.
+- **Notebook folders are first-class records, not just page paths (2026-07-25).** Folders originally lived
+  ONLY inside each page's `folder` string, so a folder existed only while a page referenced it — moving the
+  last note out silently erased the folder. Folders are now their own records (`codex_folders`, migration
+  v9); the tree unions records with page-derived paths so an **empty folder persists**. Any folder a page is
+  saved into auto-registers (path + ancestors) via `registerFolderPath`, `moveFolder` carries records with
+  the pages, and `deleteFolder` re-homes every note under it to the top level (never deletes a note). This
+  is GM-only organizational metadata — folder records are never projected to players (the player codex is a
+  flat revealed-page list), so no viewer-safety surface changes. Pages still carry their own `folder` path;
+  a record is just what keeps an empty folder on screen.
 - **Codex satellite-store follow-ups deliberately deferred (2026-07-24).** A four-lens audit of the
   codex confirmed the off-`GameState` design is sound, and flagged gaps that are **known and accepted
   for now**, not oversights: (1) the codex has **no integration-API surface** - it wires only
