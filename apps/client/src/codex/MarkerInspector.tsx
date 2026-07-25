@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Badge, Button, Field, IconButton, Input, Select, Switch } from "@vtt/ui";
 import { atlasApi, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker } from "./icons";
+import { EntityPicker } from "./EntityPicker";
 
 /**
  * The marker inspector: launch/navigate from a pin, edit its icon/color/label, wire its links (a wiki
@@ -84,10 +85,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
       <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
 
       <Field label="Links to page" htmlFor="marker-page">
-        <Select id="marker-page" value={marker.pageId ?? ""} disabled={busy} onChange={(event) => patch({ pageId: event.target.value || null })}>
-          <option value="">— none —</option>
-          {pages.map((page) => <option key={page.id} value={page.id}>{page.title}</option>)}
-        </Select>
+        <EntityPicker id="marker-page" pages={pages} value={marker.pageId ?? null} onChange={(id) => patch({ pageId: id })} ariaLabel="Links to page" placeholder="Search entities…" />
       </Field>
       {!marker.pageId && <Button variant="ghost" size="sm" onClick={onCreatePage}>＋ New page{marker.label ? ` “${marker.label}”` : ""}</Button>}
       {linkedPage && marker.revealedToPlayers && !linkedPage.revealedToPlayers && (

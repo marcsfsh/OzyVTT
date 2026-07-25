@@ -4,6 +4,7 @@ import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
+import { EntityPicker } from "./EntityPicker";
 
 /** A raw in-world date rendered as "Month Day, Year Era" (client-side; the server stores the same shape). */
 function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
@@ -110,7 +111,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
           <Field label="Year" htmlFor="j-year"><Input id="j-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => set({ dateYear: event.target.value })} /></Field>
           <Field label="Month" htmlFor="j-month"><Select id="j-month" value={draft.dateMonth} disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateMonth: event.target.value })}>{(calendar?.months ?? []).map((month, index) => <option key={index} value={String(index)}>{month.name}</option>)}</Select></Field>
           <Field label="Day" htmlFor="j-day"><Input id="j-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateDay: event.target.value })} /></Field>
-          <Field label="Pin to page" htmlFor="j-page"><Select id="j-page" value={draft.attachPageId} onChange={(event) => set({ attachPageId: event.target.value })}><option value="">— none —</option>{pages.map((page) => <option key={page.id} value={page.id}>{page.title}</option>)}</Select></Field>
+          <Field label="Pin to page" htmlFor="j-page"><EntityPicker id="j-page" pages={pages} value={draft.attachPageId || null} onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Pin to page" placeholder="— none —" /></Field>
         </div>
         <div className="codex-composer-foot">
           <Switch checked={draft.revealed} onChange={(revealed) => set({ revealed })} label={draft.revealed ? "Shown to players" : "GM only"} />
