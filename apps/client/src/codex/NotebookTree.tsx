@@ -5,9 +5,10 @@ import { CodexIcon, EntityIcon } from "./icons";
 
 /**
  * The campaign notebook's organizational tree: every page grouped into a collapsible nested-folder
- * hierarchy (folder paths like "NPCs/Villains"), Obsidian/OneNote style. The folder structure lives
- * entirely in each page's `folder` path, so there are no folder records to manage. Pages can be
- * re-organized by drag-and-drop (desktop) or a "move" affordance (touch), and folders sorted + renamed.
+ * hierarchy (folder paths like "NPCs/Villains"), Obsidian/OneNote style. Folders come from two sources
+ * unioned together — each page's `folder` path AND explicit folder records (so an empty folder persists).
+ * Within any folder, notes render ABOVE subfolders. Pages can be re-organized by drag-and-drop (desktop)
+ * or a "move" affordance (touch), and folders sorted + renamed.
  */
 export type FolderNode = { name: string; path: string; folders: Map<string, FolderNode>; pages: CodexPageSummary[] };
 export type NotebookSort = "name-asc" | "name-desc" | "recent";
@@ -108,7 +109,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
     : {};
   return (
     <div className="codex-tree" role={depth === 0 ? "tree" : "group"} {...rootDrop}>
-      {folders.map((folder) => <FolderBranch key={folder.path} folder={folder} depth={depth} handlers={handlers} />)}
+      {/* Notes belonging directly to this folder sort ABOVE its subfolders (the owner's preferred order). */}
       {pages.map((page) => (
         <div key={page.id} className="codex-tree-page-row" style={{ paddingInlineStart: `${depth * 14 + 20}px` }}>
           <button
@@ -125,6 +126,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
           <button type="button" className="codex-tree-page-move" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}>⋯</button>
         </div>
       ))}
+      {folders.map((folder) => <FolderBranch key={folder.path} folder={folder} depth={depth} handlers={handlers} />)}
     </div>
   );
 }

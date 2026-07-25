@@ -68,6 +68,9 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
     while (cursor && !guard.has(cursor.id)) { chain.unshift(cursor); guard.add(cursor.id); cursor = maps.find((map) => map.id === cursor!.parentMapId) ?? null; }
     return chain;
   }, [currentMap, maps]);
+  // Drill-down: revealed maps nested under the current one (breadcrumb goes up, these go down). `maps` is
+  // already the server's revealed-only projection, so only shared child maps ever appear here.
+  const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
 
   return (
     <div className="codex-root codex-player">
@@ -138,6 +141,16 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
             {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
             {breadcrumb.map((map, index) => <span key={map.id}>{index > 0 && <span className="codex-crumb-sep">›</span>}<button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => setCurrentMapId(map.id)}>{map.name}</button></span>)}
           </nav>
+          {childMaps.length > 0 && (
+            <nav className="codex-atlas-descend" aria-label="Maps within this one">
+              <span className="codex-descend-label">Drill into</span>
+              {childMaps.map((child) => (
+                <button key={child.id} type="button" className="codex-descend-chip" onClick={() => setCurrentMapId(child.id)}>
+                  <span className="codex-descend-arrow" aria-hidden="true">↳</span>{child.name}
+                </button>
+              ))}
+            </nav>
+          )}
           <div className="codex-atlas-body">
             {currentMap
               ? <MapSurface token={token} assetId={currentMap.assetId} markers={markers} placing={false} readOnly selectedMarkerId={null} onBackgroundClick={() => undefined} onMarkerClick={onMarkerClick} onMarkerDragEnd={() => undefined} />

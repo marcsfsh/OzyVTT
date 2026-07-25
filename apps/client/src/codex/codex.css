@@ -324,6 +324,13 @@
 .codex-crumb.is-current { color: var(--text); cursor: default; }
 .codex-crumb-sep { color: var(--text-muted); }
 .codex-atlas-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Drill-DOWN chips: the maps nested under the current one (breadcrumb is the way up, these are the way down). */
+.codex-atlas-descend { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: calc(-1 * var(--space-1)); }
+.codex-descend-label { font-family: var(--font-mono); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.codex-descend-chip { display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); }
+.codex-descend-chip:hover { background: var(--surface-3); border-color: var(--cyan); }
+.codex-descend-arrow { color: var(--cyan); font-weight: 700; }
+.codex-descend-lock { font-size: var(--fs-2xs); opacity: 0.8; }
 
 .codex-atlas-body { display: flex; gap: var(--space-3); align-items: stretch; min-height: 0; }
 .codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--void); touch-action: none; }

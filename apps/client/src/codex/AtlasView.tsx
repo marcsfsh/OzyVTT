@@ -62,6 +62,10 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
     while (cursor && !guard.has(cursor.id)) { chain.unshift(cursor); guard.add(cursor.id); cursor = maps.find((map) => map.id === cursor!.parentMapId) ?? null; }
     return chain;
   }, [currentMap, maps]);
+  // Maps nested directly under the current one — the breadcrumb walks UP the parent chain, so these
+  // "drill into" chips are the way DOWN (without them a regional child map is unreachable once you leave it).
+  const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
+  const enterMap = useCallback((mapId: string) => { setSelectedMarkerId(null); setCurrentMapId(mapId); }, []);
 
   const createFromAsset = async (asset: MapAsset) => {
     try {
@@ -109,17 +113,29 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
           {breadcrumb.map((map, index) => (
             <span key={map.id}>
               {index > 0 && <span className="codex-crumb-sep">›</span>}
-              <button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => { setSelectedMarkerId(null); setCurrentMapId(map.id); }}>{map.name}</button>
+              <button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => enterMap(map.id)}>{map.name}</button>
             </span>
           ))}
         </nav>
         <div className="codex-atlas-actions">
           {currentMap && <RevealSwitch revealed={currentMap.revealedToPlayers} onChange={revealMap} ariaLabel="Show this map to players" />}
           {currentMap && <Button variant={placing ? "primary" : "secondary"} size="sm" aria-pressed={placing} onClick={() => setPlacing((value) => !value)}>{placing ? "Placing…" : "Add marker"}</Button>}
-          <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>New map</Button>
+          <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>{currentMap ? "Add sub-map" : "New map"}</Button>
           {currentMap && <Button variant="ghost" size="sm" onClick={deleteMap}>Delete map</Button>}
         </div>
       </div>
+
+      {childMaps.length > 0 && (
+        <nav className="codex-atlas-descend" aria-label="Maps within this one">
+          <span className="codex-descend-label">Drill into</span>
+          {childMaps.map((child) => (
+            <button key={child.id} type="button" className="codex-descend-chip" onClick={() => enterMap(child.id)}>
+              <span className="codex-descend-arrow" aria-hidden="true">↳</span>{child.name}
+              {!child.revealedToPlayers && <span className="codex-descend-lock" title="GM-only — players can't see this map yet" aria-label="GM-only">🔒</span>}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {error && <p className="codex-rail-error" role="alert">{error}</p>}
 
@@ -129,11 +145,12 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
               onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} activeSceneId={activeSceneId}
-          onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={(id) => { setSelectedMarkerId(null); setCurrentMapId(id); }} onOpenPage={onOpenPage}
+          onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={onOpenPage}
           onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onActivateScene={onActivateScene} onClose={() => setSelectedMarkerId(null)} />}
       </div>
 
-      <Modal open={picking} onClose={() => setPicking(false)} title="Add a map" size="md" ariaLabel="Choose a map">
+      <Modal open={picking} onClose={() => setPicking(false)} title={currentMap ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">
+        {currentMap && <p className="codex-inspector-hint">Pick an uploaded map — it nests inside <strong>{currentMap.name}</strong>, and you can drill into it from here.</p>}
         {assetsEmpty(assets) ? <p className="codex-list-empty">No maps uploaded yet. Upload one under Scenes → Manage maps, then come back.</p> : (
           <div className="codex-asset-grid">
             {assets.map((asset) => (
