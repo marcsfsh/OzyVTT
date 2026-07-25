@@ -638,6 +638,32 @@ export class CodexStore {
     return this.getPage(pageId)!;
   }
 
+  /**
+   * Rename/move a folder: re-path every page in `fromPath` and its descendants to `toPath` (or to the top
+   * level when `toPath` is empty). Reorganization, not a content edit, so it re-paths in place without
+   * snapshotting a revision per page. Returns how many pages moved.
+   */
+  moveFolder(fromPath: string, toPath: string): number {
+    const database = this.requireDatabase();
+    const from = folder(fromPath);
+    if (!from) throw new Error("Choose a folder to move.");
+    const to = folder(toPath); // null => top level
+    if (to !== null && (to === from || to.startsWith(`${from}/`))) throw new Error("Can't move a folder into itself.");
+    let moved = 0;
+    this.transaction(() => {
+      const rows = database.prepare("SELECT id, folder FROM codex_pages WHERE folder = ? OR folder LIKE ?").all(from, `${from}/%`) as { id: string; folder: string }[];
+      const stamp = this.stamp();
+      const update = database.prepare("UPDATE codex_pages SET folder = ?, rev = rev + 1, updated_at = ? WHERE id = ?");
+      for (const row of rows) {
+        const raw = row.folder === from ? (to ?? "") : to === null ? row.folder.slice(from.length + 1) : to + row.folder.slice(from.length);
+        update.run(folder(raw), stamp, row.id); // folder() re-validates depth/length + normalizes "" -> null
+        moved += 1;
+      }
+      if (moved > 0) this.bumpRevision();
+    });
+    return moved;
+  }
+
   deletePage(pageId: string): void {
     const database = this.requireDatabase();
     if (!ID.test(pageId)) return;

@@ -45,6 +45,7 @@ const PageUpdateSchema = z.object({
 }).strict();
 const RelationshipCreateSchema = z.object({ toPageId: z.string().uuid(), type: z.string().trim().min(1).max(40) }).strict();
 const RevealSchema = z.object({ revealed: z.boolean() }).strict();
+const FolderMoveSchema = z.object({ from: z.string().trim().min(1).max(160), to: z.string().trim().max(160) }).strict();
 
 const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
 const MapCreateSchema = z.object({
@@ -230,6 +231,15 @@ export function createCodexRouter(options: CodexRouterOptions) {
     store.deletePage(pathParam(request, "id"));
     options.notifyChanged("pages");
     return envelope(response, 200, { deleted: true });
+  });
+
+  router.post(`${CODEX_BASE}/folders/move`, requireGm, (request, response) => {
+    try {
+      const { from, to } = FolderMoveSchema.parse(request.body);
+      const moved = store.moveFolder(from, to);
+      options.notifyChanged("pages");
+      return envelope(response, 200, { moved });
+    } catch (error) { return malformed(response, error); }
   });
 
   router.get(`${CODEX_BASE}/pages/:id/revisions`, requireGm, (request, response) => {

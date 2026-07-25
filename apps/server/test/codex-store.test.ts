@@ -20,6 +20,20 @@ afterEach(async () => {
 });
 
 describe("CodexStore pages", () => {
+  it("moveFolder re-paths a folder and its descendants, dissolves to top level, and guards self-moves", () => {
+    const a = store.createPage({ title: "A", folder: "NPCs" });
+    const b = store.createPage({ title: "B", folder: "NPCs/Villains" });
+    const c = store.createPage({ title: "C", folder: "Places" });
+    expect(store.moveFolder("NPCs", "Cast")).toBe(2);                       // rename NPCs -> Cast
+    expect(store.getPage(a.id)!.folder).toBe("Cast");
+    expect(store.getPage(b.id)!.folder).toBe("Cast/Villains");              // descendant re-pathed
+    expect(store.getPage(c.id)!.folder).toBe("Places");                     // an unrelated folder is untouched
+    expect(store.moveFolder("Cast", "")).toBe(2);                           // dissolve Cast to the top level
+    expect(store.getPage(a.id)!.folder).toBeNull();
+    expect(store.getPage(b.id)!.folder).toBe("Villains");
+    expect(() => store.moveFolder("Places", "Places/Sub")).toThrow(/itself/i); // can't nest a folder inside itself
+  });
+
   it("creates, updates with rev bump, reveals, and persists through restart", async () => {
     const page = store.createPage({ title: "Bree", playerBody: "A crossroads town.", gmBody: "The innkeeper is a spy.", tags: ["Town", "town"] });
     expect(page).toMatchObject({ title: "Bree", playerBody: "A crossroads town.", revealedToPlayers: false, rev: 1, tags: ["town"] });
