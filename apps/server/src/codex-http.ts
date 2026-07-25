@@ -90,7 +90,8 @@ const JournalWriteSchema = z.object({
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
-  weekdays: z.array(z.string().trim().min(1).max(40)).max(20)
+  weekdays: z.array(z.string().trim().min(1).max(40)).max(20),
+  currentDate: z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable().optional()
 }).strict();
 
 type CodexRouterOptions = Readonly<{

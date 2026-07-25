@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, SegmentedControl } from "@vtt/ui";
+import { Button, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
 import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -70,8 +70,8 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
   return (
     <div className="codex-root codex-player">
       <div className="codex-modebar">
-        <SegmentedControl ariaLabel="Codex" value={view} onChange={(value) => setView(value as PlayerView)}
-          options={[{ value: "world", label: "World" }, { value: "lore", label: "Lore" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }, { value: "graph", label: "Graph" }]} />
+        <Tabs ariaLabel="Codex" activeId={view} onChange={(id) => setView(id as PlayerView)}
+          tabs={[{ id: "world", label: "World" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         {onClose && <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>}
       </div>
 

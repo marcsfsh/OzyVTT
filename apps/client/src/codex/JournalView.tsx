@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Field, Input, Panel, Select, Switch, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, calendarYearOf, codexApi, formatWorldYear, journalApi, type CodexCalendar, type CodexJournalEntry, type CodexPageSummary } from "./api";
+import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
+
+/** A raw in-world date rendered as "Month Day, Year Era" (client-side; the server stores the same shape). */
+function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
+  const month = calendar.months[Math.max(0, Math.min(date.month, calendar.months.length - 1))];
+  return `${month?.name ?? ""} ${date.day}, ${formatWorldYear(calendar, date.year)}`;
+}
 
 /**
  * The campaign journal + chronicle: GM-written two-layer entries placed on the world's own calendar.
@@ -81,12 +87,18 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
       .map((year) => ({ key: year === null ? "undated" : String(year), label: year === null ? "Undated" : (calendar ? formatWorldYear(calendar, year) : String(year)), entries: byYear.get(year)! }));
   }, [entries, calendar]);
 
+  // The world's "now": a readout + a Today marker placed in its year on the timeline.
+  const now = calendar?.currentDate ?? null;
+  const nowYear = now && calendar ? calendarYearOf(calendar, dateToInstant(calendar, now)) : null;
+  const nowLabel = now && calendar ? formatWorldDate(calendar, now) : null;
+
   return (
     <div className="codex-journal">
       <Panel accent="cyan" className="codex-composer">
         <div className="codex-composer-head">
           <strong>{editingId ? "Edit entry" : "New journal entry"}</strong>
           <div className="codex-composer-head-actions">
+            {nowLabel && <span className="codex-now-chip" title="The world's current date — set it in the calendar">◈ Now: {nowLabel}</span>}
             <Button variant="ghost" size="sm" onClick={() => setCalendarOpen(true)}>📅 Calendar</Button>
             {editingId && <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setDraft(EMPTY); }}>Cancel</Button>}
           </div>
@@ -113,6 +125,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
         {groups.map((group) => (
           <section key={group.key} className="codex-timeline-group">
             <div className="codex-timeline-year">{group.label}</div>
+            {nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">◈ Today — {nowLabel}</div>}
             {group.entries.map((entry) => (
               <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
                 <header className="codex-entry-head">

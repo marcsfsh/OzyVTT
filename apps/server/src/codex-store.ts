@@ -104,7 +104,8 @@ export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
 /** The world's calendar: ordered months (each with a length), weekday names, and an era suffix. */
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
-export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[] }>;
+/** The world's calendar; `currentDate` is the campaign's "now" (a Today marker on the timeline), optional. */
+export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
 /** A structured in-world date (month is a 0-based index into the calendar's months). */
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 
@@ -374,6 +375,8 @@ function entityFields(value: Readonly<Record<string, string>> | undefined): Reco
   return out;
 }
 const REL_TYPE = /^[a-z0-9][a-z0-9-]*$/;
+/** Relationship types that read the same both ways (label === inverse) - A->B and B->A are the SAME edge. */
+const SYMMETRIC_RELATIONSHIPS = new Set(["ally", "enemy", "rival", "related"]);
 function relationshipType(value: string): string {
   const trimmed = value.trim().toLowerCase();
   if (!REL_TYPE.test(trimmed) || trimmed.length > 40) throw new Error("A relationship type must be a lowercase slug.");
@@ -385,10 +388,14 @@ function parseFields(json: string | null | undefined): Record<string, string> {
   catch { return {}; }
 }
 function normalizeCalendar(input: CodexCalendar): CodexCalendar {
-  const months = (input.months ?? []).map((month) => ({ name: shortLabel(month.name, 40, "month name") ?? "Month", days: Math.max(1, Math.min(Math.trunc(month.days), 400)) }));
+  const months = (input.months ?? []).map((month) => ({ name: shortLabel(month.name, 40, "month name") ?? "Month", days: Number.isFinite(month.days) ? Math.max(1, Math.min(Math.trunc(month.days), 400)) : 30 }));
   if (months.length < 1 || months.length > 24) throw new Error("A calendar needs 1 to 24 months.");
   const weekdays = (input.weekdays ?? []).slice(0, 20).map((day) => shortLabel(day, 40, "weekday") ?? "Day");
-  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", months, weekdays };
+  const current = input.currentDate;
+  const currentDate = current && Number.isFinite(current.year) && Number.isFinite(current.month) && Number.isFinite(current.day)
+    ? { year: Math.trunc(current.year), month: Math.max(0, Math.min(Math.trunc(current.month), months.length - 1)), day: Math.max(1, Math.trunc(current.day)) }
+    : null;
+  return { yearName: shortLabel(input.yearName, 20, "era") ?? "", months, weekdays, currentDate };
 }
 function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
 /** An absolute, monotonically-increasing day number for chronological sorting (negative years allowed). */
@@ -403,7 +410,13 @@ function formatInWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): str
   const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
   const month = calendar.months[monthIdx];
   const day = Math.max(1, Math.min(Math.trunc(date.day), month.days));
-  return `${month.name} ${day}, ${Math.trunc(date.year)}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
+  const base = `${month.name} ${day}, ${Math.trunc(date.year)}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
+  if (calendar.weekdays.length > 0) {
+    const instant = calendarInstantOf(calendar, date);
+    const index = ((instant % calendar.weekdays.length) + calendar.weekdays.length) % calendar.weekdays.length; // non-negative for negative years
+    return `${calendar.weekdays[index]}, ${base}`;
+  }
+  return base;
 }
 const MAP_KINDS = new Set<CodexMapKind>(["battlemap", "regional", "world"]);
 function mapName(value: string): string {
@@ -541,7 +554,7 @@ export class CodexStore {
       database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
-      this.rebuildFts(pageId, row.title, row.player_body, row.gm_body);
+      this.rebuildFts(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json);
       this.snapshotRevision(pageId, row, "codex:create");
       this.bumpRevision();
     });
@@ -571,7 +584,7 @@ export class CodexStore {
       database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
         .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
-      this.rebuildFts(pageId, next.title, next.player_body, next.gm_body);
+      this.rebuildFts(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json);
       this.snapshotRevision(pageId, next, authorTag);
       this.bumpRevision();
     });
@@ -638,8 +651,10 @@ export class CodexStore {
     if (from === to) throw new Error("An entity can't relate to itself.");
     if (!this.pageRow(from) || !this.pageRow(to)) throw new CodexNotFoundError("One of those pages no longer exists.");
     const relType = relationshipType(type);
-    // Same from/to/type is idempotent - return the existing edge rather than duplicate it.
-    const existing = database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?").get(from, to, relType) as RelationshipRowRaw | undefined;
+    // Same from/to/type is idempotent. For symmetric types (ally/enemy/...) the reverse direction is the SAME edge.
+    const existing = (SYMMETRIC_RELATIONSHIPS.has(relType)
+      ? database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE ((from_page_id = ? AND to_page_id = ?) OR (from_page_id = ? AND to_page_id = ?)) AND type = ?").get(from, to, to, from, relType)
+      : database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?").get(from, to, relType)) as RelationshipRowRaw | undefined;
     if (existing) return this.toRel(existing);
     const relId = this.freshId();
     this.transaction(() => {
@@ -1119,13 +1134,15 @@ export class CodexStore {
     for (const link of links) insert.run(pageId, link.layer, link.targetKind, link.targetRef, link.section);
   }
 
-  private rebuildFts(pageId: string, pageTitle: string, playerBody: string, gmBody: string) {
+  private rebuildFts(pageId: string, pageTitle: string, playerBody: string, gmBody: string, fieldsJson: string, gmFieldsJson: string) {
     const database = this.requireDatabase();
     database.prepare("DELETE FROM codex_fts_player WHERE page_id = ?").run(pageId);
     database.prepare("DELETE FROM codex_fts_gm WHERE page_id = ?").run(pageId);
-    // Player index carries ONLY the player-facing body: a player search can never surface gm-body text.
-    database.prepare("INSERT INTO codex_fts_player (page_id, title, body) VALUES (?, ?, ?)").run(pageId, pageTitle, playerBody);
-    database.prepare("INSERT INTO codex_fts_gm (page_id, title, body) VALUES (?, ?, ?)").run(pageId, pageTitle, `${playerBody}\n${gmBody}`);
+    const fieldText = Object.values(parseFields(fieldsJson)).join(" ");     // public field VALUES (race, ruler, ...)
+    const gmFieldText = Object.values(parseFields(gmFieldsJson)).join(" ");  // GM-only field values (secret motives)
+    // Player index carries ONLY player-facing text (body + public fields): a player search can never surface gm content.
+    database.prepare("INSERT INTO codex_fts_player (page_id, title, body) VALUES (?, ?, ?)").run(pageId, pageTitle, `${playerBody}\n${fieldText}`);
+    database.prepare("INSERT INTO codex_fts_gm (page_id, title, body) VALUES (?, ?, ?)").run(pageId, pageTitle, `${playerBody}\n${gmBody}\n${fieldText}\n${gmFieldText}`);
   }
 
   private snapshotRevision(pageId: string, row: PageRow, authorTag: string) {

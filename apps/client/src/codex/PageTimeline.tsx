@@ -12,6 +12,7 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => { void journalApi.forPage(gmToken, pageId).then(setEntries).catch(() => setEntries([])); }, [gmToken, pageId]);
   useEffect(() => { load(); }, [load]);
@@ -20,8 +21,9 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
   const add = async () => {
     const text = note.trim();
     if (!text) return;
-    setBusy(true);
+    setBusy(true); setError(null);
     try { await journalApi.create(gmToken, { playerText: text, attachPageId: pageId }); setNote(""); load(); }
+    catch (addError) { setError(addError instanceof Error ? addError.message : "Couldn't log that note."); }
     finally { setBusy(false); }
   };
 
@@ -44,6 +46,7 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
         <Input value={note} placeholder="Pin a note to this place…" aria-label="Pin a note to this page" onChange={(event) => setNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void add(); }} />
         <Button variant="secondary" size="sm" disabled={busy || !note.trim()} onClick={add}>Add</Button>
       </div>
+      {error && <p className="codex-rail-error" role="alert">{error}</p>}
     </div>
   );
 }

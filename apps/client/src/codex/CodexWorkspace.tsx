@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Input, SegmentedControl } from "@vtt/ui";
+import { Badge, Button, Input, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
 import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge } from "./api";
 import { PageEditor } from "./PageEditor";
@@ -160,8 +160,8 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   return (
     <div className="codex-root">
       <div className="codex-modebar">
-        <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as typeof mode)}
-          options={[{ value: "world", label: "World" }, { value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }, { value: "graph", label: "Graph" }]} />
+        <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => setMode(id as typeof mode)}
+          tabs={[{ id: "world", label: "World" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>

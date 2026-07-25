@@ -50,6 +50,7 @@ async function body(response: Response) { return response.json() as Promise<Json
 const get = (base: string, path: string, headers: Record<string, string>) => fetch(`${base}${path}`, { headers });
 const post = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
 const patch = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
+const put = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PUT", headers, body: JSON.stringify(payload) });
 
 describe("codex HTTP viewer-safety boundary", () => {
   it("hides gmBody and unrevealed pages from players, but shows the GM everything", async () => {
@@ -215,5 +216,17 @@ describe("codex HTTP viewer-safety boundary", () => {
     const playerEdges = (await body(await get(base, "/api/v1/codex/relationships", PLAYER))).data.relationships as Json[];
     expect(playerEdges).toHaveLength(1); // only the edge whose BOTH endpoints are revealed
     expect(playerEdges[0].type).toBe("rules");
+  });
+
+  it("round-trips the world calendar (incl. current date), and weekdays appear in dated labels", async () => {
+    const { base } = await fixture();
+    const cal = { yearName: "AE", months: [{ name: "Rise", days: 10 }, { name: "Fall", days: 10 }], weekdays: ["Sol", "Lun"], currentDate: { year: 3, month: 1, day: 4 } };
+    const saved = await body(await put(base, "/api/v1/codex/calendar", GM, cal));
+    expect(saved.data.calendar.currentDate).toEqual({ year: 3, month: 1, day: 4 });
+    const got = await body(await get(base, "/api/v1/codex/calendar", PLAYER)); // calendar is readable by any role
+    expect(got.data.calendar.yearName).toBe("AE");
+    const entry = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Dawn.", inWorldDate: { year: 0, month: 0, day: 1 } }));
+    expect(entry.data.entry.inWorldLabel).toBe("Sol, Rise 1, 0 AE"); // weekday now wired into the label
+    expect((await put(base, "/api/v1/codex/calendar", PLAYER, cal)).status).toBe(401); // players cannot edit it (GM only)
   });
 });
