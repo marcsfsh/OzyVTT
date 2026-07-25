@@ -52,7 +52,7 @@
 .codex-tree-folder:hover { background: var(--surface-2); color: var(--text); }
 .codex-tree-caret { display: inline-block; width: 0.9em; color: var(--text-muted); }
 .codex-tree-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.codex-tree-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.codex-tree-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-tree-page {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; text-align: left;
   padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
@@ -150,27 +150,15 @@
 .codex-page-timeline-add { display: flex; gap: var(--space-2); align-items: center; }
 .codex-page-timeline-add > :first-child { flex: 1; }
 
-/* Entity-type accents: a restrained magenta -> cyan spectrum (on-brand; no green/amber/orange), icon + label
-   carry the finer distinction. Defined as tokens so components never hardcode hex. */
-:root {
-  --codex-type-note: var(--text-muted);
-  --codex-type-character: var(--magenta);
-  --codex-type-event: var(--magenta-hi);
-  --codex-type-location: var(--cyan);
-  --codex-type-species: var(--cyan-hi);
-  --codex-type-faction: var(--violet);
-  --codex-type-religion: var(--violet-hi);
-  --codex-type-item: var(--indigo);
-}
 
 /* Searchable entity picker (relationships, journal pins, marker links). */
 .codex-picker { position: relative; }
 .codex-picker-chip { display: inline-flex; align-items: center; gap: var(--space-1); max-width: 100%; padding: 4px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); font-size: var(--fs-sm); }
 .codex-picker-chip > span:first-child { flex: none; }
-.codex-picker-x { border: none; background: none; color: var(--text-dim); cursor: pointer; padding: 0 2px; font-size: var(--fs-xs); }
+.codex-picker-x { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; border: none; background: none; color: var(--text-dim); cursor: pointer; border-radius: var(--radius-sm); font-size: var(--fs-xs); }
 .codex-picker-x:hover { color: var(--magenta); }
-.codex-picker-menu { position: absolute; z-index: 30; top: calc(100% + 2px); left: 0; right: 0; margin: 0; padding: var(--space-1); list-style: none; max-height: 240px; overflow-y: auto; background: var(--surface-1); border: 1px solid var(--line-strong, var(--line)); border-radius: var(--radius-md); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.4)); }
-.codex-picker-opt { display: flex; align-items: center; gap: var(--space-2); width: 100%; text-align: left; border: none; background: none; color: var(--text); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); }
+.codex-picker-menu { position: absolute; z-index: 30; top: calc(100% + 2px); left: 0; right: 0; margin: 0; padding: var(--space-1); list-style: none; max-height: 240px; overflow-y: auto; background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-2); }
+.codex-picker-opt { display: flex; align-items: center; gap: var(--space-2); width: 100%; text-align: left; border: none; background: none; color: var(--text); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); }
 .codex-picker-opt.is-active { background: color-mix(in srgb, var(--cyan) 16%, transparent); }
 .codex-picker-opt-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -179,7 +167,7 @@
 .codex-field-area { min-height: 3.5em; }
 .codex-field-wide { grid-column: 1 / -1; } /* textareas (goals, properties, traits) span the full row */
 .codex-fields-secret { margin-top: var(--space-3); border-left: 3px solid var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 7%, var(--surface-2)); border-radius: var(--radius-md); padding: var(--space-3); }
-.codex-fields-secret-tag { grid-column: 1 / -1; justify-self: start; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 16%, transparent); padding: 2px 8px; border-radius: var(--radius-pill); margin-bottom: var(--space-1); }
+.codex-fields-secret-tag { grid-column: 1 / -1; justify-self: start; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet); background: color-mix(in srgb, var(--violet) 16%, transparent); padding: 2px 8px; border-radius: var(--radius-pill); margin-bottom: var(--space-1); }
 .codex-tree-icon { flex-shrink: 0; }
 .codex-rels { display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-rels-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
@@ -199,33 +187,37 @@
 /* Calendar + chronicle */
 .codex-composer-head-actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .codex-timeline-group { display: flex; flex-direction: column; gap: var(--space-3); }
-.codex-timeline-year { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--cyan); border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-top: var(--space-3); }
-.codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; }
+.codex-timeline-year { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-top: var(--space-3); }
+.codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .codex-timeline-now { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.06em; color: var(--cyan); background: color-mix(in srgb, var(--cyan) 10%, transparent); border-left: 3px solid var(--cyan); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); margin: var(--space-2) 0; }
 .codex-calendar-editor { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-cal-months { display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-cal-months-head { display: flex; align-items: center; justify-content: space-between; }
 .codex-cal-month { display: grid; grid-template-columns: 1fr 90px auto; gap: var(--space-2); align-items: center; }
 .codex-cal-current { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: var(--space-2); align-items: center; }
+@media (max-width: 480px) {
+  .codex-cal-month { grid-template-columns: 1fr 72px auto; }
+  .codex-cal-current { grid-template-columns: 1fr 1fr; }
+}
 .codex-cal-foot { display: flex; justify-content: flex-end; }
 
 /* World home dashboard */
 .codex-world { display: flex; flex-direction: column; gap: var(--space-5); overflow-y: auto; }
 .codex-world-stats { display: flex; gap: var(--space-4); flex-wrap: wrap; }
 .codex-world-stat { display: flex; flex-direction: column; color: var(--text-muted); font-size: var(--fs-sm); }
-.codex-world-statnum { font-family: var(--font-display); font-size: var(--fs-2xl); color: var(--magenta); }
+.codex-world-statnum { font-family: var(--font-display); font-size: var(--fs-h1); color: var(--magenta); }
 .codex-world-section { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-world-h { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
 .codex-world-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
-.codex-world-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; transition: background 0.12s ease, transform 0.08s ease; }
+.codex-world-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
 .codex-world-typecard:hover { background: var(--surface-2); transform: translateY(-1px); }
 .codex-world-typeicon { font-size: 1.05rem; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
 .codex-world-typelabel { flex: 1; color: var(--text); }
-.codex-world-typecount { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--cyan); }
+.codex-world-typecount { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); }
 .codex-world-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .codex-tag-chip { display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
 .codex-tag-chip:hover { border-color: var(--cyan); color: var(--text); }
-.codex-tag-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.codex-tag-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-world-recent { display: flex; flex-direction: column; gap: var(--space-1); }
 .codex-world-recentitem { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
 .codex-world-recentitem:hover { background: var(--surface-2); border-color: var(--line); }
@@ -238,21 +230,21 @@
 .codex-graph-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .codex-graph-hint { font-size: var(--fs-sm); color: var(--text-muted); }
 .codex-graph-legend { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-left: auto; }
-.codex-graph-legenditem { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: 2px var(--space-2); cursor: pointer; transition: opacity 0.12s ease, border-color 0.12s ease; }
+.codex-graph-legenditem { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
 .codex-graph-legenditem:hover { border-color: var(--line); color: var(--text); }
 .codex-graph-legenditem.is-off { opacity: 0.4; text-decoration: line-through; }
 .codex-graph-legenditem i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .codex-graph-zoom { display: flex; gap: var(--space-1); align-items: center; }
 .codex-graph-svg { flex: 1 1 auto; min-height: 62vh; width: 100%; background: radial-gradient(circle at 50% 40%, var(--surface-1), var(--void)); border: 1px solid var(--line); border-radius: var(--radius-lg); cursor: grab; }
 .codex-graph-svg:active { cursor: grabbing; }
-.codex-graph-arrowhead { fill: var(--line-strong, #3a4152); }
-.codex-graph-edge line { stroke: var(--line-strong, #3a4152); stroke-width: 1.2; opacity: 0.5; transition: opacity 0.12s ease, stroke 0.12s ease; }
+.codex-graph-arrowhead { fill: var(--line-strong); }
+.codex-graph-edge line { stroke: var(--line-strong); stroke-width: 1.2; opacity: 0.5; transition: opacity var(--dur-hover) var(--ease-settle), stroke var(--dur-hover) var(--ease-settle); }
 .codex-graph-edge.is-lit line { stroke: var(--cyan); opacity: 0.95; stroke-width: 1.8; }
 .codex-graph-edge.is-dim { opacity: 0.15; }
 .codex-graph-edgelabel { fill: var(--text-dim); font-size: 9px; font-family: var(--font-mono); pointer-events: none; }
-.codex-graph-node { cursor: pointer; transition: opacity 0.12s ease; }
+.codex-graph-node { cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle); }
 .codex-graph-node:focus { outline: none; }
-.codex-graph-node circle { stroke: var(--void); stroke-width: 2; transition: stroke 0.1s ease; }
+.codex-graph-node circle { stroke: var(--void); stroke-width: 2; transition: stroke var(--dur-hover) var(--ease-settle); }
 .codex-graph-node.is-hover circle { stroke: var(--text); stroke-width: 2.5; }
 .codex-graph-node:focus-visible circle { stroke: var(--cyan); stroke-width: 3; }
 .codex-graph-node.is-dim { opacity: 0.28; }
@@ -386,7 +378,7 @@
 /* Body editor: GM-secret pane is unmistakably marked; wiki-link autocomplete floats under the textarea. */
 .codex-editor-body { position: relative; }
 .codex-editor-body.is-gm .codex-body-input { border-left: 3px solid var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 7%, var(--surface-2)); }
-.codex-gm-tag { position: absolute; top: var(--space-2); right: var(--space-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 16%, transparent); padding: 2px 6px; border-radius: var(--radius-pill); pointer-events: none; }
+.codex-gm-tag { position: absolute; top: var(--space-2); right: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 16%, transparent); padding: 2px 6px; border-radius: var(--radius-pill); pointer-events: none; }
 .codex-wiki-suggest { position: absolute; top: 100%; left: var(--space-2); margin-top: 4px; z-index: 20; min-width: 220px; max-width: calc(100% - 2 * var(--space-2)); list-style: none; padding: var(--space-1); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: 0 12px 32px color-mix(in srgb, var(--void) 55%, transparent); }
 .codex-wiki-suggest-item { display: block; width: 100%; text-align: left; padding: var(--space-1) var(--space-2); border: none; background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; }
 .codex-wiki-suggest-item.is-active { background: var(--surface-3); }

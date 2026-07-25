@@ -179,7 +179,7 @@ const CONTROL_CHARS = /\p{Cc}/u;
 const MAX_BODY = 100_000;
 const MAX_TAGS = 24;
 
-const MIGRATIONS = [{
+export const MIGRATIONS = [{
   version: 1,
   sql: `
     CREATE TABLE codex_meta (

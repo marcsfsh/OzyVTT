@@ -75,6 +75,8 @@ export function RelationshipGraph({ nodes, edges, onOpen }: Readonly<{ nodes: re
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false); // survives pointerup so the click handler can tell a pan from a tap
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map()); // live pointers, for two-finger pinch
+  const pinch = useRef<{ startDist: number; startK: number } | null>(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
   const [hover, setHover] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<EntityType>>(new Set());
@@ -114,8 +116,23 @@ export function RelationshipGraph({ nodes, edges, onOpen }: Readonly<{ nodes: re
       return { k, x: vx - worldX * k, y: vy - worldY * k };
     });
   };
-  const onPointerDown = (event: ReactPointerEvent) => { drag.current = { x: event.clientX, y: event.clientY }; moved.current = false; (event.target as Element).setPointerCapture?.(event.pointerId); };
+  const pinchDistance = () => { const [a, b] = [...pointers.current.values()]; return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0; };
+  const onPointerDown = (event: ReactPointerEvent) => {
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.current.size === 2) { pinch.current = { startDist: pinchDistance() || 1, startK: view.k }; drag.current = null; return; }
+    drag.current = { x: event.clientX, y: event.clientY }; moved.current = false;
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+  };
   const onPointerMove = (event: ReactPointerEvent) => {
+    if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinch.current && pointers.current.size >= 2) {
+      const dist = pinchDistance();
+      const k = Math.max(0.25, Math.min(3, pinch.current.startK * (dist / pinch.current.startDist)));
+      const [a, b] = [...pointers.current.values()];
+      const { vx, vy } = toViewBox((a.x + b.x) / 2, (a.y + b.y) / 2); // zoom around the pinch midpoint
+      setView((prev) => { const worldX = (vx - prev.x) / prev.k, worldY = (vy - prev.y) / prev.k; return { k, x: vx - worldX * k, y: vy - worldY * k }; });
+      return;
+    }
     if (!drag.current) return;
     const factor = 1 / scaleAt();
     const dx = (event.clientX - drag.current.x) * factor, dy = (event.clientY - drag.current.y) * factor;
@@ -123,7 +140,12 @@ export function RelationshipGraph({ nodes, edges, onOpen }: Readonly<{ nodes: re
     drag.current.x = event.clientX; drag.current.y = event.clientY;
     setView((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
   };
-  const onPointerUp = () => { drag.current = null; };
+  const onPointerUp = (event: ReactPointerEvent) => {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size === 1) { const [remaining] = [...pointers.current.values()]; drag.current = { x: remaining.x, y: remaining.y }; moved.current = true; } // resume pan on the surviving finger
+    else if (pointers.current.size === 0) drag.current = null;
+  };
   // moved.current persists past the synchronous pointerup→click, so a pan that started on a node doesn't open it.
   const openNode = (id: string) => { if (!moved.current) onOpen(id); };
 

@@ -1,8 +1,9 @@
+import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CodexRevisionConflictError, CodexStore, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
+import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
 import { projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
 
 let directory: string;
@@ -249,6 +250,23 @@ describe("CodexStore entities + relationships", () => {
     // Restoring a revision re-seals too (the revision's fields never re-leak goals).
     const rev = store.listRevisions(page.id).find((entry) => entry.rev === 1)!;
     expect(store.restoreRevision(page.id, rev.id, "gm").fields.goals).toBeUndefined();
+  });
+
+  it("migration v7 backfills pre-existing secret fields out of the public map (the pillar-1 legacy fix)", () => {
+    // Simulate a DB written before the seal existed: `goals` sitting in the public fields_json.
+    const database = new DatabaseSync(":memory:");
+    database.exec("CREATE TABLE codex_pages (id TEXT PRIMARY KEY, fields_json TEXT, gm_fields_json TEXT DEFAULT '{}')");
+    database.prepare("INSERT INTO codex_pages (id, fields_json, gm_fields_json) VALUES (?, ?, ?)").run("leaky", JSON.stringify({ race: "Vampire", goals: "usurp the throne" }), "{}");
+    database.prepare("INSERT INTO codex_pages (id, fields_json, gm_fields_json) VALUES (?, ?, ?)").run("clean", JSON.stringify({ race: "Human" }), "{}");
+    const v7 = MIGRATIONS.find((migration) => migration.version === 7);
+    expect(v7).toBeDefined();
+    database.exec(v7!.sql);
+    const leaky = database.prepare("SELECT fields_json, gm_fields_json FROM codex_pages WHERE id = 'leaky'").get() as { fields_json: string; gm_fields_json: string };
+    expect(JSON.parse(leaky.fields_json)).toEqual({ race: "Vampire" });               // goals removed from the player-facing map
+    expect(JSON.parse(leaky.gm_fields_json)).toEqual({ goals: "usurp the throne" });   // moved into the GM-only map
+    const clean = database.prepare("SELECT fields_json FROM codex_pages WHERE id = 'clean'").get() as { fields_json: string };
+    expect(JSON.parse(clean.fields_json)).toEqual({ race: "Human" });                  // rows without goals untouched
+    database.close();
   });
 
   it("creates typed relationships, resolves both directions, dedupes, and cascades on page delete", () => {
