@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Badge } from "@vtt/ui";
+import { Badge, Button } from "@vtt/ui";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, entityIcon, type EntityType } from "./entities";
 
 /** The minimum an entity needs to appear on the World home — satisfied by both the GM and player page summaries. */
@@ -11,11 +11,12 @@ type WorldEntity = Readonly<{ id: string; title: string; entityType: EntityType;
  * the page list (the entity store), so it's always current. Shared by the GM and the player codex; the
  * player passes showReveal=false (everything they can see is, by definition, revealed).
  */
-export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, showReveal = true }: Readonly<{
+export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, onCreate, showReveal = true }: Readonly<{
   pages: readonly WorldEntity[];
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
+  onCreate?: () => void;
   showReveal?: boolean;
 }>) {
   const byType = useMemo(() => {
@@ -33,7 +34,7 @@ export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, showReveal
 
   if (pages.length === 0) {
     return showReveal
-      ? <div className="codex-main-empty"><h3>Your world begins here</h3><p>Create characters, locations, factions and more in the Pages tab - they'll gather here, grouped by type, with a tag cloud and recent changes.</p></div>
+      ? <div className="codex-main-empty"><h3>Your world begins here</h3><p>Characters, locations, factions and more gather here - grouped by type, with a tag cloud and recent changes. Create your first entity to begin.</p>{onCreate && <Button variant="primary" onClick={onCreate}>New page</Button>}</div>
       : <div className="codex-main-empty"><h3>The world, as you know it</h3><p>As the GM reveals people, places and lore, they'll gather here - grouped by type, with a tag cloud and recent discoveries.</p></div>;
   }
 

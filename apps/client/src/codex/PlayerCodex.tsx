@@ -60,6 +60,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   }, [markers, maps, openPage]);
 
   const filteredPages = useMemo(() => pages.filter((summary) => (!filter.type || summary.entityType === filter.type) && (!filter.tag || summary.tags.includes(filter.tag))), [pages, filter]);
+  const knownTitles = useMemo(() => new Set(pages.map((summary) => summary.title.toLowerCase())), [pages]); // for wiki-link "redlinks"
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const breadcrumb = useMemo(() => {
     const chain: PlayerCodexMap[] = []; let cursor = currentMap; const guard = new Set<string>();
@@ -110,7 +111,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
                       })}
                     </dl>
                   )}
-                  <div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} token={token} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div>
+                  <div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} token={token} knownTitles={knownTitles} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div>
                   {pageRels.length > 0 && (
                     <div className="codex-reader-rels">
                       <h4 className="codex-backlinks-title">Relationships</h4>
@@ -151,7 +152,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
             {timeline.map((entry) => (
               <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
                 <header className="codex-entry-head codex-entry-meta">{entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}<span className="codex-entry-when">{whenLabel(entry)}</span></header>
-                <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} token={token} /></div>
+                <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} token={token} knownTitles={knownTitles} /></div>
               </article>
             ))}
           </div>

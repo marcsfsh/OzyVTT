@@ -6,18 +6,27 @@ import { codexApi, type CodexPageSummary } from "./api";
  * Opened with Cmd/Ctrl-K (or a toolbar button). Keyboard-first: type to filter, ↑/↓ to move, Enter to
  * run the highlighted action, Esc to close.
  */
+type GotoTarget = "world" | "pages" | "atlas" | "journal" | "graph";
 type Action =
   | { kind: "page"; id: string; label: string }
   | { kind: "create"; label: string; title: string }
-  | { kind: "goto"; label: string; target: "atlas" | "journal" };
+  | { kind: "goto"; label: string; target: GotoTarget };
 
 type CommandPaletteProps = Readonly<{
   gmToken: string;
   onOpenPage: (id: string) => void;
   onCreatePage: (title: string) => void;
-  onGoto: (target: "atlas" | "journal") => void;
+  onGoto: (target: GotoTarget) => void;
   onClose: () => void;
 }>;
+
+const GOTO: ReadonlyArray<{ label: string; target: GotoTarget }> = [
+  { label: "Go to World", target: "world" },
+  { label: "Go to Pages", target: "pages" },
+  { label: "Go to Atlas", target: "atlas" },
+  { label: "Go to Journal", target: "journal" },
+  { label: "Go to Graph", target: "graph" }
+];
 
 export function CommandPalette({ gmToken, onOpenPage, onCreatePage, onGoto, onClose }: CommandPaletteProps) {
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -33,7 +42,7 @@ export function CommandPalette({ gmToken, onOpenPage, onCreatePage, onGoto, onCl
     const matched = pages.filter((page) => !q || page.title.toLowerCase().includes(q)).slice(0, 8).map((page) => ({ kind: "page" as const, id: page.id, label: page.title }));
     const list: Action[] = [...matched];
     if (q && !pages.some((page) => page.title.toLowerCase() === q)) list.push({ kind: "create", label: `Create page “${query.trim()}”`, title: query.trim() });
-    if (!q) list.push({ kind: "goto", label: "Go to Atlas", target: "atlas" }, { kind: "goto", label: "Go to Journal", target: "journal" });
+    if (!q) list.push(...GOTO.map((entry) => ({ kind: "goto" as const, label: entry.label, target: entry.target })));
     return list;
   }, [pages, query]);
 

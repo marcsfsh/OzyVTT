@@ -32,7 +32,7 @@ function emphasize(text: string, keyBase: string): ReactNode[] {
   return nodes;
 }
 
-function inline(text: string, keyBase: string, onNavigate?: (target: string) => void): ReactNode[] {
+function inline(text: string, keyBase: string, onNavigate?: (target: string) => void, knownTitles?: ReadonlySet<string>): ReactNode[] {
   const nodes: ReactNode[] = [];
   let last = 0;
   let index = 0;
@@ -46,10 +46,13 @@ function inline(text: string, keyBase: string, onNavigate?: (target: string) => 
     const section = sectionPart?.trim();
     const isEntity = ENTITY_PREFIX.test(target);
     const shown = section ? `${target.replace(ENTITY_PREFIX, "")} › ${section}` : target.replace(ENTITY_PREFIX, "");
-    if (isEntity || !onNavigate) {
-      nodes.push(<span key={`${keyBase}-w${index}`} className="codex-md-link codex-md-link-inert">{shown}</span>);
+    // A plain [[Title]] is clickable only if it resolves. When knownTitles is provided (the player, who
+    // can't auto-create), an unresolved link renders inert ("redlink") instead of a live-looking dead end.
+    const resolvable = !isEntity && !!onNavigate && (!knownTitles || knownTitles.has(target.toLowerCase()));
+    if (resolvable) {
+      nodes.push(<button key={`${keyBase}-w${index}`} type="button" className="codex-md-link" onClick={() => onNavigate!(target)}>{shown}</button>);
     } else {
-      nodes.push(<button key={`${keyBase}-w${index}`} type="button" className="codex-md-link" onClick={() => onNavigate(target)}>{shown}</button>);
+      nodes.push(<span key={`${keyBase}-w${index}`} className="codex-md-link codex-md-link-inert">{shown}</span>);
     }
     last = match.index + match[0].length;
     index += 1;
@@ -60,7 +63,7 @@ function inline(text: string, keyBase: string, onNavigate?: (target: string) => 
 
 const IMAGE_LINE = /^!\[([^\]]*)\]\(codex-asset:([0-9a-fA-F-]{36})\)$/;
 
-export function CodexMarkdown({ text, onNavigate, token }: Readonly<{ text: string; onNavigate?: (target: string) => void; token?: string }>) {
+export function CodexMarkdown({ text, onNavigate, token, knownTitles }: Readonly<{ text: string; onNavigate?: (target: string) => void; token?: string; knownTitles?: ReadonlySet<string> }>) {
   const normalized = text.replace(/\s*—\s*/g, " - ");
   const lines = normalized.split("\n");
   const blocks: ReactNode[] = [];
@@ -68,7 +71,7 @@ export function CodexMarkdown({ text, onNavigate, token }: Readonly<{ text: stri
   const flush = () => {
     if (paragraph.length === 0) return;
     const key = `p-${blocks.length}`;
-    blocks.push(<p key={key} className="codex-md-p">{inline(paragraph.join(" "), key, onNavigate)}</p>);
+    blocks.push(<p key={key} className="codex-md-p">{inline(paragraph.join(" "), key, onNavigate, knownTitles)}</p>);
     paragraph = [];
   };
   lines.forEach((raw, lineIndex) => {
@@ -88,12 +91,12 @@ export function CodexMarkdown({ text, onNavigate, token }: Readonly<{ text: stri
       flush();
       const level = heading[1].length;
       const Tag = (level === 1 ? "h3" : level === 2 ? "h4" : "h5") as "h3" | "h4" | "h5";
-      blocks.push(<Tag key={key} className={`codex-md-h codex-md-h${level}`}>{inline(heading[2], key, onNavigate)}</Tag>);
+      blocks.push(<Tag key={key} className={`codex-md-h codex-md-h${level}`}>{inline(heading[2], key, onNavigate, knownTitles)}</Tag>);
       return;
     }
     if (line.startsWith("- ") || line.startsWith("* ")) {
       flush();
-      blocks.push(<p key={key} className="codex-md-p codex-md-bullet">{"• "}{inline(line.slice(2), key, onNavigate)}</p>);
+      blocks.push(<p key={key} className="codex-md-p codex-md-bullet">{"• "}{inline(line.slice(2), key, onNavigate, knownTitles)}</p>);
       return;
     }
     paragraph.push(line);

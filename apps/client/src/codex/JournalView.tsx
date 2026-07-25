@@ -21,6 +21,7 @@ function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): strin
  */
 type Draft = { playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean };
 const EMPTY: Draft = { playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false };
+const DRAFT_KEY = "codex-journal-draft";
 
 function whenLabel(entry: CodexJournalEntry): string {
   if (entry.inWorldLabel) return entry.inWorldLabel;
@@ -35,7 +36,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [draft, setDraft] = useState<Draft>(() => { try { const saved = sessionStorage.getItem(DRAFT_KEY); return saved ? { ...EMPTY, ...JSON.parse(saved) } : EMPTY; } catch { return EMPTY; } });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +49,13 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { const onChanged = () => { void load(); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load]);
+  // Persist an in-progress NEW entry so switching Codex tabs mid-compose doesn't silently drop it.
+  useEffect(() => {
+    try {
+      const isEmpty = !draft.playerText.trim() && !draft.gmText.trim();
+      if (editingId || isEmpty) sessionStorage.removeItem(DRAFT_KEY); else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch { /* private mode - fine */ }
+  }, [draft, editingId]);
 
   const set = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const submit = async () => {

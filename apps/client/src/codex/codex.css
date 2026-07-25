@@ -272,7 +272,9 @@
 
 /* ----- Atlas ----- */
 .codex-root { display: flex; flex-direction: column; gap: var(--space-3); }
-.codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+/* Distinct register from the GM tab bar directly above it: a bordered sub-toolbar strip, so the two
+   nav levels don't read as one long tab list. */
+.codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); margin-bottom: var(--space-3); }
 .codex-modebar-ops { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 
 /* Command palette */

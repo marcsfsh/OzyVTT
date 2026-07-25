@@ -9,6 +9,7 @@ import { CommandPalette } from "./CommandPalette";
 import { NotebookTree, buildFolderTree } from "./NotebookTree";
 import { WorldHome } from "./WorldHome";
 import { RelationshipGraph } from "./RelationshipGraph";
+import { Notice, type NoticeMessage } from "../components/feedback";
 import { ENTITY_DEFS, type EntityType } from "./entities";
 import "./codex.css";
 
@@ -24,7 +25,9 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
   { key: "location", label: "🏰 Location", type: "location", title: "Untitled location", player: "## Description\n\n## Points of interest\n", gm: "## Secrets\n\n## Encounters\n" },
   { key: "faction", label: "⚔️ Faction", type: "faction", title: "Untitled faction", player: "## Overview\n", gm: "## True agenda\n\n## Assets & allies\n" },
   { key: "item", label: "🗡️ Item", type: "item", title: "Untitled item", player: "## Description\n", gm: "## Secrets\n" },
-  { key: "religion", label: "🕯️ Religion", type: "religion", title: "Untitled religion", player: "## Tenets\n", gm: "## Secrets\n" }
+  { key: "religion", label: "🕯️ Religion", type: "religion", title: "Untitled religion", player: "## Tenets\n", gm: "## Secrets\n" },
+  { key: "species", label: "🐉 Species", type: "species", title: "Untitled species", player: "## Description\n\n## Habitat\n", gm: "## Secrets\n" },
+  { key: "event", label: "⏳ Event", type: "event", title: "Untitled event", player: "## What happened\n", gm: "## The truth\n" }
 ];
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
@@ -43,6 +46,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeMessage>(null);
 
   // The rail always holds the FULL notebook (for the folder tree + [[ autocomplete)); search is a separate overlay.
   const refreshList = useCallback(async () => {
@@ -136,7 +140,8 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
       } catch { failed.push(file.name); }
     }
     await refreshList();
-    setError(failed.length ? `Imported ${imported} of ${files.length}. Couldn't import: ${failed.join(", ")}.` : null);
+    if (failed.length) { setError(`Imported ${imported} of ${files.length}. Couldn't import: ${failed.join(", ")}.`); }
+    else { setError(null); setNotice({ tone: "success", text: `Imported ${imported} page${imported === 1 ? "" : "s"}.` }); }
   };
 
   const navigate = useCallback(async (target: string) => {
@@ -169,8 +174,9 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
           <input ref={importInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.target.value = ""; }} />
         </div>
       </div>
+      <Notice notice={notice} />
       {mode === "world"
-        ? <WorldHome pages={pages} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
+        ? <WorldHome pages={pages} onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
             onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
         : mode === "atlas"
