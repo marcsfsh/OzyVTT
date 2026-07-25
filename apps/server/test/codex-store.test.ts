@@ -238,6 +238,19 @@ describe("CodexStore entities + relationships", () => {
     expect(store.restoreRevision(page.id, rev1.id, "gm").entityType).toBe("character");
   });
 
+  it("seals secret-keyed fields into gmFields (write, restore) and preserves them through export", () => {
+    // A write that puts the secret `goals` key in the PUBLIC fields map is sealed server-side.
+    const page = store.createPage({ title: "Vex", entityType: "character", fields: { race: "Human", goals: "poison the king" } });
+    expect(page.fields).toEqual({ race: "Human" });          // goals moved out of the player-facing map
+    expect(page.gmFields).toEqual({ goals: "poison the king" });
+    // Export carries gmFields (the SELECT includes the column - regression guard for the backup bug).
+    const exported = store.exportBundle().pages.find((candidate) => candidate.id === page.id)!;
+    expect(exported.gmFields).toEqual({ goals: "poison the king" });
+    // Restoring a revision re-seals too (the revision's fields never re-leak goals).
+    const rev = store.listRevisions(page.id).find((entry) => entry.rev === 1)!;
+    expect(store.restoreRevision(page.id, rev.id, "gm").fields.goals).toBeUndefined();
+  });
+
   it("creates typed relationships, resolves both directions, dedupes, and cascades on page delete", () => {
     const strahd = store.createPage({ title: "Strahd", entityType: "character" });
     const barovia = store.createPage({ title: "Barovia", entityType: "location", revealedToPlayers: true });

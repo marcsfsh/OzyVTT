@@ -201,6 +201,36 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(JSON.stringify(playerView)).not.toContain("poisoning");                          // the secret value never leaks
   });
 
+  it("the server seals a secret field even when it is written into the PUBLIC fields map", async () => {
+    const { base } = await fixture();
+    // A raw/legacy write that wrongly puts the secret `goals` key in player-facing `fields`.
+    const strahd = await body(await post(base, "/api/v1/codex/pages", GM, {
+      title: "Count Strahd", entityType: "character", fields: { race: "Vampire", goals: "Reclaim Tatyana" }
+    }));
+    const id = strahd.data.page.id as string;
+    await post(base, `/api/v1/codex/pages/${id}/reveal`, GM, { revealed: true });
+    const gmView = await body(await get(base, `/api/v1/codex/pages/${id}`, GM));
+    expect(gmView.data.page.fields.goals).toBeUndefined();          // server moved it out of the public map
+    expect(gmView.data.page.gmFields.goals).toBe("Reclaim Tatyana"); // into the GM-only map
+    const playerView = await body(await get(base, `/api/v1/codex/pages/${id}`, PLAYER));
+    expect(playerView.data.page.fields).toEqual({ race: "Vampire" });
+    expect(JSON.stringify(playerView)).not.toContain("Tatyana");
+  });
+
+  it("a player search finds a page by a public field value but never by a GM-only field value", async () => {
+    const { base } = await fixture();
+    const night = await body(await post(base, "/api/v1/codex/pages", GM, {
+      title: "Nightsong", entityType: "character", fields: { race: "Elfkin" }, gmFields: { goals: "Betray the coven at Xanadar" }
+    }));
+    await post(base, `/api/v1/codex/pages/${night.data.page.id}/reveal`, GM, { revealed: true });
+    const byPublic = await body(await get(base, `/api/v1/codex/search?q=Elfkin`, PLAYER));
+    expect((byPublic.data.results as Json[]).length).toBeGreaterThan(0);   // public field value is searchable
+    const bySecret = await body(await get(base, `/api/v1/codex/search?q=Xanadar`, PLAYER));
+    expect(bySecret.data.results).toHaveLength(0);                          // secret field value is NOT
+    const gmSecret = await body(await get(base, `/api/v1/codex/search?q=Xanadar`, GM));
+    expect((gmSecret.data.results as Json[]).length).toBeGreaterThan(0);    // ...but the GM can find it
+  });
+
   it("GET /relationships returns the whole-graph edge feed, viewer-safe for players", async () => {
     const { base } = await fixture();
     const a = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Azalin", entityType: "character" }));

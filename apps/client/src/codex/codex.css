@@ -78,7 +78,7 @@
   flex: 1 1 240px; min-width: 0; background: transparent; border: none; border-bottom: 1px solid var(--line);
   color: var(--text); font-family: var(--font-display); font-size: var(--fs-h2); padding: var(--space-1) 0;
 }
-.codex-title-input:focus { outline: none; border-bottom-color: var(--magenta); }
+.codex-title-input:focus { outline: none; border-bottom-color: var(--cyan); }
 .codex-editor-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 /* Obsidian/OneNote-style three-pane: explorer (rail) | editor center | context (outline + backlinks). */
 .codex-editor-titlewrap { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
@@ -153,14 +153,14 @@
 /* Entity-type accents: a restrained magenta -> cyan spectrum (on-brand; no green/amber/orange), icon + label
    carry the finer distinction. Defined as tokens so components never hardcode hex. */
 :root {
-  --codex-type-note: var(--text-muted, #8a94a6);
-  --codex-type-character: var(--magenta, #ff5cf4);
-  --codex-type-faction: var(--violet, #a45cff);
-  --codex-type-religion: #c98bff;
-  --codex-type-item: #6d84ff;
-  --codex-type-event: #4f9bff;
-  --codex-type-species: #35b9ff;
-  --codex-type-location: var(--cyan, #37e0ff);
+  --codex-type-note: var(--text-muted);
+  --codex-type-character: var(--magenta);
+  --codex-type-event: var(--magenta-hi);
+  --codex-type-location: var(--cyan);
+  --codex-type-species: var(--cyan-hi);
+  --codex-type-faction: var(--violet);
+  --codex-type-religion: var(--violet-hi);
+  --codex-type-item: var(--indigo);
 }
 
 /* Searchable entity picker (relationships, journal pins, marker links). */
@@ -197,7 +197,7 @@
 .codex-reader-rels { border-top: 1px solid var(--line); padding-top: var(--space-3); margin-top: var(--space-3); }
 
 /* Calendar + chronicle */
-.codex-composer-head-actions { display: flex; gap: var(--space-2); align-items: center; }
+.codex-composer-head-actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .codex-timeline-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-timeline-year { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--cyan); border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-top: var(--space-3); }
 .codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; }
@@ -253,7 +253,8 @@
 .codex-graph-node { cursor: pointer; transition: opacity 0.12s ease; }
 .codex-graph-node:focus { outline: none; }
 .codex-graph-node circle { stroke: var(--void); stroke-width: 2; transition: stroke 0.1s ease; }
-.codex-graph-node.is-hover circle, .codex-graph-node:focus-visible circle { stroke: #fff; stroke-width: 2.5; }
+.codex-graph-node.is-hover circle { stroke: var(--text); stroke-width: 2.5; }
+.codex-graph-node:focus-visible circle { stroke: var(--cyan); stroke-width: 3; }
 .codex-graph-node.is-dim { opacity: 0.28; }
 .codex-graph-nodeicon { font-size: 13px; pointer-events: none; }
 .codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }
@@ -280,7 +281,7 @@
 .codex-palette-scrim { position: fixed; inset: 0; background: color-mix(in srgb, var(--void) 70%, transparent); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 60; }
 .codex-palette { width: min(560px, 92vw); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); box-shadow: 0 20px 60px color-mix(in srgb, var(--void) 60%, transparent); overflow: hidden; }
 .codex-palette-input { width: 100%; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font-family: var(--font-body); font-size: var(--fs-body); padding: var(--space-3) var(--space-4); }
-.codex-palette-input:focus { outline: none; border-bottom-color: var(--magenta); }
+.codex-palette-input:focus { outline: none; border-bottom-color: var(--cyan); }
 .codex-palette-list { list-style: none; margin: 0; padding: var(--space-1); max-height: 46vh; overflow-y: auto; }
 .codex-palette-item { display: block; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-md); cursor: pointer; }
 .codex-palette-item.is-active { background: var(--surface-3); }

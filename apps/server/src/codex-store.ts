@@ -311,6 +311,16 @@ const MIGRATIONS = [{
     ALTER TABLE codex_journal ADD COLUMN in_world_month INTEGER;
     ALTER TABLE codex_journal ADD COLUMN in_world_day INTEGER;
   `
+}, {
+  version: 7,
+  // Seal pre-existing secret fields: a page created when `goals` was a plain public field still holds it
+  // in fields_json (leaks on reveal). Move it into gm_fields_json. Keep in sync with SECRET_FIELD_KEYS.
+  sql: `
+    UPDATE codex_pages
+    SET gm_fields_json = json_set(COALESCE(gm_fields_json, '{}'), '$.goals', json_extract(fields_json, '$.goals')),
+        fields_json = json_remove(fields_json, '$.goals')
+    WHERE fields_json IS NOT NULL AND json_extract(fields_json, '$.goals') IS NOT NULL;
+  `
 }];
 
 type PageRow = {
@@ -373,6 +383,22 @@ function entityFields(value: Readonly<Record<string, string>> | undefined): Reco
   }
   if (JSON.stringify(out).length > 10_000) throw new Error("Entity fields are too large.");
   return out;
+}
+/**
+ * Field keys that are GM-only (secret) whatever a caller claims. The client schema (`entities.ts`) marks
+ * these `secret` and routes them to `gmFields`; the SERVER enforces the same split so a page can never
+ * hold a secret attribute in the player-facing `fields` map - not from an old page, a restored revision,
+ * or a hand-crafted API write. Keep in sync with the schema's `secret: true` fields.
+ */
+const SECRET_FIELD_KEYS: ReadonlySet<string> = new Set(["goals"]);
+/** Move any secret-keyed values out of player-facing `fields` and into GM-only `gmFields` (viewer-safety net). */
+function sealSecretFields(fields: Record<string, string>, gmFields: Record<string, string>): { fields: Record<string, string>; gmFields: Record<string, string> } {
+  const outFields = { ...fields };
+  const outGm = { ...gmFields };
+  for (const key of SECRET_FIELD_KEYS) {
+    if (key in outFields) { outGm[key] = outFields[key]; delete outFields[key]; }
+  }
+  return { fields: outFields, gmFields: outGm };
 }
 const REL_TYPE = /^[a-z0-9][a-z0-9-]*$/;
 /** Relationship types that read the same both ways (label === inverse) - A->B and B->A are the SAME edge. */
@@ -544,8 +570,9 @@ export class CodexStore {
     const database = this.requireDatabase();
     const pageId = this.freshId();
     const stamp = this.stamp();
+    const sealed = sealSecretFields(entityFields(input.fields), entityFields(input.gmFields));
     const row: PageRow = {
-      id: pageId, title: title(input.title), entity_type: entityType(input.entityType), fields_json: JSON.stringify(entityFields(input.fields)), gm_fields_json: JSON.stringify(entityFields(input.gmFields)),
+      id: pageId, title: title(input.title), entity_type: entityType(input.entityType), fields_json: JSON.stringify(sealed.fields), gm_fields_json: JSON.stringify(sealed.gmFields),
       folder: folder(input.folder), tags_json: JSON.stringify(tags(input.tags)),
       player_body: body(input.playerBody), gm_body: body(input.gmBody), revealed: input.revealedToPlayers ? 1 : 0,
       banner_asset_id: input.bannerAssetId ? id(input.bannerAssetId) : null, rev: 1, created_at: stamp, updated_at: stamp
@@ -566,12 +593,22 @@ export class CodexStore {
     const existing = this.pageRow(pageId);
     if (!existing) throw new CodexNotFoundError("That page no longer exists.");
     if (expectedRev !== undefined && expectedRev !== existing.rev) throw new CodexRevisionConflictError("This page changed since you opened it. Reload to keep editing.");
+    // Re-seal whenever either field map is touched (covers restores + raw writes): secret keys never rest in `fields`.
+    let fieldsJson = existing.fields_json;
+    let gmFieldsJson = existing.gm_fields_json;
+    if (input.fields !== undefined || input.gmFields !== undefined) {
+      const baseFields = input.fields === undefined ? parseFields(existing.fields_json) : entityFields(input.fields);
+      const baseGm = input.gmFields === undefined ? parseFields(existing.gm_fields_json) : entityFields(input.gmFields);
+      const sealed = sealSecretFields(baseFields, baseGm);
+      fieldsJson = JSON.stringify(sealed.fields);
+      gmFieldsJson = JSON.stringify(sealed.gmFields);
+    }
     const next: PageRow = {
       ...existing,
       title: input.title === undefined ? existing.title : title(input.title),
       entity_type: input.entityType === undefined ? existing.entity_type : entityType(input.entityType),
-      fields_json: input.fields === undefined ? existing.fields_json : JSON.stringify(entityFields(input.fields)),
-      gm_fields_json: input.gmFields === undefined ? existing.gm_fields_json : JSON.stringify(entityFields(input.gmFields)),
+      fields_json: fieldsJson,
+      gm_fields_json: gmFieldsJson,
       folder: input.folder === undefined ? existing.folder : folder(input.folder),
       tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       player_body: input.playerBody === undefined ? existing.player_body : body(input.playerBody),
@@ -636,7 +673,7 @@ export class CodexStore {
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
   exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[] }> {
-    const pages = (this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE").all() as PageRow[]).map((row) => this.toPage(row));
+    const pages = (this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages ORDER BY title COLLATE NOCASE").all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
     return { pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships() };
