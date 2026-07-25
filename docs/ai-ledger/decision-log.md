@@ -83,6 +83,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   and ordering. Entries now also store the literal `{year,month,day}` (migration v6); `setCalendar`
   transactionally recomputes every dated entry's instant + label from the raw date (non-destructive
   reflow). Rule: the raw date is the source of truth; the instant is a derived sort key, recomputed.
+- **Codex has ONE secret-language and ONE relationship vocabulary (2026-07-25).** A six-lens UX review
+  found the "players see this / players don't" idea — the codex's signature concept — expressed ~5 ways.
+  Durable rule, enforced by shared components in `apps/client/src/codex/SecretMarkers.tsx`: (1) *record
+  reveal* is always `<RevealSwitch>` → "Shown to players" / "GM only" (never "Map shown/secret",
+  "Shown/Secret", etc.); (2) *GM-only content* is always `<GmOnlyTag>` + the `.codex-gm-block` violet
+  accent, identical on secret fields, the GM body tab AND its preview, the journal composer's GM field,
+  posted GM text, and pinned-timeline GM notes. Violet means GM-only and nothing else (inert wiki-links
+  are muted, not violet). Typed entity edges are **"Relationships"** everywhere; "link"/"Linked from" is
+  reserved for the auto-derived wiki-link/backlink feature. **For future codex work:** reach for
+  `RevealSwitch`/`GmOnlyTag` rather than a new toggle or tag, and don't reintroduce "connections"/"shown"
+  synonyms. Deletes go through the app's `useConfirm()` (never `window.confirm`).
 - **Codex vocab + calendar math still duplicated client/server - accepted debt (2026-07-25).** The
   architecture review flagged that entity-type/relationship vocab and the calendar instant<->date math
   live in both client (`entities.ts`, `api.ts`) and server (`codex-store.ts`), hand-synced. NOT hoisted

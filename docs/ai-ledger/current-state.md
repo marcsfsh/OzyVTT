@@ -146,6 +146,33 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   - **Mobile parity:** the calendar month/current-date rows reflow at ≤480px (verified no overflow at
     400px); EntityPicker clear/options + graph legend chips got real touch-size targets; the now-chip
     truncates; **two-finger pinch-zoom** added to the graph (mirrors `MapSurface`).
+- **Codex design-language pass (2026-07-25, same branch).** A six-agent adversarial UX review (IA/nav,
+  page editor, world+graph, journal/calendar/atlas, player, and cross-cutting coherence) plus a live
+  screenshot walkthrough found the Codex worked but expressed the same ideas many different ways. Landed
+  one coherent language; `check` + `test` (**570**) + `build` green, browser + 402px mobile verified.
+  - **One "public vs GM-only" system, two axes.** A shared `RevealSwitch` (`SecretMarkers.tsx`) replaced
+    four differently-worded reveal toggles with one **"Shown to players" / "GM only"** on pages, journal
+    entries, maps, markers. A shared `GmOnlyTag` + `.codex-gm-block`/`.codex-gm-pill` give ONE violet
+    "GM only" treatment to every GM-secret surface — secret fields, the GM body tab, **its Preview**
+    (previously dropped the cue — a screen-share leak), the journal composer's GM field, posted GM text,
+    pinned-timeline GM notes. Dropped the redundant "Visible to players when revealed" badge; de-conflicted
+    violet (inert wiki-links are now muted, not violet).
+  - **One vocabulary:** **Relationships** everywhere (was connections/links across panel, player reader,
+    graph); "link" reserved for wiki-links; player reader heading matches the GM's.
+  - **Adopted the design system the codex had skipped:** the app's themed confirm dialog + destructive
+    action replace four raw `confirm()`s (page/entry/map/marker delete); the Atlas "new map" picker is a
+    real `Modal` (was an off-screen bare div); player Codex dropped its redundant second "Close".
+  - **Navigation + no-silent-failures:** the Codex mode bar is a bordered sub-toolbar (distinct from the
+    GM tab bar above it); the command palette reaches all five modes; World's GM empty state has a real
+    "New page" CTA; **Species + Event** got create templates (all 8 types now creatable); the journal
+    composer persists an in-progress entry (sessionStorage) across tab switches; import confirms success;
+    player combat journal entries carry a "Battle" badge (not colour alone); the graph frames on the
+    connected web + takes a player-appropriate empty state.
+  - **Deliberately NOT changed (reviewers split / reversible-risk):** kept the 8 per-type entity colors
+    (the coherence lead flagged entity identity as the one already-consistent system; leave it — icon +
+    label already disambiguate) rather than the world+graph reviewer's color-by-category redesign; kept
+    the secret "Goals" field (unified its look) rather than folding it into the GM body; GM stays defaulted
+    to Pages (first action is actionable) while the player lands on World. Recorded as options, not done.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
