@@ -229,6 +229,18 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     segmented toggle. `check` + `test` (**574**, +1 folder-record store test) + `build` green; live-verified at
     1440px (open-note move saves cleanly, empty subfolder persists, create+delete folder, every new markdown
     format renders, Edit/View round-trips) and 390px (4 folder actions + 12 toolbar buttons fit, no overflow).
+  - **Atlas drill-down chips + notebook note/folder order (follow-up, at the owner's request).** Two more
+    GM-reported gaps. (1) **The atlas could only navigate UP** — the breadcrumb walks the parent chain, so a
+    regional map nested under a world map was unreachable once you left it (the sole way down was a marker's
+    "Drills into map" → Enter). The atlas bar now renders the current map's children as **"Drill into" chips**
+    (GM: a 🔒 flags a child not yet revealed); clicking one descends, the breadcrumb still climbs back. The
+    New-map button reads **"Add sub-map"** on a map and the picker says the new map nests inside the current
+    one, so creating a regional child is obvious. Mirrored in the **player** atlas — viewer-safe, since the
+    chips filter the server's already-revealed-only map projection (no lock/GM state shown to players).
+    (2) **Notebook order**: within any folder, notes now sort **above** subfolders at every level (was:
+    subfolders above the folder's own notes). Live-verified on a seeded World→Region atlas (GM drill chip +
+    descend + climb-back; player sees the same chip unlocked after reveal and can drill) and in the notebook
+    (root note above the NPCs folder; NPCs' note above its Villains subfolder). check + test (574) + build green.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
