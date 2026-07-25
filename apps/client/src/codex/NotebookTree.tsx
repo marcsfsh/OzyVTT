@@ -13,6 +13,12 @@ import { CodexIcon, EntityIcon } from "./icons";
 export type FolderNode = { name: string; path: string; folders: Map<string, FolderNode>; pages: CodexPageSummary[] };
 export type NotebookSort = "name-asc" | "name-desc" | "recent";
 const DRAG_TYPE = "application/x-codex-page";
+const FOLDER_DRAG_TYPE = "application/x-codex-folder";
+// The folder path being dragged this gesture. `getData` is unavailable during dragOver, so we need this to
+// reject dropping a folder onto itself or its own descendant before the drop fires.
+let draggedFolderPath: string | null = null;
+/** A folder can't be dropped onto itself or into one of its own descendants. */
+const invalidFolderDrop = (target: string, dragged: string | null) => dragged !== null && (target === dragged || target.startsWith(`${dragged}/`));
 
 /** Walk/create the folder-node chain for a "A/B/C" path, returning the leaf node. */
 function ensureFolder(root: FolderNode, folderPath: string): FolderNode {
@@ -52,6 +58,7 @@ type Handlers = Readonly<{
   onRenameFolder: (path: string) => void;
   onDeleteFolder: (path: string) => void;
   onMovePage: (pageId: string, folderPath: string | null) => void;
+  onMoveFolder: (fromPath: string, toParentPath: string | null) => void;
   onRequestMove: (pageId: string) => void;
 }>;
 
@@ -65,7 +72,7 @@ function sortPages(node: FolderNode, sort: NotebookSort): CodexPageSummary[] {
   return [...node.pages].sort((a, b) => dir * a.title.localeCompare(b.title));
 }
 
-/** A folder branch that highlights itself as a drop target while a page is dragged over it. */
+/** A folder branch: draggable (moves the folder + everything under it) and a drop target for pages and folders. */
 function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode; depth: number; handlers: Handlers }>) {
   const [over, setOver] = useState(false);
   const open = !handlers.collapsed.has(folder.path);
@@ -74,11 +81,24 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
       <div
         className={`codex-tree-folder-row${over ? " is-drop" : ""}`}
         style={{ paddingInlineStart: `${depth * 14 + 6}px` }}
-        onDragOver={(event) => { if (event.dataTransfer.types.includes(DRAG_TYPE)) { event.preventDefault(); setOver(true); } }}
+        onDragOver={(event) => {
+          const types = event.dataTransfer.types;
+          if (types.includes(FOLDER_DRAG_TYPE)) { if (!invalidFolderDrop(folder.path, draggedFolderPath)) { event.preventDefault(); setOver(true); } return; }
+          if (types.includes(DRAG_TYPE)) { event.preventDefault(); setOver(true); }
+        }}
         onDragLeave={() => setOver(false)}
-        onDrop={(event) => { event.preventDefault(); event.stopPropagation(); setOver(false); const id = event.dataTransfer.getData(DRAG_TYPE); if (id) handlers.onMovePage(id, folder.path); }}
+        onDrop={(event) => {
+          event.preventDefault(); event.stopPropagation(); setOver(false);
+          const from = event.dataTransfer.getData(FOLDER_DRAG_TYPE);
+          if (from) { if (!invalidFolderDrop(folder.path, from)) handlers.onMoveFolder(from, folder.path); return; }
+          const id = event.dataTransfer.getData(DRAG_TYPE);
+          if (id) handlers.onMovePage(id, folder.path);
+        }}
       >
-        <button type="button" className="codex-tree-folder" onClick={() => handlers.onToggle(folder.path)}>
+        <button type="button" className="codex-tree-folder" draggable
+          onDragStart={(event) => { event.stopPropagation(); event.dataTransfer.setData(FOLDER_DRAG_TYPE, folder.path); event.dataTransfer.effectAllowed = "move"; draggedFolderPath = folder.path; }}
+          onDragEnd={() => { draggedFolderPath = null; }}
+          onClick={() => handlers.onToggle(folder.path)}>
           <span className="codex-tree-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>
           <span className="codex-tree-folder-name">{folder.name}</span>
           <span className="codex-tree-count">{countPages(folder)}</span>
@@ -103,8 +123,13 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
   // The top-level container is the drop target for "move to the top level" (clear a page's folder).
   const rootDrop = depth === 0
     ? {
-        onDragOver: (event: React.DragEvent) => { if (event.dataTransfer.types.includes(DRAG_TYPE)) event.preventDefault(); },
-        onDrop: (event: React.DragEvent) => { const id = event.dataTransfer.getData(DRAG_TYPE); if (id) handlers.onMovePage(id, null); }
+        onDragOver: (event: React.DragEvent) => { const types = event.dataTransfer.types; if (types.includes(DRAG_TYPE) || types.includes(FOLDER_DRAG_TYPE)) event.preventDefault(); },
+        onDrop: (event: React.DragEvent) => {
+          const from = event.dataTransfer.getData(FOLDER_DRAG_TYPE);
+          if (from) { handlers.onMoveFolder(from, null); return; }
+          const id = event.dataTransfer.getData(DRAG_TYPE);
+          if (id) handlers.onMovePage(id, null);
+        }
       }
     : {};
   return (

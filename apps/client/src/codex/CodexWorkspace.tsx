@@ -181,6 +181,15 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     try { const page = await codexApi.updatePage(gmToken, id, { folder }); onPageChanged(page); await refreshList(); }
     catch (moveError) { setError(moveError instanceof Error ? moveError.message : "Couldn't move that page."); }
   }, [gmToken, onPageChanged, refreshList]);
+  // Drag a folder onto another folder (nest it) or the top level. moveFolder re-paths every note + subfolder
+  // under it, so the whole subtree travels with the folder.
+  const moveFolderTo = useCallback(async (fromPath: string, toParent: string | null) => {
+    const name = fromPath.split("/").pop() ?? fromPath;
+    const to = toParent ? `${toParent}/${name}` : name;
+    if (to === fromPath) return; // dropped on its current parent — no change
+    try { await codexApi.moveFolder(gmToken, fromPath, to); await refreshList(); }
+    catch (moveError) { setError(moveError instanceof Error ? moveError.message : "Couldn't move that folder."); }
+  }, [gmToken, refreshList]);
   const doMove = async (folder: string | null) => { const id = movingPageId; setMovingPageId(null); if (id) await movePage(id, folder); };
   const doMoveToNew = async () => {
     const id = movingPageId; setMovingPageId(null);
@@ -299,7 +308,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
                 : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
             : pages.length === 0
                 ? (!error && <p className="codex-list-empty">No pages yet.</p>)
-                : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onNewSubfolder={newSubfolder} onRenameFolder={renameFolder} onDeleteFolder={deleteFolder} onMovePage={movePage} onRequestMove={setMovingPageId} />}
+                : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onNewSubfolder={newSubfolder} onRenameFolder={renameFolder} onDeleteFolder={deleteFolder} onMovePage={movePage} onMoveFolder={moveFolderTo} onRequestMove={setMovingPageId} />}
         </nav>
       </aside>
       <section className="codex-main">

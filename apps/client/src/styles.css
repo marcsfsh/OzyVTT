@@ -6,7 +6,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-main { width: min(100% - 2rem, 1600px); margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem) 0; }
+main { width: min(100% - 2rem, 1720px); margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem) 0; }
 header { max-width: 40rem; }
 
 h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 1rem; }
