@@ -93,7 +93,7 @@
 .codex-editor { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; }
 .codex-editor-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .codex-title-input {
-  flex: 1 1 240px; min-width: 0; background: transparent; border: none; border-bottom: 1px solid var(--line);
+  width: 100%; min-width: 0; background: transparent; border: none; border-bottom: 1px solid var(--line);
   color: var(--text); font-family: var(--font-display); font-size: var(--fs-h2); padding: var(--space-1) 0;
 }
 .codex-title-input:focus { outline: none; border-bottom-color: var(--cyan); }
@@ -115,6 +115,7 @@
 .codex-tree-folder-btn { opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-sm); border-radius: var(--radius-sm); line-height: 1; }
 .codex-tree-folder-row:hover .codex-tree-folder-btn, .codex-tree-folder-btn:focus-visible { opacity: 1; }
 .codex-tree-folder-btn:hover { color: var(--cyan); background: var(--surface-2); }
+.codex-tree-folder-ic { width: 15px; height: 15px; display: block; }
 @media (max-width: 900px) {
   /* Below three-pane width, the context pane drops beneath the editor and row actions are always shown (no hover on touch). */
   .codex-editor-cols { flex-direction: column; }
@@ -126,8 +127,9 @@
 .codex-save-saved { color: var(--success); }
 .codex-save-conflict, .codex-save-error { color: var(--danger); }
 
-.codex-meta-row { display: flex; gap: var(--space-3); flex-wrap: wrap; }
-.codex-meta-row > * { flex: 1 1 160px; }
+/* Entity meta (type/folder/tags) and the typed fields share ONE responsive grid so their columns line
+   up exactly (auto-fit collapses 3→2→1 as the panel narrows; min(220px,100%) prevents overflow). */
+.codex-meta-row, .codex-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: var(--space-2) var(--space-3); align-items: start; }
 
 .codex-body-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .codex-toolbar { display: flex; gap: var(--space-1); flex-wrap: wrap; }
@@ -183,8 +185,8 @@
 .codex-picker-opt.is-active { background: color-mix(in srgb, var(--cyan) 16%, transparent); }
 .codex-picker-opt-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Typed entities: structured fields (editor) + relationships panel + reader fields. */
-.codex-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2) var(--space-3); }
+/* Typed entities: structured fields (editor) + relationships panel + reader fields. The grid itself is
+   defined with .codex-meta-row above so the two rows share identical column tracks. */
 .codex-field-area { min-height: 3.5em; }
 .codex-field-wide { grid-column: 1 / -1; } /* textareas (goals, properties, traits) span the full row */
 /* One shared "GM-only content" language: a violet block accent + the one "GM only" pill, used identically

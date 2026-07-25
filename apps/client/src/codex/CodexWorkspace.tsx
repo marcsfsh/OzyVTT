@@ -190,6 +190,15 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     try { const page = await codexApi.createPage(gmToken, { title: "Untitled page", folder: name }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
     catch (folderError) { setError(folderError instanceof Error ? folderError.message : "Couldn't create the folder."); }
   };
+  // A subfolder nests under an existing folder path; a fresh untitled note starts it off (folders live only in page paths).
+  const newSubfolder = async (parentPath: string) => {
+    const name = await prompt({ title: "New subfolder", body: `Add a subfolder inside "${parentPath}".`, placeholder: "e.g. Villains", confirmLabel: "Create" });
+    if (!name) return;
+    const child = name.split("/").map((segment) => segment.trim()).filter(Boolean).join("/");
+    if (!child) return;
+    try { const page = await codexApi.createPage(gmToken, { title: "Untitled page", folder: `${parentPath}/${child}` }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    catch (folderError) { setError(folderError instanceof Error ? folderError.message : "Couldn't create the subfolder."); }
+  };
   const renameFolder = async (path: string) => {
     const current = path.split("/").pop() ?? path;
     const name = await prompt({ title: "Rename folder", body: `Rename "${path}". Type a name, or a full path to move it.`, defaultValue: current, confirmLabel: "Rename" });
@@ -276,7 +285,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
                 : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
             : pages.length === 0
                 ? (!error && <p className="codex-list-empty">No pages yet.</p>)
-                : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onRenameFolder={renameFolder} onMovePage={movePage} onRequestMove={setMovingPageId} />}
+                : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onNewSubfolder={newSubfolder} onRenameFolder={renameFolder} onMovePage={movePage} onRequestMove={setMovingPageId} />}
         </nav>
       </aside>
       <section className="codex-main">

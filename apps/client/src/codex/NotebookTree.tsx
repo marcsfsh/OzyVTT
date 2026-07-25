@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Badge } from "@vtt/ui";
 import { type CodexPageSummary } from "./api";
-import { EntityIcon } from "./icons";
+import { CodexIcon, EntityIcon } from "./icons";
 
 /**
  * The campaign notebook's organizational tree: every page grouped into a collapsible nested-folder
@@ -43,6 +43,7 @@ type Handlers = Readonly<{
   onToggle: (path: string) => void;
   onSelect: (pageId: string) => void;
   onNewInFolder: (path: string) => void;
+  onNewSubfolder: (path: string) => void;
   onRenameFolder: (path: string) => void;
   onMovePage: (pageId: string, folderPath: string | null) => void;
   onRequestMove: (pageId: string) => void;
@@ -77,6 +78,7 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
           <span className="codex-tree-count">{countPages(folder)}</span>
         </button>
         <div className="codex-tree-folder-actions">
+          <button type="button" className="codex-tree-folder-btn" aria-label={`New subfolder in ${folder.name}`} title="New subfolder" onClick={() => handlers.onNewSubfolder(folder.path)}><CodexIcon iconId="folder-plus" className="codex-tree-folder-ic" /></button>
           <button type="button" className="codex-tree-folder-btn" aria-label={`Rename ${folder.name}`} title="Rename folder" onClick={() => handlers.onRenameFolder(folder.path)}>✎</button>
           <button type="button" className="codex-tree-folder-btn" aria-label={`New note in ${folder.name}`} title="New note here" onClick={() => handlers.onNewInFolder(folder.path)}>＋</button>
         </div>
