@@ -63,8 +63,35 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     `useConfirm` for the 4 codex delete flows (still raw `window.confirm`); tag-chip filtering;
     new-session prefill; `commandId` idempotency on codex creates; `DELETE /codex-assets/:id` + orphan
     GC; revision-snapshot coalescing; FTS5 boot-resilience; ETag on list reads; integration-API
-    (`codex:read/write`) scopes. Still not built from the original vision: mind-map graph (UX-rejected -
-    no combat payoff), fantasy calendar (schema reserves `calendarInstant`), page transclusion.
+    (`codex:read/write`) scopes. Still not built from the original vision: ~~mind-map graph~~ (built,
+    pillar 4 below), ~~fantasy calendar~~ (built, pillar 2 below), page transclusion.
+- **Worldbuilding platform — four pillars (2026-07-25, same branch).** The codex grew from a notebook
+  into a World-Anvil-class worldbuilding tool, built + verified pillar by pillar on top of it:
+  1. **Typed entities + relationships.** A page carries an **entity type** (character / location /
+     faction / item / species / religion / event + plain note), each bringing a set of **structured
+     fields** (autosaved), and **typed relationships** to other entities with a natural-language label
+     per direction ("rules" ↔ "ruled by"). New `entity_type` / `fields` columns + a
+     `codex_relationships` table (migration v3), dedupe + cascade-on-delete, and a
+     `GET /codex/relationships` feed that is **viewer-safe** for players (both endpoints must be
+     revealed). Client: a type selector + fields editor + a Relationships panel in the editor rail;
+     entity icons in the tree; players read fields + revealed links.
+  2. **Fantasy calendar + chronicle.** A GM-defined **calendar** (custom months w/ lengths, weekday
+     names, era suffix; migration v4, sensible default). A **structured in-world date** on a journal
+     entry computes an absolute `calendarInstant` (chronological sort, negative years OK) + a formatted
+     label; the **timeline groups by in-world year** ("1492 DR"), earliest first. instant↔date
+     round-trips for editing.
+  3. **World home + tag browsing.** A **World** tab: entities grouped by type as counted cards, a **tag
+     cloud** (counts, most-used first), and recently-updated; clicking a type or a tag **filters the
+     notebook** (clearable chip). Tags are now first-class (were captured but led nowhere).
+  4. **Relationship graph.** A **Graph** tab drawing the world as a web — entities as type-colored,
+     iconed nodes, typed relationships as directed labeled edges — via a small deterministic
+     force-layout (Fruchterman-Reingold + gravity) framed to fit; pan / zoom / hover, click a node to
+     open it. Reuses the viewer-safe relationships feed (no new server code); `touch-action:none`.
+  Verified per pillar: `check` + `test` (**562**, incl. new calendar + relationship suites) + `build`,
+  each with a real Chromium smoke (fields stored + inverse relationship renders; timeline groups 1400 DR
+  before 1492 DR; World cards/tags filter the notebook; a 4-node/4-edge graph framed + click-opens),
+  zero console errors. Retires the two long-deferred "not built" items and supersedes the earlier
+  UX-rejection of the graph (it now has a worldbuilding, not combat, payoff).
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,

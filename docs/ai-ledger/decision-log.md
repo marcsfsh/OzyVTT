@@ -54,6 +54,16 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   home** with tag browsing. Constraints unchanged: two-layer secrecy + viewer-safety on every new
   surface, server authority, mobile parity, and the codex stays off the `GameState` broadcast. Combat
   remains combat-first; the two pillars coexist. CLAUDE.md updated to match.
+- **All four worldbuilding pillars shipped (2026-07-25).** The plan above is now built and verified on
+  branch `claude/world-maps-geospatial-db-1kiqez`: (1) typed entities + structured fields + typed
+  relationships (migration v3, viewer-safe `GET /codex/relationships`); (2) GM-defined fantasy calendar
+  + chronological in-world-dated timeline grouped by year (migration v4); (3) a World home (entities by
+  type, tag cloud, recent) with click-to-filter tag/type browsing; (4) an interactive relationship
+  graph (deterministic force layout, viewer-safe feed, no new server code). Each pillar landed `check` +
+  `test` (562) + `build` green with a real Chromium smoke. **This reverses the earlier graph rejection**
+  (recorded in current-state as "mind-map graph — UX-rejected, no combat payoff"): under the
+  worldbuilding pillar the graph's payoff is worldbuilding, not combat, so the objection no longer
+  applies. Calendar dates flow through the journal's long-reserved `calendarInstant` column.
 - **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
   the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
   **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.
