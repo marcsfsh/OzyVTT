@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Field, IconButton, Input, Modal, SegmentedControl, Select, Switch, Textarea } from "@vtt/ui";
+import { Button, Field, IconButton, Input, Modal, SegmentedControl, Select, Switch, Textarea } from "@vtt/ui";
 import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
 import { RelationshipsPanel } from "./RelationshipsPanel";
+import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
+import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 type BodyTab = "player" | "gm";
@@ -72,6 +74,7 @@ function wikiContext(value: string, caret: number): { start: number; query: stri
 }
 
 export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onRelationshipsChanged }: PageEditorProps) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
   const [tab, setTab] = useState<BodyTab>("player");
@@ -225,7 +228,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
     } catch { setStatus("error"); }
   };
   const remove = async () => {
-    if (!confirm(`Delete "${draft.title || "this page"}"? This cannot be undone.`)) return;
+    if (!(await confirm({ title: "Delete page", body: `Delete "${draft.title || "this page"}"? This cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
     try { await codexApi.deletePage(gmToken, page.id); onDeleted(); } catch { setStatus("error"); }
   };
 
@@ -266,7 +269,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
         </div>
         <div className="codex-editor-actions">
           <span className={`codex-save-status codex-save-${status}`} role="status">{statusLabel}</span>
-          <Switch checked={revealed} onChange={toggleReveal} label={revealed ? "Shown to players" : "GM only"} />
+          <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
           <Button variant="ghost" size="sm" onClick={openRevisions}>History</Button>
           <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
         </div>
@@ -301,8 +304,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             </div>
           )}
           {typeDef.fields.some((field) => field.secret) && (
-            <div className="codex-fields codex-fields-secret">
-              <span className="codex-fields-secret-tag">GM ONLY · hidden from players</span>
+            <div className="codex-fields codex-fields-secret codex-gm-block">
+              <span className="codex-fields-secret-tag"><GmOnlyTag /></span>
               {typeDef.fields.filter((field) => field.secret).map((field) => (
                 <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`} className={field.kind === "textarea" ? "codex-field-wide" : undefined}>
                   {field.kind === "textarea"
@@ -315,7 +318,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
 
           <div className="codex-body-bar">
             <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
-              options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM secret" }]} />
+              options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM only" }]} />
             <Switch checked={preview} onChange={setPreview} label="Preview" aria-label="Toggle preview" />
           </div>
 
@@ -328,7 +331,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
           )}
 
           {preview
-            ? <div className="codex-preview">{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
+            ? <div className={`codex-preview${tab === "gm" ? " is-gm" : ""}`}>{tab === "gm" && <GmOnlyTag floating />}{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
             : <div className={`codex-editor-body${tab === "gm" ? " is-gm" : ""}`} onDrop={onBodyDrop} onDragOver={(event) => event.preventDefault()} onPaste={onBodyPaste}>
                 <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
                   placeholder={tab === "player" ? "What players learn about this place…" : "Secrets, plot hooks, GM notes…"}
@@ -337,7 +340,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
                   onKeyUp={(event) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0); }}
                   onClick={(event) => syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0)}
                   onBlur={() => window.setTimeout(() => setSuggest(null), 150)} />
-                {tab === "gm" && <span className="codex-gm-tag" aria-hidden="true">GM ONLY</span>}
+                {tab === "gm" && <GmOnlyTag floating />}
                 {suggest && suggestions.length > 0 && (
                   <ul className="codex-wiki-suggest" role="listbox" aria-label="Link to page">
                     {suggestions.map((candidate, index) => (
@@ -390,7 +393,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
         </Modal>
       )}
 
-      <div className="codex-editor-foot"><Badge tone={revealed ? "success" : "neutral"}>{revealed ? "Visible to players when revealed" : "Secret"}</Badge></div>
+      {confirmDialog}
     </div>
   );
 }

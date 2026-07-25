@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Tabs } from "@vtt/ui";
+import { Badge, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
 import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -22,7 +22,7 @@ function whenLabel(entry: PlayerCodexJournalEntry): string {
   return entry.inWorldLabel ?? (entry.sessionNumber !== null ? `Session ${entry.sessionNumber}` : entry.realDate ?? new Date(entry.createdAt).toLocaleDateString());
 }
 
-export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClose?: () => void }>) {
+export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () => void }>) {
   const [view, setView] = useState<PlayerView>("world");
   const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
   const [rels, setRels] = useState<CodexRelationshipEdge[]>([]);
@@ -72,7 +72,6 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
       <div className="codex-modebar">
         <Tabs ariaLabel="Codex" activeId={view} onChange={(id) => setView(id as PlayerView)}
           tabs={[{ id: "world", label: "World" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
-        {onClose && <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>}
       </div>
 
       {error && <p className="codex-rail-error" role="alert">{error}</p>}
@@ -84,7 +83,8 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
       )}
 
       {view === "graph" && (
-        <RelationshipGraph nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} onOpen={openPage} />
+        <RelationshipGraph nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} onOpen={openPage}
+          emptyState={<><h3>Nothing connected yet</h3><p>As the GM reveals people and places, the links between them appear here.</p></>} />
       )}
 
       {view === "lore" && (
@@ -113,7 +113,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
                   <div className="codex-reader-body">{page.body.trim() ? <CodexMarkdown text={page.body} onNavigate={navigate} token={token} /> : <p className="codex-preview-empty">Nothing written here yet.</p>}</div>
                   {pageRels.length > 0 && (
                     <div className="codex-reader-rels">
-                      <h3 className="codex-backlinks-title">Connections</h3>
+                      <h4 className="codex-backlinks-title">Relationships</h4>
                       <ul className="codex-rels-list">
                         {pageRels.map((rel) => (
                           <li key={rel.id} className="codex-rels-item">
@@ -150,7 +150,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
             {timeline.length === 0 && <p className="codex-list-empty">No entries revealed yet.</p>}
             {timeline.map((entry) => (
               <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
-                <header className="codex-entry-head"><span className="codex-entry-when">{whenLabel(entry)}</span></header>
+                <header className="codex-entry-head codex-entry-meta">{entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}<span className="codex-entry-when">{whenLabel(entry)}</span></header>
                 <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} token={token} /></div>
               </article>
             ))}

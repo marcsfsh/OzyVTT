@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { Button } from "@vtt/ui";
 import { entityColor, entityIcon, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
 import { type CodexRelationshipEdge } from "./api";
@@ -62,8 +62,12 @@ function computeLayout(nodes: readonly GraphNode[], edges: readonly CodexRelatio
     }
     temp = Math.max(temp * 0.96, 4);
   }
-  // Frame: center + scale to fit the viewBox so every node (incl. orphans flung outward) is visible.
-  const xs = [...pos.values()].map((point) => point.x), ys = [...pos.values()].map((point) => point.y);
+  // Frame on the CONNECTED web (nodes with at least one edge) so the graph opens on the story, not on
+  // orphan nodes flung to the margins. Orphans stay reachable by panning; with no edges at all, frame everything.
+  const linkedIds = new Set<string>();
+  for (const edge of links) { linkedIds.add(edge.fromPageId); linkedIds.add(edge.toPageId); }
+  const framedIds = linkedIds.size > 0 ? ids.filter((id) => linkedIds.has(id)) : ids;
+  const xs = framedIds.map((id) => pos.get(id)!.x), ys = framedIds.map((id) => pos.get(id)!.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
   const fit = Math.min((VB.w - 150) / (maxX - minX || 1), (VB.h - 170) / (maxY - minY || 1), 1.4);
@@ -71,7 +75,7 @@ function computeLayout(nodes: readonly GraphNode[], edges: readonly CodexRelatio
   return pos;
 }
 
-export function RelationshipGraph({ nodes, edges, onOpen }: Readonly<{ nodes: readonly GraphNode[]; edges: readonly CodexRelationshipEdge[]; onOpen: (pageId: string) => void }>) {
+export function RelationshipGraph({ nodes, edges, onOpen, emptyState }: Readonly<{ nodes: readonly GraphNode[]; edges: readonly CodexRelationshipEdge[]; onOpen: (pageId: string) => void; emptyState?: ReactNode }>) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false); // survives pointerup so the click handler can tell a pan from a tap
@@ -156,13 +160,15 @@ export function RelationshipGraph({ nodes, edges, onOpen }: Readonly<{ nodes: re
   });
 
   if (nodes.length === 0) {
-    return <div className="codex-main-empty"><h3>No entities yet</h3><p>The relationship graph draws every entity and the links between them. Create a few in the Pages tab and connect them.</p></div>;
+    return emptyState
+      ? <div className="codex-main-empty">{emptyState}</div>
+      : <div className="codex-main-empty"><h3>No entities yet</h3><p>The relationship graph draws every entity and the relationships between them. Create a few in the Pages tab and connect them.</p></div>;
   }
 
   return (
     <div className="codex-graph">
       <div className="codex-graph-bar">
-        <span className="codex-graph-hint">{visibleNodes.length} entities · {drawnEdges.length} links · drag to pan, scroll to zoom</span>
+        <span className="codex-graph-hint">{visibleNodes.length} entities · {drawnEdges.length} relationship{drawnEdges.length === 1 ? "" : "s"} · drag to pan, scroll to zoom</span>
         <div className="codex-graph-legend">
           {usedTypes.map((type) => (
             <button key={type} type="button" className={`codex-graph-legenditem${hidden.has(type) ? " is-off" : ""}`} aria-pressed={!hidden.has(type)} title={hidden.has(type) ? `Show ${ENTITY_DEFS[type].label}` : `Hide ${ENTITY_DEFS[type].label}`} onClick={() => toggleType(type)}>
@@ -190,7 +196,7 @@ export function RelationshipGraph({ nodes, edges, onOpen }: Readonly<{ nodes: re
             return (
               <g key={edge.id} className={`codex-graph-edge${lit ? " is-lit" : ""}${dim ? " is-dim" : ""}`}>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd="url(#codex-graph-arrow)" />
-                {(lit || view.k > 1.4) && <text x={midX} y={midY} className="codex-graph-edgelabel">{REL_LABEL.get(edge.type) ?? edge.type}</text>}
+                {(lit || view.k > 1.4 || drawnEdges.length <= 10) && <text x={midX} y={midY} className="codex-graph-edgelabel">{REL_LABEL.get(edge.type) ?? edge.type}</text>}
               </g>
             );
           })}

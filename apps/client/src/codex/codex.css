@@ -133,7 +133,8 @@
   color: var(--cyan); font: inherit; border-bottom: 1px dotted var(--cyan); text-align: left;
 }
 .codex-md-link:hover { color: var(--cyan-hi); }
-.codex-md-link-inert { color: var(--violet); border-bottom-style: solid; cursor: default; }
+/* Inert wiki-link (unresolved / not-yet-revealed): muted, NOT violet - violet is reserved for GM-only content. */
+.codex-md-link-inert { color: var(--text-muted); border-bottom-style: dashed; cursor: default; }
 
 /* Backlinks + revisions */
 .codex-backlinks { border-top: 1px solid var(--line); padding-top: var(--space-3); }
@@ -166,8 +167,13 @@
 .codex-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2) var(--space-3); }
 .codex-field-area { min-height: 3.5em; }
 .codex-field-wide { grid-column: 1 / -1; } /* textareas (goals, properties, traits) span the full row */
-.codex-fields-secret { margin-top: var(--space-3); border-left: 3px solid var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 7%, var(--surface-2)); border-radius: var(--radius-md); padding: var(--space-3); }
-.codex-fields-secret-tag { grid-column: 1 / -1; justify-self: start; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet); background: color-mix(in srgb, var(--violet) 16%, transparent); padding: 2px 8px; border-radius: var(--radius-pill); margin-bottom: var(--space-1); }
+/* One shared "GM-only content" language: a violet block accent + the one "GM only" pill, used identically
+   for secret fields, the GM body (edit + preview), the journal composer's GM field, and posted GM text. */
+.codex-gm-block { border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); border-radius: var(--radius-md); }
+.codex-gm-pill { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--violet-hi); background: color-mix(in srgb, var(--violet) 20%, transparent); padding: 2px 8px; border-radius: var(--radius-pill); }
+.codex-gm-pill.is-floating { position: absolute; top: var(--space-2); right: var(--space-2); pointer-events: none; }
+.codex-fields-secret { margin-top: var(--space-3); padding: var(--space-3); }
+.codex-fields-secret-tag { grid-column: 1 / -1; justify-self: start; margin-bottom: var(--space-1); }
 .codex-tree-icon { flex-shrink: 0; }
 .codex-rels { display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-rels-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
@@ -346,6 +352,10 @@
 .codex-composer { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-composer-head { display: flex; align-items: center; justify-content: space-between; }
 .codex-composer-body { min-height: 4.5rem; resize: vertical; }
+/* The journal composer's GM-only field gets the same violet cue as every other GM-secret content block. */
+.codex-composer-gm { position: relative; }
+.codex-composer-gm .codex-composer-body { border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); }
+.codex-composer-gm-label { display: flex; align-items: center; gap: var(--space-2); }
 .codex-composer-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; }
 .codex-composer-meta > * { flex: 1 1 130px; }
 .codex-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
@@ -357,8 +367,7 @@
 .codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); }
 .codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .codex-entry-body { color: var(--text); }
-.codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; }
-.codex-entry-gm-tag { display: inline-block; font-family: var(--font-display); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet); margin-right: var(--space-2); }
+.codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start; }
 .codex-entry-foot { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
 /* ----- Player Codex ----- */
@@ -377,8 +386,9 @@
 .codex-banner-add:hover { border-color: var(--magenta); color: var(--text); }
 /* Body editor: GM-secret pane is unmistakably marked; wiki-link autocomplete floats under the textarea. */
 .codex-editor-body { position: relative; }
-.codex-editor-body.is-gm .codex-body-input { border-left: 3px solid var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 7%, var(--surface-2)); }
-.codex-gm-tag { position: absolute; top: var(--space-2); right: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; color: var(--violet, #a45cff); background: color-mix(in srgb, var(--violet, #a45cff) 16%, transparent); padding: 2px 6px; border-radius: var(--radius-pill); pointer-events: none; }
+.codex-editor-body.is-gm .codex-body-input { border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); }
+/* GM-secret body in Preview keeps the exact same cue as edit mode - proofreading/screen-sharing must never look player-facing. */
+.codex-preview.is-gm { position: relative; border-left: 3px solid var(--violet); background: color-mix(in srgb, var(--violet) 7%, var(--surface-2)); }
 .codex-wiki-suggest { position: absolute; top: 100%; left: var(--space-2); margin-top: 4px; z-index: 20; min-width: 220px; max-width: calc(100% - 2 * var(--space-2)); list-style: none; padding: var(--space-1); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: 0 12px 32px color-mix(in srgb, var(--void) 55%, transparent); }
 .codex-wiki-suggest-item { display: block; width: 100%; text-align: left; padding: var(--space-1) var(--space-2); border: none; background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; }
 .codex-wiki-suggest-item.is-active { background: var(--surface-3); }

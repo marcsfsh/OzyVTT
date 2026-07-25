@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { Badge, Button, Field, IconButton, Input, Select, Switch } from "@vtt/ui";
+import { Badge, Button, Field, IconButton, Input, Select } from "@vtt/ui";
 import { atlasApi, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker } from "./icons";
 import { EntityPicker } from "./EntityPicker";
+import { RevealSwitch } from "./SecretMarkers";
+import { useConfirm } from "../components/feedback";
+import { useState } from "react";
 
 /**
  * The marker inspector: launch/navigate from a pin, edit its icon/color/label, wire its links (a wiki
@@ -29,6 +31,7 @@ type MarkerInspectorProps = Readonly<{
 }>;
 
 export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onActivateScene, onClose }: MarkerInspectorProps) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
     catch { setError("Couldn't change who can see this pin."); }
   };
   const remove = async () => {
-    if (!confirm("Delete this marker?")) return;
+    if (!(await confirm({ title: "Delete marker", body: "Delete this marker? This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     try { await atlasApi.deleteMarker(gmToken, marker.id); onDeleted(marker.id); }
     catch { setError("Couldn't delete the marker."); }
   };
@@ -60,7 +63,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
       <div className="codex-inspector-head">
         <strong>{marker.label || "Marker"}</strong>
         <div className="codex-inspector-head-actions">
-          <Switch checked={marker.revealedToPlayers} onChange={reveal} label={marker.revealedToPlayers ? "Shown" : "Secret"} />
+          <RevealSwitch revealed={marker.revealedToPlayers} onChange={reveal} ariaLabel="Show this marker to players" />
           <IconButton label="Close" size="sm" onClick={onClose}>✕</IconButton>
         </div>
       </div>
@@ -92,12 +95,14 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
         <p className="codex-inspector-hint">This pin is shown, but its page is still secret — <button type="button" className="codex-linklike" onClick={() => onRevealPage(linkedPage.id)}>reveal the page too</button>.</p>
       )}
 
-      <Field label="Drills into map" htmlFor="marker-submap">
-        <Select id="marker-submap" value={marker.subMapId ?? ""} disabled={busy} onChange={(event) => patch({ subMapId: event.target.value || null })}>
-          <option value="">— none —</option>
-          {subMaps.map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
-        </Select>
-      </Field>
+      {subMaps.length > 0 && (
+        <Field label="Drills into map" htmlFor="marker-submap">
+          <Select id="marker-submap" value={marker.subMapId ?? ""} disabled={busy} onChange={(event) => patch({ subMapId: event.target.value || null })}>
+            <option value="">— none —</option>
+            {subMaps.map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
+          </Select>
+        </Field>
+      )}
 
       {scenes.length > 0 && (
         <Field label="Runs scene" htmlFor="marker-scene" help="Link the encounter you prepared here, then launch it from this pin.">
@@ -110,6 +115,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
       {marker.sceneId && !linkedScene && <p className="codex-inspector-hint">The linked scene was removed. Pick another, or clear it.</p>}
 
       <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete marker</Button></div>
+      {confirmDialog}
     </aside>
   );
 }

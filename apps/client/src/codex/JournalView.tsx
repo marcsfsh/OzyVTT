@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Field, Input, Panel, Select, Switch, Textarea } from "@vtt/ui";
+import { Badge, Button, Field, Input, Panel, Select, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { EntityPicker } from "./EntityPicker";
+import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
+import { useConfirm } from "../components/feedback";
 
 /** A raw in-world date rendered as "Month Day, Year Era" (client-side; the server stores the same shape). */
 function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
@@ -28,6 +30,7 @@ function whenLabel(entry: CodexJournalEntry): string {
 }
 
 export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void }>) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
@@ -72,7 +75,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
     });
   };
   const reveal = async (entry: CodexJournalEntry, revealed: boolean) => { await journalApi.reveal(gmToken, entry.id, revealed); await load(); };
-  const remove = async (entry: CodexJournalEntry) => { if (confirm("Delete this entry?")) { await journalApi.remove(gmToken, entry.id); await load(); } };
+  const remove = async (entry: CodexJournalEntry) => { if (await confirm({ title: "Delete entry", body: "Delete this journal entry? This cannot be undone.", confirmLabel: "Delete", danger: true })) { await journalApi.remove(gmToken, entry.id); await load(); } };
 
   // Group the timeline by in-world year (dated years ascending, undated last).
   const groups = useMemo(() => {
@@ -105,7 +108,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
           </div>
         </div>
         <Field label="What the players know" htmlFor="j-player"><Textarea id="j-player" className="codex-composer-body" value={draft.playerText} placeholder="What happened, as the party would recall it…" onChange={(event) => set({ playerText: event.target.value })} /></Field>
-        <Field label="GM-only notes" htmlFor="j-gm"><Textarea id="j-gm" className="codex-composer-body" value={draft.gmText} placeholder="The truth behind it…" onChange={(event) => set({ gmText: event.target.value })} /></Field>
+        <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm"><Textarea id="j-gm" className="codex-composer-body codex-gm-block" value={draft.gmText} placeholder="The truth behind it…" onChange={(event) => set({ gmText: event.target.value })} /></Field>
         <div className="codex-composer-meta">
           <Field label="Session #" htmlFor="j-session"><Input id="j-session" type="number" inputMode="numeric" value={draft.sessionNumber} onChange={(event) => set({ sessionNumber: event.target.value })} /></Field>
           <Field label="Year" htmlFor="j-year"><Input id="j-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => set({ dateYear: event.target.value })} /></Field>
@@ -114,7 +117,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
           <Field label="Pin to page" htmlFor="j-page"><EntityPicker id="j-page" pages={pages} value={draft.attachPageId || null} onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Pin to page" placeholder="— none —" /></Field>
         </div>
         <div className="codex-composer-foot">
-          <Switch checked={draft.revealed} onChange={(revealed) => set({ revealed })} label={draft.revealed ? "Shown to players" : "GM only"} />
+          <RevealSwitch revealed={draft.revealed} onChange={(revealed) => set({ revealed })} ariaLabel="Show this entry to players" />
           <Button variant="primary" size="sm" disabled={!draft.playerText.trim() && !draft.gmText.trim()} onClick={submit}>{editingId ? "Save entry" : "Add entry"}</Button>
         </div>
       </Panel>
@@ -135,10 +138,10 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
                     {entry.kind === "combat" && <span className="codex-entry-when">{whenLabel(entry)}</span>}
                     {entry.sessionNumber !== null && <span className="codex-entry-when">Session {entry.sessionNumber}</span>}
                   </div>
-                  <Switch checked={entry.revealedToPlayers} onChange={(revealed) => reveal(entry, revealed)} aria-label="Reveal to players" label={entry.revealedToPlayers ? "Shown" : "Secret"} />
+                  <RevealSwitch revealed={entry.revealedToPlayers} onChange={(revealed) => reveal(entry, revealed)} ariaLabel="Show this entry to players" />
                 </header>
                 {entry.playerText.trim() && <div className="codex-entry-body"><CodexMarkdown text={entry.playerText} token={gmToken} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
-                {entry.gmText && <div className="codex-entry-gm"><span className="codex-entry-gm-tag">GM</span><CodexMarkdown text={entry.gmText} token={gmToken} /></div>}
+                {entry.gmText && <div className="codex-entry-gm"><GmOnlyTag /><CodexMarkdown text={entry.gmText} token={gmToken} /></div>}
                 <footer className="codex-entry-foot">
                   {entry.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(entry.attachPageId!)}>Open page</Button>}
                   <Button variant="ghost" size="sm" onClick={() => edit(entry)}>Edit</Button>
@@ -151,6 +154,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
       </div>
 
       {calendarOpen && calendar && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={setCalendar} onClose={() => setCalendarOpen(false)} />}
+      {confirmDialog}
     </div>
   );
 }

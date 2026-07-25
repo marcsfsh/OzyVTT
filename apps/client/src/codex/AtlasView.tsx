@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Switch } from "@vtt/ui";
+import { Badge, Button, Modal } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
 import { MapSurface } from "./MapSurface";
 import { MarkerInspector } from "./MarkerInspector";
+import { RevealSwitch } from "./SecretMarkers";
+import { useConfirm } from "../components/feedback";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
 
 /**
@@ -14,6 +16,7 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
  */
 type AtlasScene = Readonly<{ id: string; name: string }>;
 export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActivateScene }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void }>) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [maps, setMaps] = useState<CodexMap[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -96,7 +99,7 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
     try { onMapReplace(await atlasApi.revealMap(gmToken, currentMap.id, revealed)); }
     catch (revealError) { setError(revealError instanceof Error ? revealError.message : "Couldn't change who can see this map."); }
   };
-  const deleteMap = async () => { if (currentMap && confirm(`Delete map "${currentMap.name}"? Its markers are removed.`)) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); setCurrentMapId(parent); } };
+  const deleteMap = async () => { if (currentMap && await confirm({ title: "Delete map", body: `Delete map "${currentMap.name}"? Its markers are removed.`, confirmLabel: "Delete", danger: true })) { await atlasApi.deleteMap(gmToken, currentMap.id); const parent = currentMap.parentMapId; await loadMeta(); setCurrentMapId(parent); } };
 
   return (
     <div className="codex-atlas">
@@ -111,7 +114,7 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
           ))}
         </nav>
         <div className="codex-atlas-actions">
-          {currentMap && <Switch checked={currentMap.revealedToPlayers} onChange={revealMap} label={currentMap.revealedToPlayers ? "Map shown" : "Map secret"} />}
+          {currentMap && <RevealSwitch revealed={currentMap.revealedToPlayers} onChange={revealMap} ariaLabel="Show this map to players" />}
           {currentMap && <Button variant={placing ? "primary" : "secondary"} size="sm" aria-pressed={placing} onClick={() => setPlacing((value) => !value)}>{placing ? "Placing…" : "Add marker"}</Button>}
           <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>New map</Button>
           {currentMap && <Button variant="ghost" size="sm" onClick={deleteMap}>Delete map</Button>}
@@ -130,21 +133,19 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
           onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onActivateScene={onActivateScene} onClose={() => setSelectedMarkerId(null)} />}
       </div>
 
-      {picking && (
-        <div className="codex-asset-picker" role="dialog" aria-label="Choose a map">
-          <div className="codex-asset-picker-head"><strong>Add a map</strong><button type="button" className="codex-back" onClick={() => setPicking(false)}>✕</button></div>
-          {assetsEmpty(assets) ? <p className="codex-list-empty">No maps uploaded yet. Upload one under Scenes → Manage maps, then come back.</p> : (
-            <div className="codex-asset-grid">
-              {assets.map((asset) => (
-                <button key={asset.id} type="button" className="codex-asset-card" onClick={() => createFromAsset(asset)}>
-                  <span className="codex-asset-name">{asset.name}</span>
-                  <Badge tone="neutral">{asset.kind}</Badge>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <Modal open={picking} onClose={() => setPicking(false)} title="Add a map" size="md" ariaLabel="Choose a map">
+        {assetsEmpty(assets) ? <p className="codex-list-empty">No maps uploaded yet. Upload one under Scenes → Manage maps, then come back.</p> : (
+          <div className="codex-asset-grid">
+            {assets.map((asset) => (
+              <button key={asset.id} type="button" className="codex-asset-card" onClick={() => createFromAsset(asset)}>
+                <span className="codex-asset-name">{asset.name}</span>
+                <Badge tone="neutral">{asset.kind}</Badge>
+              </button>
+            ))}
+          </div>
+        )}
+      </Modal>
+      {confirmDialog}
     </div>
   );
 }

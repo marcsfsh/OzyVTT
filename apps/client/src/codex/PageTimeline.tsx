@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Input } from "@vtt/ui";
 import { socket } from "../socket";
 import { journalApi, type CodexJournalEntry } from "./api";
+import { GmOnlyTag } from "./SecretMarkers";
 
 /**
  * A page's pinned campaign history, shown inline in the editor: every journal entry attached to this
@@ -37,6 +38,7 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
             <li key={entry.id} className="codex-page-timeline-item">
               {entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}
               {(entry.sessionNumber != null || entry.inWorldLabel) && <span className="codex-page-timeline-meta">{[entry.sessionNumber != null ? `S${entry.sessionNumber}` : null, entry.inWorldLabel].filter(Boolean).join(" · ")}</span>}
+              {!entry.playerText.trim() && <GmOnlyTag />}
               <span className="codex-page-timeline-text">{entry.playerText || entry.gmText}</span>
             </li>
           ))}

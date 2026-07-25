@@ -27,18 +27,18 @@ export function RelationshipsPanel({ gmToken, pageId, relationships, pages, onCh
     if (!target) return;
     setBusy(true); setError(null);
     try { await codexApi.addRelationship(gmToken, pageId, target, type); setTarget(""); onChanged(); }
-    catch { setError("Couldn't add that link."); }
+    catch { setError("Couldn't add that relationship."); }
     finally { setBusy(false); }
   };
   const remove = async (relId: string) => {
     try { await codexApi.removeRelationship(gmToken, relId); onChanged(); }
-    catch { setError("Couldn't remove that link."); }
+    catch { setError("Couldn't remove that relationship."); }
   };
 
   return (
     <div className="codex-rels">
       <h4 className="codex-backlinks-title">Relationships</h4>
-      {relationships.length === 0 && <p className="codex-page-timeline-empty">No connections yet.</p>}
+      {relationships.length === 0 && <p className="codex-page-timeline-empty">No relationships yet.</p>}
       {relationships.length > 0 && (
         <ul className="codex-rels-list">
           {relationships.map((rel) => (
@@ -55,7 +55,7 @@ export function RelationshipsPanel({ gmToken, pageId, relationships, pages, onCh
           {RELATIONSHIP_TYPES.map((entry) => <option key={entry.type} value={entry.type}>{entry.label}</option>)}
         </Select>
         <EntityPicker pages={targets} value={target || null} onChange={(id) => setTarget(id ?? "")} ariaLabel="Related entity" placeholder="Search entities…" />
-        <Button variant="secondary" size="sm" disabled={busy || !target} onClick={add}>Link</Button>
+        <Button variant="secondary" size="sm" disabled={busy || !target} onClick={add}>Add</Button>
       </div>
       {error && <p className="codex-inspector-hint" role="alert">{error}</p>}
     </div>
