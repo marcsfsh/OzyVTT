@@ -241,6 +241,16 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     subfolders above the folder's own notes). Live-verified on a seeded World→Region atlas (GM drill chip +
     descend + climb-back; player sees the same chip unlocked after reveal and can drill) and in the notebook
     (root note above the NPCs folder; NPCs' note above its Villains subfolder). check + test (574) + build green.
+  - **Notes tab: three-card layout + draggable folders (follow-up, at the owner's request).** The Pages view
+    is now three distinct cards like a real notes app — notebook tree (left), editor form/body (center), and
+    the **relationships/journal/outline context as its own card** (right, was blended into the editor). Done
+    by making `.codex-main` transparent and carding `.codex-editor-center` + `.codex-editor-context` (context
+    236→288px); the app is a touch wider (`main` 1600→1720px, styles.css) so the row has room, and the cards
+    stack below the three-pane breakpoint (no overflow at 390px). **Folders are now draggable like notes**:
+    drag a folder onto another to nest it, or onto the top level to un-nest — every note + subfolder travels
+    (server `moveFolder` re-paths the subtree); dropping onto self/descendant is rejected. `check` + `test`
+    (**575**) + `build` green; live-verified at 1900px (three cards, app 1720px) + 390px (stacked), and a
+    drag of "Places"→"NPCs" moved Tavern→NPCs/Places and Cellar→NPCs/Places/Basement (API-confirmed).
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
