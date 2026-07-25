@@ -22,6 +22,118 @@ load-bearing decisions in one place plus operating decisions that don't have an 
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **Worldbuilding codex lives OUTSIDE `GameState` (2026-07-24).** The living atlas + two-layer wiki +
+  campaign journal persist in a dedicated `CodexStore` (own tables in `data/vtt.sqlite`), fetched on
+  demand over a `/api/v1/codex` REST router — NOT in the projected `GameState` blob (which
+  re-serializes + rebroadcasts whole on every command). Mutations still walk
+  validate→authorize(GM)→persist and emit a content-free `codex:changed` ping that clients refetch on;
+  `codex-projections.ts` is a second, explicit security boundary for the two-layer (player-facing +
+  GM-secret) model — because player-facing content DOES reach players, this is **not "safe by
+  construction"**, so every player-facing read is an audited strip (player FTS = player body only;
+  player marker projection drops scene/actor + unrevealed page/sub-map links; page media gated on a
+  revealed reference). Mirrors the maps/tokens satellite-store pattern; the public OpenAPI
+  game-command surface is untouched.
+- **The Codex HTTP surface is now part of the documented OpenAPI contract (2026-07-25).** The codex
+  worldbuilding routes (`/api/v1/codex/*` + `/api/v1/codex-assets/*`, ~38 operations) had always been real,
+  UI-driving routes but were never in the served `openApiDocument` — the spec silently omitted the whole
+  surface even though it explicitly aims to "match the real, running routes." They're now documented in
+  `@vtt/api-contract` (CODEX_PATHS/CODEX_ASSET_PATHS + 67 component schemas + operations), rendered into
+  `docs/api-reference.md`, and pinned by `contract.test.ts`. **Auth model documented from the handlers, and
+  it differs from the game API:** codex routes are *session*-authorized (a GM **or** player session — players
+  get the revealed-only projection), never integration-scope `bearerAuth`; every write is GM-only, and
+  folders/revisions/export stay GM-only even for reads. No route/behavior change — the server still serves the
+  same literal byte-identical (`app-map.md`: 94→132 HTTP paths). The codex is a first-party UI surface, so this
+  is documentation completeness, not an invitation to drive it as an external integration. **Footgun for future
+  edits:** the endpoint *grouping* is duplicated in THREE places that must stay in sync — `reference.ts`
+  (`docs/api-reference.md`), the in-app `apps/client/src/integrations/ApiReference.tsx` panel (VTT Setup tab),
+  and this narrative. A new path group (like codex was) is invisible in the docs/UI until a matching `GROUPS`
+  entry is added to the first two, even though it's already in the served document.
+- **A map marker links MANY pages + MANY scenes; a scene is no longer owned by one marker (2026-07-25).**
+  Markers began as one-of-each polymorphic links (`pageId`/`subMapId`/`sceneId`/`actorId`). Pages and
+  scenes became **arrays** (`pageIds`/`sceneIds`, JSON id-array columns, migration v8 backfills the old
+  singular columns which are now dormant; sub-map + actor stay single). This **relaxes the earlier
+  "a scene has one location, so linking it clears any other pin that claimed it" rule** (removed from
+  `updateMarker`): a prepared scene may now sit on several pins, and `markerForScene` — the combat-history
+  bridge's lookup — resolves to the most recently-touched marker (`ORDER BY updated_at DESC`). The reason:
+  the owner wants flexible worldbuilding links (one battle staged in several places; a pin gathering many
+  notes/encounters), and nothing depends on a scene mapping to exactly one marker. **Viewer-safety
+  boundary unchanged in kind:** `projectPlayerMarker` still returns only the revealed subset of a pin's
+  pages and strips scene/actor entirely — the array just moved the filter from one id to a set.
+- **Notebook folders are first-class records, not just page paths (2026-07-25).** Folders originally lived
+  ONLY inside each page's `folder` string, so a folder existed only while a page referenced it — moving the
+  last note out silently erased the folder. Folders are now their own records (`codex_folders`, migration
+  v9); the tree unions records with page-derived paths so an **empty folder persists**. Any folder a page is
+  saved into auto-registers (path + ancestors) via `registerFolderPath`, `moveFolder` carries records with
+  the pages, and `deleteFolder` re-homes every note under it to the top level (never deletes a note). This
+  is GM-only organizational metadata — folder records are never projected to players (the player codex is a
+  flat revealed-page list), so no viewer-safety surface changes. Pages still carry their own `folder` path;
+  a record is just what keeps an empty folder on screen.
+- **Codex satellite-store follow-ups deliberately deferred (2026-07-24).** A four-lens audit of the
+  codex confirmed the off-`GameState` design is sound, and flagged gaps that are **known and accepted
+  for now**, not oversights: (1) the codex has **no integration-API surface** - it wires only
+  `authorizeGm`/`authorizePlayer`, no `credentials.verify()`, no `codex:read/write` `IntegrationScope`,
+  no OpenAPI paths (the token-asset library already has this same gap). Revisit if/when a campaign tool
+  needs scoped codex access; until then the LAN GM UI is the only consumer. (2) Codex **create** routes
+  take no `commandId` - a retried create can duplicate a page/marker/entry, unlike the `expectedRev`
+  path on updates. Accepted for a single-GM tool; add a dedupe window if it bites on flaky mobile.
+  (3) No orphan-asset GC on `codexAssets` and no `DELETE /codex-assets/:id` (mirrors `map-http`'s
+  existing gap); (4) `codex_page_revisions` snapshots every autosave with no prune. All low-severity at
+  home-campaign scale; do not treat their absence as a bug to "fix" without a real trigger.
+- **Worldbuilding is now a core pillar, not out-of-scope (2026-07-24, product-owner directive).** The
+  original constitution listed "campaign wiki" as a do-not-drift boundary. The product owner
+  (garrettpstrand) explicitly redefined the product as a D&D VTT **and** a full worldbuilding platform
+  (World Anvil / Kanka / LegendKeeper class), scoped to a single home group. In flight / planned on top
+  of the existing Codex: **typed entities** (a page has a type - character/location/faction/item/
+  species/religion/event - with structured fields), **typed relationships** (directional, e.g.
+  rules/member-of/enemy-of) + a relationship graph, a **fantasy calendar + timeline**, and a **world
+  home** with tag browsing. Constraints unchanged: two-layer secrecy + viewer-safety on every new
+  surface, server authority, mobile parity, and the codex stays off the `GameState` broadcast. Combat
+  remains combat-first; the two pillars coexist. CLAUDE.md updated to match.
+- **All four worldbuilding pillars shipped (2026-07-25).** The plan above is now built and verified on
+  branch `claude/world-maps-geospatial-db-1kiqez`: (1) typed entities + structured fields + typed
+  relationships (migration v3, viewer-safe `GET /codex/relationships`); (2) GM-defined fantasy calendar
+  + chronological in-world-dated timeline grouped by year (migration v4); (3) a World home (entities by
+  type, tag cloud, recent) with click-to-filter tag/type browsing; (4) an interactive relationship
+  graph (deterministic force layout, viewer-safe feed, no new server code). Each pillar landed `check` +
+  `test` (562) + `build` green with a real Chromium smoke. **This reverses the earlier graph rejection**
+  (recorded in current-state as "mind-map graph — UX-rejected, no combat payoff"): under the
+  worldbuilding pillar the graph's payoff is worldbuilding, not combat, so the objection no longer
+  applies. Calendar dates flow through the journal's long-reserved `calendarInstant` column.
+- **Entity `fields` are two-layer, like the page body (2026-07-25).** A four-lens review found the
+  original single-layer `fields` leaked a revealed entity's secret attributes (e.g. a villain's "Goals &
+  motives") to players on reveal. Decision: structured fields flagged `secret` in the client schema
+  (`entities.ts`) are stored in a separate **`gmFields`** map (codex_pages migration v5) that
+  `projectPlayerPage` strips exactly like `gmBody`. **Three layers of enforcement (a later refinement
+  hardened this):** (1) the client routes secret-schema fields into `gmFields` on save
+  (`splitEntityFields`); (2) the SERVER re-seals `SECRET_FIELD_KEYS` on every write - create, update,
+  and revision-restore - so a secret key can never rest in the player-facing `fields` even from a raw
+  API write or a restored pre-hardening revision; (3) migration v7 backfilled existing rows. The server
+  is therefore NOT schema-agnostic about secrecy - `SECRET_FIELD_KEYS` (server) must stay in sync with
+  the schema's `secret:true` flags (client), the higher-stakes half of the codex vocab-duplication debt.
+  **Invariant for future work:** a new secret field needs THREE coordinated changes - client `secret:true`,
+  server `SECRET_FIELD_KEYS`, and a v7-style backfill migration. Guarded by `codex-http.test.ts` +
+  `codex-store.test.ts` (seal on write, no player-search leak, and v7's SQL against a pre-seal row).
+- **Journal entries persist the raw in-world date, not just the derived instant (2026-07-25).** Storing
+  only `calendar_instant` meant editing the calendar after dating entries silently corrupted their dates
+  and ordering. Entries now also store the literal `{year,month,day}` (migration v6); `setCalendar`
+  transactionally recomputes every dated entry's instant + label from the raw date (non-destructive
+  reflow). Rule: the raw date is the source of truth; the instant is a derived sort key, recomputed.
+- **Codex has ONE secret-language and ONE relationship vocabulary (2026-07-25).** A six-lens UX review
+  found the "players see this / players don't" idea — the codex's signature concept — expressed ~5 ways.
+  Durable rule, enforced by shared components in `apps/client/src/codex/SecretMarkers.tsx`: (1) *record
+  reveal* is always `<RevealSwitch>` → "Shown to players" / "GM only" (never "Map shown/secret",
+  "Shown/Secret", etc.); (2) *GM-only content* is always `<GmOnlyTag>` + the `.codex-gm-block` violet
+  accent, identical on secret fields, the GM body tab AND its preview, the journal composer's GM field,
+  posted GM text, and pinned-timeline GM notes. Violet means GM-only and nothing else (inert wiki-links
+  are muted, not violet). Typed entity edges are **"Relationships"** everywhere; "link"/"Linked from" is
+  reserved for the auto-derived wiki-link/backlink feature. **For future codex work:** reach for
+  `RevealSwitch`/`GmOnlyTag` rather than a new toggle or tag, and don't reintroduce "connections"/"shown"
+  synonyms. Deletes go through the app's `useConfirm()` (never `window.confirm`).
+- **Codex vocab + calendar math still duplicated client/server - accepted debt (2026-07-25).** The
+  architecture review flagged that entity-type/relationship vocab and the calendar instant<->date math
+  live in both client (`entities.ts`, `api.ts`) and server (`codex-store.ts`), hand-synced. NOT hoisted
+  this pass (nothing broken; copies agree). If the codex grows, hoist into `packages/domain` (imported by
+  both sides already).
 - **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
   the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
   **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.

@@ -49,6 +49,47 @@ export const VIEWER_PATHS = {
 } as const;
 
 /**
+ * The worldbuilding Codex surface (`codex-http.ts`), a router mounted separately from `api-v1.ts` like the
+ * map-asset and viewer routers - documented here so the served OpenAPI document matches the real, running
+ * routes. Reads accept a GM **or** player session (a player receives the revealed-only projection - `gmBody`,
+ * GM fields, and unrevealed pages/maps/markers/entries are stripped server-side); every write is GM-only.
+ * `{id}` is OpenAPI-style; the Express router substitutes `:id`.
+ */
+export const CODEX_PATHS = {
+  pages: `${API_NAMESPACE}/codex/pages`,
+  pageById: `${API_NAMESPACE}/codex/pages/{id}`,
+  pageReveal: `${API_NAMESPACE}/codex/pages/{id}/reveal`,
+  pageRelationships: `${API_NAMESPACE}/codex/pages/{id}/relationships`,
+  pageRevisions: `${API_NAMESPACE}/codex/pages/{id}/revisions`,
+  pageRevisionRestore: `${API_NAMESPACE}/codex/pages/{id}/revisions/{revisionId}/restore`,
+  search: `${API_NAMESPACE}/codex/search`,
+  folders: `${API_NAMESPACE}/codex/folders`,
+  foldersMove: `${API_NAMESPACE}/codex/folders/move`,
+  foldersDelete: `${API_NAMESPACE}/codex/folders/delete`,
+  relationships: `${API_NAMESPACE}/codex/relationships`,
+  relationshipById: `${API_NAMESPACE}/codex/relationships/{id}`,
+  maps: `${API_NAMESPACE}/codex/maps`,
+  mapById: `${API_NAMESPACE}/codex/maps/{id}`,
+  mapParent: `${API_NAMESPACE}/codex/maps/{id}/parent`,
+  mapReveal: `${API_NAMESPACE}/codex/maps/{id}/reveal`,
+  mapMarkers: `${API_NAMESPACE}/codex/maps/{id}/markers`,
+  markerById: `${API_NAMESPACE}/codex/markers/{id}`,
+  markerMove: `${API_NAMESPACE}/codex/markers/{id}/move`,
+  markerReveal: `${API_NAMESPACE}/codex/markers/{id}/reveal`,
+  journal: `${API_NAMESPACE}/codex/journal`,
+  journalById: `${API_NAMESPACE}/codex/journal/{id}`,
+  journalReveal: `${API_NAMESPACE}/codex/journal/{id}/reveal`,
+  calendar: `${API_NAMESPACE}/codex/calendar`,
+  export: `${API_NAMESPACE}/codex/export`
+} as const;
+
+/** Codex page media (banners + inline images), content-addressed, separate from map/token assets. See CODEX_PATHS. */
+export const CODEX_ASSET_PATHS = {
+  collection: `${API_NAMESPACE}/codex-assets`,
+  content: `${API_NAMESPACE}/codex-assets/{id}/content`
+} as const;
+
+/**
  * The live-game integration surface (`game-http.ts`): reads project per principal, writes dispatch
  * through the exact same operations the built-in UI's Socket.IO commands use (ADR-0016 - adapters,
  * never forks). `{param}` is OpenAPI-style; the Express router substitutes `:param`.
@@ -509,6 +550,37 @@ const gameCommandOperation = (operationId: string, scope: IntegrationScope, desc
   responses: mutationResponses
 });
 
+// Codex operation builders. Codex routes are session-authorized (GM or player), NOT integration-scope
+// authorized, so they carry gmAuth / playerAuth rather than bearerAuth+scope.
+const codexJson = (schemaRef: string) => ({ content: { "application/json": { schema: { $ref: `#/components/schemas/${schemaRef}` } } } });
+const codexGmOnly = [{ gmAuth: [] }] as const; // GM-only writes
+const codexReadRoles = [{ gmAuth: [] }, { playerAuth: [] }] as const; // reads: a GM or player session; player gets the revealed-only projection
+// Reusable codex schema fragments (shared object refs, like `apiError`, so the served document stays a single literal).
+const codexEntityType = { type: "string", enum: ["note", "character", "location", "faction", "item", "species", "religion", "event"] } as const;
+const codexMapKind = { type: "string", enum: ["battlemap", "regional", "world"] } as const;
+const codexStringMap = { type: "object", additionalProperties: { type: "string" } } as const;
+const codexUuid = { type: "string", format: "uuid" } as const;
+const codexNullableUuid = { type: ["string", "null"], format: "uuid" } as const;
+const codexInWorldDateOrNull = { oneOf: [{ $ref: "#/components/schemas/CodexInWorldDate" }, { type: "null" }] } as const;
+const codexCoord = { type: "number", minimum: 0, maximum: 1_000_000 } as const;
+const codexArrayRef = (schemaRef: string) => ({ type: "array", items: { $ref: `#/components/schemas/${schemaRef}` } });
+const codexDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
+/** One codex operation. `bad`/`notFound`/`conflict` decide which error responses the route can actually return. */
+const codexOp = (operationId: string, security: readonly unknown[], okRef: string, options: { ok?: string; params?: readonly unknown[]; body?: string; description?: string; bad?: boolean; notFound?: boolean; conflict?: boolean } = {}) => ({
+  operationId,
+  security,
+  ...(options.description ? { description: options.description } : {}),
+  ...(options.params ? { parameters: options.params } : {}),
+  ...(options.body ? { requestBody: { required: true, ...codexJson(options.body) } } : {}),
+  responses: {
+    [options.ok ?? "200"]: { description: "Success", ...codexJson(okRef) },
+    ...(options.bad === false ? {} : { "400": apiError }),
+    "401": apiError,
+    ...(options.notFound ? { "404": apiError } : {}),
+    ...(options.conflict ? { "409": apiError } : {})
+  }
+});
+
 export const openApiDocument = {
   openapi: "3.1.0",
   info: {
@@ -637,7 +709,66 @@ export const openApiDocument = {
     [ENCOUNTER_ARCHIVE_PATHS.byId]: {
       get: { operationId: "getEncounterArchive", security: gameSecurity("combat:read"), description: "One archive's full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. GM-grade data - hidden combatants included; never reaches player sessions.", parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], responses: { "200": { description: "The stored document, verbatim", content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveDocumentResponse" } } } }, "400": apiError, "401": apiError, "403": apiError, "404": apiError } },
       delete: { operationId: "deleteEncounterArchive", security: gameSecurity("admin"), description: "Permanently deletes one archived encounter (GM session or an admin-scoped credential).", parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], responses: { "200": { description: "Deleted", content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveDeletedResponse" } } } }, "400": apiError, "401": apiError, "403": apiError, "404": apiError } }
-    }
+    },
+    // ===== Codex: worldbuilding wiki / atlas / journal / calendar (codex-http.ts). Reads GM-or-player; writes GM-only. =====
+    [CODEX_PATHS.pages]: {
+      get: codexOp("listCodexPages", codexReadRoles, "CodexPageListResponse", { bad: false, description: "Every page's summary (a player sees only revealed pages). Optional `folder` (empty string = top level) and `tag` filters.", params: [{ name: "folder", in: "query", schema: { type: "string" } }, { name: "tag", in: "query", schema: { type: "string" } }] }),
+      post: codexOp("createCodexPage", codexGmOnly, "CodexPageResponse", { ok: "201", body: "CodexPageCreateRequest", description: "Creates a page." })
+    },
+    [CODEX_PATHS.search]: { get: codexOp("searchCodex", codexReadRoles, "CodexSearchResponse", { bad: false, description: "Full-text page search, role-scoped. `q` is the query.", params: [{ name: "q", in: "query", schema: { type: "string" } }] }) },
+    [CODEX_PATHS.pageById]: {
+      get: codexOp("getCodexPage", codexReadRoles, "CodexPageDocumentResponse", { bad: false, notFound: true, params: [uuidParam("id")], description: "One page with its backlinks and typed relationships, projected for the caller." }),
+      patch: codexOp("updateCodexPage", codexGmOnly, "CodexPageResponse", { body: "CodexPageUpdateRequest", params: [uuidParam("id")], notFound: true, conflict: true, description: "Edits a page. `expectedRev` rejects a stale write with 409." }),
+      delete: codexOp("deleteCodexPage", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a page; idempotent." })
+    },
+    [CODEX_PATHS.pageReveal]: { post: codexOp("revealCodexPage", codexGmOnly, "CodexPageResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Shows/hides a page to players." }) },
+    [CODEX_PATHS.pageRelationships]: { post: codexOp("createCodexRelationship", codexGmOnly, "CodexRelationshipResponse", { ok: "201", body: "CodexRelationshipCreateRequest", params: [uuidParam("id")], notFound: true, description: "Adds a typed relationship edge from this page to another." }) },
+    [CODEX_PATHS.pageRevisions]: { get: codexOp("listCodexPageRevisions", codexGmOnly, "CodexRevisionListResponse", { bad: false, notFound: true, params: [uuidParam("id")], description: "Autosaved revision history for a page." }) },
+    [CODEX_PATHS.pageRevisionRestore]: { post: codexOp("restoreCodexPageRevision", codexGmOnly, "CodexPageResponse", { params: [uuidParam("id"), { name: "revisionId", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], notFound: true, description: "Restores a page to a prior revision." }) },
+    [CODEX_PATHS.folders]: {
+      get: codexOp("listCodexFolders", codexGmOnly, "CodexFolderListResponse", { bad: false, description: "Every explicitly-created folder path; lets an empty folder persist." }),
+      post: codexOp("createCodexFolder", codexGmOnly, "CodexFolderCreatedResponse", { ok: "201", body: "CodexFolderPathRequest", description: "Creates (or keeps) an empty folder." })
+    },
+    [CODEX_PATHS.foldersMove]: { post: codexOp("moveCodexFolder", codexGmOnly, "CodexFolderMovedResponse", { body: "CodexFolderMoveRequest", description: "Renames/moves a folder subtree, re-pathing every page under it. Returns how many pages moved." }) },
+    [CODEX_PATHS.foldersDelete]: { post: codexOp("deleteCodexFolder", codexGmOnly, "CodexDeletedResponse", { body: "CodexFolderPathRequest", description: "Deletes a folder and its subfolders; every page under it drops to the top level - never deleted." }) },
+    [CODEX_PATHS.relationships]: { get: codexOp("listCodexRelationships", codexReadRoles, "CodexRelationshipEdgeListResponse", { bad: false, description: "Every relationship edge for the graph, role-scoped (a player sees only edges whose BOTH endpoints are revealed)." }) },
+    [CODEX_PATHS.relationshipById]: { delete: codexOp("deleteCodexRelationship", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Removes one relationship edge; idempotent." }) },
+    [CODEX_PATHS.maps]: {
+      get: codexOp("listCodexMaps", codexReadRoles, "CodexMapListResponse", { bad: false, description: "The atlas map tree, role-scoped (a player sees only revealed maps; a revealed map keeps its parent link only when that parent is itself revealed)." }),
+      post: codexOp("createCodexMap", codexGmOnly, "CodexMapResponse", { ok: "201", body: "CodexMapCreateRequest", notFound: true, description: "Turns an uploaded map asset into an atlas map node." })
+    },
+    [CODEX_PATHS.mapById]: {
+      patch: codexOp("updateCodexMap", codexGmOnly, "CodexMapResponse", { body: "CodexMapUpdateRequest", params: [uuidParam("id")], notFound: true, description: "Renames/retypes a map." }),
+      delete: codexOp("deleteCodexMap", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a map and its markers; idempotent." })
+    },
+    [CODEX_PATHS.mapParent]: { post: codexOp("setCodexMapParent", codexGmOnly, "CodexMapResponse", { body: "CodexMapParentRequest", params: [uuidParam("id")], notFound: true, description: "Re-parents a map in the atlas tree (null = a root map)." }) },
+    [CODEX_PATHS.mapReveal]: { post: codexOp("revealCodexMap", codexGmOnly, "CodexMapResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Shows/hides a map to players." }) },
+    [CODEX_PATHS.mapMarkers]: {
+      get: codexOp("listCodexMarkers", codexReadRoles, "CodexMarkerListResponse", { bad: false, notFound: true, params: [uuidParam("id")], description: "Markers on a map, role-scoped (a player only for a revealed map, and each pin's links filtered to the revealed subset)." }),
+      post: codexOp("createCodexMarker", codexGmOnly, "CodexMarkerResponse", { ok: "201", body: "CodexMarkerCreateRequest", params: [uuidParam("id")], notFound: true, description: "Drops a marker on a map." })
+    },
+    [CODEX_PATHS.markerById]: {
+      patch: codexOp("updateCodexMarker", codexGmOnly, "CodexMarkerResponse", { body: "CodexMarkerUpdateRequest", params: [uuidParam("id")], notFound: true, description: "Edits a marker's icon/label/links." }),
+      delete: codexOp("deleteCodexMarker", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a marker; idempotent." })
+    },
+    [CODEX_PATHS.markerMove]: { post: codexOp("moveCodexMarker", codexGmOnly, "CodexMarkerResponse", { body: "CodexMarkerMoveRequest", params: [uuidParam("id")], notFound: true, description: "Repositions a marker in normalized map coordinates." }) },
+    [CODEX_PATHS.markerReveal]: { post: codexOp("revealCodexMarker", codexGmOnly, "CodexMarkerResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Shows/hides a marker to players." }) },
+    [CODEX_PATHS.journal]: {
+      get: codexOp("listCodexJournal", codexReadRoles, "CodexJournalListResponse", { bad: false, notFound: true, description: "The campaign timeline, or a location's mini-timeline via `markerId`/`pageId`, role-scoped (a player only for a revealed marker/page, and only revealed entries).", params: [{ name: "markerId", in: "query", schema: { type: "string", format: "uuid" } }, { name: "pageId", in: "query", schema: { type: "string", format: "uuid" } }] }),
+      post: codexOp("createCodexJournalEntry", codexGmOnly, "CodexJournalEntryResponse", { ok: "201", body: "CodexJournalWriteRequest", description: "Adds a journal/timeline entry." })
+    },
+    [CODEX_PATHS.journalById]: {
+      patch: codexOp("updateCodexJournalEntry", codexGmOnly, "CodexJournalEntryResponse", { body: "CodexJournalWriteRequest", params: [uuidParam("id")], notFound: true, description: "Edits a journal entry." }),
+      delete: codexOp("deleteCodexJournalEntry", codexGmOnly, "CodexDeletedResponse", { bad: false, params: [uuidParam("id")], description: "Deletes a journal entry; idempotent." })
+    },
+    [CODEX_PATHS.journalReveal]: { post: codexOp("revealCodexJournalEntry", codexGmOnly, "CodexJournalEntryResponse", { body: "CodexRevealRequest", params: [uuidParam("id")], notFound: true, description: "Shows/hides a journal entry to players." }) },
+    [CODEX_PATHS.calendar]: {
+      get: codexOp("getCodexCalendar", codexReadRoles, "CodexCalendarResponse", { bad: false, description: "The world's calendar (months, weekdays, era, current date)." }),
+      put: codexOp("setCodexCalendar", codexGmOnly, "CodexCalendarResponse", { body: "CodexCalendarRequest", description: "Replaces the world calendar." })
+    },
+    [CODEX_PATHS.export]: { get: codexOp("exportCodex", codexGmOnly, "CodexExportResponse", { bad: false, description: "A full codex backup bundle for round-trip." }) },
+    [CODEX_ASSET_PATHS.collection]: { post: { operationId: "uploadCodexAsset", security: codexGmOnly, description: "Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201.", parameters: [{ name: "filename", in: "query", schema: { type: "string" } }], requestBody: { required: true, content: { "image/*": { schema: { type: "string", format: "binary" } } } }, responses: { "201": { description: "New image stored", ...codexJson("CodexAssetUploadResponse") }, "200": { description: "Identical bytes already stored; the existing asset is returned", ...codexJson("CodexAssetUploadResponse") }, "400": apiError, "401": apiError } } },
+    [CODEX_ASSET_PATHS.content]: { get: { operationId: "getCodexAssetContent", security: codexReadRoles, description: "Original image bytes for a page banner/inline image. GM always; a player only when the asset is used by a revealed page. Supports ETag/If-None-Match (304); sent with `Cache-Control: private, no-store`.", parameters: [uuidParam("id")], responses: { "200": { description: "Full image bytes" }, "304": { description: "Not modified" }, "403": apiError, "404": apiError } } }
   },
   components: {
     securitySchemes: {
@@ -770,7 +901,75 @@ export const openApiDocument = {
       FogPaintRequest: { type: "object", additionalProperties: false, required: ["op", "rect"], properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, op: { type: "string", enum: ["reveal", "hide"] }, rect: { type: "object", additionalProperties: false, required: ["x", "y", "width", "height"], properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number", exclusiveMinimum: 0 }, height: { type: "number", exclusiveMinimum: 0 } }, description: "Image-pixel rect; snapped to whole grid cells on calibrated unrotated maps and clamped to the map" }, sceneId: { type: "string", format: "uuid" } } },
       FogResetRequest: { type: "object", additionalProperties: false, properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 }, sceneId: { type: "string", format: "uuid" } } },
       PlayerSessionIssuedData: { type: "object", additionalProperties: false, required: ["token", "sessionId"], properties: { token: { type: "string", minLength: 1, description: "Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust)." }, sessionId: { type: "string", format: "uuid" } } },
-      PlayerSessionIssuedResponse: envelopeSchema("#/components/schemas/PlayerSessionIssuedData")
+      PlayerSessionIssuedResponse: envelopeSchema("#/components/schemas/PlayerSessionIssuedData"),
+      // ===== Codex: worldbuilding data, request bodies, and response envelopes (codex-http.ts) =====
+      CodexPageSummary: { type: "object", additionalProperties: false, required: ["id", "title", "entityType", "fields", "folder", "tags", "revealedToPlayers", "bannerAssetId", "rev", "createdAt", "updatedAt"], properties: { id: codexUuid, title: { type: "string" }, entityType: codexEntityType, fields: { ...codexStringMap, description: "Player-facing typed entity fields (free-form key/value)." }, folder: { type: ["string", "null"] }, tags: { type: "array", items: { type: "string" } }, revealedToPlayers: { type: "boolean" }, bannerAssetId: codexNullableUuid, rev: { type: "integer", minimum: 0 }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+      CodexPage: { type: "object", additionalProperties: false, required: ["id", "title", "entityType", "fields", "gmFields", "folder", "tags", "revealedToPlayers", "bannerAssetId", "playerBody", "gmBody", "rev", "createdAt", "updatedAt"], properties: { id: codexUuid, title: { type: "string" }, entityType: codexEntityType, fields: codexStringMap, gmFields: { ...codexStringMap, description: "GM-only fields; never present in a player projection." }, folder: { type: ["string", "null"] }, tags: { type: "array", items: { type: "string" } }, revealedToPlayers: { type: "boolean" }, bannerAssetId: codexNullableUuid, playerBody: { type: "string", description: "Player-facing markdown body." }, gmBody: { type: "string", description: "GM-only markdown body; stripped from a player projection." }, rev: { type: "integer", minimum: 0 }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+      CodexBacklink: { type: "object", additionalProperties: false, required: ["sourcePageId", "sourceTitle", "section"], properties: { sourcePageId: codexUuid, sourceTitle: { type: "string" }, section: { type: ["string", "null"] } } },
+      CodexRelationship: { type: "object", additionalProperties: false, description: "A relationship seen from one page: the OTHER endpoint resolved plus which way the edge points.", required: ["id", "type", "direction", "otherPageId", "otherTitle", "otherType", "otherRevealed"], properties: { id: codexUuid, type: { type: "string" }, direction: { type: "string", enum: ["out", "in"] }, otherPageId: codexUuid, otherTitle: { type: "string" }, otherType: codexEntityType, otherRevealed: { type: "boolean" } } },
+      CodexRelationshipEdge: { type: "object", additionalProperties: false, required: ["id", "fromPageId", "toPageId", "type", "createdAt"], properties: { id: codexUuid, fromPageId: codexUuid, toPageId: codexUuid, type: { type: "string" }, createdAt: { type: "string", format: "date-time" } } },
+      CodexPageRevision: { type: "object", additionalProperties: false, required: ["id", "pageId", "rev", "title", "playerBody", "gmBody", "bannerAssetId", "tags", "authoredAt", "authorTag"], properties: { id: { type: "integer", minimum: 1 }, pageId: codexUuid, rev: { type: "integer", minimum: 0 }, title: { type: "string" }, playerBody: { type: "string" }, gmBody: { type: "string" }, bannerAssetId: codexNullableUuid, tags: { type: "array", items: { type: "string" } }, authoredAt: { type: "string", format: "date-time" }, authorTag: { type: "string" } } },
+      CodexMap: { type: "object", additionalProperties: false, required: ["id", "assetId", "name", "kind", "parentMapId", "revealedToPlayers", "sortKey", "createdAt", "updatedAt"], properties: { id: codexUuid, assetId: codexUuid, name: { type: "string" }, kind: codexMapKind, parentMapId: { ...codexNullableUuid, description: "Parent map in the atlas tree; for a player, nulled when the parent is not itself revealed." }, revealedToPlayers: { type: "boolean" }, sortKey: { type: "number" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+      CodexMarker: { type: "object", additionalProperties: false, required: ["id", "mapId", "x", "y", "iconId", "iconColor", "label", "revealedToPlayers", "pageIds", "subMapId", "sceneIds", "actorId", "createdAt", "updatedAt"], properties: { id: codexUuid, mapId: codexUuid, x: { type: "number" }, y: { type: "number" }, iconId: { type: "string" }, iconColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: ["string", "null"] }, revealedToPlayers: { type: "boolean" }, pageIds: { type: "array", items: codexUuid, description: "Linked pages; for a player, filtered to the revealed subset." }, subMapId: { ...codexNullableUuid, description: "Drill-down sub-map; nulled for a player when that map is not revealed." }, sceneIds: { type: "array", items: codexUuid, description: "Linked prepared scenes; GM-only, stripped from a player projection." }, actorId: codexNullableUuid, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+      CodexInWorldDate: { type: "object", additionalProperties: false, required: ["year", "month", "day"], properties: { year: { type: "integer" }, month: { type: "integer", minimum: 0, maximum: 23 }, day: { type: "integer", minimum: 1, maximum: 400 } } },
+      CodexJournalEntry: { type: "object", additionalProperties: false, required: ["id", "playerText", "gmText", "revealedToPlayers", "attachMarkerId", "attachPageId", "kind", "sourceEncounterId", "sessionNumber", "realDate", "inWorldLabel", "calendarInstant", "inWorldDate", "sortKey", "createdAt", "updatedAt"], properties: { id: codexUuid, playerText: { type: "string" }, gmText: { type: ["string", "null"], description: "GM-only note; stripped from a player projection." }, revealedToPlayers: { type: "boolean" }, attachMarkerId: codexNullableUuid, attachPageId: codexNullableUuid, kind: { type: "string", enum: ["note", "combat"] }, sourceEncounterId: { type: ["integer", "null"] }, sessionNumber: { type: ["integer", "null"] }, realDate: { type: ["string", "null"] }, inWorldLabel: { type: ["string", "null"] }, calendarInstant: { type: ["number", "null"], description: "Sortable absolute day index derived from the calendar." }, inWorldDate: codexInWorldDateOrNull, sortKey: { type: "number" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+      CodexCalendarMonth: { type: "object", additionalProperties: false, required: ["name", "days"], properties: { name: { type: "string" }, days: { type: "integer", minimum: 1, maximum: 400 } } },
+      CodexCalendar: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string" }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string" } }, currentDate: { ...codexInWorldDateOrNull, description: "Where the campaign 'now' sits; optional." } } },
+      CodexAsset: { type: "object", additionalProperties: false, required: ["id", "width", "height", "mediaType"], properties: { id: codexUuid, width: { type: "integer", minimum: 1 }, height: { type: "integer", minimum: 1 }, mediaType: { type: "string" } } },
+      CodexPageCreateRequest: { type: "object", additionalProperties: false, required: ["title"], properties: { title: { type: "string", minLength: 1, maxLength: 160 }, entityType: codexEntityType, fields: codexStringMap, gmFields: codexStringMap, folder: { type: ["string", "null"], maxLength: 160 }, tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, playerBody: { type: "string", maxLength: 100_000 }, gmBody: { type: "string", maxLength: 100_000 }, revealedToPlayers: { type: "boolean" }, bannerAssetId: codexNullableUuid } },
+      CodexPageUpdateRequest: { type: "object", additionalProperties: false, properties: { title: { type: "string", minLength: 1, maxLength: 160 }, entityType: codexEntityType, fields: codexStringMap, gmFields: codexStringMap, folder: { type: ["string", "null"], maxLength: 160 }, tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } }, playerBody: { type: "string", maxLength: 100_000 }, gmBody: { type: "string", maxLength: 100_000 }, bannerAssetId: codexNullableUuid, expectedRev: { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 if the page moved on." } } },
+      CodexRevealRequest: { type: "object", additionalProperties: false, required: ["revealed"], properties: { revealed: { type: "boolean" } } },
+      CodexFolderPathRequest: { type: "object", additionalProperties: false, required: ["path"], properties: { path: { type: "string", minLength: 1, maxLength: 160 } } },
+      CodexFolderMoveRequest: { type: "object", additionalProperties: false, required: ["from", "to"], properties: { from: { type: "string", minLength: 1, maxLength: 160 }, to: { type: "string", maxLength: 160, description: "Empty string moves the folder to the top level." } } },
+      CodexRelationshipCreateRequest: { type: "object", additionalProperties: false, required: ["toPageId", "type"], properties: { toPageId: codexUuid, type: { type: "string", minLength: 1, maxLength: 40 } } },
+      CodexMapCreateRequest: { type: "object", additionalProperties: false, required: ["assetId", "name", "kind"], properties: { assetId: codexUuid, name: { type: "string", minLength: 1, maxLength: 120 }, kind: codexMapKind, parentMapId: codexNullableUuid, revealedToPlayers: { type: "boolean" } } },
+      CodexMapUpdateRequest: { type: "object", additionalProperties: false, properties: { name: { type: "string", minLength: 1, maxLength: 120 }, kind: codexMapKind } },
+      CodexMapParentRequest: { type: "object", additionalProperties: false, required: ["parentMapId"], properties: { parentMapId: codexNullableUuid } },
+      CodexMarkerCreateRequest: { type: "object", additionalProperties: false, required: ["x", "y", "iconId", "iconColor"], properties: { x: codexCoord, y: codexCoord, iconId: { type: "string", pattern: "^[a-z0-9][a-z0-9-]*$", maxLength: 60 }, iconColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: ["string", "null"], maxLength: 120 }, revealedToPlayers: { type: "boolean" }, pageIds: { type: "array", maxItems: 24, items: codexUuid }, subMapId: codexNullableUuid, sceneIds: { type: "array", maxItems: 24, items: codexUuid }, actorId: codexNullableUuid } },
+      CodexMarkerUpdateRequest: { type: "object", additionalProperties: false, properties: { x: codexCoord, y: codexCoord, iconId: { type: "string", pattern: "^[a-z0-9][a-z0-9-]*$", maxLength: 60 }, iconColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: ["string", "null"], maxLength: 120 }, revealedToPlayers: { type: "boolean" }, pageIds: { type: "array", maxItems: 24, items: codexUuid }, subMapId: codexNullableUuid, sceneIds: { type: "array", maxItems: 24, items: codexUuid }, actorId: codexNullableUuid } },
+      CodexMarkerMoveRequest: { type: "object", additionalProperties: false, required: ["x", "y"], properties: { x: codexCoord, y: codexCoord } },
+      CodexJournalWriteRequest: { type: "object", additionalProperties: false, properties: { playerText: { type: "string", maxLength: 20_000 }, gmText: { type: ["string", "null"], maxLength: 20_000 }, revealedToPlayers: { type: "boolean" }, attachMarkerId: codexNullableUuid, attachPageId: codexNullableUuid, sessionNumber: { type: ["integer", "null"], minimum: 0, maximum: 100_000 }, realDate: { type: ["string", "null"], maxLength: 40 }, inWorldLabel: { type: ["string", "null"], maxLength: 120 }, inWorldDate: codexInWorldDateOrNull } },
+      CodexCalendarRequest: { type: "object", additionalProperties: false, required: ["yearName", "months", "weekdays"], properties: { yearName: { type: "string", maxLength: 20 }, months: { type: "array", minItems: 1, maxItems: 24, items: { $ref: "#/components/schemas/CodexCalendarMonth" } }, weekdays: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 40 } }, currentDate: codexInWorldDateOrNull } },
+      CodexDeletedData: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } },
+      CodexDeletedResponse: envelopeSchema("#/components/schemas/CodexDeletedData"),
+      CodexPageListData: codexDataObject("pages", codexArrayRef("CodexPageSummary")),
+      CodexPageListResponse: envelopeSchema("#/components/schemas/CodexPageListData"),
+      CodexSearchData: codexDataObject("results", codexArrayRef("CodexPageSummary")),
+      CodexSearchResponse: envelopeSchema("#/components/schemas/CodexSearchData"),
+      CodexPageDocumentData: { type: "object", additionalProperties: false, required: ["page", "backlinks", "relationships"], properties: { page: { $ref: "#/components/schemas/CodexPage" }, backlinks: codexArrayRef("CodexBacklink"), relationships: codexArrayRef("CodexRelationship") } },
+      CodexPageDocumentResponse: envelopeSchema("#/components/schemas/CodexPageDocumentData"),
+      CodexPageData: codexDataObject("page", { $ref: "#/components/schemas/CodexPage" }),
+      CodexPageResponse: envelopeSchema("#/components/schemas/CodexPageData"),
+      CodexFolderListData: codexDataObject("folders", { type: "array", items: { type: "string" } }),
+      CodexFolderListResponse: envelopeSchema("#/components/schemas/CodexFolderListData"),
+      CodexFolderCreatedData: codexDataObject("path", { type: "string" }),
+      CodexFolderCreatedResponse: envelopeSchema("#/components/schemas/CodexFolderCreatedData"),
+      CodexFolderMovedData: codexDataObject("moved", { type: "integer", minimum: 0 }),
+      CodexFolderMovedResponse: envelopeSchema("#/components/schemas/CodexFolderMovedData"),
+      CodexRevisionListData: codexDataObject("revisions", codexArrayRef("CodexPageRevision")),
+      CodexRevisionListResponse: envelopeSchema("#/components/schemas/CodexRevisionListData"),
+      CodexRelationshipData: codexDataObject("relationship", { $ref: "#/components/schemas/CodexRelationshipEdge" }),
+      CodexRelationshipResponse: envelopeSchema("#/components/schemas/CodexRelationshipData"),
+      CodexRelationshipEdgeListData: codexDataObject("relationships", codexArrayRef("CodexRelationshipEdge")),
+      CodexRelationshipEdgeListResponse: envelopeSchema("#/components/schemas/CodexRelationshipEdgeListData"),
+      CodexMapListData: codexDataObject("maps", codexArrayRef("CodexMap")),
+      CodexMapListResponse: envelopeSchema("#/components/schemas/CodexMapListData"),
+      CodexMapData: codexDataObject("map", { $ref: "#/components/schemas/CodexMap" }),
+      CodexMapResponse: envelopeSchema("#/components/schemas/CodexMapData"),
+      CodexMarkerListData: codexDataObject("markers", codexArrayRef("CodexMarker")),
+      CodexMarkerListResponse: envelopeSchema("#/components/schemas/CodexMarkerListData"),
+      CodexMarkerData: codexDataObject("marker", { $ref: "#/components/schemas/CodexMarker" }),
+      CodexMarkerResponse: envelopeSchema("#/components/schemas/CodexMarkerData"),
+      CodexJournalListData: codexDataObject("entries", codexArrayRef("CodexJournalEntry")),
+      CodexJournalListResponse: envelopeSchema("#/components/schemas/CodexJournalListData"),
+      CodexJournalEntryData: codexDataObject("entry", { $ref: "#/components/schemas/CodexJournalEntry" }),
+      CodexJournalEntryResponse: envelopeSchema("#/components/schemas/CodexJournalEntryData"),
+      CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
+      CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
+      CodexExportData: { type: "object", additionalProperties: false, required: ["codex", "exportedAt"], properties: { codex: { type: "object", additionalProperties: true, description: "Opaque backup bundle (round-trips via the codex import surface)." }, exportedAt: { type: "string", format: "date-time" } } },
+      CodexExportResponse: envelopeSchema("#/components/schemas/CodexExportData"),
+      CodexAssetUploadData: codexDataObject("asset", { $ref: "#/components/schemas/CodexAsset" }),
+      CodexAssetUploadResponse: envelopeSchema("#/components/schemas/CodexAssetUploadData")
     }
   }
 } as const;

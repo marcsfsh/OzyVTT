@@ -111,7 +111,8 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   { title: "Reference content", match: (path) => path.startsWith("/api/v1/content") },
   { title: "Encounter archives (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
-  { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") }
+  { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
+  { title: "Codex (worldbuilding wiki, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") }
 ];
 
 const refName = (ref: string) => ref.replace("#/components/schemas/", "");

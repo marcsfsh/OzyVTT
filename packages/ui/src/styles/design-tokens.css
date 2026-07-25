@@ -39,6 +39,17 @@
   --violet-hi: #C79BFF;   /* readable violet for text on dark surfaces */
   --indigo: #5B6EF5;
 
+  /* Codex entity-type accents: a restrained magenta->cyan spectrum aliasing existing brand hues; the
+     entity icon + label always carry the finer distinction, so near-neighbours (base vs -hi) are fine. */
+  --codex-type-note: var(--text-muted);
+  --codex-type-character: var(--magenta);
+  --codex-type-event: var(--magenta-hi);
+  --codex-type-location: var(--cyan);
+  --codex-type-species: var(--cyan-hi);
+  --codex-type-faction: var(--violet);
+  --codex-type-religion: var(--violet-hi);
+  --codex-type-item: var(--indigo);
+
   /* Semantic (hue is a hint; always pair with icon + label) */
   --primary: var(--magenta);
   --success: var(--cyan);

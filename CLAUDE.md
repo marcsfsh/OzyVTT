@@ -8,16 +8,21 @@ paste them here.
 
 ## Product identity
 
-A private, LAN-hosted, **combat-first D&D 5e virtual tabletop** for one trusted GM
-and a small home group. Players join from a phone or laptop, claim a character, and
-share the same responsive combat experience. No accounts, no cloud, no public SaaS.
+A private, LAN-hosted **D&D 5e virtual tabletop _and_ worldbuilding platform** for one
+trusted GM and a small home group. Two first-class pillars: (1) a **combat-first** table —
+players join from a phone or laptop, claim a character, and share the same responsive combat
+experience; and (2) a **worldbuilding Codex** — a typed-entity wiki (characters, locations,
+factions, items, …), an interactive atlas, a campaign journal/timeline, and a fantasy calendar,
+all two-layer (player-facing + GM-secret) and viewer-safe. No accounts, no cloud, no public SaaS.
 
-Design philosophy: **combat-first, "just works," everything needed and nothing
-unnecessary.** When in doubt, favor the obvious GM action over another settings knob.
+Design philosophy: **"just works," everything needed and nothing unnecessary.** Combat stays
+combat-first (favor the obvious GM action over another settings knob); the Codex is a real
+worldbuilding tool (World Anvil / Kanka / LegendKeeper class) but bounded to a single home group.
 
-**Scope boundaries (do not drift into these):** not a character *builder yet* (an
-interactive play sheet ships now; the guided builder is the next roadmap update — ADR-0021),
-campaign wiki, voice/video service, public/multi-tenant SaaS, macro language, or 3D tabletop.
+**Scope boundaries (do not drift into these):** not a character *builder yet* (an interactive
+play sheet ships now; the guided builder is a roadmap update — ADR-0021), voice/video service,
+public/multi-tenant SaaS, macro language, or 3D tabletop. (The worldbuilding wiki was formerly
+out of scope; it is now a core pillar — see decision-log 2026-07-24.)
 
 ## Commands
 

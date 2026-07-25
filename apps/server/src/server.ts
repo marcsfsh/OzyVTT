@@ -18,6 +18,8 @@ import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
 import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
 import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
+import { CodexStore } from "./codex-store.js";
+import { createCodexRouter } from "./codex-http.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -70,6 +72,8 @@ export function createServer(options: CreateServerOptions) {
   const tokenCatalog = new TokenCatalogStore(options.databasePath);
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
+  const codexStore = new CodexStore(options.databasePath);
+  const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), { maxBytes: 10 * 1024 * 1024, maxDimensionPx: 4096, maxPixels: 4096 * 4096 });
   const contentLibrary = new ContentLibrary();
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
@@ -108,6 +112,10 @@ export function createServer(options: CreateServerOptions) {
       if (token && !gm && !player) { socket.disconnect(true); continue; }
       socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
     }
+  }
+  /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
+  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal") {
+    io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
   }
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
@@ -201,7 +209,21 @@ export function createServer(options: CreateServerOptions) {
     gmView: (state) => gmView(state),
     playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
     random: (sides) => randomInt(1, sides + 1),
-    newId: randomUUID
+    newId: randomUUID,
+    onEncounterArchived: ({ sceneId, turnCount }) => {
+      // Combat-history bridge: log the fight to the codex timeline, pinned to its location marker if one links this scene.
+      try {
+        const latest = store.listEncounterArchives()[0];
+        if (!latest) return;
+        const marker = sceneId ? codexStore.markerForScene(sceneId) : null;
+        const turns = turnCount > 0 ? ` (${turnCount} ${turnCount === 1 ? "turn" : "turns"})` : "";
+        codexStore.appendCombatEntry({ sourceEncounterId: latest.id, attachMarkerId: marker?.id ?? null, attachPageId: marker?.pageIds[0] ?? null, playerText: `A battle was fought here${turns}.` });
+        notifyCodexChanged("journal");
+      } catch (error) {
+        // Best-effort - a codex hiccup must never affect ending a fight - but don't fail silently.
+        console.error("codex combat-history bridge failed to log the encounter:", error instanceof Error ? error.message : error);
+      }
+    }
   });
   const commandRegistry = gameCommandRegistry(operations);
 
@@ -310,8 +332,10 @@ export function createServer(options: CreateServerOptions) {
     catalog: mapCatalog,
     authorizeGm,
     authorizePlayer: (token, assetId) => {
+      if (auth.verifyPlayer(token) === null) return false;
       const combat = store.snapshot.combat;
-      return auth.verifyPlayer(token) !== null && combat.active && combat.mapAssetId === assetId;
+      // A player may load the active battle map's image, or the image of any revealed atlas map.
+      return (combat.active && combat.mapAssetId === assetId) || codexStore.isAssetRevealedToPlayers(assetId);
     },
     authorizeViewer: (token, assetId) => {
       if (!token) return false;
@@ -332,6 +356,13 @@ export function createServer(options: CreateServerOptions) {
       try { viewerAccess.verify(token); return viewerPresentation.project().enabled && store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId); }
       catch { return false; }
     }
+  }));
+  app.use(createCodexRouter({
+    store: codexStore,
+    assets: codexAssets,
+    authorizeGm,
+    authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+    notifyChanged: notifyCodexChanged
   }));
   const gameApiRouter = createGameApiRouter({
     operations,
@@ -534,7 +565,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize(), codexAssets.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {

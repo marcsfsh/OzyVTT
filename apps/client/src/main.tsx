@@ -13,6 +13,8 @@ import { CombatLogPanel } from "./encounter/CombatLog";
 import { IntegrationsPanel } from "./integrations/IntegrationsPanel";
 import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
+import { CodexWorkspace } from "./codex/CodexWorkspace";
+import { PlayerCodex } from "./codex/PlayerCodex";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { SceneGallery } from "./scenes/SceneGallery";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
@@ -33,13 +35,14 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "scenes" | "table" | "roster" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "roster" | "codex" | "viewer" | "replay" | "setup";
 // v4 #10: reordered to Encounter | Scenes | Character Roster | ... | VTT Setup; Viewer is kept (it drives
 // the shared screen) and placed after Character Roster.
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "table", label: "Encounter" },
   { id: "scenes", label: "Scenes" },
   { id: "roster", label: "Character Roster" },
+  { id: "codex", label: "Codex" },
   { id: "viewer", label: "Viewer" },
   { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
@@ -57,6 +60,7 @@ function App() {
   const [selectedMap, setSelectedMap] = useState<MapSelection | null>(null);
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
+  const [playerCodexOpen, setPlayerCodexOpen] = useState(false);
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const previewSceneId = usePreviewScene();
   const [scenePrepOpen, setScenePrepOpen] = useState(false);
@@ -285,6 +289,9 @@ function App() {
         onChange={(id) => setGmTab(id as GmTab)}
       />}
 
+      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => setPlayerCodexOpen(true)}>Open Codex</Button></div>}
+      {mode === "player" && playerCodexOpen && mapToken && <Modal open onClose={() => setPlayerCodexOpen(false)} size="lg" title="Codex" ariaLabel="Codex"><PlayerCodex token={mapToken} onClose={() => setPlayerCodexOpen(false)} /></Modal>}
+
       {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
         <section className="table" ref={measureTablePanel}>
           {/* Scene IA lives where the GM plays: stage, switch, and create scenes from one strip.
@@ -353,6 +360,10 @@ function App() {
 
       {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
       {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
+      {mode === "gm" && gmToken && gmTab === "codex" && <div className="anim-view"><CodexWorkspace gmToken={gmToken}
+        scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
+        activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
+        onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }} /></div>}
 
       {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 

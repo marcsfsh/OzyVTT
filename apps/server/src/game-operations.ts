@@ -128,6 +128,8 @@ export type GameOperationsContext = Readonly<{
   /** Uniform die: an integer in [1, sides]. */
   random: (sides: number) => number;
   newId: () => string;
+  /** Best-effort hook fired after an encounter is archived, so the worldbuilding codex can log a combat-history entry against its location. Implementations MUST swallow their own errors - a codex hiccup can never affect ending a fight. */
+  onEncounterArchived?: (info: Readonly<{ mapAssetId: string | null; sceneId: string | null; turnCount: number }>) => void;
 }>;
 
 /** Every mutation resolves to at least the accepted revision + idempotent-duplicate flag; commands add their own extras. */
@@ -248,9 +250,14 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, expectedRevision } = request;
       const tag = principalTag(principal);
       let effectEvents: EffectNarration[] = [];
+      let endedSceneId: string | null = null;
+      let endedMapAssetId: string | null = null;
+      let endedTurnCount = 0;
       const result = await store.executeTimeline({ id: commandId, type: "encounter.end", expectedRevision, payload: request, principal: tag }, (state, timeline) => {
         // The last live picture of the fight, captured before endEncounter clears the combat.
         const finalState = structuredClone(state);
+        endedSceneId = finalState.combat.activeSceneId;
+        endedMapAssetId = finalState.combat.mapAssetId;
         // The fight's effects end with it (onEnd fires - Frenzy's Exhaustion lands now); scoped to
         // this fight's combatants so a parked scene's effects survive untouched (ADR-0020).
         effectEvents = endEncounterEffects(state, state.combat.initiative.map((entry) => entry.actorId));
@@ -279,6 +286,7 @@ export function createGameOperations(context: GameOperationsContext) {
             attribution: contentLibrary.attribution
           });
           timeline.archive({ commandId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
+          endedTurnCount = document.turnCount;
         }
         timeline.truncateAll(); // the fight is over - its live turn snapshots go with it
         timeline.clearJournal();
@@ -287,6 +295,7 @@ export function createGameOperations(context: GameOperationsContext) {
         await context.publishGameState(result.state);
         context.appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false });
         publishNarrations(effectEvents);
+        context.onEncounterArchived?.({ mapAssetId: endedMapAssetId, sceneId: endedSceneId, turnCount: endedTurnCount });
       }
       return { revision: result.state.revision, duplicate: result.duplicate };
     },

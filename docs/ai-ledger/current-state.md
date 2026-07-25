@@ -8,6 +8,249 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Worldbuilding codex (2026-07-24, branch `claude/world-maps-geospatial-db-1kiqez`).** A GM
+  worldbuilding suite + campaign journal + living atlas, on a new **Codex** GM tab (Pages | Atlas |
+  Journal) plus a read-only **player Codex** (Lore | Atlas | Journal, behind a player "Codex" button).
+  Freeform **two-layer markdown pages** (player-facing + GM-secret body, secret by default) with
+  `[[wiki-links]]`, backlinks, tags, folders, FTS search, revisions/restore, autosave, banner + inline
+  images. A nested **atlas** (world→region→local map tree, cycle-guarded) of an uploaded map asset,
+  with polymorphic **markers** (link a page / sub-map / scene / actor) placed in image-pixel space on a
+  pan/zoom/pinch/drag SVG surface (mirrors `EncounterMap` gestures, `touch-action:none`) + a curated
+  recolorable icon set. A **journal** timeline (two-layer, session/in-world dating, per-page pinning)
+  with an automatic **combat-history bridge** — a logged encounter posts a "battle fought here" entry
+  pinned to the location marker (`onEncounterArchived` hook in `encounterEnd`, best-effort). Plus a
+  **command palette** (Cmd/Ctrl-K), markdown import + JSON export. **Architecture:** a dedicated
+  `CodexStore` (own tables in `data/vtt.sqlite`) + `codex-projections.ts` (viewer-safety boundary) +
+  `/api/v1/codex` REST router + `codex-assets` media store, deliberately **off the GameState
+  broadcast** (mirrors maps/tokens); every write emits a content-free `codex:changed` ping and clients
+  refetch. Secret-by-default; `gmBody`/unrevealed content never reaches players (player FTS indexes
+  only player bodies; player marker projection strips scene/actor links + unrevealed page/sub-map
+  links; page media served to players only when used by a revealed page). Built in 7 slices, each
+  `check` + `test` (466) + `build` green with live API + player-session smokes. Deferred by discovery.
+- **Codex review + bring-to-life pass (2026-07-24, same branch).** After a four-lens audit
+  (viewer-safety / correctness / architecture / UX, each in its own subagent), a round of fixes +
+  features landed on top of the codex:
+  - **Viewer-safety (audited):** fixed a real leak - `projectPlayerMap` returned `parentMapId` even
+    when the parent map was unrevealed (a revealed child leaked a secret ancestor's id); the parent
+    link now resolves reveal-state at the router like markers already did. Hardened the
+    journal-by-attachment route to 404 a hidden marker/page for players. Added **`codex-http.test.ts`**
+    (8 tests) exercising the real network boundary - the audit flagged its absence; it now regression-
+    guards both leaks. Audit verdict otherwise clean; off-`GameState` design judged sound.
+  - **Atlas ↔ combat (the payoff):** a marker can link a prepared **Scene** and **"▶ Go live here"**
+    launches it from the pin (jumps to the table). This armed the previously-dead combat-history
+    bridge (nothing set `marker.sceneId` before). One-tap **"＋ New page"** from a pin; **"reveal the
+    page too"** nudge when a shown pin links a secret page. `markerForScene` now targets the current
+    pin (one scene = one location, enforced on link).
+  - **Notebook (user ask):** Pages became a Notion/Obsidian/OneNote-style space - **nested folder
+    paths** (`NPCs/Villains`) rendered as a collapsible **tree** (`NotebookTree`), collapse state
+    persisted, search overlays a flat list. Then a **three-pane notes layout** (2nd user ask): file
+    explorer (tree, with a per-folder "＋ new note here") | editor (with a folder **breadcrumb**) |
+    context pane (a live **Outline** of the note's headings + backlinks + pinned timeline); panes stack
+    to master-detail on narrow/touch. Verified in-browser at 1360px and 460px.
+  - **Editor:** `[[` **wiki-link autocomplete** (prevents canon forks), **drag/paste images**, an
+    unmistakable **GM-secret pane** (violet border + "GM ONLY" tag), **New ▾ templates**
+    (NPC/Location/Faction), inline **"Logged here"** page timeline (pins now read back).
+  - **Correctness (from the code review):** MapSurface dropped a spurious marker on any pan in
+    place-mode (compared vs last move sample, not gesture start) - fixed, + pointer-cancel discards;
+    PageEditor autosave could 409 against itself and wedge - saves are serialized + resync on conflict;
+    deletes release journal pins instead of dangling; stale marker-label on pin switch; player FTS no
+    longer crowded by unrevealed drafts.
+  - Verified: client+server typecheck, **31 codex server tests** (store+http), full build, and a **real
+    Chromium smoke** (GM login → Codex → nested-folder notes render in the tree → `[[` autocomplete →
+    zero console errors).
+  - **Deferred (recorded, not built):** present-atlas-map→shared-TV (touches the viewer boundary -
+    needs the `authorizeViewer` seam); map legend / marker-list panel; atlas reset/fit-view dock;
+    `useConfirm` for the 4 codex delete flows (still raw `window.confirm`); tag-chip filtering;
+    new-session prefill; `commandId` idempotency on codex creates; `DELETE /codex-assets/:id` + orphan
+    GC; revision-snapshot coalescing; FTS5 boot-resilience; ETag on list reads; integration-API
+    (`codex:read/write`) scopes. Still not built from the original vision: ~~mind-map graph~~ (built,
+    pillar 4 below), ~~fantasy calendar~~ (built, pillar 2 below), page transclusion.
+- **Worldbuilding platform — four pillars (2026-07-25, same branch).** The codex grew from a notebook
+  into a World-Anvil-class worldbuilding tool, built + verified pillar by pillar on top of it:
+  1. **Typed entities + relationships.** A page carries an **entity type** (character / location /
+     faction / item / species / religion / event + plain note), each bringing a set of **structured
+     fields** (autosaved), and **typed relationships** to other entities with a natural-language label
+     per direction ("rules" ↔ "ruled by"). New `entity_type` / `fields` columns + a
+     `codex_relationships` table (migration v3), dedupe + cascade-on-delete, and a
+     `GET /codex/relationships` feed that is **viewer-safe** for players (both endpoints must be
+     revealed). Client: a type selector + fields editor + a Relationships panel in the editor rail;
+     entity icons in the tree; players read fields + revealed links.
+  2. **Fantasy calendar + chronicle.** A GM-defined **calendar** (custom months w/ lengths, weekday
+     names, era suffix; migration v4, sensible default). A **structured in-world date** on a journal
+     entry computes an absolute `calendarInstant` (chronological sort, negative years OK) + a formatted
+     label; the **timeline groups by in-world year** ("1492 DR"), earliest first. instant↔date
+     round-trips for editing.
+  3. **World home + tag browsing.** A **World** tab: entities grouped by type as counted cards, a **tag
+     cloud** (counts, most-used first), and recently-updated; clicking a type or a tag **filters the
+     notebook** (clearable chip). Tags are now first-class (were captured but led nowhere).
+  4. **Relationship graph.** A **Graph** tab drawing the world as a web — entities as type-colored,
+     iconed nodes, typed relationships as directed labeled edges — via a small deterministic
+     force-layout (Fruchterman-Reingold + gravity) framed to fit; pan / zoom / hover, click a node to
+     open it. Reuses the viewer-safe relationships feed (no new server code); `touch-action:none`.
+  Verified per pillar: `check` + `test` (**562**, incl. new calendar + relationship suites) + `build`,
+  each with a real Chromium smoke (fields stored + inverse relationship renders; timeline groups 1400 DR
+  before 1492 DR; World cards/tags filter the notebook; a 4-node/4-edge graph framed + click-opens),
+  zero console errors. Retires the two long-deferred "not built" items and supersedes the earlier
+  UX-rejection of the graph (it now has a worldbuilding, not combat, payoff).
+- **Worldbuilding hardening + polish pass (2026-07-25, same branch).** After a four-lens review of the
+  pillars (viewer-safety / code / architecture / UX, each its own subagent), a round of fixes + polish +
+  capability landed. Now at `check` + `test` (**566**) + `build` green, browser-verified.
+  - **Viewer-safety (blocker fixed):** entity `fields` were single-layer, so a revealed villain's
+    "Goals & motives" leaked to players on reveal. Fields flagged `secret` in the schema now ride a
+    separate **`gmFields`** map (migration v5) that the player projection strips like `gmBody`; the
+    editor shows them in a violet "GM ONLY - hidden from players" block. Regression-tested at the HTTP
+    boundary. Switching a page's entity type now drops the old type's fields (they were surviving
+    invisibly and rendering to players under raw slugs). The whole-graph edge feed now projects through
+    the `codex-projections.ts` choke point (`projectPlayerRelationshipEdges`) instead of a hand-rolled
+    router filter.
+  - **Data integrity:** editing the calendar after dating journal entries silently corrupted them (only
+    a derived instant was stored). Entries now persist the **raw {year,month,day}** (migration v6);
+    `setCalendar` recomputes every dated entry's instant + label from the raw date (non-destructive
+    reflow), and the edit form re-opens what the GM typed. `normalizeCalendar` guards NaN month lengths.
+  - **Capability:** a world **"current date"** (the campaign's now) - a calendar field, a "◈ Now" readout
+    + a "Today" marker in its year on the timeline. **Weekday names** are now wired into dated labels
+    ("Sul, Hammer 15, 1492 DR"). The player Codex gained **World + Graph tabs** (viewer-safe: reuses the
+    revealed-only page list + edge feed) + entity icons + type/tag filtering. A shared searchable
+    **`EntityPicker`** (type-to-filter, chip, icons) replaced the flat entity `<select>` in
+    relationships, journal pins, and marker links.
+  - **Graph:** fixed a real drag-vs-click bug (a pan starting on a node opened it); added a type-filter
+    legend, hover-to-focus a node's neighborhood, node size by connection count, and **+/- zoom buttons**
+    (touch + keyboard couldn't zoom). **Design system:** entity colors were off-palette (green/amber/
+    orange) + hardcoded; replaced with on-brand magenta->cyan spectrum **tokens** (`--codex-type-*`) from
+    one source of truth (`ENTITY_DEFS`), used across tree / World / graph / badges.
+  - **Editor trust:** autosave now flushes on unmount (navigating away within 800ms of an edit no longer
+    drops it). The 5-way Codex switcher moved to `Tabs` (scrolls, no phone overflow). Symmetric
+    relationships (ally/enemy/...) dedupe across direction; FTS indexes field values (public->player
+    index, gm->GM index).
+  - **Deferred (recorded, not built):** player timeline year-grouping (player projection intentionally
+    omits `calendarInstant`); entity-ref field kind (typed link fields vs plain text); bulk
+    reveal/tag/move; one-click "preview codex as a player"; hoist the entity-type + calendar-math vocab
+    (and the `SECRET_FIELD_KEYS`/`secret:true` pair) into a shared package (client + server still
+    duplicate it - accepted debt, flagged by the architecture + viewer-safety reviews).
+- **Worldbuilding refinement pass (2026-07-25, same branch).** A self-review + two fresh audits
+  (viewer-safety re-audit of the final state; a style-guide/design-language audit) closed the gaps the
+  hardening pass left. Now `check` + `test` (**570**) + `build` green, browser-verified.
+  - **Viewer-safety (a real gap I'd missed):** the `gmFields` migration only ADDED an empty column - it
+    never moved a pre-existing `goals` value out of the public `fields` (a character created when
+    `goals` was a plain field would still leak on reveal). Fixed defense-in-depth: the server now
+    **seals** `SECRET_FIELD_KEYS` into `gmFields` on every write (create / update / revision-restore),
+    so a secret can't rest in the player-facing map however it arrived; **migration v7** backfills
+    existing rows. The re-audit otherwise found no leaks across all six surfaces. Also fixed
+    **`exportBundle`** silently dropping `gmFields` (its SELECT omitted the column). Guarded by new tests
+    (raw-write seal, player search can't surface a secret field value, and v7's SQL against a pre-seal row).
+  - **Style guide (a live bug):** three CSS tokens I'd used don't exist (`--fs-lg`, `--fs-2xl`,
+    `--shadow-lg`) - the journal year headers + World stat numbers were rendering at inherited size;
+    fixed to real scale tokens (verified 26px/20px). Entity-type color tokens moved into the
+    authoritative `design-tokens.css`; focus indicators that used magenta are now cyan (the reserved
+    focus color); `font-size:10px` literals + dead hex fallbacks + raw-ms transitions tokenized.
+  - **Mobile parity:** the calendar month/current-date rows reflow at ≤480px (verified no overflow at
+    400px); EntityPicker clear/options + graph legend chips got real touch-size targets; the now-chip
+    truncates; **two-finger pinch-zoom** added to the graph (mirrors `MapSurface`).
+- **Codex design-language pass (2026-07-25, same branch).** A six-agent adversarial UX review (IA/nav,
+  page editor, world+graph, journal/calendar/atlas, player, and cross-cutting coherence) plus a live
+  screenshot walkthrough found the Codex worked but expressed the same ideas many different ways. Landed
+  one coherent language; `check` + `test` (**570**) + `build` green, browser + 402px mobile verified.
+  - **One "public vs GM-only" system, two axes.** A shared `RevealSwitch` (`SecretMarkers.tsx`) replaced
+    four differently-worded reveal toggles with one **"Shown to players" / "GM only"** on pages, journal
+    entries, maps, markers. A shared `GmOnlyTag` + `.codex-gm-block`/`.codex-gm-pill` give ONE violet
+    "GM only" treatment to every GM-secret surface — secret fields, the GM body tab, **its Preview**
+    (previously dropped the cue — a screen-share leak), the journal composer's GM field, posted GM text,
+    pinned-timeline GM notes. Dropped the redundant "Visible to players when revealed" badge; de-conflicted
+    violet (inert wiki-links are now muted, not violet).
+  - **One vocabulary:** **Relationships** everywhere (was connections/links across panel, player reader,
+    graph); "link" reserved for wiki-links; player reader heading matches the GM's.
+  - **Adopted the design system the codex had skipped:** the app's themed confirm dialog + destructive
+    action replace four raw `confirm()`s (page/entry/map/marker delete); the Atlas "new map" picker is a
+    real `Modal` (was an off-screen bare div); player Codex dropped its redundant second "Close".
+  - **Navigation + no-silent-failures:** the Codex mode bar is a bordered sub-toolbar (distinct from the
+    GM tab bar above it); the command palette reaches all five modes; World's GM empty state has a real
+    "New page" CTA; **Species + Event** got create templates (all 8 types now creatable); the journal
+    composer persists an in-progress entry (sessionStorage) across tab switches; import confirms success;
+    player combat journal entries carry a "Battle" badge (not colour alone); the graph frames on the
+    connected web + takes a player-appropriate empty state.
+  - **Notebook organizing (follow-up).** The Pages tree gained real Obsidian/OneNote-style organization:
+    a persisted **sort** (Name A-Z / Z-A / Recently edited), **drag-and-drop** a page onto a folder or the
+    top level (desktop) + a per-page **move-to-folder picker** (the touch/everywhere path — mobile parity),
+    **New folder**, and **Rename folder** which re-paths the folder + its descendants via a new bulk server
+    op `moveFolder(from,to)` (`POST /codex/folders/move`, one transaction, no per-page revision, guards
+    self-nesting). Also fixed list/tree titles that were right-aligned (`.codex-list-title` is now `flex:1`).
+    Verified drag + picker + rename + 402px touch, 571 tests.
+  - **Deliberately NOT changed (reviewers split / reversible-risk):** kept the 8 per-type entity colors
+    (the coherence lead flagged entity identity as the one already-consistent system; leave it — icon +
+    label already disambiguate) rather than the world+graph reviewer's color-by-category redesign; kept
+    the secret "Goals" field (unified its look) rather than folding it into the GM body; GM stays defaulted
+    to Pages (first action is actionable) while the player lands on World. Recorded as options, not done.
+  - **Emoji → SVG icon set + copy pass (follow-up, at the owner's request).** Replaced every codex emoji
+    with a hand-drawn **fantasy-cartography SVG set** (`icons.tsx`, ~48 recolorable glyphs). It now backs
+    BOTH the map-marker picker (expanded from 24 flat-modern glyphs and restyled — castles with turrets,
+    hachured peaks, tree clusters, crossed swords, henge, ship, dragon…) AND the typed entities: each type
+    maps to a glyph (`entityIconId`) drawn in its accent colour via `<EntityIcon>`, replacing the emoji at
+    every site (tree, World cards, graph nodes, picker, reader, relationships, templates) plus the editor
+    toolbar's link/image. This **supersedes the "kept the emoji" note above** — the owner found them cheap.
+    Also professionalized the corny helper copy (empty states, journal prompts, "Logged here"→"Journal",
+    etc.). The world+graph reviewer's color-by-category idea remains an option; colours are unchanged.
+  - **Marker multi-linking (follow-up, at the owner's request).** A map pin can now link **many pages**
+    and **many prepared scenes** (was one each) alongside its single drill-down sub-map. The
+    `MarkerInspector` shows each linked page (open) and scene (**▶ Go live**) as its own removable row with
+    an adder below; storage moved to JSON id-array columns (`page_ids_json` / `scene_ids_json`, **migration
+    v8** backfills the old single `page_id`/`scene_id` into one-element arrays — those columns are now
+    dormant), each validated, deduped, and capped at 24. Relaxed the old **"one marker per scene"** rule: a
+    scene may sit on several pins, and the combat-history bridge (`markerForScene`) resolves to the most
+    recently-touched one. Viewer-safety held — the player marker projection ships only the *revealed* subset
+    of a pin's pages and still strips every scene/actor link (`codex-store` + `codex-http` unit tests, plus
+    a live GM-link→player-read check). `check` + `test` (**573**) + `build` green; browser-verified linking
+    2 pages + 2 scenes on one pin with the player seeing only the revealed page, 390px mobile clean.
+  - **Page-editor header fix + notebook subfolders (follow-up, at the owner's request).** Two GM-reported
+    issues in the Codex editor. (1) The title `<input>` was rendering **240px tall** — `.codex-title-input`
+    kept `flex: 1 1 240px` from when it was a row child, but it now sits in the *column* `.codex-editor-
+    titlewrap`, so that basis became 240px of HEIGHT (a huge empty band above the form). Fixed to
+    `width: 100%` (one line, 39px). (2) The typed-entity fields didn't line up: Entity type/Folder/Tags was
+    flexbox (3 cols) while When/Where/Participants below was an auto-fit grid that made **4** cols — nothing
+    aligned. Both rows now share ONE grid (`repeat(auto-fit, minmax(min(220px,100%),1fr))`), so columns line
+    up and collapse 3→2→1 as the panel narrows. (3) **Subfolders**: the notebook already stored/rendered
+    nested folders, but a subfolder could only be made by typing a full `Parent/Child` path; each folder row
+    now has a **New subfolder** action (a `folder-plus` glyph beside Rename + New note) that creates the
+    child under that folder's path. `check` + `test` (573) + `build` green; verified at 1440px (columns
+    align, `NPCs`→`Villains` nests one level deeper) and 390px (fields stack, no overflow, folder actions
+    always shown for touch).
+  - **Persistent folders + reliable note moves + richer markdown (follow-up, at the owner's request).**
+    Folders used to live ONLY in each page's `folder` path, so a folder vanished the moment its last note
+    left, and moving the OPEN note wedged the editor. Now **folders are first-class records** (`codex_folders`,
+    migration v9): the tree unions records with page-derived paths, any folder a page is saved into
+    auto-registers (with ancestors), and New folder / New subfolder create an empty one directly. Added
+    `listFolders`/`createFolder`/`deleteFolder` store ops + GM routes; `moveFolder` (rename) carries records
+    along; **Delete folder** re-homes every note under it to the top level (a note is never deleted) behind a
+    themed confirm. Fixed the **open-page move revert**: `PageEditor` now adopts an external change to the
+    same page (a tree move repaths folder + rev) when it holds no unsaved edits, so its Folder field updates
+    and its next autosave no longer 409s. **Markdown** got real substance: `CodexMarkdown` now also renders
+    `~~strike~~`, `` `code` ``, numbered lists (`<ol>`), blockquotes, and `---` dividers (bullets/numbers group
+    into real `<ul>`/`<ol>`; still display-only + injection-safe), the toolbar gained Strikethrough / Inline
+    code / Numbered list / Quote / Divider, and the easy-to-miss Preview switch became a clear **Edit | View**
+    segmented toggle. `check` + `test` (**574**, +1 folder-record store test) + `build` green; live-verified at
+    1440px (open-note move saves cleanly, empty subfolder persists, create+delete folder, every new markdown
+    format renders, Edit/View round-trips) and 390px (4 folder actions + 12 toolbar buttons fit, no overflow).
+  - **Atlas drill-down chips + notebook note/folder order (follow-up, at the owner's request).** Two more
+    GM-reported gaps. (1) **The atlas could only navigate UP** — the breadcrumb walks the parent chain, so a
+    regional map nested under a world map was unreachable once you left it (the sole way down was a marker's
+    "Drills into map" → Enter). The atlas bar now renders the current map's children as **"Drill into" chips**
+    (GM: a 🔒 flags a child not yet revealed); clicking one descends, the breadcrumb still climbs back. The
+    New-map button reads **"Add sub-map"** on a map and the picker says the new map nests inside the current
+    one, so creating a regional child is obvious. Mirrored in the **player** atlas — viewer-safe, since the
+    chips filter the server's already-revealed-only map projection (no lock/GM state shown to players).
+    (2) **Notebook order**: within any folder, notes now sort **above** subfolders at every level (was:
+    subfolders above the folder's own notes). Live-verified on a seeded World→Region atlas (GM drill chip +
+    descend + climb-back; player sees the same chip unlocked after reveal and can drill) and in the notebook
+    (root note above the NPCs folder; NPCs' note above its Villains subfolder). check + test (574) + build green.
+  - **Notes tab: three-card layout + draggable folders (follow-up, at the owner's request).** The Pages view
+    is now three distinct cards like a real notes app — notebook tree (left), editor form/body (center), and
+    the **relationships/journal/outline context as its own card** (right, was blended into the editor). Done
+    by making `.codex-main` transparent and carding `.codex-editor-center` + `.codex-editor-context` (context
+    236→288px); the app is a touch wider (`main` 1600→1720px, styles.css) so the row has room, and the cards
+    stack below the three-pane breakpoint (no overflow at 390px). **Folders are now draggable like notes**:
+    drag a folder onto another to nest it, or onto the top level to un-nest — every note + subfolder travels
+    (server `moveFolder` re-paths the subtree); dropping onto self/descendant is rejected. `check` + `test`
+    (**575**) + `build` green; live-verified at 1900px (three cards, app 1720px) + 390px (stacked), and a
+    drag of "Places"→"NPCs" moved Tavern→NPCs/Places and Cellar→NPCs/Places/Basement (API-confirmed).
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
