@@ -332,6 +332,16 @@ export const MIGRATIONS = [{
       page_ids_json = CASE WHEN page_id IS NOT NULL THEN json_array(page_id) ELSE '[]' END,
       scene_ids_json = CASE WHEN scene_id IS NOT NULL THEN json_array(scene_id) ELSE '[]' END;
   `
+}, {
+  version: 9,
+  // Folders become first-class records so an empty folder persists (before this, folders lived ONLY in page
+  // paths, so moving the last note out erased the folder). The tree unions these records with page paths;
+  // pages still carry their own `folder` path - a record is just what keeps an empty folder on screen.
+  sql: `
+    CREATE TABLE codex_folders (path TEXT PRIMARY KEY, created_at TEXT NOT NULL);
+    INSERT OR IGNORE INTO codex_folders (path, created_at)
+      SELECT DISTINCT folder, '' FROM codex_pages WHERE folder IS NOT NULL AND folder != '';
+  `
 }];
 
 type PageRow = {
@@ -606,6 +616,7 @@ export class CodexStore {
         .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
       this.rebuildFts(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json);
+      this.registerFolderPath(row.folder, stamp);
       this.snapshotRevision(pageId, row, "codex:create");
       this.bumpRevision();
     });
@@ -646,6 +657,7 @@ export class CodexStore {
         .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
       this.rebuildFts(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json);
+      this.registerFolderPath(next.folder, next.updated_at);
       this.snapshotRevision(pageId, next, authorTag);
       this.bumpRevision();
     });
@@ -673,19 +685,57 @@ export class CodexStore {
     if (!from) throw new Error("Choose a folder to move.");
     const to = folder(toPath); // null => top level
     if (to !== null && (to === from || to.startsWith(`${from}/`))) throw new Error("Can't move a folder into itself.");
+    // Re-path a folder value under `from` onto `to` (used for both pages and folder records).
+    const repath = (value: string): string | null => folder(value === from ? (to ?? "") : to === null ? value.slice(from.length + 1) : to + value.slice(from.length));
     let moved = 0;
     this.transaction(() => {
-      const rows = database.prepare("SELECT id, folder FROM codex_pages WHERE folder = ? OR folder LIKE ?").all(from, `${from}/%`) as { id: string; folder: string }[];
       const stamp = this.stamp();
+      const rows = database.prepare("SELECT id, folder FROM codex_pages WHERE folder = ? OR folder LIKE ?").all(from, `${from}/%`) as { id: string; folder: string }[];
       const update = database.prepare("UPDATE codex_pages SET folder = ?, rev = rev + 1, updated_at = ? WHERE id = ?");
-      for (const row of rows) {
-        const raw = row.folder === from ? (to ?? "") : to === null ? row.folder.slice(from.length + 1) : to + row.folder.slice(from.length);
-        update.run(folder(raw), stamp, row.id); // folder() re-validates depth/length + normalizes "" -> null
-        moved += 1;
-      }
-      if (moved > 0) this.bumpRevision();
+      for (const row of rows) { update.run(repath(row.folder), stamp, row.id); moved += 1; } // folder() re-validates depth/length + normalizes "" -> null
+      // Carry the folder RECORDS along too, so a renamed/moved empty folder keeps existing at its new path.
+      const recs = database.prepare("SELECT path FROM codex_folders WHERE path = ? OR path LIKE ?").all(from, `${from}/%`) as { path: string }[];
+      const dropRec = database.prepare("DELETE FROM codex_folders WHERE path = ?");
+      const addRec = database.prepare("INSERT OR IGNORE INTO codex_folders (path, created_at) VALUES (?, ?)");
+      for (const rec of recs) { dropRec.run(rec.path); const next = repath(rec.path); if (next) addRec.run(next, stamp); }
+      if (moved > 0 || recs.length > 0) this.bumpRevision();
     });
     return moved;
+  }
+
+  /** Every explicitly-created folder path (records only - the tree unions these with page-derived paths). */
+  listFolders(): string[] {
+    return (this.requireDatabase().prepare("SELECT path FROM codex_folders ORDER BY path COLLATE NOCASE").all() as { path: string }[]).map((row) => row.path);
+  }
+  /** Create (or keep) an empty folder that persists with no pages in it. Returns the normalized path. */
+  createFolder(path: string): string {
+    const database = this.requireDatabase();
+    const clean = folder(path);
+    if (!clean) throw new Error("Name the folder.");
+    this.transaction(() => {
+      database.prepare("INSERT OR IGNORE INTO codex_folders (path, created_at) VALUES (?, ?)").run(clean, this.stamp());
+      this.bumpRevision();
+    });
+    return clean;
+  }
+  /** Ensure a page's folder path (and its ancestors) exist as records, so the folder persists once the page leaves. */
+  private registerFolderPath(path: string | null, stamp: string): void {
+    if (!path) return;
+    const insert = this.requireDatabase().prepare("INSERT OR IGNORE INTO codex_folders (path, created_at) VALUES (?, ?)");
+    let acc = "";
+    for (const segment of path.split("/")) { acc = acc ? `${acc}/${segment}` : segment; insert.run(acc, stamp); }
+  }
+  /** Delete a folder (and its subfolders): every page anywhere under it drops to the top level - never deleted. */
+  deleteFolder(path: string): void {
+    const database = this.requireDatabase();
+    const clean = folder(path);
+    if (!clean) return;
+    this.transaction(() => {
+      const stamp = this.stamp();
+      database.prepare("UPDATE codex_pages SET folder = NULL, rev = rev + 1, updated_at = ? WHERE folder = ? OR folder LIKE ?").run(stamp, clean, `${clean}/%`);
+      database.prepare("DELETE FROM codex_folders WHERE path = ? OR path LIKE ?").run(clean, `${clean}/%`);
+      this.bumpRevision();
+    });
   }
 
   deletePage(pageId: string): void {

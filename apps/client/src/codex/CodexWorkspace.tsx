@@ -10,7 +10,7 @@ import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree
 import { EntityIcon } from "./icons";
 import { WorldHome } from "./WorldHome";
 import { RelationshipGraph } from "./RelationshipGraph";
-import { Notice, type NoticeMessage, usePrompt } from "../components/feedback";
+import { Notice, type NoticeMessage, useConfirm, usePrompt } from "../components/feedback";
 import { ENTITY_DEFS, type EntityType } from "./entities";
 import "./codex.css";
 
@@ -38,6 +38,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   const [templateMenu, setTemplateMenu] = useState(false);
   const [pageFilter, setPageFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
   const [edges, setEdges] = useState<CodexRelationshipEdge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[]; relationships: readonly CodexRelationship[] } | null>(null);
@@ -51,11 +52,14 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   const [sort, setSort] = useState<NotebookSort>(() => { try { return (localStorage.getItem("codex-notebook-sort") as NotebookSort) || "name-asc"; } catch { return "name-asc"; } });
   const [movingPageId, setMovingPageId] = useState<string | null>(null);
   const { prompt, dialog: promptDialog } = usePrompt();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // The rail always holds the FULL notebook (for the folder tree + [[ autocomplete)); search is a separate overlay.
   const refreshList = useCallback(async () => {
-    try { const [nextPages, nextEdges] = await Promise.all([codexApi.listPages(gmToken), codexApi.listRelationships(gmToken)]); setPages(nextPages); setEdges(nextEdges); setError(null); }
-    catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
+    try {
+      const [nextPages, nextEdges, nextFolders] = await Promise.all([codexApi.listPages(gmToken), codexApi.listRelationships(gmToken), codexApi.listFolders(gmToken).catch(() => [])]);
+      setPages(nextPages); setEdges(nextEdges); setFolders(nextFolders); setError(null);
+    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
   }, [gmToken]);
 
   useEffect(() => { void refreshList(); }, [refreshList]);
@@ -163,14 +167,14 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
 
   const onPageDeleted = useCallback(() => { setSelectedId(null); setSelected(null); void refreshList(); }, [refreshList]);
 
-  const tree = useMemo(() => buildFolderTree(pages), [pages]);
+  const tree = useMemo(() => buildFolderTree(pages, folders), [pages, folders]);
   const filteredPages = useMemo(() => pages.filter((page) => (!pageFilter.type || page.entityType === pageFilter.type) && (!pageFilter.tag || page.tags.includes(pageFilter.tag))), [pages, pageFilter]);
-  // Every folder path in use (with ancestors), for the "move to folder" picker.
+  // Every folder path (records + those implied by page paths, with ancestors), for the "move to folder" picker.
   const allFolders = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(folders);
     for (const page of pages) { let path = ""; for (const segment of (page.folder ?? "").split("/").map((part) => part.trim()).filter(Boolean)) { path = path ? `${path}/${segment}` : segment; set.add(path); } }
     return [...set].sort((a, b) => a.localeCompare(b));
-  }, [pages]);
+  }, [pages, folders]);
 
   const changeSort = (next: NotebookSort) => { setSort(next); try { localStorage.setItem("codex-notebook-sort", next); } catch { /* private mode */ } };
   const movePage = useCallback(async (id: string, folder: string | null) => {
@@ -182,21 +186,24 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     const id = movingPageId; setMovingPageId(null);
     if (!id) return;
     const name = await prompt({ title: "New folder", body: "Name a folder to move this note into.", placeholder: "e.g. NPCs/Villains", confirmLabel: "Move here" });
-    if (name) await movePage(id, name);
-  };
-  const newFolder = async () => {
-    const name = await prompt({ title: "New folder", body: "Name the folder - a new untitled note will start it off.", placeholder: "e.g. NPCs/Villains", confirmLabel: "Create" });
     if (!name) return;
-    try { const page = await codexApi.createPage(gmToken, { title: "Untitled page", folder: name }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    try { await codexApi.createFolder(gmToken, name); } catch { /* best-effort - the move still files the note there */ }
+    await movePage(id, name);
+  };
+  const openFolder = (path: string) => setCollapsed((prev) => { if (!prev.has(path)) return prev; const next = new Set(prev); next.delete(path); try { localStorage.setItem("codex-notebook-collapsed", JSON.stringify([...next])); } catch { /* private mode */ } return next; });
+  // Folders are real records now, so an empty one persists (created here with no note inside - add notes with ＋).
+  const newFolder = async () => {
+    const name = await prompt({ title: "New folder", body: "Name the folder. It starts empty - add notes to it with the ＋ on its row.", placeholder: "e.g. NPCs", confirmLabel: "Create" });
+    if (!name) return;
+    try { await codexApi.createFolder(gmToken, name); await refreshList(); }
     catch (folderError) { setError(folderError instanceof Error ? folderError.message : "Couldn't create the folder."); }
   };
-  // A subfolder nests under an existing folder path; a fresh untitled note starts it off (folders live only in page paths).
   const newSubfolder = async (parentPath: string) => {
-    const name = await prompt({ title: "New subfolder", body: `Add a subfolder inside "${parentPath}".`, placeholder: "e.g. Villains", confirmLabel: "Create" });
+    const name = await prompt({ title: "New subfolder", body: `Add a subfolder inside "${parentPath}". It starts empty.`, placeholder: "e.g. Villains", confirmLabel: "Create" });
     if (!name) return;
     const child = name.split("/").map((segment) => segment.trim()).filter(Boolean).join("/");
     if (!child) return;
-    try { const page = await codexApi.createPage(gmToken, { title: "Untitled page", folder: `${parentPath}/${child}` }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
+    try { await codexApi.createFolder(gmToken, `${parentPath}/${child}`); openFolder(parentPath); await refreshList(); }
     catch (folderError) { setError(folderError instanceof Error ? folderError.message : "Couldn't create the subfolder."); }
   };
   const renameFolder = async (path: string) => {
@@ -207,6 +214,13 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
     const to = name.includes("/") ? name : parent ? `${parent}/${name}` : name;
     try { await codexApi.moveFolder(gmToken, path, to); await refreshList(); }
     catch (renameError) { setError(renameError instanceof Error ? renameError.message : "Couldn't rename that folder."); }
+  };
+  const deleteFolder = async (path: string) => {
+    const inside = pages.filter((page) => page.folder === path || (page.folder ?? "").startsWith(`${path}/`)).length;
+    const note = inside > 0 ? ` Its ${inside} note${inside === 1 ? "" : "s"} move to the top level (nothing is deleted).` : "";
+    if (!(await confirm({ title: "Delete folder", body: `Delete the folder "${path}"?${note}`, confirmLabel: "Delete folder", danger: true }))) return;
+    try { await codexApi.deleteFolder(gmToken, path); await refreshList(); }
+    catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "Couldn't delete that folder."); }
   };
 
   return (
@@ -285,7 +299,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
                 : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
             : pages.length === 0
                 ? (!error && <p className="codex-list-empty">No pages yet.</p>)
-                : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onNewSubfolder={newSubfolder} onRenameFolder={renameFolder} onMovePage={movePage} onRequestMove={setMovingPageId} />}
+                : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onNewSubfolder={newSubfolder} onRenameFolder={renameFolder} onDeleteFolder={deleteFolder} onMovePage={movePage} onRequestMove={setMovingPageId} />}
         </nav>
       </aside>
       <section className="codex-main">
@@ -304,6 +318,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
         </div>
       </Modal>
       {promptDialog}
+      {confirmDialog}
     </div>
   );
 }

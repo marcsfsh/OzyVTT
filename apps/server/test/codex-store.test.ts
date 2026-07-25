@@ -34,6 +34,26 @@ describe("CodexStore pages", () => {
     expect(() => store.moveFolder("Places", "Places/Sub")).toThrow(/itself/i); // can't nest a folder inside itself
   });
 
+  it("folder records persist an empty folder: creating, moving the last note out, renaming, and deleting", () => {
+    store.createFolder("NPCs/Villains");
+    expect(store.listFolders()).toContain("NPCs/Villains");
+    const page = store.createPage({ title: "Strahd", folder: "NPCs/Villains" });
+    // Move the only note out to the top level - the folder RECORD keeps the folder alive (the old bug erased it).
+    store.updatePage(page.id, { folder: null }, page.rev, "gm");
+    expect(store.getPage(page.id)!.folder).toBeNull();
+    expect(store.listFolders()).toContain("NPCs/Villains");                 // still there with no pages in it
+    // Rename carries the record along.
+    store.moveFolder("NPCs/Villains", "NPCs/Rogues");
+    expect(store.listFolders()).toContain("NPCs/Rogues");
+    expect(store.listFolders()).not.toContain("NPCs/Villains");
+    // Delete drops the folder + subfolders and re-homes any pages to the top level (never deletes a page).
+    store.createFolder("NPCs/Rogues/Deep");
+    const inside = store.createPage({ title: "Thug", folder: "NPCs/Rogues/Deep" });
+    store.deleteFolder("NPCs/Rogues");
+    expect(store.listFolders().filter((f) => f.startsWith("NPCs/Rogues"))).toEqual([]);
+    expect(store.getPage(inside.id)!.folder).toBeNull();                    // its note survives at the top level
+  });
+
   it("creates, updates with rev bump, reveals, and persists through restart", async () => {
     const page = store.createPage({ title: "Bree", playerBody: "A crossroads town.", gmBody: "The innkeeper is a spy.", tags: ["Town", "town"] });
     expect(page).toMatchObject({ title: "Bree", playerBody: "A crossroads town.", revealedToPlayers: false, rev: 1, tags: ["town"] });

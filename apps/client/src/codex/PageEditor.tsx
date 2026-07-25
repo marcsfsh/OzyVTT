@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Field, IconButton, Input, Modal, SegmentedControl, Select, Switch, Textarea } from "@vtt/ui";
+import { Button, Field, IconButton, Input, Modal, SegmentedControl, Select, Textarea } from "@vtt/ui";
 import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
@@ -35,8 +35,13 @@ function applyFormat(value: string, start: number, end: number, kind: string): {
   switch (kind) {
     case "bold": return wrap("**");
     case "italic": return wrap("*");
+    case "strike": return wrap("~~");
+    case "code": return wrap("`");
     case "heading": return linePrefix("## ");
     case "bullet": return linePrefix("- ");
+    case "numbered": return linePrefix("1. ");
+    case "quote": return linePrefix("> ");
+    case "rule": return { value: `${value.slice(0, start)}\n---\n${value.slice(end)}`, caret: start + 5 };
     case "link": return { value: `${value.slice(0, start)}[${selected || "text"}](https://)${value.slice(end)}`, caret: start + 1 };
     case "wikilink": return { value: `${value.slice(0, start)}[[${selected || ""}]]${value.slice(end)}`, caret: start + 2 + selected.length };
     default: return { value, caret: end };
@@ -46,8 +51,13 @@ function applyFormat(value: string, start: number, end: number, kind: string): {
 const TOOLBAR: ReadonlyArray<{ kind: string; label: string; glyph?: string; icon?: string }> = [
   { kind: "bold", label: "Bold", glyph: "B" },
   { kind: "italic", label: "Italic", glyph: "I" },
+  { kind: "strike", label: "Strikethrough", glyph: "S" },
+  { kind: "code", label: "Inline code", glyph: "‹›" },
   { kind: "heading", label: "Heading", glyph: "H" },
   { kind: "bullet", label: "Bullet list", glyph: "•" },
+  { kind: "numbered", label: "Numbered list", glyph: "1." },
+  { kind: "quote", label: "Quote", glyph: "”" },
+  { kind: "rule", label: "Divider", glyph: "―" },
   { kind: "link", label: "Link", icon: "link" },
   { kind: "wikilink", label: "Wiki-link to another page", glyph: "[[ ]]" }
 ];
@@ -139,6 +149,19 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
   const flushRef = useRef(flush);
   flushRef.current = flush;
   useEffect(() => () => { if (serialize(draftRef.current) !== savedRef.current) void flushRef.current(); }, []);
+
+  // Adopt an EXTERNAL change to this same page (e.g. a folder move from the tree, which patches folder + rev
+  // out from under us). If we have no unsaved local edits, take the server copy so the editor doesn't keep a
+  // stale folder and then 409 its next autosave. With unsaved edits we leave the draft alone (our save wins).
+  useEffect(() => {
+    const incoming = serialize(draftOf(page));
+    if (incoming !== savedRef.current && serialize(draftRef.current) === savedRef.current) {
+      savedRef.current = incoming;
+      revRef.current = page.rev;
+      setDraft(draftOf(page));
+      setStatus("idle");
+    }
+  }, [page]);
 
   const body = tab === "player" ? draft.playerBody : draft.gmBody;
   const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
@@ -320,7 +343,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
           <div className="codex-body-bar">
             <SegmentedControl ariaLabel="Which body to edit" value={tab} onChange={(value) => setTab(value as BodyTab)}
               options={[{ value: "player", label: "Player-facing" }, { value: "gm", label: "GM only" }]} />
-            <Switch checked={preview} onChange={setPreview} label="Preview" aria-label="Toggle preview" />
+            <SegmentedControl ariaLabel="Edit or view the note" value={preview ? "view" : "edit"} onChange={(value) => setPreview(value === "view")}
+              options={[{ value: "edit", label: "Edit" }, { value: "view", label: "View" }]} />
           </div>
 
           {!preview && (

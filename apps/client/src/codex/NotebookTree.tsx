@@ -13,20 +13,24 @@ export type FolderNode = { name: string; path: string; folders: Map<string, Fold
 export type NotebookSort = "name-asc" | "name-desc" | "recent";
 const DRAG_TYPE = "application/x-codex-page";
 
-export function buildFolderTree(pages: readonly CodexPageSummary[]): FolderNode {
-  const root: FolderNode = { name: "", path: "", folders: new Map(), pages: [] };
-  for (const page of pages) {
-    const segments = (page.folder ?? "").split("/").map((segment) => segment.trim()).filter(Boolean);
-    let node = root;
-    let path = "";
-    for (const segment of segments) {
-      path = path ? `${path}/${segment}` : segment;
-      let child = node.folders.get(segment);
-      if (!child) { child = { name: segment, path, folders: new Map(), pages: [] }; node.folders.set(segment, child); }
-      node = child;
-    }
-    node.pages.push(page);
+/** Walk/create the folder-node chain for a "A/B/C" path, returning the leaf node. */
+function ensureFolder(root: FolderNode, folderPath: string): FolderNode {
+  let node = root;
+  let path = "";
+  for (const segment of folderPath.split("/").map((s) => s.trim()).filter(Boolean)) {
+    path = path ? `${path}/${segment}` : segment;
+    let child = node.folders.get(segment);
+    if (!child) { child = { name: segment, path, folders: new Map(), pages: [] }; node.folders.set(segment, child); }
+    node = child;
   }
+  return node;
+}
+
+/** Build the tree from pages AND explicit folder records (so a folder with no pages still appears). */
+export function buildFolderTree(pages: readonly CodexPageSummary[], folderPaths: readonly string[] = []): FolderNode {
+  const root: FolderNode = { name: "", path: "", folders: new Map(), pages: [] };
+  for (const path of folderPaths) ensureFolder(root, path); // empty folders first, so they persist without pages
+  for (const page of pages) ensureFolder(root, page.folder ?? "").pages.push(page);
   return root;
 }
 
@@ -45,6 +49,7 @@ type Handlers = Readonly<{
   onNewInFolder: (path: string) => void;
   onNewSubfolder: (path: string) => void;
   onRenameFolder: (path: string) => void;
+  onDeleteFolder: (path: string) => void;
   onMovePage: (pageId: string, folderPath: string | null) => void;
   onRequestMove: (pageId: string) => void;
 }>;
@@ -79,8 +84,9 @@ function FolderBranch({ folder, depth, handlers }: Readonly<{ folder: FolderNode
         </button>
         <div className="codex-tree-folder-actions">
           <button type="button" className="codex-tree-folder-btn" aria-label={`New subfolder in ${folder.name}`} title="New subfolder" onClick={() => handlers.onNewSubfolder(folder.path)}><CodexIcon iconId="folder-plus" className="codex-tree-folder-ic" /></button>
-          <button type="button" className="codex-tree-folder-btn" aria-label={`Rename ${folder.name}`} title="Rename folder" onClick={() => handlers.onRenameFolder(folder.path)}>✎</button>
           <button type="button" className="codex-tree-folder-btn" aria-label={`New note in ${folder.name}`} title="New note here" onClick={() => handlers.onNewInFolder(folder.path)}>＋</button>
+          <button type="button" className="codex-tree-folder-btn" aria-label={`Rename ${folder.name}`} title="Rename folder" onClick={() => handlers.onRenameFolder(folder.path)}>✎</button>
+          <button type="button" className="codex-tree-folder-btn" aria-label={`Delete ${folder.name}`} title="Delete folder" onClick={() => handlers.onDeleteFolder(folder.path)}><CodexIcon iconId="trash" className="codex-tree-folder-ic" /></button>
         </div>
       </div>
       {open && <NotebookTree node={folder} depth={depth + 1} {...handlers} />}

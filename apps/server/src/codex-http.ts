@@ -46,6 +46,7 @@ const PageUpdateSchema = z.object({
 const RelationshipCreateSchema = z.object({ toPageId: z.string().uuid(), type: z.string().trim().min(1).max(40) }).strict();
 const RevealSchema = z.object({ revealed: z.boolean() }).strict();
 const FolderMoveSchema = z.object({ from: z.string().trim().min(1).max(160), to: z.string().trim().max(160) }).strict();
+const FolderPathSchema = z.object({ path: z.string().trim().min(1).max(160) }).strict();
 
 const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
 const MapCreateSchema = z.object({
@@ -240,6 +241,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
       options.notifyChanged("pages");
       return envelope(response, 200, { moved });
     } catch (error) { return malformed(response, error); }
+  });
+
+  // Folder records make empty folders persist (a folder is otherwise only implied by the pages inside it). GM-only.
+  router.get(`${CODEX_BASE}/folders`, requireGm, (_request, response) => envelope(response, 200, { folders: store.listFolders() }));
+  router.post(`${CODEX_BASE}/folders`, requireGm, (request, response) => {
+    try { const path = store.createFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 201, { path }); }
+    catch (error) { return malformed(response, error); }
+  });
+  router.post(`${CODEX_BASE}/folders/delete`, requireGm, (request, response) => {
+    try { store.deleteFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 200, { deleted: true }); }
+    catch (error) { return malformed(response, error); }
   });
 
   router.get(`${CODEX_BASE}/pages/:id/revisions`, requireGm, (request, response) => {
