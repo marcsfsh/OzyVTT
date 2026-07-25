@@ -92,6 +92,41 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   before 1492 DR; World cards/tags filter the notebook; a 4-node/4-edge graph framed + click-opens),
   zero console errors. Retires the two long-deferred "not built" items and supersedes the earlier
   UX-rejection of the graph (it now has a worldbuilding, not combat, payoff).
+- **Worldbuilding hardening + polish pass (2026-07-25, same branch).** After a four-lens review of the
+  pillars (viewer-safety / code / architecture / UX, each its own subagent), a round of fixes + polish +
+  capability landed. Now at `check` + `test` (**566**) + `build` green, browser-verified.
+  - **Viewer-safety (blocker fixed):** entity `fields` were single-layer, so a revealed villain's
+    "Goals & motives" leaked to players on reveal. Fields flagged `secret` in the schema now ride a
+    separate **`gmFields`** map (migration v5) that the player projection strips like `gmBody`; the
+    editor shows them in a violet "GM ONLY - hidden from players" block. Regression-tested at the HTTP
+    boundary. Switching a page's entity type now drops the old type's fields (they were surviving
+    invisibly and rendering to players under raw slugs). The whole-graph edge feed now projects through
+    the `codex-projections.ts` choke point (`projectPlayerRelationshipEdges`) instead of a hand-rolled
+    router filter.
+  - **Data integrity:** editing the calendar after dating journal entries silently corrupted them (only
+    a derived instant was stored). Entries now persist the **raw {year,month,day}** (migration v6);
+    `setCalendar` recomputes every dated entry's instant + label from the raw date (non-destructive
+    reflow), and the edit form re-opens what the GM typed. `normalizeCalendar` guards NaN month lengths.
+  - **Capability:** a world **"current date"** (the campaign's now) - a calendar field, a "◈ Now" readout
+    + a "Today" marker in its year on the timeline. **Weekday names** are now wired into dated labels
+    ("Sul, Hammer 15, 1492 DR"). The player Codex gained **World + Graph tabs** (viewer-safe: reuses the
+    revealed-only page list + edge feed) + entity icons + type/tag filtering. A shared searchable
+    **`EntityPicker`** (type-to-filter, chip, icons) replaced the flat entity `<select>` in
+    relationships, journal pins, and marker links.
+  - **Graph:** fixed a real drag-vs-click bug (a pan starting on a node opened it); added a type-filter
+    legend, hover-to-focus a node's neighborhood, node size by connection count, and **+/- zoom buttons**
+    (touch + keyboard couldn't zoom). **Design system:** entity colors were off-palette (green/amber/
+    orange) + hardcoded; replaced with on-brand magenta->cyan spectrum **tokens** (`--codex-type-*`) from
+    one source of truth (`ENTITY_DEFS`), used across tree / World / graph / badges.
+  - **Editor trust:** autosave now flushes on unmount (navigating away within 800ms of an edit no longer
+    drops it). The 5-way Codex switcher moved to `Tabs` (scrolls, no phone overflow). Symmetric
+    relationships (ally/enemy/...) dedupe across direction; FTS indexes field values (public->player
+    index, gm->GM index).
+  - **Deferred (recorded, not built):** player timeline year-grouping (player projection intentionally
+    omits `calendarInstant`); graph two-finger pinch (has +/- buttons + wheel); entity-ref field kind
+    (typed link fields vs plain text); bulk reveal/tag/move; one-click "preview codex as a player";
+    hoist the entity-type + calendar-math vocab into a shared package (client + server still duplicate
+    it - accepted debt, flagged by the architecture review); a populated-DB migration-upgrade test.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,

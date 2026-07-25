@@ -64,6 +64,24 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   (recorded in current-state as "mind-map graph — UX-rejected, no combat payoff"): under the
   worldbuilding pillar the graph's payoff is worldbuilding, not combat, so the objection no longer
   applies. Calendar dates flow through the journal's long-reserved `calendarInstant` column.
+- **Entity `fields` are two-layer, like the page body (2026-07-25).** A four-lens review found the
+  original single-layer `fields` leaked a revealed entity's secret attributes (e.g. a villain's "Goals &
+  motives") to players on reveal. Decision: structured fields flagged `secret` in the client schema
+  (`entities.ts`) are stored in a separate **`gmFields`** map (codex_pages migration v5) that
+  `projectPlayerPage` strips exactly like `gmBody` - the server stays schema-agnostic (the client routes
+  secret-schema fields into `gmFields` on save via `splitEntityFields`; the server just never projects
+  that map to players). **Invariant for future work:** any new structured player-facing field is a
+  viewer-safety surface - decide public vs `gmFields` per field. Guarded by `codex-http.test.ts`.
+- **Journal entries persist the raw in-world date, not just the derived instant (2026-07-25).** Storing
+  only `calendar_instant` meant editing the calendar after dating entries silently corrupted their dates
+  and ordering. Entries now also store the literal `{year,month,day}` (migration v6); `setCalendar`
+  transactionally recomputes every dated entry's instant + label from the raw date (non-destructive
+  reflow). Rule: the raw date is the source of truth; the instant is a derived sort key, recomputed.
+- **Codex vocab + calendar math still duplicated client/server - accepted debt (2026-07-25).** The
+  architecture review flagged that entity-type/relationship vocab and the calendar instant<->date math
+  live in both client (`entities.ts`, `api.ts`) and server (`codex-store.ts`), hand-synced. NOT hoisted
+  this pass (nothing broken; copies agree). If the codex grows, hoist into `packages/domain` (imported by
+  both sides already).
 - **Player character sheets — interactive play sheet now, builder-ready (2026-07-23).** Reframes
   the CLAUDE.md/ADR-0018/0019 *"not a character builder"* boundary: Phase 1 ships an interactive
   **play** sheet (still not a builder); a guided **builder** is the explicit next roadmap update.
