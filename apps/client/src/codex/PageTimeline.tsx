@@ -30,8 +30,8 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
 
   return (
     <div className="codex-page-timeline">
-      <h4 className="codex-backlinks-title">Logged here</h4>
-      {entries.length === 0 && <p className="codex-page-timeline-empty">Nothing logged at this place yet.</p>}
+      <h4 className="codex-backlinks-title">Journal</h4>
+      {entries.length === 0 && <p className="codex-page-timeline-empty">No journal entries for this page yet.</p>}
       {entries.length > 0 && (
         <ul className="codex-page-timeline-list">
           {entries.map((entry) => (
@@ -45,7 +45,7 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
         </ul>
       )}
       <div className="codex-page-timeline-add">
-        <Input value={note} placeholder="Pin a note to this place…" aria-label="Pin a note to this page" onChange={(event) => setNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void add(); }} />
+        <Input value={note} placeholder="Add a journal note…" aria-label="Add a journal note to this page" onChange={(event) => setNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void add(); }} />
         <Button variant="secondary" size="sm" disabled={busy || !note.trim()} onClick={add}>Add</Button>
       </div>
       {error && <p className="codex-rail-error" role="alert">{error}</p>}

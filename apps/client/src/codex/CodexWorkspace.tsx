@@ -7,6 +7,7 @@ import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
+import { EntityIcon } from "./icons";
 import { WorldHome } from "./WorldHome";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { Notice, type NoticeMessage, usePrompt } from "../components/feedback";
@@ -20,14 +21,14 @@ import "./codex.css";
  */
 /** New-entity starters: pick a type (which brings its structured fields) + a light prose scaffold. */
 const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; title: string; player: string; gm: string }> = [
-  { key: "blank", label: "📄 Blank page", type: "note", title: "Untitled page", player: "", gm: "" },
-  { key: "character", label: "🧑 Character", type: "character", title: "Untitled character", player: "## Description\n", gm: "## Secrets & hooks\n" },
-  { key: "location", label: "🏰 Location", type: "location", title: "Untitled location", player: "## Description\n\n## Points of interest\n", gm: "## Secrets\n\n## Encounters\n" },
-  { key: "faction", label: "⚔️ Faction", type: "faction", title: "Untitled faction", player: "## Overview\n", gm: "## True agenda\n\n## Assets & allies\n" },
-  { key: "item", label: "🗡️ Item", type: "item", title: "Untitled item", player: "## Description\n", gm: "## Secrets\n" },
-  { key: "religion", label: "🕯️ Religion", type: "religion", title: "Untitled religion", player: "## Tenets\n", gm: "## Secrets\n" },
-  { key: "species", label: "🐉 Species", type: "species", title: "Untitled species", player: "## Description\n\n## Habitat\n", gm: "## Secrets\n" },
-  { key: "event", label: "⏳ Event", type: "event", title: "Untitled event", player: "## What happened\n", gm: "## The truth\n" }
+  { key: "blank", label: "Blank page", type: "note", title: "Untitled page", player: "", gm: "" },
+  { key: "character", label: "Character", type: "character", title: "Untitled character", player: "## Description\n", gm: "## Secrets & hooks\n" },
+  { key: "location", label: "Location", type: "location", title: "Untitled location", player: "## Description\n\n## Points of interest\n", gm: "## Secrets\n\n## Encounters\n" },
+  { key: "faction", label: "Faction", type: "faction", title: "Untitled faction", player: "## Overview\n", gm: "## True agenda\n\n## Assets & allies\n" },
+  { key: "item", label: "Item", type: "item", title: "Untitled item", player: "## Description\n", gm: "## Secrets\n" },
+  { key: "religion", label: "Religion", type: "religion", title: "Untitled religion", player: "## Tenets\n", gm: "## Secrets\n" },
+  { key: "species", label: "Species", type: "species", title: "Untitled species", player: "## Description\n\n## Habitat\n", gm: "## Secrets\n" },
+  { key: "event", label: "Event", type: "event", title: "Untitled event", player: "## What happened\n", gm: "## The truth\n" }
 ];
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
@@ -233,7 +234,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
                 <button type="button" className="codex-menu-scrim" aria-hidden="true" tabIndex={-1} onClick={() => setTemplateMenu(false)} />
                 <div className="codex-template-menu" role="menu">
                   {TEMPLATES.map((template) => (
-                    <button key={template.key} type="button" role="menuitem" className="codex-template-item" onClick={() => void createFromTemplate(template)}>{template.label}</button>
+                    <button key={template.key} type="button" role="menuitem" className="codex-template-item" onClick={() => void createFromTemplate(template)}><EntityIcon type={template.type} /> {template.label}</button>
                   ))}
                 </div>
               </>
@@ -274,7 +275,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
                   ))
                 : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
             : pages.length === 0
-                ? (!error && <p className="codex-list-empty">No notes yet. Create your first.</p>)
+                ? (!error && <p className="codex-list-empty">No pages yet.</p>)
                 : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onRenameFolder={renameFolder} onMovePage={movePage} onRequestMove={setMovingPageId} />}
         </nav>
       </aside>
@@ -282,15 +283,15 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
         {selectedId && <button type="button" className="codex-back" onClick={() => setSelectedId(null)}>‹ All pages</button>}
         {selected
           ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} pages={pages} backlinks={selected.backlinks} relationships={selected.relationships} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} onRelationshipsChanged={refreshSelected} />
-          : <div className="codex-main-empty"><h3>Your world, written down</h3><p>Select a page, or create one. Each page has a player-facing side and a GM-secret side - reveal it when the party earns it.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
+          : <div className="codex-main-empty"><h3>Select a page</h3><p>Every page has a player-facing side and a GM-only side. Choose one from the list, or create a new page.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}
       {paletteOpen && <CommandPalette gmToken={gmToken} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }} onCreatePage={createPageTitled} onGoto={(target) => setMode(target)} onClose={() => setPaletteOpen(false)} />}
       <Modal open={!!movingPageId} onClose={() => setMovingPageId(null)} title="Move to folder" size="sm" ariaLabel="Move to folder">
         <div className="codex-move-list">
-          <button type="button" className="codex-move-opt" onClick={() => void doMove(null)}>◆ Top level</button>
-          {allFolders.map((path) => <button key={path} type="button" className="codex-move-opt" onClick={() => void doMove(path)}>🗀 {path}</button>)}
-          <button type="button" className="codex-move-opt is-new" onClick={() => void doMoveToNew()}>＋ New folder…</button>
+          <button type="button" className="codex-move-opt" onClick={() => void doMove(null)}>Top level</button>
+          {allFolders.map((path) => <button key={path} type="button" className="codex-move-opt" onClick={() => void doMove(path)}>{path}</button>)}
+          <button type="button" className="codex-move-opt is-new" onClick={() => void doMoveToNew()}>+ New folder…</button>
         </div>
       </Modal>
       {promptDialog}

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { Button } from "@vtt/ui";
-import { entityColor, entityIcon, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
+import { iconChildren } from "./icons";
+import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
 import { type CodexRelationshipEdge } from "./api";
 
 /**
@@ -210,7 +211,7 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState }: Readonly
                 role="button" tabIndex={0} aria-label={`${ENTITY_DEFS[node.entityType].label}: ${node.title}`}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(node.id); } }}>
                 <circle r={radius} style={{ fill: entityColor(node.entityType) }} />
-                <text className="codex-graph-nodeicon" textAnchor="middle" dy="5">{entityIcon(node.entityType)}</text>
+                <g className="codex-graph-nodeicon" transform="translate(-7 -7) scale(0.58)">{iconChildren(entityIconId(node.entityType))}</g>
                 <text className="codex-graph-nodelabel" textAnchor="middle" y={radius + 15}>{node.title}</text>
               </g>
             );

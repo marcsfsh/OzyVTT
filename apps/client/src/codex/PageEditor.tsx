@@ -6,6 +6,7 @@ import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
 import { RelationshipsPanel } from "./RelationshipsPanel";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
+import { CodexIcon } from "./icons";
 import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
@@ -42,12 +43,12 @@ function applyFormat(value: string, start: number, end: number, kind: string): {
   }
 }
 
-const TOOLBAR: ReadonlyArray<{ kind: string; label: string; glyph: string }> = [
+const TOOLBAR: ReadonlyArray<{ kind: string; label: string; glyph?: string; icon?: string }> = [
   { kind: "bold", label: "Bold", glyph: "B" },
   { kind: "italic", label: "Italic", glyph: "I" },
   { kind: "heading", label: "Heading", glyph: "H" },
   { kind: "bullet", label: "Bullet list", glyph: "•" },
-  { kind: "link", label: "Link", glyph: "🔗" },
+  { kind: "link", label: "Link", icon: "link" },
   { kind: "wikilink", label: "Wiki-link to another page", glyph: "[[ ]]" }
 ];
 
@@ -285,7 +286,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
           <div className="codex-meta-row">
             <Field label="Entity type" htmlFor="codex-type">
               <Select id="codex-type" value={draft.entityType} onChange={(event) => setDraft((prev) => { const nextType = event.target.value as EntityType; const keep = new Set(entityDef(nextType).fields.map((field) => field.key)); return { ...prev, entityType: nextType, fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key))) }; })}>
-                {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].icon} {ENTITY_DEFS[type].label}</option>)}
+                {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].label}</option>)}
               </Select>
             </Field>
             <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
@@ -324,8 +325,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
 
           {!preview && (
             <div className="codex-toolbar" role="toolbar" aria-label="Formatting">
-              {TOOLBAR.map((tool) => <IconButton key={tool.kind} label={tool.label} size="sm" onClick={() => format(tool.kind)}><span className="codex-tool-glyph">{tool.glyph}</span></IconButton>)}
-              <IconButton label="Insert image" size="sm" onClick={() => imageInputRef.current?.click()}><span className="codex-tool-glyph">🖼</span></IconButton>
+              {TOOLBAR.map((tool) => <IconButton key={tool.kind} label={tool.label} size="sm" onClick={() => format(tool.kind)}>{tool.icon ? <CodexIcon iconId={tool.icon} className="codex-tool-ic" /> : <span className="codex-tool-glyph">{tool.glyph}</span>}</IconButton>)}
+              <IconButton label="Insert image" size="sm" onClick={() => imageInputRef.current?.click()}><CodexIcon iconId="image" className="codex-tool-ic" /></IconButton>
               <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(event) => { void insertImage(event.target.files?.[0]); event.target.value = ""; }} />
             </div>
           )}
@@ -334,7 +335,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             ? <div className={`codex-preview${tab === "gm" ? " is-gm" : ""}`}>{tab === "gm" && <GmOnlyTag floating />}{body.trim() ? <CodexMarkdown text={body} onNavigate={onNavigate} token={gmToken} /> : <p className="codex-preview-empty">Nothing to preview yet.</p>}</div>
             : <div className={`codex-editor-body${tab === "gm" ? " is-gm" : ""}`} onDrop={onBodyDrop} onDragOver={(event) => event.preventDefault()} onPaste={onBodyPaste}>
                 <Textarea ref={textareaRef} className="codex-body-input" value={body} aria-label={tab === "player" ? "Player-facing body" : "GM secret body"}
-                  placeholder={tab === "player" ? "What players learn about this place…" : "Secrets, plot hooks, GM notes…"}
+                  placeholder={tab === "player" ? "Player-facing description…" : "GM-only notes: secrets, hooks, stats…"}
                   onChange={(event) => { setBody(event.target.value); syncSuggest(event.target.value, event.target.selectionStart ?? 0); }}
                   onKeyDown={onBodyKeyDown}
                   onKeyUp={(event) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) syncSuggest(event.currentTarget.value, event.currentTarget.selectionStart ?? 0); }}

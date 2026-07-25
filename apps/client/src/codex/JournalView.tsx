@@ -110,13 +110,13 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
         <div className="codex-composer-head">
           <strong>{editingId ? "Edit entry" : "New journal entry"}</strong>
           <div className="codex-composer-head-actions">
-            {nowLabel && <span className="codex-now-chip" title="The world's current date — set it in the calendar">◈ Now: {nowLabel}</span>}
-            <Button variant="ghost" size="sm" onClick={() => setCalendarOpen(true)}>📅 Calendar</Button>
+            {nowLabel && <span className="codex-now-chip" title="The world's current date — set it in the calendar">Now: {nowLabel}</span>}
+            <Button variant="ghost" size="sm" onClick={() => setCalendarOpen(true)}>Calendar</Button>
             {editingId && <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setDraft(EMPTY); }}>Cancel</Button>}
           </div>
         </div>
-        <Field label="What the players know" htmlFor="j-player"><Textarea id="j-player" className="codex-composer-body" value={draft.playerText} placeholder="What happened, as the party would recall it…" onChange={(event) => set({ playerText: event.target.value })} /></Field>
-        <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm"><Textarea id="j-gm" className="codex-composer-body codex-gm-block" value={draft.gmText} placeholder="The truth behind it…" onChange={(event) => set({ gmText: event.target.value })} /></Field>
+        <Field label="Player-facing summary" htmlFor="j-player"><Textarea id="j-player" className="codex-composer-body" value={draft.playerText} placeholder="What the party knows about this…" onChange={(event) => set({ playerText: event.target.value })} /></Field>
+        <Field label={<span className="codex-composer-gm-label">GM-only notes <GmOnlyTag /></span>} htmlFor="j-gm"><Textarea id="j-gm" className="codex-composer-body codex-gm-block" value={draft.gmText} placeholder="Notes hidden from players…" onChange={(event) => set({ gmText: event.target.value })} /></Field>
         <div className="codex-composer-meta">
           <Field label="Session #" htmlFor="j-session"><Input id="j-session" type="number" inputMode="numeric" value={draft.sessionNumber} onChange={(event) => set({ sessionNumber: event.target.value })} /></Field>
           <Field label="Year" htmlFor="j-year"><Input id="j-year" type="number" inputMode="numeric" value={draft.dateYear} placeholder="1492" onChange={(event) => set({ dateYear: event.target.value })} /></Field>
@@ -133,11 +133,11 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
       {error && <p className="codex-rail-error" role="alert">{error}</p>}
 
       <div className="codex-timeline">
-        {entries.length === 0 && <p className="codex-list-empty">No entries yet. Record your first session above.</p>}
+        {entries.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
         {groups.map((group) => (
           <section key={group.key} className="codex-timeline-group">
             <div className="codex-timeline-year">{group.label}</div>
-            {nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">◈ Today — {nowLabel}</div>}
+            {nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today — {nowLabel}</div>}
             {group.entries.map((entry) => (
               <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
                 <header className="codex-entry-head">

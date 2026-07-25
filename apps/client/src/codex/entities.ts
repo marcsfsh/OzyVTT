@@ -7,43 +7,44 @@
 export type EntityType = "note" | "character" | "location" | "faction" | "item" | "species" | "religion" | "event";
 
 export type FieldDef = Readonly<{ key: string; label: string; kind?: "text" | "textarea"; placeholder?: string; secret?: boolean }>;
-/** One source of truth per entity type: its label, emoji icon, accent color, and structured fields — used by the tree, World cards, graph, badges, and editor alike. */
+/** One source of truth per entity type: its label, glyph id (see icons.tsx CODEX_ICONS), accent color, and structured fields — used by the tree, World cards, graph, badges, and editor alike. */
 export type EntityDef = Readonly<{ type: EntityType; label: string; icon: string; color: string; fields: readonly FieldDef[] }>;
 
 export const ENTITY_DEFS: Readonly<Record<EntityType, EntityDef>> = {
-  note: { type: "note", label: "Note", icon: "📄", color: "var(--codex-type-note)", fields: [] },
-  character: { type: "character", label: "Character", icon: "🧑", color: "var(--codex-type-character)", fields: [
+  note: { type: "note", label: "Note", icon: "scroll", color: "var(--codex-type-note)", fields: [] },
+  character: { type: "character", label: "Character", icon: "person", color: "var(--codex-type-character)", fields: [
     { key: "race", label: "Race / species" }, { key: "gender", label: "Gender" }, { key: "age", label: "Age" },
     { key: "role", label: "Role / occupation" }, { key: "status", label: "Status", placeholder: "alive / dead / missing" },
     { key: "location", label: "Location" }, { key: "goals", label: "Goals & motives", kind: "textarea", secret: true }
   ] },
-  location: { type: "location", label: "Location", icon: "🏰", color: "var(--codex-type-location)", fields: [
+  location: { type: "location", label: "Location", icon: "castle", color: "var(--codex-type-location)", fields: [
     { key: "kind", label: "Type", placeholder: "city / dungeon / region" }, { key: "region", label: "Region" },
     { key: "population", label: "Population" }, { key: "ruler", label: "Ruler / owner" }, { key: "climate", label: "Climate" }
   ] },
-  faction: { type: "faction", label: "Faction", icon: "⚔️", color: "var(--codex-type-faction)", fields: [
+  faction: { type: "faction", label: "Faction", icon: "banner", color: "var(--codex-type-faction)", fields: [
     { key: "kind", label: "Type", placeholder: "guild / cult / kingdom" }, { key: "leader", label: "Leader" },
     { key: "headquarters", label: "Headquarters" }, { key: "size", label: "Size" }, { key: "goals", label: "Secret agenda", kind: "textarea", secret: true }
   ] },
-  item: { type: "item", label: "Item", icon: "🗡️", color: "var(--codex-type-item)", fields: [
+  item: { type: "item", label: "Item", icon: "sword", color: "var(--codex-type-item)", fields: [
     { key: "kind", label: "Type", placeholder: "weapon / relic / consumable" }, { key: "rarity", label: "Rarity" },
     { key: "owner", label: "Current owner" }, { key: "attunement", label: "Attunement" }, { key: "properties", label: "Properties", kind: "textarea" }
   ] },
-  species: { type: "species", label: "Species", icon: "🐉", color: "var(--codex-type-species)", fields: [
+  species: { type: "species", label: "Species", icon: "dragon", color: "var(--codex-type-species)", fields: [
     { key: "category", label: "Category", placeholder: "beast / humanoid / aberration" }, { key: "habitat", label: "Habitat" },
     { key: "diet", label: "Diet" }, { key: "size", label: "Size" }, { key: "traits", label: "Traits", kind: "textarea" }
   ] },
-  religion: { type: "religion", label: "Religion", icon: "🕯️", color: "var(--codex-type-religion)", fields: [
+  religion: { type: "religion", label: "Religion", icon: "sun", color: "var(--codex-type-religion)", fields: [
     { key: "deity", label: "Deity / power" }, { key: "domains", label: "Domains" }, { key: "alignment", label: "Alignment" }, { key: "followers", label: "Followers" }
   ] },
-  event: { type: "event", label: "Event", icon: "⏳", color: "var(--codex-type-event)", fields: [
+  event: { type: "event", label: "Event", icon: "hourglass", color: "var(--codex-type-event)", fields: [
     { key: "when", label: "When" }, { key: "where", label: "Where" }, { key: "participants", label: "Participants" }, { key: "outcome", label: "Outcome", kind: "textarea" }
   ] }
 };
 
 export const ENTITY_TYPE_LIST: readonly EntityType[] = ["note", "character", "location", "faction", "item", "species", "religion", "event"];
 export function entityDef(type: EntityType | undefined): EntityDef { return ENTITY_DEFS[type ?? "note"] ?? ENTITY_DEFS.note; }
-export function entityIcon(type: EntityType | undefined): string { return entityDef(type).icon; }
+/** The CODEX_ICONS glyph id for a type (drawn via <EntityIcon>). Replaces the old emoji. */
+export function entityIconId(type: EntityType | undefined): string { return entityDef(type).icon; }
 export function entityColor(type: EntityType | undefined): string { return entityDef(type).color; }
 /** Split a flat field-value map into player-facing `fields` and GM-only `gmFields`, per the type's schema (secret fields ride in gmFields, stripped from players like the GM body). */
 export function splitEntityFields(type: EntityType | undefined, values: Readonly<Record<string, string>>): { fields: Record<string, string>; gmFields: Record<string, string> } {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Badge } from "@vtt/ui";
 import { type CodexPageSummary } from "./api";
-import { entityIcon } from "./entities";
+import { EntityIcon } from "./icons";
 
 /**
  * The campaign notebook's organizational tree: every page grouped into a collapsible nested-folder
@@ -110,7 +110,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
             onDragStart={(event) => { event.dataTransfer.setData(DRAG_TYPE, page.id); event.dataTransfer.effectAllowed = "move"; }}
             onClick={() => handlers.onSelect(page.id)}
           >
-            {page.entityType !== "note" && <span className="codex-tree-icon" aria-hidden="true">{entityIcon(page.entityType)}</span>}
+            {page.entityType !== "note" && <EntityIcon type={page.entityType} className="codex-tree-icon" />}
             <span className="codex-list-title">{page.title}</span>
             {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
           </button>

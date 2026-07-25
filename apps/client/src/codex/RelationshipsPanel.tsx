@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button, Select } from "@vtt/ui";
 import { codexApi, type CodexPageSummary, type CodexRelationship } from "./api";
-import { RELATIONSHIP_TYPES, relationshipLabel, entityIcon } from "./entities";
+import { RELATIONSHIP_TYPES, relationshipLabel } from "./entities";
+import { EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
 
 /**
@@ -44,7 +45,7 @@ export function RelationshipsPanel({ gmToken, pageId, relationships, pages, onCh
           {relationships.map((rel) => (
             <li key={rel.id} className="codex-rels-item">
               <span className="codex-rels-label">{relationshipLabel(rel.type, rel.direction)}</span>
-              <button type="button" className="codex-md-link codex-rels-target" onClick={() => onOpen(rel.otherTitle)}>{entityIcon(rel.otherType)} {rel.otherTitle}</button>
+              <button type="button" className="codex-md-link codex-rels-target" onClick={() => onOpen(rel.otherTitle)}><EntityIcon type={rel.otherType} /> {rel.otherTitle}</button>
               <button type="button" className="codex-rels-remove" aria-label="Remove relationship" onClick={() => void remove(rel.id)}>✕</button>
             </li>
           ))}

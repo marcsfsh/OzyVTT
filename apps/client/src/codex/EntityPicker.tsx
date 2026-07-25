@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Input } from "@vtt/ui";
-import { entityIcon, type EntityType } from "./entities";
+import { EntityIcon } from "./icons";
+import { type EntityType } from "./entities";
 
 type Pickable = Readonly<{ id: string; title: string; entityType: EntityType }>;
 
@@ -35,7 +36,7 @@ export function EntityPicker({ pages, value, onChange, placeholder = "Search ent
     return (
       <div className="codex-picker">
         <span className="codex-picker-chip">
-          <span aria-hidden="true">{entityIcon(selected.entityType)}</span> {selected.title}
+          <EntityIcon type={selected.entityType} /> {selected.title}
           <button type="button" className="codex-picker-x" aria-label={`Clear ${selected.title}`} onClick={() => onChange(null)}>✕</button>
         </span>
       </div>
@@ -59,7 +60,7 @@ export function EntityPicker({ pages, value, onChange, placeholder = "Search ent
             <li key={page.id}>
               <button type="button" role="option" aria-selected={index === active} className={`codex-picker-opt${index === active ? " is-active" : ""}`}
                 onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => pick(page.id)}>
-                <span aria-hidden="true">{entityIcon(page.entityType)}</span> <span className="codex-picker-opt-title">{page.title}</span>
+                <EntityIcon type={page.entityType} /> <span className="codex-picker-opt-title">{page.title}</span>
               </button>
             </li>
           ))}

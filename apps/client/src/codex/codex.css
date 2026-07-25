@@ -46,6 +46,11 @@
 .codex-list-item:hover { background: var(--surface-2); border-color: var(--line); }
 .codex-list-item.is-active { background: var(--surface-2); border-color: var(--magenta); }
 .codex-list-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Typed-entity glyph (SVG, coloured by its type) rendered inline next to a title, everywhere. */
+.codex-ent-icon { width: 1.05em; height: 1.05em; flex: none; vertical-align: -0.16em; }
+.codex-reader-titleicon { width: 0.82em; height: 0.82em; margin-right: 0.28em; vertical-align: -0.02em; }
+.codex-tool-ic { width: 1.05em; height: 1.05em; }
+.codex-world-typeglyph { width: 20px; height: 20px; }
 
 /* Notebook tree: collapsible nested folders holding the whole campaign's notes. */
 .codex-tree { display: flex; flex-direction: column; gap: 1px; }
@@ -232,7 +237,7 @@
 .codex-world-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
 .codex-world-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
 .codex-world-typecard:hover { background: var(--surface-2); transform: translateY(-1px); }
-.codex-world-typeicon { font-size: 1.05rem; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.codex-world-typeicon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
 .codex-world-typelabel { flex: 1; color: var(--text); }
 .codex-world-typecount { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); }
 .codex-world-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -269,7 +274,7 @@
 .codex-graph-node.is-hover circle { stroke: var(--text); stroke-width: 2.5; }
 .codex-graph-node:focus-visible circle { stroke: var(--cyan); stroke-width: 3; }
 .codex-graph-node.is-dim { opacity: 0.28; }
-.codex-graph-nodeicon { font-size: 13px; pointer-events: none; }
+.codex-graph-nodeicon { fill: rgba(8, 6, 20, 0.85); pointer-events: none; }
 .codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }
 .codex-editor-foot { display: flex; }
 

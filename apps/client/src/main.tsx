@@ -289,7 +289,7 @@ function App() {
         onChange={(id) => setGmTab(id as GmTab)}
       />}
 
-      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => setPlayerCodexOpen(true)}>📖 Codex</Button></div>}
+      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => setPlayerCodexOpen(true)}>Open Codex</Button></div>}
       {mode === "player" && playerCodexOpen && mapToken && <Modal open onClose={() => setPlayerCodexOpen(false)} size="lg" title="Codex" ariaLabel="Codex"><PlayerCodex token={mapToken} onClose={() => setPlayerCodexOpen(false)} /></Modal>}
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>

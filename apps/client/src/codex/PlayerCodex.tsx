@@ -7,7 +7,8 @@ import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
 import { WorldHome } from "./WorldHome";
 import { RelationshipGraph } from "./RelationshipGraph";
-import { ENTITY_DEFS, entityDef, entityIcon, relationshipLabel, type EntityType } from "./entities";
+import { EntityIcon } from "./icons";
+import { ENTITY_DEFS, entityDef, relationshipLabel, type EntityType } from "./entities";
 import "./codex.css";
 
 type PlayerView = "world" | "lore" | "atlas" | "journal" | "graph";
@@ -94,7 +95,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
             <nav className="codex-list" aria-label="Revealed pages">
               {(filter.type || filter.tag) && <div className="codex-filter-chip"><span>{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setFilter({ type: null, tag: null })}>✕</button></div>}
               {filteredPages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
-              {filteredPages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <span aria-hidden="true">{entityIcon(summary.entityType)} </span>}<span className="codex-list-title">{summary.title}</span></button>)}
+              {filteredPages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)}
             </nav>
           </aside>
           <section className="codex-main">
@@ -102,7 +103,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
             {page
               ? <article className="codex-reader">
                   {page.bannerAssetId && <CodexImage assetId={page.bannerAssetId} token={token} alt="" className="codex-banner-img" />}
-                  <h2 className="codex-reader-title">{page.entityType !== "note" && <span aria-hidden="true">{entityIcon(page.entityType)} </span>}{page.title}</h2>
+                  <h2 className="codex-reader-title">{page.entityType !== "note" && <EntityIcon type={page.entityType} className="codex-reader-titleicon" />}{page.title}</h2>
                   {Object.entries(page.fields).length > 0 && (
                     <dl className="codex-reader-fields">
                       {Object.entries(page.fields).map(([key, value]) => {
@@ -119,14 +120,14 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
                         {pageRels.map((rel) => (
                           <li key={rel.id} className="codex-rels-item">
                             <span className="codex-rels-label">{relationshipLabel(rel.type, rel.direction)}</span>
-                            <button type="button" className="codex-md-link" onClick={() => navigate(rel.otherTitle)}>{entityIcon(rel.otherType)} {rel.otherTitle}</button>
+                            <button type="button" className="codex-md-link" onClick={() => navigate(rel.otherTitle)}><EntityIcon type={rel.otherType} /> {rel.otherTitle}</button>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
                 </article>
-              : <div className="codex-main-empty"><h3>The world, as you know it</h3><p>Select a page to read what your party has learned.</p></div>}
+              : <div className="codex-main-empty"><h3>Select an entry</h3><p>Choose a page from the list to read it.</p></div>}
           </section>
         </div>
       )}
@@ -140,7 +141,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
           <div className="codex-atlas-body">
             {currentMap
               ? <MapSurface token={token} assetId={currentMap.assetId} markers={markers} placing={false} readOnly selectedMarkerId={null} onBackgroundClick={() => undefined} onMarkerClick={onMarkerClick} onMarkerDragEnd={() => undefined} />
-              : <div className="codex-main-empty"><h3>No maps yet</h3><p>When the GM reveals a map, it appears here to explore.</p></div>}
+              : <div className="codex-main-empty"><h3>No maps yet</h3><p>Maps your GM shares appear here.</p></div>}
           </div>
         </div>
       )}
