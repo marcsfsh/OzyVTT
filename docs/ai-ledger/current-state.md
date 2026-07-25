@@ -168,6 +168,13 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     composer persists an in-progress entry (sessionStorage) across tab switches; import confirms success;
     player combat journal entries carry a "Battle" badge (not colour alone); the graph frames on the
     connected web + takes a player-appropriate empty state.
+  - **Notebook organizing (follow-up).** The Pages tree gained real Obsidian/OneNote-style organization:
+    a persisted **sort** (Name A-Z / Z-A / Recently edited), **drag-and-drop** a page onto a folder or the
+    top level (desktop) + a per-page **move-to-folder picker** (the touch/everywhere path — mobile parity),
+    **New folder**, and **Rename folder** which re-paths the folder + its descendants via a new bulk server
+    op `moveFolder(from,to)` (`POST /codex/folders/move`, one transaction, no per-page revision, guards
+    self-nesting). Also fixed list/tree titles that were right-aligned (`.codex-list-title` is now `flex:1`).
+    Verified drag + picker + rename + 402px touch, 571 tests.
   - **Deliberately NOT changed (reviewers split / reversible-risk):** kept the 8 per-type entity colors
     (the coherence lead flagged entity identity as the one already-consistent system; leave it — icon +
     label already disambiguate) rather than the world+graph reviewer's color-by-category redesign; kept
