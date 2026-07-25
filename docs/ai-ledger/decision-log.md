@@ -33,6 +33,17 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   player marker projection drops scene/actor + unrevealed page/sub-map links; page media gated on a
   revealed reference). Mirrors the maps/tokens satellite-store pattern; the public OpenAPI
   game-command surface is untouched.
+- **The Codex HTTP surface is now part of the documented OpenAPI contract (2026-07-25).** The codex
+  worldbuilding routes (`/api/v1/codex/*` + `/api/v1/codex-assets/*`, ~38 operations) had always been real,
+  UI-driving routes but were never in the served `openApiDocument` — the spec silently omitted the whole
+  surface even though it explicitly aims to "match the real, running routes." They're now documented in
+  `@vtt/api-contract` (CODEX_PATHS/CODEX_ASSET_PATHS + 67 component schemas + operations), rendered into
+  `docs/api-reference.md`, and pinned by `contract.test.ts`. **Auth model documented from the handlers, and
+  it differs from the game API:** codex routes are *session*-authorized (a GM **or** player session — players
+  get the revealed-only projection), never integration-scope `bearerAuth`; every write is GM-only, and
+  folders/revisions/export stay GM-only even for reads. No route/behavior change — the server still serves the
+  same literal byte-identical (`app-map.md`: 94→132 HTTP paths). The codex is a first-party UI surface, so this
+  is documentation completeness, not an invitation to drive it as an external integration.
 - **A map marker links MANY pages + MANY scenes; a scene is no longer owned by one marker (2026-07-25).**
   Markers began as one-of-each polymorphic links (`pageId`/`subMapId`/`sceneId`/`actorId`). Pages and
   scenes became **arrays** (`pageIds`/`sceneIds`, JSON id-array columns, migration v8 backfills the old
