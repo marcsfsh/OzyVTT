@@ -178,6 +178,30 @@
 .codex-cal-months-head { display: flex; align-items: center; justify-content: space-between; }
 .codex-cal-month { display: grid; grid-template-columns: 1fr 90px auto; gap: var(--space-2); align-items: center; }
 .codex-cal-foot { display: flex; justify-content: flex-end; }
+
+/* World home dashboard */
+.codex-world { display: flex; flex-direction: column; gap: var(--space-5); overflow-y: auto; }
+.codex-world-stats { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.codex-world-stat { display: flex; flex-direction: column; color: var(--text-muted); font-size: var(--fs-sm); }
+.codex-world-statnum { font-family: var(--font-display); font-size: var(--fs-2xl); color: var(--magenta); }
+.codex-world-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.codex-world-h { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
+.codex-world-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
+.codex-world-typecard { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-1); cursor: pointer; }
+.codex-world-typecard:hover { border-color: var(--magenta); }
+.codex-world-typeicon { font-size: 1.4rem; }
+.codex-world-typelabel { flex: 1; color: var(--text); }
+.codex-world-typecount { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--cyan); }
+.codex-world-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.codex-tag-chip { display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
+.codex-tag-chip:hover { border-color: var(--cyan); color: var(--text); }
+.codex-tag-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.codex-world-recent { display: flex; flex-direction: column; gap: var(--space-1); }
+.codex-world-recentitem { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
+.codex-world-recentitem:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-filter-chip { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; padding: 2px var(--space-2); border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text); font-size: var(--fs-sm); margin-bottom: var(--space-2); }
+.codex-filter-chip button { border: none; background: transparent; color: var(--text-muted); cursor: pointer; }
+.codex-filter-chip button:hover { color: var(--danger); }
 .codex-editor-foot { display: flex; }
 
 .codex-revisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }

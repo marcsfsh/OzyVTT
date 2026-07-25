@@ -7,7 +7,8 @@ import { AtlasView } from "./AtlasView";
 import { JournalView } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
 import { NotebookTree, buildFolderTree } from "./NotebookTree";
-import { type EntityType } from "./entities";
+import { WorldHome } from "./WorldHome";
+import { ENTITY_DEFS, type EntityType } from "./entities";
 import "./codex.css";
 
 /**
@@ -27,9 +28,10 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
-  const [mode, setMode] = useState<"pages" | "atlas" | "journal">("pages");
+  const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [templateMenu, setTemplateMenu] = useState(false);
+  const [pageFilter, setPageFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[]; relationships: readonly CodexRelationship[] } | null>(null);
@@ -151,12 +153,13 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
   const onPageDeleted = useCallback(() => { setSelectedId(null); setSelected(null); void refreshList(); }, [refreshList]);
 
   const tree = useMemo(() => buildFolderTree(pages), [pages]);
+  const filteredPages = useMemo(() => pages.filter((page) => (!pageFilter.type || page.entityType === pageFilter.type) && (!pageFilter.tag || page.tags.includes(pageFilter.tag))), [pages, pageFilter]);
 
   return (
     <div className="codex-root">
       <div className="codex-modebar">
-        <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as "pages" | "atlas" | "journal")}
-          options={[{ value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
+        <SegmentedControl ariaLabel="Codex view" value={mode} onChange={(value) => setMode(value as typeof mode)}
+          options={[{ value: "world", label: "World" }, { value: "pages", label: "Pages" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
@@ -164,14 +167,18 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
           <input ref={importInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.target.value = ""; }} />
         </div>
       </div>
-      {mode === "atlas"
+      {mode === "world"
+        ? <WorldHome pages={pages} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
+            onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
+            onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
+        : mode === "atlas"
         ? <AtlasView gmToken={gmToken} scenes={scenes} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "journal"
         ? <JournalView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
-          <Input value={query} placeholder="Search the notebook…" aria-label="Search the notebook" onChange={(event) => setQuery(event.target.value)} />
+          <Input value={query} placeholder="Search the notebook…" aria-label="Search the notebook" onChange={(event) => { setQuery(event.target.value); if (event.target.value.trim()) setPageFilter({ type: null, tag: null }); }} />
           <div className="codex-newpage">
             <Button variant="primary" size="sm" aria-haspopup="menu" aria-expanded={templateMenu} onClick={() => setTemplateMenu((open) => !open)}>New ▾</Button>
             {templateMenu && (
@@ -188,7 +195,19 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
         </div>
         {error && <p className="codex-rail-error" role="alert">{error}</p>}
         <nav className="codex-list" aria-label="Campaign notebook">
-          {query.trim()
+          {(pageFilter.type || pageFilter.tag) && !query.trim() ? (
+            <>
+              <div className="codex-filter-chip"><span>{pageFilter.type ? `${ENTITY_DEFS[pageFilter.type].label}s` : `#${pageFilter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setPageFilter({ type: null, tag: null })}>✕</button></div>
+              {filteredPages.length === 0
+                ? <p className="codex-list-empty">Nothing here yet.</p>
+                : filteredPages.map((page) => (
+                    <button key={page.id} type="button" className={`codex-list-item${page.id === selectedId ? " is-active" : ""}`} onClick={() => setSelectedId(page.id)}>
+                      <span className="codex-list-title">{page.title}</span>
+                      {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
+                    </button>
+                  ))}
+            </>
+          ) : query.trim()
             ? (searchHits && searchHits.length > 0
                 ? searchHits.map((page) => (
                     <button key={page.id} type="button" className={`codex-list-item${page.id === selectedId ? " is-active" : ""}`} onClick={() => setSelectedId(page.id)}>
