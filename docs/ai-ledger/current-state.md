@@ -180,6 +180,15 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     label already disambiguate) rather than the world+graph reviewer's color-by-category redesign; kept
     the secret "Goals" field (unified its look) rather than folding it into the GM body; GM stays defaulted
     to Pages (first action is actionable) while the player lands on World. Recorded as options, not done.
+  - **Emoji → SVG icon set + copy pass (follow-up, at the owner's request).** Replaced every codex emoji
+    with a hand-drawn **fantasy-cartography SVG set** (`icons.tsx`, ~48 recolorable glyphs). It now backs
+    BOTH the map-marker picker (expanded from 24 flat-modern glyphs and restyled — castles with turrets,
+    hachured peaks, tree clusters, crossed swords, henge, ship, dragon…) AND the typed entities: each type
+    maps to a glyph (`entityIconId`) drawn in its accent colour via `<EntityIcon>`, replacing the emoji at
+    every site (tree, World cards, graph nodes, picker, reader, relationships, templates) plus the editor
+    toolbar's link/image. This **supersedes the "kept the emoji" note above** — the owner found them cheap.
+    Also professionalized the corny helper copy (empty states, journal prompts, "Logged here"→"Journal",
+    etc.). The world+graph reviewer's color-by-category idea remains an option; colours are unchanged.
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
