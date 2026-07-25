@@ -73,6 +73,11 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
     title: "Table viewer (second screen)",
     intro: "Pairing a shared display and driving its player-safe presentation. The viewer never authenticates with game credentials - pairing codes and an HttpOnly cookie only.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/viewer`)
+  },
+  {
+    title: "Codex (worldbuilding wiki, atlas, journal & calendar)",
+    intro: "The GM-authored worldbuilding surface: typed wiki pages (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its markers, the campaign journal/timeline, and the fantasy calendar - plus page media. Reads accept a GM or a player session; a player receives the revealed-only projection (GM bodies, GM fields, and unrevealed pages/maps/markers/entries are stripped server-side). Every write is GM-only.",
+    match: (path) => path.startsWith(`${API_NAMESPACE}/codex`)
   }
 ];
 

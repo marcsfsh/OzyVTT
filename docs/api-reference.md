@@ -1881,6 +1881,545 @@ Server-Sent Events stream of presentation updates for a paired viewer session; n
 
 **Responses:** `200` text/event-stream of `presentation` events · errors `401`
 
+## Codex (worldbuilding wiki, atlas, journal & calendar)
+
+The GM-authored worldbuilding surface: typed wiki pages (with folders, tags, backlinks, relationships and revision history), the nested map atlas and its markers, the campaign journal/timeline, and the fantasy calendar - plus page media. Reads accept a GM or a player session; a player receives the revealed-only projection (GM bodies, GM fields, and unrevealed pages/maps/markers/entries are stripped server-side). Every write is GM-only.
+
+### `GET /api/v1/codex/pages`
+
+Every page's summary (a player sees only revealed pages). Optional `folder` (empty string = top level) and `tag` filters.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `folder` (query, optional) - string · `tag` (query, optional) - string
+
+**Responses:** `200` Success - envelope of `CodexPageListData` · errors `401`
+
+### `POST /api/v1/codex/pages`
+
+Creates a page.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | yes |  |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | no |  |
+| `fields` | object (free-form) | no |  |
+| `gmFields` | object (free-form) | no |  |
+| `folder` | string \| null | no |  |
+| `tags` | string[] | no |  |
+| `playerBody` | string | no |  |
+| `gmBody` | string | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `bannerAssetId` | string \| null | no |  |
+
+**Responses:** `201` Success - envelope of `CodexPageData` · errors `400` `401`
+
+### `GET /api/v1/codex/search`
+
+Full-text page search, role-scoped. `q` is the query.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `q` (query, optional) - string
+
+**Responses:** `200` Success - envelope of `CodexSearchData` · errors `401`
+
+### `GET /api/v1/codex/pages/{id}`
+
+One page with its backlinks and typed relationships, projected for the caller.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexPageDocumentData` · errors `401` `404`
+
+### `PATCH /api/v1/codex/pages/{id}`
+
+Edits a page. `expectedRev` rejects a stale write with 409.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | no |  |
+| `entityType` | `note` \| `character` \| `location` \| `faction` \| `item` \| `species` \| `religion` \| `event` | no |  |
+| `fields` | object (free-form) | no |  |
+| `gmFields` | object (free-form) | no |  |
+| `folder` | string \| null | no |  |
+| `tags` | string[] | no |  |
+| `playerBody` | string | no |  |
+| `gmBody` | string | no |  |
+| `bannerAssetId` | string \| null | no |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 if the page moved on. |
+
+**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404` `409`
+
+### `DELETE /api/v1/codex/pages/{id}`
+
+Deletes a page; idempotent.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/pages/{id}/reveal`
+
+Shows/hides a page to players.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/pages/{id}/relationships`
+
+Adds a typed relationship edge from this page to another.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `toPageId` | string (uuid) | yes |  |
+| `type` | string | yes |  |
+
+**Responses:** `201` Success - envelope of `CodexRelationshipData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/pages/{id}/revisions`
+
+Autosaved revision history for a page.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexRevisionListData` · errors `401` `404`
+
+### `POST /api/v1/codex/pages/{id}/revisions/{revisionId}/restore`
+
+Restores a page to a prior revision.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid) · `revisionId` (path) - integer (≥ 1)
+
+**Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/folders`
+
+Every explicitly-created folder path; lets an empty folder persist.
+
+**Auth:** GM session
+
+**Responses:** `200` Success - envelope of `CodexFolderListData` · errors `401`
+
+### `POST /api/v1/codex/folders`
+
+Creates (or keeps) an empty folder.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `path` | string | yes |  |
+
+**Responses:** `201` Success - envelope of `CodexFolderCreatedData` · errors `400` `401`
+
+### `POST /api/v1/codex/folders/move`
+
+Renames/moves a folder subtree, re-pathing every page under it. Returns how many pages moved.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `from` | string | yes |  |
+| `to` | string | yes | Empty string moves the folder to the top level. |
+
+**Responses:** `200` Success - envelope of `CodexFolderMovedData` · errors `400` `401`
+
+### `POST /api/v1/codex/folders/delete`
+
+Deletes a folder and its subfolders; every page under it drops to the top level - never deleted.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `path` | string | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `400` `401`
+
+### `GET /api/v1/codex/relationships`
+
+Every relationship edge for the graph, role-scoped (a player sees only edges whose BOTH endpoints are revealed).
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexRelationshipEdgeListData` · errors `401`
+
+### `DELETE /api/v1/codex/relationships/{id}`
+
+Removes one relationship edge; idempotent.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `GET /api/v1/codex/maps`
+
+The atlas map tree, role-scoped (a player sees only revealed maps; a revealed map keeps its parent link only when that parent is itself revealed).
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexMapListData` · errors `401`
+
+### `POST /api/v1/codex/maps`
+
+Turns an uploaded map asset into an atlas map node.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `assetId` | string (uuid) | yes |  |
+| `name` | string | yes |  |
+| `kind` | `battlemap` \| `regional` \| `world` | yes |  |
+| `parentMapId` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+
+**Responses:** `201` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+
+### `PATCH /api/v1/codex/maps/{id}`
+
+Renames/retypes a map.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | no |  |
+| `kind` | `battlemap` \| `regional` \| `world` | no |  |
+
+**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+
+### `DELETE /api/v1/codex/maps/{id}`
+
+Deletes a map and its markers; idempotent.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/maps/{id}/parent`
+
+Re-parents a map in the atlas tree (null = a root map).
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `parentMapId` | string \| null | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/maps/{id}/reveal`
+
+Shows/hides a map to players.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexMapData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/maps/{id}/markers`
+
+Markers on a map, role-scoped (a player only for a revealed map, and each pin's links filtered to the revealed subset).
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexMarkerListData` · errors `401` `404`
+
+### `POST /api/v1/codex/maps/{id}/markers`
+
+Drops a marker on a map.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `x` | number (0–1000000) | yes |  |
+| `y` | number (0–1000000) | yes |  |
+| `iconId` | string (pattern) | yes |  |
+| `iconColor` | string (pattern) | yes |  |
+| `label` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `pageIds` | string (uuid)[] | no |  |
+| `subMapId` | string \| null | no |  |
+| `sceneIds` | string (uuid)[] | no |  |
+| `actorId` | string \| null | no |  |
+
+**Responses:** `201` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+
+### `PATCH /api/v1/codex/markers/{id}`
+
+Edits a marker's icon/label/links.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `x` | number (0–1000000) | no |  |
+| `y` | number (0–1000000) | no |  |
+| `iconId` | string (pattern) | no |  |
+| `iconColor` | string (pattern) | no |  |
+| `label` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `pageIds` | string (uuid)[] | no |  |
+| `subMapId` | string \| null | no |  |
+| `sceneIds` | string (uuid)[] | no |  |
+| `actorId` | string \| null | no |  |
+
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+
+### `DELETE /api/v1/codex/markers/{id}`
+
+Deletes a marker; idempotent.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/markers/{id}/move`
+
+Repositions a marker in normalized map coordinates.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `x` | number (0–1000000) | yes |  |
+| `y` | number (0–1000000) | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+
+### `POST /api/v1/codex/markers/{id}/reveal`
+
+Shows/hides a marker to players.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexMarkerData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/journal`
+
+The campaign timeline, or a location's mini-timeline via `markerId`/`pageId`, role-scoped (a player only for a revealed marker/page, and only revealed entries).
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `markerId` (query, optional) - string (uuid) · `pageId` (query, optional) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexJournalListData` · errors `401` `404`
+
+### `POST /api/v1/codex/journal`
+
+Adds a journal/timeline entry.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `playerText` | string | no |  |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no |  |
+
+**Responses:** `201` Success - envelope of `CodexJournalEntryData` · errors `400` `401`
+
+### `PATCH /api/v1/codex/journal/{id}`
+
+Edits a journal entry.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `playerText` | string | no |  |
+| `gmText` | string \| null | no |  |
+| `revealedToPlayers` | boolean | no |  |
+| `attachMarkerId` | string \| null | no |  |
+| `attachPageId` | string \| null | no |  |
+| `sessionNumber` | integer \| null | no |  |
+| `realDate` | string \| null | no |  |
+| `inWorldLabel` | string \| null | no |  |
+| `inWorldDate` | CodexInWorldDate \| null | no |  |
+
+**Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
+
+### `DELETE /api/v1/codex/journal/{id}`
+
+Deletes a journal entry; idempotent.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `POST /api/v1/codex/journal/{id}/reveal`
+
+Shows/hides a journal entry to players.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `revealed` | boolean | yes |  |
+
+**Responses:** `200` Success - envelope of `CodexJournalEntryData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/calendar`
+
+The world's calendar (months, weekdays, era, current date).
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `401`
+
+### `PUT /api/v1/codex/calendar`
+
+Replaces the world calendar.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `yearName` | string | yes |  |
+| `months` | CodexCalendarMonth[] | yes |  |
+| `weekdays` | string[] | yes |  |
+| `currentDate` | CodexInWorldDate \| null | no |  |
+
+**Responses:** `200` Success - envelope of `CodexCalendarData` · errors `400` `401`
+
+### `GET /api/v1/codex/export`
+
+A full codex backup bundle for round-trip.
+
+**Auth:** GM session
+
+**Responses:** `200` Success - envelope of `CodexExportData` · errors `401`
+
+### `POST /api/v1/codex-assets`
+
+Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201.
+
+**Auth:** GM session
+
+**Parameters:** `filename` (query, optional) - string
+
+**Request body:** raw `image/*` bytes.
+
+**Responses:** `200` Identical bytes already stored; the existing asset is returned - envelope of `CodexAssetUploadData` · `201` New image stored - envelope of `CodexAssetUploadData` · errors `400` `401`
+
+### `GET /api/v1/codex-assets/{id}/content`
+
+Original image bytes for a page banner/inline image. GM always; a player only when the asset is used by a revealed page. Supports ETag/If-None-Match (304); sent with `Cache-Control: private, no-store`.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Full image bytes · `304` Not modified · errors `403` `404`
+
 ## Shared shapes
 
 ### `AnnotationGeometryInput`
@@ -1889,6 +2428,14 @@ Server-Sent Events stream of presentation updates for a paired viewer session; n
 | --- | --- | --- | --- |
 | `origin` | ImagePoint | yes |  |
 | `target` | ImagePoint | yes |  |
+
+### `CodexInWorldDate`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `year` | integer | yes |  |
+| `month` | integer (0–23) | yes |  |
+| `day` | integer (1–400) | yes |  |
 
 ### `ImagePoint`
 

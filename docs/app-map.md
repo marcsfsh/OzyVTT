@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 6 GameState fields · 72 commands · 105 HTTP paths
+- 6 GameState fields · 72 commands · 132 HTTP paths
 
 ## GameState shape
 
@@ -111,6 +111,33 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`
 Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-identical to
 `@vtt/api-contract`).
 
+- `POST /api/v1/codex-assets`
+- `GET /api/v1/codex-assets/{id}/content`
+- `GET PUT /api/v1/codex/calendar`
+- `GET /api/v1/codex/export`
+- `GET POST /api/v1/codex/folders`
+- `POST /api/v1/codex/folders/delete`
+- `POST /api/v1/codex/folders/move`
+- `GET POST /api/v1/codex/journal`
+- `DELETE PATCH /api/v1/codex/journal/{id}`
+- `POST /api/v1/codex/journal/{id}/reveal`
+- `GET POST /api/v1/codex/maps`
+- `DELETE PATCH /api/v1/codex/maps/{id}`
+- `GET POST /api/v1/codex/maps/{id}/markers`
+- `POST /api/v1/codex/maps/{id}/parent`
+- `POST /api/v1/codex/maps/{id}/reveal`
+- `DELETE PATCH /api/v1/codex/markers/{id}`
+- `POST /api/v1/codex/markers/{id}/move`
+- `POST /api/v1/codex/markers/{id}/reveal`
+- `GET POST /api/v1/codex/pages`
+- `DELETE GET PATCH /api/v1/codex/pages/{id}`
+- `POST /api/v1/codex/pages/{id}/relationships`
+- `POST /api/v1/codex/pages/{id}/reveal`
+- `GET /api/v1/codex/pages/{id}/revisions`
+- `POST /api/v1/codex/pages/{id}/revisions/{revisionId}/restore`
+- `GET /api/v1/codex/relationships`
+- `DELETE /api/v1/codex/relationships/{id}`
+- `GET /api/v1/codex/search`
 - `GET /api/v1/content/conditions`
 - `GET /api/v1/content/monsters`
 - `GET /api/v1/content/monsters/{definitionId}`

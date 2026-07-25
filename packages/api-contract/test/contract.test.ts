@@ -3,6 +3,8 @@ import {
   API_NAMESPACE,
   API_VERSION,
   ApiErrorEnvelopeSchema,
+  CODEX_ASSET_PATHS,
+  CODEX_PATHS,
   CommandEnvelopeSchema,
   CONTENT_PATHS,
   CreateIntegrationCredentialRequestSchema,
@@ -85,7 +87,7 @@ describe("public API contracts", () => {
     expect(openApiDocument.info.version).toBe(API_VERSION);
     expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
 
-    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS), ...Object.values(SESSION_PATHS)];
+    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS), ...Object.values(SESSION_PATHS), ...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(IntegrationScopeSchema.options);
     for (const path of Object.values(SYSTEM_PATHS)) expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(/^#\/components\/schemas\//);
@@ -112,6 +114,32 @@ describe("public API contracts", () => {
     expect(openApiDocument.paths[VIEWER_PATHS.pairingsExchange].post.security).toEqual([]);
     expect(openApiDocument.paths[VIEWER_PATHS.presentationCommands].post.security).toEqual([{ gmAuth: [] }]);
     expect(openApiDocument.components.securitySchemes.viewerCookieAuth).toMatchObject({ type: "apiKey", in: "cookie", name: "vtt_viewer_session" });
+  });
+
+  it("documents the codex surface: GM-only writes, GM-or-player reads, session auth (never integration scopes)", () => {
+    type Op = { security?: ReadonlyArray<Record<string, readonly string[]>> };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
+    const gmOnly = [{ gmAuth: [] }];
+    const gmOrPlayer = [{ gmAuth: [] }, { playerAuth: [] }];
+    // Writes are GM-only.
+    for (const [path, method] of [[CODEX_PATHS.pages, "post"], [CODEX_PATHS.pageById, "patch"], [CODEX_PATHS.pageById, "delete"], [CODEX_PATHS.maps, "post"], [CODEX_PATHS.mapMarkers, "post"], [CODEX_PATHS.markerById, "patch"], [CODEX_PATHS.journal, "post"], [CODEX_PATHS.calendar, "put"], [CODEX_ASSET_PATHS.collection, "post"]] as const) {
+      expect(paths[path][method].security, `${method} ${path}`).toEqual(gmOnly);
+    }
+    // Reads accept a GM or a player session (players receive the revealed-only projection).
+    for (const [path, method] of [[CODEX_PATHS.pages, "get"], [CODEX_PATHS.pageById, "get"], [CODEX_PATHS.search, "get"], [CODEX_PATHS.relationships, "get"], [CODEX_PATHS.maps, "get"], [CODEX_PATHS.mapMarkers, "get"], [CODEX_PATHS.journal, "get"], [CODEX_PATHS.calendar, "get"], [CODEX_ASSET_PATHS.content, "get"]] as const) {
+      expect(paths[path][method].security, `${method} ${path}`).toEqual(gmOrPlayer);
+    }
+    // Folders, revisions, and export stay GM-only even for reads (organizational + backup surfaces).
+    expect(paths[CODEX_PATHS.folders].get.security).toEqual(gmOnly);
+    expect(paths[CODEX_PATHS.pageRevisions].get.security).toEqual(gmOnly);
+    expect(paths[CODEX_PATHS.export].get.security).toEqual(gmOnly);
+    // Every codex operation accepts a GM session and NONE carry integration-scope bearerAuth (they are session-authorized).
+    for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
+      for (const [method, op] of Object.entries(paths[path])) {
+        expect(op.security?.some((entry) => "gmAuth" in entry), `${method} ${path} must accept a GM session`).toBe(true);
+        expect(op.security?.some((entry) => "bearerAuth" in entry), `${method} ${path} must not use integration scopes`).toBe(false);
+      }
+    }
   });
 
   it("scopes every live-game operation to the least-privilege credential scope alongside GM sessions", () => {
