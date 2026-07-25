@@ -68,10 +68,16 @@ load-bearing decisions in one place plus operating decisions that don't have an 
   original single-layer `fields` leaked a revealed entity's secret attributes (e.g. a villain's "Goals &
   motives") to players on reveal. Decision: structured fields flagged `secret` in the client schema
   (`entities.ts`) are stored in a separate **`gmFields`** map (codex_pages migration v5) that
-  `projectPlayerPage` strips exactly like `gmBody` - the server stays schema-agnostic (the client routes
-  secret-schema fields into `gmFields` on save via `splitEntityFields`; the server just never projects
-  that map to players). **Invariant for future work:** any new structured player-facing field is a
-  viewer-safety surface - decide public vs `gmFields` per field. Guarded by `codex-http.test.ts`.
+  `projectPlayerPage` strips exactly like `gmBody`. **Three layers of enforcement (a later refinement
+  hardened this):** (1) the client routes secret-schema fields into `gmFields` on save
+  (`splitEntityFields`); (2) the SERVER re-seals `SECRET_FIELD_KEYS` on every write - create, update,
+  and revision-restore - so a secret key can never rest in the player-facing `fields` even from a raw
+  API write or a restored pre-hardening revision; (3) migration v7 backfilled existing rows. The server
+  is therefore NOT schema-agnostic about secrecy - `SECRET_FIELD_KEYS` (server) must stay in sync with
+  the schema's `secret:true` flags (client), the higher-stakes half of the codex vocab-duplication debt.
+  **Invariant for future work:** a new secret field needs THREE coordinated changes - client `secret:true`,
+  server `SECRET_FIELD_KEYS`, and a v7-style backfill migration. Guarded by `codex-http.test.ts` +
+  `codex-store.test.ts` (seal on write, no player-search leak, and v7's SQL against a pre-seal row).
 - **Journal entries persist the raw in-world date, not just the derived instant (2026-07-25).** Storing
   only `calendar_instant` meant editing the calendar after dating entries silently corrupted their dates
   and ordering. Entries now also store the literal `{year,month,day}` (migration v6); `setCalendar`

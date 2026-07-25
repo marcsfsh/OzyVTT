@@ -123,10 +123,29 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     relationships (ally/enemy/...) dedupe across direction; FTS indexes field values (public->player
     index, gm->GM index).
   - **Deferred (recorded, not built):** player timeline year-grouping (player projection intentionally
-    omits `calendarInstant`); graph two-finger pinch (has +/- buttons + wheel); entity-ref field kind
-    (typed link fields vs plain text); bulk reveal/tag/move; one-click "preview codex as a player";
-    hoist the entity-type + calendar-math vocab into a shared package (client + server still duplicate
-    it - accepted debt, flagged by the architecture review); a populated-DB migration-upgrade test.
+    omits `calendarInstant`); entity-ref field kind (typed link fields vs plain text); bulk
+    reveal/tag/move; one-click "preview codex as a player"; hoist the entity-type + calendar-math vocab
+    (and the `SECRET_FIELD_KEYS`/`secret:true` pair) into a shared package (client + server still
+    duplicate it - accepted debt, flagged by the architecture + viewer-safety reviews).
+- **Worldbuilding refinement pass (2026-07-25, same branch).** A self-review + two fresh audits
+  (viewer-safety re-audit of the final state; a style-guide/design-language audit) closed the gaps the
+  hardening pass left. Now `check` + `test` (**570**) + `build` green, browser-verified.
+  - **Viewer-safety (a real gap I'd missed):** the `gmFields` migration only ADDED an empty column - it
+    never moved a pre-existing `goals` value out of the public `fields` (a character created when
+    `goals` was a plain field would still leak on reveal). Fixed defense-in-depth: the server now
+    **seals** `SECRET_FIELD_KEYS` into `gmFields` on every write (create / update / revision-restore),
+    so a secret can't rest in the player-facing map however it arrived; **migration v7** backfills
+    existing rows. The re-audit otherwise found no leaks across all six surfaces. Also fixed
+    **`exportBundle`** silently dropping `gmFields` (its SELECT omitted the column). Guarded by new tests
+    (raw-write seal, player search can't surface a secret field value, and v7's SQL against a pre-seal row).
+  - **Style guide (a live bug):** three CSS tokens I'd used don't exist (`--fs-lg`, `--fs-2xl`,
+    `--shadow-lg`) - the journal year headers + World stat numbers were rendering at inherited size;
+    fixed to real scale tokens (verified 26px/20px). Entity-type color tokens moved into the
+    authoritative `design-tokens.css`; focus indicators that used magenta are now cyan (the reserved
+    focus color); `font-size:10px` literals + dead hex fallbacks + raw-ms transitions tokenized.
+  - **Mobile parity:** the calendar month/current-date rows reflow at ≤480px (verified no overflow at
+    400px); EntityPicker clear/options + graph legend chips got real touch-size targets; the now-chip
+    truncates; **two-finger pinch-zoom** added to the graph (mirrors `MapSurface`).
 - **Scene-centric IA (2026-07-22).** The GM's prep is scene-first: a **Scenes** hub tab holds a gallery
   of prepared scenes (map thumbnail, combatant count, LIVE/staging badge) with per-card go-live, private
   staging, rename, **duplicate**, remove, and **drag-to-reorder** (`scene:duplicate` + `scene:reorder`,
