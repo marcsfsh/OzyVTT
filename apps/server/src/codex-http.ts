@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -23,6 +23,7 @@ const PageCreateSchema = z.object({
   title: z.string().trim().min(1).max(160),
   entityType: EntityTypeSchema.optional(),
   fields: FieldsSchema.optional(),
+  gmFields: FieldsSchema.optional(),
   folder: z.string().max(160).nullable().optional(),
   tags: TagsSchema.optional(),
   playerBody: z.string().max(100_000).optional(),
@@ -34,6 +35,7 @@ const PageUpdateSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   entityType: EntityTypeSchema.optional(),
   fields: FieldsSchema.optional(),
+  gmFields: FieldsSchema.optional(),
   folder: z.string().max(160).nullable().optional(),
   tags: TagsSchema.optional(),
   playerBody: z.string().max(100_000).optional(),
@@ -266,9 +268,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
     const all = store.listAllRelationships();
     if (role === "gm") return envelope(response, 200, { relationships: all });
-    // Player graph: only edges whose BOTH endpoints are revealed pages.
+    // Player graph: project through the choke point - only edges whose BOTH endpoints are revealed pages.
     const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
-    return envelope(response, 200, { relationships: all.filter((edge) => revealed.has(edge.fromPageId) && revealed.has(edge.toPageId)) });
+    return envelope(response, 200, { relationships: projectPlayerRelationshipEdges(all, revealed) });
   });
 
   // ----- Maps (the atlas tree) -----

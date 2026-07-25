@@ -180,4 +180,40 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(rels[0].otherTitle).toBe("Barovia");
     expect(JSON.stringify(view)).not.toContain("Cult"); // the secret entity never leaks via a relationship
   });
+
+  it("keeps GM-only structured fields (gmFields) off a revealed page's player projection", async () => {
+    const { base } = await fixture();
+    const vex = await body(await post(base, "/api/v1/codex/pages", GM, {
+      title: "Baroness Vex", entityType: "character",
+      fields: { race: "Human", role: "Royal advisor" },
+      gmFields: { goals: "Secretly poisoning the king to install her cult's heir" }
+    }));
+    const vexId = vex.data.page.id as string;
+    await post(base, `/api/v1/codex/pages/${vexId}/reveal`, GM, { revealed: true });
+
+    const gmView = await body(await get(base, `/api/v1/codex/pages/${vexId}`, GM));
+    expect(gmView.data.page.gmFields).toEqual({ goals: "Secretly poisoning the king to install her cult's heir" });
+
+    const playerView = await body(await get(base, `/api/v1/codex/pages/${vexId}`, PLAYER));
+    expect(playerView.data.page.fields).toEqual({ race: "Human", role: "Royal advisor" }); // public facts only
+    expect(playerView.data.page.gmFields).toBeUndefined();                                  // the secret map never ships
+    expect(JSON.stringify(playerView)).not.toContain("poisoning");                          // the secret value never leaks
+  });
+
+  it("GET /relationships returns the whole-graph edge feed, viewer-safe for players", async () => {
+    const { base } = await fixture();
+    const a = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Azalin", entityType: "character" }));
+    const b = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Darkon", entityType: "location" }));
+    const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Whispered Name" }));
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: b.data.page.id, type: "rules" });
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/relationships`, GM, { toPageId: secret.data.page.id, type: "serves" });
+    await post(base, `/api/v1/codex/pages/${a.data.page.id}/reveal`, GM, { revealed: true });
+    await post(base, `/api/v1/codex/pages/${b.data.page.id}/reveal`, GM, { revealed: true });
+
+    const gmEdges = (await body(await get(base, "/api/v1/codex/relationships", GM))).data.relationships as Json[];
+    expect(gmEdges).toHaveLength(2);
+    const playerEdges = (await body(await get(base, "/api/v1/codex/relationships", PLAYER))).data.relationships as Json[];
+    expect(playerEdges).toHaveLength(1); // only the edge whose BOTH endpoints are revealed
+    expect(playerEdges[0].type).toBe("rules");
+  });
 });

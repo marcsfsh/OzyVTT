@@ -24,6 +24,8 @@ export type CodexPageRow = Readonly<{
   entityType: CodexEntityType;
   /** Structured, type-specific attributes (key -> value); player-facing when the page is revealed. */
   fields: Readonly<Record<string, string>>;
+  /** GM-only structured attributes (secret motives etc.); NEVER projected to players, like `gmBody`. */
+  gmFields: Readonly<Record<string, string>>;
   folder: string | null;
   tags: readonly string[];
   playerBody: string;
@@ -35,7 +37,7 @@ export type CodexPageRow = Readonly<{
   updatedAt: string;
 }>;
 
-export type CodexPageSummaryRow = Omit<CodexPageRow, "playerBody" | "gmBody">;
+export type CodexPageSummaryRow = Omit<CodexPageRow, "playerBody" | "gmBody" | "gmFields">;
 
 /** A directional typed relationship between two pages (Strahd --rules--> Barovia). */
 export type CodexRelationshipRow = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
@@ -131,6 +133,8 @@ export type CodexJournalRow = Readonly<{
   realDate: string | null;
   inWorldLabel: string | null;
   calendarInstant: number | null;
+  /** The literal date the GM entered (independent of the calendar config), so instants can be recomputed if the calendar changes. */
+  inWorldDate: CodexInWorldDate | null;
   sortKey: number;
   createdAt: string;
   updatedAt: string;
@@ -143,6 +147,7 @@ export type CodexPageCreateInput = Readonly<{
   title: string;
   entityType?: CodexEntityType;
   fields?: Readonly<Record<string, string>>;
+  gmFields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
@@ -155,6 +160,7 @@ export type CodexPageUpdateInput = Readonly<{
   title?: string;
   entityType?: CodexEntityType;
   fields?: Readonly<Record<string, string>>;
+  gmFields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
@@ -291,16 +297,30 @@ const MIGRATIONS = [{
 }, {
   version: 4,
   sql: `ALTER TABLE codex_meta ADD COLUMN calendar_json TEXT;`
+}, {
+  version: 5,
+  sql: `
+    ALTER TABLE codex_pages ADD COLUMN gm_fields_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE codex_page_revisions ADD COLUMN gm_fields_json TEXT NOT NULL DEFAULT '{}';
+  `
+}, {
+  version: 6,
+  sql: `
+    ALTER TABLE codex_journal ADD COLUMN in_world_year INTEGER;
+    ALTER TABLE codex_journal ADD COLUMN in_world_month INTEGER;
+    ALTER TABLE codex_journal ADD COLUMN in_world_day INTEGER;
+  `
 }];
 
 type PageRow = {
-  id: string; title: string; entity_type: string; fields_json: string; folder: string | null; tags_json: string; player_body: string;
+  id: string; title: string; entity_type: string; fields_json: string; gm_fields_json: string; folder: string | null; tags_json: string; player_body: string;
   gm_body: string; revealed: number; banner_asset_id: string | null; rev: number; created_at: string; updated_at: string;
 };
 type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
 type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; created_at: string; updated_at: string };
 type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_id: string | null; sub_map_id: string | null; scene_id: string | null; actor_id: string | null; created_at: string; updated_at: string };
-type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; sort_key: number; created_at: string; updated_at: string };
+type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; created_at: string; updated_at: string };
+const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, created_at, updated_at";
 
 function id(value: string): string {
   if (!ID.test(value)) throw new Error("Codex id is malformed.");
@@ -512,14 +532,14 @@ export class CodexStore {
     const pageId = this.freshId();
     const stamp = this.stamp();
     const row: PageRow = {
-      id: pageId, title: title(input.title), entity_type: entityType(input.entityType), fields_json: JSON.stringify(entityFields(input.fields)),
+      id: pageId, title: title(input.title), entity_type: entityType(input.entityType), fields_json: JSON.stringify(entityFields(input.fields)), gm_fields_json: JSON.stringify(entityFields(input.gmFields)),
       folder: folder(input.folder), tags_json: JSON.stringify(tags(input.tags)),
       player_body: body(input.playerBody), gm_body: body(input.gmBody), revealed: input.revealedToPlayers ? 1 : 0,
       banner_asset_id: input.bannerAssetId ? id(input.bannerAssetId) : null, rev: 1, created_at: stamp, updated_at: stamp
     };
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(row.id, row.title, row.entity_type, row.fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
       this.rebuildFts(pageId, row.title, row.player_body, row.gm_body);
       this.snapshotRevision(pageId, row, "codex:create");
@@ -538,6 +558,7 @@ export class CodexStore {
       title: input.title === undefined ? existing.title : title(input.title),
       entity_type: input.entityType === undefined ? existing.entity_type : entityType(input.entityType),
       fields_json: input.fields === undefined ? existing.fields_json : JSON.stringify(entityFields(input.fields)),
+      gm_fields_json: input.gmFields === undefined ? existing.gm_fields_json : JSON.stringify(entityFields(input.gmFields)),
       folder: input.folder === undefined ? existing.folder : folder(input.folder),
       tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags)),
       player_body: input.playerBody === undefined ? existing.player_body : body(input.playerBody),
@@ -547,8 +568,8 @@ export class CodexStore {
       updated_at: this.stamp()
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
-        .run(next.title, next.entity_type, next.fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
+      database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
+        .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
       this.rebuildFts(pageId, next.title, next.player_body, next.gm_body);
       this.snapshotRevision(pageId, next, authorTag);
@@ -671,9 +692,9 @@ export class CodexStore {
 
   /** Restore a past revision by writing it forward as a new revision (history is never rewritten). */
   restoreRevision(pageId: string, revisionId: number, authorTag: string): CodexPageRow {
-    const snap = this.requireDatabase().prepare("SELECT title, entity_type, fields_json, player_body, gm_body, banner_asset_id, tags_json FROM codex_page_revisions WHERE id = ? AND page_id = ?").get(revisionId, pageId) as { title: string; entity_type: string; fields_json: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string } | undefined;
+    const snap = this.requireDatabase().prepare("SELECT title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json FROM codex_page_revisions WHERE id = ? AND page_id = ?").get(revisionId, pageId) as { title: string; entity_type: string; fields_json: string; gm_fields_json: string; player_body: string; gm_body: string; banner_asset_id: string | null; tags_json: string } | undefined;
     if (!snap) throw new CodexNotFoundError("That revision no longer exists.");
-    return this.updatePage(pageId, { title: snap.title, entityType: snap.entity_type as CodexEntityType, fields: parseFields(snap.fields_json), playerBody: snap.player_body, gmBody: snap.gm_body, bannerAssetId: snap.banner_asset_id, tags: JSON.parse(snap.tags_json) as string[] }, undefined, authorTag);
+    return this.updatePage(pageId, { title: snap.title, entityType: snap.entity_type as CodexEntityType, fields: parseFields(snap.fields_json), gmFields: parseFields(snap.gm_fields_json), playerBody: snap.player_body, gmBody: snap.gm_body, bannerAssetId: snap.banner_asset_id, tags: JSON.parse(snap.tags_json) as string[] }, undefined, authorTag);
   }
 
   // ----- Links / backlinks -----
@@ -911,7 +932,13 @@ export class CodexStore {
   setCalendar(input: CodexCalendar): CodexCalendar {
     const calendar = normalizeCalendar(input);
     this.transaction(() => {
-      this.requireDatabase().prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(calendar));
+      const database = this.requireDatabase();
+      database.prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(calendar));
+      // Reflow every dated entry: recompute its sort instant + display label from the RAW date the GM typed,
+      // so changing month lengths/count never corrupts existing dates (they just re-place on the new calendar).
+      const dated = database.prepare("SELECT id, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM codex_journal WHERE in_world_year IS NOT NULL").all() as Array<{ id: string; year: number; month: number; day: number }>;
+      const update = database.prepare("UPDATE codex_journal SET calendar_instant = ?, in_world_label = ? WHERE id = ?");
+      for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
       this.bumpRevision();
     });
     return calendar;
@@ -928,13 +955,14 @@ export class CodexStore {
     return { year, month, day: remainder + 1 };
   }
 
-  /** Resolve a journal entry's date: a structured in-world date wins (computes instant + label); else free-text label, no instant. */
-  private resolveDate(date: CodexInWorldDate | null | undefined, label: string | null | undefined): { instant: number | null; label: string | null } {
+  /** Resolve a journal entry's date: a structured in-world date wins (computes instant + label + keeps the raw date); else free-text label, no instant. */
+  private resolveDate(date: CodexInWorldDate | null | undefined, label: string | null | undefined): { instant: number | null; label: string | null; date: CodexInWorldDate | null } {
     if (date && Number.isFinite(date.year) && Number.isFinite(date.month) && Number.isFinite(date.day)) {
       const calendar = this.getCalendar();
-      return { instant: calendarInstantOf(calendar, date), label: formatInWorldDate(calendar, date) };
+      const normalized = { year: Math.trunc(date.year), month: Math.trunc(date.month), day: Math.trunc(date.day) };
+      return { instant: calendarInstantOf(calendar, normalized), label: formatInWorldDate(calendar, normalized), date: normalized };
     }
-    return { instant: null, label: shortLabel(label, 120, "in-world date") };
+    return { instant: null, label: shortLabel(label, 120, "in-world date"), date: null };
   }
 
   // ----- Journal / timeline -----
@@ -945,7 +973,7 @@ export class CodexStore {
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
       sourceEncounterId: null, sessionNumber: sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
-      inWorldLabel: dated.label, calendarInstant: dated.instant
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date
     });
   }
 
@@ -954,7 +982,7 @@ export class CodexStore {
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
-      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null
+      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null
     });
   }
 
@@ -972,11 +1000,14 @@ export class CodexStore {
       session_number: input.sessionNumber === undefined ? existing.session_number : sessionNo(input.sessionNumber),
       real_date: input.realDate === undefined ? existing.real_date : shortLabel(input.realDate, 40, "date"),
       in_world_label: dated ? dated.label : existing.in_world_label,
-      calendar_instant: dated ? dated.instant : existing.calendar_instant
+      calendar_instant: dated ? dated.instant : existing.calendar_instant,
+      in_world_year: dated ? (dated.date ? dated.date.year : null) : existing.in_world_year,
+      in_world_month: dated ? (dated.date ? dated.date.month : null) : existing.in_world_month,
+      in_world_day: dated ? (dated.date ? dated.date.day : null) : existing.in_world_day
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, updated_at = ? WHERE id = ?")
-        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, this.stamp(), entryId);
+      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, updated_at = ? WHERE id = ?")
+        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, this.stamp(), entryId);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -1008,27 +1039,27 @@ export class CodexStore {
   /** The global campaign timeline, ordered by in-world instant (later), then session number, then time. */
   listTimeline(): CodexJournalRow[] {
     return (this.requireDatabase().prepare(
-      "SELECT id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at FROM codex_journal ORDER BY (calendar_instant IS NULL), calendar_instant, (session_number IS NULL), session_number, created_at"
+      `SELECT ${JOURNAL_COLUMNS} FROM codex_journal ORDER BY (calendar_instant IS NULL), calendar_instant, (session_number IS NULL), session_number, created_at`
     ).all() as JournalRowRaw[]).map((row) => this.toEntry(row));
   }
 
   /** Entries pinned to a specific marker or page (the per-entity mini-timeline). */
   listEntriesFor(attach: Readonly<{ markerId?: string; pageId?: string }>): CodexJournalRow[] {
     const database = this.requireDatabase();
-    const columns = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at";
-    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${columns} FROM codex_journal WHERE attach_marker_id = ? ORDER BY created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
-    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${columns} FROM codex_journal WHERE attach_page_id = ? ORDER BY created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.markerId && ID.test(attach.markerId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE attach_marker_id = ? ORDER BY created_at`).all(attach.markerId) as JournalRowRaw[]).map((row) => this.toEntry(row));
+    if (attach.pageId && ID.test(attach.pageId)) return (database.prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE attach_page_id = ? ORDER BY created_at`).all(attach.pageId) as JournalRowRaw[]).map((row) => this.toEntry(row));
     return [];
   }
 
-  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null }>): CodexJournalRow {
+  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null }>): CodexJournalRow {
     const database = this.requireDatabase();
     const entryId = this.freshId();
     const stamp = this.stamp();
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
+    const date = fields.inWorldDate;
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, sortKey, stamp, stamp);
+      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, stamp, stamp);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -1039,12 +1070,14 @@ export class CodexStore {
       id: row.id, playerText: row.player_text, gmText: row.gm_text, revealedToPlayers: row.revealed === 1,
       attachMarkerId: row.attach_marker_id, attachPageId: row.attach_page_id, kind: row.kind === "combat" ? "combat" : "note",
       sourceEncounterId: row.source_encounter_id, sessionNumber: row.session_number, realDate: row.real_date,
-      inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant, sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at
+      inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant,
+      inWorldDate: row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day } : null,
+      sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
   private journalRowRaw(entryId: string): JournalRowRaw | undefined {
     if (!ID.test(entryId)) return undefined;
-    return this.requireDatabase().prepare("SELECT id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at FROM codex_journal WHERE id = ?").get(entryId) as JournalRowRaw | undefined;
+    return this.requireDatabase().prepare(`SELECT ${JOURNAL_COLUMNS} FROM codex_journal WHERE id = ?`).get(entryId) as JournalRowRaw | undefined;
   }
 
   private toMap(row: MapRowRaw): CodexMapRow {
@@ -1066,12 +1099,12 @@ export class CodexStore {
 
   private pageRow(pageId: string): PageRow | undefined {
     if (!ID.test(pageId)) return undefined;
-    return this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages WHERE id = ?").get(pageId) as PageRow | undefined;
+    return this.requireDatabase().prepare("SELECT id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at FROM codex_pages WHERE id = ?").get(pageId) as PageRow | undefined;
   }
 
   private toPage(row: PageRow): CodexPageRow {
     return {
-      id: row.id, title: row.title, entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json),
+      id: row.id, title: row.title, entityType: (row.entity_type as CodexEntityType) ?? "note", fields: parseFields(row.fields_json), gmFields: parseFields(row.gm_fields_json),
       folder: row.folder, tags: JSON.parse(row.tags_json) as string[],
       playerBody: row.player_body, gmBody: row.gm_body, revealedToPlayers: row.revealed === 1,
       bannerAssetId: row.banner_asset_id, rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
@@ -1096,8 +1129,8 @@ export class CodexStore {
   }
 
   private snapshotRevision(pageId: string, row: PageRow, authorTag: string) {
-    this.requireDatabase().prepare("INSERT INTO codex_page_revisions (page_id, rev, title, entity_type, fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(pageId, row.rev, row.title, row.entity_type, row.fields_json, row.player_body, row.gm_body, row.banner_asset_id, row.tags_json, row.updated_at, authorTag);
+    this.requireDatabase().prepare("INSERT INTO codex_page_revisions (page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(pageId, row.rev, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.player_body, row.gm_body, row.banner_asset_id, row.tags_json, row.updated_at, authorTag);
   }
 
   private bumpRevision() {

@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRelationshipView } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -41,11 +41,12 @@ export function projectGmPage(row: CodexPageRow): GmCodexPage {
   return row;
 }
 
-/** null when the page is not revealed to players; otherwise the player-facing projection (no gmBody). */
+/** null when the page is not revealed to players; otherwise the player-facing projection (no gmBody, no gmFields). */
 export function projectPlayerPage(row: CodexPageRow): PlayerCodexPage | null {
   if (!row.revealedToPlayers) return null;
-  // Explicit destructure-and-omit: gmBody and rev never enter the returned object. Structured fields are
-  // player-facing lore (revealed with the page); a GM keeps secret attributes in gmBody instead.
+  // Explicit allow-list: gmBody, gmFields, and rev never enter the returned object. `fields` is the
+  // player-facing quick-reference (revealed with the page); GM-only structured attributes live in
+  // `gmFields` (secret motives etc.) and are dropped here exactly like gmBody.
   return { id: row.id, title: row.title, entityType: row.entityType, fields: row.fields, folder: row.folder, tags: row.tags, body: row.playerBody, bannerAssetId: row.bannerAssetId, updatedAt: row.updatedAt };
 }
 
@@ -66,6 +67,10 @@ export function projectGmRelationships(views: readonly CodexRelationshipView[]):
 /** A player sees an edge only when the OTHER endpoint is revealed (the page they're on already is). */
 export function projectPlayerRelationships(views: readonly CodexRelationshipView[]): CodexRelationshipView[] {
   return views.filter((view) => view.otherRevealed);
+}
+/** The whole-graph edge feed: a player sees an edge only when BOTH endpoints are revealed pages. */
+export function projectPlayerRelationshipEdges(edges: readonly CodexRelationshipRow[], revealedPageIds: ReadonlySet<string>): CodexRelationshipRow[] {
+  return edges.filter((edge) => revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId));
 }
 
 // ----- Maps -----

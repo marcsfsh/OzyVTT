@@ -1,18 +1,22 @@
 import { useMemo } from "react";
 import { Badge } from "@vtt/ui";
-import { type CodexPageSummary } from "./api";
-import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityIcon, type EntityType } from "./entities";
+import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, entityIcon, type EntityType } from "./entities";
+
+/** The minimum an entity needs to appear on the World home — satisfied by both the GM and player page summaries. */
+type WorldEntity = Readonly<{ id: string; title: string; entityType: EntityType; tags: readonly string[]; updatedAt: string; revealedToPlayers?: boolean }>;
 
 /**
  * The world at a glance: every entity grouped by type, a tag cloud, and what changed recently - one
  * landing that answers "what's in this world" and jumps into a filtered notebook. Derived entirely from
- * the page list (the entity store), so it's always current.
+ * the page list (the entity store), so it's always current. Shared by the GM and the player codex; the
+ * player passes showReveal=false (everything they can see is, by definition, revealed).
  */
-export function WorldHome({ pages, onPickType, onPickTag, onOpenPage }: Readonly<{
-  pages: readonly CodexPageSummary[];
+export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, showReveal = true }: Readonly<{
+  pages: readonly WorldEntity[];
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
+  showReveal?: boolean;
 }>) {
   const byType = useMemo(() => {
     const counts = {} as Record<EntityType, number>;
@@ -28,14 +32,16 @@ export function WorldHome({ pages, onPickType, onPickTag, onOpenPage }: Readonly
   const revealed = useMemo(() => pages.filter((page) => page.revealedToPlayers).length, [pages]);
 
   if (pages.length === 0) {
-    return <div className="codex-main-empty"><h3>Your world begins here</h3><p>Create characters, locations, factions and more in the Pages tab - they'll gather here, grouped by type, with a tag cloud and recent changes.</p></div>;
+    return showReveal
+      ? <div className="codex-main-empty"><h3>Your world begins here</h3><p>Create characters, locations, factions and more in the Pages tab - they'll gather here, grouped by type, with a tag cloud and recent changes.</p></div>
+      : <div className="codex-main-empty"><h3>The world, as you know it</h3><p>As the GM reveals people, places and lore, they'll gather here - grouped by type, with a tag cloud and recent discoveries.</p></div>;
   }
 
   return (
     <div className="codex-world">
       <div className="codex-world-stats">
         <div className="codex-world-stat"><span className="codex-world-statnum">{pages.length}</span><span>entities</span></div>
-        <div className="codex-world-stat"><span className="codex-world-statnum">{revealed}</span><span>revealed to players</span></div>
+        {showReveal && <div className="codex-world-stat"><span className="codex-world-statnum">{revealed}</span><span>revealed to players</span></div>}
         <div className="codex-world-stat"><span className="codex-world-statnum">{tags.length}</span><span>tags</span></div>
       </div>
 
@@ -43,10 +49,10 @@ export function WorldHome({ pages, onPickType, onPickTag, onOpenPage }: Readonly
         <h3 className="codex-world-h">By type</h3>
         <div className="codex-world-types">
           {ENTITY_TYPE_LIST.filter((type) => byType[type]).map((type) => (
-            <button key={type} type="button" className="codex-world-typecard" onClick={() => onPickType(type)}>
-              <span className="codex-world-typeicon" aria-hidden="true">{entityIcon(type)}</span>
+            <button key={type} type="button" className="codex-world-typecard" style={{ borderLeftColor: entityColor(type) }} onClick={() => onPickType(type)}>
+              <span className="codex-world-typeicon" style={{ background: `color-mix(in srgb, ${entityColor(type)} 22%, transparent)` }} aria-hidden="true">{entityIcon(type)}</span>
               <span className="codex-world-typelabel">{ENTITY_DEFS[type].label}</span>
-              <span className="codex-world-typecount">{byType[type]}</span>
+              <span className="codex-world-typecount" style={{ color: entityColor(type) }}>{byType[type]}</span>
             </button>
           ))}
         </div>
@@ -68,7 +74,7 @@ export function WorldHome({ pages, onPickType, onPickTag, onOpenPage }: Readonly
             <button key={page.id} type="button" className="codex-world-recentitem" onClick={() => onOpenPage(page.id)}>
               {page.entityType !== "note" && <span aria-hidden="true">{entityIcon(page.entityType)}</span>}
               <span className="codex-list-title">{page.title}</span>
-              {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
+              {showReveal && page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
             </button>
           ))}
         </div>

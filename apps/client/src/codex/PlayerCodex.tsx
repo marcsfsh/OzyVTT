@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, SegmentedControl } from "@vtt/ui";
 import { socket } from "../socket";
-import { playerCodexApi, type CodexRelationship, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
-import { entityDef, entityIcon, relationshipLabel } from "./entities";
+import { WorldHome } from "./WorldHome";
+import { RelationshipGraph } from "./RelationshipGraph";
+import { ENTITY_DEFS, entityDef, entityIcon, relationshipLabel, type EntityType } from "./entities";
 import "./codex.css";
+
+type PlayerView = "world" | "lore" | "atlas" | "journal" | "graph";
 
 /**
  * The player-facing Codex: a read-only window onto the worldbuilding the GM has revealed. Lore browses
@@ -19,8 +23,10 @@ function whenLabel(entry: PlayerCodexJournalEntry): string {
 }
 
 export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClose?: () => void }>) {
-  const [view, setView] = useState<"lore" | "atlas" | "journal">("lore");
+  const [view, setView] = useState<PlayerView>("world");
   const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
+  const [rels, setRels] = useState<CodexRelationshipEdge[]>([]);
+  const [filter, setFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [page, setPage] = useState<PlayerCodexPage | null>(null);
   const [pageRels, setPageRels] = useState<CodexRelationship[]>([]);
@@ -32,8 +38,8 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
 
   const load = useCallback(async () => {
     try {
-      const [nextPages, nextMaps, nextTimeline] = await Promise.all([playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token)]);
-      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline);
+      const [nextPages, nextMaps, nextTimeline, nextRels] = await Promise.all([playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token), playerCodexApi.listRelationships(token)]);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels);
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
@@ -53,6 +59,7 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
     else if (marker.pageId) openPage(marker.pageId);
   }, [markers, maps, openPage]);
 
+  const filteredPages = useMemo(() => pages.filter((summary) => (!filter.type || summary.entityType === filter.type) && (!filter.tag || summary.tags.includes(filter.tag))), [pages, filter]);
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const breadcrumb = useMemo(() => {
     const chain: PlayerCodexMap[] = []; let cursor = currentMap; const guard = new Set<string>();
@@ -63,19 +70,30 @@ export function PlayerCodex({ token, onClose }: Readonly<{ token: string; onClos
   return (
     <div className="codex-root codex-player">
       <div className="codex-modebar">
-        <SegmentedControl ariaLabel="Codex" value={view} onChange={(value) => setView(value as "lore" | "atlas" | "journal")}
-          options={[{ value: "lore", label: "Lore" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }]} />
+        <SegmentedControl ariaLabel="Codex" value={view} onChange={(value) => setView(value as PlayerView)}
+          options={[{ value: "world", label: "World" }, { value: "lore", label: "Lore" }, { value: "atlas", label: "Atlas" }, { value: "journal", label: "Journal" }, { value: "graph", label: "Graph" }]} />
         {onClose && <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>}
       </div>
 
       {error && <p className="codex-rail-error" role="alert">{error}</p>}
 
+      {view === "world" && (
+        <WorldHome pages={pages} showReveal={false} onOpenPage={openPage}
+          onPickType={(type) => { setFilter({ type, tag: null }); setView("lore"); }}
+          onPickTag={(tag) => { setFilter({ type: null, tag }); setView("lore"); }} />
+      )}
+
+      {view === "graph" && (
+        <RelationshipGraph nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} onOpen={openPage} />
+      )}
+
       {view === "lore" && (
         <div className={`codex-workspace${selectedPageId ? " has-selection" : ""}`}>
           <aside className="codex-rail">
             <nav className="codex-list" aria-label="Revealed pages">
-              {pages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
-              {pages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}><span className="codex-list-title">{summary.title}</span></button>)}
+              {(filter.type || filter.tag) && <div className="codex-filter-chip"><span>{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setFilter({ type: null, tag: null })}>✕</button></div>}
+              {filteredPages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
+              {filteredPages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <span aria-hidden="true">{entityIcon(summary.entityType)} </span>}<span className="codex-list-title">{summary.title}</span></button>)}
             </nav>
           </aside>
           <section className="codex-main">

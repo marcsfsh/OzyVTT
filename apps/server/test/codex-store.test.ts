@@ -332,6 +332,21 @@ describe("CodexStore calendar + timeline", () => {
     expect(store.dateForInstant(entry.calendarInstant!)).toEqual({ year: 1, month: 1, day: 5 }); // round-trips
     expect(() => store.setCalendar({ yearName: "", months: [], weekdays: [] })).toThrow(/1 to 24 months/);
   });
+
+  it("reflows already-dated entries when the calendar changes, without corrupting them", () => {
+    const early = store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1, month: 0, day: 1 } });
+    const late = store.createEntry({ playerText: "The war.", inWorldDate: { year: 2, month: 0, day: 1 } });
+    expect(late.calendarInstant! - early.calendarInstant!).toBe(360); // default 12x30: one year apart
+    // Swap in a shorter year: 2 x 100 = 200 days.
+    store.setCalendar({ yearName: "AE", months: [{ name: "Rise", days: 100 }, { name: "Fall", days: 100 }], weekdays: [] });
+    const reflowed = store.listTimeline().filter((entry) => entry.calendarInstant !== null);
+    const earlyNow = reflowed.find((entry) => entry.id === early.id)!;
+    const lateNow = reflowed.find((entry) => entry.id === late.id)!;
+    expect(lateNow.calendarInstant! - earlyNow.calendarInstant!).toBe(200); // re-placed on the new year length
+    expect(earlyNow.inWorldLabel).toBe("Rise 1, 1 AE");                     // label recomputed from the RAW date
+    expect(earlyNow.inWorldDate).toEqual({ year: 1, month: 0, day: 1 });    // raw date preserved verbatim
+    expect(reflowed[0].id).toBe(early.id);                                  // chronological order intact
+  });
 });
 
 describe("CodexStore media visibility (page images)", () => {

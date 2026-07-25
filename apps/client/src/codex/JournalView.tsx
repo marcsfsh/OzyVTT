@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Field, Input, Panel, Select, Switch, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, calendarYearOf, codexApi, formatWorldYear, instantToDate, journalApi, type CodexCalendar, type CodexJournalEntry, type CodexPageSummary } from "./api";
+import { calendarApi, calendarYearOf, codexApi, formatWorldYear, journalApi, type CodexCalendar, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 
@@ -57,7 +57,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
   };
   const edit = (entry: CodexJournalEntry) => {
     setEditingId(entry.id);
-    const date = entry.calendarInstant !== null && calendar ? instantToDate(calendar, entry.calendarInstant) : null;
+    const date = entry.inWorldDate; // the raw date the GM typed - correct even if the calendar has since changed
     setDraft({
       playerText: entry.playerText, gmText: entry.gmText ?? "", sessionNumber: entry.sessionNumber?.toString() ?? "",
       dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : "",

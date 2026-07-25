@@ -5,7 +5,7 @@ import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
 import { RelationshipsPanel } from "./RelationshipsPanel";
-import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, type EntityType } from "./entities";
+import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 type BodyTab = "player" | "gm";
 type SaveStatus = "idle" | "saving" | "saved" | "conflict" | "error";
@@ -13,7 +13,8 @@ type SaveStatus = "idle" | "saving" | "saved" | "conflict" | "error";
 type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null };
 
 function draftOf(page: CodexPage): Draft {
-  return { title: page.title, entityType: page.entityType, fields: { ...page.fields }, folder: page.folder ?? "", tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId };
+  // The editor holds one flat value map; public `fields` + GM-only `gmFields` merge for editing and re-split on save.
+  return { title: page.title, entityType: page.entityType, fields: { ...page.fields, ...page.gmFields }, folder: page.folder ?? "", tagsText: page.tags.join(", "), playerBody: page.playerBody, gmBody: page.gmBody, bannerAssetId: page.bannerAssetId };
 }
 function serialize(draft: Draft): string { return JSON.stringify(draft); }
 function parseTags(text: string): string[] {
@@ -100,8 +101,10 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
     setStatus("saving");
     try {
       const draftNow = draftRef.current;
+      // Split the flat value map back into player-facing `fields` and GM-only `gmFields` (secret motives never reach players).
+      const { fields, gmFields } = splitEntityFields(draftNow.entityType, draftNow.fields);
       const updated = await codexApi.updatePage(gmToken, page.id, {
-        title: draftNow.title.trim() || "Untitled", entityType: draftNow.entityType, fields: draftNow.fields,
+        title: draftNow.title.trim() || "Untitled", entityType: draftNow.entityType, fields, gmFields,
         folder: draftNow.folder.trim() || null, tags: parseTags(draftNow.tagsText),
         playerBody: draftNow.playerBody, gmBody: draftNow.gmBody, bannerAssetId: draftNow.bannerAssetId, expectedRev: revRef.current
       });
@@ -126,6 +129,12 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
     const timer = setTimeout(() => { void flush(); }, 800);
     return () => clearTimeout(timer);
   }, [draft, flush]);
+
+  // Flush any pending edit when the editor unmounts (navigating away / switching Codex tabs) - the debounce
+  // timer alone would silently drop the last edit. flushRef holds the latest flush so this runs only on unmount.
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => () => { if (serialize(draftRef.current) !== savedRef.current) void flushRef.current(); }, []);
 
   const body = tab === "player" ? draft.playerBody : draft.gmBody;
   const setBody = (next: string) => setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
@@ -272,7 +281,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
 
           <div className="codex-meta-row">
             <Field label="Entity type" htmlFor="codex-type">
-              <Select id="codex-type" value={draft.entityType} onChange={(event) => setDraft((prev) => ({ ...prev, entityType: event.target.value as EntityType }))}>
+              <Select id="codex-type" value={draft.entityType} onChange={(event) => setDraft((prev) => { const nextType = event.target.value as EntityType; const keep = new Set(entityDef(nextType).fields.map((field) => field.key)); return { ...prev, entityType: nextType, fields: Object.fromEntries(Object.entries(prev.fields).filter(([key]) => keep.has(key))) }; })}>
                 {ENTITY_TYPE_LIST.map((type) => <option key={type} value={type}>{ENTITY_DEFS[type].icon} {ENTITY_DEFS[type].label}</option>)}
               </Select>
             </Field>
@@ -280,10 +289,22 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             <Field label="Tags" htmlFor="codex-tags" help="Comma-separated"><Input id="codex-tags" value={draft.tagsText} placeholder="town, npc" onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))} /></Field>
           </div>
 
-          {typeDef.fields.length > 0 && (
+          {typeDef.fields.some((field) => !field.secret) && (
             <div className="codex-fields">
-              {typeDef.fields.map((field) => (
-                <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`}>
+              {typeDef.fields.filter((field) => !field.secret).map((field) => (
+                <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`} className={field.kind === "textarea" ? "codex-field-wide" : undefined}>
+                  {field.kind === "textarea"
+                    ? <Textarea id={`codex-field-${field.key}`} className="codex-field-area" value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />
+                    : <Input id={`codex-field-${field.key}`} value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />}
+                </Field>
+              ))}
+            </div>
+          )}
+          {typeDef.fields.some((field) => field.secret) && (
+            <div className="codex-fields codex-fields-secret">
+              <span className="codex-fields-secret-tag">GM ONLY · hidden from players</span>
+              {typeDef.fields.filter((field) => field.secret).map((field) => (
+                <Field key={field.key} label={field.label} htmlFor={`codex-field-${field.key}`} className={field.kind === "textarea" ? "codex-field-wide" : undefined}>
                   {field.kind === "textarea"
                     ? <Textarea id={`codex-field-${field.key}`} className="codex-field-area" value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />
                     : <Input id={`codex-field-${field.key}`} value={draft.fields[field.key] ?? ""} placeholder={field.placeholder} onChange={(event) => setField(field.key, event.target.value)} />}

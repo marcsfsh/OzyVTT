@@ -21,7 +21,7 @@ export type CodexPageSummary = Readonly<{
   updatedAt: string;
 }>;
 
-export type CodexPage = CodexPageSummary & Readonly<{ playerBody: string; gmBody: string }>;
+export type CodexPage = CodexPageSummary & Readonly<{ playerBody: string; gmBody: string; gmFields: Readonly<Record<string, string>> }>;
 export type CodexBacklink = Readonly<{ sourcePageId: string; sourceTitle: string; section: string | null }>;
 /** A relationship as listed against one page: the OTHER endpoint resolved, plus which way the edge points. */
 export type CodexRelationship = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: EntityType; otherRevealed: boolean }>;
@@ -43,6 +43,7 @@ export type CodexPageInput = Readonly<{
   title?: string;
   entityType?: EntityType;
   fields?: Readonly<Record<string, string>>;
+  gmFields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
@@ -169,7 +170,7 @@ export type CodexJournalKind = "note" | "combat";
 export type CodexJournalEntry = Readonly<{
   id: string; playerText: string; gmText: string | null; revealedToPlayers: boolean;
   attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null;
-  sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null;
+  sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null;
   sortKey: number; createdAt: string; updatedAt: string;
 }>;
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
