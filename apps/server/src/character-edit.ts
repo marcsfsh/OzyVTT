@@ -26,7 +26,15 @@ function replaceDefinition(state: GameState, definitionId: string, next: ActorDe
 
 export function setCharacterIdentity(state: GameState, actorId: string, character: ActorDefinition["character"]): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
-  replaceDefinition(state, definitionId, { ...definition, character });
+  // The sheet's identity editor sends class/race/background/feats and knows nothing about the
+  // builder's provenance ledger (`character.choices`), so replacing the block wholesale would
+  // silently drop it - and with it every level-up/respec prefill. Carry the stored ledger forward
+  // unless the caller supplies one of its own (the builder does).
+  const storedChoices = definition.character?.choices;
+  const merged = character !== undefined && character.choices === undefined && storedChoices !== undefined
+    ? { ...character, choices: storedChoices }
+    : character;
+  replaceDefinition(state, definitionId, { ...definition, character: merged });
 }
 
 export function setCharacterProficiencies(state: GameState, actorId: string, proficiencies: ActorDefinition["proficiencies"]): void {

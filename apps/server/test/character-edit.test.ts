@@ -23,6 +23,20 @@ describe("character edit", () => {
     setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 8 }], feats: [] });
     expect(state.definitions[0].definition.character?.classes[0].level).toBe(8);
   });
+  it("preserves the builder's choice ledger when the sheet edits identity", () => {
+    const state = stateWith();
+    // the builder recorded why each pick was made; the sheet's identity editor knows nothing about it
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 4 }], feats: [], choices: [{ level: 4, kind: "asi", id: "str-plus-2" }] });
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 5 }], feats: [] });
+    expect(state.definitions[0].definition.character?.classes[0].level).toBe(5);
+    expect(state.definitions[0].definition.character?.choices).toEqual([{ level: 4, kind: "asi", id: "str-plus-2" }]);
+  });
+  it("lets the builder replace the choice ledger explicitly (respec)", () => {
+    const state = stateWith();
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 4 }], feats: [], choices: [{ level: 4, kind: "asi", id: "str-plus-2" }] });
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 4 }], feats: [], choices: [{ level: 4, kind: "feat", id: "alert" }] });
+    expect(state.definitions[0].definition.character?.choices).toEqual([{ level: 4, kind: "feat", id: "alert" }]);
+  });
   it("sets save and skill proficiency selections", () => {
     const state = stateWith();
     setCharacterProficiencies(state, actorId, { saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "expertise" }] });
