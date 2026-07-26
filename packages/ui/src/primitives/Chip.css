@@ -39,6 +39,8 @@
   transition: opacity var(--dur-hover), background var(--dur-hover);
 }
 .nh-chip-remove:hover { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
+/* A chip's ✕ stays visually tiny; `.tap-target` gives the finger the 44px floor. */
+.nh-chip-remove.tap-target::after { border-radius: 50%; }
 
 /* Pressable / selectable chip (filter + condition toggles) */
 .nh-chip--pressable { cursor: pointer; }

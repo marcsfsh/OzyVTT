@@ -1,0 +1,44 @@
+.nh-review { display: grid; gap: var(--space-4); }
+
+.nh-review-section {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+/* Missing something: a danger edge AND the words next to the Edit link. */
+.nh-review-section.is-incomplete { border-color: var(--danger); }
+
+.nh-review-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.nh-review-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
+.nh-review-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--cyan);
+  font: 600 var(--fs-sm) / 1 var(--font-body);
+  cursor: pointer;
+}
+.nh-review-edit:hover { color: var(--cyan-hi); background: color-mix(in srgb, var(--surface-3) 60%, transparent); }
+.nh-review-edit-icon { display: grid; place-items: center; font-size: 0.95em; }
+
+.nh-review-incomplete { margin: 0; display: flex; align-items: center; gap: var(--space-1); color: var(--danger-hi); font-size: var(--fs-sm); }
+
+/* Reuse .nh-statlist's grid; only the value face changes, because a review holds
+   prose ("Wood elf") next to numbers ("17"). */
+.nh-review-stats { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+.nh-review-stats dd.nh-review-text { font-family: var(--font-body); font-weight: 600; line-height: 1.35; }
+.nh-review-stats dd.nh-review-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.nh-review-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: var(--lh-body); }
+
+@media (max-width: 480px) {
+  .nh-review-stats { grid-template-columns: 1fr 1fr; }
+}

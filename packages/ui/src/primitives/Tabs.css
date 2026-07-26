@@ -8,8 +8,13 @@
 .nh-tabs--horizontal::-webkit-scrollbar { display: none; }
 .nh-tabs--vertical { flex-direction: column; align-items: stretch; }
 
+/* The active tab already owns ::after (the underline), so the 44px floor
+   (decision 16) is real paint here rather than a `.tap-target` extension. */
 .nh-tab {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
   padding: var(--space-3) var(--space-4);
   border: 0;
   background: transparent;

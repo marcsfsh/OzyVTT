@@ -69,6 +69,23 @@
   font-size: var(--fs-sm);
 }
 
+/* Wizard demo — the shell owns the viewport in the app, so the style guide bounds it
+   in a scroll frame to keep this page readable. The sticky header/footer stick to
+   the frame instead of the window, which is exactly what they do in the app. */
+.sg-wizard-frame {
+  height: 36rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+.sg-wizard-frame .nh-wizard { min-height: 100%; }
+.sg-wizard-step { display: grid; gap: var(--space-3); padding-bottom: var(--space-4); }
+/* The preview pane is always visible on a laptop; this button is the narrow-screen way in.
+   Scoped through .sg-wizard-step so it out-specifies .nh-btn's own display. */
+.sg-wizard-step .sg-wizard-preview-btn { justify-self: start; }
+@media (min-width: 901px) { .sg-wizard-step .sg-wizard-preview-btn { display: none; } }
+
 /* Textures */
 .sg-textures { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
 .sg-texture {

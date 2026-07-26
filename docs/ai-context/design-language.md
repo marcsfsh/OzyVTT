@@ -29,8 +29,12 @@ right.
 - **Primitives:** `@vtt/ui` exports the shared components — `Button`,
   `Field`/`Input`/`Select`/`Textarea`, `Panel`, `Tabs`, `Menu`, `Tooltip`,
   `Modal`, `Chip`, `Wordmark`, `Eyebrow`, `ToastProvider`/`useToast`,
-  `ThemeToggle`, `useTheme`. Build new UI from these; do not hand-roll bespoke
-  controls. Primitive CSS classes are `nh-`-namespaced.
+  `ThemeToggle`, `useTheme`, plus the guided-flow set (`WizardShell`, `Steps`,
+  `ChoiceCard`, `ChoiceGrid`, `AbilityScoreAllocator`, `DiceInputRow`, `NameField`,
+  `FeatureList`, `ReviewSummary`) and the system's own SVG glyphs (`IconCheck`,
+  `IconChevron`, `IconSearch`, `IconShuffle`, `IconDie`, `IconPencil` — primitives
+  never use emoji). Build new UI from these; do not hand-roll bespoke controls.
+  Primitive CSS classes are `nh-`-namespaced.
 - **Living reference:** the dev-only `/styleguide` route (`styleguide.html`)
   renders every token, type role, and primitive with its states and a live theme
   switch. A new primitive isn't done until it appears there.
@@ -166,7 +170,7 @@ do not track out body text.
 
 ---
 
-## 4. Spacing, radius, elevation
+## 4. Spacing, radius, elevation, touch targets
 
 - Spacing (`--space-*`), 4px base: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64.
 - Radius: `--radius-sm 4px`, `--radius-md 8px`, `--radius-lg 12px`, `--radius-pill`.
@@ -174,6 +178,32 @@ do not track out body text.
 - Elevation, in order of preference: a lighter surface token; a 1px border in
   `--line` or a low-alpha accent; a dark ambient shadow. Colored glow is state,
   not resting elevation.
+
+### The 44px touch-target floor (authoritative)
+
+**Every interactive control presents a hit area of at least `--tap-min` (44px) on
+every device.** Phone and laptop are the same build (mobile-ux.md), so there is no
+"desktop-only" control that may be smaller. This is a floor, not a size: it governs
+the *hit area*, never the paint.
+
+Two ways to meet it — pick by whether growing the paint hurts:
+
+1. **Grow the paint** (`min-height: var(--tap-min)`) where a taller control is
+   harmless or better: `.nh-btn`, `.nh-input`, `.nh-tab`, `.nh-menu-trigger`,
+   `.nh-menu-item`, `.nh-stepper-btn` (also `width`), `.nh-feature-summary`.
+   Stacked lists (menus, disclosure rows) **must** use this — overlapping invisible
+   extensions in a vertical list steal their neighbours' taps.
+2. **Grow only the area** with the `.tap-target` utility, which centres a
+   `--tap-min` box on the control via `::after`. Use it where the light visual
+   weight is the point: `.nh-btn--sm` (32px paint), `.nh-iconbtn` (36px),
+   `.nh-segmented-option`, `.nh-switch` (22px), `.nh-chip-remove` (18px),
+   `.nh-modal-close`. Never on a control that already uses `::after` for a visual
+   (the active tab's underline) — give those a `min-height` instead.
+
+New controls inherit this by composing `@vtt/ui` primitives. A hand-rolled control
+must state which of the two routes it took. Verify by measuring, not by eye:
+`getBoundingClientRect().height` (or the `::after` height for `.tap-target`) at a
+375px viewport.
 
 ---
 
@@ -277,5 +307,6 @@ all-caps only for small eyebrow labels.
    (with `nh-`-namespaced CSS) and to `/styleguide`, not inline in a feature.
 3. Run the Section 8 checklist; verify AA contrast in all three themes; confirm
    reduced-motion and reduced-transparency behavior.
-4. For a UI-affecting change, look at it running (`npm run dev`) at a desktop
+4. Meet the 44px touch floor (§4) and say which route you took.
+5. For a UI-affecting change, look at it running (`npm run dev`) at a desktop
    width and a narrow/touch viewport, and cycle the themes.

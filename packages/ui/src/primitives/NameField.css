@@ -1,0 +1,30 @@
+.nh-namefield { display: grid; gap: var(--space-3); }
+.nh-namefield-row { display: flex; align-items: center; gap: var(--space-2); }
+.nh-namefield-row .nh-input { flex: 1 1 auto; min-width: 0; }
+.nh-namefield-shuffle { flex: none; }
+
+.nh-namefield-suggestions { display: grid; gap: var(--space-2); }
+.nh-namefield-suggestions-label {
+  color: var(--text-muted);
+  font: 800 var(--fs-xs) / 1.3 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.nh-namefield-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.nh-namefield-suggestion {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1 var(--font-body);
+  cursor: pointer;
+}
+.nh-namefield-suggestion:hover:not(:disabled) { background: var(--surface-3); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+/* The one already in the field — a quiet cyan edge, matching selection everywhere
+   else. No glow: the field itself is the answer, not this chip. */
+.nh-namefield-suggestion.is-taken { border-color: var(--cyan); color: var(--text); }
+.nh-namefield-suggestion:disabled { color: var(--text-muted); cursor: not-allowed; }

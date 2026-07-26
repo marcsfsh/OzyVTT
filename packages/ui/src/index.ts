@@ -57,3 +57,23 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } fr
 export { Steps, type StepsProps, type StepItem } from "./primitives/Steps";
 export { Skeleton, type SkeletonProps } from "./primitives/Skeleton";
 export { Kbd, type KbdProps } from "./primitives/Kbd";
+
+/* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's
+   richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
+export { IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil } from "./primitives/icons";
+
+/* Guided-flow primitives (character builder, and any other long wizard) */
+export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";
+export { ChoiceCard, type ChoiceCardProps } from "./primitives/ChoiceCard";
+export { ChoiceGrid, type ChoiceGridProps, type ChoiceOption } from "./primitives/ChoiceGrid";
+export {
+  AbilityScoreAllocator,
+  type AbilityScoreAllocatorProps,
+  type AbilityAllocationMode,
+  type AbilityRowData,
+  type AbilityPoolValue
+} from "./primitives/AbilityScoreAllocator";
+export { DiceInputRow, type DiceInputRowProps, type DiceEntryMode } from "./primitives/DiceInputRow";
+export { NameField, type NameFieldProps } from "./primitives/NameField";
+export { FeatureList, type FeatureListProps, type FeatureItem } from "./primitives/FeatureList";
+export { ReviewSummary, type ReviewSummaryProps, type ReviewSection, type ReviewItem } from "./primitives/ReviewSummary";

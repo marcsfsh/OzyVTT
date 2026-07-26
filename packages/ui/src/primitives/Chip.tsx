@@ -53,7 +53,7 @@ export function Chip({ tone = "neutral", icon, atRisk = false, className, childr
     <span className={cls} title={title} {...aria}>
       {body}
       {onRemove && (
-        <button type="button" className="nh-chip-remove" aria-label={removeLabel ?? "Remove"} onClick={onRemove}>
+        <button type="button" className="nh-chip-remove tap-target" aria-label={removeLabel ?? "Remove"} onClick={onRemove}>
           ✕
         </button>
       )}

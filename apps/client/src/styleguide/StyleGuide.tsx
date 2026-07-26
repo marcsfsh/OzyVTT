@@ -1,14 +1,20 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  AbilityScoreAllocator,
   Alert,
   Avatar,
   Badge,
   Button,
+  ChoiceCard,
+  ChoiceGrid,
   Chip,
+  DiceInputRow,
   Eyebrow,
+  FeatureList,
   Field,
   IconButton,
+  IconDie,
   Input,
   Kbd,
   LinkButton,
@@ -16,8 +22,10 @@ import {
   Meter,
   MenuItem,
   Modal,
+  NameField,
   Panel,
   PanelHeader,
+  ReviewSummary,
   SegmentedControl,
   Select,
   Skeleton,
@@ -30,7 +38,10 @@ import {
   Tooltip,
   ToastProvider,
   useToast,
+  WizardShell,
   Wordmark,
+  type AbilityPoolValue,
+  type ChoiceOption,
   type TabItem
 } from "@vtt/ui";
 
@@ -85,6 +96,247 @@ const DEMO_TABS: TabItem[] = [
   { id: "setup", label: "VTT Setup" }
 ];
 
+/* ---- Character-builder demo data (presentation only — the real content comes from
+   the SRD bundles and the real math from @vtt/rules-5e). ---- */
+
+const WIZARD_STEPS = [
+  { label: "Species" }, { label: "Class" }, { label: "Background" },
+  { label: "Ability scores" }, { label: "Skills" }, { label: "Equipment" }, { label: "Review" }
+];
+
+const SPECIES: ChoiceOption[] = [
+  { value: "human", title: "Human", facet: "srd", keywords: "versatile", meta: "+1 to all · 30 ft", description: "Ambitious and adaptable, humans turn up in every corner of the world.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "elf", title: "Elf", facet: "srd", keywords: "fey darkvision", meta: "+2 DEX · 30 ft", description: "Graceful, long-lived, and at home in twilight — darkvision and keen senses.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "dwarf", title: "Dwarf", facet: "srd", keywords: "stout hardy", meta: "+2 CON · 25 ft", description: "Stone-hardy and stubborn, with darkvision and a resistance to poison.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "halfling", title: "Halfling", facet: "srd", keywords: "lucky small", meta: "+2 DEX · 25 ft", description: "Small, lucky, and very hard to frighten.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "dragonborn", title: "Dragonborn", facet: "srd", keywords: "breath weapon", meta: "+2 STR · 30 ft", description: "Draconic ancestry grants a breath weapon and matching damage resistance.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "gnome", title: "Gnome", facet: "srd", keywords: "cunning tinker", meta: "+2 INT · 25 ft", description: "Inventive and irrepressible, with advantage on mental saves against magic.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "half-elf", title: "Half-Elf", facet: "srd", keywords: "charisma versatile", meta: "+2 CHA · 30 ft", description: "At home everywhere and nowhere; two extra skills of your choosing.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "half-orc", title: "Half-Orc", facet: "srd", keywords: "relentless endurance", meta: "+2 STR · 30 ft", description: "Relentless endurance keeps you standing at 1 hit point once per rest.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "tiefling", title: "Tiefling", facet: "srd", keywords: "infernal fire", meta: "+2 CHA · 30 ft", description: "Infernal heritage: fire resistance and a little innate magic.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "ashborn", title: "Ashborn", facet: "homebrew", keywords: "volcanic", meta: "+2 CON · 30 ft", description: "Born of the cinder wastes; the campaign's own lineage.", badge: <Badge tone="primary">Homebrew</Badge> },
+  { value: "tidewalker", title: "Tidewalker", facet: "homebrew", keywords: "aquatic swim", meta: "+2 WIS · 30 ft", description: "Amphibious wanderers of the drowned coast, with a swim speed.", badge: <Badge tone="primary">Homebrew</Badge> },
+  { value: "voidkin", title: "Voidkin", facet: "homebrew", keywords: "starlight", meta: "+2 INT · 30 ft", description: "Touched by the space between stars. Needs the GM's blessing.", badge: <Badge tone="primary">Homebrew</Badge>, disabled: true, disabledReason: "The GM has not unlocked this lineage." }
+];
+
+const ABILITIES = [
+  { id: "str", label: "Strength", abbr: "STR" },
+  { id: "dex", label: "Dexterity", abbr: "DEX" },
+  { id: "con", label: "Constitution", abbr: "CON" },
+  { id: "int", label: "Intelligence", abbr: "INT" },
+  { id: "wis", label: "Wisdom", abbr: "WIS" },
+  { id: "cha", label: "Charisma", abbr: "CHA" }
+];
+const SPECIES_BONUS: Record<string, number> = { dex: 2, con: 1 };
+const POINT_COST: Record<number, number> = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
+const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
+/* Demo-only: the shipping wizard takes these from @vtt/rules-5e. */
+const modifierOf = (score: number) => Math.floor((score - 10) / 2);
+
+const CLASS_FEATURES = [
+  { id: "second-wind", title: "Second Wind", meta: "Level 1", badge: <Badge tone="info">SRD</Badge>, body: <p>Once per short or long rest, use a bonus action to regain 1d10 + your fighter level in hit points.</p>, defaultOpen: true },
+  { id: "action-surge", title: "Action Surge", meta: "Level 2", badge: <Badge tone="info">SRD</Badge>, body: <p>On your turn, take one additional action. Once per short or long rest.</p> },
+  { id: "martial-archetype", title: "Martial Archetype", meta: "Level 3", badge: <Badge tone="info">SRD</Badge>, body: <p>Choose the archetype that shapes the rest of your fighter career. Its features arrive at levels 3, 7, 10, 15, and 18.</p> },
+  { id: "asi-4", title: "Ability Score Improvement", meta: "Level 4", badge: <Badge tone="info">SRD</Badge>, body: <p>Raise one ability by 2, or two abilities by 1 each — or take a feat instead. No ability goes above 20 this way.</p> },
+  { id: "extra-attack", title: "Extra Attack", meta: "Level 5", badge: <Badge tone="info">SRD</Badge>, body: <p>Attack twice whenever you take the Attack action on your turn.</p> },
+  { id: "cinder-mark", title: "Cinder Mark", meta: "Level 3", badge: <Badge tone="primary">Homebrew</Badge>, body: <p>Brand a creature you hit. Your next attack against it before the end of your next turn deals an extra 1d6 fire damage.</p> }
+];
+
+/** The wizard frame driving a real step: species picking, live validation gating,
+    a preview pane, and the persistent attribution footnote. */
+function WizardDemo() {
+  const [step, setStep] = useState(0);
+  const [species, setSpecies] = useState<string | null>(null);
+  const [facet, setFacet] = useState("all");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const chosen = SPECIES.find((option) => option.value === species) ?? null;
+
+  return (
+    <div className="sg-wizard-frame">
+      <WizardShell
+        title="Create a character"
+        eyebrow="Character builder"
+        steps={WIZARD_STEPS}
+        current={step}
+        onStepSelect={setStep}
+        onSaveAndClose={() => undefined}
+        onBack={step > 0 ? () => setStep((s) => s - 1) : undefined}
+        onNext={step < WIZARD_STEPS.length - 1 ? () => setStep((s) => s + 1) : undefined}
+        blockedReason={step === 0 && !species ? "Choose a species to continue." : undefined}
+        resume={<Alert tone="info" title="Draft found">You started this character on another device. <Button variant="ghost" size="sm">Resume draft</Button></Alert>}
+        detail={chosen
+          ? <>
+              <p>{chosen.description}</p>
+              <p className="tabular sg-muted">{chosen.meta}</p>
+            </>
+          : <p>Pick a species to preview its traits here.</p>}
+        detailTitle={chosen ? chosen.title : "Preview"}
+        detailOpen={detailOpen}
+        onCloseDetail={() => setDetailOpen(false)}
+        detailBackLabel="Back to the list"
+        footnote="Species, class, and background text from the SRD 5.2.1, CC BY 4.0."
+      >
+        <div className="sg-wizard-step">
+          <Button variant="secondary" size="sm" className="sg-wizard-preview-btn" onClick={() => setDetailOpen(true)}>Show preview</Button>
+          <ChoiceGrid
+            ariaLabel="Species"
+            options={SPECIES}
+            value={species}
+            onChange={(value) => { setSpecies(value); }}
+            searchPlaceholder="Search species…"
+            facetValue={facet}
+            onFacetChange={setFacet}
+            facetLabel="Source"
+            facets={[{ value: "all", label: "All" }, { value: "srd", label: "SRD" }, { value: "homebrew", label: "Homebrew" }]}
+          />
+        </div>
+      </WizardShell>
+    </div>
+  );
+}
+
+/** All four ability-generation methods behind one component. */
+function AllocatorDemo() {
+  const [method, setMethod] = useState("standard");
+  const [assigned, setAssigned] = useState<Record<string, string | null>>({});
+  const [scores, setScores] = useState<Record<string, number>>(() => Object.fromEntries(ABILITIES.map((a) => [a.id, 8])));
+  const [rolls, setRolls] = useState<number[]>([]);
+  const [diceMode, setDiceMode] = useState<"auto" | "manual">("auto");
+
+  const spend = method === "point-buy";
+  const values = method === "roll" ? rolls : method === "custom" ? [17, 15, 13, 12, 10, 8] : STANDARD_ARRAY;
+
+  const pool: AbilityPoolValue[] = useMemo(
+    () => values.map((value, index) => {
+      const id = `${method}-${index}`;
+      return { id, value, assignedTo: Object.entries(assigned).find(([, poolId]) => poolId === id)?.[0] ?? null };
+    }),
+    [values, assigned, method]
+  );
+
+  const rows = ABILITIES.map((ability) => {
+    const bonus = SPECIES_BONUS[ability.id];
+    const base = spend ? scores[ability.id] : pool.find((entry) => entry.assignedTo === ability.id)?.value ?? null;
+    const total = base == null ? null : base + (bonus ?? 0);
+    return { ...ability, score: base, bonus, total, modifier: total == null ? null : modifierOf(total), min: 8, max: 15 };
+  });
+
+  const spent = ABILITIES.reduce((sum, ability) => sum + (POINT_COST[scores[ability.id]] ?? 0), 0);
+
+  const switchMethod = (next: string) => { setMethod(next); setAssigned({}); setRolls([]); };
+  const assign = (abilityId: string, poolId: string | null) => setAssigned((prev) => {
+    const next = { ...prev };
+    if (poolId) for (const key of Object.keys(next)) if (next[key] === poolId) next[key] = null;
+    next[abilityId] = poolId;
+    return next;
+  });
+
+  return (
+    <AbilityScoreAllocator
+      mode={spend ? "spend" : "assign"}
+      method={method}
+      onMethodChange={switchMethod}
+      methods={[
+        { value: "standard", label: "Standard array" },
+        { value: "point-buy", label: "Point buy" },
+        { value: "roll", label: "Roll 4d6" },
+        { value: "custom", label: "GM formula" }
+      ]}
+      methodHint={
+        method === "standard" ? "Assign 15, 14, 13, 12, 10, 8 to the six abilities."
+        : method === "point-buy" ? "Spend 27 points. 8 is free; 15 costs 9."
+        : method === "roll" ? "Roll 4d6 and drop the lowest, six times, then assign the results."
+        : "This table's formula: 2d6 + 6, rolled six times."
+      }
+      rows={rows}
+      pool={spend ? undefined : pool}
+      onAssign={assign}
+      onScoreChange={(abilityId, next) => setScores((prev) => ({ ...prev, [abilityId]: next }))}
+      budget={spend ? { spent, total: 27 } : undefined}
+      toolbar={method === "roll"
+        ? <DiceInputRow
+            label="Roll six scores"
+            notation="4d6 drop lowest"
+            mode={diceMode}
+            onModeChange={setDiceMode}
+            min={3}
+            max={18}
+            onRoll={() => setRolls(Array.from({ length: 6 }, () => 8 + Math.floor(Math.random() * 8)))}
+            onManual={(total) => setRolls((prev) => (prev.length >= 6 ? prev : [...prev, total]))}
+            onReroll={rolls.length > 0 ? () => { setRolls([]); setAssigned({}); } : undefined}
+            result={rolls.length > 0 ? rolls.join(" · ") : undefined}
+            hint={diceMode === "manual" ? "Type each of your six totals, one at a time." : "The server owns the dice; this button only asks for them."}
+          />
+        : undefined}
+    />
+  );
+}
+
+function NameFieldDemo() {
+  const POOLS = [
+    ["Borin Stoneguard", "Mirena Dawnbright", "Lyra Emberwise", "Kel Tanner"],
+    ["Draven Ash", "Sabine Vale", "Orrin Quickfoot", "Thessaly Grey"],
+    ["Rurik Ironvow", "Nessa Coldbrook", "Halvard Finn", "Ilsa Wren"]
+  ];
+  const [batch, setBatch] = useState(0);
+  const [name, setName] = useState("");
+  return (
+    <div className="sg-grid2">
+      <NameField
+        value={name}
+        onChange={setName}
+        suggestions={POOLS[batch % POOLS.length]}
+        onShuffle={() => setBatch((b) => b + 1)}
+        help="Per-species name bundles feed these; you can always type your own."
+      />
+    </div>
+  );
+}
+
+function DiceInputDemo() {
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
+  const [hp, setHp] = useState<number | null>(null);
+  return (
+    <DiceInputRow
+      label="Hit points for level 4"
+      notation="1d10 + 2"
+      mode={mode}
+      onModeChange={setMode}
+      min={3}
+      max={12}
+      onRoll={() => setHp(3 + Math.floor(Math.random() * 10))}
+      onManual={setHp}
+      onReroll={hp != null ? () => setHp(null) : undefined}
+      result={hp != null ? `${hp} HP` : undefined}
+      hint="Outside combat the wizard offers both paths; inside an encounter, RollControls does."
+    />
+  );
+}
+
+function ChoiceGridDemo() {
+  const [value, setValue] = useState<string | null>("elf");
+  const [facet, setFacet] = useState("all");
+  const chosen = SPECIES.find((option) => option.value === value) ?? null;
+  return (
+    <ChoiceGrid
+      ariaLabel="Species"
+      options={SPECIES}
+      value={value}
+      onChange={setValue}
+      searchPlaceholder="Search species…"
+      facetLabel="Source"
+      facetValue={facet}
+      onFacetChange={setFacet}
+      facets={[{ value: "all", label: "All" }, { value: "srd", label: "SRD" }, { value: "homebrew", label: "Homebrew" }]}
+      detailTitle={chosen?.title ?? "Details"}
+      detail={chosen
+        ? <><p>{chosen.description}</p><p className="tabular sg-muted">{chosen.meta}</p></>
+        : <p>Select a species to read its full entry.</p>}
+      emptyAction={<Button variant="secondary" onClick={() => setFacet("all")}>Clear filters</Button>}
+    />
+  );
+}
+
 export function StyleGuide() {
   const [tab, setTab] = useState("encounter");
   const [vtab, setVtab] = useState("encounter");
@@ -96,6 +348,8 @@ export function StyleGuide() {
   const [mod, setMod] = useState(0);
   const [seg, setSeg] = useState("all");
   const [dockSide, setDockSide] = useState("right");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [cardPick, setCardPick] = useState("fighter");
 
   return (
     <ToastProvider>
@@ -390,11 +644,104 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Done steps check off; the current step glows.">
+          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Two forms, one component, swapped by media query: the full horizontal rail above 760px (done steps check off, the current step glows, it scrolls rather than wraps) and a 'Step 3 of 7' + progress bar below it, so a seven-step flow never blobs into rows at 375px. Pass onStepSelect to let a completed step be revisited.">
             <Steps
               current={1}
               steps={[{ label: "Upload map" }, { label: "Calibrate grid" }, { label: "Verify scale" }, { label: "Save" }]}
             />
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <Steps current={3} ariaLabel="Character builder progress" onStepSelect={() => {}} steps={WIZARD_STEPS} />
+            </div>
+          </Section>
+
+          <Section id="wizard" title="Wizard shell" blurb="The multi-step frame behind the character builder: a full page on a laptop, a full-screen sheet on a phone — deliberately not a modal. Header and footer stick, so Back/Next stay put while the step body scrolls. Next is gated per step: when the step is incomplete the button disables AND the reason is shown and announced (a silent disabled button is a dead end). It also carries the resume-draft slot, Save & close, an optional preview pane that collapses to master-detail on narrow screens, and the persistent CC BY footnote.">
+            <WizardDemo />
+            <p className="sg-muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--fs-sm)" }}>
+              Demoed inside a bounded scroll frame so the whole page stays readable; in the app it owns the viewport.
+            </p>
+          </Section>
+
+          <Section id="choicecard" title="Choice card" blurb="The selectable content card behind every pick-one step (species, class, background, feat). Radio semantics — role=radio + aria-checked — because these grids are single-select. There is exactly ONE chosen treatment in the system: a cyan edge with the selection glow plus a check. Slots: icon, description, mono meta line, and the provenance Badge (info = SRD, primary = Homebrew — reuse those, don't invent a third).">
+            <div className="sg-grid3" role="radiogroup" aria-label="Class">
+              <ChoiceCard
+                selected={cardPick === "fighter"} onSelect={() => setCardPick("fighter")}
+                title="Fighter" meta="d10 hit die · STR or DEX" badge={<Badge tone="info">SRD</Badge>}
+                icon={<IconDie />}
+                description="A master of martial combat, skilled with every weapon and all armor."
+              />
+              <ChoiceCard
+                selected={cardPick === "wizard"} onSelect={() => setCardPick("wizard")}
+                title="Wizard" meta="d6 hit die · INT" badge={<Badge tone="info">SRD</Badge>}
+                description="A scholarly magic-user capable of manipulating the structures of reality."
+              />
+              <ChoiceCard
+                selected={cardPick === "warden"} onSelect={() => setCardPick("warden")}
+                title="Ember Warden" meta="d10 hit die · CON" badge={<Badge tone="primary">Homebrew</Badge>}
+                description="This table's own class: a sworn guardian who burns their own vitality for power."
+              />
+              <ChoiceCard
+                selected={false} onSelect={() => {}} disabled
+                title="Artificer" meta="d8 hit die · INT" badge={<Badge tone="info">SRD</Badge>}
+                description="Not in the SRD bundle yet."
+                disabledReason="Not available at level 1 in this campaign."
+              />
+            </div>
+          </Section>
+
+          <Section id="choicegrid" title="Choice grid (faceted picker)" blurb="Search + facets + a ChoiceCard grid + an optional detail pane. The search is debounced (160ms) so a long catalog doesn't refilter per keystroke; no results is a real .nh-empty state; and the grid is a keyboard radiogroup — arrows move and select, Home/End jump, and a roving tabindex means Tab enters and leaves the grid once instead of stepping through twelve cards.">
+            <ChoiceGridDemo />
+          </Section>
+
+          <Section id="allocator" title="Ability score allocator" blurb="All four generation methods behind one component: standard array, point buy, 4d6-drop-lowest, and a GM custom formula. Two interactions cover them — assign values from a pool, or spend against a budget. Assignment is a per-ability select rather than drag-and-drop: dragging is the obvious mouse gesture and a dead end on a phone, and shipping both would be two ways to say one thing. Base, bonus, total, and modifier all render in the mono tabular face. Pure presentation: every number and callback comes from @vtt/rules-5e.">
+            <AllocatorDemo />
+          </Section>
+
+          <Section id="diceinput" title="Dice input row" blurb="The manual-vs-auto roll control for everything OUTSIDE combat — ability generation, starting HP, starting gold. It speaks the same two-mode vocabulary as the encounter's RollControls ('roll it for me' or type what your physical dice showed) so rolling feels the same everywhere, but it shares no combat state.">
+            <DiceInputDemo />
+          </Section>
+
+          <Section id="namefield" title="Name field" blurb="Text input + a shuffle button + a row of clickable suggestions from the per-species name bundles. The suggestions are plain buttons, not a dropdown: a name list you have to open is a name list nobody uses.">
+            <NameFieldDemo />
+          </Section>
+
+          <Section id="features" title="Feature list" blurb="In-flow disclosure for long class/species feature lists (Menu is a popover — wrong shape for twenty features you read alongside the step). Built on native details/summary, so keyboard and screen-reader behaviour come from the platform. Collapsed rows are one tappable line, which is what makes a twenty-feature class readable at 375px.">
+            <FeatureList items={CLASS_FEATURES} allowExpandAll ariaLabel="Fighter features" />
+          </Section>
+
+          <Section id="review" title="Review summary" blurb="The final 'here's your character' step: every choice grouped by the step that made it, each group with its own way back. It extends .nh-statlist rather than inventing a second key/value grid, and anything still missing is called out in words beside its Edit link.">
+            <ReviewSummary
+              sections={[
+                { id: "identity", title: "Identity", onEdit: () => {}, items: [
+                  { label: "Name", value: "Borin Stoneguard" },
+                  { label: "Species", value: "Dwarf" },
+                  { label: "Class", value: "Fighter 4" },
+                  { label: "Background", value: "Soldier" }
+                ] },
+                { id: "abilities", title: "Ability scores", onEdit: () => {}, items: [
+                  { label: "STR", value: "16 (+3)", numeric: true },
+                  { label: "DEX", value: "12 (+1)", numeric: true },
+                  { label: "CON", value: "17 (+3)", numeric: true },
+                  { label: "INT", value: "10 (±0)", numeric: true },
+                  { label: "WIS", value: "13 (+1)", numeric: true },
+                  { label: "CHA", value: "8 (−1)", numeric: true }
+                ] },
+                { id: "vitals", title: "Vitals", onEdit: () => {}, items: [
+                  { label: "HP", value: "38", numeric: true },
+                  { label: "AC", value: "18", numeric: true },
+                  { label: "Speed", value: "25 ft", numeric: true },
+                  { label: "Prof", value: "+2", numeric: true }
+                ], note: "Armor class comes from your equipped armor, so it can change when you swap gear." },
+                { id: "equipment", title: "Equipment", onEdit: () => {}, editLabel: "Edit",
+                  incomplete: "Pick one of the two starting packs.",
+                  items: [
+                    { label: "Weapon", value: "Warhammer" },
+                    { label: "Armor", value: "Chain mail" },
+                    { label: "Pack", value: "Not chosen" }
+                  ] }
+              ]}
+            >
+              <p className="sg-muted" style={{ fontSize: "var(--fs-sm)" }}>SRD 5.2.1 content, CC BY 4.0.</p>
+            </ReviewSummary>
           </Section>
 
           <Section id="skeleton" title="Skeleton loaders" blurb="Quiet shimmer placeholders shaped like the content they stand in for (neutralized under reduced-motion). Use while a fetch resolves.">
@@ -418,11 +765,28 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="overlays" title="Modals & toasts" blurb="Native dialog with scrim blur, focus return, and scroll lock. Toasts name the result.">
+          <Section id="overlays" title="Modals, sheets & toasts" blurb="Native dialog with scrim blur, focus return, and scroll lock. Toasts name the result. size='full' is the full-screen sheet: a roomy centred surface on a laptop, edge-to-edge over the whole viewport at ≤760px (with the footer clearing the home indicator) — reach for it instead of overriding max-height on a modal, which is what features kept doing.">
             <div className="sg-row">
               <Button variant="primary" onClick={() => setModalOpen(true)}>Open modal</Button>
+              <Button variant="secondary" onClick={() => setSheetOpen(true)}>Open full-screen sheet</Button>
               <ToastDemo />
             </div>
+            <Modal
+              open={sheetOpen}
+              onClose={() => setSheetOpen(false)}
+              size="full"
+              title="Browse the bestiary"
+              accent="cyan"
+              footer={<>
+                <Button variant="ghost" onClick={() => setSheetOpen(false)}>Cancel</Button>
+                <Button variant="primary" onClick={() => setSheetOpen(false)}>Add selected</Button>
+              </>}
+            >
+              <p className="sg-muted">Long, browse-heavy surfaces (content browsers, sheets, the builder's sub-pickers) want the whole phone screen. Shrink the window below 760px to watch this go edge-to-edge.</p>
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <FeatureList items={CLASS_FEATURES} />
+              </div>
+            </Modal>
             <Modal
               open={modalOpen}
               onClose={() => setModalOpen(false)}

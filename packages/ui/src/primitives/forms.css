@@ -4,6 +4,8 @@
 
 .nh-input {
   width: 100%;
+  /* 44px touch floor (decision 16) — a tappable field on a phone. */
+  min-height: var(--tap-min);
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);

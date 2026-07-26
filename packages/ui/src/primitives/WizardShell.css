@@ -1,0 +1,132 @@
+/* WizardShell — full page on a laptop, full-screen sheet on a phone (builder
+   decision 4). Header and footer stick to the edges of the shell so Back/Next stay
+   reachable while the step body scrolls. */
+
+.nh-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 100dvh;
+  padding: 0 0 var(--space-4);
+  background: var(--bg);
+}
+
+.nh-wizard-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.nh-wizard-titles { min-width: 0; display: grid; gap: var(--space-1); }
+/* Display face, not the wordmark: a work screen, and the step indicator is already
+   the loud element in this region (§8.1 — one glowing thing per region). */
+.nh-wizard-title {
+  margin: 0;
+  font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+  letter-spacing: var(--tracking-display);
+}
+.nh-wizard-headops { display: flex; align-items: center; gap: var(--space-2); }
+.nh-wizard-progress { grid-column: 1 / -1; }
+
+.nh-wizard-resume { padding: 0 var(--space-4); }
+
+.nh-wizard-body { flex: 1 1 auto; min-height: 0; padding: 0 var(--space-4); }
+.nh-wizard-main { min-width: 0; }
+
+/* Detail / preview pane. */
+.nh-wizard-detail {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+.nh-wizard-detail-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
+.nh-wizard-detail-body { min-width: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* Master-detail return link — the same affordance the Codex workspace uses. */
+.nh-wizard-detail-back {
+  display: none;
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--cyan);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.nh-wizard-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.nh-wizard-foot-back { justify-self: start; }
+.nh-wizard-foot-next { justify-self: end; }
+/* The gating reason. It keeps its row whether or not it is filled, so the footer
+   never jumps as steps validate; role="status" announces it when it appears. */
+.nh-wizard-blocked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-height: 1.2em;
+  text-align: center;
+  color: var(--danger-hi);
+  font-size: var(--fs-sm);
+}
+.nh-wizard-blocked-icon { flex: none; }
+.nh-wizard-blocked.is-clear { color: transparent; }
+
+.nh-wizard-footnote {
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+}
+
+/* ---- Narrow: master-detail. Showing both panes stacked would mean two half-read
+   columns; the Codex workspace already solved this by swapping them. ---- */
+@media (max-width: 900px) {
+  .nh-wizard-body--split.has-detail .nh-wizard-main { display: none; }
+  .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail { display: none; }
+  .nh-wizard-detail-back { display: block; }
+}
+
+@media (max-width: 560px) {
+  /* At phone width the reason needs its own line, or Back/Next get squeezed to nothing. */
+  .nh-wizard-foot { grid-template-columns: 1fr 1fr; }
+  .nh-wizard-blocked { grid-row: 1; grid-column: 1 / -1; }
+  .nh-wizard-foot-back, .nh-wizard-foot-next { grid-row: 2; }
+  .nh-wizard-foot-back .nh-btn, .nh-wizard-foot-next .nh-btn { width: 100%; }
+  .nh-wizard-foot-back, .nh-wizard-foot-next { justify-self: stretch; }
+}
+
+/* ---- Laptop: a full page inside the app shell, not a floating card ---- */
+@media (min-width: 901px) {
+  .nh-wizard-body--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    gap: var(--space-4);
+    align-items: start;
+  }
+}

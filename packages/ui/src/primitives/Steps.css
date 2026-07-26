@@ -1,13 +1,47 @@
+/* Two indicators, one component (see Steps.tsx): the compact phone form and the
+   full horizontal rail. The media query picks exactly one. */
+
+.nh-steps-compact { display: grid; gap: var(--space-2); }
+.nh-steps-compact-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.nh-steps-count { flex: none; color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; }
+.nh-steps-compact-label {
+  min-width: 0;
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nh-steps-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+/* The one neon moment in the indicator: how far you are. */
+.nh-steps-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width var(--dur-base) var(--ease-settle);
+}
+
 .nh-steps {
-  display: flex;
+  display: none;
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  padding: 0;
+  padding: 0 0 var(--space-1);
   list-style: none;
-  flex-wrap: wrap;
+  /* Never wrap — a seven-step flow scrolls sideways instead of blobbing into rows. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.nh-step { display: inline-flex; align-items: center; gap: var(--space-2); }
+.nh-steps::-webkit-scrollbar { display: none; }
+.nh-step { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
 /* Connector line between steps. */
 .nh-step:not(:last-child)::after {
   content: "";
@@ -19,6 +53,7 @@
 .nh-step-marker {
   display: grid;
   place-items: center;
+  flex: none;
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 50%;
@@ -27,9 +62,29 @@
   color: var(--text-muted);
   font: 700 var(--fs-xs) / 1 var(--font-body);
 }
-.nh-step-label { color: var(--text-muted); font: 600 var(--fs-sm) / 1.3 var(--font-body); }
+.nh-step-label { color: var(--text-muted); font: 600 var(--fs-sm) / 1.3 var(--font-body); white-space: nowrap; }
 
 .nh-step--done .nh-step-marker { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 22%, transparent); color: var(--cyan-hi); }
 .nh-step--done .nh-step-label { color: var(--text-dim); }
 .nh-step--current .nh-step-marker { border-color: transparent; background: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
 .nh-step--current .nh-step-label { color: var(--text); }
+
+/* Jump back to a completed step. Meets the 44px floor by padding, not by paint. */
+.nh-step-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+.nh-step-jump:hover .nh-step-label { color: var(--text); }
+.nh-step-jump:hover .nh-step-marker { border-color: var(--cyan-hi); }
+
+@media (min-width: 761px) {
+  .nh-steps-compact { display: none; }
+  .nh-steps { display: flex; }
+}

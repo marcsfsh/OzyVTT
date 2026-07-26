@@ -12,7 +12,9 @@ export interface ModalProps {
   footer?: ReactNode;
   /** Top accent hairline; magenta by default (§5.4: one accent hairline). */
   accent?: PanelAccent;
-  size?: "sm" | "md" | "lg";
+  /** `full` is the full-screen sheet: a roomy centred surface on a laptop, edge-to-edge
+      over the whole viewport at ≤760px. Reach for it instead of overriding max-height. */
+  size?: "sm" | "md" | "lg" | "full";
   /** Accessible label when there's no visible title. */
   ariaLabel?: string;
   className?: string;
@@ -60,7 +62,7 @@ export function Modal({ open, onClose, title, children, footer, accent = "magent
           {title != null && (
             <header className="nh-modal-head">
               <h2 className="nh-modal-title">{title}</h2>
-              <button type="button" className="nh-modal-close interactive" aria-label="Close" onClick={onClose}>✕</button>
+              <button type="button" className="nh-modal-close tap-target interactive" aria-label="Close" onClick={onClose}>✕</button>
             </header>
           )}
           <div className="nh-modal-body scroll-y">{children}</div>

@@ -1,5 +1,7 @@
 .nh-segmented {
   display: inline-flex;
+  /* Wrap rather than overflow: four options at 375px would otherwise run off-screen. */
+  flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--line);
@@ -9,7 +11,10 @@
 .nh-segmented-option {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
+  /* Paint stays compact; `.tap-target` on the option lifts the hit area to 44px. */
+  min-height: 2.25rem;
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
@@ -18,7 +23,7 @@
   font: 600 var(--fs-sm) / 1 var(--font-body);
   cursor: pointer;
 }
-.nh-segmented--sm .nh-segmented-option { padding: var(--space-1) var(--space-2); }
+.nh-segmented--sm .nh-segmented-option { min-height: 1.85rem; padding: var(--space-1) var(--space-2); }
 .nh-segmented-option:hover { color: var(--text); }
 .nh-segmented-option[aria-pressed="true"] {
   background: var(--surface-3);

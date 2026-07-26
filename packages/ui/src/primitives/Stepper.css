@@ -8,10 +8,13 @@
   background: var(--surface-2);
   overflow: hidden;
 }
+/* −/+ are the ability-allocator's primary touch control, so they carry the 44px
+   floor as real paint rather than an invisible extension (decision 16). */
 .nh-stepper-btn {
   display: grid;
   place-items: center;
-  width: 2rem;
+  width: var(--tap-min);
+  min-height: var(--tap-min);
   padding: var(--space-2) 0;
   border: 0;
   background: transparent;

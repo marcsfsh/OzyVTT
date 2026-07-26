@@ -1,0 +1,82 @@
+.nh-choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  /* Room on the right for the chosen check so a long title never runs under it. */
+  padding: var(--space-3) calc(var(--space-4) + 1rem) var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.nh-choice:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-2); }
+
+.nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
+.nh-choice-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--text);
+  font: 700 var(--fs-body) / 1.25 var(--font-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nh-choice-badge { flex: none; }
+
+.nh-choice-desc {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  /* Even card heights in a grid without truncating mid-word. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nh-choice-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+.nh-choice-locked { display: flex; align-items: center; gap: var(--space-1); color: var(--danger-hi); font-size: var(--fs-xs); }
+
+/* ---- The one chosen treatment: cyan edge + selection glow + a check ---- */
+.nh-choice-check {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--cyan);
+  color: var(--text-on-neon);
+  font-size: 0.85rem;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle);
+}
+.nh-choice.is-selected {
+  border-color: var(--cyan);
+  background: var(--surface-2);
+  box-shadow: var(--glow-cyan);
+  transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover);
+}
+.nh-choice.is-selected .nh-choice-check { opacity: 1; transform: none; }
+.nh-choice.is-selected .nh-choice-title { color: var(--text); }
+
+.nh-choice:disabled { cursor: not-allowed; opacity: 0.55; }
+.nh-choice:disabled .nh-choice-locked { opacity: 1; }
+
+/* The selection glow above is a class-level box-shadow, so it would out-specify the
+   zero-specificity global :focus-visible ring and leave a focused, already-selected
+   card with no keyboard ring. Restate the ring here so focus always wins. */
+.nh-choice:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nh-choice-check { transition: none; transform: none; }
+}
