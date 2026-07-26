@@ -3,6 +3,7 @@ import type { GmView, PlayerActor, PlayerView, PresenceStatus } from "@vtt/domai
 import { Avatar, Badge, Button, Input, Stepper, type AvatarPresence, type BadgeTone } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { CharacterSheet } from "../encounter/CharacterSheet";
+import { PdfImportModal } from "./PdfImportModal";
 import { ConditionChips, ConditionEditor } from "../encounter/conditions";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
@@ -89,6 +90,7 @@ export function ActorRoster(props: Props) {
   const [claiming, setClaiming] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
   const importFileRef = useRef<HTMLInputElement | null>(null);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
 
   const importSheet = (file: File) => {
     setFeedback(`Importing ${file.name}…`);
@@ -163,7 +165,9 @@ export function ActorRoster(props: Props) {
     <div id="roster-body">
     {props.role === "gm" && <div className="roster-import">
       <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
+      <Button type="button" onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
       <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
+      <PdfImportModal open={pdfImportOpen} onClose={() => setPdfImportOpen(false)} onImported={(name) => setFeedback(`Imported ${name} — it's ready to claim below.`)} />
     </div>}
     {chooseList.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">{ownedActor ? "No other characters" : "No characters yet"}</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : ownedActor ? "You've claimed your character — it's shown in your player bar below." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
       {chooseList.map((actor) => {

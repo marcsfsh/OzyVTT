@@ -1,0 +1,45 @@
+.pdf-import-head { margin-bottom: 1rem; }
+.pdf-import-head h2 { margin: 0.15rem 0 0.35rem; }
+.pdf-import-head p { margin: 0; opacity: 0.75; font-size: 0.9rem; }
+
+.pdf-import-drop { display: grid; gap: 0.6rem; justify-items: center; padding: 2rem 1rem; }
+.pdf-import-note { margin: 0; opacity: 0.75; }
+
+.pdf-import-review { display: grid; gap: 0.9rem; }
+
+.pdf-import-warnings,
+.pdf-import-error {
+  border: 1px solid var(--border, #6b5a86);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.88rem;
+}
+.pdf-import-warnings { border-color: var(--caution, #e0a458); background: color-mix(in srgb, var(--caution, #e0a458) 12%, transparent); }
+.pdf-import-error { border-color: var(--danger, #e0526a); background: color-mix(in srgb, var(--danger, #e0526a) 12%, transparent); }
+.pdf-import-warnings ul,
+.pdf-import-error ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+.pdf-import-warnings li,
+.pdf-import-error li { margin: 0.15rem 0; }
+
+.pdf-import-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  gap: 0.75rem;
+}
+.pdf-import-fields label { display: grid; gap: 0.25rem; font-size: 0.85rem; opacity: 0.95; }
+
+.pdf-import-summary { display: grid; gap: 0.4rem; margin: 0; }
+.pdf-import-summary > div { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.pdf-import-summary dt { opacity: 0.7; }
+.pdf-import-summary dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.pdf-import-abilities { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+.pdf-import-buttons { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.pdf-import-buttons-right { display: flex; gap: 0.5rem; }
+
+@media (max-width: 480px) {
+  .pdf-import-buttons { flex-direction: column-reverse; align-items: stretch; }
+  .pdf-import-buttons-right { flex-direction: column; }
+  .pdf-import-summary > div { flex-direction: column; gap: 0.1rem; }
+  .pdf-import-summary dd { text-align: left; }
+}
