@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Modal, Button, Input } from "@vtt/ui";
 import { validateDraft, type ImportResult } from "@vtt/dndbeyond-pdf";
 import { extractCharacterFromFile } from "../pdfImport/loadPdf";
+import { useSpellReference } from "../encounter/spells";
 import { socket } from "../socket";
 import { newId } from "../lib/ids";
 import "./pdf-import.css";
@@ -18,13 +19,15 @@ export function PdfImportModal({ open, onClose, onImported }: Props) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const spellRef = useSpellReference();
+  const knownSpellIds = useMemo(() => new Set(spellRef.map((s) => s.id)), [spellRef]);
 
   const reset = () => { setResult(null); setFileName(""); setError(""); setSaveMsg(""); };
   const close = () => { reset(); onClose(); };
 
   const pick = (file: File) => {
     setBusy(true); setError(""); setSaveMsg(""); setFileName(file.name);
-    extractCharacterFromFile(file)
+    extractCharacterFromFile(file, knownSpellIds)
       .then(setResult)
       .catch((e: unknown) => setError(`Couldn't read that PDF (${e instanceof Error ? e.message : "unknown error"}). Make sure it's a D&D Beyond PDF export.`))
       .finally(() => setBusy(false));

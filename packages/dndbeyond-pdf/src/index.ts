@@ -30,11 +30,18 @@ export function validateDraft(draft: Record<string, unknown>, warnings: string[]
   };
 }
 
+export interface ImportOptions {
+  /** Passed through to pdfjs getDocument (e.g. `{ verbosity: 0 }`). */
+  docOptions?: Record<string, unknown>;
+  /** SRD content spell ids (from `content:spells`) — spells not in the set are flagged as unmatched. */
+  knownSpellIds?: ReadonlySet<string>;
+}
+
 /** Extract a DDB PDF into a validated draft. Caller injects `getDocument` (browser build with a worker,
  * or the Node build) so this works in either environment. */
-export async function importCharacterPdf(getDocument: GetDocument, data: Uint8Array, docOptions?: Record<string, unknown>): Promise<ImportResult> {
-  const widgets = await readWidgetsWith(getDocument, data, docOptions);
-  const { draft, warnings } = buildDefinition(widgets);
+export async function importCharacterPdf(getDocument: GetDocument, data: Uint8Array, options: ImportOptions = {}): Promise<ImportResult> {
+  const widgets = await readWidgetsWith(getDocument, data, options.docOptions);
+  const { draft, warnings } = buildDefinition(widgets, { knownSpellIds: options.knownSpellIds });
   return validateDraft(draft, warnings);
 }
 

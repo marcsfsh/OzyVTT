@@ -35,6 +35,10 @@ const SKILLS: { id: string; ability: Ability; aliases: string[] }[] = [
 
 const nkey = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "x";
+/** DDB appends ritual/concentration tags to spell names; strip them for the display name + id. */
+const cleanSpellName = (raw: string): string => raw.replace(/\s*[[(](?:R|C|Ritual|Concentration)[\])]\s*$/gi, "").replace(/\s+/g, " ").trim();
+/** SRD content ids are name-slugs with apostrophes removed ("Hunter's Mark" -> "hunters-mark"). */
+const contentId = (name: string): string => name.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "x";
 const toInt = (v: string | undefined): number | undefined => {
   if (v == null) return undefined;
   const m = v.match(/-?\d+/);
@@ -48,7 +52,7 @@ const parseSpellLevel = (h: string): number => {
 
 interface Keyed extends Widget { key: string; }
 
-export function buildDefinition(widgets: Widget[]): DraftResult {
+export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: ReadonlySet<string> } = {}): DraftResult {
   const warnings: string[] = [];
   const items: Keyed[] = widgets.map((w) => ({ ...w, key: nkey(w.name) }));
   const first = new Map<string, Keyed>();
@@ -126,7 +130,7 @@ export function buildDefinition(widgets: Widget[]): DraftResult {
   if (saves.length || skills.length) draft.proficiencies = { saves, skills };
 
   // ---- spellcasting ----
-  const spellcasting = buildSpellcasting(items, warnings);
+  const spellcasting = buildSpellcasting(items, warnings, options.knownSpellIds);
   if (spellcasting) draft.spellcasting = spellcasting;
 
   // ---- weapons -> actions ----
@@ -148,7 +152,7 @@ export function buildDefinition(widgets: Widget[]): DraftResult {
   return { draft, warnings };
 }
 
-function buildSpellcasting(items: Keyed[], warnings: string[]): Record<string, unknown> | null {
+function buildSpellcasting(items: Keyed[], warnings: string[], knownSpellIds?: ReadonlySet<string>): Record<string, unknown> | null {
   const spell = items.filter((i) => i.key.startsWith("spell"));
   if (!spell.length) return null;
   const first = new Map<string, string>();
@@ -193,13 +197,20 @@ function buildSpellcasting(items: Keyed[], warnings: string[]): Record<string, u
     } else {
       const src = source.get(ev.idx) ?? "";
       const always = /always prepared/i.test(src);
-      spells.push({ id: slug(ev.value), name: ev.value.slice(0, 120), level: cur, prepared: prepared.get(ev.idx) === "P" || always, alwaysPrepared: always });
+      const name = cleanSpellName(ev.value);
+      if (!name) continue;
+      spells.push({ id: contentId(name), name: name.slice(0, 120), level: cur, prepared: prepared.get(ev.idx) === "P" || always, alwaysPrepared: always });
     }
   }
   sc.slots = Object.entries(slots).map(([level, max]) => ({ level: +level, max })).sort((a, b) => a.level - b.level);
   if (pact) sc.pact = pact;
   const seen = new Set<string>();
-  sc.spells = spells.filter((s) => { const k = `${s.id}@${s.level}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 400);
+  const deduped = spells.filter((s) => { const k = `${s.id}@${s.level}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 400);
+  sc.spells = deduped;
+  if (knownSpellIds && knownSpellIds.size) {
+    const unmatched = deduped.filter((s) => !knownSpellIds.has(s.id)).length;
+    if (unmatched) warnings.push(`${unmatched} spell(s) aren't in the SRD list (homebrew, renamed, or another source) — they import by name but won't link to the reference.`);
+  }
   return sc;
 }
 

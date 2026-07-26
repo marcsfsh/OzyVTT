@@ -42,6 +42,28 @@ describe("D&D Beyond PDF import — golden fixtures (recorded widgets)", () => {
     expect(d.startingInventory?.length ?? 0).toBeGreaterThan(10);
   });
 
+  it("spell ids are SRD-style slugs; ritual tags and apostrophes normalized", () => {
+    const wiz = importFixture("wizard20");
+    expect(wiz.parsed.success).toBe(true);
+    if (!wiz.parsed.success) return;
+    const ids = wiz.parsed.data.spellcasting!.spells.map((s) => s.id);
+    expect(ids).toContain("ray-of-frost");
+    expect(ids).toContain("fireball");
+    expect(ids.every((id) => /^[a-z0-9-]+$/.test(id))).toBe(true);
+    // warlock's "Detect Magic [R]" must become "detect-magic", not "detect-magic-r"
+    const war = importFixture("warlock20");
+    if (war.parsed.success) {
+      const wids = war.parsed.data.spellcasting!.spells.map((s) => s.id);
+      expect(wids).toContain("detect-magic");
+      expect(wids.some((id) => /-r$|-c$/.test(id))).toBe(false);
+    }
+  });
+
+  it("flags spells not in the provided SRD id set", () => {
+    const { warnings } = buildDefinition(widgetsOf("wizard20"), { knownSpellIds: new Set(["ray-of-frost"]) });
+    expect(warnings.some((w) => /SRD list/i.test(w))).toBe(true);
+  });
+
   it("fighter20: non-caster has no spellcasting block", () => {
     const { parsed } = importFixture("fighter20");
     expect(parsed.success).toBe(true);
