@@ -1,0 +1,151 @@
+[
+  {
+    "id": "soldier",
+    "name": "Soldier",
+    "source": "srd",
+    "summary": "You trained on a battlefield and learned discipline under arms.",
+    "description": "You trained as a soldier, whether in a militia, a mercenary company, or a standing army. You learned discipline, unit tactics, and the value of a hot meal.",
+    "abilityOptions": {
+      "from": [
+        "str",
+        "dex",
+        "con"
+      ],
+      "spreads": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "originFeatId": "savage-attacker",
+    "skillProficiencies": [
+      "athletics",
+      "intimidation"
+    ],
+    "toolChoices": {
+      "choose": 1,
+      "from": [
+        "dice-set",
+        "playing-card-set"
+      ]
+    },
+    "startingEquipment": [
+      {
+        "id": "soldier-a",
+        "label": "Spear, Shortbow, 20 Arrows, Gaming Set, Healer's Kit, Quiver, Traveler's Clothes, and 14 GP",
+        "items": [
+          {
+            "id": "spear",
+            "name": "Spear"
+          },
+          {
+            "id": "shortbow",
+            "name": "Shortbow"
+          },
+          {
+            "id": "arrows-20",
+            "name": "Arrows (20)"
+          },
+          {
+            "id": "dice-set",
+            "name": "Dice Set"
+          },
+          {
+            "id": "healers-kit",
+            "name": "Healer's Kit"
+          },
+          {
+            "id": "quiver",
+            "name": "Quiver"
+          },
+          {
+            "id": "travelers-clothes",
+            "name": "Traveler's Clothes"
+          }
+        ],
+        "goldPieces": 14
+      },
+      {
+        "id": "soldier-b",
+        "label": "50 GP",
+        "items": [],
+        "goldPieces": 50
+      }
+    ]
+  },
+  {
+    "id": "sage",
+    "name": "Sage",
+    "source": "srd",
+    "summary": "You spent years learning the lore of the multiverse.",
+    "description": "You spent years learning the lore of the multiverse, studying at a library, an academy, or under a mentor, and you know where to look for answers.",
+    "abilityOptions": {
+      "from": [
+        "con",
+        "int",
+        "wis"
+      ],
+      "spreads": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "originFeatId": "magic-initiate-wizard",
+    "skillProficiencies": [
+      "arcana",
+      "history"
+    ],
+    "toolProficiencies": [
+      "calligraphers-supplies"
+    ],
+    "startingEquipment": [
+      {
+        "id": "sage-a",
+        "label": "Quarterstaff, Calligrapher's Supplies, Book (history), 8 sheets of Parchment, Robe, and 8 GP",
+        "items": [
+          {
+            "id": "quarterstaff",
+            "name": "Quarterstaff"
+          },
+          {
+            "id": "calligraphers-supplies",
+            "name": "Calligrapher's Supplies"
+          },
+          {
+            "id": "book",
+            "name": "Book (history)"
+          },
+          {
+            "id": "parchment",
+            "name": "Parchment (one sheet)",
+            "quantity": 8
+          },
+          {
+            "id": "robe",
+            "name": "Robe"
+          }
+        ],
+        "goldPieces": 8
+      },
+      {
+        "id": "sage-b",
+        "label": "50 GP",
+        "items": [],
+        "goldPieces": 50
+      }
+    ]
+  }
+]

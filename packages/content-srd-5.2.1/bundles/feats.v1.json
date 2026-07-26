@@ -1,0 +1,82 @@
+[
+  {
+    "id": "alert",
+    "name": "Alert",
+    "source": "srd",
+    "category": "origin",
+    "summary": "You are always ready for a fight.",
+    "feature": {
+      "id": "alert",
+      "name": "Alert",
+      "description": "You gain the following benefits. Initiative Proficiency: When you roll Initiative, you can add your Proficiency Bonus to the roll. Initiative Swap: Immediately after you roll Initiative, you can swap your Initiative with the Initiative of one willing ally in the same combat, unless either of you has the Incapacitated condition.",
+      "tags": [
+        "initiative"
+      ]
+    }
+  },
+  {
+    "id": "tough",
+    "name": "Tough",
+    "source": "srd",
+    "category": "origin",
+    "summary": "Your Hit Point maximum grows faster than normal.",
+    "feature": {
+      "id": "tough",
+      "name": "Tough",
+      "description": "Your Hit Point maximum increases by an amount equal to twice your character level when you gain this feat. Whenever you gain a level thereafter, your Hit Point maximum increases by an additional 2 Hit Points.",
+      "modifiers": [
+        {
+          "type": "hit-points-per-level",
+          "amount": 2
+        }
+      ]
+    }
+  },
+  {
+    "id": "savage-attacker",
+    "name": "Savage Attacker",
+    "source": "srd",
+    "category": "origin",
+    "summary": "Your weapon strikes bite deeper.",
+    "feature": {
+      "id": "savage-attacker",
+      "name": "Savage Attacker",
+      "description": "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice and use either roll against the target.",
+      "uses": {
+        "limit": 1,
+        "per": "turn"
+      }
+    }
+  },
+  {
+    "id": "magic-initiate-wizard",
+    "name": "Magic Initiate (Wizard)",
+    "source": "srd",
+    "category": "origin",
+    "summary": "You dabble in arcane magic.",
+    "prerequisite": {
+      "requires": [],
+      "abilityScores": [],
+      "text": "Repeatable, but you must choose a different spell list each time."
+    },
+    "repeatable": true,
+    "feature": {
+      "id": "magic-initiate-wizard",
+      "name": "Magic Initiate (Wizard)",
+      "description": "You learn two cantrips of your choice from the Wizard spell list. You also choose one level 1 spell from that list; you always have it prepared and can cast it once without a spell slot, regaining that use on a Long Rest. Intelligence is your spellcasting ability for these spells.",
+      "tags": [
+        "spellcasting"
+      ],
+      "choice": {
+        "kind": "cantrip",
+        "choose": 2,
+        "fromCatalog": "wizard-spells",
+        "maxSpellLevel": 0
+      },
+      "uses": {
+        "limit": 1,
+        "per": "long-rest"
+      }
+    }
+  }
+]

@@ -1,0 +1,135 @@
+[
+  {
+    "speciesId": "human",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "human-given",
+        "label": "Given",
+        "names": [
+          "Adran",
+          "Bram",
+          "Cora",
+          "Darvin",
+          "Elda",
+          "Farrow",
+          "Gwen",
+          "Hale",
+          "Ilsa",
+          "Joss",
+          "Kera",
+          "Lorin",
+          "Mira",
+          "Neal",
+          "Orin",
+          "Pell",
+          "Quinn",
+          "Rilla",
+          "Soren",
+          "Tessa",
+          "Ulric",
+          "Vera",
+          "Wend",
+          "Yara"
+        ]
+      },
+      {
+        "id": "human-family",
+        "label": "Family",
+        "names": [
+          "Ashdown",
+          "Brightwater",
+          "Carrow",
+          "Delvin",
+          "Emberly",
+          "Fairwind",
+          "Grayford",
+          "Holloway",
+          "Ironmond",
+          "Kestrel",
+          "Lockwood",
+          "Marsh",
+          "Northgate",
+          "Ostler",
+          "Pike",
+          "Ravensford",
+          "Stonewell",
+          "Thatcher",
+          "Underhill",
+          "Vance",
+          "Whitlock"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "elf",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "elf-given",
+        "label": "Given",
+        "names": [
+          "Aelar",
+          "Berrian",
+          "Caelynn",
+          "Dayereth",
+          "Enna",
+          "Faelen",
+          "Galinndan",
+          "Halimath",
+          "Immeral",
+          "Ivellios",
+          "Korfel",
+          "Lamlis",
+          "Mindartis",
+          "Naeris",
+          "Paelias",
+          "Peren",
+          "Quarion",
+          "Riardon",
+          "Silvyr",
+          "Thamior",
+          "Theriatis",
+          "Varis",
+          "Xanaphia"
+        ]
+      },
+      {
+        "id": "elf-family",
+        "label": "Family",
+        "names": [
+          "Amakiir",
+          "Amastacia",
+          "Galanodel",
+          "Holimion",
+          "Ilphelkiir",
+          "Liadon",
+          "Meliamne",
+          "Nailo",
+          "Siannodel",
+          "Xiloscient"
+        ]
+      },
+      {
+        "id": "elf-child",
+        "label": "Child",
+        "names": [
+          "Ara",
+          "Bryn",
+          "Del",
+          "Eryn",
+          "Faen",
+          "Innil",
+          "Lia",
+          "Naill",
+          "Rinn",
+          "Sai",
+          "Syllin",
+          "Thia",
+          "Vall"
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,174 @@
+[
+  {
+    "id": "human",
+    "name": "Human",
+    "source": "srd",
+    "summary": "Resourceful, skillful, and versatile.",
+    "description": "Humans are the most adaptable of the common species. They range widely in appearance and temperament, and their ambition drives them into every corner of the world.",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "speedFeet": 30,
+    "darkvisionFeet": null,
+    "creatureType": "humanoid",
+    "abilityBonuses": [],
+    "languages": [
+      "common"
+    ],
+    "traits": [
+      {
+        "id": "human-resourceful",
+        "name": "Resourceful",
+        "description": "You gain Heroic Inspiration whenever you finish a Long Rest."
+      },
+      {
+        "id": "human-skillful",
+        "name": "Skillful",
+        "description": "You gain proficiency in one skill of your choice.",
+        "choice": {
+          "kind": "skill",
+          "choose": 1,
+          "fromCatalog": "skills"
+        }
+      },
+      {
+        "id": "human-versatile",
+        "name": "Versatile",
+        "description": "You gain an Origin feat of your choice.",
+        "choice": {
+          "kind": "feat",
+          "choose": 1,
+          "fromCatalog": "origin-feats"
+        }
+      }
+    ],
+    "lineages": []
+  },
+  {
+    "id": "elf",
+    "name": "Elf",
+    "source": "srd",
+    "summary": "Long-lived, keen-sensed, and touched by the Feywild.",
+    "description": "Elves are magical people of otherworldly grace, whose ancestors dwelled in the Feywild. Their bonds with that plane leave them with heightened senses and a trance-like rest.",
+    "sizes": [
+      "small",
+      "medium"
+    ],
+    "speedFeet": 30,
+    "darkvisionFeet": 60,
+    "creatureType": "humanoid",
+    "abilityBonuses": [],
+    "languages": [
+      "common",
+      "elvish"
+    ],
+    "traits": [
+      {
+        "id": "elf-darkvision",
+        "name": "Darkvision",
+        "description": "You have Darkvision with a range of 60 feet.",
+        "modifiers": [
+          {
+            "type": "darkvision",
+            "feet": 60
+          }
+        ]
+      },
+      {
+        "id": "elf-fey-ancestry",
+        "name": "Fey Ancestry",
+        "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition."
+      },
+      {
+        "id": "elf-keen-senses",
+        "name": "Keen Senses",
+        "description": "You have proficiency in the Insight, Perception, or Survival skill.",
+        "choice": {
+          "kind": "skill",
+          "choose": 1,
+          "from": [
+            "insight",
+            "perception",
+            "survival"
+          ]
+        }
+      },
+      {
+        "id": "elf-trance",
+        "name": "Trance",
+        "description": "You don't need to sleep, and magic can't put you to sleep. You can finish a Long Rest in 4 hours if you spend those hours in a trancelike meditation, during which you retain consciousness."
+      },
+      {
+        "id": "elf-lineage",
+        "name": "Elven Lineage",
+        "description": "You are part of an elven lineage that grants you supernatural abilities.",
+        "choice": {
+          "kind": "lineage",
+          "choose": 1,
+          "fromCatalog": "elf-lineages"
+        }
+      }
+    ],
+    "lineages": [
+      {
+        "id": "drow",
+        "name": "Drow",
+        "description": "The elves of the Underdark. Your Darkvision has a range of 120 feet, and you know the Dancing Lights cantrip.",
+        "traits": [
+          {
+            "id": "drow-superior-darkvision",
+            "name": "Superior Darkvision",
+            "description": "The range of your Darkvision increases to 120 feet.",
+            "modifiers": [
+              {
+                "type": "darkvision",
+                "feet": 120
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "high-elf",
+        "name": "High Elf",
+        "description": "Heirs of arcane tradition. You know the Prestidigitation cantrip and can swap it whenever you finish a Long Rest.",
+        "traits": [
+          {
+            "id": "high-elf-cantrip",
+            "name": "Arcane Cantrip",
+            "description": "You know the Prestidigitation cantrip. Whenever you finish a Long Rest, you can replace it with a different cantrip from the Wizard spell list.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "prestidigitation",
+                  "level": 0,
+                  "alwaysPrepared": true,
+                  "ability": "int"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "wood-elf",
+        "name": "Wood Elf",
+        "description": "Swift keepers of the wild. Your Speed increases to 35 feet and you know the Druidcraft cantrip.",
+        "traits": [
+          {
+            "id": "wood-elf-fleet",
+            "name": "Fleet of Foot",
+            "description": "Your Speed increases to 35 feet.",
+            "modifiers": [
+              {
+                "type": "speed",
+                "amount": 5
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

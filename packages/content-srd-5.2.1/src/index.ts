@@ -6,6 +6,15 @@
 import { createRequire } from "node:module";
 import { z } from "zod";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import {
+  BackgroundReferenceSchema, ClassReferenceSchema, FeatReferenceSchema, NamePoolReferenceSchema,
+  SpeciesReferenceSchema, SubclassReferenceSchema,
+  type BackgroundReference, type ClassReference, type FeatReference, type NamePoolReference,
+  type SpeciesReference, type SubclassReference
+} from "./character-content.js";
+
+/** Character-builder content shapes (classes, subclasses, species, backgrounds, feats, names). */
+export * from "./character-content.js";
 
 const require = createRequire(import.meta.url);
 
@@ -186,4 +195,54 @@ export function loadRules(): readonly RuleReference[] {
 /** CC BY 4.0 attribution that must accompany any surface displaying this content. */
 export function loadAttribution(): ContentAttribution {
   return loadBundle("attribution.json", ContentAttributionSchema);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Character-builder bundles.
+//
+// SEED CONTENT WARNING: the six bundles below currently carry a small, deliberately partial slice of
+// the SRD (task packet phase 1.1) - enough real entries to prove the schemas parse and the loaders
+// work while the wizard, the rules math, and the UI are built against them in parallel. Full
+// transcription (12 classes x 20 levels, 12 subclasses, 9 species, 4 backgrounds, ~20 feats) is
+// phases 2 and 5. Do NOT read a missing class as a schema gap.
+// ---------------------------------------------------------------------------------------------
+
+/** Playable classes with their 20-row level tables and features-as-data. */
+export function loadClasses(): readonly ClassReference[] {
+  return loadBundle("classes.v1.json", z.array(ClassReferenceSchema));
+}
+
+/** Subclasses, each pointing at its parent `classId`. */
+export function loadSubclasses(): readonly SubclassReference[] {
+  return loadBundle("subclasses.v1.json", z.array(SubclassReferenceSchema));
+}
+
+/** Playable species (size, speed, darkvision, traits); ability increases live on backgrounds in SRD 5.2.1. */
+export function loadSpecies(): readonly SpeciesReference[] {
+  return loadBundle("species.v1.json", z.array(SpeciesReferenceSchema));
+}
+
+/** Backgrounds (ability-score options, origin feat, proficiencies, starting equipment). */
+export function loadBackgrounds(): readonly BackgroundReference[] {
+  return loadBundle("backgrounds.v1.json", z.array(BackgroundReferenceSchema));
+}
+
+/** Feats; each carries its mechanics as an ordinary FeatureRecord. */
+export function loadFeats(): readonly FeatReference[] {
+  return loadBundle("feats.v1.json", z.array(FeatReferenceSchema));
+}
+
+/** Hand-authored per-species name pools feeding the random generator. */
+export function loadNames(): readonly NamePoolReference[] {
+  return loadBundle("names.v1.json", z.array(NamePoolReferenceSchema));
+}
+
+/** Subclasses belonging to one class, in bundle order. */
+export function subclassesForClass(classId: string): readonly SubclassReference[] {
+  return loadSubclasses().filter((subclass) => subclass.classId === classId);
+}
+
+/** Name pools for one species, or undefined when that species has none authored yet. */
+export function namesForSpecies(speciesId: string): NamePoolReference | undefined {
+  return loadNames().find((pool) => pool.speciesId === speciesId);
 }

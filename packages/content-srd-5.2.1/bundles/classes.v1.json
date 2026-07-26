@@ -1,0 +1,1665 @@
+[
+  {
+    "id": "fighter",
+    "name": "Fighter",
+    "source": "srd",
+    "summary": "A master of martial combat, skilled with a variety of weapons and armor.",
+    "description": "Fighters rule many battlefields. Questing knights, conquering overlords, royal champions, elite foot soldiers, hardened mercenaries, and bandit kings are all Fighters, united by their unparalleled mastery with weapons and armor and their thorough knowledge of the skills of combat.",
+    "hitDie": "d10",
+    "statPriority": [
+      "str",
+      "con",
+      "dex",
+      "wis",
+      "cha",
+      "int"
+    ],
+    "primaryAbilities": [
+      "str",
+      "dex"
+    ],
+    "savingThrows": [
+      "str",
+      "con"
+    ],
+    "skillChoices": {
+      "choose": 2,
+      "from": [
+        "acrobatics",
+        "animal-handling",
+        "athletics",
+        "history",
+        "insight",
+        "intimidation",
+        "perception",
+        "persuasion",
+        "survival"
+      ]
+    },
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "heavy",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "martial"
+    ],
+    "toolProficiencies": [],
+    "startingEquipment": [
+      {
+        "id": "fighter-a",
+        "label": "Chain Mail, Greatsword, Flail, 8 Javelins, Dungeoneer's Pack, and 4 GP",
+        "items": [
+          {
+            "id": "chain-mail",
+            "name": "Chain Mail"
+          },
+          {
+            "id": "greatsword",
+            "name": "Greatsword"
+          },
+          {
+            "id": "flail",
+            "name": "Flail"
+          },
+          {
+            "id": "javelin",
+            "name": "Javelin",
+            "quantity": 8
+          },
+          {
+            "id": "dungeoneers-pack",
+            "name": "Dungeoneer's Pack"
+          }
+        ],
+        "goldPieces": 4
+      },
+      {
+        "id": "fighter-b",
+        "label": "Studded Leather Armor, Scimitar, Shortsword, Longbow, 20 Arrows, Quiver, Dungeoneer's Pack, and 11 GP",
+        "items": [
+          {
+            "id": "studded-leather-armor",
+            "name": "Studded Leather Armor"
+          },
+          {
+            "id": "scimitar",
+            "name": "Scimitar"
+          },
+          {
+            "id": "shortsword",
+            "name": "Shortsword"
+          },
+          {
+            "id": "longbow",
+            "name": "Longbow"
+          },
+          {
+            "id": "arrows-20",
+            "name": "Arrows (20)"
+          },
+          {
+            "id": "quiver",
+            "name": "Quiver"
+          },
+          {
+            "id": "dungeoneers-pack",
+            "name": "Dungeoneer's Pack"
+          }
+        ],
+        "goldPieces": 11
+      },
+      {
+        "id": "fighter-c",
+        "label": "155 GP",
+        "items": [],
+        "goldPieces": 155
+      }
+    ],
+    "multiclassProficiencies": {
+      "armor": [
+        "light",
+        "medium",
+        "shields"
+      ],
+      "weapons": [
+        "simple",
+        "martial"
+      ],
+      "tools": []
+    },
+    "multiclassPrerequisites": {
+      "mode": "any",
+      "minimums": [
+        {
+          "ability": "str",
+          "minimum": 13
+        },
+        {
+          "ability": "dex",
+          "minimum": 13
+        }
+      ]
+    },
+    "subclassLevel": 3,
+    "subclassLabel": "Fighter Subclass",
+    "asiLevels": [
+      4,
+      6,
+      8,
+      12,
+      14,
+      16
+    ],
+    "levelTable": [
+      {
+        "level": 1,
+        "proficiencyBonus": 2,
+        "features": [
+          "fighting-style",
+          "second-wind",
+          "weapon-mastery"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 2
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "proficiencyBonus": 2,
+        "features": [
+          "action-surge",
+          "tactical-mind"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 2
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 3
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "proficiencyBonus": 2,
+        "features": [
+          "fighter-subclass"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 2
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 3
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 4,
+        "proficiencyBonus": 2,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 3
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 4
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 5,
+        "proficiencyBonus": 3,
+        "features": [
+          "extra-attack",
+          "tactical-shift"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 3
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 4
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 6,
+        "proficiencyBonus": 3,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 3
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 4
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 7,
+        "proficiencyBonus": 3,
+        "features": [],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 3
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 4
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 8,
+        "proficiencyBonus": 3,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 3
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 4
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 9,
+        "proficiencyBonus": 4,
+        "features": [
+          "indomitable",
+          "tactical-master"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 3
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 4
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 10,
+        "proficiencyBonus": 4,
+        "features": [],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 5
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 11,
+        "proficiencyBonus": 4,
+        "features": [
+          "two-extra-attacks"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 5
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 12,
+        "proficiencyBonus": 4,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 5
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 13,
+        "proficiencyBonus": 5,
+        "features": [
+          "studied-attacks"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 5
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 14,
+        "proficiencyBonus": 5,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 5
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 15,
+        "proficiencyBonus": 5,
+        "features": [],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 5
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 16,
+        "proficiencyBonus": 5,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 6
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 1
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 17,
+        "proficiencyBonus": 6,
+        "features": [],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 6
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 2
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 18,
+        "proficiencyBonus": 6,
+        "features": [],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 6
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 2
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 19,
+        "proficiencyBonus": 6,
+        "features": [
+          "epic-boon"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 6
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 2
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 20,
+        "proficiencyBonus": 6,
+        "features": [
+          "three-extra-attacks"
+        ],
+        "classResources": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "amount": 4
+          },
+          {
+            "id": "weapon-mastery",
+            "name": "Weapon Mastery",
+            "amount": 6
+          },
+          {
+            "id": "action-surge",
+            "name": "Action Surge",
+            "amount": 2
+          },
+          {
+            "id": "indomitable",
+            "name": "Indomitable",
+            "amount": 3
+          }
+        ]
+      }
+    ],
+    "features": [
+      {
+        "id": "fighting-style",
+        "name": "Fighting Style",
+        "level": 1,
+        "description": "You have honed your martial prowess and gain a Fighting Style feat of your choice. Whenever you gain a Fighter level, you can replace the feat you chose with a different Fighting Style feat.",
+        "tags": [
+          "fighting-style"
+        ],
+        "choice": {
+          "kind": "fighting-style",
+          "choose": 1,
+          "fromCatalog": "fighting-style-feats"
+        }
+      },
+      {
+        "id": "second-wind",
+        "name": "Second Wind",
+        "level": 1,
+        "description": "You have a limited well of physical and mental stamina that you can draw on. As a Bonus Action, you can regain Hit Points equal to 1d10 plus your Fighter level. You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
+        "tags": [
+          "healing"
+        ],
+        "actions": [
+          {
+            "id": "second-wind",
+            "name": "Second Wind",
+            "activation": "bonus-action",
+            "description": "Regain Hit Points equal to 1d10 plus your Fighter level.",
+            "damage": []
+          }
+        ],
+        "uses": {
+          "per": "long-rest",
+          "scaling": {
+            "type": "by-level",
+            "table": [
+              {
+                "level": 1,
+                "limit": 2
+              },
+              {
+                "level": 4,
+                "limit": 3
+              },
+              {
+                "level": 10,
+                "limit": 4
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "weapon-mastery",
+        "name": "Weapon Mastery",
+        "level": 1,
+        "description": "Your training with weapons allows you to use the mastery property of three kinds of Simple or Martial weapons of your choice. Whenever you finish a Long Rest, you can change the kinds of weapons you chose.",
+        "tags": [
+          "weapon-mastery"
+        ],
+        "choice": {
+          "kind": "weapon-mastery",
+          "choose": 3,
+          "fromCatalog": "weapons",
+          "repeatable": false
+        }
+      },
+      {
+        "id": "action-surge",
+        "name": "Action Surge",
+        "level": 2,
+        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action, except the Magic action. Once you use this feature, you can't do so again until you finish a Short or Long Rest.",
+        "tags": [
+          "action-economy"
+        ],
+        "uses": {
+          "per": "short-rest",
+          "scaling": {
+            "type": "by-level",
+            "table": [
+              {
+                "level": 2,
+                "limit": 1
+              },
+              {
+                "level": 17,
+                "limit": 2
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "tactical-mind",
+        "name": "Tactical Mind",
+        "level": 2,
+        "description": "You have a mind for tactics on and off the battlefield. When you fail an ability check, you can expend a use of Second Wind to push yourself toward success. Roll 1d10 and add it to the check, potentially turning it into a success. If the check still fails, this use of Second Wind isn't expended."
+      },
+      {
+        "id": "fighter-subclass",
+        "name": "Fighter Subclass",
+        "level": 3,
+        "description": "You gain a Fighter subclass of your choice. A subclass is a specialization that grants you features at certain Fighter levels.",
+        "tags": [
+          "subclass"
+        ],
+        "choice": {
+          "kind": "subclass",
+          "choose": 1,
+          "fromCatalog": "fighter-subclasses"
+        }
+      },
+      {
+        "id": "ability-score-improvement",
+        "name": "Ability Score Improvement",
+        "description": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You can take this feature more than once.",
+        "tags": [
+          "asi"
+        ],
+        "choice": {
+          "kind": "asi-or-feat",
+          "choose": 1,
+          "fromCatalog": "general-feats",
+          "repeatable": true
+        }
+      },
+      {
+        "id": "extra-attack",
+        "name": "Extra Attack",
+        "level": 5,
+        "description": "You can attack twice, instead of once, whenever you take the Attack action on your turn.",
+        "modifiers": [
+          {
+            "type": "extra-attack",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "id": "tactical-shift",
+        "name": "Tactical Shift",
+        "level": 5,
+        "description": "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks."
+      },
+      {
+        "id": "indomitable",
+        "name": "Indomitable",
+        "level": 9,
+        "description": "If you fail a saving throw, you can reroll it with a bonus equal to your Fighter level. You must use the new roll, and you can't use this feature again until you finish a Long Rest.",
+        "uses": {
+          "per": "long-rest",
+          "scaling": {
+            "type": "by-level",
+            "table": [
+              {
+                "level": 9,
+                "limit": 1
+              },
+              {
+                "level": 13,
+                "limit": 2
+              },
+              {
+                "level": 17,
+                "limit": 3
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "tactical-master",
+        "name": "Tactical Master",
+        "level": 9,
+        "description": "When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack."
+      },
+      {
+        "id": "two-extra-attacks",
+        "name": "Two Extra Attacks",
+        "level": 11,
+        "description": "You can attack three times, instead of once, whenever you take the Attack action on your turn.",
+        "modifiers": [
+          {
+            "type": "extra-attack",
+            "count": 2
+          }
+        ],
+        "replacesFeatureId": "extra-attack"
+      },
+      {
+        "id": "studied-attacks",
+        "name": "Studied Attacks",
+        "level": 13,
+        "description": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn."
+      },
+      {
+        "id": "epic-boon",
+        "name": "Epic Boon",
+        "level": 19,
+        "description": "You gain an Epic Boon feat or another feat of your choice for which you qualify.",
+        "tags": [
+          "feat"
+        ],
+        "choice": {
+          "kind": "feat",
+          "choose": 1,
+          "fromCatalog": "epic-boon-feats"
+        }
+      },
+      {
+        "id": "three-extra-attacks",
+        "name": "Three Extra Attacks",
+        "level": 20,
+        "description": "You can attack four times, instead of once, whenever you take the Attack action on your turn.",
+        "modifiers": [
+          {
+            "type": "extra-attack",
+            "count": 3
+          }
+        ],
+        "replacesFeatureId": "two-extra-attacks"
+      }
+    ]
+  },
+  {
+    "id": "wizard",
+    "name": "Wizard",
+    "source": "srd",
+    "summary": "A scholarly magic-user capable of manipulating the structures of reality.",
+    "description": "Wizards are defined by their exhaustive study of magic's inner workings. They cast spells of explosive fire, arcing lightning, subtle deception, and spectacular transformation, drawing on a spellbook of hard-won formulas.",
+    "hitDie": "d6",
+    "statPriority": [
+      "int",
+      "con",
+      "dex",
+      "wis",
+      "cha",
+      "str"
+    ],
+    "primaryAbilities": [
+      "int"
+    ],
+    "savingThrows": [
+      "int",
+      "wis"
+    ],
+    "skillChoices": {
+      "choose": 2,
+      "from": [
+        "arcana",
+        "history",
+        "insight",
+        "investigation",
+        "medicine",
+        "nature",
+        "religion"
+      ]
+    },
+    "armorProficiencies": [],
+    "weaponProficiencies": [
+      "simple"
+    ],
+    "toolProficiencies": [],
+    "startingEquipment": [
+      {
+        "id": "wizard-a",
+        "label": "2 Daggers, Arcane Focus (Quarterstaff), Robe, Spellbook, Scholar's Pack, and 5 GP",
+        "items": [
+          {
+            "id": "dagger",
+            "name": "Dagger",
+            "quantity": 2
+          },
+          {
+            "id": "quarterstaff",
+            "name": "Quarterstaff"
+          },
+          {
+            "id": "robe",
+            "name": "Robe"
+          },
+          {
+            "id": "spellbook",
+            "name": "Spellbook"
+          },
+          {
+            "id": "scholars-pack",
+            "name": "Scholar's Pack"
+          }
+        ],
+        "goldPieces": 5
+      },
+      {
+        "id": "wizard-b",
+        "label": "55 GP",
+        "items": [],
+        "goldPieces": 55
+      }
+    ],
+    "multiclassProficiencies": {
+      "armor": [],
+      "weapons": [],
+      "tools": []
+    },
+    "multiclassPrerequisites": {
+      "mode": "all",
+      "minimums": [
+        {
+          "ability": "int",
+          "minimum": 13
+        }
+      ]
+    },
+    "subclassLevel": 3,
+    "subclassLabel": "Wizard Subclass",
+    "asiLevels": [
+      4,
+      8,
+      12,
+      16
+    ],
+    "spellcasting": {
+      "ability": "int",
+      "prepares": "prepared",
+      "ritual": true,
+      "focus": "arcane-focus",
+      "multiclassProgression": "full",
+      "spellListId": "wizard"
+    },
+    "levelTable": [
+      {
+        "level": 1,
+        "proficiencyBonus": 2,
+        "features": [
+          "spellcasting",
+          "ritual-adept",
+          "arcane-recovery"
+        ],
+        "spellSlots": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 3,
+        "preparedCount": 4,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "proficiencyBonus": 2,
+        "features": [
+          "scholar"
+        ],
+        "spellSlots": [
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 3,
+        "preparedCount": 5,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "proficiencyBonus": 2,
+        "features": [
+          "wizard-subclass"
+        ],
+        "spellSlots": [
+          4,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 3,
+        "preparedCount": 6,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 4,
+        "proficiencyBonus": 2,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 7,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 5,
+        "proficiencyBonus": 3,
+        "features": [
+          "memorize-spell"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 9,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 6,
+        "proficiencyBonus": 3,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 10,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 7,
+        "proficiencyBonus": 3,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 11,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 4
+          }
+        ]
+      },
+      {
+        "level": 8,
+        "proficiencyBonus": 3,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 12,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 4
+          }
+        ]
+      },
+      {
+        "level": 9,
+        "proficiencyBonus": 4,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 14,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 5
+          }
+        ]
+      },
+      {
+        "level": 10,
+        "proficiencyBonus": 4,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 15,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 5
+          }
+        ]
+      },
+      {
+        "level": 11,
+        "proficiencyBonus": 4,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 16,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 6
+          }
+        ]
+      },
+      {
+        "level": 12,
+        "proficiencyBonus": 4,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 16,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 6
+          }
+        ]
+      },
+      {
+        "level": 13,
+        "proficiencyBonus": 5,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 17,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 7
+          }
+        ]
+      },
+      {
+        "level": 14,
+        "proficiencyBonus": 5,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 18,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 7
+          }
+        ]
+      },
+      {
+        "level": 15,
+        "proficiencyBonus": 5,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 19,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 8
+          }
+        ]
+      },
+      {
+        "level": 16,
+        "proficiencyBonus": 5,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 21,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 8
+          }
+        ]
+      },
+      {
+        "level": 17,
+        "proficiencyBonus": 6,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 22,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 9
+          }
+        ]
+      },
+      {
+        "level": 18,
+        "proficiencyBonus": 6,
+        "features": [
+          "spell-mastery"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          3,
+          1,
+          1,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 23,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 9
+          }
+        ]
+      },
+      {
+        "level": 19,
+        "proficiencyBonus": 6,
+        "features": [
+          "epic-boon"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 24,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 10
+          }
+        ]
+      },
+      {
+        "level": 20,
+        "proficiencyBonus": 6,
+        "features": [
+          "signature-spells"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          3,
+          2,
+          2,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 25,
+        "classResources": [
+          {
+            "id": "arcane-recovery",
+            "name": "Arcane Recovery",
+            "amount": 10
+          }
+        ]
+      }
+    ],
+    "features": [
+      {
+        "id": "spellcasting",
+        "name": "Spellcasting",
+        "level": 1,
+        "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power. Intelligence is your spellcasting ability for your Wizard spells, and you prepare a list of them from your spellbook after each Long Rest.",
+        "tags": [
+          "spellcasting"
+        ]
+      },
+      {
+        "id": "ritual-adept",
+        "name": "Ritual Adept",
+        "level": 1,
+        "description": "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this way.",
+        "tags": [
+          "spellcasting"
+        ]
+      },
+      {
+        "id": "arcane-recovery",
+        "name": "Arcane Recovery",
+        "level": 1,
+        "description": "You can regain some of your magical energy by studying your spellbook. When you finish a Short Rest, you can choose expended spell slots to recover. The spell slots can have a combined level equal to no more than half your Wizard level (round up), and none of the slots can be level 6 or higher.",
+        "uses": {
+          "limit": 1,
+          "per": "long-rest"
+        }
+      },
+      {
+        "id": "scholar",
+        "name": "Scholar",
+        "level": 2,
+        "description": "While studying magic, you also specialized in another field of study. Choose one of the following skills in which you have proficiency: Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.",
+        "choice": {
+          "kind": "expertise",
+          "choose": 1,
+          "from": [
+            "arcana",
+            "history",
+            "investigation",
+            "medicine",
+            "nature",
+            "religion"
+          ]
+        }
+      },
+      {
+        "id": "wizard-subclass",
+        "name": "Wizard Subclass",
+        "level": 3,
+        "description": "You gain a Wizard subclass of your choice. A subclass is a specialization that grants you features at certain Wizard levels.",
+        "tags": [
+          "subclass"
+        ],
+        "choice": {
+          "kind": "subclass",
+          "choose": 1,
+          "fromCatalog": "wizard-subclasses"
+        }
+      },
+      {
+        "id": "ability-score-improvement",
+        "name": "Ability Score Improvement",
+        "description": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You can take this feature more than once.",
+        "tags": [
+          "asi"
+        ],
+        "choice": {
+          "kind": "asi-or-feat",
+          "choose": 1,
+          "fromCatalog": "general-feats",
+          "repeatable": true
+        }
+      },
+      {
+        "id": "memorize-spell",
+        "name": "Memorize Spell",
+        "level": 5,
+        "description": "Whenever you finish a Short Rest, you can study your spellbook and replace one of the Wizard spells you have prepared with another spell from the book."
+      },
+      {
+        "id": "spell-mastery",
+        "name": "Spell Mastery",
+        "level": 18,
+        "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action. You always have those spells prepared, and you can cast them at their lowest level without expending a spell slot.",
+        "choice": {
+          "kind": "spell",
+          "choose": 2,
+          "fromCatalog": "wizard-spells",
+          "maxSpellLevel": 2
+        }
+      },
+      {
+        "id": "epic-boon",
+        "name": "Epic Boon",
+        "level": 19,
+        "description": "You gain an Epic Boon feat or another feat of your choice for which you qualify.",
+        "tags": [
+          "feat"
+        ],
+        "choice": {
+          "kind": "feat",
+          "choose": 1,
+          "fromCatalog": "epic-boon-feats"
+        }
+      },
+      {
+        "id": "signature-spells",
+        "name": "Signature Spells",
+        "level": 20,
+        "description": "Choose two level 3 spells in your spellbook as your signature spells. You always have these spells prepared, and you can cast each of them once at level 3 without expending a spell slot. Once you do so, you can't cast that spell in this way again until you finish a Short or Long Rest.",
+        "choice": {
+          "kind": "spell",
+          "choose": 2,
+          "fromCatalog": "wizard-spells",
+          "maxSpellLevel": 3
+        }
+      }
+    ]
+  }
+]

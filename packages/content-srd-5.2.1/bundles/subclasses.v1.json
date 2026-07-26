@@ -1,0 +1,100 @@
+[
+  {
+    "id": "champion",
+    "name": "Champion",
+    "source": "srd",
+    "classId": "fighter",
+    "subclassLevel": 3,
+    "summary": "A relentless warrior who pursues physical excellence in combat.",
+    "description": "Champions focus on the development of martial prowess in a straightforward, rigorous style. They combine rigorous training with physical excellence to deal devastating blows.",
+    "features": [
+      {
+        "id": "improved-critical",
+        "name": "Improved Critical",
+        "level": 3,
+        "description": "Your attack rolls with weapons and Unarmed Strikes can score a Critical Hit on a roll of 19 or 20 on the d20."
+      },
+      {
+        "id": "remarkable-athlete",
+        "name": "Remarkable Athlete",
+        "level": 7,
+        "description": "You have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks."
+      },
+      {
+        "id": "additional-fighting-style",
+        "name": "Additional Fighting Style",
+        "level": 10,
+        "description": "You gain another Fighting Style feat of your choice.",
+        "choice": {
+          "kind": "fighting-style",
+          "choose": 1,
+          "fromCatalog": "fighting-style-feats"
+        }
+      },
+      {
+        "id": "superior-critical",
+        "name": "Superior Critical",
+        "level": 15,
+        "description": "Your attack rolls with weapons and Unarmed Strikes can now score a Critical Hit on a roll of 18-20 on the d20.",
+        "replacesFeatureId": "improved-critical"
+      },
+      {
+        "id": "survivor",
+        "name": "Survivor",
+        "level": 18,
+        "description": "You attain the pinnacle of resilience in battle. You have Advantage on Death Saving Throws, and at the start of each of your turns you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point."
+      }
+    ]
+  },
+  {
+    "id": "evoker",
+    "name": "Evoker",
+    "source": "srd",
+    "classId": "wizard",
+    "subclassLevel": 3,
+    "summary": "A wizard who sculpts explosive elemental magic.",
+    "description": "You focus your study on magic that creates powerful elemental effects such as bitter cold, searing flame, rolling thunder, crackling lightning, and burning acid.",
+    "features": [
+      {
+        "id": "evocation-savant",
+        "name": "Evocation Savant",
+        "level": 3,
+        "description": "Choose two Wizard spells from the Evocation school, each of which must be level 1 or 2, and add them to your spellbook for free.",
+        "choice": {
+          "kind": "spell",
+          "choose": 2,
+          "fromCatalog": "wizard-spells",
+          "maxSpellLevel": 2
+        }
+      },
+      {
+        "id": "potent-cantrip",
+        "name": "Potent Cantrip",
+        "level": 3,
+        "description": "Your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the damage (if any) but suffers no additional effect from the cantrip."
+      },
+      {
+        "id": "sculpt-spells",
+        "name": "Sculpt Spells",
+        "level": 6,
+        "description": "You can create pockets of relative safety within the effects of your evocations. When you cast an Evocation spell that affects other creatures you can see, you can choose a number of them equal to 1 plus the spell's level; the chosen creatures automatically succeed on their saving throws against the spell and take no damage if they would normally take half damage on a successful save."
+      },
+      {
+        "id": "empowered-evocation",
+        "name": "Empowered Evocation",
+        "level": 10,
+        "description": "You can add your Intelligence modifier to one damage roll of any Wizard Evocation spell you cast."
+      },
+      {
+        "id": "overchannel",
+        "name": "Overchannel",
+        "level": 14,
+        "description": "You can increase the power of your spells. When you cast a Wizard spell of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do so, you suffer no adverse effect; using it again before you finish a Long Rest deals necrotic damage to you.",
+        "uses": {
+          "limit": 1,
+          "per": "long-rest"
+        }
+      }
+    ]
+  }
+]

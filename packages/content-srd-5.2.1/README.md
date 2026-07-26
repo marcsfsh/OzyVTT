@@ -39,10 +39,26 @@ anything consumes it.
     Combat, Damage and Healing, ...).
   - `attribution.json` — the required CC BY 4.0 attribution (wording verified against the
     SRD's own Legal Information page); any surface that displays this content must show it.
+  - **Character-builder bundles — currently PHASE-1 SEEDS, not full transcriptions:**
+    `classes.v1.json` (Fighter + Wizard, each with a complete 20-row level table),
+    `subclasses.v1.json` (Champion, Evoker), `species.v1.json` (Human, Elf),
+    `backgrounds.v1.json` (Soldier, Sage), `feats.v1.json` (Alert, Tough, Savage Attacker,
+    Magic Initiate), `names.v1.json` (per-species name pools). These exist to prove the
+    record schemas parse and the loaders work while the wizard, rules math, and UI are built
+    in parallel. Transcribing the remaining 10 classes, 10 subclasses, 7 species, 2
+    backgrounds, and ~16 feats is phases 2 and 5 of the character-builder task packet — a
+    missing class is a content gap, not a schema gap.
+- `src/character-content.ts` — the character-builder record schemas
+  (`ClassReference`, `SubclassReference`, `SpeciesReference`, `BackgroundReference`,
+  `FeatReference`, `NamePoolReference`) built on ONE shared `FeatureRecord`: prose plus
+  optional structured riders reusing the actor-side `ActionSchema` / `EffectGrantSchema` /
+  `ActionUsesSchema` shapes. Every record carries `source: "srd" | "homebrew"`, identity ids
+  stay open slugs, and no feature needs hardcoded behavior — homebrew authors the same record.
 - `src/index.ts` — typed, validated loaders (`loadMonsterDefinitions`, `loadConditions`,
   `loadSpells`, `loadWeapons`, `loadWeaponProperties`, `loadArmor`, `loadSkills`,
-  `loadDamageTypes`, `loadRules`, `loadAttribution`). Server-side only: clients receive
-  content via server projections, never by importing this package.
+  `loadDamageTypes`, `loadRules`, `loadAttribution`, plus `loadClasses`, `loadSubclasses`,
+  `loadSpecies`, `loadBackgrounds`, `loadFeats`, `loadNames`). Server-side only: clients
+  receive content via server projections, never by importing this package.
 
 ## Curation record (why the bundle differs from the raw fixtures)
 
@@ -56,8 +72,10 @@ anything consumes it.
   belong, plus a garbage CON-save value; **`mastiff`** and **`swarm-of-rats`** store save
   *modifiers* where the SRD-printed save bonuses belong.
 - **`greater-invisibility`** — upstream ships an empty description; restored from the SRD.
-- Deferred (not bundled): classes, species, feats, backgrounds, magic items — character-build
-  and loot content outside this VTT's "not a character builder" scope.
+- Classes, species, feats, and backgrounds were previously deferred as "outside this VTT's
+  not-a-character-builder scope". That scope changed (ADR-0021 / the character-builder task
+  packet): they are now first-class bundles, seeded above and transcribed in phases 2 and 5.
+- Still deferred (not bundled): magic items and other loot content.
 
 ## License
 
