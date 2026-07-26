@@ -79,7 +79,7 @@
    enlarged, and OS-fullscreen modes since it lives inside the stage. */
 /* align-items: center keeps every control on one vertical plane; min-height reserves the slide-out's
    height so opening a tab never nudges the whole row down (report #8). */
-.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 2.25rem; max-width: calc(100% - 1.4rem); }
+.encounter-map-overlay { position: absolute; left: .7rem; top: .7rem; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 2.5rem; max-width: calc(100% - 1.4rem); }
 /* The per-viewer notifications bell sits top-right, opposite the top-left tool cluster. */
 .encounter-map-notify { position: absolute; right: .7rem; top: .7rem; z-index: 3; }
 .encounter-map-tools { display: flex; gap: .3rem; }
@@ -99,11 +99,18 @@
 .encounter-map-swatches button.selected { outline: 2px solid var(--cyan-hi); outline-offset: 1px; }
 .encounter-shape-editor-color { flex-direction: row !important; align-items: center; justify-content: space-between; }
 .encounter-shape-editor-color input { width: 2.4rem; height: 1.7rem; padding: 0; }
-.encounter-map-icon { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
+/* The mid-combat map tools are the most touch-critical cluster in the product, so they meet the
+   44px floor (design-language §4): 2.5rem of paint — as much as a floating overlay over the map can
+   spend without eating the battlefield — plus the `.tap-target` recipe for the last 4px of hit AREA
+   (2px per side, which is why .encounter-map-tools/.encounter-map-slideout gap by .3rem: 4.8px > 4px,
+   so two neighbouring areas never overlap and never steal each other's taps). */
+.encounter-map-icon { position: relative; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-1) 82%, transparent); color: var(--text); font-size: 1.05rem; line-height: 1; text-align: center; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, color .16s ease; }
+.encounter-map-icon::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, var(--tap-min)); height: max(100%, var(--tap-min)); transform: translate(-50%, -50%); }
 .encounter-map-icon:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 .encounter-map-icon[aria-pressed="true"], .encounter-map-icon[aria-expanded="true"] { background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 .encounter-map-icon:disabled { opacity: .4; cursor: not-allowed; }
-.encounter-map-menu { position: absolute; left: 0; top: 2.5rem; z-index: 6; min-width: 12rem; display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
+/* Clears the 2.5rem trigger plus its 2px hit-area overhang. */
+.encounter-map-menu { position: absolute; left: 0; top: 2.9rem; z-index: 6; min-width: 12rem; display: flex; flex-direction: column; gap: .15rem; padding: .4rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--shadow-2); }
 .encounter-map-wrench .encounter-map-menu { left: auto; right: 0; }
 .encounter-map-menu-title { margin: .1rem .3rem .3rem; color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
 .encounter-map-menu button { padding: .5rem .6rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); text-align: left; font-size: .82rem; cursor: pointer; }
@@ -209,7 +216,8 @@
 .encounter-map-scene-live { display: inline-flex; gap: .35rem; }
 .encounter-map-scene-live .scene-golive { background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta)); border-color: var(--magenta); color: var(--text); }
 
-/* Narrow viewports: a saved left/right dock must never squeeze the map to a sliver. */
-@media (max-width: 700px) {
+/* Narrow viewports: a saved left/right dock must never squeeze the map to a sliver.
+   650 is this file's documented narrow step (mobile-ux.md), not a fourth number. */
+@media (max-width: 650px) {
   .encounter-map-dock.dock-right, .encounter-map-dock.dock-left { width: min(var(--dock-side-width), 62vw); }
 }

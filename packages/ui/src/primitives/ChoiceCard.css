@@ -41,7 +41,11 @@
   overflow: hidden;
 }
 .nh-choice-meta { color: var(--text-muted); font-size: var(--fs-xs); }
-.nh-choice-locked { display: flex; align-items: center; gap: var(--space-1); color: var(--danger-hi); font-size: var(--fs-xs); }
+/* "Locked" is CAUTION (violet), not danger: rose-red is damage and destruction (§2).
+   Kept at --fs-sm and full strength — on a disabled card, why it is locked is the most
+   important thing on the card. */
+.nh-choice-locked { display: flex; align-items: center; gap: var(--space-2); color: var(--caution-hi); font-size: var(--fs-sm); }
+.nh-choice-locked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
 
 /* ---- The one chosen treatment: cyan edge + selection glow + a check ---- */
 .nh-choice-check {
@@ -60,17 +64,32 @@
   transform: scale(0.8);
   transition: opacity var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle);
 }
+/* Cyan edge + glow + the check disc, and NO fill: hover already owns --surface-2, so
+   a filled selected state would make "the pointer is here" and "this is my answer"
+   the same pixel color. Border + glow + check is unambiguous on its own. */
 .nh-choice.is-selected {
   border-color: var(--cyan);
-  background: var(--surface-2);
   box-shadow: var(--glow-cyan);
   transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover);
 }
 .nh-choice.is-selected .nh-choice-check { opacity: 1; transform: none; }
 .nh-choice.is-selected .nh-choice-title { color: var(--text); }
 
-.nh-choice:disabled { cursor: not-allowed; opacity: 0.55; }
-.nh-choice:disabled .nh-choice-locked { opacity: 1; }
+/* Disabled dims PER PROPERTY, never with a group `opacity`: group alpha composites the
+   whole subtree, so a child can't opt back out of it (the old `.nh-choice-locked
+   { opacity: 1 }` was a no-op) and the locked reason fell to 2.08:1 in light theme.
+   Dim the frame, the title, and the icon; leave the reason at full strength. */
+.nh-choice:disabled {
+  cursor: not-allowed;
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 70%, var(--bg));
+}
+.nh-choice:disabled .nh-choice-title { color: var(--text-dim); }
+/* desc/meta keep their resting colors: dimming them further drops --text-muted below
+   AA, and AA is not negotiable (§2). Disabled reads from the frame, the title, and the
+   locked reason. */
+.nh-choice:disabled .nh-choice-icon { color: var(--text-muted); }
+.nh-choice:disabled .nh-choice-badge { opacity: 0.75; }
 
 /* The selection glow above is a class-level box-shadow, so it would out-specify the
    zero-specificity global :focus-visible ring and leave a focused, already-selected

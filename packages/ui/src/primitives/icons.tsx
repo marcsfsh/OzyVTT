@@ -61,3 +61,25 @@ export function IconPencil({ className }: Readonly<{ className?: string }>) {
     </Glyph>
   );
 }
+
+/** Warning / blocked / incomplete / locked — the one caution mark in the system.
+    Replaces the bare "⚠" (U+26A0) the guided-flow primitives used to render: Manrope
+    has no glyph for it, so it fell back to a system face at ~10px, and iOS/Android
+    give it *emoji* presentation — a yellow triangle, a hue this palette does not own.
+    This takes `currentColor`, so it is always `--caution` (or whatever the caller sets). */
+export function IconWarning({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M12 2.6c.6 0 1.2.32 1.53.87l9 15.4A1.75 1.75 0 0 1 21 21.5H3a1.75 1.75 0 0 1-1.53-2.63l9-15.4A1.76 1.76 0 0 1 12 2.6zm-1.1 5.6v6h2.2v-6zm0 7.6v2.2h2.2v-2.2z" />
+    </Glyph>
+  );
+}
+
+/** Info / neutral highlight — low urgency, never an alarm. */
+export function IconInfo({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.1 4.4v2.2h2.2V6.4zm0 3.9v7.3h2.2v-7.3z" />
+    </Glyph>
+  );
+}

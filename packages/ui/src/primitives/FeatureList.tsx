@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { cx } from "./util";
+import { Button } from "./Button";
 import { IconChevron } from "./icons";
 import "./FeatureList.css";
 
@@ -61,9 +62,9 @@ export function FeatureList({ items, openIds, onToggle, allowExpandAll = false, 
     <div className={cx("nh-features", className)} aria-label={ariaLabel} role={ariaLabel ? "group" : undefined}>
       {allowExpandAll && items.length > 0 && (
         <div className="nh-features-bulk">
-          <button type="button" className="nh-features-bulk-btn" onClick={() => setAll(true)}>Expand all</button>
+          <Button variant="ghost" size="sm" onClick={() => setAll(true)}>Expand all</Button>
           <span className="nh-features-bulk-sep" aria-hidden="true">·</span>
-          <button type="button" className="nh-features-bulk-btn" onClick={() => setAll(false)}>Collapse all</button>
+          <Button variant="ghost" size="sm" onClick={() => setAll(false)}>Collapse all</Button>
         </div>
       )}
 

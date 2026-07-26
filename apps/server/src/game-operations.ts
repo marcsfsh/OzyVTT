@@ -176,12 +176,15 @@ export function createGameOperations(context: GameOperationsContext) {
 
     contentConditions(_principal: GamePrincipal) {
       // Reference text is public information: any joined session (GM or player) may read it.
-      return { conditions: contentLibrary.conditionSummaries() };
+      // Attribution rides along like every other catalog: ADR-0015 requires the BUNDLE's canonical
+      // statement (author, source URL, license URI) on any surface that displays this content, and a
+      // client that has to hand-write a substitute always writes a weaker one.
+      return { conditions: contentLibrary.conditionSummaries(), attribution: contentLibrary.attribution };
     },
 
     contentSpells(_principal: GamePrincipal) {
       // Spell rules are public reference text (the CC-BY SRD), like conditions - any joined session may read them.
-      return { spells: contentLibrary.spellSummaries() };
+      return { spells: contentLibrary.spellSummaries(), attribution: contentLibrary.attribution };
     },
 
     contentEquipment(_principal: GamePrincipal) {

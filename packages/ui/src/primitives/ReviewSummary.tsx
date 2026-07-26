@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cx } from "./util";
-import { IconPencil } from "./icons";
+import { Button } from "./Button";
+import { IconPencil, IconWarning } from "./icons";
 import "./ReviewSummary.css";
 
 export interface ReviewItem {
@@ -48,16 +49,16 @@ export function ReviewSummary({ sections, children, ariaLabel = "Character summa
           <header className="nh-review-head">
             <h3 className="nh-review-title">{section.title}</h3>
             {section.onEdit && (
-              <button type="button" className="nh-review-edit interactive" onClick={section.onEdit}>
+              <Button variant="ghost" size="sm" className="nh-review-edit" onClick={section.onEdit}>
                 <span className="nh-review-edit-icon" aria-hidden="true"><IconPencil /></span>
                 {section.editLabel ?? "Edit"}
                 <span className="nh-sr-only"> {typeof section.title === "string" ? section.title : ""}</span>
-              </button>
+              </Button>
             )}
           </header>
 
           {section.incomplete != null && (
-            <p className="nh-review-incomplete"><span aria-hidden="true">⚠</span> {section.incomplete}</p>
+            <p className="nh-review-incomplete"><span className="nh-review-incomplete-icon" aria-hidden="true"><IconWarning /></span>{section.incomplete}</p>
           )}
 
           <dl className="nh-statlist nh-review-stats">

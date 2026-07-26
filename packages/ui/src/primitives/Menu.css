@@ -21,6 +21,49 @@
 .nh-menu-trigger::marker { content: ""; }
 .nh-menu-trigger:hover { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
 
+/* ---- Icon-square trigger ----
+   A compact 1.75rem square for dense tool clusters, so a ⋯ can sit beside a same-size
+   drag grip as an even pair. `min-height` on the base trigger beats any `height` an app
+   sets regardless of specificity, which is exactly how this became a 28×44 rectangle
+   next to a 28×28 square — so the variant clears it here, in the primitive, and the app
+   stops overriding.
+
+   The 44px floor is met by the hit AREA (§4 route 2 — the `.tap-target` recipe,
+   inlined so BOTH ways in share one rule): growing the paint would rebuild the
+   rectangle this variant exists to remove. `.nh-card-tools` gaps its children by
+   --space-4 so two neighbouring 44px areas never overlap.
+
+   Two ways in: the `icon` prop, or the shared `.nh-card-tools` pattern (patterns.css),
+   whose tools are icon-only by definition. */
+.nh-menu-trigger--icon,
+.nh-card-tools .nh-menu-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  border-radius: var(--radius-sm);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  font-size: 1rem;
+  line-height: 1;
+}
+.nh-menu-trigger--icon::after,
+.nh-card-tools .nh-menu-trigger::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--tap-min));
+  height: max(100%, var(--tap-min));
+  transform: translate(-50%, -50%);
+}
+.nh-menu-trigger--icon .nh-menu-trigger-label,
+.nh-card-tools .nh-menu-trigger .nh-menu-trigger-label { display: grid; place-items: center; line-height: 1; }
+
 .nh-menu-caret { font-size: 0.8em; color: var(--text-dim); transition: transform var(--dur-hover) var(--ease-settle); }
 .nh-menu[open] .nh-menu-caret { transform: rotate(180deg); }
 

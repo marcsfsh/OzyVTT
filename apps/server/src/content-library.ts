@@ -1,6 +1,6 @@
-import type { ContentActionSummary, ContentBackgroundSummary, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary } from "@vtt/domain";
+import type { ContentActionSummary, ContentBackgroundSummary, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSpeciesSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSpecies, loadSpells, loadSubclasses, type FeatureRecord } from "@vtt/content-srd-5.2.1";
+import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSpecies, loadSpells, loadSubclasses, type ClassLevelRow, type FeatureRecord } from "@vtt/content-srd-5.2.1";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -139,7 +139,20 @@ const featureSummaryOf = (feature: FeatureRecord): ContentFeatureSummary => ({
     ? { kind: feature.choice.kind, choose: feature.choice.choose, from: feature.choice.from ?? [], fromCatalog: feature.choice.fromCatalog ?? null }
     : null
 });
-const equipmentOptionLabels = (options: ReadonlyArray<{ label: string }>): readonly string[] => options.map((option) => option.label);
+// The whole bundle, not just its label: a label can be shown but never turned into inventory, so the
+// wizard's "take option A" had nothing to add. Items and the "or take N gp" alternative both travel.
+const equipmentOptionsOf = (options: ReadonlyArray<{ id: string; label: string; items: ReadonlyArray<{ id: string; name: string; quantity: number }>; goldPieces: number }>): readonly ContentStartingEquipmentOption[] =>
+  options.map((option) => ({ id: option.id, label: option.label, items: option.items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity })), goldPieces: option.goldPieces }));
+// The printed 20-row table as DISPLAY data. Optional columns become null ("this class has no such
+// column") rather than 0, so the wizard can tell "no cantrips" from "zero cantrips at this level".
+const levelRowOf = (row: ClassLevelRow): ContentClassLevelRow => ({
+  level: row.level, proficiencyBonus: row.proficiencyBonus,
+  spellSlots: row.spellSlots ? [...row.spellSlots] : null,
+  pactSlots: row.pactSlots ? { level: row.pactSlots.level, slots: row.pactSlots.slots } : null,
+  cantripsKnown: row.cantripsKnown ?? null, spellsKnown: row.spellsKnown ?? null,
+  preparedFormula: row.preparedFormula ?? null, preparedCount: row.preparedCount ?? null,
+  classResources: row.classResources.map((resource) => ({ id: resource.id, name: resource.name, amount: resource.amount }))
+});
 const byName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
 
 const classSummaries: readonly ContentClassSummary[] = loadClasses().map((entry) => ({
@@ -148,7 +161,8 @@ const classSummaries: readonly ContentClassSummary[] = loadClasses().map((entry)
   skillChoiceCount: entry.skillChoices.choose, skillChoices: entry.skillChoices.from,
   subclassLevel: entry.subclassLevel, subclassLabel: entry.subclassLabel ?? null, asiLevels: entry.asiLevels,
   spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
-  startingEquipmentOptions: equipmentOptionLabels(entry.startingEquipment),
+  levelTable: entry.levelTable.map(levelRowOf),
+  startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
   features: entry.features.map(featureSummaryOf)
 })).sort(byName);
 
@@ -174,7 +188,7 @@ const backgroundSummaries: readonly ContentBackgroundSummary[] = loadBackgrounds
   abilityOptions: entry.abilityOptions ? { from: entry.abilityOptions.from, spreads: entry.abilityOptions.spreads } : null,
   originFeatId: entry.originFeatId ?? null,
   skillProficiencies: entry.skillProficiencies, toolProficiencies: entry.toolProficiencies, languages: entry.languages,
-  startingEquipmentOptions: equipmentOptionLabels(entry.startingEquipment),
+  startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
   features: entry.features.map(featureSummaryOf)
 })).sort(byName);
 

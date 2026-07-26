@@ -1717,7 +1717,7 @@ A stat block's actions flattened for running them (GM-grade only): attack bonus,
 
 ### `GET /api/v1/content/conditions`
 
-The bundled SRD condition reference (public information - any GM, player, or integration session).
+The bundled SRD condition reference (public information - any GM, player, or integration session). Includes the CC BY 4.0 attribution line.
 
 **Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
 
@@ -1725,7 +1725,7 @@ The bundled SRD condition reference (public information - any GM, player, or int
 
 ### `GET /api/v1/content/spells`
 
-The bundled SRD spell list with the fields a sheet needs to cast from: level, school, casting time, range, components, duration, concentration/ritual flags, description, and the upcast (`castingOptions`) rows keyed by slot level.
+The bundled SRD spell list with the fields a sheet needs to cast from: level, school, casting time, range, components, duration, concentration/ritual flags, description, and the upcast (`castingOptions`) rows keyed by slot level. Includes the CC BY 4.0 attribution line.
 
 **Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
 

@@ -1,6 +1,6 @@
 import type { KeyboardEvent, ReactNode, Ref } from "react";
 import { cx } from "./util";
-import { IconCheck } from "./icons";
+import { IconCheck, IconWarning } from "./icons";
 import "./ChoiceCard.css";
 
 export interface ChoiceCardProps {
@@ -63,7 +63,7 @@ export function ChoiceCard({
       {description != null && <span className="nh-choice-desc">{description}</span>}
       {meta != null && <span className="nh-choice-meta tabular">{meta}</span>}
       {disabled && disabledReason != null && (
-        <span className="nh-choice-locked"><span aria-hidden="true">⚠</span> {disabledReason}</span>
+        <span className="nh-choice-locked"><span className="nh-choice-locked-icon" aria-hidden="true"><IconWarning /></span>{disabledReason}</span>
       )}
       {/* The check is the chosen mark. aria-checked already carries it for AT. */}
       <span className="nh-choice-check" aria-hidden="true"><IconCheck /></span>

@@ -54,6 +54,11 @@
   --primary: var(--magenta);
   --success: var(--cyan);
   --caution: #C77DFF;
+  /* Caution as TEXT. The --danger/--danger-hi pair exists because the fill hue isn't
+     readable as small type; caution needs the same pair, and --violet-hi is already the
+     system's "readable violet on this theme's surfaces". Use --caution for edges and
+     fills, --caution-hi for the words. */
+  --caution-hi: var(--violet-hi);
   --danger: #FF2D5E;
   --danger-hi: #FF6B8E;
   --info: var(--indigo);

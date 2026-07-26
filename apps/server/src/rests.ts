@@ -1,9 +1,26 @@
-import type { GameState } from "@vtt/domain";
+import { makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
+import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { healActor, type ActorScope } from "./hit-points.js";
+
+/**
+ * Take `count` dice off a multiclass pool, biggest die first - the same order the roll is made in
+ * (the command rolls the pool's headline die), so the pool that shrinks matches the dice that fell.
+ * Returns the new entries; the caller has already checked the pool holds enough.
+ */
+function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
+  let left = count;
+  return [...entries]
+    .sort((a, b) => Number(b.die.slice(1)) - Number(a.die.slice(1)))
+    .map((entry) => {
+      const taken = Math.min(left, entry.remaining);
+      left -= taken;
+      return { ...entry, remaining: entry.remaining - taken };
+    });
+}
 
 /**
  * Apply a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
@@ -31,7 +48,8 @@ export function spendHitDice(state: GameState, actorId: string, faces: readonly 
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
   const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
   const events = healActor(state, actorId, healed, scope);
-  actor.hitDice = { ...actor.hitDice, remaining: actor.hitDice.remaining - faces.length };
+  // Decrement the POOL, not a single counter: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
+  actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));
   return { healed, events, conModifier };
 }
 
@@ -55,7 +73,8 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
-  if (actor.hitDice) actor.hitDice = { ...actor.hitDice, remaining: actor.hitDice.maximum };
+  // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").
+  if (actor.hitDice) actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
   actor.actionUses = {};
@@ -68,10 +87,13 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   // to the sheet's defaults. Absent spellcasting leaves these untouched (additive).
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
-    const maxByLevel = new Map(longRestDefinition.spellcasting.slots.map((entry) => [entry.level, entry.max] as const));
+    // `spellSlotMaxima` covers the multiclass sheet whose combined table is derived rather than stored,
+    // so a caster seeded from `spellcasting.classes[]` refills instead of staying empty.
+    const maxByLevel = new Map(spellSlotMaxima(longRestDefinition).map((entry) => [entry.level, entry.max] as const));
     actor.spellSlots = actor.spellSlots.map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level) ?? slot.remaining }));
   }
-  if (actor.pactSlots && longRestDefinition?.spellcasting?.pact) actor.pactSlots = { ...actor.pactSlots, remaining: longRestDefinition.spellcasting.pact.max };
+  const pactMaximum = actor.pactSlots ? pactSlotMaximum(longRestDefinition) : null;
+  if (actor.pactSlots && pactMaximum) actor.pactSlots = { ...actor.pactSlots, remaining: pactMaximum.max };
   if (longRestDefinition?.spellcasting) actor.preparedSpellIds = longRestDefinition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id);
   return events;
 }

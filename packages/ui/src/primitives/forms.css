@@ -4,6 +4,10 @@
 
 .nh-input {
   width: 100%;
+  /* Own the box model rather than inheriting it: with content-box, `width: 100%` plus
+     padding and border pushes the field 26px past its column, which is a horizontal
+     scrollbar at 375px on any consumer that hasn't set a global border-box reset. */
+  box-sizing: border-box;
   /* 44px touch floor (decision 16) — a tappable field on a phone. */
   min-height: var(--tap-min);
   padding: var(--space-3);
@@ -39,7 +43,8 @@
   margin: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   font-size: var(--fs-sm);
   color: var(--danger-hi);
 }
+.nh-field-error-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }

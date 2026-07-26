@@ -151,7 +151,9 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
         ...(ownDefinition ? { definition: ownDefinition } : {}),
         ...(mine ? { actionUses: { ...actionUses } } : {}),
-        ...(mine && hitDice ? { hitDice: { ...hitDice } } : {}),
+        // The pool's `entries` array is copied too - a player projection must never hand out a live
+        // reference into GameState (same deep-copy rule as spellSlots/inventory below).
+        ...(mine && hitDice ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } } : {}),
         // Sheet resources reach ONLY the owning player - never another player, never the viewer (which
         // projects separately). Same owner-gate as actionUses/hitDice above; viewer safety by construction.
         ...(mine ? { spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })), pactSlots: pactSlots === null ? null : { ...pactSlots }, preparedSpellIds: [...preparedSpellIds], inventory: inventory.map((item) => ({ ...item })), currency: { ...currency } } : {}),

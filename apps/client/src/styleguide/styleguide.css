@@ -1,3 +1,8 @@
+/* The styleguide entry loads only @vtt/ui/styles.css, not the app's styles.css, so it has
+   to clear the UA body margin itself — otherwise the page sits 8px off and a full-width
+   control can push the document past the viewport at 375px. */
+body { margin: 0; }
+
 .sg { min-height: 100vh; }
 
 .sg-header {
@@ -81,10 +86,8 @@
 }
 .sg-wizard-frame .nh-wizard { min-height: 100%; }
 .sg-wizard-step { display: grid; gap: var(--space-3); padding-bottom: var(--space-4); }
-/* The preview pane is always visible on a laptop; this button is the narrow-screen way in.
-   Scoped through .sg-wizard-step so it out-specifies .nh-btn's own display. */
-.sg-wizard-step .sg-wizard-preview-btn { justify-self: start; }
-@media (min-width: 901px) { .sg-wizard-step .sg-wizard-preview-btn { display: none; } }
+/* No hand-rolled "Show preview" button here any more: WizardShell owns both halves of the
+   master-detail swap (onOpenDetail / onCloseDetail) and shows each at the right width. */
 
 /* Textures */
 .sg-textures { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }

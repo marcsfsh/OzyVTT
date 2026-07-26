@@ -1,5 +1,8 @@
-import type { ActorDefinition, GameState } from "@vtt/domain";
-import { abilityModifier, armorClassFromEquipment } from "@vtt/rules-5e";
+import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
+import {
+  abilityModifier, armorClassFromEquipment, hitDicePool, multiclassCasterLevel, multiclassPactSlots, multiclassSpellSlots,
+  type ClassLevelEntry
+} from "@vtt/rules-5e";
 import { endEffectsSustainedBy } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -16,13 +19,87 @@ function dedupedName(state: GameState, base: string): string {
   }
 }
 
-/** SRD Hit Point Dice pool from a definition's hit-point formula ("7d8 + 14" → 7 × d8); no parseable formula = unmodeled (null, the fail-open pattern). */
-export function hitDiceFromDefinition(definition: ActorDefinition): { die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number } | null {
+/**
+ * SRD Hit Point Dice entry from a definition's hit-point formula ("7d8 + 14" → 7 × d8); no parseable
+ * formula = unmodeled (null, the fail-open pattern). `DiceFormulaSchema` allows only ONE die term, so
+ * this can express a monster or a single-class sheet but never a multiclass pool - see `seedHitDice`.
+ */
+export function hitDiceFromDefinition(definition: ActorDefinition): HitDiceEntry | null {
   const match = definition.hitPoints.formula?.match(/^(\d+)d(4|6|8|10|12|20)\b/i);
   if (!match) return null;
   const count = Math.min(40, Number.parseInt(match[1], 10));
   if (count < 1) return null;
-  return { die: `d${match[2]}` as "d4" | "d6" | "d8" | "d10" | "d12" | "d20", maximum: count, remaining: count };
+  return { die: `d${match[2]}` as HitDiceEntry["die"], maximum: count, remaining: count };
+}
+
+/** The sheet's class levels in the shape `@vtt/rules-5e` progression math expects. */
+function classLevelsOf(definition: ActorDefinition): ClassLevelEntry[] {
+  return (definition.character?.classes ?? []).map((entry) => ({ classId: entry.id, level: entry.level, ...(entry.hitDie ? { hitDie: entry.hitDie } : {}) }));
+}
+
+/**
+ * THE Hit Point Dice pool a live actor is seeded with. A sheet that records its class levels pools
+ * one entry per die size (Fighter 3 / Wizard 2 = 3d10 + 2d6) - the hit-point FORMULA cannot express
+ * that, so deriving it from `formula` silently dropped every class after the first. Monsters and
+ * legacy/PDF sheets with no class levels keep the formula-derived single entry.
+ */
+export function seedHitDice(definition: ActorDefinition): Actor["hitDice"] {
+  const classLevels = classLevelsOf(definition);
+  if (classLevels.length > 0) {
+    const pool = makeHitDicePool(hitDicePool(classLevels).map((entry) => ({ die: entry.die, maximum: entry.count, remaining: entry.count })));
+    if (pool) return pool;
+  }
+  const single = hitDiceFromDefinition(definition);
+  return single ? makeHitDicePool([single]) : null;
+}
+
+/**
+ * THE spell-slot maxima a character actually has, by slot level. A multiclass builder fills
+ * `spellcasting.classes[]` and the SRD combined slot table belongs at the top level; when the top
+ * level is empty but per-class casters are declared, derive the combined table from the class levels
+ * (SRD Multiclassing) rather than seeding a "modeled caster with zero slots".
+ *
+ * Single-sourced: seeding (`instantiate`, the example party), the long rest, and the slot-spend clamp
+ * all read this, so they can never disagree about a character's maximum.
+ */
+export function spellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
+  const spellcasting = definition?.spellcasting;
+  if (!spellcasting) return [];
+  if (spellcasting.slots.length > 0) return spellcasting.slots;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return [];
+  const casterLevels = classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId));
+  return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
+    .map((count, index) => ({ level: index + 1, max: count }))
+    .filter((slot) => slot.max > 0);
+}
+
+/** Warlock Pact Magic maximum, derived from the Warlock levels when the sheet did not state one. */
+export function pactSlotMaximum(definition: ActorDefinition | undefined): { level: number; max: number } | null {
+  const spellcasting = definition?.spellcasting;
+  if (!spellcasting) return null;
+  if (spellcasting.pact) return spellcasting.pact;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return null;
+  const pact = multiclassPactSlots(classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId)));
+  return pact ? { level: pact.level, max: pact.slots } : null;
+}
+
+/** Live spell-slot pools for a freshly instantiated actor; null = not a modeled spellcaster. */
+export function seedSpellSlots(definition: ActorDefinition): Actor["spellSlots"] {
+  if (!definition.spellcasting) return null;
+  return spellSlotMaxima(definition).map((slot) => ({ level: slot.level, remaining: slot.max }));
+}
+
+/** Live Pact Magic pool for a freshly instantiated actor; null = no pact pool. */
+export function seedPactSlots(definition: ActorDefinition): Actor["pactSlots"] {
+  const pact = pactSlotMaximum(definition);
+  return pact ? { level: pact.level, remaining: pact.max } : null;
+}
+
+/** The spells a sheet starts the day with prepared (defaults the long rest also restores). */
+export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
+  return definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [];
 }
 
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
@@ -46,10 +123,10 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     conditionImmunities: definition.conditionImmunities ? [...definition.conditionImmunities] : [],
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
-    hitDice: hitDiceFromDefinition(definition),
-    spellSlots: definition.spellcasting ? definition.spellcasting.slots.map((slot) => ({ level: slot.level, remaining: slot.max })) : null,
-    pactSlots: definition.spellcasting?.pact ? { level: definition.spellcasting.pact.level, remaining: definition.spellcasting.pact.max } : null,
-    preparedSpellIds: definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [],
+    hitDice: seedHitDice(definition),
+    spellSlots: seedSpellSlots(definition),
+    pactSlots: seedPactSlots(definition),
+    preparedSpellIds: seedPreparedSpellIds(definition),
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,

@@ -1,5 +1,6 @@
 import { GameStateSchema, type GameState, type StoredDefinition } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { seedHitDice, seedPactSlots, seedPreparedSpellIds, seedSpellSlots } from "./actor-roster.js";
 
 /**
  * Three level-7 example player characters - a self-sufficient adventuring party that exercises every
@@ -174,7 +175,11 @@ const PARTY: ReadonlyArray<Readonly<{ id: string; definitionId: string; definiti
   { id: PLACEHOLDER_ACTOR_IDS.wizard, definitionId: EXAMPLE_DEFINITION_IDS.wizard, definition: LYRA }
 ];
 
-/** Live actor derived from a definition, mirroring the server's own `instantiate` so hp/AC/init/size never drift from the sheet. */
+/**
+ * Live actor derived from a definition. Sheet-derived resources come from the SAME seeding helpers
+ * `instantiate` uses (`actor-roster.ts`) rather than a second copy of the logic, so the example party
+ * can never drift from an imported sheet - the drift is exactly how the multiclass slot bug hid.
+ */
 function actorFor(member: (typeof PARTY)[number]) {
   const { id, definitionId, definition } = member;
   return {
@@ -187,9 +192,10 @@ function actorFor(member: (typeof PARTY)[number]) {
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],
-    spellSlots: definition.spellcasting ? definition.spellcasting.slots.map((slot) => ({ level: slot.level, remaining: slot.max })) : null,
-    pactSlots: definition.spellcasting?.pact ? { level: definition.spellcasting.pact.level, remaining: definition.spellcasting.pact.max } : null,
-    preparedSpellIds: definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [],
+    hitDice: seedHitDice(definition),
+    spellSlots: seedSpellSlots(definition),
+    pactSlots: seedPactSlots(definition),
+    preparedSpellIds: seedPreparedSpellIds(definition),
     inventory: (definition.startingInventory ?? []).map((item) => ({ ...item })),
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     ...(definition.summary ? { notes: definition.summary } : {}),

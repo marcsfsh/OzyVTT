@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { cx } from "./util";
 import { Button } from "./Button";
 import { Input } from "./forms";
-import { IconDie } from "./icons";
+import { IconDie, IconWarning } from "./icons";
 import { SegmentedControl } from "./SegmentedControl";
 import "./DiceInputRow.css";
 
@@ -108,7 +108,7 @@ export function DiceInputRow({
       </div>
 
       {error != null
-        ? <p className="nh-diceinput-error" role="alert"><span aria-hidden="true">⚠</span> {error}</p>
+        ? <p className="nh-diceinput-error" role="alert"><span className="nh-diceinput-error-icon" aria-hidden="true"><IconWarning /></span>{error}</p>
         : hint != null ? <p className="nh-diceinput-hint">{hint}</p> : null}
     </div>
   );

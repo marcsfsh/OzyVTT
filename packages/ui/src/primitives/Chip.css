@@ -42,8 +42,12 @@
 /* A chip's ✕ stays visually tiny; `.tap-target` gives the finger the 44px floor. */
 .nh-chip-remove.tap-target::after { border-radius: 50%; }
 
-/* Pressable / selectable chip (filter + condition toggles) */
-.nh-chip--pressable { cursor: pointer; }
+/* Pressable / selectable chip (filter + condition toggles). A condition toggle mid-combat
+   is a finger target, so it takes the 44px floor: 2rem of paint (a 44px pill would stop
+   reading as a chip and would double the height of an initiative row) plus `.tap-target`
+   for the last 12px of hit AREA. That leaves 6px of overhang per side, so a wrapping chip
+   row must gap its children by at least --space-3 or neighbours steal each other's taps. */
+.nh-chip--pressable { min-height: 2rem; cursor: pointer; }
 .nh-chip--pressable:hover:not(:disabled) { border-color: var(--line-strong); }
 .nh-chip--pressable[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-3) 55%, var(--surface-2)); box-shadow: inset 0 0 0 1px currentColor; }
 .nh-chip--pressable:disabled { opacity: 0.6; cursor: not-allowed; }

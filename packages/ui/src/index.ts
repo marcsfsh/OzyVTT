@@ -60,7 +60,7 @@ export { Kbd, type KbdProps } from "./primitives/Kbd";
 
 /* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's
    richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
-export { IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil } from "./primitives/icons";
+export { IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil, IconWarning, IconInfo } from "./primitives/icons";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";

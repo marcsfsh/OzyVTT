@@ -6,7 +6,7 @@ import torva from "../../test-fixtures/actors/torva-grimtusk.v1.json";
 import pip from "../../test-fixtures/actors/pip-underbough.v1.json";
 import sable from "../../test-fixtures/actors/sable-vex.v1.json";
 import jsonSchema from "../json/actor-definition.v1.schema.json";
-import { ActorDefinitionSchema, characterChoices, resolveSpellcasting } from "../src/index.js";
+import { ActorDefinitionSchema, ActorSchema, characterChoices, makeHitDicePool, resolveSpellcasting } from "../src/index.js";
 
 describe("actor definition v1", () => {
   const jsonValidate = new Ajv2020({ strict: false }).compile(jsonSchema);
@@ -162,6 +162,103 @@ describe("actor definition v1", () => {
     expect(resolveSpellcasting(data?.spellcasting, "paladin")).toEqual({ classId: "paladin", ability: "cha", saveDc: 15, attackBonus: 7 });
     // An unknown class id with several entries falls back to the top-level (primary caster) fields.
     expect(resolveSpellcasting(data?.spellcasting, "bard")).toEqual({ ability: "cha", saveDc: 15, attackBonus: 7 });
+  });
+
+  /**
+   * REGRESSION: the lone-entry shortcut (resolution step 2) used to fire even when the caller named a
+   * DIFFERENT class, so an Eldritch Knight / Wizard sheet answered "what are the fighter's numbers?"
+   * with the Wizard's INT and DC. Step 2 exists for the caller who names no class at all.
+   */
+  it("never answers an explicitly named class with another class's spellcasting numbers", () => {
+    const single = structuredClone(legacyDefinition) as Record<string, any>;
+    single.spellcasting = {
+      ability: "int", saveDc: 15, attackBonus: 7,
+      slots: [{ level: 1, max: 4 }],
+      classes: [{ classId: "wizard", ability: "int", saveDc: 15, attackBonus: 7 }],
+      spells: []
+    };
+    const parsed = ActorDefinitionSchema.parse(single);
+    expect(jsonValidate(single), JSON.stringify(jsonValidate.errors)).toBe(true);
+    // Naming NO class keeps the single-entry shortcut - the ordinary single-class caster.
+    expect(resolveSpellcasting(parsed.spellcasting)).toEqual({ classId: "wizard", ability: "int", saveDc: 15, attackBonus: 7 });
+    expect(resolveSpellcasting(parsed.spellcasting, "wizard")).toEqual({ classId: "wizard", ability: "int", saveDc: 15, attackBonus: 7 });
+    // Naming a class with NO entry must NOT be handed the wizard's entry; it falls through to the
+    // top-level fields (step 3), and it never claims to be the wizard's.
+    const fighter = resolveSpellcasting(parsed.spellcasting, "fighter");
+    expect(fighter).toEqual({ ability: "int", saveDc: 15, attackBonus: 7 });
+    expect(fighter?.classId).toBeUndefined();
+    // Same rule with a differing per-class entry: asking for "fighter" cannot borrow the wizard's DC.
+    const differing = structuredClone(single);
+    differing.spellcasting.classes = [{ classId: "wizard", ability: "int", saveDc: 19, attackBonus: 11 }];
+    differing.spellcasting.saveDc = 13;
+    differing.spellcasting.attackBonus = 5;
+    differing.spellcasting.ability = "cha";
+    const parsedDiffering = ActorDefinitionSchema.parse(differing);
+    expect(resolveSpellcasting(parsedDiffering.spellcasting, "fighter")).toEqual({ ability: "cha", saveDc: 13, attackBonus: 5 });
+  });
+
+  /**
+   * REGRESSION: the doc block on SpellcastingSchema always said a builder filling `classes[]` must
+   * keep the top-level pool populated, but nothing enforced it - so a definition with per-class slots
+   * and an empty top-level `slots` parsed happily and seeded a caster with ZERO live slots that no
+   * long rest could refill. It is now a parse error under BOTH schemas.
+   */
+  it("rejects per-class spell slots without the combined top-level pool", () => {
+    const inconsistent = structuredClone(legacyDefinition) as Record<string, any>;
+    inconsistent.spellcasting = {
+      ability: "cha",
+      slots: [],
+      classes: [
+        { classId: "paladin", ability: "cha", slots: [{ level: 1, max: 4 }] },
+        { classId: "wizard", ability: "int", slots: [{ level: 1, max: 4 }, { level: 2, max: 3 }] }
+      ],
+      spells: []
+    };
+    const parsed = ActorDefinitionSchema.safeParse(inconsistent);
+    expect(parsed.success).toBe(false);
+    expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join("."))).toContain("spellcasting.slots");
+    expect(jsonValidate(inconsistent)).toBe(false);
+    // Omitting `slots` entirely is the same violation (it defaults to an empty pool).
+    const omitted = structuredClone(inconsistent);
+    delete omitted.spellcasting.slots;
+    expect(ActorDefinitionSchema.safeParse(omitted).success).toBe(false);
+    expect(jsonValidate(omitted)).toBe(false);
+    // Filling the combined pool makes the same sheet legal again under both schemas.
+    const consistent = structuredClone(inconsistent);
+    consistent.spellcasting.slots = [{ level: 1, max: 4 }, { level: 2, max: 3 }, { level: 3, max: 3 }];
+    expect(ActorDefinitionSchema.safeParse(consistent).success).toBe(true);
+    expect(jsonValidate(consistent), JSON.stringify(jsonValidate.errors)).toBe(true);
+    // Per-class ENTRIES without per-class slots stay legal - the server derives the combined table.
+    const derived = structuredClone(inconsistent);
+    for (const entry of derived.spellcasting.classes) delete entry.slots;
+    expect(ActorDefinitionSchema.safeParse(derived).success).toBe(true);
+    expect(jsonValidate(derived), JSON.stringify(jsonValidate.errors)).toBe(true);
+  });
+
+  /**
+   * REGRESSION: `Actor.hitDice` was one `{die, maximum, remaining}`, so a Fighter 3 / Wizard 2 could
+   * only ever be stored as ONE die size and silently lost 2 of its 5 dice. It is now a pool. The
+   * change must stay additive: a GameState persisted with the old single-object shape still loads.
+   */
+  it("normalises every Hit-Dice shape into one pool, old saves included", () => {
+    const pool = makeHitDicePool([{ die: "d10", maximum: 3, remaining: 1 }, { die: "d6", maximum: 2, remaining: 2 }]);
+    // The summary is DERIVED: total dice, labelled with the largest size present.
+    expect(pool).toEqual({ die: "d10", maximum: 5, remaining: 3, entries: [{ die: "d10", maximum: 3, remaining: 1 }, { die: "d6", maximum: 2, remaining: 2 }] });
+    expect(makeHitDicePool([])).toBeNull();
+
+    const base = { id: "3f1c9e2a-0000-4000-8000-00000000f001", name: "Old Save", kind: "player-character" as const, hp: { current: 10, maximum: 10 } };
+    // A save written before pools existed loads as a one-entry pool (no schemaVersion bump needed).
+    expect(ActorSchema.parse({ ...base, hitDice: { die: "d12", maximum: 7, remaining: 4 } }).hitDice)
+      .toEqual({ die: "d12", maximum: 7, remaining: 4, entries: [{ die: "d12", maximum: 7, remaining: 4 }] });
+    // A save with no hit dice at all keeps the null default (unmodeled).
+    expect(ActorSchema.parse(base).hitDice).toBeNull();
+    expect(ActorSchema.parse({ ...base, hitDice: null }).hitDice).toBeNull();
+    // A hand-written summary can never disagree with the pool: it is recomputed from `entries`.
+    expect(ActorSchema.parse({ ...base, hitDice: { die: "d4", maximum: 99, remaining: 99, entries: [{ die: "d8", maximum: 2, remaining: 0 }] } }).hitDice)
+      .toEqual({ die: "d8", maximum: 2, remaining: 0, entries: [{ die: "d8", maximum: 2, remaining: 0 }] });
+    // Garbage still fails loudly rather than being normalised into something plausible.
+    expect(ActorSchema.safeParse({ ...base, hitDice: { die: "d7", maximum: 1, remaining: 1 } }).success).toBe(false);
+    expect(ActorSchema.safeParse({ ...base, hitDice: { die: "d6", maximum: 1, remaining: 1, entries: "nope" } }).success).toBe(false);
   });
 
   it("rejects malformed builder input under both schemas", () => {

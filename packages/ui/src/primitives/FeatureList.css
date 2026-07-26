@@ -1,16 +1,9 @@
 .nh-features { display: grid; gap: var(--space-2); }
 
-.nh-features-bulk { display: flex; align-items: center; gap: var(--space-2); }
-.nh-features-bulk-btn {
-  min-height: var(--tap-min);
-  padding: 0 var(--space-2);
-  border: 0;
-  background: none;
-  color: var(--cyan);
-  font: 600 var(--fs-sm) / 1 var(--font-body);
-  cursor: pointer;
-}
-.nh-features-bulk-btn:hover { color: var(--cyan-hi); text-decoration: underline; }
+/* Expand all / Collapse all are `Button variant="ghost"` — the system's quiet text
+   action. They used to be hand-rolled cyan text with an underline hover, one of three
+   different ways this feature set said "quiet text action". */
+.nh-features-bulk { display: flex; align-items: center; gap: var(--space-1); }
 .nh-features-bulk-sep { color: var(--text-muted); }
 
 .nh-feature {
@@ -49,7 +42,8 @@
 .nh-feature-body > :first-child { margin-top: 0; }
 .nh-feature-body > :last-child { margin-bottom: 0; }
 
-@media (max-width: 480px) {
+/* Documented breakpoint ladder (760/560/650/850/980) — 560 is the phone step. */
+@media (max-width: 560px) {
   /* A long feature name plus its level qualifier will not share one line at 375px. */
   .nh-feature-summary { flex-wrap: wrap; }
   .nh-feature-title { flex-basis: calc(100% - 2.5rem); }

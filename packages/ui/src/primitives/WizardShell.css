@@ -53,18 +53,11 @@
 }
 .nh-wizard-detail-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
 .nh-wizard-detail-body { min-width: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-/* Master-detail return link — the same affordance the Codex workspace uses. */
-.nh-wizard-detail-back {
-  display: none;
-  align-self: flex-start;
-  min-height: var(--tap-min);
-  padding: 0 var(--space-2);
-  border: 0;
-  background: none;
-  color: var(--cyan);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
+/* The master-detail pair. Both are `Button variant="ghost"` — the system's quiet text
+   action — so they get their look, hover, and 44px hit area from `.nh-btn`; these rules
+   only place them, and hide each one at the width where it makes no sense. */
+.nh-wizard-detail-open { display: none; margin-bottom: var(--space-3); }
+.nh-wizard-detail-back { display: none; align-self: flex-start; }
 
 .nh-wizard-foot {
   position: sticky;
@@ -90,11 +83,14 @@
   margin: 0;
   min-height: 1.2em;
   text-align: center;
-  color: var(--danger-hi);
+  /* "Not finished yet" is CAUTION (violet), not danger: rose-red means damage and
+     destruction (§2). Nothing has gone wrong here — a step is simply incomplete. */
+  color: var(--caution-hi);
   font-size: var(--fs-sm);
 }
-.nh-wizard-blocked-icon { flex: none; }
+.nh-wizard-blocked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
 .nh-wizard-blocked.is-clear { color: transparent; }
+.nh-wizard-blocked.is-clear .nh-wizard-blocked-icon { display: none; }
 
 .nh-wizard-footnote {
   margin: 0;
@@ -105,11 +101,13 @@
 }
 
 /* ---- Narrow: master-detail. Showing both panes stacked would mean two half-read
-   columns; the Codex workspace already solved this by swapping them. ---- */
-@media (max-width: 900px) {
+   columns; the Codex workspace already solved this by swapping them. 760 is the
+   documented phone/laptop step — the same one Steps uses to swap its two forms, so
+   the rail and the split now change together instead of 140px apart. ---- */
+@media (max-width: 760px) {
   .nh-wizard-body--split.has-detail .nh-wizard-main { display: none; }
   .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail { display: none; }
-  .nh-wizard-detail-back { display: block; }
+  .nh-wizard-detail-open, .nh-wizard-detail-back { display: inline-flex; }
 }
 
 @media (max-width: 560px) {
@@ -122,7 +120,7 @@
 }
 
 /* ---- Laptop: a full page inside the app shell, not a floating card ---- */
-@media (min-width: 901px) {
+@media (min-width: 761px) {
   .nh-wizard-body--split {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);

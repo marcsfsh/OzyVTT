@@ -25,9 +25,12 @@
 }
 .nh-segmented--sm .nh-segmented-option { min-height: 1.85rem; padding: var(--space-1) var(--space-2); }
 .nh-segmented-option:hover { color: var(--text); }
+/* Pressed = a lifted surface + full-strength text. NO glow: this control is a filter,
+   and it lives in the same region as the answer it filters (a ChoiceCard grid, whose
+   selected card glows cyan). Two cyan glows in one region breaks §8.1, and the louder
+   of the two was the one that isn't the answer. */
 .nh-segmented-option[aria-pressed="true"] {
   background: var(--surface-3);
   color: var(--text);
-  box-shadow: var(--glow-cyan);
 }
 .nh-segmented-icon { font-size: 1em; line-height: 1; }

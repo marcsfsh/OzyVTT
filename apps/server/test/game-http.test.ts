@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,6 +20,31 @@ import { createServer } from "../src/server.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECRET_ID = "10000000-0000-4000-8000-000000000002";
+
+/**
+ * One `socket.on(...)` registration: the event name and the shared operation it dispatches to (the
+ * operation is where the real authorization gate lives, so the twin check below can compare it).
+ * The event class is deliberately `[^"]+` - anything quoted counts, so a name this codebase does not
+ * currently use (camelCase, underscores) FAILS the guard rather than disappearing from the scrape.
+ */
+function scrapeSocketHandlers(source: string): ReadonlyArray<{ event: string; operation: string | null }> {
+  const handlers: Array<{ event: string; operation: string | null }> = [];
+  for (const line of source.split("\n")) {
+    const registration = /socket\.on\("([^"]+)"/.exec(line);
+    if (!registration) continue;
+    handlers.push({ event: registration[1], operation: /operations\.([A-Za-z0-9_]+)\(/.exec(line)?.[1] ?? null });
+  }
+  return handlers;
+}
+
+/** True when the shared operation refuses a player session outright (`requireGmGrade`) - the socket's actual read gate. */
+const operationsSource = readFileSync(fileURLToPath(new URL("../src/game-operations.ts", import.meta.url)), "utf8");
+function gmOnlyOperation(method: string): boolean {
+  const start = [`\n    ${method}(`, `\n    async ${method}(`].map((marker) => operationsSource.indexOf(marker)).find((index) => index >= 0);
+  if (start === undefined) throw new Error(`operations.${method} was not found in game-operations.ts`);
+  const end = operationsSource.indexOf("\n    },", start);
+  return operationsSource.slice(start, end === -1 ? undefined : end).includes("requireGmGrade");
+}
 
 function png(width: number, height: number) {
   const buffer = Buffer.alloc(24);
@@ -327,6 +352,18 @@ describe("public game API over /api/v1", () => {
     const spellsBody = await spells.json();
     expect(spellsBody.data.spells.length).toBeGreaterThan(100);
     expect(spellsBody.data.spells[0]).toHaveProperty("castingOptions");
+    // ADR-0015: every displaying surface shows the BUNDLE's canonical statement - author, source URL
+    // and license URI - so no client has to hand-write a weaker paraphrase of it. Spells and
+    // conditions shipped without it while the six builder catalogs carried it.
+    expect(spellsBody.data.attribution).toContain("System Reference Document 5.2.1");
+    expect(spellsBody.data.attribution).toContain("Wizards of the Coast");
+    expect(spellsBody.data.attribution).toContain("creativecommons.org/licenses/by/4.0");
+
+    const conditions = await fetch(base + CONTENT_PATHS.conditions, { headers: bearer(playerToken) });
+    expect(conditions.status).toBe(200);
+    const conditionsBody = await conditions.json();
+    expect(conditionsBody.data.conditions.length).toBeGreaterThan(5);
+    expect(conditionsBody.data.attribution).toContain("System Reference Document 5.2.1");
 
     const equipment = await fetch(base + CONTENT_PATHS.equipment, { headers: bearer(playerToken) });
     expect(equipment.status).toBe(200);
@@ -704,14 +741,37 @@ describe("public game API over /api/v1", () => {
     }
   });
 
+  it("scrapes socket handlers by any event name, so an unconventional one fails instead of vanishing", () => {
+    // The guard below is only worth its green tick if it can SEE every handler. The original
+    // character class (`[a-z0-9:-]+`) silently matched nothing for a camelCase or underscored event
+    // name, so such a handler would ship socket-only with the guard still passing - the exact failure
+    // mode the guard exists to prevent. `[^"]+` turns that silence into a failure.
+    const synthetic = [
+      `    socket.on("codex:setPage", (payload, acknowledge) => respond(acknowledge, "x", "y", (principal) => operations.codexSetPage(principal, payload)));`,
+      `    socket.on("codex:set_page", (payload, acknowledge) => respond(acknowledge, "x", "y", (principal) => operations.codexSetPage(principal, payload)));`
+    ].join("\n");
+    expect(scrapeSocketHandlers(synthetic).map((handler) => handler.event)).toEqual(["codex:setPage", "codex:set_page"]);
+    // The old narrow class saw neither, which is what made the blind spot silent.
+    expect([...synthetic.matchAll(/socket\.on\("([a-z0-9:-]+)"/g)].map((match) => match[1])).toEqual([]);
+    // And once they ARE seen, the guard's own assertion rejects them: neither is a cataloged command.
+    for (const handler of scrapeSocketHandlers(synthetic)) expect(Object.keys(GAME_COMMAND_SCOPES)).not.toContain(handler.event.replace(":", "."));
+  });
+
   it("gives every Socket.IO capability an HTTP twin - no socket-only capability (ADR-0016)", () => {
     // The guard the earlier debt slipped past: the route-table test above compares
     // GAME_COMMAND_SCOPES <-> typed routes <-> OpenAPI, so a capability that never entered
     // GAME_COMMAND_SCOPES was invisible to all three (character.submit-import / resolve-import,
     // content:spells, content:equipment all shipped socket-only that way). This test starts from the
     // OTHER end - the socket surface itself - and demands each event reach the public API.
-    const source = readFileSync(fileURLToPath(new URL("../src/server.ts", import.meta.url)), "utf8");
-    const events = [...source.matchAll(/socket\.on\("([a-z0-9:-]+)"/g)].map((match) => match[1]);
+    //
+    // The scrape covers EVERY module under src/, not just server.ts: a handler registered from a
+    // feature module (the codex, a future importer) is a socket capability like any other, and
+    // reading one file would leave it invisible here.
+    const sourceDirectory = fileURLToPath(new URL("../src/", import.meta.url));
+    const handlers = readdirSync(sourceDirectory)
+      .filter((file) => file.endsWith(".ts"))
+      .flatMap((file) => scrapeSocketHandlers(readFileSync(join(sourceDirectory, file), "utf8")));
+    const events = handlers.map((handler) => handler.event);
     expect(events.length).toBeGreaterThan(80); // the scrape actually found the handlers
 
     // Reads and session issuance aren't commands, so each names the documented operation serving the same data.
@@ -733,12 +793,27 @@ describe("public game API over /api/v1", () => {
       "content:names": [CONTENT_PATHS.names, "get"]
     };
     const TRANSPORT_ONLY = new Set(["disconnect"]); // Socket.IO lifecycle, not a game capability
+    // `session:join` is how a socket PRESENTS a token; its HTTP twin MINTS one (the GM issues player
+    // sessions), so the two are deliberately gated differently and the authorization comparison below
+    // does not apply. Every other read must serve the same audience on both transports.
+    const AUTHORIZATION_EXEMPT = new Set(["session:join"]);
 
-    for (const event of events) {
+    for (const handler of handlers) {
+      const event = handler.event;
       if (TRANSPORT_ONLY.has(event)) continue;
       const twin = READ_TWINS[event];
       if (twin) {
         expect(openApiDocument.paths, `socket read "${event}" has no documented HTTP twin`).toHaveProperty([twin[0], twin[1]]);
+        if (AUTHORIZATION_EXEMPT.has(event)) continue;
+        // A twin that merely EXISTS is not a twin: it has to admit the same callers. The socket's
+        // real gate is the shared operation it dispatches to (`requireGmGrade` or not), so compare
+        // that against the documented security - a GM-only read must not offer `playerAuth`, and a
+        // table-wide read must. Without this, documenting a GM-only bestiary as player-readable (or
+        // locking a builder catalog a player needs) passes unnoticed.
+        expect(handler.operation, `socket read "${event}" does not dispatch to a shared operation`).not.toBeNull();
+        const documented = (openApiDocument.paths as unknown as Record<string, Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>>)[twin[0]][twin[1]];
+        const playerReachable = (documented.security ?? []).some((entry) => "playerAuth" in entry);
+        expect(playerReachable, `socket read "${event}" and ${twin[1].toUpperCase()} ${twin[0]} disagree on who may read it`).toBe(!gmOnlyOperation(handler.operation!));
         continue;
       }
       // Every other event is a mutation: the socket name and the command type are the same string
@@ -747,6 +822,6 @@ describe("public game API over /api/v1", () => {
       expect(Object.keys(GAME_COMMAND_SCOPES), `socket command "${event}" is not in GAME_COMMAND_SCOPES (socket-only capability)`).toContain(commandType);
     }
     // And nothing in the read table is stale.
-    for (const event of Object.keys(READ_TWINS)) expect(events, `READ_TWINS lists "${event}", which server.ts no longer handles`).toContain(event);
+    for (const event of Object.keys(READ_TWINS)) expect(events, `READ_TWINS lists "${event}", which the server no longer handles`).toContain(event);
   });
 });

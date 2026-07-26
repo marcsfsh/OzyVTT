@@ -36,8 +36,12 @@
 .scenes-maps-view { display: flex; flex-direction: column; gap: var(--space-3); }
 .scenes-back { align-self: flex-start; }
 
-/* Drag-to-reorder handle (pointer + touch); keyboard reorder uses the ⋯ menu's Move earlier/later. */
+/* Drag-to-reorder handle (pointer + touch); keyboard reorder uses the ⋯ menu's Move earlier/later.
+   It matches its neighbour the ⋯ trigger by construction: same 1.75rem square paint, same 44px hit
+   area from the same `.tap-target` recipe (§4 route 2). @vtt/ui owns the ⋯ side of the pair now
+   (`.nh-card-tools .nh-menu-trigger` in Menu.css), so the app no longer overrides the primitive. */
 .scene-card-grip {
+  position: relative;
   display: grid;
   place-items: center;
   width: 1.75rem;
@@ -53,27 +57,19 @@
   touch-action: none;
   transition: color var(--dur-hover), background var(--dur-hover);
 }
+.scene-card-grip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--tap-min));
+  height: max(100%, var(--tap-min));
+  transform: translate(-50%, -50%);
+}
 .scene-card-grip:hover { color: var(--text); background: var(--surface-2); }
 .scene-card-grip:active { cursor: grabbing; }
 .scene-card-grip:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
 .nh-card.is-dragging { opacity: .55; }
-
-/* Match the ⋯ menu trigger to the drag grip: a square, centered icon button (its @vtt/ui default is a
-   wider padded pill), so the two tools read as an even pair. */
-.scene-gallery-hub .nh-card-tools .nh-menu-trigger {
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  gap: 0;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  border-color: var(--line);
-  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  font-size: 1rem;
-  line-height: 1;
-}
-.scene-gallery-hub .nh-card-tools .nh-menu-trigger-label { display: grid; place-items: center; line-height: 1; }
 
 /* Lift a card whose ⋯ menu is open above its neighbours so the popover isn't clipped behind them. */
 .scene-gallery-hub .nh-card:has(details[open]) { z-index: 5; }

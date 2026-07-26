@@ -11,6 +11,10 @@ export interface MenuProps {
   /** Accessible name when the trigger is icon-only. */
   label?: string;
   hideCaret?: boolean;
+  /** Icon-square trigger: a compact 1.75rem square instead of the padded pill, for
+      dense tool clusters (the ⋯ beside a card's drag grip). The 44px floor is met by
+      the hit AREA, not the paint — see Menu.css. Implies `hideCaret`. */
+  icon?: boolean;
   className?: string;
   triggerClassName?: string;
 }
@@ -18,7 +22,7 @@ export interface MenuProps {
 /** Disclosure menu built on native <details>/<summary> (§7.6): the caret rotates
     on open, the popover eases in, and it closes on Escape, outside-click, or item
     activation. Default marker is hidden. */
-export function Menu({ trigger, children, align = "start", label, hideCaret = false, className, triggerClassName }: MenuProps) {
+export function Menu({ trigger, children, align = "start", label, hideCaret = false, icon = false, className, triggerClassName }: MenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -48,9 +52,9 @@ export function Menu({ trigger, children, align = "start", label, hideCaret = fa
 
   return (
     <details ref={ref} className={cx("nh-menu", `nh-menu--${align}`, className)}>
-      <summary className={cx("nh-menu-trigger", "interactive", triggerClassName)} aria-label={label} aria-haspopup="menu">
+      <summary className={cx("nh-menu-trigger", icon && "nh-menu-trigger--icon", "interactive", triggerClassName)} aria-label={label} aria-haspopup="menu">
         <span className="nh-menu-trigger-label">{trigger}</span>
-        {!hideCaret && <span className="nh-menu-caret" aria-hidden="true">▾</span>}
+        {!hideCaret && !icon && <span className="nh-menu-caret" aria-hidden="true">▾</span>}
       </summary>
       <div className="nh-menu-popover anim-popover" role="menu" onClick={closeAfterItem}>
         {children}

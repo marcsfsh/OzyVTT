@@ -37,11 +37,55 @@ describe("character edit", () => {
     setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 4 }], feats: [], choices: [{ level: 4, kind: "feat", id: "alert" }] });
     expect(state.definitions[0].definition.character?.choices).toEqual([{ level: 4, kind: "feat", id: "alert" }]);
   });
+  it("preserves hit dice and the other classes when a single-class editor saves identity", () => {
+    const state = stateWith();
+    // A Fighter 3 / Wizard 2 as the builder (or an import) recorded it, hit dice and all.
+    setCharacterIdentity(state, actorId, { classes: [
+      { id: "fighter", name: "Fighter", level: 3, hitDie: "d10" },
+      { id: "wizard", name: "Wizard", level: 2, hitDie: "d6" }
+    ], feats: [] });
+    // The sheet's identity editor renders one class and knows nothing about `hitDie`.
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 4 }], feats: [] });
+    const classes = state.definitions[0].definition.character?.classes;
+    expect(classes).toEqual([
+      { id: "fighter", name: "Fighter", level: 4, hitDie: "d10" },
+      { id: "wizard", name: "Wizard", level: 2, hitDie: "d6" }
+    ]);
+  });
+  it("lets a supplied class row clear a subclass it renders (only omission preserves)", () => {
+    const state = stateWith();
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 3, subclass: { id: "champion", name: "Champion" }, hitDie: "d10" }], feats: [] });
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 3 }], feats: [] });
+    // hitDie (which no editor renders) survives; the subclass the editor DID render is cleared.
+    expect(state.definitions[0].definition.character?.classes[0]).toEqual({ id: "fighter", name: "Fighter", level: 3, hitDie: "d10" });
+  });
   it("sets save and skill proficiency selections", () => {
     const state = stateWith();
     setCharacterProficiencies(state, actorId, { saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "expertise" }] });
     expect(state.definitions[0].definition.proficiencies?.skills[0]).toMatchObject({ id: "athletics", proficiency: "expertise" });
     expect(state.definitions[0].definition.proficiencies?.saves).toEqual(["str", "con"]);
+  });
+  it("preserves training and override totals when the sheet toggles one skill", () => {
+    const state = stateWith();
+    // A full proficiency block as an import/builder writes it.
+    setCharacterProficiencies(state, actorId, {
+      saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "proficient" }],
+      armor: ["heavy"], weapons: ["martial"], tools: ["smiths-tools"], languages: ["common", "dwarvish"],
+      saveOverrides: { str: 7 }, skillOverrides: { athletics: 9 }
+    });
+    // The sheet's proficiency editor sends ONLY {saves, skills} - one skill toggle must not wipe the rest.
+    setCharacterProficiencies(state, actorId, { saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "expertise" }] });
+    expect(state.definitions[0].definition.proficiencies).toEqual({
+      saves: ["str", "con"], skills: [{ id: "athletics", proficiency: "expertise" }],
+      armor: ["heavy"], weapons: ["martial"], tools: ["smiths-tools"], languages: ["common", "dwarvish"],
+      saveOverrides: { str: 7 }, skillOverrides: { athletics: 9 }
+    });
+  });
+  it("lets a caller that supplies training replace it (explicit beats stored)", () => {
+    const state = stateWith();
+    setCharacterProficiencies(state, actorId, { saves: [], skills: [], armor: ["heavy"], languages: ["common"] });
+    setCharacterProficiencies(state, actorId, { saves: [], skills: [], armor: [], languages: ["common", "elvish"] });
+    expect(state.definitions[0].definition.proficiencies).toMatchObject({ armor: [], languages: ["common", "elvish"] });
   });
   it("refuses to edit a shared bundle definition (only import-<actorId> is editable)", () => {
     const state = stateWith("bundle-goblin");

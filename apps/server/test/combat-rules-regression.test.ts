@@ -1826,7 +1826,8 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
   it("a long rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
     const game = buildRestingGame(2, 10);
     applyRest(game, HERO, "long", resolveTorva(game));
-    expect(game.actors[0].hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7 });
+    // The stored save uses the pre-multiclass single-object shape; it normalises into a one-entry pool.
+    expect(game.actors[0].hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7, entries: [{ die: "d12", maximum: 7, remaining: 7 }] });
     expect(game.actors[0].hp.current).toBe(75);
   });
 
@@ -1835,7 +1836,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
     const OWNER = "30000000-0000-4000-8000-00000000000b";
     game.actors[0].ownerSessionId = OWNER;
     const ownView = projectPlayerView(game, OWNER, () => null).actors[0];
-    expect(ownView.hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7 });
+    expect(ownView.hitDice).toEqual({ die: "d12", maximum: 7, remaining: 7, entries: [{ die: "d12", maximum: 7, remaining: 7 }] });
     const strangerView = projectPlayerView(game, "30000000-0000-4000-8000-00000000000c", () => null).actors[0];
     expect("hitDice" in strangerView).toBe(false);
     // Pre-hit-dice saves parse with the null default (additive-state pattern).

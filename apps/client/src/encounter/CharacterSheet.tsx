@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
@@ -202,7 +202,15 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
-  const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
+  // One draft row per class the character HAS (multiclass is decision #2 of the builder packet), not
+  // just the first. `id` is sticky: a row loaded from the sheet keeps its stored class id even when
+  // the name is retyped, so fixing a typo edits that class instead of minting a second one; a row the
+  // user adds here has no id yet and gets one slugified from its name on save. `hitDie` rides along
+  // untouched (nothing on this sheet edits it) so the multiclass Hit-Dice pool survives an identity edit.
+  type ClassDraft = { key: string; id: string | null; name: string; subclass: string; level: number; hitDie?: "d4" | "d6" | "d8" | "d10" | "d12" };
+  const blankClassDraft = (): ClassDraft => ({ key: newId(), id: null, name: "", subclass: "", level: 1 });
+  const [idDraft, setIdDraft] = useState<{ classes: ClassDraft[]; race: string; background: string }>({ classes: [], race: "", background: "" });
+  const editClassDraft = (key: string, patch: Partial<ClassDraft>) => setIdDraft((draft) => ({ ...draft, classes: draft.classes.map((row) => row.key === key ? { ...row, ...patch } : row) }));
   // Roll-entry settings (feedback #8), remembered per browser: "digital" click-to-roll vs "manual" (you
   // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
   // The one per-browser dice-input preference, shared with every other roll surface (saves, attacks, the
@@ -431,19 +439,41 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   };
   const toggleSave = (ability: string) => { const next = { ...profDraft, saves: profDraft.saves.includes(ability) ? profDraft.saves.filter((entry) => entry !== ability) : [...profDraft.saves, ability] }; setProfDraft(next); persistProficiencies(next); };
   const cycleSkill = (id: string) => { const current = profDraft.skills[id]; const tier = current === undefined ? "proficient" : current === "proficient" ? "expertise" : undefined; const skills = { ...profDraft.skills }; if (tier) skills[id] = tier; else delete skills[id]; const next = { ...profDraft, skills }; setProfDraft(next); persistProficiencies(next); };
-  const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
-  const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
-    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as proficiencies).
-    if (definitionId && definition) { const nextDef = { ...definition, character: next }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
+  const openIdEditor = () => {
+    const rows = (character?.classes ?? []).map((klass, index) => ({ key: `${klass.id}-${index}`, id: klass.id, name: klass.name, subclass: klass.subclass?.name ?? "", level: klass.level, hitDie: klass.hitDie }));
+    setIdDraft({ classes: rows.length > 0 ? rows : [blankClassDraft()], race: character?.race?.name ?? "", background: character?.background?.name ?? "" });
+    setEditMode("identity");
+  };
+  const saveIdentity = () => {
+    const classes = idDraft.classes.filter((row) => row.name.trim().length > 0).map((row) => ({
+      id: row.id ?? slugify(row.name), name: row.name.trim(),
+      ...(row.subclass.trim() ? { subclass: { id: slugify(row.subclass), name: row.subclass.trim() } } : {}),
+      level: row.level,
+      ...(row.hitDie ? { hitDie: row.hitDie } : {})
+    // Class id is the key the server merges rows on, so two rows that resolve to the same id (an
+    // added row retyped to match an existing class) must not both ship - the first one wins.
+    })).filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index);
+    const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
+    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as
+    // proficiencies). Spread over the STORED identity, not a bare replacement, so the optimistic copy
+    // mirrors the server's carry-forward merge (the builder's `choices` ledger stays put locally too).
+    if (definitionId && definition) { const nextDef = { ...definition, character: { ...character, ...next } }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
     setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
   // The sheet's own scrolling content (one column of the workspace below). Identity + roll settings now
   // live in the fixed header/rollbar; only the identity EDIT FORM stays inline in the scroll.
   const sheetScroll = (<div className="sheet-scroll">
       {editMode === "identity" && <div className="sheet-editor sheet-id-editor">
-          <label>Class<input type="text" value={idDraft.className} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, className: event.target.value }))} /></label>
-          <label>Subclass<input type="text" value={idDraft.subclass} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, subclass: event.target.value }))} /></label>
-          <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
+          {/* Every class the character has gets its own Class/Subclass/Level trio - a multiclass sheet
+              is edited whole, so saving can never delete the classes this form didn't render. The
+              labels wrap in the existing flex row, so extra classes stay usable on a phone. */}
+          {idDraft.classes.map((row, index) => { const n = idDraft.classes.length > 1 ? ` ${index + 1}` : ""; return <Fragment key={row.key}>
+            <label>Class{n}<input type="text" value={row.name} maxLength={60} onChange={(event) => editClassDraft(row.key, { name: event.target.value })} /></label>
+            <label>Subclass{n}<input type="text" value={row.subclass} maxLength={60} onChange={(event) => editClassDraft(row.key, { subclass: event.target.value })} /></label>
+            <label>Level{n}<input type="number" min="1" max="20" value={row.level} onChange={(event) => editClassDraft(row.key, { level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) })} /></label>
+          </Fragment>; })}
+          {/* The schema allows up to four classes; dropping one is a respec, which the builder owns. */}
+          {idDraft.classes.length < 4 && <Button size="sm" variant="ghost" onClick={() => setIdDraft((draft) => ({ ...draft, classes: [...draft.classes, blankClassDraft()] }))}>Add a class</Button>}
           <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
           <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
           <Button size="sm" disabled={busy} onClick={saveIdentity}>Save</Button>

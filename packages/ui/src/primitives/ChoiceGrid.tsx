@@ -42,9 +42,11 @@ export interface ChoiceGridProps {
   facetLabel?: string;
   facetAllValue?: string;
 
-  /** Optional detail pane rendered beside the grid (the selected option's full text). */
-  detail?: ReactNode;
-  detailTitle?: ReactNode;
+  /* NO detail pane. A grid of a dozen cards plus a detail column has exactly one
+     honest narrow-screen layout — master-detail — and `WizardShell` already owns it
+     (`detail` / `detailOpen` / `onOpenDetail`). Stacking a detail after the cards, as
+     this used to, meant scrolling past every card to read the one you just tapped.
+     Pass the detail to the shell instead: one idea, one place. */
 
   emptyTitle?: string;
   emptyText?: string;
@@ -54,7 +56,7 @@ export interface ChoiceGridProps {
   className?: string;
 }
 
-/** Faceted picker: search + facets + a `ChoiceCard` grid + an optional detail pane.
+/** Faceted picker: search + facets + a `ChoiceCard` grid.
     The closest existing surface is MonsterBrowser, which is a flat undebounced list;
     this fixes the three things that made it feel cheap:
 
@@ -69,7 +71,6 @@ export function ChoiceGrid({
   options, value, onChange, ariaLabel,
   searchable = true, searchPlaceholder = "Search…", searchDelay = 160,
   facets, facetValue, onFacetChange, facetLabel = "Filter", facetAllValue = "all",
-  detail, detailTitle,
   emptyTitle = "No matches", emptyText = "Try a different search or clear the filters.", emptyAction,
   className
 }: ChoiceGridProps) {
@@ -121,7 +122,7 @@ export function ChoiceGrid({
   };
 
   return (
-    <div className={cx("nh-choicegrid", detail != null && "nh-choicegrid--split", className)}>
+    <div className={cx("nh-choicegrid", className)}>
       <div className="nh-choicegrid-picker">
         {(searchable || facets) && (
           <div className="nh-choicegrid-controls">
@@ -180,13 +181,6 @@ export function ChoiceGrid({
           </div>
         )}
       </div>
-
-      {detail != null && (
-        <aside className="nh-choicegrid-detail" aria-label={typeof detailTitle === "string" ? detailTitle : "Details"}>
-          {detailTitle != null && <h3 className="nh-choicegrid-detail-title">{detailTitle}</h3>}
-          <div className="nh-choicegrid-detail-body">{detail}</div>
-        </aside>
-      )}
     </div>
   );
 }

@@ -132,6 +132,79 @@ export type Currency = z.infer<typeof CurrencySchema>;
 /** A live spell-slot pool for one slot level (remaining out of the definition's maximum). */
 export const SpellSlotSchema = z.object({ level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9) }).strict();
 
+/** Faces per hit-die size, so a mixed pool can name its largest die without a second lookup table. */
+const HIT_DIE_FACES: Readonly<Record<string, number>> = Object.freeze({ d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 });
+
+/** ONE size of Hit Point Die a creature carries: a Fighter 3 / Wizard 2 has a 3×d10 entry AND a 2×d6 entry. */
+export const HitDiceEntrySchema = z.object({
+  die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]),
+  maximum: z.number().int().min(1).max(40),
+  remaining: z.number().int().min(0).max(40)
+}).strict();
+export type HitDiceEntry = z.infer<typeof HitDiceEntrySchema>;
+
+/**
+ * Normalise every accepted Hit-Dice input to the pool shape, so the field grows additively without a
+ * schemaVersion bump (ADR-0007). Three inputs are accepted:
+ *   - `{die, maximum, remaining}`             — a save written before multiclass pools existed.
+ *   - `[{die, maximum, remaining}, …]`        — a bare pool array.
+ *   - `{die, maximum, remaining, entries[]}`  — the current shape; the summary is RE-DERIVED here, never
+ *                                               trusted, so a hand-written summary cannot drift.
+ * Malformed input is passed straight through so Zod reports the real error instead of this helper.
+ */
+function normaliseHitDicePool(input: unknown): unknown {
+  if (input === null || input === undefined || typeof input !== "object") return input;
+  // Order matters: `"entries" in []` is TRUE (arrays inherit Array.prototype.entries), so the bare-array
+  // case must be settled before the carrier is inspected, and the carrier check must be own-property.
+  let source: unknown[];
+  if (Array.isArray(input)) source = input;
+  else if (Object.prototype.hasOwnProperty.call(input, "entries")) {
+    const carried = (input as { entries: unknown }).entries;
+    if (!Array.isArray(carried)) return input;
+    source = carried;
+  } else source = [input];
+  if (source.length === 0) return input;
+  const entries: unknown[] = [];
+  let maximum = 0;
+  let remaining = 0;
+  let largestFaces = -1;
+  let die: unknown;
+  for (const candidate of source) {
+    if (candidate === null || typeof candidate !== "object") return input;
+    const { die: entryDie, maximum: entryMaximum, remaining: entryRemaining } = candidate as Record<string, unknown>;
+    if (typeof entryDie !== "string" || typeof entryMaximum !== "number" || typeof entryRemaining !== "number") return input;
+    entries.push({ die: entryDie, maximum: entryMaximum, remaining: entryRemaining });
+    maximum += entryMaximum;
+    remaining += entryRemaining;
+    const faces = HIT_DIE_FACES[entryDie] ?? 0;
+    if (faces > largestFaces) { largestFaces = faces; die = entryDie; }
+  }
+  return { die, maximum, remaining, entries };
+}
+
+/**
+ * A live Hit Point Dice POOL (SRD Hit Point Dice). `entries` is the truth: a multiclass sheet carries
+ * several die sizes at once (Fighter 3 / Wizard 2 = 3d10 + 2d6), which one `{die, maximum}` could not
+ * express — it silently dropped every class after the first.
+ *
+ * `die`/`maximum`/`remaining` are a DERIVED summary kept for the pre-multiclass readers: the TOTAL
+ * number of dice in the pool, labelled with the largest size present. They are recomputed from
+ * `entries` on every parse, so summary and pool cannot drift — never write them by hand, build the
+ * pool with `makeHitDicePool`.
+ */
+export const HitDicePoolSchema = z.preprocess(normaliseHitDicePool, z.object({
+  die: HitDiceEntrySchema.shape.die,
+  maximum: z.number().int().min(1).max(240),
+  remaining: z.number().int().min(0).max(240),
+  entries: z.array(HitDiceEntrySchema).min(1).max(6)
+}).strict().nullable());
+export type HitDicePool = NonNullable<z.infer<typeof HitDicePoolSchema>>;
+
+/** Build a pool (summary included) from per-die entries. An empty pool is `null` — "not modeled". */
+export function makeHitDicePool(entries: readonly HitDiceEntry[]): HitDicePool | null {
+  return entries.length === 0 ? null : HitDicePoolSchema.parse(entries) as HitDicePool;
+}
+
 export const ActorSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(120),
@@ -164,8 +237,8 @@ export const ActorSchema = z.object({
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary resources seeded from the definition (SRD 2024): per-round legendary actions and Legendary Resistance per day. GM knowledge - stripped from player projections. Additive. */
   legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional(),
-  /** Short-rest healing pool (SRD Hit Point Dice), seeded from the definition's hit-point formula; null = not modeled (rests behave as before). Reaches players only on their own claimed character. Additive. */
-  hitDice: z.object({ die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]), maximum: z.number().int().min(1).max(40), remaining: z.number().int().min(0).max(40) }).strict().nullable().default(null),
+  /** Short-rest healing pool (SRD Hit Point Dice), seeded from the sheet's per-class hit dice (or a monster's hit-point formula); null = not modeled (rests behave as before). A pre-multiclass single-object save normalises into a one-entry pool on load — see HitDicePoolSchema. Reaches players only on their own claimed character. Additive. */
+  hitDice: HitDicePoolSchema.default(null),
   /** Per-token health-display override; absent = inherit the table-wide `combat.healthDisplay`. GM knowledge - resolved and audience-gated in the player/viewer projections. Additive. */
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch-ms timestamp of when this actor last entered a fight (encounter start / add-combatant). Powers the scene-setup "Recent" list; GM-only, stripped from the player projection. Additive. */
@@ -380,7 +453,9 @@ export type ClassSpellcasting = z.infer<typeof ClassSpellcastingSchema>;
  *      source of truth for every sheet written before `classes[]` existed.
  * A builder that fills `classes[]` MUST also keep the top-level fields populated (mirror the primary
  * caster) so older consumers keep working; `classes` is purely additive and defaults to empty.
- * Slot pools are NOT per class: the top-level `slots`/`pact` remain the character's single live pool.
+ * Slot pools are NOT per class: the top-level `slots`/`pact` remain the character's single live pool,
+ * and the superRefine below ENFORCES that - per-class slots without the combined top-level pool is a
+ * parse error, not a caster who silently seeds zero slots.
  */
 const SpellcastingSchema = z.object({
   ability: AbilitySchema,
@@ -397,7 +472,16 @@ const SpellcastingSchema = z.object({
     /** Which class granted this spell, so the resolution order above can pick the right ability. Additive. */
     classId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional()
   }).strict()).max(400).default([])
-}).strict();
+}).strict().superRefine((spellcasting, context) => {
+  // ENFORCE the contract documented above. A builder that fills per-class `slots` but leaves the
+  // top-level pool empty produces a "modeled caster with zero slots": the live actor seeds
+  // `spellSlots: []` and a long rest restores nothing. Failing loudly at parse time beats shipping a
+  // caster who cannot cast.
+  const perClassSlots = (spellcasting.classes ?? []).some((entry) => (entry.slots ?? []).length > 0);
+  if (perClassSlots && spellcasting.slots.length === 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["slots"], message: "A sheet with per-class spell slots must also carry the combined top-level slots (the character's single live pool)." });
+  }
+});
 export type Spellcasting = z.infer<typeof SpellcastingSchema>;
 
 /**
@@ -409,7 +493,10 @@ export function resolveSpellcasting(spellcasting: Spellcasting | undefined, clas
   if (!spellcasting) return undefined;
   const entries = spellcasting.classes ?? [];
   const match = classId ? entries.find((entry) => entry.classId === classId) : undefined;
-  const chosen = match ?? (entries.length === 1 ? entries[0] : undefined);
+  // Step 2 (the lone-entry shortcut) may fire ONLY when the caller named no class. Asking for
+  // "fighter" on an Eldritch Knight / Wizard sheet must never be answered with the Wizard's INT and
+  // DC - an unmatched request falls through to step 3, the top-level (primary caster) fields.
+  const chosen = match ?? (classId === undefined && entries.length === 1 ? entries[0] : undefined);
   if (chosen) return { classId: chosen.classId, ability: chosen.ability, saveDc: chosen.saveDc ?? spellcasting.saveDc, attackBonus: chosen.attackBonus ?? spellcasting.attackBonus };
   return { ability: spellcasting.ability, saveDc: spellcasting.saveDc, attackBonus: spellcasting.attackBonus };
 }

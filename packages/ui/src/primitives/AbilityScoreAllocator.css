@@ -35,7 +35,7 @@
   color: var(--text-muted);
   font: 800 var(--fs-xs) / 1.4 var(--font-body);
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: var(--tracking-eyebrow);
 }
 .nh-abil-head > span:not(:first-child):not(:nth-child(2)) { text-align: right; }
 
@@ -46,13 +46,13 @@
   background: var(--surface-1);
 }
 .nh-abil-name { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
-.nh-abil-abbr { color: var(--text); font: 700 var(--fs-body) / 1 var(--font-mono); letter-spacing: .04em; }
+.nh-abil-abbr { color: var(--text); font: 700 var(--fs-body) / 1 var(--font-mono); letter-spacing: var(--tracking-display); }
 .nh-abil-full { color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .nh-abil-cell { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-width: 0; }
 .nh-abil-cell--control { justify-content: flex-start; }
 /* Micro-labels exist for the stacked phone layout; the header row covers desktop. */
-.nh-abil-cell-label { display: none; color: var(--text-muted); font: 800 var(--fs-2xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: .05em; }
+.nh-abil-cell-label { display: none; color: var(--text-muted); font: 800 var(--fs-2xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 .nh-abil-select { max-width: 7rem; }
 
 .nh-abil-num { color: var(--text-dim); font-size: var(--fs-body); font-weight: 700; }
@@ -61,8 +61,9 @@
 :root[data-theme="light"] .nh-abil-num--mod { color: var(--cyan); }
 .nh-abil-note { grid-column: 1 / -1; color: var(--text-muted); font-size: var(--fs-xs); }
 
-/* ---- Phone: each ability becomes a small card with its own labels ---- */
-@media (max-width: 700px) {
+/* ---- Phone: each ability becomes a small card with its own labels.
+   650 is the documented "dense table folds" step in the ladder (760/650/560/850/980). ---- */
+@media (max-width: 650px) {
   .nh-abil-head { display: none; }
   .nh-abil-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));

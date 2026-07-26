@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { cx } from "./util";
 import { Button } from "./Button";
+import { IconWarning } from "./icons";
 import { Steps, type StepItem } from "./Steps";
 import "./WizardShell.css";
 
@@ -34,12 +35,19 @@ export interface WizardShellProps {
   /** Resume-draft affordance slot: an Alert, a Button, whatever the flow needs. */
   resume?: ReactNode;
 
-  /** Optional detail/preview pane beside the step body. */
+  /** Optional detail/preview pane beside the step body. This is the ONE detail pane
+      in a guided flow — `ChoiceGrid` deliberately has none, so a phone never has to
+      scroll past the whole grid to read what it just picked. */
   detail?: ReactNode;
   detailTitle?: ReactNode;
   /** Narrow screens are master-detail (mirroring the Codex workspace): the detail
       pane replaces the body when this is true, with a back link to the list. */
   detailOpen?: boolean;
+  /** The narrow-screen way IN. Rendered above the step body below 760px (where the
+      pane is hidden) so every consumer gets the same affordance instead of
+      hand-rolling a "Show preview" button. */
+  onOpenDetail?: () => void;
+  detailOpenLabel?: string;
   onCloseDetail?: () => void;
   detailBackLabel?: string;
 
@@ -68,7 +76,8 @@ export function WizardShell({
   title, eyebrow, steps, current, onStepSelect, children,
   onBack, onNext, backLabel = "Back", nextLabel = "Next", blockedReason, busy = false,
   onSaveAndClose, saveLabel = "Save & close", resume,
-  detail, detailTitle, detailOpen = false, onCloseDetail, detailBackLabel = "Back to the list",
+  detail, detailTitle, detailOpen = false,
+  onOpenDetail, detailOpenLabel = "Show details", onCloseDetail, detailBackLabel = "Back to the list",
   footnote, ariaLabel, className
 }: WizardShellProps) {
   const reasonId = useId();
@@ -94,11 +103,16 @@ export function WizardShell({
       {resume != null && <div className="nh-wizard-resume">{resume}</div>}
 
       <div className={cx("nh-wizard-body", detail != null && "nh-wizard-body--split", detailOpen && "has-detail")}>
-        <div className="nh-wizard-main">{children}</div>
+        <div className="nh-wizard-main">
+          {detail != null && onOpenDetail && (
+            <Button variant="ghost" size="sm" className="nh-wizard-detail-open" onClick={onOpenDetail}>{detailOpenLabel}</Button>
+          )}
+          {children}
+        </div>
         {detail != null && (
           <aside className="nh-wizard-detail" aria-label={typeof detailTitle === "string" ? detailTitle : "Details"}>
             {onCloseDetail && (
-              <button type="button" className="nh-wizard-detail-back" onClick={onCloseDetail}>‹ {detailBackLabel}</button>
+              <Button variant="ghost" size="sm" className="nh-wizard-detail-back" onClick={onCloseDetail}>‹ {detailBackLabel}</Button>
             )}
             {detailTitle != null && <h2 className="nh-wizard-detail-title">{detailTitle}</h2>}
             <div className="nh-wizard-detail-body">{detail}</div>
@@ -111,7 +125,7 @@ export function WizardShell({
           {onBack && <Button variant="secondary" onClick={onBack} disabled={busy}>{backLabel}</Button>}
         </div>
         <p className={cx("nh-wizard-blocked", !blocked && "is-clear")} id={reasonId} role="status">
-          {blocked && <><span className="nh-wizard-blocked-icon" aria-hidden="true">⚠</span>{blockedReason}</>}
+          {blocked && <><span className="nh-wizard-blocked-icon" aria-hidden="true"><IconWarning /></span>{blockedReason}</>}
         </p>
         <div className="nh-wizard-foot-next">
           {onNext && (

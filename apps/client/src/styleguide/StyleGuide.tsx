@@ -172,12 +172,13 @@ function WizardDemo() {
           : <p>Pick a species to preview its traits here.</p>}
         detailTitle={chosen ? chosen.title : "Preview"}
         detailOpen={detailOpen}
+        onOpenDetail={() => setDetailOpen(true)}
+        detailOpenLabel="Show preview"
         onCloseDetail={() => setDetailOpen(false)}
         detailBackLabel="Back to the list"
         footnote="Species, class, and background text from the SRD 5.2.1, CC BY 4.0."
       >
         <div className="sg-wizard-step">
-          <Button variant="secondary" size="sm" className="sg-wizard-preview-btn" onClick={() => setDetailOpen(true)}>Show preview</Button>
           <ChoiceGrid
             ariaLabel="Species"
             options={SPECIES}
@@ -316,7 +317,6 @@ function DiceInputDemo() {
 function ChoiceGridDemo() {
   const [value, setValue] = useState<string | null>("elf");
   const [facet, setFacet] = useState("all");
-  const chosen = SPECIES.find((option) => option.value === value) ?? null;
   return (
     <ChoiceGrid
       ariaLabel="Species"
@@ -328,10 +328,6 @@ function ChoiceGridDemo() {
       facetValue={facet}
       onFacetChange={setFacet}
       facets={[{ value: "all", label: "All" }, { value: "srd", label: "SRD" }, { value: "homebrew", label: "Homebrew" }]}
-      detailTitle={chosen?.title ?? "Details"}
-      detail={chosen
-        ? <><p>{chosen.description}</p><p className="tabular sg-muted">{chosen.meta}</p></>
-        : <p>Select a species to read its full entry.</p>}
       emptyAction={<Button variant="secondary" onClick={() => setFacet("all")}>Clear filters</Button>}
     />
   );
@@ -459,12 +455,17 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="menus" title="Menus & tooltips" blurb="Native details/summary disclosure; caret rotates on open.">
+          <Section id="menus" title="Menus & tooltips" blurb="Native details/summary disclosure; caret rotates on open. The default trigger is a padded pill that carries the 44px floor as paint; icon puts it in a 1.75rem square instead — for dense tool clusters, where the floor is hit area, not paint — so a ⋯ can sit beside a same-size grip as an even pair.">
             <div className="sg-row">
               <Menu trigger="Options">
                 <MenuItem icon="⚔">Roll mode</MenuItem>
                 <MenuItem icon="🎲">Rules mode</MenuItem>
                 <MenuItem icon="🗑" tone="danger">End encounter</MenuItem>
+              </Menu>
+              <Menu trigger="⋯" icon label="Scene actions" align="end">
+                <MenuItem icon="✎">Rename</MenuItem>
+                <MenuItem icon="⧉">Duplicate</MenuItem>
+                <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
               </Menu>
               <Tooltip content="Reveal the map to the shared screen">
                 <Button variant="secondary">Hover / focus me</Button>
@@ -570,7 +571,7 @@ export function StyleGuide() {
                 <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 combatants</span></div>
                 <span className="nh-card-status"><Badge tone="primary" solid>LIVE</Badge></span>
                 <div className="nh-card-tools">
-                  <Menu trigger="⋯">
+                  <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
                   </Menu>
@@ -582,7 +583,7 @@ export function StyleGuide() {
                 <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 combatants</span></div>
                 <span className="nh-card-status"><Badge>Staging</Badge></span>
                 <div className="nh-card-tools">
-                  <Menu trigger="⋯">
+                  <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
                     <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
@@ -594,7 +595,7 @@ export function StyleGuide() {
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
                 <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 combatants</span></div>
                 <div className="nh-card-tools">
-                  <Menu trigger="⋯">
+                  <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
                     <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
@@ -654,7 +655,7 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="wizard" title="Wizard shell" blurb="The multi-step frame behind the character builder: a full page on a laptop, a full-screen sheet on a phone — deliberately not a modal. Header and footer stick, so Back/Next stay put while the step body scrolls. Next is gated per step: when the step is incomplete the button disables AND the reason is shown and announced (a silent disabled button is a dead end). It also carries the resume-draft slot, Save & close, an optional preview pane that collapses to master-detail on narrow screens, and the persistent CC BY footnote.">
+          <Section id="wizard" title="Wizard shell" blurb="The multi-step frame behind the character builder: a full page on a laptop, a full-screen sheet on a phone — deliberately not a modal. Header and footer stick, so Back/Next stay put while the step body scrolls. Next is gated per step: when the step is incomplete the button disables AND the reason is shown and announced (a silent disabled button is a dead end). It also carries the resume-draft slot, Save & close, an optional preview pane, and the persistent CC BY footnote. The preview is the flow's ONE detail pane: a column on a laptop, and below 760px a master-detail swap with both halves — the way in (onOpenDetail) and the way back (onCloseDetail) — owned by the shell, so no consumer re-invents a 'Show preview' button. Shrink the window past 760px to watch it swap.">
             <WizardDemo />
             <p className="sg-muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--fs-sm)" }}>
               Demoed inside a bounded scroll frame so the whole page stays readable; in the app it owns the viewport.
@@ -688,7 +689,7 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="choicegrid" title="Choice grid (faceted picker)" blurb="Search + facets + a ChoiceCard grid + an optional detail pane. The search is debounced (160ms) so a long catalog doesn't refilter per keystroke; no results is a real .nh-empty state; and the grid is a keyboard radiogroup — arrows move and select, Home/End jump, and a roving tabindex means Tab enters and leaves the grid once instead of stepping through twelve cards.">
+          <Section id="choicegrid" title="Choice grid (faceted picker)" blurb="Search + facets + a ChoiceCard grid. The search is debounced (160ms) so a long catalog doesn't refilter per keystroke; no results is a real .nh-empty state; and the grid is a keyboard radiogroup — arrows move and select, Home/End jump, and a roving tabindex means Tab enters and leaves the grid once instead of stepping through twelve cards. It carries no detail pane of its own: a phone can only show the cards or the detail, never both, and WizardShell already owns that master-detail swap — pass the selected option's text to the shell instead.">
             <ChoiceGridDemo />
           </Section>
 

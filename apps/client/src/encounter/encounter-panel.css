@@ -35,8 +35,11 @@
 .combatant-tools .initiative-score { width: 8rem; }
 .combatant-remove { flex: none; width: 1.9rem; height: 1.9rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); cursor: pointer; }
 .combatant-remove:hover:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 80%, var(--danger)); color: var(--danger-hi); }
-.combatant-choice { display: flex; gap: .7rem; align-items: center; cursor: pointer; }
-.combatant-choice input { width: 1.2rem; height: 1.2rem; accent-color: var(--magenta); }
+/* The <label> wraps the box, so the whole row IS the control's hit area — that is what carries the
+   44px floor here (a bare checkbox can't take a ::after; it's a replaced element). The box itself
+   grows to 1.5rem so it is legible next to the name, not just tappable. */
+.combatant-choice { display: flex; gap: .7rem; align-items: center; min-height: var(--tap-min); cursor: pointer; }
+.combatant-choice input { flex: none; width: 1.5rem; height: 1.5rem; accent-color: var(--magenta); }
 .combatant-choice span, .combatant-choice strong, .combatant-choice small { display: block; }
 .combatant-choice small, .initiative-list small { display: block; margin-top: .2rem; color: var(--text-muted); }
 .initiative-score { color: var(--text-dim); font-size: var(--fs-sm); }
@@ -164,13 +167,15 @@
 .health-bloodied { background: color-mix(in srgb, var(--surface-3) 60%, var(--magenta)); color: var(--magenta-hi); }
 .health-down { background: color-mix(in srgb, var(--surface-3) 60%, var(--danger)); color: var(--danger-hi); }
 /* Conditions: tracked reference state — chips everywhere (violet-coded), a compact picker where editable. */
-.condition-chips { display: inline-flex; flex-wrap: wrap; gap: .25rem; margin-left: .45rem; vertical-align: middle; }
+/* --space-3 is the minimum gap a row of pressable chips can use: each carries a 44px hit area
+   around 2rem of paint (Chip.css), so anything tighter and neighbouring chips steal taps. */
+.condition-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-left: .45rem; vertical-align: middle; }
 /* Condition pills are the shared Chip (icon + tone) now; only the row container + the dashed add
    toggle keep bespoke rules below. */
 .condition-add { min-width: 1.5rem; text-align: center; background: transparent; color: var(--text-muted); border-style: dashed; }
 .condition-editor { margin-top: .35rem; }
 .initiative-list.gm .condition-editor { margin-top: .3rem; }
-.condition-picker { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.condition-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: .45rem; padding: .55rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
 .condition-option { display: inline-flex; align-items: center; gap: .3rem; }
 .actor-card-conditions { margin: -.4rem 0 .8rem; }
 .actor-card-conditions .condition-chips { margin-left: 0; }
@@ -261,8 +266,9 @@
 .action-preview .save-prompt-manual button { flex: none; height: 1.9rem; margin: 0; padding: 0 1rem; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
 /* "Final total" manual mode: a compact Natural 20 (crit) checkbox under the total field - a rolled die can't
    be read off a hand-computed total, so the crit is declared. Overrides the column's full-width input sizing. */
-.action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: .35rem; align-self: flex-start; color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
-.action-preview .manual-nat20 input { width: auto; height: auto; margin: 0; padding: 0; accent-color: var(--magenta); }
+/* Label = hit area (see .combatant-choice), so the 44px floor is real paint on the row. */
+.action-preview .manual-nat20 { display: inline-flex; align-items: center; gap: .5rem; align-self: flex-start; min-height: var(--tap-min); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; }
+.action-preview .manual-nat20 input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; padding: 0; accent-color: var(--magenta); }
 .action-apply-group { display: flex; gap: .4rem; margin-top: .5rem; align-items: stretch; }
 .action-apply-group .action-apply { flex: 1 1 auto; margin-top: 0; }
 .action-damage-edit { flex: 0 0 4rem; width: 4rem; margin: 0; padding: .55rem .5rem; border: 1px solid var(--danger); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 82%, var(--danger)); color: var(--danger-hi); font-weight: 700; text-align: center; font-size: var(--fs-body); font-family: var(--font-mono); }
@@ -296,8 +302,9 @@
    and bottom margin so it sits clearly above the turn order / sheet in either view. */
 .initiative-prompt { margin: 0 0 .6rem; padding: .55rem .7rem; border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan)); background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan)); }
 /* GM encounter-setup opt-in for player-rolled initiative. */
-.encounter-players-roll-init { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 0; font-size: var(--fs-sm); color: var(--text-dim); cursor: pointer; }
-.encounter-players-roll-init input { width: 1rem; height: 1rem; margin: 0; }
+/* Label = hit area (see .combatant-choice), so the 44px floor is real paint on the row. */
+.encounter-players-roll-init { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 0; min-height: var(--tap-min); font-size: var(--fs-sm); color: var(--text-dim); cursor: pointer; }
+.encounter-players-roll-init input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--magenta); }
 /* GM "waiting on players to roll initiative" banner above the initiative list, with the roll-for-the-rest action. */
 .initiative-gathering { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; padding: .5rem .65rem; border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta)); font-size: var(--fs-sm); color: var(--text); }
 .initiative-gathering span { flex: 1 1 12rem; }

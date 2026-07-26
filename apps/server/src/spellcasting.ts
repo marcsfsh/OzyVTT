@@ -1,5 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 
 type ResolveDefinition = (definitionId: string) => ActorDefinition | undefined;
@@ -15,7 +16,9 @@ export function setSpellSlotRemaining(state: GameState, actorId: string, level: 
   const slot = actor.spellSlots?.find((entry) => entry.level === level);
   if (!slot) throw new CommandRejectedError(`${actor.name} has no level-${level} spell slots.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  const max = definition?.spellcasting?.slots.find((entry) => entry.level === level)?.max ?? slot.remaining;
+  // Same single-sourced maxima the seeding and the long rest use, so a multiclass caster whose
+  // combined table is derived is not clamped down to whatever it happens to have left.
+  const max = spellSlotMaxima(definition).find((entry) => entry.level === level)?.max ?? slot.remaining;
   const clamped = Math.max(0, Math.min(max, remaining));
   actor.spellSlots = actor.spellSlots!.map((entry) => entry.level === level ? { ...entry, remaining: clamped } : entry);
 }

@@ -33,7 +33,7 @@ export function Chip({ tone = "neutral", icon, atRisk = false, className, childr
     "nh-chip",
     tone !== "neutral" && `nh-chip--${tone}`,
     atRisk && "nh-chip--at-risk",
-    isButton && "nh-chip--pressable interactive",
+    isButton && "nh-chip--pressable tap-target interactive",
     className
   );
   const body = (
