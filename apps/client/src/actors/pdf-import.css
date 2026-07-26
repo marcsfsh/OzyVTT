@@ -43,3 +43,15 @@
   .pdf-import-summary > div { flex-direction: column; gap: 0.1rem; }
   .pdf-import-summary dd { text-align: left; }
 }
+
+/* GM approval queue for player-submitted imports (rendered by ActorRoster). */
+.roster-pending { margin-top: 0.75rem; display: grid; gap: 0.5rem; }
+.roster-pending-head p { margin: 0.15rem 0 0; opacity: 0.75; font-size: 0.85rem; }
+.roster-pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.roster-pending li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.4rem 0.6rem; border: 1px solid var(--border, #6b5a86); border-radius: 0.5rem; }
+.roster-pending-name { font-weight: 600; }
+.roster-pending-actions { display: flex; gap: 0.4rem; }
+@media (max-width: 480px) {
+  .roster-pending li { flex-direction: column; align-items: stretch; }
+  .roster-pending-actions { justify-content: flex-end; }
+}

@@ -8,7 +8,7 @@ import { setCondition } from "./actor-conditions.js";
 import { actionAvailability, resolveDefinitionAction } from "./action-resolution.js";
 import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
-import { addActorFromDefinition, importActorDefinition, removeActor, storedDefinition } from "./actor-roster.js";
+import { addActorFromDefinition, importActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "./actor-roster.js";
 import { canInitiateForActor, canPlayerTarget } from "./authorization.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "./spellcasting.js";
 import { setCurrency, setInventoryItem } from "./inventory.js";
@@ -35,7 +35,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -533,6 +533,26 @@ export function createGameOperations(context: GameOperationsContext) {
       }
       const actorId = envelope.commandId;
       const result = await store.execute({ id: envelope.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.expectedRevision, payload: envelope, principal: principalTag(principal) }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.visibility));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate, actorId };
+    },
+
+    async characterSubmitImport(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      // Any authenticated player or GM may submit a sheet; GM approval (below) is the gate.
+      const envelope = parse(CharacterSubmitImportSchema, raw, "The import submission is malformed.");
+      if (JSON.stringify(envelope.definition ?? null).length > 262_144) throw new GameInputError("That sheet is too large to import.");
+      const parsed = ActorDefinitionSchema.safeParse(envelope.definition);
+      if (!parsed.success) { const issue = parsed.error.issues[0]; throw new GameInputError(`That file is not a valid character (${issue.path.join(".") || "root"}: ${issue.message}).`); }
+      const result = await store.execute({ id: envelope.commandId, type: "character.submit-import", expectedRevision: envelope.expectedRevision, payload: envelope, principal: principalTag(principal) }, (state) => submitPendingImport(state, parsed.data, envelope.commandId, sessionIdOf(principal)));
+      if (!result.duplicate) await context.publishGameState(result.state);
+      return { revision: result.state.revision, duplicate: result.duplicate };
+    },
+
+    async characterResolveImport(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can approve imported sheets.");
+      const envelope = parse(CharacterResolveImportSchema, raw, "The import decision is malformed.");
+      const actorId = envelope.commandId;
+      const result = await store.execute({ id: envelope.commandId, type: "character.resolve-import", actorId, expectedRevision: envelope.expectedRevision, payload: envelope, principal: principalTag(principal) }, (state) => resolvePendingImport(state, envelope.importId, envelope.approve, actorId));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },

@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 6 GameState fields · 72 commands · 132 HTTP paths
+- 7 GameState fields · 72 commands · 132 HTTP paths
 
 ## GameState shape
 
@@ -17,6 +17,7 @@ single JSON blob the server persists and projects per role.
 - `actors`
 - `combat`
 - `definitions`
+- `pendingImports`
 - `revision`
 - `rolls`
 - `schemaVersion`

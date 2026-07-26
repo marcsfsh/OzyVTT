@@ -9,9 +9,9 @@ import "./pdf-import.css";
 
 const ABIL = ["str", "dex", "con", "int", "wis", "cha"] as const;
 
-type Props = { open: boolean; onClose: () => void; onImported?: (name: string) => void };
+type Props = { open: boolean; onClose: () => void; role: "gm" | "player"; onImported?: (name: string) => void };
 
-export function PdfImportModal({ open, onClose, onImported }: Props) {
+export function PdfImportModal({ open, onClose, role, onImported }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -45,12 +45,16 @@ export function PdfImportModal({ open, onClose, onImported }: Props) {
   const confirmImport = () => {
     if (!result?.definition) return;
     const name = result.definition.name;
+    const definition = result.definition;
     setSaving(true); setSaveMsg("");
-    socket.emit("actor:import-definition", { commandId: newId(), definition: result.definition }, (res: { ok: boolean; message?: string }) => {
+    const ack = (res: { ok: boolean; message?: string }) => {
       setSaving(false);
       if (res.ok) { onImported?.(name); close(); }
       else setSaveMsg(res.message ?? "The server rejected the import.");
-    });
+    };
+    // GMs create the actor directly; a player submits it for GM approval (server re-validates either way).
+    if (role === "gm") socket.emit("actor:import-definition", { commandId: newId(), definition }, ack);
+    else socket.emit("character:submit-import", { commandId: newId(), definition }, ack);
   };
 
   // Prefer validated data for display; fall back to the raw draft when a required field is missing.
@@ -104,7 +108,7 @@ export function PdfImportModal({ open, onClose, onImported }: Props) {
         <Button variant="ghost" type="button" onClick={reset} disabled={saving}>Choose a different file</Button>
         <div className="pdf-import-buttons-right">
           <Button variant="secondary" type="button" onClick={close} disabled={saving}>Cancel</Button>
-          <Button type="button" onClick={confirmImport} disabled={!result.valid || saving}>{saving ? "Adding…" : "Add to roster"}</Button>
+          <Button type="button" onClick={confirmImport} disabled={!result.valid || saving}>{saving ? (role === "gm" ? "Adding…" : "Sending…") : role === "gm" ? "Add to roster" : "Send to GM for approval"}</Button>
         </div>
       </div>
     </div>}

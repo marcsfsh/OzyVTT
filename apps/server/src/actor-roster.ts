@@ -79,6 +79,20 @@ export function importActorDefinition(state: GameState, definition: ActorDefinit
   state.definitions = [...state.definitions, { id: definitionId, definition }];
 }
 
+/** Queue a player-submitted import for GM approval; the definition is pre-validated by the caller. */
+export function submitPendingImport(state: GameState, definition: ActorDefinition, id: string, submittedBy: string) {
+  if (state.pendingImports.length >= 20) throw new CommandRejectedError("The import queue is full - ask your GM to review the pending sheets first.");
+  state.pendingImports = [...state.pendingImports.filter((entry) => entry.id !== id), { id, name: definition.name, submittedBy, definition }];
+}
+
+/** GM decision on a queued import: approving instantiates a claimable actor; either way it leaves the queue. */
+export function resolvePendingImport(state: GameState, importId: string, approve: boolean, newActorId: string) {
+  const pending = state.pendingImports.find((entry) => entry.id === importId);
+  if (!pending) throw new CommandRejectedError("That pending import is no longer in the queue.");
+  state.pendingImports = state.pendingImports.filter((entry) => entry.id !== importId);
+  if (approve) importActorDefinition(state, pending.definition, newActorId, "public");
+}
+
 export function removeActor(state: GameState, actorId: string) {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");

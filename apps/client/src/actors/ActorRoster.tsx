@@ -154,6 +154,13 @@ export function ActorRoster(props: Props) {
     });
   };
 
+  const resolveImport = (importId: string, approve: boolean, name: string) => {
+    setFeedback(approve ? `Approving ${name}…` : `Rejecting ${name}…`);
+    socket.emit("character:resolve-import", { commandId: newId(), importId, approve }, (result) => {
+      setFeedback(result.ok ? (approve ? `${name} added to the roster.` : `Rejected ${name}.`) : result.message ?? "Couldn't resolve the import.");
+    });
+  };
+
   return <section className="roster" aria-labelledby="roster-heading">
     <div className="roster-heading">
       <div><span className="eyebrow">CHARACTER ROSTER</span><h2 id="roster-heading">Choose your place at the table.</h2></div>
@@ -163,11 +170,23 @@ export function ActorRoster(props: Props) {
         in the app shell. v5 #7: the player's own character now lives in the always-shown YouArePlaying
         bar (rendered outside this roster), so it's excluded from the "choose your place" grid here. */}
     <div id="roster-body">
-    {props.role === "gm" && <div className="roster-import">
-      <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
+    <div className="roster-import">
       <Button type="button" onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
-      <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
-      <PdfImportModal open={pdfImportOpen} onClose={() => setPdfImportOpen(false)} onImported={(name) => setFeedback(`Imported ${name} — it's ready to claim below.`)} />
+      {props.role === "gm" && <>
+        <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />
+        <Button type="button" variant="secondary" onClick={() => importFileRef.current?.click()}>Import character sheet (JSON)</Button>
+      </>}
+      <PdfImportModal open={pdfImportOpen} role={props.role} onClose={() => setPdfImportOpen(false)} onImported={(name) => setFeedback(props.role === "gm" ? `Imported ${name} — it's ready to claim below.` : `Sent ${name} to your GM for approval.`)} />
+    </div>
+    {props.role === "gm" && "pendingImports" in props.state && props.state.pendingImports.length > 0 && <div className="roster-pending">
+      <div className="roster-pending-head"><span className="eyebrow">PENDING IMPORTS</span><p>Players submitted these from their own device — approve to add them to the roster.</p></div>
+      <ul>{props.state.pendingImports.map((pending) => <li key={pending.id}>
+        <span className="roster-pending-name">{pending.name}</span>
+        <span className="roster-pending-actions">
+          <Button type="button" onClick={() => resolveImport(pending.id, true, pending.name)}>Approve</Button>
+          <Button type="button" variant="ghost" onClick={() => resolveImport(pending.id, false, pending.name)}>Reject</Button>
+        </span>
+      </li>)}</ul>
     </div>}
     {chooseList.length === 0 ? <div className="nh-empty"><span className="nh-empty-icon" aria-hidden="true">🎭</span><span className="nh-empty-title">{ownedActor ? "No other characters" : "No characters yet"}</span><span className="nh-empty-text">{props.role === "gm" ? "Import a character sheet above to add someone to the table." : ownedActor ? "You've claimed your character — it's shown in your player bar below." : "Your GM hasn't added any characters yet — they'll appear here to claim."}</span></div> : <div className="actor-grid">
       {chooseList.map((actor) => {

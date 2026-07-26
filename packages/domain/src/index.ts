@@ -6,6 +6,9 @@ export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSche
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(200), definition: ActorDefinitionSchema }).strict();
 export type StoredDefinition = z.infer<typeof StoredDefinitionSchema>;
+/** A player-submitted PDF import awaiting GM approval. GM-only — never in PlayerView or the viewer (ADR-0018). */
+export const PendingImportSchema = z.object({ id: z.string().max(120), name: z.string().min(1).max(120), submittedBy: z.string().max(120), definition: ActorDefinitionSchema }).strict();
+export type PendingImport = z.infer<typeof PendingImportSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
 export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "manual"]);
@@ -372,7 +375,9 @@ export const GameStateSchema = z.object({
   rolls: z.array(RollRecordSchema).default([]),
   combat: CombatStateSchema.default({ active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [], tokens: [], annotations: [] }),
   /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign, additive per ADR-0007. */
-  definitions: z.array(StoredDefinitionSchema).max(100).default([])
+  definitions: z.array(StoredDefinitionSchema).max(100).default([]),
+  /** Player-submitted PDF imports awaiting GM approval. GM-only: curated out of PlayerView (a Pick) and the viewer. Additive per ADR-0007/0018. */
+  pendingImports: z.array(PendingImportSchema).max(20).default([])
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
@@ -530,6 +535,8 @@ export interface ClientToServerEvents {
   "actor:add-from-definition": (payload: { commandId: string; definitionId: string; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:remove": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:import-definition": (payload: { commandId: string; definition: unknown; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
+  "character:submit-import": (payload: { commandId: string; definition: unknown; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:resolve-import": (payload: { commandId: string; importId: string; approve: boolean; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-size": (payload: { commandId: string; actorId: string; size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-visibility": (payload: { commandId: string; actorId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
