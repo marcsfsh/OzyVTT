@@ -1,0 +1,4 @@
+# Source DDB PDF exports are kept local only (real player handle; large binaries).
+# The committed *.widgets.json (sanitized) are the golden oracle. Regenerate with:
+#   node test/record-fixtures.mjs
+*.pdf
