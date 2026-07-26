@@ -482,6 +482,45 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Character builder — Phase 1 foundation (2026-07-26, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
+  The approved plan (16 discovery decisions + architecture principles) is `docs/task-packets/character-builder.md`:
+  a guided wizard for **GM and player**, levels **1-20 with multiclass**, creation + level-up + respec, a
+  configurable random generator, full page on desktop / full-screen sheet on mobile, server-held drafts that
+  double as the pending-approval record, GM-gated ability methods, per-species name bundles, CC BY footer, and
+  a 44px touch floor. **Phase 1 builds the foundation only — no wizard screens exist yet and no character can
+  be created through a UI.** What landed:
+  - **Content model** (`packages/content-srd-5.2.1/src/character-content.ts` + six seed bundles): reference
+    schemas for classes / subclasses / species / backgrounds / feats / name pools, all built on ONE shared
+    `FeatureRecord` whose riders reuse the real actor-side shapes (`ActionSchema.omit({attack,save})`,
+    `EffectGrantSchema`) rather than clones. Every record carries `source: "srd" | "homebrew"`; identity ids
+    stay open slugs. `ClassReference` enforces a 20-row level table and feature-id resolution via `superRefine`.
+    Seeds: Fighter + Wizard (full 20-row tables), Champion + Evoker, Human + Elf, Soldier + Sage, 4 feats,
+    2 name pools — **transcription of the remaining 10 classes / 10 subclasses / 7 species / 2 backgrounds /
+    ~16 feats is Phase 2 and 5 work.**
+  - **Schema deltas** (additive-optional, `schemaVersion` unchanged, JSON mirror in lockstep with an Ajv
+    back-compat proof): `character.choices[]` provenance ledger, per-class `hitDie`, per-class
+    `spellcasting.classes[]`, armor/weapon/tool/language proficiencies, weapon `properties`. `Actor.hitDice`
+    became a **normalising pool** — a Zod preprocess accepts the legacy single object, a bare array, or
+    `entries[]`, keeping `die`/`maximum`/`remaining` as a derived summary recomputed on every parse, so
+    existing single-object readers get the correct multiclass total with no client edit.
+  - **Rules math** (`packages/rules-5e`): ability generation (standard array, point-buy costs, `4d6kh3`, GM
+    custom formula), **class stat-priority tables as data**, HP per level incl. `max(roll, average)`, spell
+    slots for single-class and multiclass caster level, ASI levels, multiclass prerequisites.
+  - **UI primitives** (`@vtt/ui`, all demoed in `/styleguide`): `WizardShell`, `ChoiceCard`, `ChoiceGrid`,
+    `AbilityScoreAllocator`, `DiceInputRow`, `NameField`, `FeatureList`, `ReviewSummary`, `Modal size="full"`,
+    plus a documented **44px touch floor**.
+  - **API**: the socket-only debt repaid (`character.submit-import`/`resolve-import` now on both transports)
+    and six content catalogs shipped on both transports from day one, player-readable, each returning CC BY
+    attribution. A new guard test scrapes every `socket.on(...)` in `apps/server/src/*.ts` and requires each
+    event to resolve to a declared scope or a documented HTTP read — closing the structural hole that let the
+    original debt through — plus an Ajv guard validating served content payloads against the OpenAPI document.
+  - **Verified:** `check` clean across all workspaces, **689 tests passing** (server 523, rules-5e 85, content
+    36, api-contract 17, schemas 15, pdf 13), client build green. Three adversarial QA passes (UI/style-guide,
+    core-functionality, requirements-compliance) ran against it; six major correctness bugs and eight major
+    UI/UX findings were fixed, each with a regression test proven to bite by reverting the fix first.
+  - **Not yet built / gating Phase 2:** see `known-bugs.md` — the `fromCatalog` resolver, the GM ability-method
+    setting, the dropped class/species/background wire fields, the bundle→rules adapter, the feature-rider
+    interpreter, and `GameState.characterDrafts[]`.
 - **D&D Beyond PDF importer — Phase 1.5 (2026-07-26, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
   A GM imports a D&D Beyond **PDF export** from the roster ("Import from D&D Beyond (PDF)", beside the JSON
   import). The DDB 2024 sheet is a **named AcroForm**, so extraction is a deterministic field-name → schema

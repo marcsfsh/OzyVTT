@@ -7,6 +7,36 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-26 — Character builder: features-as-data, so homebrew is additive
+
+The guided builder is being built with a **later homebrew update as a first-class design input** (the owner's
+explicit ask: homebrew should eventually cover classes, subclasses, species, backgrounds, feats, **class
+features**, spells, **all item types**, and monsters). Five rules make that additive rather than a rewrite, and
+they bind all future character-builder work:
+
+1. **Features-as-data.** A class/species/feat feature is a declarative `FeatureRecord` — prose plus optional
+   structured riders drawn from the existing `ActionSchema` / `EffectGrant` / `EffectModifier` vocabulary. **No
+   feature may be implemented as hardcoded client or server behavior.** Homebrew authors the same record type;
+   the wizard and rules engine cannot tell SRD from homebrew apart.
+2. **One merged catalog, one `source: "srd" | "homebrew"` discriminator**, merged once at
+   `apps/server/src/content-library.ts`.
+3. **No new closed enums in content.** Identity ids stay open slugs; ordering and labels come from data, never
+   a hardcoded client list.
+4. **The choice-provenance ledger (`character.choices[]`) is load-bearing** — level-up and respec cannot
+   prefill prior choices without it, and retrofitting provenance onto existing characters is impossible.
+5. **`definitionId` MUST be `import-<actorId>`** — three paths depend on the prefix; a differently-keyed PC is
+   permanently un-editable *and* un-removable.
+
+Also decided: creation submits **one atomic command**, never per-step commands (ten steps would mean ten
+revisions, ten broadcasts, and a half-built character visible in `actors[]`); and edit paths **preserve fields
+they don't know about** — one `carryForwardOmitted()` helper states the rule once ("undefined means not
+supplied"), after a wholesale-replace bug silently wiped the choice ledger and, separately, armor/weapon/tool/
+language training.
+
+Scope approved: levels 1-20, multiclass, creation + level-up + respec. This supersedes the "not a character
+builder" boundary that ADR-0021 had already begun reframing. Full plan and the 16 discovery decisions:
+`docs/task-packets/character-builder.md`.
+
 ## 2026-07-26 — D&D Beyond PDF importer extracts client-side (ADR-0018 amended)
 
 The DDB PDF export is a **named AcroForm** (every value is a widget with a field name), so the
