@@ -69,6 +69,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `token.move` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
+| `character.submit-import` | `actor:write` |
+| `character.resolve-import` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
 | `actor.heal` | `actor:write` |
@@ -681,6 +683,40 @@ Imports a canonical ActorDefinition JSON as a claimable actor with a full sheet 
 | `expectedRevision` | integer (≥ 0) | no |  |
 | `definition` | object (free-form) | yes | A canonical ActorDefinition JSON (schema version discoverable via /system/version) |
 | `visibility` | `public` \| `gm-only` | no | Default: `"public"`. |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/character-imports`
+
+Submits a character sheet into the GM's approval queue instead of importing it directly - the player path (a GM importing their own sheet uses the definitions import). Any joined session may submit; nothing reaches the roster until the GM resolves it. The queued entry's `importId` is this call's commandId, so keep it to resolve or re-send the submission idempotently.
+
+**Auth:** Integration credential with `actor:write` · GM session · Player session (own-character limits apply)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no | Also becomes the queued submission's importId; resend it to retry the submission idempotently |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `definition` | object (free-form) | yes | A canonical ActorDefinition JSON, at most 256 KiB serialized (schema version discoverable via /system/version) |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/character-imports/{importId}/resolve`
+
+Approves (`approve: true`) or rejects a queued character submission (GM-grade only). Either decision removes it from the queue; approving instantiates the claimable actor, whose id equals THIS call's commandId (returned as `actorId`).
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Parameters:** `importId` (path) - string
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no | Also becomes the approved actor's id |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `approve` | boolean | yes | true instantiates the submitted sheet as a claimable actor; false discards it. Either way the submission leaves the queue |
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
@@ -1649,7 +1685,7 @@ Clears every fog stroke - with fog enabled the whole map is hidden again (GM-gra
 
 ## Reference content
 
-The bundled SRD 5.2.1 content (CC BY 4.0): bestiary, runnable action summaries, and condition reference.
+The bundled SRD 5.2.1 content (CC BY 4.0): bestiary, runnable action summaries, the condition/spell/equipment reference, and the character-builder catalogs (classes, subclasses, species, backgrounds, feats, name pools). The bestiary is GM-grade; every rules catalog is public reference a player session may read, and each carries the `attribution` line the displaying surface must show.
 
 ### `GET /api/v1/content/monsters`
 
@@ -1686,6 +1722,70 @@ The bundled SRD condition reference (public information - any GM, player, or int
 **Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
 
 **Responses:** `200` Condition reference entries - envelope of `ContentConditionsData` · errors `401` `403`
+
+### `GET /api/v1/content/spells`
+
+The bundled SRD spell list with the fields a sheet needs to cast from: level, school, casting time, range, components, duration, concentration/ritual flags, description, and the upcast (`castingOptions`) rows keyed by slot level.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentSpellsData` · errors `401` `403`
+
+### `GET /api/v1/content/equipment`
+
+The bundled SRD equipment catalog - gear, weapons, and armor folded into one browse-and-add list, with the weapon/armor blocks populated for those categories. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentEquipmentData` · errors `401` `403`
+
+### `GET /api/v1/content/classes`
+
+The character-builder class catalog: hit die, primary abilities, saving-throw and skill proficiency choices, the spellcasting ability where the class has one, and the class features as data. `source` distinguishes bundled SRD records from GM homebrew merged into the same catalog. Includes the CC BY 4.0 attribution line the builder must display.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentClassesData` · errors `401` `403`
+
+### `GET /api/v1/content/subclasses`
+
+The character-builder subclass catalog, each keyed to its parent `classId` and the level it unlocks at, with its features as data. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentSubclassesData` · errors `401` `403`
+
+### `GET /api/v1/content/species`
+
+The character-builder species catalog: creature size, walking speed, and the species traits as data. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentSpeciesData` · errors `401` `403`
+
+### `GET /api/v1/content/backgrounds`
+
+The character-builder background catalog: granted skill/tool proficiencies, languages, starting-equipment prose, and the background feat where one applies. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentBackgroundsData` · errors `401` `403`
+
+### `GET /api/v1/content/feats`
+
+The character-builder feat catalog, with each feat's category and human-readable prerequisite. The server, not the client, is the authority on whether a prerequisite is met. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentFeatsData` · errors `401` `403`
+
+### `GET /api/v1/content/names`
+
+Per-species name pools for the builder's random generator. Pool `kind` is an open slug and pool order comes from the data, so new pools are additive. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentNamesData` · errors `401` `403`
 
 ## Encounter archives (Time Machine)
 

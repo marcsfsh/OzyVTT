@@ -56,7 +56,7 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
   },
   {
     title: "Reference content",
-    intro: "The bundled SRD 5.2.1 content (CC BY 4.0): bestiary, runnable action summaries, and condition reference.",
+    intro: "The bundled SRD 5.2.1 content (CC BY 4.0): bestiary, runnable action summaries, the condition/spell/equipment reference, and the character-builder catalogs (classes, subclasses, species, backgrounds, feats, name pools). The bestiary is GM-grade; every rules catalog is public reference a player session may read, and each carries the `attribution` line the displaying surface must show.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/content`)
   },
   {

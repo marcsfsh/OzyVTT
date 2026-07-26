@@ -170,9 +170,18 @@ describe("public API contracts", () => {
     expect(acceptsPlayer(GAME_PATHS.actorDamage, "post")).toBe(true);
     expect(acceptsPlayer(GAME_PATHS.rolls, "post")).toBe(true);
     expect(acceptsPlayer(CONTENT_PATHS.conditions, "get")).toBe(true);
+    // A player submits their own sheet into the queue; only the GM decides on it.
+    expect(acceptsPlayer(GAME_PATHS.characterImports, "post")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.characterImportResolve, "post")).toBe(false);
     expect(acceptsPlayer(GAME_PATHS.encounterStart, "post")).toBe(false);
     expect(acceptsPlayer(GAME_PATHS.actorHp, "post")).toBe(false);
     expect(acceptsPlayer(CONTENT_PATHS.monsters, "get")).toBe(false);
+    // Every rules catalog except the bestiary is public reference: a player builds their own
+    // character, so the builder catalogs must never inherit the bestiary's GM-only gating.
+    for (const path of [CONTENT_PATHS.spells, CONTENT_PATHS.equipment, CONTENT_PATHS.classes, CONTENT_PATHS.subclasses, CONTENT_PATHS.species, CONTENT_PATHS.backgrounds, CONTENT_PATHS.feats, CONTENT_PATHS.names]) {
+      expect(acceptsPlayer(path, "get"), `${path} must accept a player session`).toBe(true);
+      expect(scopeOf(path, "get"), `${path} scope`).toEqual(["game:read"]);
+    }
     expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(false);
     expect(openApiDocument.components.securitySchemes.playerAuth).toMatchObject({ type: "http", scheme: "bearer" });
   });

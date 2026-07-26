@@ -1,6 +1,6 @@
-import type { ContentActionSummary, ContentConditionSummary, ContentEquipmentSummary, ContentMonsterSummary, ContentSpellSummary } from "@vtt/domain";
+import type { ContentActionSummary, ContentBackgroundSummary, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSpeciesSummary, ContentSpellSummary, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { loadAttribution, loadConditions, loadEquipment, loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
+import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSpecies, loadSpells, loadSubclasses, type FeatureRecord } from "@vtt/content-srd-5.2.1";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -40,6 +40,12 @@ export class ContentLibrary {
   hasCondition(conditionId: string): boolean { return conditionIds.has(conditionId); }
   spellSummaries(): readonly ContentSpellSummary[] { return spellSummaries; }
   equipmentSummaries(): readonly ContentEquipmentSummary[] { return equipmentSummaries; }
+  classSummaries(): readonly ContentClassSummary[] { return classSummaries; }
+  subclassSummaries(): readonly ContentSubclassSummary[] { return subclassSummaries; }
+  speciesSummaries(): readonly ContentSpeciesSummary[] { return speciesSummaries; }
+  backgroundSummaries(): readonly ContentBackgroundSummary[] { return backgroundSummaries; }
+  featSummaries(): readonly ContentFeatSummary[] { return featSummaries; }
+  nameBundles(): readonly ContentNameBundle[] { return nameBundles; }
   monsterAction(definitionId: string, actionId: string): ActorDefinition["actions"][number] | undefined {
     return this.byId.get(definitionId)?.actions.find((action) => action.id === actionId);
   }
@@ -107,4 +113,84 @@ const spellSummaries: readonly ContentSpellSummary[] = loadSpells()
 const equipmentSummaries: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
   id: item.id, name: item.name, category: item.category, costGp: item.costGp, weightLb: item.weightLb, description: item.description,
   weapon: item.weapon ?? null, armor: item.armor ?? null
+}));
+
+// ---------- Character-builder catalogs ----------
+//
+// This is THE merge point for builder content, the same role `loadEquipment()` plays for gear: one
+// catalog per type, mapped once from the bundle records into the transport-owned wire shapes. GM
+// homebrew becomes another source folded in here (`source: "homebrew"`), never a fork (ADR-0016).
+//
+// Each row is the browse-and-pick PROJECTION of its bundle record. The structured riders on a
+// feature - granted actions, effects, modifiers, limited uses - are deliberately not on the wire:
+// the server applies them when it builds the character, so the wizard cannot become a second,
+// divergent rules engine (CLAUDE.md rule 2). Prose, level, tags, and the pick a feature asks for are
+// what a client needs to render and collect choices.
+//
+// NOTE: the bundles currently carry a partial SRD slice (task packet phase 1.1 seed content) - full
+// transcription is phases 2 and 5. A short catalog here is missing CONTENT, never a missing endpoint.
+const featureSummaryOf = (feature: FeatureRecord): ContentFeatureSummary => ({
+  id: feature.id,
+  name: feature.name,
+  level: feature.level ?? null,
+  description: feature.description,
+  tags: feature.tags,
+  choice: feature.choice
+    ? { kind: feature.choice.kind, choose: feature.choice.choose, from: feature.choice.from ?? [], fromCatalog: feature.choice.fromCatalog ?? null }
+    : null
+});
+const equipmentOptionLabels = (options: ReadonlyArray<{ label: string }>): readonly string[] => options.map((option) => option.label);
+const byName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
+
+const classSummaries: readonly ContentClassSummary[] = loadClasses().map((entry) => ({
+  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
+  hitDie: entry.hitDie, statPriority: entry.statPriority, primaryAbilities: entry.primaryAbilities, savingThrows: entry.savingThrows,
+  skillChoiceCount: entry.skillChoices.choose, skillChoices: entry.skillChoices.from,
+  subclassLevel: entry.subclassLevel, subclassLabel: entry.subclassLabel ?? null, asiLevels: entry.asiLevels,
+  spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
+  startingEquipmentOptions: equipmentOptionLabels(entry.startingEquipment),
+  features: entry.features.map(featureSummaryOf)
+})).sort(byName);
+
+const subclassSummaries: readonly ContentSubclassSummary[] = loadSubclasses().map((entry) => ({
+  id: entry.id, name: entry.name, source: entry.source, classId: entry.classId, summary: entry.summary ?? null, description: entry.description ?? null,
+  subclassLevel: entry.subclassLevel ?? null,
+  spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
+  features: entry.features.map(featureSummaryOf)
+})).sort(byName);
+
+// Species traits and lineage traits are the same FeatureRecord shape; the lineage's own traits are
+// folded into `features` so a client renders one list (the lineage row keeps its identity for picking).
+const speciesSummaries: readonly ContentSpeciesSummary[] = loadSpecies().map((entry) => ({
+  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
+  sizes: entry.sizes, speedFeet: entry.speedFeet, darkvisionFeet: entry.darkvisionFeet, creatureType: entry.creatureType,
+  languages: entry.languages,
+  lineages: entry.lineages.map((lineage) => ({ id: lineage.id, name: lineage.name, description: lineage.description ?? null })),
+  features: [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map(featureSummaryOf)
+})).sort(byName);
+
+const backgroundSummaries: readonly ContentBackgroundSummary[] = loadBackgrounds().map((entry) => ({
+  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
+  abilityOptions: entry.abilityOptions ? { from: entry.abilityOptions.from, spreads: entry.abilityOptions.spreads } : null,
+  originFeatId: entry.originFeatId ?? null,
+  skillProficiencies: entry.skillProficiencies, toolProficiencies: entry.toolProficiencies, languages: entry.languages,
+  startingEquipmentOptions: equipmentOptionLabels(entry.startingEquipment),
+  features: entry.features.map(featureSummaryOf)
+})).sort(byName);
+
+// A feat IS a feature plus catalog metadata - hence the single `feature`, not a list. Prerequisites
+// travel as structured data AND prose; the server remains the authority on whether one is met.
+const featSummaries: readonly ContentFeatSummary[] = loadFeats().map((entry) => ({
+  id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
+  category: entry.category, repeatable: entry.repeatable,
+  prerequisiteLevel: entry.prerequisite?.level ?? null,
+  prerequisiteAbilities: entry.prerequisite?.abilityScores ?? [],
+  prerequisiteRequires: entry.prerequisite?.requires ?? [],
+  prerequisiteText: entry.prerequisite?.text ?? null,
+  feature: featureSummaryOf(entry.feature)
+})).sort(byName);
+
+const nameBundles: readonly ContentNameBundle[] = loadNames().map((entry) => ({
+  speciesId: entry.speciesId, source: entry.source,
+  pools: entry.pools.map((pool) => ({ id: pool.id, label: pool.label, names: pool.names }))
 }));

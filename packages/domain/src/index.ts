@@ -440,6 +440,40 @@ export type ContentSpellsResult = { ok: boolean; message?: string; spells?: read
 /** One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only for those categories. */
 export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: "weapon" | "armor" | "shield" | "ammunition" | "adventuring-gear" | "tool" | "equipment-pack" | "consumable" | "focus" | "wondrous"; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
+
+// ---------- Character-builder catalogs ----------
+// One merged catalog per type, read-only, public SRD *rules* reference: a player builds their own
+// character, so unlike the bestiary these are readable by any joined session. Every response carries
+// the CC BY 4.0 `attribution` line the displaying surface must show (ADR-0015).
+
+/** Where a catalog record came from. Bundled SRD and GM homebrew live in ONE catalog, merged server-side, so the wizard can't tell them apart (adapters, never forks). */
+export type ContentSourceKind = "srd" | "homebrew";
+/**
+ * A class/subclass/species/background/feat feature as data - the browse-and-pick projection of the
+ * bundle's shared `FeatureRecord`: prose, the level it lands at, its grouping tags, and whether it
+ * asks the player to choose something. No feature is ever hardcoded client or server behavior;
+ * homebrew authors the same record. The structured riders (granted actions, effects, modifiers,
+ * limited uses) stay on the server-side record - the server, never the wizard, applies them.
+ */
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null }> | null }>;
+/** One playable class. `hitDie` ("d10") keys the multiclass hit-dice pool, `statPriority` drives the random generator, and `spellcastingProgression` is what a multiclass slot table sums. */
+export type ContentClassSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; hitDie: string; statPriority: readonly string[]; primaryAbilities: readonly string[]; savingThrows: readonly string[]; skillChoiceCount: number; skillChoices: readonly string[]; subclassLevel: number; subclassLabel: string | null; asiLevels: readonly number[]; spellcastingAbility: string | null; spellcastingProgression: "full" | "half" | "third" | "pact" | null; startingEquipmentOptions: readonly string[]; features: readonly ContentFeatureSummary[] }>;
+export type ContentClassesResult = { ok: boolean; message?: string; classes?: readonly ContentClassSummary[]; attribution?: string };
+/** One subclass, keyed to its parent `classId`. `subclassLevel` is null when it simply inherits the class's own subclass level. */
+export type ContentSubclassSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; classId: string; summary: string | null; description: string | null; subclassLevel: number | null; spellcastingAbility: string | null; spellcastingProgression: "full" | "half" | "third" | "pact" | null; features: readonly ContentFeatureSummary[] }>;
+export type ContentSubclassesResult = { ok: boolean; message?: string; subclasses?: readonly ContentSubclassSummary[]; attribution?: string };
+/** One playable species and its traits-as-data. `sizes` is a list because several 2024 species let the player pick. SRD 5.2.1 puts ability increases on the BACKGROUND, so a species usually grants none. */
+export type ContentSpeciesSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; sizes: readonly string[]; speedFeet: number; darkvisionFeet: number | null; creatureType: string; languages: readonly string[]; lineages: ReadonlyArray<{ id: string; name: string; description: string | null }>; features: readonly ContentFeatureSummary[] }>;
+export type ContentSpeciesResult = { ok: boolean; message?: string; species?: readonly ContentSpeciesSummary[]; attribution?: string };
+/** One background: the ability-increase options and proficiencies it grants, its origin feat, and its starting-equipment choices (chosen option recorded in the character's `choices[]` ledger). */
+export type ContentBackgroundSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; abilityOptions: Readonly<{ from: readonly string[]; spreads: ReadonlyArray<readonly number[]> }> | null; originFeatId: string | null; skillProficiencies: readonly string[]; toolProficiencies: readonly string[]; languages: readonly string[]; startingEquipmentOptions: readonly string[]; features: readonly ContentFeatureSummary[] }>;
+export type ContentBackgroundsResult = { ok: boolean; message?: string; backgrounds?: readonly ContentBackgroundSummary[]; attribution?: string };
+/** One feat. Prerequisites are reported as data + prose for display; the SERVER decides whether one is met, never the wizard. A feat IS a feature plus catalog metadata - hence the single `feature`. */
+export type ContentFeatSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; category: string; repeatable: boolean; prerequisiteLevel: number | null; prerequisiteAbilities: ReadonlyArray<{ ability: string; minimum: number }>; prerequisiteRequires: readonly string[]; prerequisiteText: string | null; feature: ContentFeatureSummary }>;
+export type ContentFeatsResult = { ok: boolean; message?: string; feats?: readonly ContentFeatSummary[]; attribution?: string };
+/** Hand-authored name pools for one species, feeding the builder's random generator. Pool `id` is an open slug and pool order comes from the data, so new pools are additive. */
+export type ContentNameBundle = Readonly<{ speciesId: string; source: ContentSourceKind; pools: ReadonlyArray<{ id: string; label: string; names: readonly string[] }> }>;
+export type ContentNamesResult = { ok: boolean; message?: string; names?: readonly ContentNameBundle[]; attribution?: string };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
@@ -550,6 +584,12 @@ export interface ClientToServerEvents {
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
   "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
+  "content:classes": (payload: Record<string, never>, acknowledgement: (result: ContentClassesResult) => void) => void;
+  "content:subclasses": (payload: Record<string, never>, acknowledgement: (result: ContentSubclassesResult) => void) => void;
+  "content:species": (payload: Record<string, never>, acknowledgement: (result: ContentSpeciesResult) => void) => void;
+  "content:backgrounds": (payload: Record<string, never>, acknowledgement: (result: ContentBackgroundsResult) => void) => void;
+  "content:feats": (payload: Record<string, never>, acknowledgement: (result: ContentFeatsResult) => void) => void;
+  "content:names": (payload: Record<string, never>, acknowledgement: (result: ContentNamesResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
   "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; commit?: boolean; attackNatural?: number; attackTotal?: number; critical?: boolean; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;

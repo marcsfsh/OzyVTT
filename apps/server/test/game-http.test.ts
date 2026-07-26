@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { GameStateSchema } from "@vtt/domain";
+import { loadActorFixture } from "@vtt/test-fixtures";
 import { CONTENT_PATHS, ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS, GameCommandCatalogResponseSchema, GameLogResponseSchema, GameMutationAcceptedResponseSchema, GameSnapshotResponseSchema, EncounterArchiveListResponseSchema, openApiDocument, PlayerSessionIssuedResponseSchema, SESSION_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_COMMAND_SCOPES } from "../src/game-commands.js";
@@ -312,6 +315,106 @@ describe("public game API over /api/v1", () => {
     expect(badLimit.status).toBe(400);
   });
 
+  it("serves every public rules catalog to a player session over HTTP, with the CC BY attribution the builder must display", async () => {
+    const { base, server, gmToken } = await boot();
+    const reader = await issueCredential(base, gmToken, "builder client", ["game:read"]);
+    const playerToken = server.auth.issuePlayerSession();
+
+    // Spells and equipment were socket-only before P1.5; they are public reference like conditions,
+    // so a player session reads them over HTTP too (the character wizard runs from a player seat).
+    const spells = await fetch(base + CONTENT_PATHS.spells, { headers: bearer(playerToken) });
+    expect(spells.status).toBe(200);
+    const spellsBody = await spells.json();
+    expect(spellsBody.data.spells.length).toBeGreaterThan(100);
+    expect(spellsBody.data.spells[0]).toHaveProperty("castingOptions");
+
+    const equipment = await fetch(base + CONTENT_PATHS.equipment, { headers: bearer(playerToken) });
+    expect(equipment.status).toBe(200);
+    const equipmentBody = await equipment.json();
+    expect(equipmentBody.data.equipment.length).toBeGreaterThan(50);
+    expect(typeof equipmentBody.data.attribution).toBe("string");
+
+    // The six character-builder catalogs, on the same audience terms. The bundles are seed content
+    // (phase 1.1) and grow in later phases, so these assert "at least one real row" rather than counts.
+    const catalogs = [
+      [CONTENT_PATHS.classes, "classes"],
+      [CONTENT_PATHS.subclasses, "subclasses"],
+      [CONTENT_PATHS.species, "species"],
+      [CONTENT_PATHS.backgrounds, "backgrounds"],
+      [CONTENT_PATHS.feats, "feats"],
+      [CONTENT_PATHS.names, "names"]
+    ] as const;
+    const catalogRows: Record<string, ReadonlyArray<Record<string, unknown>>> = {};
+    for (const [path, key] of catalogs) {
+      const asPlayer = await fetch(base + path, { headers: bearer(playerToken) });
+      expect(asPlayer.status, `player GET ${path}`).toBe(200);
+      const body = await asPlayer.json();
+      expect(Array.isArray(body.data[key]), `${path} returns ${key}[]`).toBe(true);
+      expect(body.data[key].length, `${path} has rows`).toBeGreaterThan(0);
+      expect(typeof body.data.attribution, `${path} carries attribution`).toBe("string");
+      catalogRows[key] = body.data[key];
+      // Same read through a scoped integration credential and a GM session.
+      expect((await fetch(base + path, { headers: bearer(reader.token) })).status).toBe(200);
+      expect((await fetch(base + path, { headers: bearer(gmToken) })).status).toBe(200);
+      expect((await fetch(base + path)).status, `anonymous GET ${path}`).toBe(401);
+    }
+
+    // Spot-check that the wire projection actually carries what the wizard picks on, rather than
+    // shipping a well-authorized empty shape: source discriminator, the multiclass hit die, the
+    // generator's stat priority, and features-as-data including the choices a feature asks for.
+    const fighter = catalogRows.classes.find((entry) => entry.id === "fighter") as Record<string, unknown>;
+    expect(fighter.source).toBe("srd");
+    expect(fighter.hitDie).toBe("d10");
+    expect(fighter.statPriority).toHaveLength(6);
+    expect(fighter.savingThrows).toEqual(["str", "con"]);
+    const features = fighter.features as ReadonlyArray<Record<string, unknown>>;
+    expect(features.length).toBeGreaterThan(0);
+    expect(features.find((feature) => feature.choice)?.choice).toMatchObject({ kind: expect.any(String), choose: expect.any(Number) });
+    // Subclasses key to their parent class, and name pools to their species - both open slugs.
+    expect(catalogRows.subclasses.every((entry) => typeof entry.classId === "string")).toBe(true);
+    expect(catalogRows.names.every((entry) => typeof entry.speciesId === "string" && (entry.pools as unknown[]).length > 0)).toBe(true);
+  });
+
+  it("runs the player-submitted character import through the HTTP twin: player submits, only the GM resolves", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    const definition = loadActorFixture("player-character") as Record<string, unknown>;
+
+    // A player session may submit - this is the player path the wizard rides on.
+    const importId = randomUUID();
+    const submitted = await post(base, GAME_PATHS.characterImports, playerToken, { commandId: importId, definition });
+    expect(submitted.status).toBe(200);
+    const submitBody = GameMutationAcceptedResponseSchema.parse(await submitted.json());
+    expect(submitBody.data.commandId).toBe(importId);
+    expect(submitBody.data.duplicate).toBe(false);
+
+    // commandId idempotency survives the second transport: the same id replays instead of re-queueing.
+    const replay = GameMutationAcceptedResponseSchema.parse(await (await post(base, GAME_PATHS.characterImports, playerToken, { commandId: importId, definition })).json());
+    expect(replay.data.duplicate).toBe(true);
+    // expectedRevision optimistic concurrency is preserved too.
+    const stale = await post(base, GAME_PATHS.characterImports, playerToken, { commandId: randomUUID(), definition, expectedRevision: 0 });
+    expect(stale.status).toBe(409);
+    expect((await stale.json()).error.currentRevision).toBe(submitBody.data.revision);
+
+    // Resolving is GM-only - the operation's own role check, not the route's, refuses the player.
+    const resolvePath = GAME_PATHS.characterImportResolve.replace("{importId}", importId);
+    const refused = await post(base, resolvePath, playerToken, { approve: true });
+    expect(refused.status).toBe(403);
+
+    const approved = await post(base, resolvePath, gmToken, { approve: true });
+    expect(approved.status).toBe(200);
+    const approvedBody = GameMutationAcceptedResponseSchema.parse(await approved.json());
+    const actorId = approvedBody.data.actorId as string;
+    // The approved character must be keyed `import-<actorId>` or it is permanently un-editable and un-removable.
+    const snapshot = GameSnapshotResponseSchema.parse(await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(gmToken) })).json());
+    const actors = (snapshot.data.game as { actors: ReadonlyArray<{ id: string; definitionId?: string | null }> }).actors;
+    expect(actors.find((actor) => actor.id === actorId)?.definitionId).toBe(`import-${actorId}`);
+    expect((snapshot.data.game as { pendingImports: readonly unknown[] }).pendingImports).toHaveLength(0);
+
+    // A second decision on the same submission is refused - it already left the queue.
+    expect((await post(base, resolvePath, gmToken, { approve: false })).status).toBe(409);
+  });
+
   it("serves the enriched Time Machine archives under /api/v1 with scope + GM-grade gating", async () => {
     const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
     const reader = await issueCredential(base, gmToken, "archivist", ["combat:read"]);
@@ -535,6 +638,8 @@ describe("public game API over /api/v1", () => {
       [GAME_PATHS.actorHp, "post", "actor.set-hp"],
       [GAME_PATHS.actorConditions, "post", "actor.set-condition"],
       [GAME_PATHS.definitionsImport, "post", "actor.import-definition"],
+      [GAME_PATHS.characterImports, "post", "character.submit-import"],
+      [GAME_PATHS.characterImportResolve, "post", "character.resolve-import"],
       [GAME_PATHS.rolls, "post", "dice.roll"],
       [GAME_PATHS.actionResolve, "post", "action.resolve"],
       [GAME_PATHS.saveAnswer, "post", "save.answer"],
@@ -597,5 +702,51 @@ describe("public game API over /api/v1", () => {
       const documented = paths[path][method].security?.find((entry) => "bearerAuth" in entry)?.bearerAuth;
       expect(documented, `${method.toUpperCase()} ${path} (${type})`).toEqual([GAME_COMMAND_SCOPES[type]]);
     }
+  });
+
+  it("gives every Socket.IO capability an HTTP twin - no socket-only capability (ADR-0016)", () => {
+    // The guard the earlier debt slipped past: the route-table test above compares
+    // GAME_COMMAND_SCOPES <-> typed routes <-> OpenAPI, so a capability that never entered
+    // GAME_COMMAND_SCOPES was invisible to all three (character.submit-import / resolve-import,
+    // content:spells, content:equipment all shipped socket-only that way). This test starts from the
+    // OTHER end - the socket surface itself - and demands each event reach the public API.
+    const source = readFileSync(fileURLToPath(new URL("../src/server.ts", import.meta.url)), "utf8");
+    const events = [...source.matchAll(/socket\.on\("([a-z0-9:-]+)"/g)].map((match) => match[1]);
+    expect(events.length).toBeGreaterThan(80); // the scrape actually found the handlers
+
+    // Reads and session issuance aren't commands, so each names the documented operation serving the same data.
+    const READ_TWINS: Readonly<Record<string, readonly [string, string]>> = {
+      "session:join": [SESSION_PATHS.player, "post"],
+      "log:read": [GAME_PATHS.log, "get"],
+      "actor:available-actions": [GAME_PATHS.actorAvailableActions, "get"],
+      "content:monsters": [CONTENT_PATHS.monsters, "get"],
+      "content:monster-sheet": [CONTENT_PATHS.monsterById, "get"],
+      "content:monster-actions": [CONTENT_PATHS.monsterActions, "get"],
+      "content:conditions": [CONTENT_PATHS.conditions, "get"],
+      "content:spells": [CONTENT_PATHS.spells, "get"],
+      "content:equipment": [CONTENT_PATHS.equipment, "get"],
+      "content:classes": [CONTENT_PATHS.classes, "get"],
+      "content:subclasses": [CONTENT_PATHS.subclasses, "get"],
+      "content:species": [CONTENT_PATHS.species, "get"],
+      "content:backgrounds": [CONTENT_PATHS.backgrounds, "get"],
+      "content:feats": [CONTENT_PATHS.feats, "get"],
+      "content:names": [CONTENT_PATHS.names, "get"]
+    };
+    const TRANSPORT_ONLY = new Set(["disconnect"]); // Socket.IO lifecycle, not a game capability
+
+    for (const event of events) {
+      if (TRANSPORT_ONLY.has(event)) continue;
+      const twin = READ_TWINS[event];
+      if (twin) {
+        expect(openApiDocument.paths, `socket read "${event}" has no documented HTTP twin`).toHaveProperty([twin[0], twin[1]]);
+        continue;
+      }
+      // Every other event is a mutation: the socket name and the command type are the same string
+      // with `:` swapped for `.`, and the command type must be publicly cataloged.
+      const commandType = event.replace(":", ".");
+      expect(Object.keys(GAME_COMMAND_SCOPES), `socket command "${event}" is not in GAME_COMMAND_SCOPES (socket-only capability)`).toContain(commandType);
+    }
+    // And nothing in the read table is stale.
+    for (const event of Object.keys(READ_TWINS)) expect(events, `READ_TWINS lists "${event}", which server.ts no longer handles`).toContain(event);
   });
 });

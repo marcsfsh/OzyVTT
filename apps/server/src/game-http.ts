@@ -243,6 +243,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.actorHp), ...command("actor.set-hp", actorIdParam));
   router.post(expressPath(GAME_PATHS.actorConditions), ...command("actor.set-condition", actorIdParam));
   router.post(expressPath(GAME_PATHS.definitionsImport), ...command("actor.import-definition"));
+  router.post(expressPath(GAME_PATHS.characterImports), ...command("character.submit-import"));
+  router.post(expressPath(GAME_PATHS.characterImportResolve), ...command("character.resolve-import", (req: Request) => ({ importId: req.params.importId })));
   router.post(expressPath(GAME_PATHS.rolls), ...command("dice.roll"));
   router.post(expressPath(GAME_PATHS.actionResolve), ...command("action.resolve"));
   router.post(expressPath(GAME_PATHS.saveAnswer), ...command("save.answer", saveIdParam));
@@ -321,6 +323,16 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.get(expressPath(CONTENT_PATHS.monsterById), authorize("game:read"), (req, res) => sendContent(res, () => ops.contentMonsterSheet(res.locals.principal as GamePrincipal, { definitionId: req.params.definitionId })));
   router.get(expressPath(CONTENT_PATHS.monsterActions), authorize("game:read"), (req, res) => sendContent(res, () => ops.contentMonsterActions(res.locals.principal as GamePrincipal, { definitionId: req.params.definitionId })));
   router.get(expressPath(CONTENT_PATHS.conditions), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentConditions(res.locals.principal as GamePrincipal)));
+  // Rules catalogs: public SRD reference, so these accept a player session too (the operations enforce
+  // that themselves - no requireGmGrade). The bestiary above is the deliberate GM-only exception.
+  router.get(expressPath(CONTENT_PATHS.spells), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSpells(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.equipment), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentEquipment(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.classes), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentClasses(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.subclasses), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSubclasses(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.species), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSpecies(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.backgrounds), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentBackgrounds(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.feats), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentFeats(res.locals.principal as GamePrincipal)));
+  router.get(expressPath(CONTENT_PATHS.names), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentNames(res.locals.principal as GamePrincipal)));
 
   // ---------- Encounter archives (Time Machine v2) ----------
 

@@ -190,6 +190,33 @@ export function createGameOperations(context: GameOperationsContext) {
       return { equipment: contentLibrary.equipmentSummaries(), attribution: contentLibrary.attribution };
     },
 
+    // The six character-builder catalogs. Deliberately NOT gated like the bestiary: a player builds
+    // their own character, so any joined session reads them (the same audience as conditions, spells
+    // and equipment). Attribution rides on every one - ADR-0015 requires the wizard to display it.
+    contentClasses(_principal: GamePrincipal) {
+      return { classes: contentLibrary.classSummaries(), attribution: contentLibrary.attribution };
+    },
+
+    contentSubclasses(_principal: GamePrincipal) {
+      return { subclasses: contentLibrary.subclassSummaries(), attribution: contentLibrary.attribution };
+    },
+
+    contentSpecies(_principal: GamePrincipal) {
+      return { species: contentLibrary.speciesSummaries(), attribution: contentLibrary.attribution };
+    },
+
+    contentBackgrounds(_principal: GamePrincipal) {
+      return { backgrounds: contentLibrary.backgroundSummaries(), attribution: contentLibrary.attribution };
+    },
+
+    contentFeats(_principal: GamePrincipal) {
+      return { feats: contentLibrary.featSummaries(), attribution: contentLibrary.attribution };
+    },
+
+    contentNames(_principal: GamePrincipal) {
+      return { names: contentLibrary.nameBundles(), attribution: contentLibrary.attribution };
+    },
+
     contentMonsterActions(principal: GamePrincipal, raw: unknown) {
       requireGmGrade(principal, "Only the GM can browse stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The action lookup is malformed.");
@@ -1608,6 +1635,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["token.move", "Move a combatant's token (server-snapped); position null returns it to the tray.", (p, raw) => operations.tokenMove(p, raw)],
     ["actor.add-from-definition", "Instantiate a bundled SRD monster onto the roster (GM).", (p, raw) => operations.actorAddFromDefinition(p, raw)],
     ["actor.import-definition", "Import a canonical ActorDefinition JSON as a claimable actor (GM).", (p, raw) => operations.actorImportDefinition(p, raw)],
+    ["character.submit-import", "Submit a character sheet into the GM's approval queue (anyone at the table); the queued importId equals the commandId.", (p, raw) => operations.characterSubmitImport(p, raw)],
+    ["character.resolve-import", "Approve or reject a queued character submission (GM); approving instantiates the actor, whose id equals the commandId.", (p, raw) => operations.characterResolveImport(p, raw)],
     ["actor.remove", "Remove an actor from the roster (GM).", (p, raw) => operations.actorRemove(p, raw)],
     ["actor.apply-damage", "Apply damage (GM anyone; a player their claimed character).", (p, raw) => operations.actorApplyDamage(p, raw)],
     ["actor.heal", "Heal hit points (GM anyone; a player their claimed character).", (p, raw) => operations.actorHeal(p, raw)],
