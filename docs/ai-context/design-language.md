@@ -29,12 +29,17 @@ right.
 - **Primitives:** `@vtt/ui` exports the shared components — `Button`,
   `Field`/`Input`/`Select`/`Textarea`, `Panel`, `Tabs`, `Menu`, `Tooltip`,
   `Modal`, `Chip`, `Wordmark`, `Eyebrow`, `ToastProvider`/`useToast`,
-  `ThemeToggle`, `useTheme`, plus the guided-flow set (`WizardShell`, `Steps`,
-  `ChoiceCard`, `ChoiceGrid`, `AbilityScoreAllocator`, `DiceInputRow`, `NameField`,
-  `FeatureList`, `ReviewSummary`) and the system's own SVG glyphs (`IconCheck`,
-  `IconChevron`, `IconSearch`, `IconShuffle`, `IconDie`, `IconPencil` — primitives
-  never use emoji). Build new UI from these; do not hand-roll bespoke controls.
-  Primitive CSS classes are `nh-`-namespaced.
+  `ThemeToggle` (which *is* a `SegmentedControl` — it has no styling of its own),
+  `useTheme`, plus the guided-flow set (`WizardShell`, `Steps`, `ChoiceCard`,
+  `ChoiceGrid`, `AbilityScoreAllocator`, `DiceInputRow`, `NameField`, `FeatureList`,
+  `ReviewSummary`) and the system's own SVG glyphs (`IconCheck`, `IconChevron`,
+  `IconSearch`, `IconShuffle`, `IconDie`, `IconPencil`, `IconWarning`, `IconInfo`).
+  **Primitives never render a glyph as text** — not emoji, and not "text" symbols like
+  `⚠` (U+26A0): Manrope has no glyph for it, so it silently falls back to a system
+  face at the wrong size, and iOS/Android give it *emoji* presentation (a yellow
+  triangle — a hue this palette does not own). An SVG glyph takes `currentColor` and
+  renders identically everywhere. Build new UI from these; do not hand-roll bespoke
+  controls. Primitive CSS classes are `nh-`-namespaced.
 - **Living reference:** the dev-only `/styleguide` route (`styleguide.html`)
   renders every token, type role, and primitive with its states and a live theme
   switch. A new primitive isn't done until it appears there.
@@ -133,6 +138,13 @@ Semantic map (hue is a hint, never the only signal):
 | Damage / destroy / critical | `--danger` (rose-red) | a distinct icon and label |
 | Info / neutral highlight | `--info` (indigo) | plain, low urgency |
 
+**"Not finished" is caution, not danger.** Rose-red is reserved for damage and
+destruction — an actual loss. A blocked Next, an incomplete review section, a locked
+choice card: nothing has gone wrong, the flow is simply not done, so those use
+`--caution`. Both violet and rose have a text-safe partner (`--caution-hi`,
+`--danger-hi`) because the fill hue does not meet AA as small type — use the `-hi`
+token for the words and the base token for edges and fills.
+
 Text: primary `--text`, secondary `--text-dim`, muted/placeholder `--text-muted`,
 and `--text-on-neon` for ink on bright fills (its value flips per theme).
 
@@ -166,7 +178,14 @@ face. Use `font-variant-numeric: tabular-nums` on anything that updates live.
 
 Scale: `--fs-display 34`, `--fs-h1 26`, `--fs-h2 20`, `--fs-h3 16`, `--fs-body 15`,
 `--fs-sm 13`, `--fs-xs 11`. Eyebrows/small-caps track `+0.08em`; display `+0.01em`;
-do not track out body text.
+do not track out body text. Those two values are tokens — `--tracking-eyebrow` and
+`--tracking-display`. Use the token; a hand-typed `.05em`/`.06em`/`.07em` is the same
+role rendered four slightly different ways.
+
+Breakpoints are a fixed ladder, not per-file taste: **760 / 650 / 560** (plus
+`min-width: 850/980` where a layout earns a third column). Full rationale in
+`mobile-ux.md`. A new number in a new stylesheet means two components change shape at
+widths 140px apart for no reason.
 
 ---
 
@@ -181,29 +200,61 @@ do not track out body text.
 
 ### The 44px touch-target floor (authoritative)
 
-**Every interactive control presents a hit area of at least `--tap-min` (44px) on
-every device.** Phone and laptop are the same build (mobile-ux.md), so there is no
+**The rule:** an interactive control presents a hit area of at least `--tap-min`
+(44px). Phone and laptop are the same build (mobile-ux.md), so there is no
 "desktop-only" control that may be smaller. This is a floor, not a size: it governs
 the *hit area*, never the paint.
+
+**Where it actually holds today** — this is the honest scope, not an aspiration:
+
+- **Every `@vtt/ui` primitive.** Measured 2026-07-26 at a 375px viewport across the
+  whole `/styleguide` page: **0 controls below the floor**. New UI composed from
+  `@vtt/ui` inherits it for free, which is the main reason to compose rather than
+  hand-roll.
+- **The named app controls that carry it themselves** (they are not primitives, and
+  each states its route in a comment): `.encounter-map-icon` (map tools),
+  `.combatant-choice` / `.encounter-players-roll-init` / `.manual-nat20` (the
+  label is the hit area for a bare checkbox), `.combatant-remove`,
+  `.encounter-add-monsters`, `.scene-card-grip`.
+
+**Known exceptions** (real, measured, and not yet fixed — do not claim otherwise):
+
+| Control | Measured @375 | Why it is still open |
+|---|---|---|
+| `DicePanel`'s two `<summary>` disclosures | 39px and 19.5px tall | Unclassed `<summary>` in `apps/client/src/dice/`; needs a scoped rule there. |
+| `.encounter-map-swatches button` (color picker) | 24×24 | Inside a popover grid; 44px areas would overlap at the current 4.8px gap. |
+| Raw `<input type="checkbox">` outside the named labels above | 13–20px | A replaced element cannot take `::after`; each one needs its wrapping `<label>` to carry `min-height`. |
 
 Two ways to meet it — pick by whether growing the paint hurts:
 
 1. **Grow the paint** (`min-height: var(--tap-min)`) where a taller control is
    harmless or better: `.nh-btn`, `.nh-input`, `.nh-tab`, `.nh-menu-trigger`,
-   `.nh-menu-item`, `.nh-stepper-btn` (also `width`), `.nh-feature-summary`.
+   `.nh-menu-item`, `.nh-stepper-btn` (also `width`), `.nh-feature-summary`,
+   `.nh-choice`, `.nh-step-jump`, `.nh-namefield-suggestion`.
    Stacked lists (menus, disclosure rows) **must** use this — overlapping invisible
    extensions in a vertical list steal their neighbours' taps.
 2. **Grow only the area** with the `.tap-target` utility, which centres a
    `--tap-min` box on the control via `::after`. Use it where the light visual
    weight is the point: `.nh-btn--sm` (32px paint), `.nh-iconbtn` (36px),
    `.nh-segmented-option`, `.nh-switch` (22px), `.nh-chip-remove` (18px),
-   `.nh-modal-close`. Never on a control that already uses `::after` for a visual
-   (the active tab's underline) — give those a `min-height` instead.
+   `.nh-chip--pressable` (32px), `.nh-toast-close` (20px), `.nh-modal-close`,
+   `.nh-menu-trigger--icon` (28px). Never on a control that already uses `::after`
+   for a visual (the active tab's underline) — give those a `min-height` instead.
+
+**Route 2 has a gap budget.** A `::after` box overhangs the paint by
+`(44 − paint) / 2` per side, so **neighbouring controls must be gapped by at least
+the sum of their overhangs** or the later sibling silently steals the earlier one's
+taps. Worked examples in the codebase: `.nh-card-tools` gaps by `--space-4` (28px
+squares, 8px overhang each); a pressable-chip row gaps by `--space-3` (32px paint,
+6px overhang each); `.encounter-map-tools` gets away with 4.8px because its paint is
+40px (2px overhang each).
 
 New controls inherit this by composing `@vtt/ui` primitives. A hand-rolled control
-must state which of the two routes it took. Verify by measuring, not by eye:
-`getBoundingClientRect().height` (or the `::after` height for `.tap-target`) at a
-375px viewport.
+must state which of the two routes it took. **Verify by measuring, not by eye**, and
+not with `getBoundingClientRect()` alone — that misses the `::after`. At a 375px
+viewport, take `max(rect.height, parseFloat(getComputedStyle(el, "::after").height))`,
+and confirm the area is genuinely reachable by walking `document.elementFromPoint`
+outward from the control's centre until it stops returning the control.
 
 ---
 
@@ -227,6 +278,15 @@ must state which of the two routes it took. Verify by measuring, not by eye:
   chips: pill, `--surface-3`, 1px accent border by category (harmful `--danger`,
   magical/concentration `--violet`, beneficial `--cyan`), each with an icon +
   short label so category reads without color.
+- **Selected vs hover.** Hover owns the surface lift (`--surface-2`); selection owns
+  the edge, the glow, and the check mark. A selected state must never take hover's
+  fill, or "the pointer is here" and "this is my answer" become the same pixels.
+- **Disabled.** Dim **per property** — `color`, `border-color`, `background` — never
+  with a group `opacity`. Group alpha composites the whole subtree, so a child cannot
+  opt back out of it (`.child { opacity: 1 }` inside an `opacity: .55` parent is a
+  no-op), and the one thing a disabled control most needs to say — *why* it is
+  disabled — is exactly what gets dimmed below AA. The reason text stays at full
+  strength in `--caution-hi`.
 
 ---
 
@@ -278,7 +338,12 @@ off screens that hold dense text.
 
 ## 8. Restraint rules ("not too overt")
 
-1. At most one glowing element per region at rest.
+1. At most one glowing element per region at rest. A *region* is one working area,
+   not one screen: a faceted picker is one region, so its filter and its answer
+   cannot both glow. When two candidates compete, the glow goes to the **answer**
+   (the selected card), never to the control that narrowed the list — which is why
+   `.nh-segmented-option[aria-pressed]` reads as pressed with `--surface-3` + `--text`
+   and no glow at all.
 2. Texture stays off dense text; the everyday grain lives at the shell level.
 3. Neon is for edges and states; fills are dark (surface tokens).
 4. The color-ramp bloom appears once per view at most.

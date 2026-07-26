@@ -33,7 +33,10 @@
 .combatant-setup li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .75rem 0; border-bottom: 1px solid var(--line); }
 .combatant-tools { display: flex; align-items: center; gap: .5rem; }
 .combatant-tools .initiative-score { width: 8rem; }
-.combatant-remove { flex: none; width: 1.9rem; height: 1.9rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); cursor: pointer; }
+/* Icon button: compact paint, 44px hit area from the `.tap-target` recipe (§4 route 2). The 6.8px of
+   overhang per side clears its neighbours — .combatant-tools gaps by 8px, rows by 24px. */
+.combatant-remove { position: relative; flex: none; width: 1.9rem; height: 1.9rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--danger-hi); font-size: var(--fs-sm); cursor: pointer; }
+.combatant-remove::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, var(--tap-min)); height: max(100%, var(--tap-min)); transform: translate(-50%, -50%); }
 .combatant-remove:hover:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 80%, var(--danger)); color: var(--danger-hi); }
 /* The <label> wraps the box, so the whole row IS the control's hit area — that is what carries the
    44px floor here (a bare checkbox can't take a ::after; it's a replaced element). The box itself
@@ -687,7 +690,7 @@
 .you-are-playing-buttons { display: flex; gap: .5rem; }
 .you-are-playing-buttons button { flex: 0 0 auto; padding: .6rem 1.1rem; text-align: center; }
 @media (max-width: 560px) { .sheet-abilities { grid-template-columns: repeat(3, 1fr); } .sheet-meta dt { min-width: 6rem; } }
-.encounter-add-monsters { width: 100%; margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
+.encounter-add-monsters { width: 100%; min-height: var(--tap-min); margin: .9rem 0 .6rem; padding: .6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--text-dim); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .encounter-add-monsters:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cyan) 55%, transparent); background: var(--surface-2); color: var(--text); }
 /* Monster browser renders in the shared Modal, sized for a scrollable list. */
 .monster-browser-controls { display: flex; flex-direction: column; gap: .5rem; margin-top: .2rem; }
