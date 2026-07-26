@@ -482,6 +482,21 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **D&D Beyond PDF importer — Phase 1.5 (2026-07-26, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
+  A GM imports a D&D Beyond **PDF export** from the roster ("Import from D&D Beyond (PDF)", beside the JSON
+  import). The DDB 2024 sheet is a **named AcroForm**, so extraction is a deterministic field-name → schema
+  mapping in a new **`packages/dndbeyond-pdf`** (`pdfjs-dist`, Apache-2.0): widgets → a draft
+  `actor-character` definition validated against the real `ActorDefinitionSchema`, then a **review modal**
+  (editable name/AC/HP/speed + warnings) whose confirm reuses the existing `actor:import-definition` command
+  (no new server surface; the server still re-validates). Extraction is **client-side/in-browser** — the PDF
+  never leaves the device (amends ADR-0018's server-worker proposal; pdfjs worker bundled locally, no CDN).
+  Recovers identity/classes, abilities, AC/HP/speed/init/PB, save+skill proficiencies (incl. expertise),
+  spellcasting (ability/DC/slots/pact/spells with prepared+level), weapons→actions, and inventory;
+  **flag-and-degrades** on ambiguity (>4-class multiclass caps to 4 + warns; non-caster → no spellcasting).
+  **Verified:** `packages/dndbeyond-pdf` **11 vitest golden tests** over 6 sanitized widget fixtures (all
+  validate against the real schema; source PDFs gitignored), monorepo `check` green, client `build` green
+  (worker emits as a local asset). GM-initiated in v1. **Pending:** a live GM/mobile browser smoke (no e2e
+  harness in-repo). Deferred: player-upload + GM approval, the 2014 layout, OCR, the DDB JSON on-ramp.
 - **Player-driven combat + unified dice input (2026-07-24, branch
   `claude/character-sheet-combat-3uwp2t`).** Finishes the specced-but-lighter "Slice 2" of
   `docs/product/character-sheet-initiative.md`: players now run their own combat rolls, and the

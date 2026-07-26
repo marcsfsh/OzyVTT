@@ -7,6 +7,16 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-26 — D&D Beyond PDF importer extracts client-side (ADR-0018 amended)
+
+The DDB PDF export is a **named AcroForm** (every value is a widget with a field name), so the
+importer extracts **in the browser** with `pdfjs-dist` as a deterministic field-name → schema
+mapping (`packages/dndbeyond-pdf`), not the server-side MarkItDown worker ADR-0018 originally
+proposed. The PDF never leaves the device; the reviewed draft reuses the existing
+`actor:import-definition` command and the server re-validates it (authority unchanged). GM-initiated
+for v1; ambiguity flag-and-degrades (a >4-class multiclass caps to 4 + warns). Verified by 11 golden
+tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
+
 ## Architecture (see `docs/adr/` for full rationale)
 
 - **Authoritative LAN server owns `GameState`.** No game decision runs on the client. (ADR-0001)
