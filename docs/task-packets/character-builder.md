@@ -106,6 +106,26 @@ same record). Projected to **the GM and the owning player**, nobody else. Supers
 **PHASE 2 — Vertical slice (prove it).** Fighter + Wizard + Cleric authored to level 20; species +
 backgrounds; wizard creates a level-1..20 single-class character end-to-end; GM path; attribution footer.
 
+*Phase-2 amendments (2026-07-26, from the requirements-QA pass):*
+- **Mint `character.create` after all** (supersedes §3's "reuse import, don't mint a create verb"). The
+  earlier resolution assumed the client assembles the `ActorDefinition`; QA established that feature
+  riders are deliberately withheld from the wire (so the client can't become a second rules engine),
+  which means **assembly must happen server-side**. `character.create` takes the *choices* (identity ids,
+  base scores + background bonus allocation, per-level HP entries, and the `character.choices[]` ledger
+  as the literal build input), and the server's feature-rider interpreter assembles the definition and
+  lands it through `importActorDefinition` — so the `import-<actorId>` keying trap that motivated the
+  original resolution is still satisfied. GM-only in Phase 2; Phase 3's player path reuses the same
+  assembly into the draft/approval flow. Client previews mirror, never replace, the server result.
+- **Auto-rolls go through the existing `dice.roll`** (server-authoritative, in roll history, zero new
+  API); manual mode is the player typing their physical result into the draft, validated on submit.
+- **The wizard's steps are, canonically:** 1 Species · 2 Background · 3 Class & level · 4 Class
+  features (subclass, ASIs/feats, fighting styles, spells) · 5 Ability scores · 6 Equipment · 7 Name &
+  review.
+- **Must-fix-first items** (QA blockers): the `fromCatalog` resolver + restored spell-list link, the
+  decision-10 builder policy (`builder.set-policy`, GM-writable / player-readable, both transports),
+  and the dropped class/species/background wire fields. The bundle→rules adapter and the skills
+  catalog (`content:skills` + an `ability` column) land in the same slice.
+
 **PHASE 3 — Player path + drafts.** `characterDrafts` store, resume-anywhere, pending-approval sheet
 (viewable/editable, campaign-inert), GM approval queue UI.
 
