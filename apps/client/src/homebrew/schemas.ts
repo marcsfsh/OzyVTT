@@ -150,8 +150,11 @@ const proficiencyFields = (): readonly FieldDef[] => [
   { key: "toolProficiencies", label: "Tool proficiencies", kind: "tags", suggestions: ["thieves-tools", "herbalism-kit"] }
 ];
 
-const featuresField = (label: string, blurbless = false): FieldDef => ({
-  key: "features",
+/** `key` is the record's own: every type stores a LIST under `features` (or `traits`)
+    except a feat, which is one `FeatureRecord` under a singular `feature`. The renderer
+    is the same either way — `FeatureEditor`'s `single` mode reads the object. */
+const featuresField = (label: string, key = "features", blurbless = false): FieldDef => ({
+  key,
   label,
   kind: "custom",
   custom: "features",
@@ -312,7 +315,7 @@ const SPECIES_SCHEMA: HomebrewSchema = {
       title: "Languages",
       fields: [{ key: "languages", label: "Languages", kind: "tags", suggestions: ["common", "elvish", "dwarvish", "draconic"] }]
     },
-    { id: "traits", title: "Traits", fields: [{ ...featuresField("Species traits"), key: "traits" }] },
+    { id: "traits", title: "Traits", fields: [featuresField("Species traits", "traits")] },
     {
       id: "lineages",
       title: "Lineages",
@@ -410,7 +413,7 @@ const FEAT_SCHEMA: HomebrewSchema = {
         }
       ]
     },
-    { id: "feature", title: "The feat itself", fields: [featuresField("What it does")] }
+    { id: "feature", title: "The feat itself", fields: [featuresField("What it does", "feature")] }
   ]
 };
 

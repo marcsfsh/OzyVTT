@@ -17,10 +17,31 @@
  */
 
 import { proficiencyBonusForLevel } from "@vtt/rules-5e";
+import { newId } from "../lib/ids";
 import type { Draft } from "./schema";
 import type { HomebrewType } from "./types";
 
 export const LEVELS: readonly number[] = Array.from({ length: 20 }, (_, index) => index + 1);
+
+/**
+ * One blank `FeatureRecord`, with the four rider arrays the schema defaults so nothing
+ * downstream writes `?? []`.
+ *
+ * `level` is deliberately absent: WHERE a feature is granted is the caller's business,
+ * and the two callers answer it differently. A class feature must arrive already on a
+ * level-table row (`FeatureEditor` supplies the level), because a class's grants live in
+ * `levelTable[].features[]` and nowhere else. A feat's single feature has no level at
+ * all — taking the feat is the grant.
+ */
+export const blankFeature = (): Record<string, unknown> => ({
+  id: newId(),
+  name: "",
+  description: "",
+  tags: [],
+  actions: [],
+  effects: [],
+  modifiers: []
+});
 
 /** One level row with only its two always-present columns. Derived columns are added by
     `LevelTableEditor`'s generator, which owns the whole "delete the cells" argument. */
@@ -70,7 +91,12 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
 
   background: () => ({ ...BASE, abilityOptions: { from: [], spreads: [] }, skillProficiencies: [], toolProficiencies: [], startingEquipment: [], features: [] }),
 
-  feat: () => ({ ...BASE, category: "general", repeatable: false, features: [] }),
+  /* `feature`, SINGULAR and required — a feat IS one `FeatureRecord` plus catalog
+     metadata (`FeatReferenceSchema`, which is `.strict()`). Seeding the plural `features`
+     here put an unrecognised key on every feat AND left the required one missing, so no
+     feat could ever be published; the editor's own "What it does" section wrote to the
+     same wrong key. Both now name `feature`. */
+  feat: () => ({ ...BASE, category: "general", repeatable: false, feature: blankFeature() }),
 
   /* The eight seeded values are what make this form ~8 decisions instead of 24 fields. */
   /* The seeded values are what make this form ~8 decisions instead of 24 fields — and

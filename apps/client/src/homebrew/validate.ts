@@ -66,11 +66,47 @@ function badFormula(value: unknown): string | null {
   return null;
 }
 
+/** Every `FeatureRecord` on a record, whichever key its type stores them under: a list at
+    `features` (class, subclass, background), `traits` (species), or the ONE object at
+    `feature` (a feat — `FeatReferenceSchema` is singular there). */
+function featuresOf(draft: Draft): Array<Record<string, unknown>> {
+  if (Array.isArray(draft.features)) return draft.features as Array<Record<string, unknown>>;
+  if (Array.isArray(draft.traits)) return draft.traits as Array<Record<string, unknown>>;
+  const one = draft.feature;
+  return one && typeof one === "object" && !Array.isArray(one) ? [one as Record<string, unknown>] : [];
+}
+
+/**
+ * A class feature that asks a choice but sits on no level row.
+ *
+ * The server grants class features from `levelTable[].features[]` and nowhere else, so
+ * this feature's pick capacity is `choose × 0` — while the wizard reads `feature.level`,
+ * offers the pick and refuses to Create until it is answered. The result is a character
+ * that cannot be created and an error naming a feature id.
+ *
+ * `FeatureEditor` makes the state unauthorable, so this is the backstop for the one path
+ * it does not own: a record that arrived from a pack import or an SRD copy already in
+ * this shape. A feature with no choice is merely inert, and is not blocked.
+ */
+function ungrantedChoice(draft: Draft): BlockedReason | null {
+  const table = Array.isArray(draft.levelTable) ? (draft.levelTable as Array<Record<string, unknown>>) : [];
+  if (table.length === 0) return null;
+  const granted = new Set<string>();
+  for (const row of table) for (const id of Array.isArray(row.features) ? (row.features as string[]) : []) granted.add(id);
+  for (const entry of featuresOf(draft)) {
+    if (!entry?.choice || typeof entry.id !== "string" || granted.has(entry.id)) continue;
+    return {
+      text: `Give “${entry.name || "an unnamed feature"}” a level — it's under Features. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
+      sectionId: "features"
+    };
+  }
+  return null;
+}
+
 /** A choice whose `fromCatalog` resolves to nothing would be silently skipped at build
     time, which is the single hardest homebrew failure to diagnose from the outside. */
 function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): BlockedReason | null {
-  const features = Array.isArray(draft.features) ? draft.features : Array.isArray(draft.traits) ? draft.traits : [];
-  for (const entry of features as Array<Record<string, unknown>>) {
+  for (const entry of featuresOf(draft)) {
     const choice = entry?.choice as Record<string, unknown> | undefined;
     const slug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
     if (!slug) continue;
@@ -108,6 +144,9 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
           ? { text: "Choose a spell list — it's under Progression. A caster with no list can't be built.", sectionId: "progression" }
           : null,
         formulaBlocker,
+        // Before `brokenCatalog`: a skipped choice still builds a character, an ungranted
+        // one cannot be built at all.
+        ungrantedChoice(draft),
         brokenCatalog(draft, ctx, "features")
       );
     }
@@ -140,9 +179,9 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
     case "feat":
       return first(
         need(draft, "category", "Choose a category — it's under Category. Nothing offers a feat with no category.", "category"),
-        Array.isArray(draft.features) && draft.features.length === 0
-          ? { text: "Say what this feat does — it's under The feat itself.", sectionId: "feature" }
-          : null,
+        // `feature`, singular: a feat IS one `FeatureRecord`. Its NAME is what the wizard
+        // prints beside the pick, so an unnamed one is a blank line on the card.
+        need(draft, "feature.name", "Say what this feat does — it's under The feat itself.", "feature"),
         formulaBlocker,
         brokenCatalog(draft, ctx, "feature")
       );

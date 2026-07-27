@@ -163,8 +163,10 @@ export function RecordDetail({
         onDraft={setDraft}
         ctx={ctx}
         featuresKey={field.key}
-        // Only class and subclass have a level table for a feature to be placed on.
+        // Only class and subclass place a feature at a level.
         levelAware={doc.type === "class" || doc.type === "subclass"}
+        // A feat IS one `FeatureRecord` under a singular `feature` key, not a list.
+        single={doc.type === "feat"}
         singular={doc.type === "species" ? "trait" : "feature"}
         idPrefix={`hb-${doc.type}`}
       />

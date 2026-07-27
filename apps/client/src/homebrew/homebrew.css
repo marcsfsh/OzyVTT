@@ -19,7 +19,6 @@
   min-height: var(--tap-min);
 }
 .hb-count { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
-.hb-caveat { margin-bottom: var(--space-3); }
 
 .hb-unavailable-text { margin: 0 0 var(--space-3); }
 
@@ -165,6 +164,12 @@
 /* 20 level chips: narrow, uniform, and still over the 44px floor via `.nh-chip`'s own
    min-height. The gap is the (44 − paint) / 2 budget for adjacent small targets. */
 .hb-levels > * { min-width: 2.75rem; justify-content: center; }
+/* LOCKED, not unavailable. A class feature's last level can't be cleared, so its chip is
+   genuinely `disabled` — but it is the chip that is ON, and the primitive's
+   `:disabled { opacity: .6 }` says the opposite of the truth AND drags the label under
+   AA (measured 3.55:1). Full contrast here; the reason is the sentence beneath the group,
+   which is where every other state in this editor is stated too. */
+.hb-levels .nh-chip--pressable[aria-pressed="true"]:disabled { opacity: 1; cursor: default; }
 
 .hb-fieldset {
   border: 1px solid var(--line); border-radius: var(--radius-md);

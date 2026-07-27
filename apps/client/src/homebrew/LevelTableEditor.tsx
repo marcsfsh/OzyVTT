@@ -263,7 +263,14 @@ export function LevelTableEditor({
         </span>
         <span className="hb-lt-cell hb-lt-slots">
           <span className="hb-lt-micro">Spell slots</span>
-          <span className="tabular hb-lt-derived" aria-label={slots.label}>{slots.text}</span>
+          {/* `4 3 3 2 – – – – –` is nine columns collapsed into one, so the spelled-out
+              reading is the only one a screen reader can use. It is REAL TEXT in a
+              visually hidden span, not an `aria-label`: an aria-label on a roleless
+              <span> is ignored by the accessible-name computation entirely (name from
+              author is only honoured on elements that take one), so the label was being
+              dropped and the announcement was the glyph row. */}
+          <span className="tabular hb-lt-derived" aria-hidden="true">{slots.text}</span>
+          <span className="nh-sr-only">{slots.label}</span>
           {overridden && <Badge tone="caution">Overridden</Badge>}
           <IconButton
             label={`Edit level ${value}`}

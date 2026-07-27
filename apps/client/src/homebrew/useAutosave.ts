@@ -36,11 +36,22 @@ export interface AutosaveConfig<T> {
    *
    * The homebrew editor fills a record with sensible defaults on the way in
    * (`withDefaults`), so a blank spell shows level 1 / evocation / 60 feet the moment it
-   * opens. Baselining on `draft` would treat all of that as already saved and never send
-   * it: the form would show eight filled fields the server had never heard of, and the
-   * record would refuse to publish for reasons visibly contradicted by the screen.
-   * Passing the stored record here makes the filled-in defaults dirty, so they park on
-   * the first debounce. Omit it and the baseline is `draft`, as before.
+   * opens, and a record duplicated from the SRD gains whatever keys its type's blank has.
+   * Those keys have to reach the server EVENTUALLY — the form would otherwise show eight
+   * filled fields the server had never heard of, and the record would refuse to publish
+   * for reasons visibly contradicted by the screen.
+   *
+   * But "eventually" is not "on open". This used to be the only baseline, which made the
+   * filled-in defaults dirty at mount: **selecting a record in the rail PATCHed it**,
+   * burning a revision and an `updatedAt` for a record nobody touched — and for a
+   * duplicated feat it wrote a key the type's schema rejects, turning a valid copy into
+   * one that could never be published, while the readout said "Saved" throughout.
+   *
+   * So there are two references, and they answer different questions. This one answers
+   * "is a PATCH needed at all?". `draft`-at-mount answers "has the GM changed anything?",
+   * and only that schedules one. A record opened and closed untouched is never written;
+   * the first real edit — or the flush that publishing awaits — carries the defaults with
+   * it. Omit this and both references are the draft, as before.
    */
   baseline?: T;
   /** PATCHes `draft` with `expectedRev` and resolves the row's NEW revision. */
@@ -83,7 +94,11 @@ export function useAutosave<T>({
 }: AutosaveConfig<T>): Autosave<T> {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const revRef = useRef(rev);
+  /** What the server holds. Decides whether a PATCH has anything to send. */
   const savedRef = useRef(serialize(baseline === undefined ? draft : baseline));
+  /** What the form showed when it opened. Decides whether the GM has EDITED anything —
+      and therefore whether to schedule a save. Opening a record must not write to it. */
+  const openedRef = useRef(serialize(draft));
   const draftRef = useRef(draft);
   const savingRef = useRef(false);
   const dirtyRef = useRef(false);
@@ -122,6 +137,7 @@ export function useAutosave<T>({
       // The snapshot taken BEFORE the await, not the draft now: an edit that landed
       // mid-flight must stay dirty, and `dirtyRef` below re-runs for it.
       savedRef.current = snapshot;
+      openedRef.current = snapshot;
       revRef.current = nextRev;
       setStatus("saved");
     } catch (error) {
@@ -147,8 +163,13 @@ export function useAutosave<T>({
   // Debounce. `dirty` is set synchronously so the readout says "Unsaved changes" from
   // the first keystroke rather than sitting on "Saved" for 800ms, which is the one
   // window in which the GM might close the tab believing their work is parked.
+  //
+  // Compared against the draft AT OPEN, never against the server's copy: the defaults the
+  // form filled in are not an edit, and treating them as one is what made merely selecting
+  // a record write to it. Once the GM does change something, `flush` still sends the whole
+  // draft, so the defaults travel with the first real edit.
   useEffect(() => {
-    if (serializeRef.current(draft) === savedRef.current) return;
+    if (serializeRef.current(draft) === openedRef.current) return;
     setStatus("dirty");
     const timer = setTimeout(() => void flush(), delayMs);
     return () => clearTimeout(timer);
@@ -158,7 +179,7 @@ export function useAutosave<T>({
   flushRef.current = flush;
   useEffect(
     () => () => {
-      if (serializeRef.current(draftRef.current) !== savedRef.current) void flushRef.current();
+      if (serializeRef.current(draftRef.current) !== openedRef.current) void flushRef.current();
     },
     []
   );
@@ -167,7 +188,11 @@ export function useAutosave<T>({
 
   const markSaved = useCallback((nextRev: number, nextDraft: T) => {
     revRef.current = nextRev;
+    // Both references move: the server now holds this body, and it is also the new
+    // "unedited" mark — otherwise every later keystroke would still measure itself
+    // against the draft as it was when the pane first mounted.
     savedRef.current = serializeRef.current(nextDraft);
+    openedRef.current = savedRef.current;
     setStatus("saved");
   }, []);
 

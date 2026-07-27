@@ -26,6 +26,7 @@ import { CreateRecordModal, type CreateRequest } from "./CreateRecordModal";
 import { HomebrewRail, EMPTY_FILTERS, type RailFilters } from "./HomebrewRail";
 import { RecordDetail } from "./RecordDetail";
 import { HomebrewRequestError, homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
+import { blankDraft } from "./defaults";
 import { typeLabel } from "./types";
 import "./homebrew.css";
 
@@ -124,10 +125,16 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
             // ourselves produced "Fireball (copy) (copy)" — naming is the server's job,
             // and doing it in both places is how the two get to disagree.
             await homebrewApi.duplicate(gmToken, request.sourceId)
-          : // Blank records carry only their type discriminator and a placeholder name.
-            // A draft is ALLOWED to be invalid — that is the whole point of the state —
-            // so the create call does not have to satisfy the type's full schema.
-            await homebrewApi.create(gmToken, { type: request.type, name: `New ${typeLabel(request.type)}` });
+          : // A blank record is created WITH its type's blank draft, not with a bare
+            // `{type, name}` the editor then quietly PATCHes on first open. A draft is
+            // allowed to be invalid — that is the whole point of the state — so this does
+            // not have to satisfy the type's schema; it just has to be the same body the
+            // form is about to show, or opening the record is itself a write.
+            await homebrewApi.create(gmToken, {
+              ...blankDraft(request.type),
+              type: request.type,
+              name: `New ${typeLabel(request.type)}`
+            });
       setCreateOpen(false);
       await refresh();
       setSelectedId(created.id);
@@ -216,17 +223,13 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         </p>
       </div>
 
-      {/* The one honest caveat, stated ONCE for the whole library rather than on every
-          published record: the store's `publishedFor` returns an empty slice for both
-          audiences today, so publishing does not yet put anything in the builder or the
-          pickers. Saying nothing would let a GM publish, go looking, and conclude their
-          work was lost. It annotates the exception — it appears only once something is
-          published — and it comes out the day the catalog merge lands. */}
-      {counts.published > 0 && (
-        <Alert tone="info" className="hb-caveat">
-          Published records don&rsquo;t reach the character builder or the encounter and inventory pickers yet — that merge is still being built. Everything you author here is saved.
-        </Alert>
-      )}
+      {/* The catalog merge has landed: a published record reaches the GM's own builder and
+          pickers at once, and a published + shown one reaches the players' too (measured —
+          publishing and revealing one spell took /content/spells from 339 to 340). The
+          caveat that used to stand here said the opposite, so it came out rather than
+          being reworded: the two states already say this in words on the record itself
+          (Draft / Published / Shown to players), and repeating it as a library-wide banner
+          would state the same constraint a second time for no new information. */}
 
       <div className={`hb-workspace${hasSelection ? " has-selection" : ""}`}>
         <HomebrewRail
