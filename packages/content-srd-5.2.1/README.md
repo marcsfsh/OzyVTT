@@ -10,6 +10,17 @@ anything consumes it.
 - `sources/open5e-srd-2024/` — vendored, unmodified [open5e-api](https://github.com/open5e/open5e-api)
   Django fixtures for the `srd-2024` document (CC BY 4.0 — the only document vendored;
   third-party/OGL sources are deliberately excluded).
+- `sources/dnd-5e-srd-markdown/` — vendored, unmodified CC BY 4.0 markdown transcription of SRD
+  5.2.1, pinned to a commit (`PROVENANCE.json`). It exists because the open5e fixtures ship **no**
+  class, subclass, species, background or feat data at all — so the seven character-builder bundles
+  had no machine-checkable source and were hand-authored, which is exactly where both licensing
+  violations landed. **Secondary standing:** a community transcription is a cross-check and a
+  transcription source, never an authority that silently overrides a reviewed bundle. It was
+  accepted only after reproducing the three independently hand-transcribed classes exactly —
+  Fighter, Wizard and Cleric each match on hit die, saving throws, skill choose-count, the full
+  skill list, all 20 progression rows and starting-equipment gold. Only the four files the builder
+  content needs are vendored; spells/monsters/rules already have a validated source and a second
+  copy would create a second truth.
 - `scripts/build-bundle.ts` — the ETL/adapter. Joins Creature + CreatureAction +
   CreatureActionAttack + CreatureTrait and adapts each stat block into a canonical
   `ActorDefinition` (structured attacks/saves/damage; everything unmodeled stays inert in
@@ -35,9 +46,12 @@ anything consumes it.
   - `armor.v1.json` — the armor table (13) with AC-derivation fields; the shield row carries
     its +2 bonus in `acBase`.
   - `skills.v1.json` (18) and `damage-types.v1.json` (13) — short reference descriptions.
-    Skills additionally carry the SRD `ability` column (`acrobatics` → `dex`, …), hand-added on
-    top of the ETL output — a bundle rebuild must preserve it (`build-bundle.ts` does not emit it
-    yet; the ability-column test guards against a silent clobber).
+    Skills additionally carry the SRD `ability` column (`acrobatics` → `dex`, …). This used to be
+    hand-added on top of the ETL output, so **every rebuild silently deleted it** and only the
+    ability-column test stood between that and a shipped regression (it caught exactly that during
+    the phase-5 content pass). `build-bundle.ts` now emits the column from a reviewed
+    `SKILL_ABILITY` table and fails closed on an unmapped skill; a rebuild is a no-op diff, and the
+    test now guards a rebuild rather than a hand-edit.
   - `rules.v1.json` — the 56 core-rules glossary entries grouped by ruleset (D20 Tests,
     Combat, Damage and Healing, ...).
   - `attribution.json` — the required CC BY 4.0 attribution (wording verified against the

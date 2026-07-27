@@ -1,0 +1,18 @@
+{
+  "vendoredFrom": "https://github.com/downfallx/dnd-5e-srd-markdown",
+  "commit": "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4",
+  "commitDate": "2026-01-09T16:54:05-05:00",
+  "retrieved": "2026-07-27",
+  "license": "CC-BY-4.0",
+  "upstreamLicenseFile": "LICENSE",
+  "why": "A structured CC BY 4.0 transcription of SRD 5.2.1 covering the character-creation content the open5e srd-2024 fixtures do NOT ship: classes, subclasses, class spell lists, species, backgrounds and feats. Before this, those seven bundles were hand-authored with no machine-checkable source - which is where both licensing violations (the PHB-2024 `tough` feat, the 2014 PHB elf name pools) landed.",
+  "files": [
+    "classes.md",
+    "character-origins.md",
+    "feats.md",
+    "equipment.md"
+  ],
+  "notVendored": "spells.md, monsters-A-Z.md, animals.md, magic-items.md, rules-glossary.md, playing-the-game.md, gameplay-toolbox.md, character-creation.md - the corresponding bundles already come from the open5e fixtures and are cross-validated; vendoring a second copy would add weight and a second source of truth for content that already has one.",
+  "standing": "SECONDARY. This is a community transcription, not the publisher's own machine-readable release, so it is a cross-check and a transcription source - never an authority that silently overrides a reviewed bundle. It was accepted only after reproducing the three independently hand-transcribed classes exactly: Fighter, Wizard and Cleric each match on hit die, saving throws, skill choose-count, the full skill list, all 20 progression rows, and starting-equipment gold. A disagreement between this source and a committed bundle is a reviewed CORRECTION, decided against the SRD text, not an automatic overwrite.",
+  "attributionNote": "CC BY 4.0 attribution is owed to Wizards of the Coast for SRD 5.2.1 itself (see bundles/attribution.json, which is what any consuming surface must display). This record documents where the transcription was obtained; it does not replace that attribution."
+}

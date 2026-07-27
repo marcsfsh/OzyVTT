@@ -115,7 +115,17 @@ export const ContentAttributionSchema = z.object({
   source: z.object({
     name: z.string(), author: z.string(), publisher: z.string(), permalink: z.string(),
     vendoredFrom: z.string(), retrieved: z.string()
-  })
+  }),
+  /**
+   * Further CC BY 4.0 transcriptions the bundles draw on beyond `source`. Additive-optional so an
+   * older attribution.json still validates (ADR-0007). These are SECONDARY: the CC BY attribution
+   * owed to a consumer is `attribution` above - Wizards of the Coast for SRD 5.2.1 itself - and
+   * these rows only record where a transcription of that text was obtained.
+   */
+  additionalSources: z.array(z.object({
+    name: z.string(), vendoredFrom: z.string(), commit: z.string(),
+    retrieved: z.string(), covers: z.string()
+  })).default([])
 });
 export type ContentAttribution = z.infer<typeof ContentAttributionSchema>;
 

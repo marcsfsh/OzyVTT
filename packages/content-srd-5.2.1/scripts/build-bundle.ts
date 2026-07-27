@@ -580,7 +580,27 @@ const describesRecords = (rows: Fixture<DescribesFields>[]) => onlySrd(rows).map
   name: titleCase(row.fields.describes),
   description: row.fields.desc
 }));
-const skillRecords = describesRecords(skills);
+/**
+ * The SRD's skill -> governing ability column. The open5e `SkillDescription` fixtures carry only the
+ * name and blurb, so this column has to come from somewhere; it used to be hand-added on top of the
+ * ETL output, which meant every `build-bundle` run silently deleted it and only a guard test stood
+ * between that and a shipped regression. Emitting it here closes that hazard: the table is reviewed
+ * data in the same spirit as CORRECTIONS, and the guard test now protects a rebuild rather than a
+ * hand-edit. Values are the SRD 5.2.1 skills table verbatim.
+ */
+const SKILL_ABILITY: Readonly<Record<string, string>> = {
+  acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
+  history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis",
+  nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int",
+  "sleight-of-hand": "dex", stealth: "dex", survival: "wis"
+};
+const skillRecords = describesRecords(skills).map(({ id, name, description }) => {
+  const ability = SKILL_ABILITY[id];
+  // Fail closed rather than emit a skill the character sheet cannot resolve an ability for.
+  if (!ability) throw new Error(`No SRD ability column for skill "${id}" - add it to SKILL_ABILITY.`);
+  // Key order matches the committed bundle so a rebuild is a no-op diff, not 36 reordered lines.
+  return { id, name, ability, description };
+});
 const damageTypeRecords = describesRecords(damageTypes);
 
 const ruleSetNames = new Map(onlySrd(ruleSets).map((set) => [set.pk, set.fields.name]));
@@ -604,7 +624,18 @@ const attribution = {
     permalink: srdDocument.fields.permalink,
     vendoredFrom: "https://github.com/open5e/open5e-api (data/v2/wizards-of-the-coast/srd-2024, staging branch)",
     retrieved: "2026-07-17"
-  }
+  },
+  // The open5e fixtures ship no class, subclass, species, background or feat data at all, so the
+  // character-builder bundles had no machine-checkable source and were hand-authored - which is
+  // where both licensing violations landed. This transcription covers exactly that gap. It is
+  // secondary by construction: see sources/dnd-5e-srd-markdown/PROVENANCE.json.
+  additionalSources: [{
+    name: "dnd-5e-srd-markdown",
+    vendoredFrom: "https://github.com/downfallx/dnd-5e-srd-markdown",
+    commit: "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4",
+    retrieved: "2026-07-27",
+    covers: "classes, subclasses, class spell lists, species, backgrounds, feats"
+  }]
 };
 
 // Fail closed on every bundle, not just monsters: nothing is written unless everything validates.
