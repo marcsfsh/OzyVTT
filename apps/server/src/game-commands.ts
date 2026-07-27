@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema } from "@vtt/domain";
-import { CharacterIdentitySchema, CurrencySchema, InventoryItemSchema, ProficienciesSchema } from "@vtt/schemas";
+import { AnnotationPointSchema, AnnotationShapeKindSchema, AnnotationVisibilitySchema, BuilderAbilityMethodSchema, EncounterTokenPositionSchema, RollPurposeSchema, RollVisibilitySchema } from "@vtt/domain";
+import { AbilitySchema, CharacterChoiceSchema, CharacterIdentitySchema, CurrencySchema, InventoryItemSchema, ProficienciesSchema } from "@vtt/schemas";
 
 /**
  * Wire schemas for every game command, shared by BOTH transports: the Socket.IO handlers in
@@ -173,6 +173,45 @@ export const CharacterSetInventorySchema = z.object({ commandId: z.string().uuid
 export const CharacterSetCurrencySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), currency: CurrencySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetIdentitySchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), character: CharacterIdentitySchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const CharacterSetProficienciesSchema = z.object({ commandId: z.string().uuid(), actorId: z.string().uuid(), proficiencies: ProficienciesSchema, expectedRevision: z.number().int().nonnegative().optional() }).strict();
+/**
+ * Create a character from CHOICES, not a finished sheet (phase-2 amendment): identity ids, base
+ * scores + the background allocation, per-level HP entries, and the choices[] ledger as the literal
+ * build input. The server validates every id against the content catalogs, resolves catalog-driven
+ * picks through the shared `resolveCatalogChoice`, interprets feature riders, assembles the
+ * ActorDefinition, and lands it through the import path (actorId = commandId; sheet keyed
+ * `import-<actorId>`). Deeper cross-field validation (spreads, caps, catalog membership) lives in
+ * `character-build.ts` where the content is at hand - this schema pins the wire shape.
+ */
+export const CharacterCreateSchema = z.object({
+  commandId: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  speciesId: z.string().regex(/^[a-z0-9-]+$/).max(80),
+  backgroundId: z.string().regex(/^[a-z0-9-]+$/).max(80),
+  classId: z.string().regex(/^[a-z0-9-]+$/).max(80),
+  level: z.number().int().min(1).max(20),
+  subclassId: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
+  abilityMethod: BuilderAbilityMethodSchema,
+  baseScores: z.object({ str: z.number().int().min(1).max(30), dex: z.number().int().min(1).max(30), con: z.number().int().min(1).max(30), int: z.number().int().min(1).max(30), wis: z.number().int().min(1).max(30), cha: z.number().int().min(1).max(30) }).strict(),
+  backgroundBonusAllocation: z.array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(3) }).strict()).max(3),
+  hp: z.object({ mode: z.enum(["average", "entries"]), entries: z.array(z.number().int().min(1).max(12)).max(19).optional() }).strict(),
+  choices: z.array(CharacterChoiceSchema).max(200),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict();
+/**
+ * GM sets the character-builder table policy (decision 10). `customFormula` semantics: omitted =
+ * keep the stored formula, null = clear it, a string = validate through `validateAbilityFormula`
+ * (the same dice grammar every other roll uses) and store it. Duplicated methods are rejected.
+ */
+export const BuilderSetPolicySchema = z.object({
+  commandId: z.string().uuid(),
+  allowedAbilityMethods: z.array(BuilderAbilityMethodSchema).min(1).max(4),
+  customFormula: z.string().trim().min(1).max(160).nullable().optional(),
+  expectedRevision: z.number().int().nonnegative().optional()
+}).strict().superRefine((payload, context) => {
+  if (new Set(payload.allowedAbilityMethods).size !== payload.allowedAbilityMethods.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["allowedAbilityMethods"], message: "Each ability method may be listed once." });
+  }
+});
 export const DiceRollSchema = z.object({ commandId: z.string().uuid(), formula: z.string().min(1).max(160), purpose: RollPurposeSchema, visibility: RollVisibilitySchema, label: z.string().min(1).max(80).optional(), actorId: z.string().uuid().optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict();
 export const TokenMoveSchema = z.object({
   commandId: z.string().uuid(), actorId: z.string().uuid(), position: EncounterTokenPositionSchema.nullable(), sceneId: z.string().uuid().optional(),

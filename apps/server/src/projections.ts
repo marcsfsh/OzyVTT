@@ -126,6 +126,10 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
   const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id));
   return {
     revision: state.revision,
+    // The GM's builder policy travels verbatim (GM-set, player-read - decision 10): it holds no
+    // secrets, and a player's wizard must know which ability methods to offer. Copied, never a
+    // live reference into GameState.
+    builderPolicy: { allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods], customFormula: state.builderPolicy.customFormula },
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),

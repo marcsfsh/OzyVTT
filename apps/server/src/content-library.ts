@@ -1,6 +1,7 @@
-import type { ContentActionSummary, ContentBackgroundSummary, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSpeciesSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
+import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSpecies, loadSpells, loadSubclasses, type ClassLevelRow, type FeatureRecord } from "@vtt/content-srd-5.2.1";
+import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
+import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -38,6 +39,7 @@ export class ContentLibrary {
   monster(definitionId: string): ActorDefinition | undefined { return this.byId.get(definitionId); }
   conditionSummaries(): readonly ContentConditionSummary[] { return conditionSummaries; }
   hasCondition(conditionId: string): boolean { return conditionIds.has(conditionId); }
+  skillSummaries(): readonly ContentSkillSummary[] { return skillSummaries; }
   spellSummaries(): readonly ContentSpellSummary[] { return spellSummaries; }
   equipmentSummaries(): readonly ContentEquipmentSummary[] { return equipmentSummaries; }
   classSummaries(): readonly ContentClassSummary[] { return classSummaries; }
@@ -52,6 +54,23 @@ export class ContentLibrary {
   monsterActionSummaries(definitionId: string): readonly ContentActionSummary[] | undefined {
     return this.byId.get(definitionId)?.actions.map(actionSummaryOf);
   }
+
+  // ---------- Character-builder assembly surface (server-side ONLY - riders never reach the wire) ----------
+
+  /** The wire catalogs `resolveCatalogChoice` reads - the server validates character.create choices through the SAME resolver the wizard renders from. */
+  catalogChoiceCatalogs(): CatalogChoiceCatalogs {
+    return { classes: classSummaries, subclasses: subclassSummaries, species: speciesSummaries, feats: featSummaries, spells: spellSummaries, equipment: equipmentSummaries, skills: skillSummaries };
+  }
+  /** The rules progression table with every AUTHORED class adapted in (bundle wins; SRD rows remain the fallback for un-authored classes). */
+  classProgressionTable(): ClassProgressionTable { return progressionTable; }
+  /** Full bundle records (riders included) for the server-side feature interpreter. Never projected to a client. */
+  classRecord(id: string): ClassReference | undefined { return classRecords.get(id); }
+  subclassRecord(id: string): SubclassReference | undefined { return subclassRecords.get(id); }
+  speciesRecord(id: string): SpeciesReference | undefined { return speciesRecords.get(id); }
+  backgroundRecord(id: string): BackgroundReference | undefined { return backgroundRecords.get(id); }
+  featRecord(id: string): FeatReference | undefined { return featRecords.get(id); }
+  equipmentRecord(id: string): EquipmentReference | undefined { return equipmentRecords.get(id); }
+  spellRecord(id: string): SpellReference | undefined { return spellRecords.get(id); }
 }
 
 /** One flattening for both content sources (bundled + imported), so the runner's wire shape can't fork. */
@@ -104,9 +123,20 @@ const spellSummaries: readonly ContentSpellSummary[] = loadSpells()
     id: spell.id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime,
     rangeText: spell.range.text, componentsText: spellComponentsText(spell.components), duration: spell.duration,
     concentration: spell.concentration, ritual: spell.ritual, description: spell.description, higherLevel: spell.higherLevel,
+    // The spell-list link (which class lists this spell is on) - what the builder's spell step
+    // filters by, paired with the class record's spellcasting.spellListId. Dropping this severed
+    // the list in both directions (phase-2 QA must-fix).
+    classes: spell.classes,
     damageRoll: spell.damage.roll, damageTypes: spell.damage.types, castingOptions: slotCastingOptions(spell.castingOptions)
   }))
   .sort((left, right) => left.name.localeCompare(right.name));
+
+// Skill catalog: reference text + the ability each check uses (the content loader fills the SRD
+// mapping when the bundle row predates the ability column, so `ability` is null only for a genuinely
+// unmapped homebrew row). This endpoint is what retires the client's hardcoded SKILL_ABILITY table.
+const skillSummaries: readonly ContentSkillSummary[] = loadSkills().map((skill) => ({
+  id: skill.id, name: skill.name, description: skill.description, ability: skill.ability ?? null
+}));
 
 // The wire shape mirrors EquipmentReference one-to-one (the content package already folds weapons/armor
 // in and sorts by name), so the server just re-emits it as the transport-owned type.
@@ -154,13 +184,32 @@ const levelRowOf = (row: ClassLevelRow): ContentClassLevelRow => ({
   classResources: row.classResources.map((resource) => ({ id: resource.id, name: resource.name, amount: resource.amount }))
 });
 const byName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
+/** A bundle "choose N from" list -> the wire shape (null = the record offers no such choice). */
+const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[] }> | undefined): ContentChoiceList | null =>
+  list ? { choose: list.choose, from: list.from } : null;
+/** A class/subclass spellcasting header -> the wire shape. The structured riders stay server-side as ever; this is the caster step's display data plus the spell-list link. */
+const spellcastingSummaryOf = (spellcasting: ContentSpellcasting | undefined): ContentSpellcastingSummary | null =>
+  spellcasting
+    ? { ability: spellcasting.ability, prepares: spellcasting.prepares, ritual: spellcasting.ritual, focus: spellcasting.focus, progression: spellcasting.multiclassProgression, spellListId: spellcasting.spellListId ?? null }
+    : null;
 
 const classSummaries: readonly ContentClassSummary[] = loadClasses().map((entry) => ({
   id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
   hitDie: entry.hitDie, statPriority: entry.statPriority, primaryAbilities: entry.primaryAbilities, savingThrows: entry.savingThrows,
   skillChoiceCount: entry.skillChoices.choose, skillChoices: entry.skillChoices.from,
+  // Armor/weapon/tool training and the multiclass rules were authored but never crossed the wire -
+  // the wizard's proficiency summary and multiclass gating had no data path (phase-2 QA must-fix).
+  armorProficiencies: entry.armorProficiencies, weaponProficiencies: entry.weaponProficiencies, toolProficiencies: entry.toolProficiencies,
+  toolChoices: choiceListOf(entry.toolChoices),
+  multiclassProficiencies: entry.multiclassProficiencies
+    ? { armor: entry.multiclassProficiencies.armor, weapons: entry.multiclassProficiencies.weapons, tools: entry.multiclassProficiencies.tools, skillChoices: choiceListOf(entry.multiclassProficiencies.skills) }
+    : null,
+  multiclassPrerequisites: entry.multiclassPrerequisites
+    ? { mode: entry.multiclassPrerequisites.mode, minimums: entry.multiclassPrerequisites.minimums.map((minimum) => ({ ability: minimum.ability, minimum: minimum.minimum })) }
+    : null,
   subclassLevel: entry.subclassLevel, subclassLabel: entry.subclassLabel ?? null, asiLevels: entry.asiLevels,
   spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
+  spellcasting: spellcastingSummaryOf(entry.spellcasting),
   levelTable: entry.levelTable.map(levelRowOf),
   startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
   features: entry.features.map(featureSummaryOf)
@@ -170,6 +219,7 @@ const subclassSummaries: readonly ContentSubclassSummary[] = loadSubclasses().ma
   id: entry.id, name: entry.name, source: entry.source, classId: entry.classId, summary: entry.summary ?? null, description: entry.description ?? null,
   subclassLevel: entry.subclassLevel ?? null,
   spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
+  spellcasting: spellcastingSummaryOf(entry.spellcasting),
   features: entry.features.map(featureSummaryOf)
 })).sort(byName);
 
@@ -178,7 +228,13 @@ const subclassSummaries: readonly ContentSubclassSummary[] = loadSubclasses().ma
 const speciesSummaries: readonly ContentSpeciesSummary[] = loadSpecies().map((entry) => ({
   id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
   sizes: entry.sizes, speedFeet: entry.speedFeet, darkvisionFeet: entry.darkvisionFeet, creatureType: entry.creatureType,
-  languages: entry.languages,
+  // Ability increases as DATA (empty for every SRD 5.2.1 species - they live on the background);
+  // the wire carries whatever the record declares so 2014-style/homebrew species work unchanged.
+  abilityBonuses: entry.abilityBonuses.map((bonus) => ({ ability: bonus.ability, amount: bonus.amount })),
+  abilityBonusChoice: entry.abilityBonusChoice
+    ? { choose: entry.abilityBonusChoice.choose, amount: entry.abilityBonusChoice.amount, from: entry.abilityBonusChoice.from }
+    : null,
+  languages: entry.languages, languageChoices: choiceListOf(entry.languageChoices),
   lineages: entry.lineages.map((lineage) => ({ id: lineage.id, name: lineage.name, description: lineage.description ?? null })),
   features: [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map(featureSummaryOf)
 })).sort(byName);
@@ -187,7 +243,9 @@ const backgroundSummaries: readonly ContentBackgroundSummary[] = loadBackgrounds
   id: entry.id, name: entry.name, source: entry.source, summary: entry.summary ?? null, description: entry.description ?? null,
   abilityOptions: entry.abilityOptions ? { from: entry.abilityOptions.from, spreads: entry.abilityOptions.spreads } : null,
   originFeatId: entry.originFeatId ?? null,
-  skillProficiencies: entry.skillProficiencies, toolProficiencies: entry.toolProficiencies, languages: entry.languages,
+  skillProficiencies: entry.skillProficiencies, skillChoices: choiceListOf(entry.skillChoices),
+  toolProficiencies: entry.toolProficiencies, toolChoices: choiceListOf(entry.toolChoices),
+  languages: entry.languages, languageChoices: choiceListOf(entry.languageChoices),
   startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
   features: entry.features.map(featureSummaryOf)
 })).sort(byName);
@@ -208,3 +266,16 @@ const nameBundles: readonly ContentNameBundle[] = loadNames().map((entry) => ({
   speciesId: entry.speciesId, source: entry.source,
   pools: entry.pools.map((pool) => ({ id: pool.id, label: pool.label, names: pool.names }))
 }));
+
+// ---------- Server-side assembly indexes (full records, riders included - never on the wire) ----------
+// The bundle-driven progression table: authored classes drive the rules math through the adapter,
+// with the static SRD rows remaining the fallback for classes not authored yet (known-bugs M2 -
+// a homebrew or authored class must never silently fall back to d8/none/4-8-12-16 defaults).
+const progressionTable: ClassProgressionTable = progressionTableFromClasses(loadClasses());
+const classRecords = new Map(loadClasses().map((entry) => [entry.id, entry]));
+const subclassRecords = new Map(loadSubclasses().map((entry) => [entry.id, entry]));
+const speciesRecords = new Map(loadSpecies().map((entry) => [entry.id, entry]));
+const backgroundRecords = new Map(loadBackgrounds().map((entry) => [entry.id, entry]));
+const featRecords = new Map(loadFeats().map((entry) => [entry.id, entry]));
+const equipmentRecords = new Map(loadEquipment().map((entry) => [entry.id, entry]));
+const spellRecords = new Map(loadSpells().map((entry) => [entry.id, entry]));

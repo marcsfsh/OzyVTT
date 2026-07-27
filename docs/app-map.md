@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 7 GameState fields · 74 commands · 142 HTTP paths
+- 8 GameState fields · 76 commands · 145 HTTP paths
 
 ## GameState shape
 
@@ -15,6 +15,7 @@ Top-level fields of the authoritative `GameState` (`packages/domain` `GameStateS
 single JSON blob the server persists and projects per role.
 
 - `actors`
+- `builderPolicy`
 - `combat`
 - `definitions`
 - `pendingImports`
@@ -30,7 +31,7 @@ pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map
 operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`
 route -> projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `save`, `scene`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `save`, `scene`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -59,7 +60,9 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`
 | `annotation.set-color` | `combat:write` |
 | `annotation.set-movable` | `combat:write` |
 | `annotation.set-visibility` | `combat:write` |
+| `builder.set-policy` | `actor:write` |
 | `character.claim` | `actor:write` |
+| `character.create` | `actor:write` |
 | `character.force-release` | `actor:write` |
 | `character.release` | `actor:write` |
 | `character.resolve-import` | `actor:write` |
@@ -150,6 +153,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/content/monsters/{definitionId}`
 - `GET /api/v1/content/monsters/{definitionId}/actions`
 - `GET /api/v1/content/names`
+- `GET /api/v1/content/skills`
 - `GET /api/v1/content/species`
 - `GET /api/v1/content/spells`
 - `GET /api/v1/content/subclasses`
@@ -190,8 +194,10 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/annotations/{id}/visibility`
 - `POST /api/v1/game/annotations/clear`
 - `POST /api/v1/game/annotations/ping`
+- `POST /api/v1/game/builder/policy`
 - `POST /api/v1/game/character-imports`
 - `POST /api/v1/game/character-imports/{importId}/resolve`
+- `POST /api/v1/game/characters`
 - `POST /api/v1/game/claims`
 - `POST /api/v1/game/claims/{actorId}/force-release`
 - `POST /api/v1/game/claims/release`

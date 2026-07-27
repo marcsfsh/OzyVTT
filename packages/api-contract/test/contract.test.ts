@@ -178,7 +178,7 @@ describe("public API contracts", () => {
     expect(acceptsPlayer(CONTENT_PATHS.monsters, "get")).toBe(false);
     // Every rules catalog except the bestiary is public reference: a player builds their own
     // character, so the builder catalogs must never inherit the bestiary's GM-only gating.
-    for (const path of [CONTENT_PATHS.spells, CONTENT_PATHS.equipment, CONTENT_PATHS.classes, CONTENT_PATHS.subclasses, CONTENT_PATHS.species, CONTENT_PATHS.backgrounds, CONTENT_PATHS.feats, CONTENT_PATHS.names]) {
+    for (const path of [CONTENT_PATHS.skills, CONTENT_PATHS.spells, CONTENT_PATHS.equipment, CONTENT_PATHS.classes, CONTENT_PATHS.subclasses, CONTENT_PATHS.species, CONTENT_PATHS.backgrounds, CONTENT_PATHS.feats, CONTENT_PATHS.names]) {
       expect(acceptsPlayer(path, "get"), `${path} must accept a player session`).toBe(true);
       expect(scopeOf(path, "get"), `${path} scope`).toEqual(["game:read"]);
     }

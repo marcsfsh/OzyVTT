@@ -155,9 +155,29 @@ export function loadArmor(): readonly ArmorReference[] {
   return loadBundle("armor.v1.json", z.array(ArmorReferenceSchema));
 }
 
-/** The 18 SRD 5.2.1 skill descriptions. */
-export function loadSkills(): readonly ConditionReference[] {
-  return loadBundle("skills.v1.json", z.array(ConditionReferenceSchema));
+/**
+ * A skill: reference text plus the ability its check uses. `ability` is optional-with-fallback while
+ * the bundle column is being authored: a record without one falls back to the well-known SRD mapping
+ * below, and a record that CARRIES one (bundle data, homebrew) always wins - so a homebrew skill is
+ * one bundle row, never a code edit (the `SKILL_ABILITY` client hardcode is the anti-pattern).
+ */
+export const SkillReferenceSchema = ConditionReferenceSchema.extend({ ability: AbilityShortSchema.optional() });
+export type SkillReference = z.infer<typeof SkillReferenceSchema>;
+
+/** The printed SRD 5.2.1 skill->ability table, used ONLY when a bundle row omits its own `ability`. */
+const SRD_SKILL_ABILITY: Readonly<Record<string, z.infer<typeof AbilityShortSchema>>> = Object.freeze({
+  athletics: "str",
+  acrobatics: "dex", "sleight-of-hand": "dex", stealth: "dex",
+  arcana: "int", history: "int", investigation: "int", nature: "int", religion: "int",
+  "animal-handling": "wis", insight: "wis", medicine: "wis", perception: "wis", survival: "wis",
+  deception: "cha", intimidation: "cha", performance: "cha", persuasion: "cha"
+});
+
+/** The 18 SRD 5.2.1 skill descriptions, each with the ability its check uses (bundle column first, SRD fallback second). */
+export function loadSkills(): readonly SkillReference[] {
+  return loadBundle("skills.v1.json", z.array(SkillReferenceSchema)).map((skill) => (
+    skill.ability ? skill : { ...skill, ability: SRD_SKILL_ABILITY[skill.id] }
+  ));
 }
 
 /**

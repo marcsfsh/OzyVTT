@@ -269,6 +269,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.post(expressPath(GAME_PATHS.characterSetCurrency), ...command("character.set-currency", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetIdentity), ...command("character.set-identity", actorIdParam));
   router.post(expressPath(GAME_PATHS.characterSetProficiencies), ...command("character.set-proficiencies", actorIdParam));
+  router.post(expressPath(GAME_PATHS.characters), ...command("character.create"));
+  router.post(expressPath(GAME_PATHS.builderPolicy), ...command("builder.set-policy"));
   // Literal segments (ping/clear) are registered before the {id} routes, though methods keep them unambiguous anyway.
   router.post(expressPath(GAME_PATHS.annotationsPing), ...command("annotation.ping"));
   router.post(expressPath(GAME_PATHS.annotationsClear), ...command("annotation.clear"));
@@ -325,6 +327,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.get(expressPath(CONTENT_PATHS.conditions), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentConditions(res.locals.principal as GamePrincipal)));
   // Rules catalogs: public SRD reference, so these accept a player session too (the operations enforce
   // that themselves - no requireGmGrade). The bestiary above is the deliberate GM-only exception.
+  router.get(expressPath(CONTENT_PATHS.skills), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSkills(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.spells), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentSpells(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.equipment), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentEquipment(res.locals.principal as GamePrincipal)));
   router.get(expressPath(CONTENT_PATHS.classes), authorize("game:read"), (_req, res) => sendContent(res, () => ops.contentClasses(res.locals.principal as GamePrincipal)));

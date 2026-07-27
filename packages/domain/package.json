@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "check": "tsc --noEmit" },
+  "scripts": { "check": "tsc --noEmit", "test": "vitest run" },
   "dependencies": { "@vtt/schemas": "*", "zod": "^3.24.2" },
-  "devDependencies": { "typescript": "^5.8.2" }
+  "devDependencies": { "typescript": "^5.8.2", "vitest": "^4.1.10" }
 }

@@ -112,6 +112,57 @@ export function casterProgressionFor(classId: string, table: ClassProgressionTab
 }
 
 /**
+ * The class fields the progression adapter reads, STRUCTURALLY - the shape a content-bundle
+ * `ClassReference` (or a homebrew record) already satisfies. Declared here rather than importing the
+ * content package so `@vtt/rules-5e` stays dependency-free; the content schema is the superset.
+ */
+export type ClassProgressionSource = Readonly<{
+  id: string;
+  hitDie: HitDie;
+  statPriority: readonly Ability[];
+  primaryAbilities: readonly Ability[];
+  savingThrows: readonly Ability[];
+  asiLevels: readonly number[];
+  subclassLevel: number;
+  spellcasting?: Readonly<{ ability: Ability; multiclassProgression: "full" | "half" | "third" | "pact" }> | null;
+  multiclassPrerequisites?: Readonly<{ mode: "all" | "any"; minimums: ReadonlyArray<Readonly<{ ability: Ability; minimum: number }>> }> | null;
+}>;
+
+/**
+ * ONE authored class record -> the progression row every rules function reads. This is the adapter
+ * the bundle-served catalog (and tomorrow's homebrew) drives the math through, so an authored class
+ * gets ITS OWN hit die, stat priority, caster progression, ASI levels, and multiclass prerequisites
+ * instead of silently falling back to SRD defaults (d8, sheet order, "none", 4/8/12/16, always-pass).
+ */
+export function progressionFromClass(source: ClassProgressionSource): ClassProgression {
+  return {
+    hitDie: source.hitDie,
+    statPriority: source.statPriority,
+    primaryAbilities: source.primaryAbilities,
+    savingThrows: source.savingThrows,
+    asiLevels: source.asiLevels,
+    subclassLevel: source.subclassLevel,
+    casterProgression: source.spellcasting ? source.spellcasting.multiclassProgression : "none",
+    spellcastingAbility: source.spellcasting ? source.spellcasting.ability : null,
+    multiclassPrerequisite: {
+      mode: source.multiclassPrerequisites?.mode ?? "all",
+      minimums: (source.multiclassPrerequisites?.minimums ?? []).map((entry) => [entry.ability, entry.minimum] as const)
+    }
+  };
+}
+
+/**
+ * The full table for a set of authored classes, with the static SRD rows as the FALLBACK for classes
+ * the catalog has not authored yet (task-packet phase 14: content lands class by class). An authored
+ * class always wins over its SRD row - the bundle is the source of truth, `class-data.ts` the net.
+ */
+export function progressionTableFromClasses(classes: readonly ClassProgressionSource[], fallback: ClassProgressionTable = SRD_CLASS_PROGRESSION): ClassProgressionTable {
+  const table: Record<string, ClassProgression> = { ...fallback };
+  for (const source of classes) table[source.id] = progressionFromClass(source);
+  return table;
+}
+
+/**
  * SRD multiclass prerequisites: to take a level in `classId` the character needs its listed ability
  * minimums (all of them, or any one of them for the Fighter's "Strength 13 or Dexterity 13").
  * An unknown class has no declared prerequisite and is allowed - homebrew declares its own.

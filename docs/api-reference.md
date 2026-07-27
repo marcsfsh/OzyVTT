@@ -101,6 +101,8 @@ Every command is reachable two ways with identical semantics: its **typed route*
 | `character.set-currency` | `actor:write` |
 | `character.set-identity` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
+| `character.create` | `actor:write` |
+| `builder.set-policy` | `actor:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.ping` | `combat:write` |
 | `annotation.move` | `combat:write` |
@@ -1184,6 +1186,64 @@ Sets a character's identity (class/level/race/background/feats) on its editable 
 
 **Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
 
+### `POST /api/v1/game/characters`
+
+Creates a character from CHOICES rather than a finished sheet (GM-grade only in this phase): identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no | Also becomes the created actor's id (and keys its editable sheet as import-<actorId>); resend it to retry idempotently |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `name` | string | yes |  |
+| `speciesId` | string (pattern) | yes | A species id from the content catalog |
+| `backgroundId` | string (pattern) | yes |  |
+| `classId` | string (pattern) | yes |  |
+| `level` | integer (1–20) | yes |  |
+| `subclassId` | string (pattern) | no | Required once level reaches the class's subclass level |
+| `abilityMethod` | `standard-array` \| `point-buy` \| `roll` \| `custom` | yes | Must be one of the methods the builder policy allows; base scores are validated against the method (array multiset, point-buy budget, formula bounds) |
+| `baseScores` | object | yes | The six scores BEFORE the background allocation and any species/feat bonuses |
+| `baseScores.str` | integer (1–30) | yes |  |
+| `baseScores.dex` | integer (1–30) | yes |  |
+| `baseScores.con` | integer (1–30) | yes |  |
+| `baseScores.int` | integer (1–30) | yes |  |
+| `baseScores.wis` | integer (1–30) | yes |  |
+| `baseScores.cha` | integer (1–30) | yes |  |
+| `backgroundBonusAllocation` | object[] | yes | The background's ability increases, matching one of its printed spreads (+2/+1 or +1/+1/+1) over its listed abilities; empty when the background grants none |
+| `backgroundBonusAllocation[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `backgroundBonusAllocation[].amount` | integer (1–3) | yes |  |
+| `hp` | object | yes |  |
+| `hp.mode` | `average` \| `entries` | yes | average = the SRD fixed value every level; entries = one rolled result per level after the first, applied as max(roll, average) - the builder's friendly default |
+| `hp.entries` | integer (1–12)[] | no | Required for mode entries: exactly level-1 rolls, each within [1, hit die] |
+| `choices` | object[] | yes | The choice-provenance ledger AS the build input: every pick the wizard collected (skills, subclass, spells, cantrips, feats/ASI with their splits, equipment options, lineage, languages, tools). Catalog-driven picks are validated through the same fromCatalog resolver the wizard used; the ledger is stored verbatim on the sheet for level-up and respec |
+| `choices[].level` | integer (1–20) | yes |  |
+| `choices[].classId` | string (pattern) | no |  |
+| `choices[].kind` | string (pattern) | yes |  |
+| `choices[].id` | string (pattern) | yes |  |
+| `choices[].payload` | object (free-form) | no |  |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
+### `POST /api/v1/game/builder/policy`
+
+Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing "custom" is only actionable while a formula is set. The stored policy is projected to every player verbatim.
+
+**Auth:** Integration credential with `actor:write` · GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `commandId` | string (uuid) | no |  |
+| `expectedRevision` | integer (≥ 0) | no |  |
+| `allowedAbilityMethods` | `standard-array` \| `point-buy` \| `roll` \| `custom`[] | yes | Which ability-score methods the wizard offers players (task-packet decision 10); duplicates rejected |
+| `customFormula` | string \| null | no | The GM's custom roll formula (e.g. 3d6, 2d6+6), validated through the server dice grammar and 1-30 bounds; null clears it. Omitting the field keeps the stored formula |
+
+**Responses:** `200` Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed - envelope of `GameMutationAccepted` · errors `400` `401` `403` `409`
+
 ### `POST /api/v1/game/actors/{actorId}/proficiencies`
 
 Sets a character's save and skill proficiency selections on its editable imported sheet. Player sessions may target only their claimed character.
@@ -1723,9 +1783,17 @@ The bundled SRD condition reference (public information - any GM, player, or int
 
 **Responses:** `200` Condition reference entries - envelope of `ContentConditionsData` · errors `401` `403`
 
+### `GET /api/v1/content/skills`
+
+The skill catalog: reference text plus the ability each check uses, as data - the source the builder and sheet read instead of a hardcoded client list, so a homebrew skill is one catalog row. Includes the CC BY 4.0 attribution line.
+
+**Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Catalog entries - envelope of `ContentSkillsData` · errors `401` `403`
+
 ### `GET /api/v1/content/spells`
 
-The bundled SRD spell list with the fields a sheet needs to cast from: level, school, casting time, range, components, duration, concentration/ritual flags, description, and the upcast (`castingOptions`) rows keyed by slot level. Includes the CC BY 4.0 attribution line.
+The bundled SRD spell list with the fields a sheet needs to cast from: level, school, casting time, range, components, duration, concentration/ritual flags, description, the spell-list tags (`classes`) the builder filters on, and the upcast (`castingOptions`) rows keyed by slot level. Includes the CC BY 4.0 attribution line.
 
 **Auth:** Integration credential with `game:read` · GM session · Player session (own-character limits apply)
 

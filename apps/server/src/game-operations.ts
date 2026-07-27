@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { CombatLogEntry, GameState, GmView, PlayerView, RollRecord, TableEvent } from "@vtt/domain";
-import { rollDice } from "@vtt/rules-5e";
+import { rollDice, validateAbilityFormula } from "@vtt/rules-5e";
 import { ActorDefinitionSchema } from "@vtt/schemas";
+import { buildCharacterDefinition } from "./character-build.js";
 import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
@@ -35,7 +36,7 @@ import { answerSave, dismissSave } from "./saving-throws.js";
 import { answerReaction, dismissReaction } from "./reactions.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "./turn-economy.js";
 import {
-  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
+  ActionResolveSchema, ActorAddFromDefinitionSchema, ActorAvailableActionsSchema, ActorImportDefinitionSchema, BuilderSetPolicySchema, CharacterCreateSchema, CharacterSubmitImportSchema, CharacterResolveImportSchema, ActorRemoveSchema, ActorRestSchema, ActorSetSpeedSchema, ActorSpendHitDiceSchema, AddCombatantSchema, CharacterSetCurrencySchema, CharacterSetIdentitySchema, CharacterSetInventorySchema, CharacterSetPreparedSchema, CharacterSetProficienciesSchema, CharacterSetSlotSchema,
   AnnotationAddSchema, AnnotationClearSchema, AnnotationColorSetSchema, AnnotationMovableSetSchema, AnnotationMoveSchema,
   AnnotationPingSchema, AnnotationRemoveSchema, AnnotationVisibilitySetSchema, ApplyDamageSchema, CommandIdentitySchema, ContentActionsSchema,
   DamageResolveSchema, DeathSaveRollSchema, DiceRollSchema, EffectAddSchema, EffectEndSchema, EncounterStartSchema, GAME_COMMAND_SCOPES, HpAmountSchema, InitiativeNextSchema, InitiativePreviousSchema,
@@ -180,6 +181,13 @@ export function createGameOperations(context: GameOperationsContext) {
       // statement (author, source URL, license URI) on any surface that displays this content, and a
       // client that has to hand-write a substitute always writes a weaker one.
       return { conditions: contentLibrary.conditionSummaries(), attribution: contentLibrary.attribution };
+    },
+
+    contentSkills(_principal: GamePrincipal) {
+      // The skill catalog (reference text + the ability each check uses) is public reference like
+      // conditions: any joined session reads it, and the sheet/builder derive skill modifiers from
+      // it instead of a hardcoded client table.
+      return { skills: contentLibrary.skillSummaries(), attribution: contentLibrary.attribution };
     },
 
     contentSpells(_principal: GamePrincipal) {
@@ -565,6 +573,45 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: envelope.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.expectedRevision, payload: envelope, principal: principalTag(principal) }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.visibility));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
+    },
+
+    async characterCreate(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      // GM-only in phase 2; phase 3's player path reuses the same assembly into the draft/approval
+      // flow (task-packet amendment) - the assembly itself never assumes a GM.
+      requireGmGrade(principal, "Only the GM can create characters directly.");
+      const request = parse(CharacterCreateSchema, raw, "The character-create command is malformed.");
+      const actorId = request.commandId;
+      const result = await store.execute({ id: request.commandId, type: "character.create", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        // Assemble INSIDE the command so validation reads the CURRENT builder policy, then land the
+        // definition through the same import path as every other sheet (`import-<actorId>` keying).
+        const definition = buildCharacterDefinition(request, contentLibrary, state.builderPolicy);
+        importActorDefinition(state, definition, actorId, "public");
+      });
+      if (!result.duplicate) {
+        await context.publishGameState(result.state);
+        context.appendLog({ kind: "encounter", text: `${actorName(actorId)} joined the roster (character builder).`, actorIds: [actorId] });
+      }
+      return { revision: result.state.revision, duplicate: result.duplicate, actorId };
+    },
+
+    async builderSetPolicy(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
+      requireGmGrade(principal, "Only the GM can set the character-builder policy.");
+      const request = parse(BuilderSetPolicySchema, raw, "The builder-policy command is malformed.");
+      // A supplied formula must clear the SAME validator the roll path uses - never stored unvetted.
+      if (typeof request.customFormula === "string") {
+        const check = validateAbilityFormula(request.customFormula);
+        if (!check.ok) throw new GameInputError(check.message);
+      }
+      const { commandId, allowedAbilityMethods, expectedRevision } = request;
+      const result = await store.execute({ id: commandId, type: "builder.set-policy", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
+        state.builderPolicy = {
+          allowedAbilityMethods: [...allowedAbilityMethods],
+          // Omitted = keep the stored formula; null = clear; a string = the validated new formula.
+          customFormula: request.customFormula === undefined ? state.builderPolicy.customFormula : request.customFormula
+        };
+      });
+      if (!result.duplicate) { await context.publishGameState(result.state); context.appendLog({ kind: "encounter", text: `Character-builder ability methods set to ${allowedAbilityMethods.join(", ")}.`, gmOnly: true }); }
+      return { revision: result.state.revision, duplicate: result.duplicate };
     },
 
     async characterSubmitImport(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
@@ -1671,6 +1718,8 @@ export function gameCommandRegistry(operations: GameOperations): ReadonlyMap<str
     ["character.set-currency", "Set a character's coin purse.", (p, raw) => operations.characterSetCurrency(p, raw)],
     ["character.set-identity", "Edit a character's identity (class/level/race/background/feats) on its imported sheet.", (p, raw) => operations.characterSetIdentity(p, raw)],
     ["character.set-proficiencies", "Edit a character's save and skill proficiency selections on its imported sheet.", (p, raw) => operations.characterSetProficiencies(p, raw)],
+    ["character.create", "Create a character from choices (ids, scores, HP entries, the choices ledger); the server assembles and imports the sheet (GM). The actor's id equals the commandId.", (p, raw) => operations.characterCreate(p, raw)],
+    ["builder.set-policy", "Set the character-builder policy: allowed ability-score methods and the GM's custom roll formula (GM).", (p, raw) => operations.builderSetPolicy(p, raw)],
     ["annotation.add", "Draw a measurement or area shape on the encounter map.", (p, raw) => operations.annotationAdd(p, raw)],
     ["annotation.ping", "Ping a point on the encounter map.", (p, raw) => operations.annotationPing(p, raw)],
     ["annotation.move", "Move or resize an annotation you may edit.", (p, raw) => operations.annotationMove(p, raw)],
