@@ -79,6 +79,21 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ### Found by the 2026-07-27 phase-5 content pass
 
+- **[character-builder] ~~Repeated class choices were under-offered, making level-8+ characters
+  uncreatable~~ — FIXED 2026-07-27.** The wire carried no repeat count, so the client inferred one
+  from `asiLevels` and **only for `asi-or-feat`**; every other repeated choice was offered once while
+  the server's capacity is `choose x grants`. The build was then rejected at Create with "needs 4
+  pick(s); got 1". `ContentFeatureSummary.grantedAtLevels` now carries the level table's own answer,
+  resolved server-side, and the client uses it for every kind. Two defects compounded it, both mine
+  from the phase-5 generator: it stamped a concrete `feature.level` on repeated features (which sent
+  the client down the single-grant branch), and it omitted `repeatable: true` on the ASI choice that
+  the hand-authored Fighter has always carried — taking an ASI at both level 4 and level 8 repeats
+  one option id, which `character-build.ts:478` rejects unless the choice allows it. Level 8 went
+  from **3/12 to 12/12** classes creatable. Note the pre-existing half: no SRD class had a repeated
+  NON-ASI choice until Rogue expertise (1, 6) and Sorcerer metamagic (2, 10, 17) were added, so the
+  gap had never been exercised. **This matters for homebrew:** a homebrew class may repeat any
+  choice at all, so `grantedAtLevels` is load-bearing for that work, not just this fix.
+
 - **[content] ~~Champion's feature levels disagreed with the source~~ — FIXED 2026-07-27.** The
   hand-authored record carried 2024 feature **text** at 2014 feature **levels**: Remarkable Athlete
   at 7 and Additional Fighting Style at 10 are the old progression, and **Heroic Warrior (level 10)

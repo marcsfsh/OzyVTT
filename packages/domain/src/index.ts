@@ -506,7 +506,19 @@ export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: numbe
   maxSpellLevel: number | null;
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   options: readonly ContentFeatureOptionSummary[] }>;
-export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null }>;
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null; /**
+ * EVERY level at which the owning class's table grants this feature - the authoritative repeat
+ * count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times, and the server's capacity
+ * is `choose x grants` (`character-build.ts` grantedClassFeatures), so a client that cannot see the
+ * repeats offers too few picks and the build is rejected at Create.
+ *
+ * The client used to infer this, and only for `asi-or-feat`, from `asiLevels`. That covered the SRD
+ * classes that existed at the time and silently under-offered for every other repeated choice - a
+ * Rogue's Expertise (levels 1 and 6) and a Sorcerer's Metamagic (2, 10, 17) are both repeats that
+ * are not ASIs, and a homebrew class may repeat any choice at all. Empty for a feature that is not
+ * granted by a class level table (species traits, feats, subclass features).
+ */
+grantedAtLevels: readonly number[] }>;
 /**
  * ONE row of a class's printed 20-level table - the display data the wizard renders when a player
  * previews "what do I get at level 7?": slot columns, cantrips/spells known, the prepared-spell

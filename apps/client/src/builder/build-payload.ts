@@ -175,15 +175,21 @@ export function offerContext(draft: BuilderDraft, catalogs: BuilderCatalogs): Of
 function grantedClassFeatures(classRecord: ContentClassSummary, level: number): Array<{ feature: ContentFeatureSummary; level: number }> {
   const granted: Array<{ feature: ContentFeatureSummary; level: number }> = [];
   for (const feature of classRecord.features) {
-    if (feature.level != null) {
-      if (feature.level <= level) granted.push({ feature, level: feature.level });
+    // `grantedAtLevels` is the level table's own answer, resolved server-side - the authoritative
+    // repeat count, and the ONLY thing that agrees with the server's capacity of `choose x grants`.
+    //
+    // This used to be inferred, and only for `asi-or-feat`, from `asiLevels`; every other repeated
+    // choice fell through to "granted once". That silently under-offered and the build was then
+    // rejected at Create with "needs 4 pick(s); got 1" - a level-8 Barbarian, a level-6 Rogue
+    // (Expertise at 1 and 6) and a level-10 Sorcerer (Metamagic at 2, 10, 17) were all uncreatable,
+    // and a homebrew class may repeat any choice at all.
+    if (feature.grantedAtLevels.length > 0) {
+      for (const grantLevel of feature.grantedAtLevels) if (grantLevel <= level) granted.push({ feature, level: grantLevel });
       continue;
     }
-    // A level-less feature is the repeated one: the class's Ability Score Improvement, granted once
-    // per entry in `asiLevels`. (The wire's level rows carry no feature list, so `asiLevels` - which
-    // the class summary DOES carry - is the documented source for the repeat count.)
-    if (feature.choice?.kind === "asi-or-feat") {
-      for (const asiLevel of classRecord.asiLevels) if (asiLevel <= level) granted.push({ feature, level: asiLevel });
+    // No level-table grant: a species trait, a feat, a subclass feature. `level` stands alone.
+    if (feature.level != null) {
+      if (feature.level <= level) granted.push({ feature, level: feature.level });
       continue;
     }
     granted.push({ feature, level: 1 });

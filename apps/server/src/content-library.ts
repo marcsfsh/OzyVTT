@@ -177,14 +177,28 @@ const choiceSummaryOf = (choice: FeatureRecord["choice"]): ContentFeatureSummary
     }
   : null;
 
-const featureSummaryOf = (feature: FeatureRecord): ContentFeatureSummary => ({
+const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => ({
   id: feature.id,
   name: feature.name,
   level: feature.level ?? null,
   description: feature.description,
   tags: feature.tags,
-  choice: choiceSummaryOf(feature.choice)
+  choice: choiceSummaryOf(feature.choice),
+  grantedAtLevels
 });
+
+/** feature id -> every level row that grants it, in order. The client's repeat count. */
+const grantLevelsOf = (levelTable: ClassReference["levelTable"]): ReadonlyMap<string, number[]> => {
+  const levels = new Map<string, number[]>();
+  for (const row of levelTable) {
+    for (const featureId of row.features) {
+      const existing = levels.get(featureId);
+      if (existing) existing.push(row.level);
+      else levels.set(featureId, [row.level]);
+    }
+  }
+  return levels;
+};
 // The whole bundle, not just its label: a label can be shown but never turned into inventory, so the
 // wizard's "take option A" had nothing to add. Items and the "or take N gp" alternative both travel.
 const equipmentOptionsOf = (options: ReadonlyArray<{ id: string; label: string; items: ReadonlyArray<{ id: string; name: string; quantity: number }>; goldPieces: number }>): readonly ContentStartingEquipmentOption[] =>
@@ -228,7 +242,12 @@ const classSummaries: readonly ContentClassSummary[] = loadClasses().map((entry)
   spellcasting: spellcastingSummaryOf(entry.spellcasting),
   levelTable: entry.levelTable.map(levelRowOf),
   startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
-  features: entry.features.map(featureSummaryOf)
+  // The level table is the ONLY place that knows a feature repeats, and it does not travel with a
+  // feature list on the wire - so the repeat count is resolved here and carried per feature.
+  features: (() => {
+    const grants = grantLevelsOf(entry.levelTable);
+    return entry.features.map((feature) => featureSummaryOf(feature, grants.get(feature.id) ?? []));
+  })()
 })).sort(byName);
 
 const subclassSummaries: readonly ContentSubclassSummary[] = loadSubclasses().map((entry) => ({
@@ -236,7 +255,7 @@ const subclassSummaries: readonly ContentSubclassSummary[] = loadSubclasses().ma
   subclassLevel: entry.subclassLevel ?? null,
   spellcastingAbility: entry.spellcasting?.ability ?? null, spellcastingProgression: entry.spellcasting?.multiclassProgression ?? null,
   spellcasting: spellcastingSummaryOf(entry.spellcasting),
-  features: entry.features.map(featureSummaryOf)
+  features: entry.features.map((feature) => featureSummaryOf(feature))
 })).sort(byName);
 
 // Species traits and lineage traits are the same FeatureRecord shape; the lineage's own traits are
@@ -252,7 +271,7 @@ const speciesSummaries: readonly ContentSpeciesSummary[] = loadSpecies().map((en
     : null,
   languages: entry.languages, languageChoices: choiceListOf(entry.languageChoices),
   lineages: entry.lineages.map((lineage) => ({ id: lineage.id, name: lineage.name, description: lineage.description ?? null })),
-  features: [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map(featureSummaryOf)
+  features: [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map((feature) => featureSummaryOf(feature))
 })).sort(byName);
 
 const backgroundSummaries: readonly ContentBackgroundSummary[] = loadBackgrounds().map((entry) => ({
@@ -263,7 +282,7 @@ const backgroundSummaries: readonly ContentBackgroundSummary[] = loadBackgrounds
   toolProficiencies: entry.toolProficiencies, toolChoices: choiceListOf(entry.toolChoices),
   languages: entry.languages, languageChoices: choiceListOf(entry.languageChoices),
   startingEquipmentOptions: equipmentOptionsOf(entry.startingEquipment),
-  features: entry.features.map(featureSummaryOf)
+  features: entry.features.map((feature) => featureSummaryOf(feature))
 })).sort(byName);
 
 // A feat IS a feature plus catalog metadata - hence the single `feature`, not a list. Prerequisites

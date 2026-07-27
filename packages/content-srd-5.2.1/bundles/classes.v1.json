@@ -638,7 +638,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -1412,7 +1413,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -3106,7 +3108,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -4691,7 +4694,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -5482,7 +5486,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -6262,7 +6267,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -6812,7 +6818,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -7611,7 +7618,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {
@@ -8338,7 +8346,8 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats"
+     "fromCatalog": "general-feats",
+     "repeatable": true
     }
    },
    {

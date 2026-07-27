@@ -167,7 +167,12 @@ const ALL_SKILLS = [
   "religion", "sleight-of-hand", "stealth", "survival"
 ];
 
-const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "general-feats" };
+// `repeatable` matters: an ASI is granted at several levels and taking it at BOTH level 4 and
+// level 8 is legal, so the same option id appears twice. The server rejects a repeated option id
+// unless the choice says so (`character-build.ts:478`), and the hand-authored Fighter has always
+// carried this - omitting it made every generated class uncreatable from its second ASI onward.
+// Expertise and Metamagic are deliberately NOT repeatable: those pick a DIFFERENT entry each time.
+const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "general-feats", repeatable: true };
 const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
 
 /**
