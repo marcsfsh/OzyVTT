@@ -166,7 +166,7 @@ const featureSummaryOf = (feature: FeatureRecord): ContentFeatureSummary => ({
   description: feature.description,
   tags: feature.tags,
   choice: feature.choice
-    ? { kind: feature.choice.kind, choose: feature.choice.choose, from: feature.choice.from ?? [], fromCatalog: feature.choice.fromCatalog ?? null }
+    ? { kind: feature.choice.kind, choose: feature.choice.choose, from: feature.choice.from ?? [], fromCatalog: feature.choice.fromCatalog ?? null, maxSpellLevel: feature.choice.maxSpellLevel ?? null }
     : null
 });
 // The whole bundle, not just its label: a label can be shown but never turned into inventory, so the

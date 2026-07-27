@@ -1,0 +1,107 @@
+/* Character builder — LAYOUT ONLY.
+   Every control comes from @vtt/ui (which carries the 44px floor, the focus ring, and the one
+   chosen treatment), so nothing here paints a control: these rules place the step's sections and
+   give each offer a heading rhythm. Tokens only — no hex, no new breakpoint (760 is the documented
+   phone/laptop step, the same one WizardShell and Steps already swap at). */
+
+/* The wizard OWNS the viewport: it is a full page on a laptop and a full-screen sheet on a phone
+   (decision 4), never a modal floating over the table. */
+.cb-page {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+  /* This element is the scroll container, and the shell's header and footer are sticky over it.
+     Without scroll padding, anything the BROWSER scrolls to — a card reached by keyboard focus, an
+     anchor jump — lands underneath the footer and reads as unreachable. Found by driving the wizard
+     with a real browser: the focused card was visible and un-clickable. */
+  scroll-padding-top: calc(var(--space-16) + var(--space-6));
+  scroll-padding-bottom: calc(var(--space-16) + var(--space-6));
+}
+
+.cb-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-block: var(--space-4);
+}
+
+/* One offer = one heading + one count + one picker. Every step repeats this shape, so a player
+   who has answered one "choose N" has answered all of them. */
+.cb-offer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.cb-step > .cb-offer:first-child { padding-top: 0; border-top: 0; }
+
+.cb-offer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.cb-offer-title {
+  margin: 0;
+  font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+  letter-spacing: var(--tracking-display);
+}
+.cb-offer-level {
+  margin-left: var(--space-2);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+/* The running count is data, so it takes the mono face — and it is only ever a readout, never a
+   second place the pick can be made. */
+.cb-offer-count {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.cb-offer-help {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.cb-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+
+/* The ability-increase rows (an ASI's +2 split, a background's +2/+1). Each row is a label plus a
+   Select — the same gesture the allocator already uses to hand out a score, rather than a second
+   invention for the same act. */
+.cb-asi { display: flex; flex-direction: column; gap: var(--space-3); }
+.cb-asi-rows { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.cb-asi-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+}
+.cb-asi-label {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .cb-step { gap: var(--space-5); }
+  /* A Select next to its label wraps rather than shrinking below a tappable width. */
+  .cb-asi-rows { flex-direction: column; align-items: stretch; }
+  .cb-asi-row { justify-content: space-between; }
+}

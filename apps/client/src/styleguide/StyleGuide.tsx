@@ -309,6 +309,7 @@ function DiceInputDemo() {
       onManual={setHp}
       onReroll={hp != null ? () => setHp(null) : undefined}
       result={hp != null ? `${hp} HP` : undefined}
+      complete={hp != null}
       hint="Outside combat the wizard offers both paths; inside an encounter, RollControls does."
     />
   );
@@ -330,6 +331,29 @@ function ChoiceGridDemo() {
       facets={[{ value: "all", label: "All" }, { value: "srd", label: "SRD" }, { value: "homebrew", label: "Homebrew" }]}
       emptyAction={<Button variant="secondary" onClick={() => setFacet("all")}>Clear filters</Button>}
     />
+  );
+}
+
+/** The same grid in choose-N mode — the shape every content offer with `choose > 1`
+    takes (three Weapon Masteries, six prepared spells, two Magic Initiate cantrips). */
+function ChoiceGridMultiDemo() {
+  const [picked, setPicked] = useState<readonly string[]>(["elf"]);
+  const max = 2;
+  return (
+    <>
+      <p className="sg-muted tabular">{picked.length} of {max} chosen</p>
+      <ChoiceGrid
+        ariaLabel="Weapon masteries"
+        selection="multiple"
+        options={SPECIES}
+        value={null}
+        onChange={() => undefined}
+        values={picked}
+        max={max}
+        onToggle={(value, next) => setPicked((prev) => next ? [...prev, value] : prev.filter((entry) => entry !== value))}
+        searchPlaceholder="Search options…"
+      />
+    </>
   );
 }
 
@@ -693,11 +717,15 @@ export function StyleGuide() {
             <ChoiceGridDemo />
           </Section>
 
+          <Section id="choicegrid-multi" title="Choice grid (choose N)" blurb="selection='multiple' turns the same grid into the choose-N list every content offer needs — three Weapon Masteries, six prepared spells, two Magic Initiate cantrips. Same cards, same single chosen treatment; only the semantics change (role=checkbox, and arrows move focus without ticking every card they pass). Pass max and the grid locks the UNCHOSEN cards at capacity with a reason, while the chosen ones stay tappable so a pick can always be swapped — capacity handled once here rather than re-derived by each step. The chosen cards keep their cyan edge and check but spend no glow: a choose-6 region has six answers, and §8.1 budgets one glowing element per region — six blooming cards is the wallpaper that rule exists to prevent.">
+            <ChoiceGridMultiDemo />
+          </Section>
+
           <Section id="allocator" title="Ability score allocator" blurb="All four generation methods behind one component: standard array, point buy, 4d6-drop-lowest, and a GM custom formula. Two interactions cover them — assign values from a pool, or spend against a budget. Assignment is a per-ability select rather than drag-and-drop: dragging is the obvious mouse gesture and a dead end on a phone, and shipping both would be two ways to say one thing. Base, bonus, total, and modifier all render in the mono tabular face. Pure presentation: every number and callback comes from @vtt/rules-5e.">
             <AllocatorDemo />
           </Section>
 
-          <Section id="diceinput" title="Dice input row" blurb="The manual-vs-auto roll control for everything OUTSIDE combat — ability generation, starting HP, starting gold. It speaks the same two-mode vocabulary as the encounter's RollControls ('roll it for me' or type what your physical dice showed) so rolling feels the same everywhere, but it shares no combat state.">
+          <Section id="diceinput" title="Dice input row" blurb="The manual-vs-auto roll control for everything OUTSIDE combat — ability generation, starting HP, starting gold. It speaks the same two-mode vocabulary as the encounter's RollControls ('roll it for me' or type what your physical dice showed) so rolling feels the same everywhere, but it shares no combat state. Pass complete once the row has collected every result it needs: the roll and Apply actions lock while Roll again stays live, so a finished set never leaves a button that silently does nothing.">
             <DiceInputDemo />
           </Section>
 

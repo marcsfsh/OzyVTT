@@ -22,6 +22,10 @@ export interface ChoiceCardProps {
   /** Roving tabindex, set by ChoiceGrid. Standalone cards leave it at 0. */
   tabIndex?: number;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  /** "radio" (pick one, the default) or "checkbox" (pick several). Set by
+      `ChoiceGrid` from its own `selection` mode — the two look identical on
+      purpose; only the semantics differ. */
+  selectionRole?: "radio" | "checkbox";
   id?: string;
   className?: string;
   ref?: Ref<HTMLButtonElement>;
@@ -30,24 +34,25 @@ export interface ChoiceCardProps {
 /** The selectable content card behind every "pick one" step: species, class,
     background, feat, subclass.
 
-    It has radio semantics (`role="radio"` + `aria-checked`) because these grids are
-    single-select — a pressed-button grid would let a keyboard user believe several
-    can be on at once.
+    It carries `aria-checked` under either `role="radio"` (pick one — the default) or
+    `role="checkbox"` (pick N of a list, e.g. three Weapon Masteries). A pressed-button
+    grid would leave a keyboard user unable to tell the two apart; the roles say it
+    outright, and `ChoiceGrid` sets the right one for its selection mode.
 
     There is exactly ONE chosen treatment in the system: a cyan edge with the
-    selection glow plus a check mark. Do not add a second cue (no "Selected" label,
-    no filled background) — cyan is selection everywhere else too, and one card
-    selected means one glowing element per region. */
+    selection glow plus a check mark — identical in both modes. Do not add a second cue
+    (no "Selected" label, no filled background) — cyan is selection everywhere else too,
+    and one card selected means one glowing element per region. */
 export function ChoiceCard({
   selected, onSelect, title, description, icon, badge, meta,
-  disabled = false, disabledReason, tabIndex, onKeyDown, id, className, ref
+  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, className, ref
 }: ChoiceCardProps) {
   return (
     <button
       ref={ref}
       id={id}
       type="button"
-      role="radio"
+      role={selectionRole}
       aria-checked={selected}
       disabled={disabled}
       tabIndex={tabIndex}

@@ -12,7 +12,9 @@
    and destruction (§2). The edge is paired with the words next to the Edit link. */
 .nh-review-section.is-incomplete { border-color: var(--caution); }
 
-.nh-review-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+/* `max-width: none` for the same reason as `.nh-wizard-head`: a host app's bare `header` rule must
+   not decide how wide a primitive's own header is. */
+.nh-review-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); max-width: none; }
 .nh-review-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
 /* Edit is `Button variant="ghost" size="sm"` — the system's quiet text action. This
    rule only aligns the pencil; the button's own look, hover, and 44px hit area come

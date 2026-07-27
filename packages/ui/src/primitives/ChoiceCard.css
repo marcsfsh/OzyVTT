@@ -75,6 +75,12 @@
 .nh-choice.is-selected .nh-choice-check { opacity: 1; transform: none; }
 .nh-choice.is-selected .nh-choice-title { color: var(--text); }
 
+/* Choose-N grids keep the chosen EDGE and CHECK — the treatment is unchanged — but spend no glow.
+   §8.1 budgets one glowing element per region, and a "choose 6 spells" region has six answers by
+   definition; six glowing cards is precisely the wallpaper that rule exists to prevent. The cyan
+   edge plus the check still say "chosen" without colour alone, so nothing is lost but the bloom. */
+.nh-choicegrid-items[role="group"] .nh-choice.is-selected { box-shadow: none; }
+
 /* Disabled dims PER PROPERTY, never with a group `opacity`: group alpha composites the
    whole subtree, so a child can't opt back out of it (the old `.nh-choice-locked
    { opacity: 1 }` was a no-op) and the locked reason fell to 2.08:1 in light theme.

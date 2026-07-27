@@ -7,6 +7,30 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-27 — Character builder wizard: three UI decisions worth not relitigating
+
+Settled while building the phase-2 wizard screens; each was a fork with a defensible other answer.
+
+1. **The ASI level offers "raise scores" or "take a feat" — and the catalog's own Ability Score
+   Improvement feat is filtered out of that feat list.** The server accepts both routes (the `asi`
+   shorthand with a `payload.increases` split, or the feat resolved from `general-feats`), and they
+   produce identical scores. Offering both would be the same idea expressed twice in one picker. The
+   wizard offers the shorthand and hides the duplicate feat. Level-up and respec should do the same.
+2. **Each step owns the picks its SOURCE asks for**, not the picks that look thematically related.
+   The Sage's Magic Initiate cantrips are chosen on the Background step (the background grants the
+   feat), not on the spell step; the background's +2/+1 is spent on the Ability scores step, where
+   the totals are visible. One rule, no per-offer judgement calls.
+3. **A choose-N grid keeps the chosen edge and check but spends no glow.** §8.1 budgets one glowing
+   element per region, and a "choose 6 spells" region has six answers by definition. Rather than
+   invent a second chosen treatment, the multi-select grid drops the bloom only — cyan edge plus the
+   check still carry the state without colour alone. Implemented in `ChoiceCard.css`, scoped to
+   `.nh-choicegrid-items[role="group"]`.
+
+Also settled: the wizard has **one exit** (Save & close). The draft is parked on every change, so a
+second "leave without saving" button would be a lie *and* — at 375px — overhang the last card in the
+step with its 44px tap area. Discarding lives on the resume banner ("Start fresh"), next to the draft
+it throws away.
+
 ## 2026-07-26 — Character builder: features-as-data, so homebrew is additive
 
 The guided builder is being built with a **later homebrew update as a first-class design input** (the owner's

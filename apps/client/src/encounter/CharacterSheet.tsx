@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
+import { resolveSpellcasting, type ActorDefinition, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
+import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
@@ -23,20 +24,13 @@ const d20 = (bonus: number) => bonus === 0 ? "1d20" : `1d20 ${bonus > 0 ? "+" : 
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
-const titleizeSkill = (id: string) => id.split("-").map(titleCase).join(" ");
 const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
 /** Best-effort per-browser preference storage for the sheet's roll settings (private-mode safe). */
 const readSetting = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeSetting = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable; setting stays in-session */ } };
 const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
-/** SRD governing ability for each of the 18 skills (drives the read-only skill bonus). */
-const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
-  acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
-  history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis",
-  nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int",
-  "sleight-of-hand": "dex", stealth: "dex", survival: "wis"
-};
-const ALL_SKILLS = Object.keys(SKILL_ABILITY).sort();
+/** One skill row on the sheet: which ability governs its check comes from the catalog, never code. */
+type SheetSkill = Readonly<{ id: string; name: string; ability: (typeof ABILITIES)[number] | null }>;
 
 type SrdExtension = Partial<{
   challengeRating: number; type: string; alignment: string; armorDetail: string | null;
@@ -251,6 +245,15 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const { prompt, dialog } = usePrompt();
   // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
   const spellRef = useSpellReference();
+  // The skills the sheet lists, and the ability each check uses, come from the CATALOG (session-cached
+  // like the spell reference). This replaces the hardcoded 18-skill SKILL_ABILITY table, which meant a
+  // homebrew skill needed a code edit to be rollable - the named anti-pattern in architecture
+  // principle 3. Ordering is by name from the data; a row whose ability the bundle never set shows no
+  // bonus rather than a wrong one.
+  const skillCatalog = useSkillCatalog();
+  const sheetSkills: readonly SheetSkill[] = [...skillCatalog.items]
+    .map((skill) => ({ id: skill.id, name: skill.name, ability: (ABILITIES as readonly string[]).includes(skill.ability ?? "") ? skill.ability as SheetSkill["ability"] : null }))
+    .sort((left, right) => left.name.localeCompare(right.name));
   const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
@@ -344,8 +347,22 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const preparedIds = new Set<string>(actor.preparedSpellIds ?? []);
   const liveSlotRemaining = new Map<number, number>((actor.spellSlots ?? []).map((slot) => [slot.level, slot.remaining]));
   const pact = actor.pactSlots ?? null;
-  const spellDc = spellcasting && definition ? (spellcasting.saveDc ?? spellSaveDc(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
-  const spellAtk = spellcasting && definition ? (spellcasting.attackBonus ?? spellAttackBonus(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  // Caster numbers go through `resolveSpellcasting` - THE documented resolution order (per-class
+  // entry by classId, then the lone-entry shortcut, then the top-level fields). Reading
+  // `spellcasting.ability` directly, as this did, showed a Paladin/Wizard ONE save DC for both
+  // spell lists. One row per casting class; a single-class or legacy sheet still renders one.
+  const casterEntries = spellcasting?.classes ?? [];
+  const casterRows = (definition && spellcasting
+    ? (casterEntries.length > 0 ? casterEntries.map((entry) => entry.classId) : [undefined])
+    : []
+  ).flatMap((classId) => {
+    const resolved = resolveSpellcasting(spellcasting, classId);
+    if (!resolved) return [];
+    const dc = resolved.saveDc ?? spellSaveDc(definition!.abilityScores[resolved.ability], definition!.proficiencyBonus);
+    const attack = resolved.attackBonus ?? spellAttackBonus(definition!.abilityScores[resolved.ability], definition!.proficiencyBonus);
+    const name = classId ? character?.classes?.find((entry) => entry.id === classId)?.name ?? titleCase(classId) : null;
+    return [{ key: classId ?? "primary", name, ability: resolved.ability, dc, attack }];
+  });
   // "Cast at" support: index the SRD spell data by id, and the character's slot pools by level.
   const spellIndex = new Map(spellRef.map((entry) => [entry.id, entry]));
   const slotMaxByLevel = new Map<number, number>((spellcasting?.slots ?? []).map((slot) => [slot.level, slot.max]));
@@ -530,24 +547,28 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             ? <div className="sheet-editor">
                 <p className="sheet-editor-hint">Changes save as you go. Tap a save to toggle it; tap a skill to cycle proficient → expertise → none. Press <strong>Done</strong> when finished.</p>
                 <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => <button type="button" key={ability} className={`sheet-prepare${profDraft.saves.includes(ability) ? " is-prepared" : ""}`} disabled={busy} onClick={() => toggleSave(ability)}>{ability.toUpperCase()}</button>)}</div>
-                <ul className="sheet-skill-list sheet-skill-edit">{ALL_SKILLS.map((id) => { const tier = profDraft.skills[id]; return <li key={id}><span>{titleizeSkill(id)}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(id)}>{tier ?? "—"}</button></li>; })}</ul>
+                <ul className="sheet-skill-list sheet-skill-edit">{sheetSkills.map((skill) => { const tier = profDraft.skills[skill.id]; return <li key={skill.id}><span>{skill.name}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(skill.id)}>{tier ?? "—"}</button></li>; })}</ul>
               </div>
             : <>
                 <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
                 <ul className="sheet-skill-list sheet-skill-cols">
-                  {ALL_SKILLS.map((id) => { const ability = SKILL_ABILITY[id]; const tier = proficiencies?.skills.find((skill) => skill.id === id)?.proficiency; const bonus = skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, tier ?? "none"); return <li key={id}>
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => void rollD20(bonus, "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
+                  {sheetSkills.map((skill) => { const tier = proficiencies?.skills.find((entry) => entry.id === skill.id)?.proficiency; const bonus = skill.ability ? skillBonus(definition.abilityScores[skill.ability], definition.proficiencyBonus, tier ?? "none") : null; return <li key={skill.id}>
+                    {bonus === null
+                      ? <span className="sheet-roll-chip" title={`${skill.name} names no governing ability, so it has no rollable bonus`}>—</span>
+                      : <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${skill.name}`} onClick={() => void rollD20(bonus, "check", `${skill.name} check`)}>{signed(bonus)}</button>}
                     <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"} aria-label={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
-                    <span className="sheet-skill-name">{titleizeSkill(id)} <em>{ability.toUpperCase()}</em></span>
+                    <span className="sheet-skill-name">{skill.name} {skill.ability && <em>{skill.ability.toUpperCase()}</em>}</span>
                   </li>; })}
                 </ul>
               </>}
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
           <div className="sheet-spellcast-fields">
-            <div className="sheet-spellcast-field"><span>Caster</span><strong>{spellcasting.ability.toUpperCase()}</strong></div>
-            <div className="sheet-spellcast-field"><span>Save DC</span><strong>{spellDc ?? "-"}</strong></div>
-            {spellAtk !== null && <div className="sheet-spellcast-field"><span>Spell atk</span><strong>{signed(spellAtk)}</strong></div>}
+            {casterRows.map((row) => <Fragment key={row.key}>
+              <div className="sheet-spellcast-field"><span>{row.name ? `${row.name} caster` : "Caster"}</span><strong>{row.ability.toUpperCase()}</strong></div>
+              <div className="sheet-spellcast-field"><span>Save DC</span><strong>{row.dc}</strong></div>
+              <div className="sheet-spellcast-field"><span>Spell atk</span><strong>{signed(row.attack)}</strong></div>
+            </Fragment>)}
           </div>
           {(() => {
             type Spell = (typeof spellcasting.spells)[number];

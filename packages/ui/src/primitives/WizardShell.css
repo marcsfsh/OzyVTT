@@ -15,6 +15,11 @@
   position: sticky;
   top: 0;
   z-index: 2;
+  /* Defend against the consuming app's element-selector globals. The client's styles.css carries a
+     bare `header { max-width: 40rem }` (written for its landing hero), which clamped this sticky
+     header to 640px: the step body then scrolled visibly past it in the uncovered gutter. A
+     primitive must not depend on which globals its host happens to define. */
+  max-width: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
@@ -37,7 +42,13 @@
 
 .nh-wizard-resume { padding: 0 var(--space-4); }
 
-.nh-wizard-body { flex: 1 1 auto; min-height: 0; padding: 0 var(--space-4); }
+/* GROW into spare space, never SHRINK below the content. `flex: 1 1 auto` with `min-height: 0`
+   let this item compress inside the shell's `min-height: 100dvh` column, so a step taller than the
+   viewport overflowed its own box: the shell stayed exactly one screen tall, the page had nothing
+   to scroll, and every card below the fold sat unreachable under the sticky footer. Caught by
+   driving the first real consumer (the character builder) in a browser — the styleguide demo's
+   steps are all short enough to never hit it. */
+.nh-wizard-body { flex: 1 0 auto; padding: 0 var(--space-4); }
 .nh-wizard-main { min-width: 0; }
 
 /* Detail / preview pane. */
@@ -126,5 +137,15 @@
     grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
     gap: var(--space-4);
     align-items: start;
+  }
+  /* Stay beside the list. A step body can run well past a screen (a class's feature set, a
+     66-spell picker), and a preview you have scrolled away from previews nothing — the column
+     just becomes empty gutter. It clears the sticky header, and scrolls inside itself rather
+     than growing past the viewport. */
+  .nh-wizard-detail {
+    position: sticky;
+    top: calc(var(--space-16) + var(--space-12));
+    max-height: calc(100dvh - var(--space-16) * 2 - var(--space-12));
+    overflow-y: auto;
   }
 }

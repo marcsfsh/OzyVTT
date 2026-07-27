@@ -8,7 +8,10 @@ import { ConditionChips, ConditionEditor } from "../encounter/conditions";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 
-type Props = { role: "gm"; state: GmView } | { role: "player"; state: PlayerView };
+type Props = ({ role: "gm"; state: GmView } | { role: "player"; state: PlayerView }) & {
+  /** GM only (phase 2): opens the full-page character builder. Absent ⇒ the button is not offered. */
+  onCreateCharacter?: () => void;
+};
 
 function statusForGm(ownerSessionId: string | null) { return ownerSessionId ? "Claimed" : "Available"; }
 function statusForPlayer(actor: PlayerActor) { return actor.claimStatus === "mine" ? "Your character" : actor.claimStatus === "claimed" ? "Taken" : "Available"; }
@@ -171,6 +174,9 @@ export function ActorRoster(props: Props) {
         bar (rendered outside this roster), so it's excluded from the "choose your place" grid here. */}
     <div id="roster-body">
     <div className="roster-import">
+      {/* Building beats importing when there's nothing to import, so it leads the row — and it is
+          the one primary action here (the two import paths stay secondary). */}
+      {props.role === "gm" && props.onCreateCharacter && <Button type="button" variant="primary" onClick={props.onCreateCharacter}>Create a character</Button>}
       <Button type="button" onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
       {props.role === "gm" && <>
         <input ref={importFileRef} type="file" accept=".json,application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) importSheet(file); event.target.value = ""; }} />

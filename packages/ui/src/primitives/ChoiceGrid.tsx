@@ -24,10 +24,26 @@ export interface ChoiceOption {
 
 export interface ChoiceGridProps {
   options: readonly ChoiceOption[];
+  /** Single-select answer. Ignored (pass null) when `selection` is "multiple". */
   value: string | null;
   onChange: (value: string) => void;
   /** Required — a radiogroup needs an accessible name. */
   ariaLabel: string;
+
+  /** "single" (default) is the pick-one radiogroup. "multiple" is the choose-N
+      list every content offer needs (three Weapon Masteries, six prepared spells):
+      same cards, same one chosen treatment, checkbox semantics. */
+  selection?: "single" | "multiple";
+  /** multiple: the chosen ids. */
+  values?: readonly string[];
+  /** multiple: `next` is false when the card was already chosen. */
+  onToggle?: (value: string, next: boolean) => void;
+  /** multiple: how many may be chosen. Once `values` is full, the unchosen cards
+      lock with a reason rather than silently swallowing taps — the grid owns this
+      so every choose-N step says the same thing the same way. */
+  max?: number;
+  /** The reason shown on locked cards at capacity. */
+  maxReachedReason?: ReactNode;
 
   searchable?: boolean;
   searchPlaceholder?: string;
@@ -69,6 +85,7 @@ export interface ChoiceGridProps {
     and any smarter ranking belong to the caller. */
 export function ChoiceGrid({
   options, value, onChange, ariaLabel,
+  selection = "single", values, onToggle, max, maxReachedReason,
   searchable = true, searchPlaceholder = "Search…", searchDelay = 160,
   facets, facetValue, onFacetChange, facetLabel = "Filter", facetAllValue = "all",
   emptyTitle = "No matches", emptyText = "Try a different search or clear the filters.", emptyAction,
@@ -94,11 +111,27 @@ export function ChoiceGrid({
     });
   }, [options, debounced, facets, facetValue, facetAllValue]);
 
-  // Roving tabindex: the selected card is the grid's single tab stop, falling back
-  // to the first selectable one so the group is always reachable.
-  const selectable = shown.filter((option) => !option.disabled);
-  const tabStop = selectable.find((option) => option.value === value)?.value ?? selectable[0]?.value ?? null;
+  const multiple = selection === "multiple";
+  const chosen = useMemo(() => new Set(values ?? []), [values]);
+  const isChosen = (option: ChoiceOption) => multiple ? chosen.has(option.value) : option.value === value;
+  // At capacity the UNCHOSEN cards lock (the chosen ones must stay tappable, or the
+  // player can never change their mind) — with a reason, per the disabled rule.
+  const atCapacity = multiple && max != null && chosen.size >= max;
+  const lockedReason = maxReachedReason ?? (max != null ? `You have already chosen ${max}. Unpick one to swap.` : undefined);
+  const lockedOf = (option: ChoiceOption) => option.disabled === true || (atCapacity && !chosen.has(option.value));
 
+  // Roving tabindex: a chosen card is the grid's single tab stop, falling back to the
+  // first selectable one so the group is always reachable.
+  const selectable = shown.filter((option) => !lockedOf(option));
+  const tabStop = selectable.find(isChosen)?.value ?? selectable[0]?.value ?? null;
+
+  const pick = (option: ChoiceOption) => {
+    if (multiple) onToggle?.(option.value, !chosen.has(option.value));
+    else onChange(option.value);
+  };
+
+  // Arrow keys MOVE in both modes; only a radiogroup also selects as it moves — a
+  // checkbox group that selected on arrow would tick every card you scrolled past.
   const move = (from: string, delta: number, toEdge?: "first" | "last") => {
     if (selectable.length === 0) return;
     const index = selectable.findIndex((option) => option.value === from);
@@ -107,7 +140,7 @@ export function ChoiceGrid({
       : (index + delta + selectable.length) % selectable.length;
     const target = selectable[next];
     if (!target) return;
-    onChange(target.value);
+    if (!multiple) onChange(target.value);
     itemRefs.current.get(target.value)?.focus();
   };
 
@@ -157,27 +190,31 @@ export function ChoiceGrid({
             {emptyAction}
           </div>
         ) : (
-          <div className="nh-choicegrid-items" role="radiogroup" aria-label={ariaLabel}>
-            {shown.map((option) => (
-              <ChoiceCard
-                key={option.value}
-                ref={(node) => {
-                  if (node) itemRefs.current.set(option.value, node);
-                  else itemRefs.current.delete(option.value);
-                }}
-                selected={option.value === value}
-                onSelect={() => onChange(option.value)}
-                onKeyDown={(event) => onKeyDown(event, option.value)}
-                tabIndex={option.value === tabStop ? 0 : -1}
-                title={option.title}
-                description={option.description}
-                icon={option.icon}
-                badge={option.badge}
-                meta={option.meta}
-                disabled={option.disabled}
-                disabledReason={option.disabledReason}
-              />
-            ))}
+          <div className="nh-choicegrid-items" role={multiple ? "group" : "radiogroup"} aria-label={ariaLabel}>
+            {shown.map((option) => {
+              const locked = lockedOf(option);
+              return (
+                <ChoiceCard
+                  key={option.value}
+                  ref={(node) => {
+                    if (node) itemRefs.current.set(option.value, node);
+                    else itemRefs.current.delete(option.value);
+                  }}
+                  selectionRole={multiple ? "checkbox" : "radio"}
+                  selected={isChosen(option)}
+                  onSelect={() => pick(option)}
+                  onKeyDown={(event) => onKeyDown(event, option.value)}
+                  tabIndex={option.value === tabStop ? 0 : -1}
+                  title={option.title}
+                  description={option.description}
+                  icon={option.icon}
+                  badge={option.badge}
+                  meta={option.meta}
+                  disabled={locked}
+                  disabledReason={option.disabled === true ? option.disabledReason : lockedReason}
+                />
+              );
+            })}
           </div>
         )}
       </div>

@@ -36,25 +36,43 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   grants/uses` are read by nothing but the summary projection, which strips them. `content-library.ts`,
   `packages/domain`, and the published OpenAPI `ContentFeature` description all assert "the server
   applies them when it builds the character" — that code does not exist. Largest unscoped Phase-2 item.
-- **[character-builder] `resolveSpellcasting` has zero production consumers.** It is documented as
-  mandatory ("so no consumer re-implements it… multiclass support cannot be half-applied"), but
-  `apps/client/src/encounter/CharacterSheet.tsx:347-348,548` still computes spell DC/attack and the
-  caster label from the top-level `spellcasting.ability` unconditionally — so a multiclass sheet shows
-  one DC. Migrate the existing consumer.
+- **[character-builder] ~~`resolveSpellcasting` has zero production consumers~~ — FIXED 2026-07-27
+  (phase-2 wizard branch).** `CharacterSheet.tsx` now resolves caster numbers through
+  `resolveSpellcasting`, one row per casting class (labelled "<Class> caster"), so a multiclass sheet
+  can no longer show one DC for two spell lists. Verified in a browser: an Evoker Wizard 3 renders
+  "Wizard caster INT / Save DC 13 / Spell atk +5".
 - **[character-builder] No server-side builder roll command.** `DiceInputRow` covers manual-entry and
   auto-roll client-side, but nothing server-side accepts a typed builder result the way
   `initiative.roll-self` accepts `natural`. Without it the client owns the roll (violates server
   authority).
 - **[character-builder] Homebrew discriminator covers 6 of 9 promised content types.** Spells,
   equipment/weapons/armor, and monsters carry no `source` field, and `EquipmentReferenceSchema.category`
-  is a **closed 10-value enum** — a direct conflict with "all item types". Also `SKILL_ABILITY`
-  (`CharacterSheet.tsx:33-39`) still hardcodes the 18 SRD skills, there is no `content:skills`
-  endpoint, and `skills.v1.json` has no `ability` column, so a homebrew skill needs three edits.
+  is a **closed 10-value enum** — a direct conflict with "all item types". (The `SKILL_ABILITY`
+  hardcode is **fixed** as of 2026-07-27: `content:skills` carries an `ability` column and
+  `CharacterSheet.tsx` drives both the skill list and each governing ability from the catalog, so a
+  homebrew skill is now a bundle row and nothing else.)
 - **[character-builder] Content/test gaps.** `soldier-a` starting equipment references `dice-set` but the
   catalog id is `gaming-set-dice` — invisible because the cross-reference test checks *class* equipment
   ids and *background skill* ids but not background equipment ids. And
   `character-content.test.ts:65-66` sets only `statPriority[0]` to 13, so Paladin/Monk/Ranger
   (multi-ability prerequisites) will fail the moment they are authored.
+- **[ui] A bare `header { max-width: 40rem }` in `apps/client/src/styles.css` clamps every
+  `<header>` in the app**, including four `@vtt/ui` primitives (`WizardShell`, `ReviewSummary`,
+  `Modal`, `Panel`). It was written for the landing hero. Found 2026-07-27 when it silently clamped
+  the character builder's sticky header to 640px, letting the step body scroll visibly through the
+  uncovered gutter. `WizardShell` and `ReviewSummary` now defend themselves with `max-width: none`;
+  **`Modal` and `Panel` heads are still clamped**. The real fix is to scope the app global (e.g.
+  `main > header`), which would also unclamp `.codex-entry-head` / `.acting-console-head` — a visual
+  change wide enough to want its own pass.
+- **[content] `skills.v1.json` prints "Sleight Of Hand"** (capital "Of"); the SRD prints "Sleight of
+  Hand". Harmless but now visible, because the sheet renders the catalog's `name` verbatim instead of
+  title-casing the id. One-row data fix.
+- **[character-builder] No GM-facing editor for `builder.set-policy`.** The command and the
+  `PlayerView.builderPolicy` projection both exist and the wizard honours the policy (it offers only
+  the permitted ability methods, and "custom" only when a formula is configured), but nothing in the
+  UI lets the GM *set* it — so the table is stuck on the default (all four methods, no custom
+  formula). Small VTT-Setup panel; decision 10 is not fully delivered until it lands.
+
 - **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
   deliberately not retuned mid-flight. Needs its own pass.

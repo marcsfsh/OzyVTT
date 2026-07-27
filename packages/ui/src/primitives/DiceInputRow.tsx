@@ -30,6 +30,10 @@ export interface DiceInputRowProps {
   min?: number;
   max?: number;
   busy?: boolean;
+  /** Nothing left to roll — every result this row collects is already in. It locks the roll and
+      Apply actions while leaving `onReroll` live, so a finished set reads as finished instead of
+      offering a button that silently does nothing. Distinct from `busy`, which is "in flight". */
+  complete?: boolean;
   hint?: ReactNode;
   className?: string;
 }
@@ -45,7 +49,7 @@ export interface DiceInputRowProps {
 export function DiceInputRow({
   label, notation, mode, onModeChange, onRoll, onManual, onReroll, result,
   rollLabel = "Roll it for me", manualLabel = "Rolled total", manualPlaceholder = "Type the total",
-  rerollLabel = "Roll again", min = 1, max = 100, busy = false, hint, className
+  rerollLabel = "Roll again", min = 1, max = 100, busy = false, complete = false, hint, className
 }: DiceInputRowProps) {
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +85,7 @@ export function DiceInputRow({
 
       <div className="nh-diceinput-row">
         {mode === "auto" ? (
-          <Button variant="primary" onClick={onRoll} disabled={busy}>
+          <Button variant="primary" onClick={onRoll} disabled={busy || complete}>
             <span className="nh-diceinput-die" aria-hidden="true"><IconDie /></span>
             {rollLabel}
           </Button>
@@ -96,11 +100,11 @@ export function DiceInputRow({
               placeholder={manualPlaceholder}
               aria-label={manualLabel}
               aria-invalid={error != null || undefined}
-              disabled={busy}
+              disabled={busy || complete}
               onChange={(event) => { setTyped(event.target.value); if (error) setError(null); }}
               onKeyDown={(event) => { if (event.key === "Enter" && typed.trim() !== "") { event.preventDefault(); submit(); } }}
             />
-            <Button variant="primary" onClick={submit} disabled={busy || typed.trim() === ""}>Apply</Button>
+            <Button variant="primary" onClick={submit} disabled={busy || complete || typed.trim() === ""}>Apply</Button>
           </>
         )}
         {result != null && <span className="nh-diceinput-result tabular" role="status">{result}</span>}

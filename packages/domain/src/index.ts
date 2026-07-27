@@ -492,7 +492,9 @@ export type ContentSourceKind = "srd" | "homebrew";
  * homebrew authors the same record. The structured riders (granted actions, effects, modifiers,
  * limited uses) stay on the server-side record - the server, never the wizard, applies them.
  */
-export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null }> | null }>;
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
+  /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
+  maxSpellLevel: number | null }> | null }>;
 /**
  * ONE row of a class's printed 20-level table - the display data the wizard renders when a player
  * previews "what do I get at level 7?": slot columns, cantrips/spells known, the prepared-spell

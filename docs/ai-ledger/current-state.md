@@ -8,6 +8,36 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Character builder — the wizard screens (2026-07-27, branch
+  `claude/dndbeyond-sheet-importer-0k6u2e`). A character can now be created through the UI for the
+  first time.** A seven-step guided flow (Species · Background · Class & level · Class features ·
+  Ability scores · Equipment · Name & review) launched from **"Create a character"** beside the
+  roster's import buttons (GM only, phase 2). It is a **full page**, not a modal: `WizardShell` takes
+  the viewport on a laptop and becomes a full-screen sheet on a phone (decision 4).
+  - **Offers come from the content, not from code.** `apps/client/src/builder/build-payload.ts`
+    rebuilds the same offer set `character-build.ts` validates against, resolving every `fromCatalog`
+    slug through the shared `resolveCatalogChoice` — so the wizard and the server cannot disagree
+    about what was offerable. Each offer renders with its pick count and gates Next until exactly
+    filled, always with a reason ("Choose 3 for Weapon Mastery — 1 of 3 so far").
+  - **Server authority holds.** The client sends CHOICES; the server assembles the sheet. Auto-rolls
+    (ability scores, per-level HP) go through the existing `dice.roll`, so the numbers are
+    server-thrown and land in roll history; manual entry carries the player's own physical dice into
+    the payload. Nothing on the review screen is a computed game outcome — it shows the inputs, and a
+    400 surfaces the server's own message inline.
+  - **Ability scores** honour `builderPolicy.allowedAbilityMethods` (custom shown only with a
+    configured formula) and wire `AbilityScoreAllocator` to the real `@vtt/rules-5e` math.
+  - **Draft persistence is client-side for now** (`builder/draft.ts` → localStorage, keyed per
+    session), surfaced through the shell's existing resume affordance. The stored record is the same
+    shape a Phase-3 `GameState.characterDrafts[]` row would hold, so the swap is a change of
+    transport, not of model.
+  - **Ten catalogs** are read once per session through `apps/client/src/content/catalogs.ts` (module
+    cache + in-flight dedupe + listener set; a failed or empty ack is never cached), and the
+    persistent CC BY footer renders the catalogs' own `attribution` lines.
+  - **Verified by driving it:** a Fighter 5 (human soldier, Champion) and a Wizard 3 (high-elf sage,
+    Evoker) created end-to-end in Chromium at 1440px and again at 375px with touch — HP 52/AC 16 and
+    HP 20/AC 12/DC 13/slots 4+2 on their sheets, matching `character-build.test.ts` exactly; zero
+    horizontal overflow on all seven steps at 375px; 0 controls under the 44px floor.
+
 - **Worldbuilding codex (2026-07-24, branch `claude/world-maps-geospatial-db-1kiqez`).** A GM
   worldbuilding suite + campaign journal + living atlas, on a new **Codex** GM tab (Pages | Atlas |
   Journal) plus a read-only **player Codex** (Lore | Atlas | Journal, behind a player "Codex" button).
