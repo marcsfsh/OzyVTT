@@ -1,7 +1,7 @@
 import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
-import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -31,11 +31,13 @@ export type HomebrewCatalogSlice = Readonly<{
   spells: readonly SpellReference[];
   equipment: readonly EquipmentReference[];
   monsters: readonly ActorDefinition[];
+  /** Membership overlays, applied over the generated spell bundle at the merge point - never an edit to it. */
+  spellLists: readonly SpellListReference[];
 }>;
 
 /** The identity slice: what every catalog reads today, before any homebrew store exists. */
 export const EMPTY_HOMEBREW_SLICE: HomebrewCatalogSlice = Object.freeze({
-  classes: [], subclasses: [], species: [], backgrounds: [], feats: [], spells: [], equipment: [], monsters: []
+  classes: [], subclasses: [], species: [], backgrounds: [], feats: [], spells: [], equipment: [], monsters: [], spellLists: []
 });
 
 /**

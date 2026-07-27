@@ -448,7 +448,9 @@ export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save"
 /** Which slice of the worldbuilding codex changed; the `codex:changed` ping carries no content, so it is viewer-safe - every recipient refetches only its own projected view over HTTP. */
 export type CodexChangeScope = "pages" | "maps" | "markers" | "journal";
 export type CodexChangedEvent = Readonly<{ scope: CodexChangeScope; codexRevision: number }>;
-export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; "codex:changed": (event: CodexChangedEvent) => void; }
+/** The homebrew library changed. Like `codex:changed` this carries NO content - only a revision, so every recipient refetches its own audience-filtered view over HTTP. A ping that carried the record would hand a player a GM-only draft. */
+export type HomebrewChangedEvent = Readonly<{ revision: number }>;
+export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; "codex:changed": (event: CodexChangedEvent) => void; "homebrew:changed": (event: HomebrewChangedEvent) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
 export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string; needsConfirm?: "rewrite-history" | "discard-changes"; /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };

@@ -1865,7 +1865,7 @@ The GM's homebrew library as flat summaries - the authored body stays out of the
 
 **Auth:** GM session
 
-**Parameters:** `type` (query, optional) - `class` \| `subclass` \| `species` \| `background` \| `feat` \| `class-feature` \| `spell` \| `item` \| `monster` · `state` (query, optional) - `draft` \| `published` · `visibleToPlayers` (query, optional) - boolean · `q` (query, optional) - string · `includeDeleted` (query, optional) - boolean · `limit` (query, optional) - integer (1–200) · `cursor` (query, optional) - string
+**Parameters:** `type` (query, optional) - `class` \| `subclass` \| `species` \| `background` \| `feat` \| `spell` \| `equipment` \| `monster` \| `spell-list` · `state` (query, optional) - `draft` \| `published` · `visibleToPlayers` (query, optional) - boolean · `q` (query, optional) - string · `includeDeleted` (query, optional) - boolean · `limit` (query, optional) - integer (1–200) · `cursor` (query, optional) - string
 
 **Responses:** `200` Success - envelope of `HomebrewContentListData` · errors `400` `401` `403`
 
@@ -2011,7 +2011,7 @@ Exports published, non-deleted records as a shareable pack. Optional `type` and 
 
 **Auth:** GM session
 
-**Parameters:** `type` (query, optional) - `class` \| `subclass` \| `species` \| `background` \| `feat` \| `class-feature` \| `spell` \| `item` \| `monster` · `id` (query, optional) - string (pattern)[]
+**Parameters:** `type` (query, optional) - `class` \| `subclass` \| `species` \| `background` \| `feat` \| `spell` \| `equipment` \| `monster` \| `spell-list` · `id` (query, optional) - string (pattern)[]
 
 **Responses:** `200` Success - envelope of `HomebrewPackExportData` · errors `400` `401` `403`
 
@@ -2796,7 +2796,7 @@ The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One
 
 ### `HomebrewRecord`
 
-The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. The body carries its own `type` discriminator. Published as an open object for now: it becomes a nine-branch `oneOf` (class, subclass, species, background, feat, class-feature, spell, item, monster) with `discriminator: { propertyName: "type" }` as each type's authored shape lands. Until then the server's Zod schemas are the authority on this body, and a client should treat it as opaque round-trip data.
+The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. The body carries its own `type` discriminator. Published as an open object for now: it becomes a nine-branch `oneOf` (class, subclass, species, background, feat, spell, equipment, monster, spell-list) with `discriminator: { propertyName: "type" }` as each type's authored shape lands. Until then the server's Zod schemas are the authority on this body, and a client should treat it as opaque round-trip data.
 
 ### `ImagePoint`
 

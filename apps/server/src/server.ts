@@ -20,6 +20,8 @@ import { createGameOperations, gameCommandRegistry, type GamePrincipal } from ".
 import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexRouter } from "./codex-http.js";
+import { HomebrewStore } from "./homebrew-store.js";
+import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -74,7 +76,11 @@ export function createServer(options: CreateServerOptions) {
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
   const codexStore = new CodexStore(options.databasePath);
   const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), { maxBytes: 10 * 1024 * 1024, maxDimensionPx: 4096, maxPixels: 4096 * 4096 });
-  const contentLibrary = new ContentLibrary();
+  const homebrewStore = new HomebrewStore(options.databasePath);
+  // The homebrew seam is wired from the first slice so the revision gate is exercised in production
+  // from the start. `publishedFor` returns the empty slice until per-type publish validation lands,
+  // so both audiences keep sharing the module-level SRD-only catalog - identical cost to before.
+  const contentLibrary = new ContentLibrary(homebrewStore);
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   const gmLoginRateLimiter = new LoginRateLimiter();
@@ -116,6 +122,19 @@ export function createServer(options: CreateServerOptions) {
   /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
   function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal") {
     io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
+  }
+  /**
+   * Ping every client that the GM's homebrew library changed so it refetches its own merged catalog.
+   * CONTENT-FREE BY DESIGN - a revision counter and nothing else. No `scope`, no `type`: telling
+   * players which kind of thing the GM is working on buys nothing at a home group's scale and is a
+   * small leak of GM intent.
+   *
+   * The emit is widened because `ServerToClientEvents` (`packages/domain`) does not carry
+   * `homebrew:changed` yet; it is owned by another workstream this round. Delete the cast - not the
+   * call - once the member lands.
+   */
+  function notifyHomebrewChanged() {
+    io.emit("homebrew:changed", { revision: homebrewStore.revision });
   }
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
@@ -227,6 +246,11 @@ export function createServer(options: CreateServerOptions) {
   });
   const commandRegistry = gameCommandRegistry(operations);
 
+  // A homebrew pack can carry up to 500 authored records, which does not fit the global limit below.
+  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
+  // works when it runs FIRST - hence this one line above the global parser rather than inside the
+  // homebrew router.
+  app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
   // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
   // by the operation itself) fit through the HTTP surface too.
   app.use(express.json({ limit: "512kb" }));
@@ -363,6 +387,14 @@ export function createServer(options: CreateServerOptions) {
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
     notifyChanged: notifyCodexChanged
+  }));
+  // GM-only end to end: `authorizePlayer` is supplied ONLY so an authenticated player gets a 403
+  // rather than the 401 an unauthenticated caller gets. There is no player-readable homebrew route.
+  app.use(createHomebrewRouter({
+    store: homebrewStore,
+    authorizeGm,
+    authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+    notifyChanged: notifyHomebrewChanged
   }));
   const gameApiRouter = createGameApiRouter({
     operations,
@@ -578,7 +610,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize(), codexAssets.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize(), codexAssets.initialize(), homebrewStore.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
@@ -593,7 +625,7 @@ export function createServer(options: CreateServerOptions) {
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); combatLog.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); combatLog.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); homebrewStore.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }
