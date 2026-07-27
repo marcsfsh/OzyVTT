@@ -21,8 +21,12 @@
 
 .nh-abil-budget { display: grid; gap: var(--space-2); }
 
-/* ---- The six rows ---- */
-.nh-abil-table { display: grid; gap: var(--space-2); }
+/* ---- The six rows ----
+   Capped, because a table of five short tracks does not get better by being wider: stretched to the
+   full page the eye travelled the best part of a thousand pixels from "STR" to its own total, six
+   times over, across an empty middle. 36rem clears the ~520px the five tracks actually need and
+   sits above 375px's 343px, so the phone's stacked card layout below is untouched. */
+.nh-abil-table { display: grid; gap: var(--space-2); max-width: 36rem; }
 .nh-abil-head,
 .nh-abil-row {
   display: grid;

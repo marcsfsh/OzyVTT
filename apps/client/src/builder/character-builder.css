@@ -67,6 +67,13 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
+/* An answered offer, folded down to its answer: display chips plus the one way back in. */
+.cb-offer-picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .cb-offer-help {
   margin: 0;
   max-width: 68ch;
@@ -78,6 +85,15 @@
   margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+
+/* The detail column is reserved for the whole of a step that can fill it, so it needs something to
+   say before the first pick. Muted, so it reads as a held place rather than as prose about the
+   character — nothing has gone wrong and there is nothing to fix. */
+.cb-detail-empty {
+  margin: 0;
+  color: var(--text-muted);
   line-height: var(--lh-body);
 }
 

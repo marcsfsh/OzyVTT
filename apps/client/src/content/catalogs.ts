@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CatalogChoiceCatalogs, ContentBackgroundSummary, ContentClassSummary, ContentFeatSummary,
   ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSubclassSummary
@@ -23,6 +23,11 @@ import { socket } from "../socket";
  */
 
 type CatalogRead<T> = Readonly<{ items: readonly T[]; attribution: string | null; loaded: boolean }>;
+
+/** ONE empty list for every not-yet-loaded catalog. `cache ?? []` minted a fresh array per render, so
+    a consumer keyed on `items` (see `useBuilderCatalogs`) could never be stable before the fetch lands.
+    Sharing one frozen array makes `items` identity change exactly once - when the cache is filled. */
+const EMPTY: readonly never[] = Object.freeze([]);
 
 /** Builds one cached catalog + its hook. `fetcher` owns the (individually typed) socket emit. */
 function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attribution: string | undefined) => void) => void) {
@@ -56,7 +61,7 @@ function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attrib
       request();
       return () => { listeners.delete(listener); };
     }, []);
-    return { items: cache ?? [], attribution, loaded: cache !== null };
+    return { items: cache ?? EMPTY, attribution, loaded: cache !== null };
   }
 
   return { useCatalog, request };
@@ -112,22 +117,38 @@ export function useBuilderCatalogs(): BuilderCatalogs {
   const spells = useSpellReference();
   const equipment = useEquipmentReference();
 
-  const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, nameRead];
-  const attributions = [...new Set([...reads.map((read) => read.attribution), equipment.attribution].filter((line): line is string => typeof line === "string" && line.length > 0))];
-
-  return {
-    choice: {
-      classes: classRead.items,
-      subclasses: subclassRead.items,
-      species: speciesRead.items,
-      feats: featRead.items,
-      spells,
-      equipment: equipment.catalog,
-      skills: skillRead.items
-    },
-    backgrounds: backgroundRead.items,
-    names: nameRead.items,
-    loaded: reads.every((read) => read.loaded) && spells.length > 0 && equipment.catalog.length > 0,
-    attributions
-  };
+  /**
+   * ONE object identity per content load. Every field here is a cached list or a cached string, so the
+   * value only ever CHANGES when a catalog answers - but rebuilding the literal per render handed the
+   * wizard a new `catalogs` every time, and `catalogs` is a dependency of its `computeOffers` memos and
+   * of the pick-pruning effect. Typing a name therefore re-walked every offer in the build. Keyed on
+   * the cached identities (stable once loaded, see `EMPTY` above), so the walk happens when the BUILD
+   * changes and not when the render does. This is a correctness fix, not a measurable speed-up.
+   */
+  return useMemo(() => {
+    const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, nameRead];
+    const attributions = [...new Set([...reads.map((read) => read.attribution), equipment.attribution].filter((line): line is string => typeof line === "string" && line.length > 0))];
+    return {
+      choice: {
+        classes: classRead.items,
+        subclasses: subclassRead.items,
+        species: speciesRead.items,
+        feats: featRead.items,
+        spells,
+        equipment: equipment.catalog,
+        skills: skillRead.items
+      },
+      backgrounds: backgroundRead.items,
+      names: nameRead.items,
+      loaded: reads.every((read) => read.loaded) && spells.length > 0 && equipment.catalog.length > 0,
+      attributions
+    };
+    // The lists and the attribution lines ARE the value: `loaded` flips exactly when a list identity
+    // does (a miss is never cached, line 40), so it needs no key of its own.
+  }, [
+    classRead.items, subclassRead.items, speciesRead.items, backgroundRead.items, featRead.items, skillRead.items, nameRead.items,
+    spells, equipment.catalog,
+    classRead.attribution, subclassRead.attribution, speciesRead.attribution, backgroundRead.attribution,
+    featRead.attribution, skillRead.attribution, nameRead.attribution, equipment.attribution
+  ]);
 }

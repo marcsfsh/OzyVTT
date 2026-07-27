@@ -6,7 +6,7 @@ import {
   validateAbilityFormula, type Ability, type HitDie
 } from "@vtt/rules-5e";
 import {
-  AbilityScoreAllocator, Alert, Badge, Button, ChoiceGrid, DiceInputRow, FeatureList, NameField,
+  AbilityScoreAllocator, Alert, Badge, Button, Chip, ChoiceGrid, DiceInputRow, FeatureList, NameField,
   ReviewSummary, SegmentedControl, Select, Stepper, useToast, WizardShell, type ChoiceOption, type DiceEntryMode,
   type FeatureItem, type ReviewSection, type StepItem
 } from "@vtt/ui";
@@ -59,13 +59,23 @@ const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
 
 const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 const sourceBadge = (source: string) => source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : <Badge tone="info">SRD</Badge>;
-const featureItems = (features: readonly ContentFeatureSummary[], limit = 40): FeatureItem[] =>
-  features.slice(0, limit).map((feature) => ({
+/**
+ * One row per distinct trait NAME. Content lists a species' per-lineage variants as separate
+ * features, so Dragonborn's ten ancestries printed 25 rows for 15 titles — "Breath Weapon (Fire)"
+ * five times, byte-identical each time. Keeping the first is lossless (the repeats say the same
+ * thing) and it is the de-dupe, not the `limit`, that decides what is dropped: the slice used to
+ * spend its budget on copies.
+ */
+const featureItems = (features: readonly ContentFeatureSummary[], limit = 40): FeatureItem[] => {
+  const seen = new Set<string>();
+  const distinct = features.filter((feature) => seen.has(feature.name) ? false : (seen.add(feature.name), true));
+  return distinct.slice(0, limit).map((feature) => ({
     id: feature.id,
     title: feature.name,
     meta: feature.level != null ? `Level ${feature.level}` : undefined,
     body: <p>{feature.description}</p>
   }));
+};
 
 /** Sentence-case a stored provenance phrase for a card's disabled reason. */
 const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
@@ -74,12 +84,41 @@ const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.sli
 const featSummary = (catalogs: BuilderCatalogs, id: string) =>
   catalogs.choice.feats.find((entry) => entry.id === id)?.summary ?? undefined;
 
-/** One pick offered by the content: heading, count, and the grid that answers it. */
+/**
+ * One pick offered by the content: heading, count, and the grid that answers it — until it IS
+ * answered, at which point the grid folds down to the answer.
+ *
+ * A level-5 Wizard's fourth step asks seven questions and, once every one of them has been answered,
+ * was still showing all 183 cards it asked them with: nine thousand pixels of scroll whose entire
+ * content was options already declined. An answered question is a line, not a grid. Reopening it is
+ * one press of Change, in the place the answer is.
+ */
 function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
   onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
 }>) {
   const picks = draft.picks[offer.key] ?? [];
+  const complete = picks.length === offer.capacity;
+  const [expanded, setExpanded] = useState(false);
+  /**
+   * DERIVED, never stored. An offer whose picks are pruned away by a change upstream (a new class,
+   * a granted origin feat) becomes incomplete, and therefore open again, with no stale "collapsed"
+   * flag anywhere to invalidate. It is also why an offer whose capacity exceeds its option count —
+   * a choose-5-of-4 content gap — can never fold: it can never be complete.
+   */
+  const collapsed = complete && !expanded;
+  const changeRef = useRef<HTMLButtonElement | null>(null);
+  const wasCollapsed = useRef(collapsed);
+  useEffect(() => {
+    const justCollapsed = collapsed && !wasCollapsed.current;
+    wasCollapsed.current = collapsed;
+    // The last pick unmounts the grid the finger (or the Space bar) was in, and focus falls to
+    // <body> — a keyboard walk would then restart from the top of the page. Hand it to the control
+    // that stands where the grid was. Only when it really was lost: a mouse user who never had
+    // focus in the grid keeps whatever they had.
+    if (justCollapsed && document.activeElement === document.body) changeRef.current?.focus();
+  }, [collapsed]);
+
   if (offer.unresolvable) {
     return <section className="cb-offer">
       <h3 className="cb-offer-title">{offer.label}</h3>
@@ -91,10 +130,15 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   const isFeat = FEAT_KINDS.has(offer.kind);
   const options: ChoiceOption[] = offer.options.map((option) => ({
     value: option.id,
-    title: offer.kind === "equipment" ? `Option ${option.id.split("-").pop()?.toUpperCase() ?? ""}` : option.name,
+    // The option's NAME is the title, for every kind. Equipment used to be titled "Option A" with the
+    // kit demoted to the description, which made the card's headline the one word carrying no
+    // information and pushed the contents into a 3-line clamp that cut "…and 8 GP" — the number you
+    // would compare against the other option's "50 GP". The review step already lists the real name
+    // (`pickedNames`), so this is also the two agreeing about what was chosen.
+    title: option.name,
     // Every feat in the catalog carries a summary; showing it turns a grid of bare names
     // ("Alert", "Savage Attacker") into a choice that can actually be made from the card.
-    description: offer.kind === "equipment" ? option.name : isFeat ? featSummary(catalogs, option.id) : undefined,
+    description: isFeat ? featSummary(catalogs, option.id) : undefined,
     meta: option.level != null && option.level > 0 ? `Level ${option.level}` : option.level === 0 ? "Cantrip" : undefined,
     // A proficiency this build already holds stays IN the list and greys out, saying where it
     // came from. Picked from a different source it would be merged away server-side, costing the
@@ -105,6 +149,9 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
     keywords: option.id
   }));
   const many = offer.capacity > 1;
+  const nameOf = (id: string) => offer.options.find((option) => option.id === id)?.name ?? titleize(id);
+  /* The heading is byte-identical in both states: the question and its count do not change just
+     because it has been answered, and a heading that moved would cost the collapse its whole point. */
   return <section className="cb-offer">
     <div className="cb-offer-head">
       <h3 className="cb-offer-title">{offer.label}</h3>
@@ -112,19 +159,31 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
         {many ? `${picks.length} of ${offer.capacity} chosen` : picks.length === 1 ? "Chosen" : "Choose one"}
       </span>
     </div>
-    {offer.help && <p className="cb-offer-help">{offer.help}</p>}
-    <ChoiceGrid
-      ariaLabel={offer.label}
-      options={options}
-      searchable={offer.options.length > 8}
-      searchPlaceholder="Search options…"
-      selection={many ? "multiple" : "single"}
-      value={many ? null : picks[0] ?? null}
-      onChange={(value) => onSet(offer, [value])}
-      values={many ? picks : undefined}
-      max={many ? offer.capacity : undefined}
-      onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
-    />
+    {collapsed
+      /* DISPLAY chips, never `.nh-chip--pressable`: a readout is not a second place the pick can be
+         made (the rule the count beside it already obeys). Change is the one way back in. */
+      ? <div className="cb-offer-picks">
+          {picks.map((pick) => <Chip key={pick}>{nameOf(pick)}</Chip>)}
+          <Button ref={changeRef} variant="ghost" size="sm" onClick={() => setExpanded(true)}>Change</Button>
+        </div>
+      : <>
+          {offer.help && <p className="cb-offer-help">{offer.help}</p>}
+          <ChoiceGrid
+            ariaLabel={offer.label}
+            options={options}
+            searchable={offer.options.length > 8}
+            searchPlaceholder="Search options…"
+            selection={many ? "multiple" : "single"}
+            value={many ? null : picks[0] ?? null}
+            onChange={(value) => onSet(offer, [value])}
+            values={many ? picks : undefined}
+            max={many ? offer.capacity : undefined}
+            onToggle={(value, next) => onSet(offer, next ? [...picks, value] : picks.filter((id) => id !== value))}
+          />
+          {/* Only ever offered once the question is answered, so exactly one of Change / Done is on
+              screen at a time. Reopening a finished offer needs a way back out that is not a pick. */}
+          {complete && <div className="cb-offer-picks"><Button variant="ghost" size="sm" onClick={() => setExpanded(false)}>Done</Button></div>}
+        </>}
   </section>;
 }
 
@@ -275,13 +334,24 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   // and its actor list is projected (hidden combatants stripped), so it could only under-count.
   const capacity = useMemo(() => "definitions" in state ? rosterCapacity(state.definitions.length, state.actors.length) : null, [state]);
 
-  // Keep the draft honest as the build changes shape: a Fighter's skills are not a Wizard's.
+  /**
+   * Keep the draft honest as the build changes shape: a Fighter's skills are not a Wizard's.
+   *
+   * `draft.picks` IS a dependency, and not an optional one. `prunePicks` also mirrors the chosen
+   * subclass onto `draft.subclassId`, and that id is what `computeOffers` reads to offer the
+   * subclass's OWN choices — so a pick is what makes the next question appear (choosing Evocation
+   * is what asks for its two Evocation Savant spells). While `catalogs` was rebuilt every render
+   * this effect ran constantly and happened to catch that; memoising the catalogs (correctly) took
+   * the accident away, and the subclass's offers stopped appearing. The reconciler runs when the
+   * draft's PICKS change, which is when the set of offers can change — and no longer when the
+   * player types a name, assigns a score, or opens the detail pane.
+   */
   useEffect(() => {
     setDraft((current) => {
       const pruned = prunePicks(current, computeOffers(current, catalogs));
       return pruned === current ? current : pruned;
     });
-  }, [draft.classId, draft.speciesId, draft.backgroundId, draft.level, draft.subclassId, catalogs]);
+  }, [draft.classId, draft.speciesId, draft.backgroundId, draft.level, draft.subclassId, draft.picks, catalogs]);
 
   // Park the draft on every change so a reload (or Save & close) never costs the player their work -
   // EXCEPT while an unanswered resume offer is on screen. Saving then would overwrite the very draft
@@ -551,6 +621,22 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   }, [catalogs.names, draft.speciesId, nameSeed]);
 
   // ---- Step bodies ---------------------------------------------------------------------------
+  /**
+   * Species, Background, and Class are the three PRIMARY picks, and they were the only decisions in
+   * the wizard rendered as a bare grid: no heading, no count. That made "Species" carry less
+   * typographic weight than "Keen Senses" — a sub-choice of the thing it decides — and it left the
+   * step's first element unlabelled. Same `.cb-offer` shell as every other decision, so a player who
+   * has answered one has answered all of them.
+   */
+  const primaryPick = (label: string, answered: boolean, grid: ReactNode): ReactNode =>
+    <section className="cb-offer">
+      <div className="cb-offer-head">
+        <h3 className="cb-offer-title">{label}</h3>
+        <span className="cb-offer-count tabular" role="status">{answered ? "Chosen" : "Choose one"}</span>
+      </div>
+      {grid}
+    </section>;
+
   const stepOffers = (owner: BuilderOffer["step"]) => offers.filter((offer) => offer.step === owner);
   const renderOffer = (offer: BuilderOffer) => offer.kind === "asi-or-feat"
     ? <AsiOffer key={offer.key} offer={offer} draft={draft} catalogs={catalogs} capBefore={abilityCap.before.get(offer.key) ?? null} onSet={setPicks} onIncreases={setIncreases} />
@@ -595,12 +681,16 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     switch (step) {
       case "species":
         return <>
-          <ChoiceGrid ariaLabel="Species" options={speciesOptions} value={draft.speciesId} onChange={(value) => patch({ speciesId: value })} searchPlaceholder="Search species…" />
+          {primaryPick("Species", draft.speciesId != null,
+            <ChoiceGrid ariaLabel="Species" options={speciesOptions} value={draft.speciesId} onChange={(value) => patch({ speciesId: value })}
+              searchable={speciesOptions.length > 8} searchPlaceholder="Search species…" />)}
           {stepOffers("species").map(renderOffer)}
         </>;
       case "background":
         return <>
-          <ChoiceGrid ariaLabel="Backgrounds" options={backgroundOptions} value={draft.backgroundId} onChange={(value) => patch({ backgroundId: value })} searchPlaceholder="Search backgrounds…" />
+          {primaryPick("Background", draft.backgroundId != null,
+            <ChoiceGrid ariaLabel="Backgrounds" options={backgroundOptions} value={draft.backgroundId} onChange={(value) => patch({ backgroundId: value })}
+              searchable={backgroundOptions.length > 8} searchPlaceholder="Search backgrounds…" />)}
           {context.originFeat && <p className="cb-note">{context.background?.name} grants the <strong>{context.originFeat.name}</strong> feat.</p>}
           {displacedSpeciesFeat && <p className="cb-note">
             {context.background?.name} grants <strong>{context.originFeat!.name}</strong>, which replaces your{" "}
@@ -610,7 +700,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         </>;
       case "class":
         return <>
-          <ChoiceGrid ariaLabel="Classes" options={classOptions} value={draft.classId} onChange={(value) => patch({ classId: value })} searchPlaceholder="Search classes…" />
+          {primaryPick("Class", draft.classId != null,
+            <ChoiceGrid ariaLabel="Classes" options={classOptions} value={draft.classId} onChange={(value) => patch({ classId: value })}
+              searchable={classOptions.length > 8} searchPlaceholder="Search classes…" />)}
           <section className="cb-offer">
             <div className="cb-offer-head">
               <h3 className="cb-offer-title">Level</h3>
@@ -841,7 +933,31 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     return null;
   };
 
-  const detailNode = detail();
+  /** What the reserved column says while it has nothing to show. One line per step, in that step's
+      own words — it is a held place, not a state to be fixed. */
+  const DETAIL_PLACEHOLDER: Partial<Record<StepId, string>> = {
+    species: "Pick a species to read its traits here.",
+    background: "Pick a background to read about it here.",
+    class: "Pick a class to read about it here.",
+    features: context.classRecord?.subclassLabel
+      ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
+      : "Pick a subclass to read about it here."
+  };
+
+  /**
+   * The detail COLUMN is reserved for the whole of any step that can fill it, so choosing a species
+   * or a subclass no longer re-lays the entire grid out under the finger that just tapped it.
+   * `WizardShell` splits the body on `detail != null`, so passing null until something was picked
+   * meant one tap both mounted a 472-element pane AND reflowed every card from five columns to
+   * three. That cost lands hardest exactly where the grid is biggest.
+   *
+   * The trade is deliberate and must not be "fixed" back: these steps are three columns from
+   * arrival rather than five. Five columns for the two taps before a pick is not worth a
+   * 183-to-397-card reflow on the tap itself.
+   */
+  const realDetail = detail();
+  const placeholder = DETAIL_PLACEHOLDER[step];
+  const detailNode = realDetail ?? (placeholder ? <p className="cb-detail-empty">{placeholder}</p> : null);
   const isLast = stepIndex === STEP_IDS.length - 1;
   const goTo = (index: number) => { setStepIndex(index); setDetailOpen(false); };
   /**
@@ -902,9 +1018,11 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       detail={detailNode}
       detailTitle={step === "species" ? context.species?.name : step === "background" ? context.background?.name : step === "class" ? context.classRecord?.name : context.subclass?.name}
       detailOpen={detailOpen}
-      onOpenDetail={detailNode ? () => setDetailOpen(true) : undefined}
+      /* Gated on REAL content, never the placeholder: below 760px this is a button that leaves the
+         step, and it must not lead to a sentence saying there is nothing here yet. */
+      onOpenDetail={realDetail ? () => setDetailOpen(true) : undefined}
       detailOpenLabel="Show details"
-      onCloseDetail={detailNode ? () => setDetailOpen(false) : undefined}
+      onCloseDetail={realDetail ? () => setDetailOpen(false) : undefined}
       footnote={catalogs.attributions.length > 0 ? catalogs.attributions.join(" ") : "Character content is served with its licence line; the catalogs have not loaded yet."}
     >
       <div className="cb-step">

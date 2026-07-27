@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cx } from "./util";
 import { Input } from "./forms";
-import { IconSearch } from "./icons";
+import { IconSearch, IconWarning } from "./icons";
 import { ChoiceCard } from "./ChoiceCard";
 import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 import "./ChoiceGrid.css";
@@ -94,6 +94,7 @@ export function ChoiceGrid({
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const searchId = useId();
+  const lockedNoticeId = useId();
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
 
   useEffect(() => {
@@ -111,14 +112,26 @@ export function ChoiceGrid({
     });
   }, [options, debounced, facets, facetValue, facetAllValue]);
 
+  /** Is anything actually narrowing the list right now? */
+  const filtering = debounced.trim().length > 0 || (facets != null && facetValue != null && facetValue !== facetAllValue);
+
   const multiple = selection === "multiple";
   const chosen = useMemo(() => new Set(values ?? []), [values]);
   const isChosen = (option: ChoiceOption) => multiple ? chosen.has(option.value) : option.value === value;
   // At capacity the UNCHOSEN cards lock (the chosen ones must stay tappable, or the
   // player can never change their mind) — with a reason, per the disabled rule.
+  //
+  // The reason is stated ONCE, beside the count, and every capacity-locked card points at it with
+  // `aria-describedby`. It used to be stamped INTO each card: a choose-6 grid of 70 spells rendered
+  // 64 copies of one sentence, and at level 20 the wizard's fourth step carried 409 of them — a
+  // third of that step's DOM restating a fact about the GRID, not about any card. One idea, one
+  // place; a locked option still says why, it just does not say it 64 times.
   const atCapacity = multiple && max != null && chosen.size >= max;
   const lockedReason = maxReachedReason ?? (max != null ? `You have already chosen ${max}. Unpick one to swap.` : undefined);
-  const lockedOf = (option: ChoiceOption) => option.disabled === true || (atCapacity && !chosen.has(option.value));
+  const capacityLocked = (option: ChoiceOption) => atCapacity && option.disabled !== true && !chosen.has(option.value);
+  const lockedOf = (option: ChoiceOption) => option.disabled === true || capacityLocked(option);
+  // Announced only when it is true AND there is something it applies to.
+  const showLockedNotice = atCapacity && lockedReason != null && shown.some(capacityLocked);
 
   // Roving tabindex: a chosen card is the grid's single tab stop, falling back to the
   // first selectable one so the group is always reachable.
@@ -178,9 +191,25 @@ export function ChoiceGrid({
           </div>
         )}
 
-        <p className="nh-choicegrid-count tabular" role="status">
-          {shown.length} of {options.length}
-        </p>
+        {/* "9 of 9" counts nothing: with no search text and no facet, `shown` IS `options`, and every
+            offer already carries its own "2 of 3 chosen" heading — so an unfiltered step announced
+            two numbers, one of them constant. The count returns the moment a filter hides something,
+            which is the only moment the two can differ. */}
+        {filtering && (
+          <p className="nh-choicegrid-count tabular" role="status">
+            {shown.length} of {options.length}
+          </p>
+        )}
+
+        {/* The capacity rule, stated once. NOT a live region: `.cb-offer-count` already announces
+            "6 of 6 chosen" the moment the last pick lands, and two announcements of one event is the
+            duplication this replaced. It is a DESCRIPTION — the locked cards point at it. */}
+        {showLockedNotice && (
+          <p className="nh-choicegrid-locked" id={lockedNoticeId}>
+            <span className="nh-choicegrid-locked-icon" aria-hidden="true"><IconWarning /></span>
+            {lockedReason}
+          </p>
+        )}
 
         {shown.length === 0 ? (
           <div className="nh-empty">
@@ -192,7 +221,8 @@ export function ChoiceGrid({
         ) : (
           <div className="nh-choicegrid-items" role={multiple ? "group" : "radiogroup"} aria-label={ariaLabel}>
             {shown.map((option) => {
-              const locked = lockedOf(option);
+              const byCapacity = capacityLocked(option);
+              const locked = option.disabled === true || byCapacity;
               return (
                 <ChoiceCard
                   key={option.value}
@@ -211,7 +241,12 @@ export function ChoiceGrid({
                   badge={option.badge}
                   meta={option.meta}
                   disabled={locked}
-                  disabledReason={option.disabled === true ? option.disabledReason : lockedReason}
+                  /* PER-OPTION only. `option.disabled` is the caller saying something true about THIS
+                     option ("you already have Perception from your background") — it belongs on the
+                     card and nowhere else. Capacity is a fact about the grid, so a capacity-locked
+                     card points at the one notice above instead of carrying a copy of it. */
+                  disabledReason={option.disabled === true ? option.disabledReason : undefined}
+                  {...(byCapacity && showLockedNotice ? { "aria-describedby": lockedNoticeId } : {})}
                 />
               );
             })}

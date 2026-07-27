@@ -27,6 +27,10 @@ export interface ChoiceCardProps {
       purpose; only the semantics differ. */
   selectionRole?: "radio" | "checkbox";
   id?: string;
+  /** Points at a reason stated ONCE outside the card — how `ChoiceGrid` says "you have already
+      chosen N" to a screen reader without stamping the sentence onto every locked card. A locked
+      option must still say why; this is the other way of saying it. */
+  "aria-describedby"?: string;
   className?: string;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -45,7 +49,8 @@ export interface ChoiceCardProps {
     and one card selected means one glowing element per region. */
 export function ChoiceCard({
   selected, onSelect, title, description, icon, badge, meta,
-  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, className, ref
+  disabled = false, disabledReason, tabIndex, onKeyDown, selectionRole = "radio", id, className, ref,
+  "aria-describedby": describedBy
 }: ChoiceCardProps) {
   return (
     <button
@@ -54,6 +59,7 @@ export function ChoiceCard({
       type="button"
       role={selectionRole}
       aria-checked={selected}
+      aria-describedby={describedBy}
       disabled={disabled}
       tabIndex={tabIndex}
       onKeyDown={onKeyDown}
