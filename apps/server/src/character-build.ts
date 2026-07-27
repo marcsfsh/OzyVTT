@@ -193,7 +193,17 @@ function interpretAction(feature: FeatureRecord, action: FeatureRecord["actions"
   }
   if (save) {
     if (save.dc === "spellcasting" && context.spellcastingAbility === null) reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
-    const dc = save.dc === "spellcasting" ? spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus) : save.dc;
+    // `FeatureSaveDcSchema` has THREE forms, not two: the "spellcasting" literal, a printed number,
+    // and a derived `{base, ability, proficiencyBonus}` - the shape Dragonborn's Breath Weapon uses
+    // (8 + CON + PB). Only the literal was resolved, so the object fell through to `ActionSchema`,
+    // which requires a number, and EVERY Dragonborn character failed to build with
+    // `actions[].save.dc: Expected number, received object`. One of nine species was uncreatable.
+    // The attack branch above already resolves its own template; this mirrors it.
+    const dc = save.dc === "spellcasting"
+      ? spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus)
+      : typeof save.dc === "number"
+        ? save.dc
+        : save.dc.base + abilityModifier(context.finalScores[save.dc.ability]) + (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
     assembled.save = { ability: save.ability, dc };
   }
   if (damageByLevel && damageByLevel.length > 0) {

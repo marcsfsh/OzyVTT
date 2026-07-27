@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, resolveSpellcasting, type GameState } from "@vtt/domain";
-import { meetsMulticlassPrerequisites } from "@vtt/rules-5e";
+import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -676,5 +676,34 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
 
   it("counts Warlock levels as pact progression, not full", () => {
     expect(library.classProgressionTable().warlock.casterProgression).toBe("pact");
+  });
+});
+
+describe("buildCharacterDefinition - derived save DCs", () => {
+  // `FeatureSaveDcSchema` has THREE forms: the "spellcasting" literal, a printed number, and a
+  // derived `{base, ability, proficiencyBonus}`. Only the first two were resolved, so the object
+  // reached `ActionSchema` - which requires a number - and every Dragonborn character failed to
+  // build with `actions[].save.dc: Expected number, received object`. One of the nine species was
+  // uncreatable through the wizard, and nothing caught it because no test built a Dragonborn.
+  it("resolves a species trait's derived save DC to a number (Dragonborn Breath Weapon)", () => {
+    const input = {
+      ...fighterInput(),
+      speciesId: "dragonborn",
+      // Keep only the class-side picks: the base fixture is a Human, whose Skillful/Versatile
+      // choices name features a Dragonborn does not have.
+      choices: [
+        ...fighterInput().choices.filter((choice) => {
+          const featureId = (choice as { payload?: { featureId?: string } }).payload?.featureId ?? "";
+          return !featureId.startsWith("human-") && choice.kind !== "size";
+        }),
+        { level: 1, kind: "lineage", id: "black-dragon" }
+      ]
+    } as CharacterCreateRequestInput;
+    const definition = buildCharacterDefinition(input, library, defaultPolicy);
+    const breath = definition.actions.find((action) => /breath/i.test(action.name));
+    expect(breath, "Dragonborn should grant a Breath Weapon action").toBeTruthy();
+    // 8 + CON modifier + proficiency bonus, resolved at build time - never an object on the wire.
+    expect(typeof breath!.save?.dc).toBe("number");
+    expect(breath!.save?.dc).toBe(8 + abilityModifier(definition.abilityScores.con) + definition.proficiencyBonus);
   });
 });
