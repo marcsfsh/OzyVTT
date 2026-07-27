@@ -126,7 +126,15 @@
    reason is the one thing that must stay readable when its control is disabled.
    Never `--text-muted` (3.61:1, fails AA). */
 .hb-blocked { margin: 0; color: var(--caution-hi); font-size: var(--fs-sm); }
+/* The jump control is a `Button variant="secondary" size="sm"` and paints itself; the
+   only thing owed here is the chevron's direction and a baseline that sits with the
+   sentence rather than above it. `.hb-back-icon` turns 90deg for "back", so forward is
+   the same glyph the other way — one shape, two rotations, no second icon. */
+.hb-blocked-jump { vertical-align: middle; }
+.hb-blocked-jump-icon { display: inline-flex; transform: rotate(-90deg); font-size: 1.05em; }
 .hb-usage { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* The create modal's consequence line: a fact, not a warning — the quiet register. */
+.hb-create-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 .hb-detail-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 /* Annotated, never blocked — so it is a quiet line, not an error tone. */
@@ -137,12 +145,24 @@
 .hb-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .hb-section:focus-visible { outline: 2px solid var(--cyan); outline-offset: 6px; border-radius: var(--radius-md); }
 /* Never a bare <h3>: the app global's `h1,h2,h3 { font-weight: 400 }` would synthesise
-   faux-bold on the single-weight display face. The full shorthand carries its weight. */
+   faux-bold on the single-weight display face. The full shorthand carries its weight.
+
+   `--fs-h2` (20px), not `--fs-h3` (16px), and a 2px `--line` rule above it. At h3 a
+   section heading was ONE PIXEL larger than the 15px body at the same weight with no
+   rule and no background, so the class editor's seven sections — Basics through Advanced,
+   including a 20-row table — read as seven equal blocks down a 4,900px scroll with no
+   sense of where you were. The 2px top hairline is §5's own "this labels a kind" device,
+   borrowed from the panel; `--line` rather than an accent, because a section is a
+   division and not a state (§8.1: one glowing thing per region). */
 .hb-section-title {
   margin: 0;
-  font: 400 var(--fs-h3) / var(--lh-tight) var(--font-display);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--line);
+  font: 400 var(--fs-h2) / var(--lh-tight) var(--font-display);
   color: var(--text);
 }
+/* The first section opens the form; there is nothing above it to divide it from. */
+.hb-form > .hb-section:first-child > .hb-section-title { padding-top: 0; border-top: 0; }
 .hb-section-blurb { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); max-width: 60ch; }
 
 .hb-section--advanced {
@@ -214,6 +234,16 @@
   gap: var(--space-2);
   align-items: center;
 }
+/* A non-caster renders four columns, not seven: the component drops Spell slots,
+   Cantrips and Prepared entirely rather than filling 60 cells with "—" and empty inputs
+   (see LevelTableEditor's `casts`). The track list has to follow, or the four remaining
+   cells would sit in the first four of seven tracks and leave a third of the row blank.
+   Features and Resources take the freed width — Resources also carries the row's edit
+   button here, since it is the last cell. */
+.hb-lt-table--nocast .hb-lt-head,
+.hb-lt-table--nocast .hb-lt-row {
+  grid-template-columns: 3.5rem 3rem minmax(10rem, 1.5fr) minmax(10rem, 1fr);
+}
 .hb-lt-head {
   padding: var(--space-1) var(--space-2);
   font: 400 var(--fs-2xs) / 1.3 var(--font-display);
@@ -233,8 +263,16 @@
 .hb-lt-level { font-variant-numeric: tabular-nums; }
 .hb-lt-slots { flex-wrap: wrap; }
 .hb-lt-edit { margin-left: auto; }
-/* Micro-labels live in the DOM at every width and turn on only in the card fold. */
-.hb-lt-micro { display: none; color: var(--text-dim); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; }
+/* Micro-labels live in the DOM at every width and turn on only in the card fold.
+   `overflow-wrap: normal` undoes the `anywhere` its wrapping `.hb-lt-wrapcell` sets: that
+   rule exists so a long FEATURE NAME can break rather than widen the row, but it was
+   inherited by the label too and broke it mid-word — "FEATUR / ES", "RESOURCE / S" — in
+   the mobile card fold. The value wants `anywhere`; its label never does. */
+.hb-lt-micro {
+  display: none; color: var(--text-dim); font-size: var(--fs-2xs);
+  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow);
+  overflow-wrap: normal; white-space: nowrap;
+}
 
 /* `min-width: 0` is load-bearing, not tidy-up. A grid item defaults to `min-width: auto`,
    so this strip — which holds a nested RowEditor with an intrinsically wide Add button —
@@ -280,7 +318,14 @@
      truncates both. 760 is already on the breakpoint ladder, so no new number is
      introduced. Do not "tidy" this back to 650. */
   .hb-lt-head { display: none; }
-  .hb-lt-row {
+  /* `.hb-lt-table--nocast .hb-lt-row` is (0,2,0) and this rule is (0,1,0), so the
+     four-column non-caster track list would WIN here despite being declared earlier —
+     specificity does not care which side of a media query a rule sits on. Measured: the
+     card fold still turned its micro-labels on at 375px while the row kept four tracks,
+     so a non-caster class scrolled sideways inside `.hb-lt-scroll`. Both selectors are
+     stated at the same weight so the fold wins for every class, caster or not. */
+  .hb-lt-row,
+  .hb-lt-table--nocast .hb-lt-row {
     /* minmax(0, 1fr), never a bare 1fr: an implicit `auto` minimum lets a wide child
        (the nested resources RowEditor) widen the track past the viewport. */
     grid-template-columns: minmax(0, 1fr);

@@ -293,13 +293,17 @@ export function FieldRenderer(props: FieldRendererProps) {
       return (
         <fieldset className="hb-fieldset nh-fieldgrid-wide">
           <legend className="hb-fieldset-legend">{field.label}</legend>
+          {/* Stated ONCE for the group, never once per member field — and ABOVE it, not
+              below. Under the grid, a group's help landed after every member's own help,
+              so "How many times this can be used before a rest gives it back" rendered
+              three controls away from the field it explains and beneath a different
+              field's note. A group blurb introduces its group; it does not follow it. */}
+          {help && <p className="nh-field-help">{help}</p>}
           <FieldGrid>
             {(field.rows ?? []).map((child) => (
               <FieldRenderer {...props} key={child.key} field={child} idPrefix={`${idPrefix}-${field.key}`} />
             ))}
           </FieldGrid>
-          {/* Stated ONCE beneath the group, never once per member field. */}
-          {help && <p className="nh-field-help">{help}</p>}
         </fieldset>
       );
 

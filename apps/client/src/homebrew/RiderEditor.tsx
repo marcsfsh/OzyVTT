@@ -106,8 +106,13 @@ const usesField = (label: string, scope: "feature" | "item"): FieldDef => ({
       : "How many times this can be used before a rest gives it back.",
   rows: [
     {
+      // "Uses are …", not a second "How many": this select and the number beside it were
+      // BOTH labelled "How many" and rendered side by side in the same grid row, one
+      // asking how the count is COMPUTED and one asking for the count. Every option
+      // already reads as the completion of this label — "Uses are a flat number", "Uses
+      // are Proficiency bonus" — so the label is the sentence the values finish.
       key: "mode",
-      label: "How many",
+      label: "Uses are",
       kind: "select",
       options: [opt("flat", "A flat number"), opt("proficiency-bonus", "Proficiency bonus"), opt("ability-modifier", "Ability modifier"), opt("by-level", "By level")],
       // `mode` is NOT stored — it is read back out of the shape, so there is no second

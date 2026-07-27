@@ -279,6 +279,26 @@ export function basicsSection(
 
 export const opt = (value: string, label?: string): SelectOption => ({ value, label: label ?? value });
 
+/**
+ * Does this `fromCatalog` slug name **the record being edited**?
+ *
+ * Two families are derived by appending a suffix to a record's own id —
+ * `<classId>-subclasses` and `<speciesId>-lineages` — and they are the two the merged
+ * catalogs structurally cannot answer while authoring: they name a DRAFT, and no merged
+ * catalog holds a draft. `resolveCatalogChoice` therefore throws for them, correctly and
+ * unhelpfully.
+ *
+ * The server has a carve-out for exactly this pair and answers them from AUTHORSHIP
+ * rather than publication (`homebrew-validate.ts`, `SelfCatalog`) — a subclass that
+ * exists satisfies its class, draft or not, because publishing is not playing. This
+ * predicate is how the client recognises the same pair so it neither blocks on them
+ * (`validate.ts`) nor calls them broken (`FeatureEditor`). It is a predicate and not an
+ * answer on purpose: the client has no way to count which drafts name this record, so it
+ * says what it knows and leaves the count to the side that can.
+ */
+export const namesOwnRecord = (slug: string, recordId: string): boolean =>
+  recordId !== "" && (slug === `${recordId}-subclasses` || slug === `${recordId}-lineages`);
+
 /** Sentence-case a slug or a camelCase key for a label the GM reads. */
 export function humanise(key: string): string {
   const spaced = key.replace(/[-_]/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");

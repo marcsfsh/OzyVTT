@@ -226,10 +226,34 @@ export function LevelTableEditor({
     return ids.map((id) => featureName.get(id) ?? id).join(", ");
   };
 
+  /**
+   * **What CHANGES at this level**, not the whole pool restated twenty times.
+   *
+   * `classResources` is cumulative, so printing the row printed
+   * `Second Wind ×3, Weapon Mastery ×4, Action Surge ×1` on all twenty rows with one
+   * digit moving — the densest thing on the screen, read-only, and 19/20 of it already
+   * said on the row above. That is the pattern the readiness pass deleted at source
+   * (decision-log 2026-07-27 rule 4: state a constraint once per group, not once per
+   * option). The delta says the same table in the cells that carry information.
+   *
+   * A resource that stops appearing is a change too, and a silent disappearance is the
+   * one thing a delta must not do — so it is named rather than dropped.
+   */
   const resourceText = (index: number) => {
     const list = rows[index]?.classResources ?? [];
-    if (list.length === 0) return "—";
-    return list.map((resource) => `${resource.name || resource.id} ×${resource.amount}`).join(", ");
+    const before = index === 0 ? [] : rows[index - 1]?.classResources ?? [];
+    const wasAt = new Map(before.map((resource) => [resource.id, resource]));
+    const parts = list
+      .filter((resource) => {
+        const previous = wasAt.get(resource.id);
+        return !previous || previous.amount !== resource.amount;
+      })
+      .map((resource) => `${resource.name || resource.id} ×${resource.amount}`);
+    const nowAt = new Set(list.map((resource) => resource.id));
+    for (const resource of before) {
+      if (!nowAt.has(resource.id)) parts.push(`${resource.name || resource.id} gone`);
+    }
+    return parts.length === 0 ? "—" : parts.join(", ");
   };
 
   const placed = useMemo(() => {
@@ -239,6 +263,8 @@ export function LevelTableEditor({
   }, [rows]);
 
   const shown = narrow && !showAll ? [level - 1] : LEVELS.map((_, index) => index);
+  /** Derived, never stored: the three slot columns are a function of the progression. */
+  const casts = progression !== undefined;
 
   const renderRow = (index: number) => {
     const row = rows[index];
@@ -261,17 +287,56 @@ export function LevelTableEditor({
           <span className="hb-lt-micro">Features</span>
           {featureText(index)}
         </span>
-        <span className="hb-lt-cell hb-lt-slots">
-          <span className="hb-lt-micro">Spell slots</span>
-          {/* `4 3 3 2 – – – – –` is nine columns collapsed into one, so the spelled-out
-              reading is the only one a screen reader can use. It is REAL TEXT in a
-              visually hidden span, not an `aria-label`: an aria-label on a roleless
-              <span> is ignored by the accessible-name computation entirely (name from
-              author is only honoured on elements that take one), so the label was being
-              dropped and the announcement was the glyph row. */}
-          <span className="tabular hb-lt-derived" aria-hidden="true">{slots.text}</span>
-          <span className="nh-sr-only">{slots.label}</span>
-          {overridden && <Badge tone="caution">Overridden</Badge>}
+        {/* THE THREE SPELLCASTING COLUMNS EXIST ONLY FOR A CASTER. On a class the editor
+            already knows has none, they were 20 rows of "—" plus 40 permanently-empty
+            number inputs: 60 cells that could never mean anything and 40 of them
+            claiming to be editable. The summary line above already says "no
+            spellcasting", so the fact is stated once and the columns are simply gone —
+            and they come back the moment a progression is picked, because this is
+            derived from `progressionOf(draft)` and nothing is stored. */}
+        {casts && (
+          <>
+            <span className="hb-lt-cell hb-lt-slots">
+              <span className="hb-lt-micro">Spell slots</span>
+              {/* `4 3 3 2 – – – – –` is nine columns collapsed into one, so the spelled-out
+                  reading is the only one a screen reader can use. It is REAL TEXT in a
+                  visually hidden span, not an `aria-label`: an aria-label on a roleless
+                  <span> is ignored by the accessible-name computation entirely (name from
+                  author is only honoured on elements that take one), so the label was being
+                  dropped and the announcement was the glyph row. */}
+              <span className="tabular hb-lt-derived" aria-hidden="true">{slots.text}</span>
+              <span className="nh-sr-only">{slots.label}</span>
+              {overridden && <Badge tone="caution">Overridden</Badge>}
+            </span>
+            <span className="hb-lt-cell hb-lt-num">
+              <span className="hb-lt-micro">Cantrips</span>
+              <NumberField
+                value={row.cantripsKnown ?? null}
+                min={0}
+                max={10}
+                placeholder="—"
+                onChange={(next) => writeRow(index, { cantripsKnown: next ?? undefined })}
+              />
+            </span>
+            <span className="hb-lt-cell hb-lt-num">
+              <span className="hb-lt-micro">Prepared</span>
+              <NumberField
+                value={row.preparedCount ?? null}
+                min={0}
+                max={60}
+                placeholder="—"
+                onChange={(next) => writeRow(index, { preparedCount: next ?? undefined })}
+              />
+            </span>
+          </>
+        )}
+        <span className="hb-lt-cell hb-lt-derived hb-lt-wrapcell">
+          <span className="hb-lt-micro">Resources</span>
+          {resourceText(index)}
+          {/* The row's edit control, at the END of the row rather than inside the Spell
+              slots cell it used to live in. It opens the whole level — slots AND class
+              resources — so a non-caster losing the slots column must not lose the only
+              way into its own resources. */}
           <IconButton
             label={`Edit level ${value}`}
             size="sm"
@@ -281,30 +346,6 @@ export function LevelTableEditor({
           >
             <IconPencil />
           </IconButton>
-        </span>
-        <span className="hb-lt-cell hb-lt-num">
-          <span className="hb-lt-micro">Cantrips</span>
-          <NumberField
-            value={row.cantripsKnown ?? null}
-            min={0}
-            max={10}
-            placeholder="—"
-            onChange={(next) => writeRow(index, { cantripsKnown: next ?? undefined })}
-          />
-        </span>
-        <span className="hb-lt-cell hb-lt-num">
-          <span className="hb-lt-micro">Prepared</span>
-          <NumberField
-            value={row.preparedCount ?? null}
-            min={0}
-            max={60}
-            placeholder="—"
-            onChange={(next) => writeRow(index, { preparedCount: next ?? undefined })}
-          />
-        </span>
-        <span className="hb-lt-cell hb-lt-derived hb-lt-wrapcell">
-          <span className="hb-lt-micro">Resources</span>
-          {resourceText(index)}
         </span>
 
         {editing && (
@@ -435,9 +476,11 @@ export function LevelTableEditor({
 
   return (
     <div className="hb-lt">
-      {/* The constraint, stated ONCE for the whole table rather than once per derived cell. */}
+      {/* The constraints, stated ONCE for the whole table rather than once per derived
+          cell — including the one that lets the Resources column stop repeating itself. */}
       <p className="nh-field-help">
         Proficiency bonus, features and spell slots are calculated. Override a row if your class breaks the pattern.
+        Resources list what changes at that level.
       </p>
       <p className="hb-lt-summary">
         <strong className="tabular">20 levels</strong> &middot; {progressionWord} &middot;{" "}
@@ -449,14 +492,14 @@ export function LevelTableEditor({
       )}
 
       <div className="hb-lt-scroll">
-        <div className="hb-lt-table" role="group" aria-label="Level table">
+        <div className={`hb-lt-table${casts ? "" : " hb-lt-table--nocast"}`} role="group" aria-label="Level table">
           <div className="hb-lt-head" aria-hidden="true">
             <span>Level</span>
             <span>Bonus</span>
             <span>Features</span>
-            <span>Spell slots</span>
-            <span>Cantrips</span>
-            <span>Prepared</span>
+            {casts && <span>Spell slots</span>}
+            {casts && <span>Cantrips</span>}
+            {casts && <span>Prepared</span>}
             <span>Resources</span>
           </div>
           {shown.map(renderRow)}

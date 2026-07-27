@@ -54,7 +54,26 @@ export const blankLevelRow = (level: number) => ({
 
 export const blankLevelTable = () => LEVELS.map(blankLevelRow);
 
-const BASE = { summary: "", description: "" };
+/**
+ * `source: "homebrew"` is on EVERY blank draft, and it is load-bearing rather than
+ * decorative.
+ *
+ * `contentRecordBase` declares `source: ContentSourceSchema`, which **defaults to
+ * `"srd"`**. A record authored from blank carried no `source` key at all, so the moment
+ * it published, the merged catalog served the GM's own invention as bundled SRD — and two
+ * surfaces believed it. The character builder badges provenance from exactly this field
+ * (`sourceBadge`), so an invented class sat between Sorcerer and Warlock with nothing to
+ * distinguish it; and the create modal's duplicate picker filtered its SRD block on
+ * `source !== "homebrew"`, which was a no-op, so the same record rendered twice with a
+ * React duplicate-key warning. The server already writes it on an SRD copy
+ * (`homebrew-srd-copy.ts`) — this is the other half, for the records the client authors.
+ *
+ * `withDefaults` fills it in on open, so records made before this repair themselves.
+ * Not for `monster`: an `ActorDefinition`'s `source` is a provenance OBJECT
+ * (`{ name, version, externalId }`), already seeded below, and a string there is a parse
+ * error rather than a discriminator.
+ */
+const BASE = { source: "homebrew", summary: "", description: "" };
 
 const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
   class: () => ({
@@ -104,6 +123,7 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
      `.optional()`, so the KEY is required and the value may be null. Omitting one reads
      as "Required" on a form that visibly has nothing to fill in. */
   spell: () => ({
+    source: "homebrew",
     description: "",
     level: 1,
     school: "evocation",
@@ -128,7 +148,7 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
 
   /* `EquipmentReferenceSchema` is `.strict()` and its three value fields are
      `.nullable()`, not `.optional()` — so `null`, and only these keys. */
-  equipment: () => ({ description: null, category: "gear", costGp: 0, weightLb: 0 }),
+  equipment: () => ({ source: "homebrew", description: null, category: "gear", costGp: 0, weightLb: 0 }),
 
   /* A creature IS an `ActorDefinition`. `schemaId`, `schemaVersion` and `source` are
      forced and never shown — a homebrew stat block that is not "vtt.actor-monster" is

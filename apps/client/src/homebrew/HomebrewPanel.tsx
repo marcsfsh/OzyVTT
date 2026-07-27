@@ -116,6 +116,42 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     [gmToken]
   );
 
+  /**
+   * The records that have to be copied WITH a class for the copy to stand up.
+   *
+   * `homebrew-srd-copy.ts` re-points the copy's subclass pick from `fighter-subclasses`
+   * to `<newId>-subclasses` — it must, or the copy would offer FIGHTER's subclasses and
+   * `character-build.ts` would hard-reject every build made from it. But that family
+   * matches nothing until a subclass names the copy, so "duplicate Fighter" landed a
+   * record whose Publish was disabled before the GM had touched anything. The route the
+   * create modal itself calls "the only tractable one for a class" failed on first use.
+   *
+   * So the copy brings them: duplicate each subclass through the same endpoint, then
+   * re-point its `classId` at the new class. Two calls per subclass and no new server
+   * surface. The count was already stated in the modal before Create was pressed.
+   *
+   * Partial failure is reported, never swallowed: a class with three of its four
+   * subclasses is still publishable and still correct, and the GM is told which one is
+   * missing rather than discovering the gap at the table.
+   */
+  const copyCompanions = async (
+    classId: string,
+    companions: ReadonlyArray<Readonly<{ id: string; name: string }>>
+  ): Promise<readonly string[]> => {
+    const failed: string[] = [];
+    for (const companion of companions) {
+      try {
+        const copy = await homebrewApi.duplicate(gmToken, companion.id);
+        // The server keeps `classId` verbatim — correctly, since it names a SEPARATE
+        // record that usually still exists. Here it must follow the copy instead.
+        await homebrewApi.update(gmToken, copy.id, { ...copy.record, classId }, copy.rev);
+      } catch {
+        failed.push(companion.name);
+      }
+    }
+    return failed;
+  };
+
   const create = async (request: CreateRequest) => {
     setCreating(true);
     try {
@@ -135,31 +171,31 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
               type: request.type,
               name: `New ${typeLabel(request.type)}`
             });
+
+      const companions = request.mode === "duplicate" ? request.companions : [];
+      const failed = companions.length > 0 ? await copyCompanions(created.id, companions) : [];
+
       setCreateOpen(false);
       await refresh();
       setSelectedId(created.id);
-      setSelected(created);
+      // Re-read after the companions land: the class's validity is the SERVER's answer
+      // and it was computed before its subclasses existed. Without this the record opens
+      // with a stale "no subclass names this class yet" that is no longer true.
+      setSelected(companions.length > 0 ? await homebrewApi.get(gmToken, created.id) : created);
+
       const name = typeof created.record.name === "string" ? created.record.name : "";
-      toast(name ? `${name} created.` : `New ${typeLabel(request.type)} created.`, { tone: "success" });
+      const made = name || `New ${typeLabel(request.type)}`;
+      const copied = companions.length - failed.length;
+      if (failed.length > 0) {
+        // `info`, not `error`: the record the GM asked for DID get made, and a class with
+        // some of its subclasses is still correct. The sentence names what is missing and
+        // what to do; the tone says nothing failed outright, because nothing did.
+        toast(`${made} created, but ${failed.join(" and ")} couldn't be copied. Add a subclass before publishing.`, { tone: "info" });
+      } else {
+        toast(copied > 0 ? `${made} created, with ${copied} ${copied === 1 ? "subclass" : "subclasses"}.` : `${made} created.`, { tone: "success" });
+      }
     } catch (error) {
-      // The contract says `/duplicate` accepts an SRD id, and the picker offers SRD
-      // records on that basis — but the server answers 404 for one today. "That record
-      // no longer exists" is a misleading thing to tell a GM about Acid Arrow, so the
-      // one case that has a different cause gets its own sentence. It stops being
-      // reachable the moment the server implements it; nothing here needs removing.
-      const srdGap =
-        request.mode === "duplicate" &&
-        request.origin === "srd" &&
-        error instanceof HomebrewRequestError &&
-        error.status === 404;
-      toast(
-        srdGap
-          ? `Copying SRD records isn't switched on yet, so ${request.sourceName} can't be duplicated. Start from blank instead.`
-          : error instanceof Error
-            ? error.message
-            : "Couldn't create that record.",
-        { tone: "error" }
-      );
+      toast(error instanceof Error ? error.message : "Couldn't create that record.", { tone: "error" });
     } finally {
       setCreating(false);
     }
@@ -267,7 +303,6 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
                   records={records}
                   usageCount={usageCount}
                   onChanged={(next) => { setSelected(next); patchRow(next); }}
-                  onRemoved={() => setFilters((prev) => ({ ...prev, status: "removed" }))}
                 />
               : hasSelection
                 ? <Skeleton variant="block" height="16rem" />

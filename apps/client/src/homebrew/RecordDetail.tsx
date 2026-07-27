@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Menu, MenuItem, SaveState } from "@vtt/ui";
+import { Alert, Badge, Button, IconChevron, Menu, MenuItem, SaveState } from "@vtt/ui";
 import { RevealSwitch } from "../codex/SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { HomebrewRequestError, homebrewApi, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
@@ -47,15 +47,13 @@ export function RecordDetail({
   record: initial,
   records,
   usageCount,
-  onChanged,
-  onRemoved
+  onChanged
 }: Readonly<{
   gmToken: string;
   record: HomebrewRecordDocument;
   records: readonly HomebrewRecordSummary[];
   usageCount: number;
   onChanged: (record: HomebrewRecordDocument) => void;
-  onRemoved: () => void;
 }>) {
   const { confirm, dialog } = useConfirm();
   const [doc, setDoc] = useState(initial);
@@ -235,9 +233,16 @@ export function RecordDetail({
       await autosave.flush();
       await homebrewApi.remove(gmToken, docRef.current.id);
       const next = await homebrewApi.get(gmToken, docRef.current.id);
+      // `adopt` patches the rail row in place, so the row picks up its Removed state and
+      // leaves the default view — and NOTHING ELSE MOVES. Removing one record used to
+      // flip the library's status filter to "Removed", which hid the other ten behind a
+      // count line that still read "10 records" above a list of one. The GM did not ask
+      // to change the view. The feedback is already here and already sufficient: this
+      // pane keeps the record selected, shows the Removed badge and offers Restore, and
+      // the rail foots with "N removed records are hidden. Show them" — a filter change
+      // the GM makes, which is the difference that matters.
       adopt(next);
       autosave.markSaved(next.rev, draftRef.current);
-      onRemoved();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Couldn't remove that record.");
     } finally {
@@ -291,15 +296,22 @@ export function RecordDetail({
         </div>
 
         {/* ONE sentence slot, shared by the local blocker and the server's rejection.
-            `{Section}` is a control, not a restatement — it removes the hunt. */}
+            `{Section}` is a CONTROL and the only place the section is named — the sentence
+            no longer repeats it (`validate.ts`, "one copy template"). It is `secondary`
+            with the system's own jump chevron, not a `ghost`: a ghost at `--text-dim`
+            beside a `--caution-hi` sentence was dimmer than the words it followed and did
+            not read as a button at all. `.tap-target` because `.nh-btn--sm` paints 32px
+            (design-language §4, route 2) and the only things it can steal taps from here
+            are the words either side of it. */}
         {(blockedReason || actionError) && !removed && (
           <p className="hb-blocked" id={reasonId} role={actionError ? "alert" : undefined}>
             {actionError ?? blockedReason}
             {!actionError && blockedSection && (
               <>
                 {" "}
-                <Button variant="ghost" size="sm" onClick={jumpToSection}>
+                <Button variant="secondary" size="sm" className="tap-target hb-blocked-jump" onClick={jumpToSection}>
                   {blockedSection}
+                  <span className="hb-blocked-jump-icon" aria-hidden="true"><IconChevron /></span>
                 </Button>
               </>
             )}

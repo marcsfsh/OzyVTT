@@ -65,7 +65,7 @@ const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUp
  * a badge, because it is the one that is not always true. `ChoiceCard` guards `badge != null`, so
  * `undefined` collapses the slot rather than reserving an empty one.
  */
-const sourceBadge = (source: string) => source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : undefined;
+const sourceBadge = (source: string | undefined) => source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : undefined;
 /**
  * One row per distinct trait NAME. Content lists a species' per-lineage variants as separate
  * features, so Dragonborn's ten ancestries printed 25 rows for 15 titles — "Breath Weapon (Fire)"
@@ -90,6 +90,29 @@ const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.sli
 /** A feat's one-line summary, for the grids whose options ARE feats. All 19 SRD feats carry one. */
 const featSummary = (catalogs: BuilderCatalogs, id: string) =>
   catalogs.choice.feats.find((entry) => entry.id === id)?.summary ?? undefined;
+
+/**
+ * Provenance for an OFFER option, by id.
+ *
+ * The three primary grids read `entry.source` straight off their catalog row. An offer's
+ * options cannot: `resolveCatalogChoice` narrows every catalog row to
+ * `CatalogChoiceOption` — `{ id, name, level? }` — so `source` is not merely unrendered
+ * there, it is structurally absent. Widening that type is a change to the shared
+ * client/server resolver contract in `packages/domain`, so instead the id is looked back
+ * up in the catalog it came from, which is already loaded and already carries the field.
+ *
+ * Subclasses and feats only: those are the two offer families whose wire summaries carry
+ * `source` at all. Spells, equipment and creatures do not (see `ContentSpellSummary`,
+ * `ContentEquipmentSummary`, `ContentMonsterSummary`) — so a homebrew spell is still
+ * unbadged, and inventing a badge from a guess would be worse than the gap.
+ *
+ * Nothing here reveals anything a player may not see: these catalogs are audience-merged
+ * server-side, so an unpublished or GM-only record is not in them to be badged. The badge
+ * says one word, `Homebrew`, and never says anything about visibility.
+ */
+const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined =>
+  catalogs.choice.subclasses.find((entry) => entry.id === id)?.source
+  ?? catalogs.choice.feats.find((entry) => entry.id === id)?.source;
 
 /**
  * One pick offered by the content: heading, count, and the grid that answers it — until it IS
@@ -146,6 +169,7 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
     // Every feat in the catalog carries a summary; showing it turns a grid of bare names
     // ("Alert", "Savage Attacker") into a choice that can actually be made from the card.
     description: isFeat ? featSummary(catalogs, option.id) : undefined,
+    badge: sourceBadge(offerSource(catalogs, option.id)),
     meta: option.level != null && option.level > 0 ? `Level ${option.level}` : option.level === 0 ? "Cantrip" : undefined,
     // A proficiency this build already holds stays IN the list and greys out, saying where it
     // came from. Picked from a different source it would be merged away server-side, costing the
@@ -217,7 +241,10 @@ function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Rea
   const increases = draft.asiIncreases[offer.key] ?? [];
   const featOptions: ChoiceOption[] = offer.options
     .filter((option) => option.id !== "ability-score-improvement")
-    .map((option) => ({ value: option.id, title: option.name, description: featSummary(catalogs, option.id), keywords: option.id }));
+    .map((option) => ({
+      value: option.id, title: option.name, description: featSummary(catalogs, option.id),
+      badge: sourceBadge(offerSource(catalogs, option.id)), keywords: option.id
+    }));
 
   /**
    * Which shape of increase is being made. Derived from the draft when it holds an answer (an

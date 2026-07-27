@@ -16,7 +16,15 @@
  *
  * ## One copy template
  *
- * > **`"{Imperative} — it's under {Section}."`**
+ * > **`"{Imperative}."`** — and the section is a CONTROL, never a second copy of the word.
+ *
+ * The sentence used to name its own section while `RecordDetail` rendered a jump button
+ * labelled with that same section immediately after it, so every blocker printed its
+ * section name twice — worst case, a feat's *"Say what this feat does"* followed by a
+ * control reading *"The feat itself"* after the sentence had already said it. The two
+ * halves were written independently and neither knew about the other. The `sectionId`
+ * still rides on every reason — it is what the jump control needs — but the WORD belongs
+ * to the control alone. Say the thing once.
  *
  * Never a boolean, never a list. Shaped exactly like the character builder's
  * `stepBlockedReason`, which buys "progress means done, not visited" and "state a
@@ -25,7 +33,7 @@
  */
 
 import { getAt } from "./paths";
-import { isDiceFormula, type Draft, type SchemaContext } from "./schema";
+import { isDiceFormula, namesOwnRecord, type Draft, type SchemaContext } from "./schema";
 import { TYPE_WORDS, typeLabel, type HomebrewType } from "./types";
 
 export type BlockedReason = Readonly<{ text: string; sectionId?: string }>;
@@ -96,12 +104,36 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
   for (const entry of featuresOf(draft)) {
     if (!entry?.choice || typeof entry.id !== "string" || granted.has(entry.id)) continue;
     return {
-      text: `Give “${entry.name || "an unnamed feature"}” a level — it's under Features. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
+      text: `Give “${entry.name || "an unnamed feature"}” a level. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
       sectionId: "features"
     };
   }
   return null;
 }
+
+/**
+ * A slug DERIVED FROM THE RECORD'S OWN ID — `<own id>-subclasses`, `<own id>-lineages`.
+ *
+ * These two families, and only these two, are the ones the merged catalogs cannot answer:
+ * they name the record being edited, which is a draft, and a draft is in no merged
+ * catalog. The server has a carve-out for exactly this pair and answers them from
+ * AUTHORSHIP — a subclass that EXISTS satisfies its class, whatever state it is in
+ * (`homebrew-validate.ts`, `SelfCatalog`). The client cannot ask that question: a
+ * `HomebrewRecordSummary` carries no `classId`, so there is no way here to count which
+ * drafts name this class.
+ *
+ * So it does not guess. Re-implementing half the server's rule is how the client became
+ * STRICTER than the server and disabled Publish on a record the server would have
+ * accepted — duplicate SRD Fighter, and the copy's re-pointed `fighter-subclasses` read
+ * as broken forever. The server's answer arrives in `doc.validity` and renders through
+ * `serverBlockedReason`, in the same one sentence slot, with a better sentence than this
+ * function could write. Every OTHER slug is still checked here, where the answer is local
+ * and instant. (CLAUDE.md rule 2: the client is never a second rules engine.)
+ *
+ * The predicate itself lives in `schema.ts` beside `SchemaContext`, because
+ * `FeatureEditor` has to recognise the same pair to keep its inline readout from calling
+ * them broken either.
+ */
 
 /** A choice whose `fromCatalog` resolves to nothing would be silently skipped at build
     time, which is the single hardest homebrew failure to diagnose from the outside. */
@@ -109,7 +141,7 @@ function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): Blo
   for (const entry of featuresOf(draft)) {
     const choice = entry?.choice as Record<string, unknown> | undefined;
     const slug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
-    if (!slug) continue;
+    if (!slug || namesOwnRecord(slug, ctx.recordId)) continue;
     const result = ctx.resolveCatalog(slug);
     if ("error" in result) {
       return {
@@ -121,10 +153,38 @@ function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): Blo
   return null;
 }
 
+/**
+ * The one field the PLAYER-FACING pick grid actually renders, per type.
+ *
+ * The gate used to demand primary abilities and saving throws — numbers the player never
+ * reads off a card — and never demanded the line the card is made of, so a class could
+ * publish in four field interactions and arrive in the builder as a titled card with a
+ * blank body. `CharacterBuilder` builds species / background / class cards as
+ * `description: entry.summary`, and a feat card as `featSummary()`, so on those four an
+ * empty `summary` IS the empty card. An item's card is its `description`
+ * (`ContentEquipmentSummary`); a creature's browse row (`ContentMonsterSummary`) carries
+ * no prose field at all, which is why there is no entry for it here rather than an
+ * invented one.
+ *
+ * Second in priority, right behind the name, because it is the second thing the record
+ * needs to be worth picking.
+ */
+const SHOWN_TO_PLAYERS: Partial<Record<HomebrewType, Readonly<{ path: string; text: string }>>> = {
+  class: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this class from." },
+  species: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this species from." },
+  background: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this background from." },
+  feat: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this feat from." },
+  equipment: { path: "description", text: "Describe this item — the description is what the inventory shows." }
+};
+
 export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: SchemaContext): BlockedReason | null {
   const word = typeLabel(type);
-  const named = need(draft, "name", `Give this ${word} a name — it's under Basics.`, "basics");
+  const named = need(draft, "name", `Give this ${word} a name.`, "basics");
   if (named) return named;
+
+  const shown = SHOWN_TO_PLAYERS[type];
+  const blankCard = shown ? need(draft, shown.path, shown.text, "basics") : null;
+  if (blankCard) return blankCard;
 
   const formula = badFormula(draft);
   const formulaBlocker: BlockedReason | null = formula
@@ -136,12 +196,12 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       const spellcasting = draft.spellcasting as Record<string, unknown> | null | undefined;
       const listId = typeof spellcasting?.spellListId === "string" ? spellcasting.spellListId : "";
       return first(
-        need(draft, "hitDie", "Choose a hit die — it's under Progression.", "progression"),
-        need(draft, "primaryAbilities", "Pick this class's primary ability — it's under Progression.", "progression"),
-        need(draft, "savingThrows", "Pick the two saving throws this class is proficient in — it's under Progression.", "progression"),
-        need(draft, "skillChoices.from", "Pick which skills this class can choose from — it's under Proficiencies.", "proficiencies"),
+        need(draft, "hitDie", "Choose a hit die.", "progression"),
+        need(draft, "primaryAbilities", "Pick this class's primary ability.", "progression"),
+        need(draft, "savingThrows", "Pick the two saving throws this class is proficient in.", "progression"),
+        need(draft, "skillChoices.from", "Pick which skills this class can choose from.", "proficiencies"),
         spellcasting && !listId
-          ? { text: "Choose a spell list — it's under Progression. A caster with no list can't be built.", sectionId: "progression" }
+          ? { text: "Choose a spell list. A caster with no list can't be built.", sectionId: "progression" }
           : null,
         formulaBlocker,
         // Before `brokenCatalog`: a skipped choice still builds a character, an ungranted
@@ -153,9 +213,9 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
 
     case "subclass":
       return first(
-        need(draft, "classId", "Say which class this subclass belongs to — it's under Belongs to.", "belongs-to"),
+        need(draft, "classId", "Say which class this subclass belongs to.", "belongs-to"),
         (draft.spellcasting as Record<string, unknown> | null | undefined) && blank(getAt(draft, "spellcasting.spellListId"))
-          ? { text: "Choose a spell list — it's under Belongs to. A subclass caster falls back to the class list, which for a homebrew class is empty.", sectionId: "belongs-to" }
+          ? { text: "Choose a spell list. A subclass caster falls back to the class list, which for a homebrew class is empty.", sectionId: "belongs-to" }
           : null,
         formulaBlocker,
         brokenCatalog(draft, ctx, "features")
@@ -163,40 +223,40 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
 
     case "species":
       return first(
-        need(draft, "speedFeet", "Give this species a walking speed — it's under Body.", "body"),
-        need(draft, "sizes", "Choose at least one size — it's under Body.", "body"),
+        need(draft, "speedFeet", "Give this species a walking speed.", "body"),
+        need(draft, "sizes", "Choose at least one size.", "body"),
         formulaBlocker,
         brokenCatalog(draft, ctx, "traits")
       );
 
     case "background":
       return first(
-        need(draft, "originFeatId", "Choose the feat this background grants — it's under Origin.", "origin"),
+        need(draft, "originFeatId", "Choose the feat this background grants.", "origin"),
         formulaBlocker,
         brokenCatalog(draft, ctx, "features")
       );
 
     case "feat":
       return first(
-        need(draft, "category", "Choose a category — it's under Category. Nothing offers a feat with no category.", "category"),
+        need(draft, "category", "Choose a category. Nothing offers a feat with no category.", "category"),
         // `feature`, singular: a feat IS one `FeatureRecord`. Its NAME is what the wizard
         // prints beside the pick, so an unnamed one is a blank line on the card.
-        need(draft, "feature.name", "Say what this feat does — it's under The feat itself.", "feature"),
+        need(draft, "feature.name", "Say what this feat does.", "feature"),
         formulaBlocker,
         brokenCatalog(draft, ctx, "feature")
       );
 
     case "spell":
       return first(
-        need(draft, "description", "Describe what this spell does — it's under Basics.", "basics"),
-        need(draft, "school", "Give this spell a school — it's under Casting.", "casting"),
-        need(draft, "castingTime", "Say how long this spell takes to cast — it's under Casting.", "casting"),
-        need(draft, "duration", "Give this spell a duration — it's under Casting.", "casting"),
+        need(draft, "description", "Describe what this spell does.", "basics"),
+        need(draft, "school", "Give this spell a school.", "casting"),
+        need(draft, "castingTime", "Say how long this spell takes to cast.", "casting"),
+        need(draft, "duration", "Give this spell a duration.", "casting"),
         typeof getAt(draft, "damage.roll") === "string" && !isDiceFormula(String(getAt(draft, "damage.roll")))
-          ? { text: `Fix the damage formula “${getAt(draft, "damage.roll")}” — it's under Effect.`, sectionId: "effect" }
+          ? { text: `Fix the damage formula “${getAt(draft, "damage.roll")}”.`, sectionId: "effect" }
           : null,
         !blank(getAt(draft, "damage.roll")) && blank(getAt(draft, "damage.types"))
-          ? { text: "Give this spell a damage type — it's under Effect.", sectionId: "effect" }
+          ? { text: "Give this spell a damage type.", sectionId: "effect" }
           : null
       );
 
@@ -212,18 +272,18 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       const weapon = draft.weapon as Record<string, unknown> | null | undefined;
       const casts = draft.casts as Record<string, unknown> | null | undefined;
       return first(
-        need(draft, "category", "Choose a category — it's under Basics.", "basics"),
+        need(draft, "category", "Choose a category.", "basics"),
         weapon && !blank(weapon.damageDice) && blank(weapon.damageType)
-          ? { text: "Give this item a damage type — it's under Weapon.", sectionId: "weapon" }
+          ? { text: "Give this item a damage type.", sectionId: "weapon" }
           : null,
         weapon && typeof weapon.damageDice === "string" && weapon.damageDice.trim() !== "" && !isDiceFormula(weapon.damageDice)
-          ? { text: `Fix the damage formula “${weapon.damageDice}” — it's under Weapon.`, sectionId: "weapon" }
+          ? { text: `Fix the damage formula “${weapon.damageDice}”.`, sectionId: "weapon" }
           : null,
         draft.castsSpell === true && blank(casts?.spellId)
-          ? { text: "Choose which spell this item casts — it's under Magic.", sectionId: "magic" }
+          ? { text: "Choose which spell this item casts.", sectionId: "magic" }
           : null,
         draft.isMagic === true && !!draft.uses && blank(getAt(draft, "uses.limit")) && blank(getAt(draft, "uses.scaling"))
-          ? { text: "Say how many charges this item has, or turn charges off — it's under Magic.", sectionId: "magic" }
+          ? { text: "Say how many charges this item has, or turn charges off.", sectionId: "magic" }
           : null,
         formulaBlocker
       );
@@ -235,14 +295,14 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
       const statblock = (draft.extensions as Record<string, Record<string, unknown>> | undefined)?.["open5e.srd-2024"];
       return first(
         typeof statblock?.challengeRating !== "number"
-          ? { text: "Give this creature a challenge rating — it's under Identity.", sectionId: "identity" }
+          ? { text: "Give this creature a challenge rating.", sectionId: "identity" }
           : null,
-        need(draft, "armorClass", "Give this creature an armour class — it's under Defences.", "defences"),
-        need(draft, "hitPoints.maximum", "Give this creature hit points — it's under Defences.", "defences"),
+        need(draft, "armorClass", "Give this creature an armour class.", "defences"),
+        need(draft, "hitPoints.maximum", "Give this creature hit points.", "defences"),
         typeof getAt(draft, "hitPoints.formula") === "string" &&
         String(getAt(draft, "hitPoints.formula")).trim() !== "" &&
         !isDiceFormula(String(getAt(draft, "hitPoints.formula")))
-          ? { text: `Fix the hit-point formula “${getAt(draft, "hitPoints.formula")}” — it's under Defences.`, sectionId: "defences" }
+          ? { text: `Fix the hit-point formula “${getAt(draft, "hitPoints.formula")}”.`, sectionId: "defences" }
           : null,
         formulaBlocker
       );
@@ -277,10 +337,11 @@ export function serverBlockedReason(
   const required = /required/i.test(issue.message);
   // Zod messages arrive without terminal punctuation; the template supplies it exactly once.
   const detail = issue.message.replace(/[.\s]+$/, "");
+  // No section name in the words — `sectionId` rides along and the jump control says it once.
   return {
     text: required
-      ? `Fill in ${found.label} — it's under ${found.sectionTitle}.`
-      : `Fix ${found.label} — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}. It's under ${found.sectionTitle}.`,
+      ? `Fill in ${found.label}.`
+      : `Fix ${found.label} — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
     sectionId: found.sectionId
   };
 }

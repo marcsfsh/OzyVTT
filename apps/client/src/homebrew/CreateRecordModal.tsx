@@ -27,9 +27,17 @@ type StartingPoint = "blank" | "duplicate";
 export type CreateRequest =
   | Readonly<{ mode: "blank"; type: HomebrewType }>
   /** `origin` is carried so a failure can be explained in the right words: copying a
-      bundled SRD record and copying your own are the same call to the same endpoint,
-      but only one of them can fail because the server has not implemented it. */
-  | Readonly<{ mode: "duplicate"; type: HomebrewType; sourceId: string; sourceName: string; origin: "srd" | "homebrew" }>;
+      bundled SRD record and copying your own are the same call to the same endpoint.
+      `companions` is what the sentence below the grid PROMISES — the modal computes it,
+      says it, and sends it, so the thing the GM was told is the thing that happens. */
+  | Readonly<{
+      mode: "duplicate";
+      type: HomebrewType;
+      sourceId: string;
+      sourceName: string;
+      origin: "srd" | "homebrew";
+      companions: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+    }>;
 
 export function CreateRecordModal({
   open,
@@ -108,15 +116,23 @@ export function CreateRecordModal({
         ? `Choose a ${typeLabel(type)} to duplicate.`
         : null;
 
+  const chosen = sourceId === null ? undefined : sources.find((candidate) => candidate.id === sourceId);
+  /**
+   * The consequence of THIS pick, stated before the GM commits rather than as an error
+   * afterwards. A duplicated class's subclass pick points at a family only the copy owns,
+   * which matches nothing until a subclass names the copy — so the copy takes them.
+   * Rendered only when there is something to say; a class with no subclasses says nothing.
+   */
+  const companions = chosen?.companions ?? [];
+
   const submit = () => {
     if (blockedReason || busy) return;
     if (start === "blank") {
       onCreate({ mode: "blank", type });
       return;
     }
-    const source = sources.find((candidate) => candidate.id === sourceId);
-    if (!source) return;
-    onCreate({ mode: "duplicate", type, sourceId: source.id, sourceName: source.name, origin: source.origin });
+    if (!chosen) return;
+    onCreate({ mode: "duplicate", type, sourceId: chosen.id, sourceName: chosen.name, origin: chosen.origin, companions });
   };
 
   return (
@@ -189,6 +205,15 @@ export function CreateRecordModal({
               }
             />
           </div>
+        )}
+
+        {/* Not a warning and not an error — a fact about what Create is about to do, in
+            the quiet note register, sitting directly under the grid it is about. */}
+        {companions.length > 0 && (
+          <p className="hb-create-note">
+            {chosen!.name}&rsquo;s {companions.length} {companions.length === 1 ? "subclass is" : "subclasses are"} copied too, so the
+            copy has something to offer at its subclass level and can be published straight away.
+          </p>
         )}
 
         {/* The reason lives in exactly ONE place: beside the action it blocks. */}

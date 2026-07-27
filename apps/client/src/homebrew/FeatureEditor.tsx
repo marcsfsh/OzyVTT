@@ -60,6 +60,7 @@ import { newId } from "../lib/ids";
 import { RiderEditor, riderSummary, type RiderKind } from "./RiderEditor";
 import { LEVELS, blankFeature } from "./defaults";
 import { setAt } from "./paths";
+import { namesOwnRecord } from "./schema";
 import type { Draft, SchemaContext } from "./schema";
 
 type Feature = Readonly<{
@@ -307,7 +308,10 @@ export function FeatureEditor({
       patch(index, { choice: merged });
     };
 
-    const catalogResult = catalogSlug ? ctx.resolveCatalog(catalogSlug) : null;
+    // A slug naming THIS record. The merged catalog cannot answer it while the record is
+    // a draft; the server answers it from authorship. See `namesOwnRecord`.
+    const selfCatalog = !!catalogSlug && namesOwnRecord(catalogSlug, ctx.recordId);
+    const catalogResult = catalogSlug && !selfCatalog ? ctx.resolveCatalog(catalogSlug) : null;
 
     return (
       <div className="hb-feature">
@@ -480,15 +484,25 @@ export function FeatureEditor({
                   )}
                 </FieldGrid>
                 {/* Live, and resolved through the SAME function the server validates
-                    with, so the count the GM reads is the count the game offers. */}
-                <p className={!catalogSlug || (catalogResult && "error" in catalogResult) ? "hb-blocked" : "nh-field-help"}>
-                  {!catalogSlug
-                    ? family
-                      ? "Pick which one, and this will say how many options players get."
-                      : "This matches no catalog — the choice would be skipped."
-                    : catalogResult && "error" in catalogResult
-                      ? `This matches no catalog — the choice would be skipped. (${catalogResult.error})`
-                      : `Players will pick from ${catalogResult?.count ?? 0} ${catalogResult?.count === 1 ? "option" : "options"}.`}
+                    with, so the count the GM reads is the count the game offers — EXCEPT
+                    for a slug naming this very record (`<own id>-subclasses`,
+                    `<own id>-lineages`). Those resolve against the merged catalog, which
+                    by construction cannot hold the draft being edited, so the shared
+                    resolver throws and the readout said "matches no catalog" on a class
+                    the GM had just duplicated and not touched. The server answers that
+                    pair from authorship instead, so the honest thing to say here is what
+                    the rule is, in the neutral register — not a caution about a break
+                    that is not one. */}
+                <p className={(!catalogSlug || (catalogResult && "error" in catalogResult)) && !selfCatalog ? "hb-blocked" : "nh-field-help"}>
+                  {selfCatalog
+                    ? "Players pick from the records that name this one. They only have to exist in your library — they don't have to be published."
+                    : !catalogSlug
+                      ? family
+                        ? "Pick which one, and this will say how many options players get."
+                        : "This matches no catalog — the choice would be skipped."
+                      : catalogResult && "error" in catalogResult
+                        ? `This matches no catalog — the choice would be skipped. (${catalogResult.error})`
+                        : `Players will pick from ${catalogResult?.count ?? 0} ${catalogResult?.count === 1 ? "option" : "options"}.`}
                 </p>
               </>
             )}
