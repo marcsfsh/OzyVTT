@@ -46,6 +46,9 @@ export type CharacterBuilderProps = Readonly<{
   onCreated: (name: string) => void;
 }>;
 
+/** How long Create waits for the table's answer before offering the (idempotent) retry. */
+const CREATE_ACK_TIMEOUT_MS = 10_000;
+
 const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
   "standard-array": "Standard array", "point-buy": "Point buy", roll: "Roll 4d6", custom: "GM formula"
 };
@@ -206,7 +209,9 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   const [stepIndex, setStepIndex] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [rejection, setRejection] = useState<string | null>(null);
+  /** The one thing that went wrong with a submit, said in the wizard's own words. A rejection and a
+      silent server are different messages but the SAME surface - one alert, in one place, found. */
+  const [rejection, setRejection] = useState<{ title: string; text: string } | null>(null);
   const [resumable, setResumable] = useState<StoredDraft | null>(() => {
     const stored = loadDraft(sessionKey);
     return stored && draftHasProgress(stored.draft) ? stored : null;
@@ -235,10 +240,12 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   }, [draft.classId, draft.speciesId, draft.backgroundId, draft.level, draft.subclassId, catalogs]);
 
   // Park the draft on every change so a reload (or Save & close) never costs the player their work -
-  // EXCEPT while the resume banner is still on screen. Saving then would overwrite the very draft
-  // the banner is advertising: one click on a different species and the unfinished character it
-  // promised is gone on the next reload. The banner therefore owns the store until it is answered,
-  // and the first real edit answers it (see `editDraft`).
+  // EXCEPT while an unanswered resume offer is on screen. Saving then would overwrite the very draft
+  // the banner is advertising: one click on a different species and the unfinished character it just
+  // promised is gone on the next reload. So the offer owns the store until it is ANSWERED, and only
+  // Resume / Discard / Save & close answer it. That is also why the banner stays put rather than
+  // auto-dismissing on the first pick: a pending question that would destroy work has to keep being
+  // asked, and its copy says exactly which two answers release the store.
   useEffect(() => {
     if (resumable) return;
     if (draftHasProgress(draft)) saveDraft(sessionKey, draft);
@@ -262,18 +269,13 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     // GM-only: a character being rolled up is the GM's business in phase 2, and it still lands in
     // the roll history, so the roll stays server-thrown and auditable rather than client-invented.
     socket.emit("dice:roll", { commandId: newId(), formula, purpose: "manual", visibility: "gm-only", label }, (result) => {
-      if (!result.ok || !result.rollId) { setRolling(false); setRejection(result.message ?? "That roll was rejected."); return; }
+      if (!result.ok || !result.rollId) { setRolling(false); setRejection({ title: "That roll was rejected", text: result.message ?? "The table refused the roll." }); return; }
       pendingRolls.current.set(result.rollId, apply);
     });
   };
 
-  /**
-   * Every edit the PLAYER makes goes through here (the pruning effect does not - it is bookkeeping).
-   * Besides applying the change it answers the resume banner: making a pick IS declining the offer,
-   * so the banner steps aside on the first one rather than riding all seven steps, and the stored
-   * draft it was advertising stays intact right up to that moment.
-   */
-  const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => { setResumable(null); setDraft(update); };
+  /** Every edit the PLAYER makes goes through here; the pruning effect does not, being bookkeeping. */
+  const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => setDraft(update);
   const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
   const setPicks = (offer: BuilderOffer, ids: readonly string[]) =>
     editDraft((current) => ({ ...current, picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) } }));
@@ -293,6 +295,8 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
    * it only inside the successful transaction), so the id stays good for the retry.
    */
   const attemptId = useRef<string | null>(null);
+  const ackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (ackTimer.current !== null) clearTimeout(ackTimer.current); }, []);
 
   const finishCreate = (name: string) => {
     attemptId.current = null;
@@ -307,11 +311,21 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     setSubmitting(true);
     let payload;
     try { payload = buildCreatePayload(draft, offers); }
-    catch (error) { setSubmitting(false); setRejection(error instanceof Error ? error.message : "The character is not complete yet."); return; }
+    catch (error) { setSubmitting(false); setRejection({ title: "The character is not complete yet", text: error instanceof Error ? error.message : "Something is still missing." }); return; }
     attemptId.current ??= newId();
     const commandId = attemptId.current;
+    // A lost ack would otherwise leave Create spinning for ever, which is the ONE state the reused
+    // commandId cannot help with - there is no way to press it again. So the wait is bounded and the
+    // way out says why resending is safe.
+    if (ackTimer.current !== null) clearTimeout(ackTimer.current);
+    ackTimer.current = setTimeout(() => {
+      ackTimer.current = null;
+      setSubmitting(false);
+      setRejection({ title: "The table has not answered", text: "Press Create character again. It resends the same request, so it cannot make a second character." });
+    }, CREATE_ACK_TIMEOUT_MS);
     socket.emit("character:create", { commandId, ...payload }, (result) => {
-      if (!result.ok) { setSubmitting(false); setRejection(result.message ?? "The character could not be created."); return; }
+      if (ackTimer.current !== null) { clearTimeout(ackTimer.current); ackTimer.current = null; }
+      if (!result.ok) { setSubmitting(false); setRejection({ title: "The server rejected this character", text: result.message ?? "The character could not be created." }); return; }
       setPendingCreate({ actorId: result.actorId ?? commandId, typedName: payload.name });
     });
   };
@@ -339,11 +353,14 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   useEffect(() => {
     const node = rejectionRef.current;
     if (!rejection || !node) return;
+    // Only one of the two steps mounts the alert at a time, so the ref always points at the live one.
     node.focus({ preventScroll: true });
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     node.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
   }, [rejection]);
 
+  // Leaving IS an answer to a pending resume offer: the player has decided this build is the one
+  // worth keeping, so it takes the slot rather than being thrown away in favour of the older draft.
   const saveAndClose = () => { if (draftHasProgress(draft)) saveDraft(sessionKey, draft); onClose(); };
 
   // ---- Ability scores ------------------------------------------------------------------------
@@ -440,6 +457,13 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     facet: entry.source, keywords: entry.primaryAbilities.join(" ")
   }));
 
+  /* ONE failure surface, rendered on the two steps that can produce one: a rejected server roll
+     belongs to the ability step, a rejected create to the review step. Rendering it only on review
+     (as this did) meant a refused roll set a message the player was never on the step to see. */
+  const problemAlert = rejection ? <div ref={rejectionRef} tabIndex={-1} className="cb-rejection">
+    <Alert tone="danger" title={rejection.title}>{rejection.text}</Alert>
+  </div> : null;
+
   const body = (): ReactNode => {
     switch (step) {
       case "species":
@@ -475,6 +499,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
         const options = context.background?.abilityOptions ?? null;
         const spread = draft.backgroundBonus.map((entry) => entry.amount).join("/");
         return <>
+          {problemAlert}
           <AbilityScoreAllocator
             mode={assignMode ? "assign" : "spend"}
             rows={allocatorRows}
@@ -588,9 +613,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
           />
           {/* Not finished is caution, never danger: the table still has room, it is just filling up. */}
           {capacity?.warning && <Alert tone="warning" title="The table is filling up">{capacity.warning}</Alert>}
-          {rejection && <div ref={rejectionRef} tabIndex={-1} className="cb-rejection">
-            <Alert tone="danger" title="The server rejected this character">{rejection}</Alert>
-          </div>}
+          {problemAlert}
           <ReviewSummary sections={reviewSections()} />
         </>;
       default:
@@ -695,8 +718,8 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
       onSaveAndClose={saveAndClose}
       resume={resumable
         ? <Alert tone="info" title="Unfinished character found">
-            You started a character on this device {describeWhen(resumable.updatedAt)}. It is kept
-            exactly as you left it until you resume it, discard it, or begin a different character.{" "}
+            You started a character on this device {describeWhen(resumable.updatedAt)}. It stays exactly
+            as you left it until you answer — resume it, or discard it to save the one you build now.{" "}
             <Button variant="secondary" size="sm" onClick={() => { setDraft(resumable.draft); setResumable(null); }}>Resume it</Button>
             {/* Discarding is the one action here that destroys work, so it takes the destructive
                 treatment rather than reading as the twin of the button beside it. */}
