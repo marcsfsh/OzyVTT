@@ -9,8 +9,9 @@ import {
   type FeatureChoice, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
   type SpellListReference, type SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import type { ContentView } from "./content-library.js";
+import { STATBLOCK_EXTENSION, statblockFacts, type ContentView } from "./content-library.js";
 import { homebrewIdProblem } from "./homebrew-ids.js";
+import type { HomebrewAuthoredIndex } from "./homebrew-store.js";
 
 /**
  * The publish gate. A DRAFT MAY BE INVALID (decision 7) - that is what drafts are for - so nothing
@@ -36,7 +37,9 @@ import { homebrewIdProblem } from "./homebrew-ids.js";
  *
  *   1. SCHEMA        the record's own Zod schema - the SAME one the SRD bundle is parsed through.
  *   2. IDENTITY      `hb-` prefixed, <= 60 characters, slug-legal, and (monsters) self-consistent.
- *   3. REFERENTIAL   every id this record names resolves in the merged GM catalog.
+ *   3. REFERENTIAL   every id this record names resolves in the merged GM catalog - except the two
+ *                    class/subclass rules, which ask whether the other record has been AUTHORED,
+ *                    because demanding publication in both directions deadlocked both.
  *   4. UNSUPPORTED   shapes that parse and are then read by nothing.
  *
  * DELIBERATELY NOT HERE: the plan's tier of ADVISORIES (fields that parse and do nothing -
@@ -51,6 +54,12 @@ export type HomebrewValidationContext = Readonly<{
   catalog: ContentView;
   /** Published spell-list overlays, so a list under validation resolves in the graph it will join. */
   spellLists: readonly SpellListReference[];
+  /**
+   * Who has been AUTHORED, drafts included. Required, not optional: the two rules that read it are
+   * the two that deadlocked publishing entirely, and an optional field would let a call site quietly
+   * reinstate the deadlock. A caller with no store passes `EMPTY_AUTHORED_INDEX`.
+   */
+  authored: HomebrewAuthoredIndex;
 }>;
 
 type Issue = HomebrewValidationIssue;
@@ -64,15 +73,23 @@ type Owner = Readonly<{ id: string; name: string }>;
  *
  * `resolveCatalogChoice` answers `<classId>-subclasses` and `<speciesId>-lineages` by looking the
  * owning record up in the published catalog - and the record being validated is a DRAFT, so it is not
- * there. Without this, every class would fail publish with "No class hb-... is in the catalog",
- * including a fully-authored one whose subclasses are already published: the class cannot publish
- * until its subclasses exist and the subclasses cannot resolve until the class publishes. That is a
- * deadlock, not a validation.
+ * there. Without this, every class would fail publish with "No class hb-... is in the catalog".
  *
- * These two families - and only these two - are therefore answered from the record itself, which is
- * also what makes the message useful ("no subclasses name this class yet" rather than "no class").
- * `-spells` keys on a spell-list id, `-feats` on a free category slug, and `skills`/`weapons` are
- * global, so none of them are self-referential and none need this.
+ * These two families - and only these two - are therefore answered from the record itself (a
+ * species' lineages) or from the authorship index (a class's subclasses), which is also what makes
+ * the message useful ("no subclasses name this class yet" rather than "no class"). `-spells` keys on
+ * a spell-list id, `-feats` on a free category slug, and `skills`/`weapons` are global, so none of
+ * them are self-referential and none need this.
+ *
+ * ORDERING IS NOT PART OF THE ANSWER, and getting that wrong is how this file used to make the
+ * headline feature unusable. Counting only PUBLISHED subclasses here, while `subclassIssues`
+ * demanded a PUBLISHED class, left a perfect deadlock in both directions: duplicate Fighter and
+ * publish and you are told to publish a subclass first; duplicate Champion, re-point it, publish,
+ * and you are told to publish the class first. The carve-out above did not prevent that deadlock, it
+ * relocated it. Both rules now read authorship rather than publication - a record that EXISTS
+ * satisfies them, whatever state it is in - which is the honest question anyway: publishing is not
+ * playing, and a published record whose partner is still a draft is inert (drafts are in no merged
+ * catalog), not dangerous.
  */
 type SelfCatalog = Readonly<{ slug: string; count: number; whenEmpty: string }> | undefined;
 
@@ -80,6 +97,7 @@ type SelfCatalog = Readonly<{ slug: string; count: number; whenEmpty: string }> 
 type Checks = Readonly<{
   catalog: ContentView;
   spellLists: readonly SpellListReference[];
+  authored: HomebrewAuthoredIndex;
   catalogs: CatalogChoiceCatalogs;
   add: Add;
 }>;
@@ -137,7 +155,7 @@ export function validateForPublish(
   if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record rather than editing its id.`);
 
   // ---- Tiers 3 and 4, per type. ----
-  const checks: Checks = { catalog: context.catalog, spellLists: context.spellLists, catalogs: context.catalog.catalogChoiceCatalogs(), add };
+  const checks: Checks = { catalog: context.catalog, spellLists: context.spellLists, authored: context.authored, catalogs: context.catalog.catalogChoiceCatalogs(), add };
   const record = parsed.data;
   switch (type) {
     case "class": classIssues(record as ClassReference, checks); break;
@@ -173,12 +191,35 @@ function classIssues(entry: ClassReference, checks: Checks) {
   // `choose x (times granted)`. Resolve the repeat count here, where the table is in hand.
   const grants = new Map<string, number>();
   for (const row of entry.levelTable) for (const featureId of row.features) grants.set(featureId, (grants.get(featureId) ?? 0) + 1);
+  // Published subclasses AND authored drafts, unioned by id so a published homebrew subclass (which
+  // is in both) is not counted twice. Drafts count because a class does not need a PUBLISHED
+  // subclass to be publishable - it needs one to exist, and the pair can then publish in either
+  // order. See `SelfCatalog`.
+  const subclassIds = new Set([
+    ...checks.catalog.subclassSummaries().filter((summary) => summary.classId === entry.id).map((summary) => summary.id),
+    ...checks.authored.subclassIdsFor(entry.id)
+  ]);
   const self: SelfCatalog = {
     slug: `${entry.id}-subclasses`,
-    count: checks.catalog.subclassSummaries().filter((summary) => summary.classId === entry.id).length,
-    whenEmpty: `no subclasses name "${entry.name}" yet. Publish at least one subclass for it first (duplicating an SRD subclass and re-pointing its class is the quick way).`
+    count: subclassIds.size,
+    whenEmpty: `no subclass names "${entry.name}" yet. Create one first (duplicating an SRD subclass and picking this class is the quick way) - it does not have to be published, it only has to exist.`
   };
-  entry.features.forEach((feature, index) => featureIssues(feature, ["features", index], checks, grants.get(feature.id) ?? 1, self));
+  entry.features.forEach((feature, index) => {
+    const granted = grants.get(feature.id) ?? 0;
+    // A CHOICE-BEARING FEATURE THAT NO LEVEL ROW GRANTS IS AN UNCREATABLE CHARACTER, and it used to
+    // publish clean because this line invented a grant count (`?? 1`) for a feature the table never
+    // grants. Everything downstream then disagreed with itself: the wire carries
+    // `grantedAtLevels: []`, the wizard reads that as "granted once" and OFFERS the pick (and blocks
+    // Create until it is answered), while `grantedClassFeatures` in `character-build.ts` builds its
+    // offers from the LEVEL TABLE ALONE and never makes a matching one - so Create fails with
+    // `No feature "..." offers a "skill" choice.` and the character can never be made. Refuse it
+    // here, where the GM can fix it, and say which of the two edits fixes it.
+    if (feature.choice && granted === 0) {
+      checks.add(["features", index], `"${feature.name}" asks the player to choose, but no level in the table grants it - the character builder would offer the pick and then refuse to create the character. Add "${feature.id}" to a level in the level table, or remove its choice.`);
+      return;
+    }
+    featureIssues(feature, ["features", index], checks, granted, self);
+  });
   startingEquipmentIssues(entry.startingEquipment, ["startingEquipment"], checks);
   if (entry.skillChoices.from.length < entry.skillChoices.choose) {
     checks.add(["skillChoices", "from"], `This class asks for ${entry.skillChoices.choose} skills but offers only ${entry.skillChoices.from.length}.`);
@@ -187,9 +228,20 @@ function classIssues(entry: ClassReference, checks: Checks) {
 
 function subclassIssues(entry: SubclassReference, checks: Checks) {
   const parent = checks.catalog.classRecord(entry.classId);
-  if (!parent) {
-    checks.add(["classId"], `No class "${entry.classId}" is in the catalog. Publish the class before its subclasses.`);
-  } else if (entry.spellcasting) {
+  // AUTHORED, not published. "Publish the class before its subclasses" was the second jaw of the
+  // deadlock, and it never earned its keep: the merged catalogs expose published records only, so a
+  // published subclass whose class is still a draft is unreachable by every consumer - the wizard
+  // filters subclasses by class and `resolveCatalogChoice("<classId>-subclasses")` does the same -
+  // which makes it inert, not dangerous. What IS worth catching is a class id that names NOTHING, a
+  // typo that would silently strand the subclass forever; that check survives intact below.
+  if (!parent && !checks.authored.has("class", entry.classId)) {
+    checks.add(["classId"], `No class "${entry.classId}" exists. Create the class this subclass belongs to (it can stay a draft), or point this at an existing one.`);
+  } else if (!parent && entry.spellcasting) {
+    // The ONE case that still wants an order, and it is not a deadlock: the check below needs the
+    // class's level table, which only a published class has here. The class side no longer waits for
+    // anything, so "publish the class first" is always available.
+    checks.add(["spellcasting"], `A spellcasting subclass can only be checked against a published class's spell slots, and "${entry.classId}" is still a draft. Publish the class first - it does not need its subclasses published.`);
+  } else if (parent && entry.spellcasting) {
     // TIER 4, and it is a DEFERRAL wearing a rejection's clothes. A subclass's own `levelTable` is
     // dead data today - nothing reads it: not the builder, not the catalog projection, not the wire
     // summary. So a third-caster subclass on a non-caster class produces a character with zero
@@ -256,9 +308,14 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
   }
   // Not cosmetic: the picker row renders "CR 0 - <size> unknown" and the creature is unfindable by
   // type search. Both fields live in the untyped extension bag, so no schema can catch this.
-  const extension = statblockExtension(definition);
-  if (typeof extension?.challengeRating !== "number") checks.add(["extensions"], "This creature has no challenge rating, so the bestiary will list it as CR 0.");
-  if (typeof extension?.type !== "string" || extension.type.length === 0) checks.add(["extensions"], "This creature has no creature type, so the bestiary will list it as \"unknown\" and type search will never find it.");
+  //
+  // Read through the BESTIARY'S OWN READER, never a private copy. This used to prefer a
+  // `vtt.statblock` key that no consumer has ever read, so a creature carrying only that bag passed
+  // the guard and then listed as exactly the "CR 0 - unknown" the guard exists to prevent. Sharing
+  // `statblockFacts` means the guard cannot pass what the list cannot show.
+  const facts = statblockFacts(definition);
+  if (facts.challengeRating === null) checks.add(["extensions"], `This creature has no challenge rating, so the bestiary would list it as CR 0. Put a numeric "challengeRating" in the "${STATBLOCK_EXTENSION}" extension bag.`);
+  if (facts.creatureType === null) checks.add(["extensions"], `This creature has no creature type, so the bestiary would list it as "unknown" and type search would never find it. Put a "type" in the "${STATBLOCK_EXTENSION}" extension bag.`);
 }
 
 function spellListIssues(list: SpellListReference, checks: Checks) {
@@ -361,13 +418,6 @@ function startingEquipmentIssues(
   });
 }
 
-/** `vtt.statblock` first so a homebrew record can override an SRD-duplicated field; the open5e bag is the fallback. */
-function statblockExtension(definition: ActorDefinition): { challengeRating?: unknown; type?: unknown } | undefined {
-  const bag = definition.extensions ?? {};
-  const extension = bag["vtt.statblock"] ?? bag["open5e.srd-2024"];
-  return extension && typeof extension === "object" ? extension as { challengeRating?: unknown; type?: unknown } : undefined;
-}
-
 // ---------------------------------------------------------------------------------------------
 // The router seam
 // ---------------------------------------------------------------------------------------------
@@ -385,7 +435,13 @@ function statblockExtension(definition: ActorDefinition): { challengeRating?: un
 export function createHomebrewValidator(source: {
   forAudience: (audience: "gm" | "player") => ContentView;
   publishedSpellLists: () => readonly SpellListReference[];
+  /** Drafts included - the gate asks about AUTHORSHIP, not publication. See `HomebrewAuthoredIndex`. */
+  authoredIndex: () => HomebrewAuthoredIndex;
 }) {
   return (type: HomebrewContentType, body: unknown): HomebrewValidity =>
-    validateForPublish(type, body, { catalog: source.forAudience("gm"), spellLists: source.publishedSpellLists() });
+    validateForPublish(type, body, {
+      catalog: source.forAudience("gm"),
+      spellLists: source.publishedSpellLists(),
+      authored: source.authoredIndex()
+    });
 }

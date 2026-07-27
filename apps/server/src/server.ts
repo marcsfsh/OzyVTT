@@ -419,7 +419,10 @@ export function createServer(options: CreateServerOptions) {
     // end, and a record whose dependencies are published-but-not-player-visible is perfectly valid.
     validate: createHomebrewValidator({
       forAudience: (audience) => contentLibrary.forAudience(audience),
-      publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists
+      publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
+      // Drafts included, and only here: the gate asks whether a record EXISTS, which is what lets a
+      // class and its subclass publish in either order instead of neither. No catalog reads this.
+      authoredIndex: () => homebrewStore.authoredIndex()
     }),
     usagesOf: homebrewUsagesFor,
     catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)

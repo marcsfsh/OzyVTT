@@ -31,6 +31,24 @@ describe("homebrew id shapes are per type, in both directions", () => {
     expect(isMintedHomebrewId(OPAQUE, "class")).toBe(false);
   });
 
+  it("accepts a builder id that merely STARTS like a monster's - a class named \"M\" is not a monster", () => {
+    // Reading `hb-m-` as proof of monsterhood misfires on every name that slugs to `m-...`:
+    // duplicating a class named "M" mints `hb-m-copy-60a055`, which is ours by construction. Pack
+    // import then called it foreign, re-minted it into a fresh EMPTY row, left the subclass pointing
+    // at the id it had just abandoned (so the subclass could never publish), and reported the whole
+    // thing as a "homebrew-collision" when nothing had collided. The two shapes cannot actually
+    // overlap: a builder suffix is 6 or 8 hex, a monster's is 12.
+    const minted = mintHomebrewId("class", "M copy", () => false);
+    expect(minted).toMatch(/^hb-m-copy-[0-9a-f]{6}$/);
+    expect(isMintedHomebrewId(minted, "class")).toBe(true);
+    expect(isMintedHomebrewId("hb-m-copy-60a055", "class")).toBe(true);
+    expect(homebrewIdProblem("hb-m-copy-60a055", "class")).toBeNull();
+    // A bare "M" mints `hb-m-<6hex>`, which still is not the 12-hex monster shape.
+    const bare = mintHomebrewId("class", "M", () => false);
+    expect(isMintedHomebrewId(bare, "class")).toBe(true);
+    expect(isMintedHomebrewId(bare, "monster")).toBe(false);
+  });
+
   it("accepts the opaque shape for a monster", () => {
     expect(isMintedHomebrewId(OPAQUE, "monster")).toBe(true);
     expect(homebrewIdProblem(OPAQUE, "monster")).toBeNull();

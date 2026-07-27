@@ -268,6 +268,29 @@ const levelRowOf = (row: ClassLevelRow): ContentClassLevelRow => ({
   classResources: row.classResources.map((resource) => ({ id: resource.id, name: resource.name, amount: resource.amount }))
 });
 const byName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
+
+/** The extension key challenge rating and creature type actually live under. */
+export const STATBLOCK_EXTENSION = "open5e.srd-2024";
+/**
+ * A creature's bestiary facts, read from the ONE bag that carries them.
+ *
+ * Exported because the publish gate must refuse exactly what this function cannot find, and it used
+ * to read a different key (`vtt.statblock`) first. That divergence had a name and a symptom: a
+ * monster carrying only `vtt.statblock` published clean and then listed as "CR 0 - unknown", which
+ * is the precise failure the guard exists to prevent. One reader, both call sites, no drift.
+ */
+export function statblockFacts(definition: ActorDefinition): { challengeRating: number | null; creatureType: string | null } {
+  const extension = (definition.extensions ?? {})[STATBLOCK_EXTENSION];
+  const bag = (extension && typeof extension === "object" ? extension : {}) as { challengeRating?: unknown; type?: unknown };
+  // Narrowed, not cast: the bag is untyped by design, so a string CR would otherwise reach the wire
+  // where `ContentMonsterSummary` declares a number. Null means "the bestiary has nothing to show",
+  // which is the exact condition the publish gate refuses.
+  return {
+    challengeRating: typeof bag.challengeRating === "number" ? bag.challengeRating : null,
+    creatureType: typeof bag.type === "string" && bag.type.length > 0 ? bag.type : null
+  };
+}
+
 /** A bundle "choose N from" list -> the wire shape (null = the record offers no such choice). */
 const choiceListOf = (list: Readonly<{ choose: number; from: readonly string[] }> | undefined): ContentChoiceList | null =>
   list ? { choose: list.choose, from: list.from } : null;
@@ -436,12 +459,12 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
   }
   const monsterSummaries: readonly ContentMonsterSummary[] = [...monstersById.entries()]
     .map(([id, definition]) => {
-      const extension = definition.extensions["open5e.srd-2024"] as { challengeRating?: number; type?: string } | undefined;
+      const facts = statblockFacts(definition);
       return {
         id,
         name: definition.name,
-        challengeRating: extension?.challengeRating ?? 0,
-        type: extension?.type ?? "unknown",
+        challengeRating: facts.challengeRating ?? 0,
+        type: facts.creatureType ?? "unknown",
         size: definition.size,
         armorClass: definition.armorClass,
         hitPoints: definition.hitPoints.maximum

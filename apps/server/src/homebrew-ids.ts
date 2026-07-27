@@ -127,8 +127,14 @@ function isOpaqueMonsterId(id: string): boolean {
 export function isMintedHomebrewId(id: string, type: HomebrewContentType): boolean {
   if (!id.startsWith(HOMEBREW_ID_PREFIX) || id.length > HOMEBREW_ID_MAX_LENGTH || !SLUG_LEGAL.test(id)) return false;
   if (type === "monster") return isOpaqueMonsterId(id);
-  // A builder id must NOT wear the monster prefix either - one shape per type, both directions.
-  if (id.startsWith(MONSTER_PREFIX)) return false;
+  // A builder id must not be a MONSTER ID either - one shape per type, both directions. The test is
+  // the whole opaque shape, never the `hb-m-` prefix alone: a class named "M" mints
+  // `hb-m-copy-60a055`, which wears the prefix and is perfectly ours. Reading the prefix as proof of
+  // monsterhood made pack import call that id foreign, re-mint it into a fresh empty row, and leave
+  // every subclass pointing at the id it just abandoned - reported as a collision that never
+  // happened. The two shapes cannot overlap (a builder suffix is 6 or 8 hex, a monster's is 12), so
+  // this is exact rather than a heuristic.
+  if (isOpaqueMonsterId(id)) return false;
   const suffix = id.slice(id.lastIndexOf("-") + 1);
   return id.lastIndexOf("-") > HOMEBREW_ID_PREFIX.length - 1 && HEX.test(suffix) && (suffix.length === 6 || suffix.length === 8);
 }

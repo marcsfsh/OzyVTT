@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { SpellListReferenceSchema, loadClasses, loadSpells, type SpellListReference } from "@vtt/content-srd-5.2.1";
+import type { HomebrewContentType } from "@vtt/api-contract";
+import { SpellListReferenceSchema, SubclassReferenceSchema, loadClasses, loadSpells, type SpellListReference } from "@vtt/content-srd-5.2.1";
+import { ActorDefinitionSchema } from "@vtt/schemas";
 import { ContentLibrary, type ContentAudience, type HomebrewCatalogSlice, type HomebrewContentSource } from "../src/content-library.js";
+import { EMPTY_AUTHORED_INDEX, type HomebrewAuthoredIndex } from "../src/homebrew-store.js";
 import { findCatalogRecord, rewriteForNewId } from "../src/homebrew-srd-copy.js";
 import { validateForPublish, type HomebrewValidationContext } from "../src/homebrew-validate.js";
 
@@ -22,8 +25,15 @@ const classBody = (overrides: Record<string, unknown> = {}) => ({
   subclassLevel: 3, levelTable: LEVEL_TABLE, ...overrides
 });
 
+/** Rows the GM has AUTHORED but not necessarily published - what breaks the publish deadlock. */
+type Authored = Readonly<{ type: HomebrewContentType; id: string; classId?: string }>;
+const authoredWith = (rows: readonly Authored[]): HomebrewAuthoredIndex => ({
+  has: (type, id) => rows.some((row) => row.type === type && row.id === id),
+  subclassIdsFor: (classId) => new Set(rows.filter((row) => row.type === "subclass" && row.classId === classId).map((row) => row.id))
+});
+
 /** A library whose GM slice carries `slice`, so cross-record checks resolve against real merged content. */
-function contextWith(slice: Partial<HomebrewCatalogSlice> = {}): HomebrewValidationContext {
+function contextWith(slice: Partial<HomebrewCatalogSlice> = {}, authored: HomebrewAuthoredIndex = EMPTY_AUTHORED_INDEX): HomebrewValidationContext {
   const full: HomebrewCatalogSlice = {
     classes: [], subclasses: [], species: [], backgrounds: [], feats: [],
     spells: [], equipment: [], monsters: [], spellLists: [], ...slice
@@ -33,7 +43,7 @@ function contextWith(slice: Partial<HomebrewCatalogSlice> = {}): HomebrewValidat
     publishedFor: (audience: ContentAudience) => audience === "gm" ? full : { ...full, classes: [], spells: [], spellLists: [] },
     monsterForInstance: () => undefined
   };
-  return { catalog: new ContentLibrary(source).forAudience("gm"), spellLists: full.spellLists };
+  return { catalog: new ContentLibrary(source).forAudience("gm"), spellLists: full.spellLists, authored };
 }
 
 const messages = (validity: { issues: ReadonlyArray<{ message: string }> }) => validity.issues.map((issue) => issue.message).join(" | ");
@@ -73,12 +83,64 @@ describe("tier 2 - identity", () => {
 });
 
 describe("tier 3 - cross-record references", () => {
-  it("refuses a subclass whose class is not published yet", () => {
+  it("refuses a subclass whose class does not exist at all - a typo that would strand it forever", () => {
     const validity = validateForPublish("subclass", { id: "hb-mutant-a1b2c3", name: "Mutant", source: "homebrew", classId: "hb-nothing-000000" }, contextWith());
-    expect(messages(validity)).toContain("Publish the class before its subclasses");
+    expect(messages(validity)).toContain(`No class "hb-nothing-000000" exists`);
     expect(validateForPublish("subclass", { id: "hb-mutant-a1b2c3", name: "Mutant", source: "homebrew", classId: "wizard" }, contextWith()).valid).toBe(true);
   });
+});
 
+/**
+ * THE DEADLOCK, from both ends.
+ *
+ * A class asked for a PUBLISHED subclass and a subclass asked for a PUBLISHED class, so neither
+ * could ever go first and a homebrew class could not be published at all - the headline feature,
+ * unusable by any sequence of GM actions that did not involve hand-editing a `fromCatalog` slug.
+ * Both rules now read AUTHORSHIP: a record that exists satisfies them, whatever state it is in.
+ */
+describe("a class and its subclass publish in either order", () => {
+  const subclassPick = {
+    features: [{ id: "archetype", name: "Martial Archetype", description: "x", choice: { kind: "subclass", choose: 1, fromCatalog: "hb-blood-hunter-a1b2c3-subclasses" } }],
+    levelTable: LEVEL_TABLE.map((row) => row.level === 3 ? { ...row, features: ["archetype"] } : row)
+  };
+  const mutant = { id: "hb-mutant-a1b2c3", name: "Mutant", source: "homebrew", classId: "hb-blood-hunter-a1b2c3" };
+
+  it("publishes the CLASS first, on the strength of a subclass that is still a draft", () => {
+    const drafted = authoredWith([{ type: "subclass", id: "hb-mutant-a1b2c3", classId: "hb-blood-hunter-a1b2c3" }]);
+    expect(validateForPublish("class", classBody(subclassPick), contextWith({}, drafted))).toEqual({ valid: true, issues: [] });
+    // With nothing naming it, the refusal survives - and says the subclass need not be published.
+    const alone = validateForPublish("class", classBody(subclassPick), contextWith());
+    expect(alone.valid).toBe(false);
+    expect(messages(alone)).toContain("it does not have to be published, it only has to exist");
+  });
+
+  it("publishes the SUBCLASS first, on the strength of a class that is still a draft", () => {
+    const drafted = authoredWith([{ type: "class", id: "hb-blood-hunter-a1b2c3" }]);
+    expect(validateForPublish("subclass", mutant, contextWith({}, drafted))).toEqual({ valid: true, issues: [] });
+  });
+
+  it("counts a published subclass and a drafted one once each, never twice", () => {
+    // The published copy is in BOTH the catalog and the authorship index; a naive sum would double
+    // it and mask a class that really has too few options for a `choose: 2` pick.
+    const published = SubclassReferenceSchema.parse(mutant);
+    const both = contextWith({ subclasses: [published] }, authoredWith([{ type: "subclass", id: "hb-mutant-a1b2c3", classId: "hb-blood-hunter-a1b2c3" }]));
+    const twoPicks = validateForPublish("class", classBody({
+      ...subclassPick,
+      features: [{ ...subclassPick.features[0], choice: { kind: "subclass", choose: 2, fromCatalog: "hb-blood-hunter-a1b2c3-subclasses" } }]
+    }), both);
+    expect(messages(twoPicks)).toContain("asks for 2 distinct pick(s) but offers only 1");
+  });
+
+  it("still wants the class published first for a CASTER subclass, which is an order and not a deadlock", () => {
+    // The third-caster check needs the class's level table, which only a published class has here.
+    // The class side waits for nothing now, so this order is always reachable.
+    const caster = { ...mutant, spellcasting: { ability: "int", prepares: "prepared", spellListId: "wizard" } };
+    const drafted = authoredWith([{ type: "class", id: "hb-blood-hunter-a1b2c3" }]);
+    expect(messages(validateForPublish("subclass", caster, contextWith({}, drafted)))).toContain("Publish the class first");
+  });
+});
+
+describe("tier 3 - cross-record references, continued", () => {
   it("refuses a background whose origin feat does not resolve - today that rejects seven wizard steps in", () => {
     const validity = validateForPublish("background", { id: "hb-hermit-a1b2c3", name: "Hermit", source: "homebrew", originFeatId: "hb-nothing-000000" }, contextWith());
     expect(messages(validity)).toContain("Publish the origin feat");
@@ -112,6 +174,29 @@ describe("tier 3 - cross-record references", () => {
       levelTable: LEVEL_TABLE.map((row) => row.level === 1 ? { ...row, features: ["style"] } : row)
     }), contextWith());
     expect(messages(validity)).toContain("asks for 3 distinct pick(s) but offers only 2");
+  });
+
+  it("refuses a choice-bearing feature that no level row grants - the wizard offers a pick the build cannot match", () => {
+    // CAPACITY DIVERGENCE, and it was the editor's default shape. `grantedAtLevels` reaches the wire
+    // empty, the wizard reads that as "granted once" and OFFERS the pick (blocking Create until it
+    // is answered), and `character-build.ts` builds its offers from the LEVEL TABLE alone - so the
+    // character fails Create with `No feature "..." offers a "skill" choice` and can never be made.
+    const validity = validateForPublish("class", classBody({
+      features: [{ id: "orphan", name: "Orphaned Talent", description: "x", choice: { kind: "skill", choose: 1, fromCatalog: "skills" } }]
+    }), contextWith());
+    expect(validity.valid).toBe(false);
+    expect(messages(validity)).toContain("no level in the table grants it");
+    // The named fix works: put the feature in the table and it publishes.
+    expect(validateForPublish("class", classBody({
+      features: [{ id: "orphan", name: "Orphaned Talent", description: "x", choice: { kind: "skill", choose: 1, fromCatalog: "skills" } }],
+      levelTable: LEVEL_TABLE.map((row) => row.level === 2 ? { ...row, features: ["orphan"] } : row)
+    }), contextWith()).valid).toBe(true);
+  });
+
+  it("leaves a plain ungranted feature alone - it is dead display text, not an uncreatable character", () => {
+    expect(validateForPublish("class", classBody({
+      features: [{ id: "flavour", name: "Flavour", description: "Never granted, asks nothing." }]
+    }), contextWith()).valid).toBe(true);
   });
 
   it("counts a repeated grant against capacity, and exempts a repeatable choice", () => {
@@ -151,7 +236,34 @@ describe("tier 3 - cross-record references", () => {
       proficiencyBonus: 3, armorClass: 15, hitPoints: { maximum: 90 }, speedFeet: 30, extensions
     });
     expect(messages(validateForPublish("monster", monster({}), contextWith()))).toMatch(/challenge rating/);
-    expect(validateForPublish("monster", monster({ "vtt.statblock": { challengeRating: 5, type: "undead" } }), contextWith()).valid).toBe(true);
+    expect(validateForPublish("monster", monster({ "open5e.srd-2024": { challengeRating: 5, type: "undead" } }), contextWith()).valid).toBe(true);
+  });
+
+  it("reads the SAME extension bag the bestiary reads, so nothing it passes can list as \"CR 0 - unknown\"", () => {
+    // The guard used to prefer `vtt.statblock`, a key no consumer has ever read: a creature carrying
+    // only that bag published clean and then listed as exactly the "CR 0 - unknown" the guard claims
+    // to prevent. The assertion is the INVARIANT rather than the key - if the guard passes it, the
+    // list must be able to show it - so re-keying either side without the other fails here.
+    const monster = (bag: string) => ({
+      id: "hb-m-4f19c8b02de7", schemaId: "vtt.actor-monster", schemaVersion: 1,
+      source: { name: "Homebrew", version: "1", externalId: "hb-m-4f19c8b02de7" },
+      name: "Bone Colossus", size: "large",
+      abilityScores: { str: 18, dex: 10, con: 16, int: 6, wis: 10, cha: 6 },
+      proficiencyBonus: 3, armorClass: 15, hitPoints: { maximum: 90 }, speedFeet: 30,
+      extensions: { [bag]: { challengeRating: 5, type: "undead" } }
+    });
+    let passed = 0;
+    for (const bag of ["vtt.statblock", "open5e.srd-2024"]) {
+      const body = monster(bag);
+      if (!validateForPublish("monster", body, contextWith()).valid) continue;
+      passed += 1;
+      const listed = contextWith({ monsters: [ActorDefinitionSchema.parse(body)] })
+        .catalog.monsterSummaries().find((row) => row.id === "hb-m-4f19c8b02de7")!;
+      expect(listed.challengeRating, `${bag} passed the gate and then listed as CR ${listed.challengeRating}`).toBe(5);
+      expect(listed.type, `${bag} passed the gate and then listed as "${listed.type}"`).toBe("undead");
+    }
+    // And the guard is not simply refusing everything.
+    expect(passed).toBe(1);
   });
 
   it("refuses a monster whose content id disagrees with its record id - its live tokens would resolve to nothing", () => {
@@ -232,9 +344,10 @@ describe("a duplicated SRD record still passes its own gate", () => {
       const source = findCatalogRecord(context.catalog, entry.id)!;
       const newId = `hb-${entry.id}-a1b2c3`;
       const validity = validateForPublish("class", rewriteForNewId("class", source.body, entry.id, newId), context);
-      // The ONE thing a copy legitimately loses: it has no subclasses of its own yet. That is exactly
-      // the loud, actionable message the GM should get from the publish button.
-      const unexpected = validity.issues.filter((issue) => !String(issue.message).includes("no subclasses name"));
+      // The ONE thing a copy legitimately loses: nothing calls itself a subclass of it yet. That is
+      // the loud, actionable message the GM should get from the publish button - and it is satisfied
+      // by a DRAFT subclass, so it never becomes the deadlock it used to be.
+      const unexpected = validity.issues.filter((issue) => !String(issue.message).includes("no subclass names"));
       expect(unexpected, `${entry.id}: ${messages({ issues: unexpected })}`).toEqual([]);
     }
   });

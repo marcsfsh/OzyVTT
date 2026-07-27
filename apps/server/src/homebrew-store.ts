@@ -55,6 +55,37 @@ export type HomebrewRecordRow = Readonly<{
 export type HomebrewSummaryRow = Omit<HomebrewRecordRow, "body">;
 
 export type HomebrewCreateInput = Readonly<{ type: HomebrewContentType; body: HomebrewBody }>;
+
+/**
+ * What the publish gate needs that no CATALOG can answer: which records EXIST, drafts included.
+ *
+ * The merged catalogs hold published records only - that is belt 1 of the visibility guarantee and
+ * it is not negotiable. But two of the gate's cross-record rules are about authorship rather than
+ * about play ("does a class by this id exist", "does anything claim to be a subclass of this
+ * class"), and answering those from the published catalog alone deadlocked the headline feature: a
+ * class would not publish until a subclass named it, and a subclass would not publish until its
+ * class had. Neither could go first. This index is the third source that breaks the tie - it sees
+ * drafts, and it is used ONLY by the gate, never by a catalog read, so nothing player-facing learns
+ * a draft exists.
+ */
+export type HomebrewAuthoredIndex = Readonly<{
+  /** Does a live (non-deleted) record of this type exist at this id, in ANY state? */
+  has(type: HomebrewContentType, id: string): boolean;
+  /** The ids of live subclass records naming this class, in ANY state. */
+  subclassIdsFor(classId: string): ReadonlySet<string>;
+}>;
+
+/** The empty index, for a caller with no store (a fixture, or a pre-initialize read). */
+export const EMPTY_AUTHORED_INDEX: HomebrewAuthoredIndex = Object.freeze({
+  has: () => false,
+  subclassIdsFor: () => new Set<string>()
+});
+
+/**
+ * Re-validation of a body about to replace a PUBLISHED one. Returns whether the new body would
+ * still publish. See `HomebrewStore.update` - this is the seam that keeps "published" honest.
+ */
+export type HomebrewRevalidator = (type: HomebrewContentType, body: HomebrewBody) => boolean;
 export type HomebrewListFilter = Readonly<{
   type?: HomebrewContentType;
   state?: HomebrewContentState;
@@ -146,6 +177,8 @@ export class HomebrewStore implements HomebrewContentSource {
   private slices?: { revision: number; gm: HomebrewCatalogSlice; player: HomebrewCatalogSlice };
   /** Status-blind monster index for live-instance resolution, on the same revision gate. */
   private monsters?: { revision: number; byId: Map<string, ActorDefinition> };
+  /** Draft-aware authorship index for the publish gate, on the same revision gate. */
+  private authored?: { revision: number; index: HomebrewAuthoredIndex };
 
   constructor(private readonly databasePath: string, private readonly now: () => number = Date.now) {}
 
@@ -177,6 +210,7 @@ export class HomebrewStore implements HomebrewContentSource {
     // persisted value, which could coincide with a cached one from the previous handle.
     this.slices = undefined;
     this.monsters = undefined;
+    this.authored = undefined;
   }
 
   /** The coarse counter bumped inside every write transaction - drives `homebrew:changed` and the view cache. */
@@ -226,6 +260,47 @@ export class HomebrewStore implements HomebrewContentSource {
       this.monsters = { revision: this.revisionValue, byId: this.buildMonsterIndex() };
     }
     return this.monsters.byId.get(definitionId);
+  }
+
+  /**
+   * Who has been AUTHORED, published or not - the publish gate's third source (see
+   * `HomebrewAuthoredIndex`). Deleted rows are excluded: a soft-deleted subclass must not be what
+   * lets its class publish, or unpublishing by deletion would leave the class standing on nothing.
+   *
+   * NOT part of `HomebrewContentSource`, deliberately. `ContentLibrary` must never gain a way to
+   * reach a draft; this is handed to the validator directly and to nothing else.
+   */
+  authoredIndex(): HomebrewAuthoredIndex {
+    if (!this.database) return EMPTY_AUTHORED_INDEX;
+    if (!this.authored || this.authored.revision !== this.revisionValue) {
+      this.authored = { revision: this.revisionValue, index: this.buildAuthoredIndex() };
+    }
+    return this.authored.index;
+  }
+
+  private buildAuthoredIndex(): HomebrewAuthoredIndex {
+    const rows = this.requireDatabase()
+      .prepare("SELECT id, type, body_json FROM homebrew_records WHERE deleted_at IS NULL")
+      .all() as Array<{ id: string; type: string; body_json: string }>;
+    const ids = new Set<string>();
+    const subclassesByClass = new Map<string, Set<string>>();
+    for (const row of rows) {
+      ids.add(`${row.type}:${row.id}`);
+      if (row.type !== "subclass") continue;
+      // Read the raw JSON rather than the parsed body: a DRAFT MAY BE INVALID, so a subclass whose
+      // body does not parse yet still counts as naming its class. Requiring a parse here would put
+      // half the deadlock back.
+      let classId: unknown;
+      try { classId = (JSON.parse(row.body_json) as { classId?: unknown }).classId; } catch { continue; }
+      if (typeof classId !== "string" || classId === "") continue;
+      const existing = subclassesByClass.get(classId);
+      if (existing) existing.add(row.id);
+      else subclassesByClass.set(classId, new Set([row.id]));
+    }
+    return Object.freeze({
+      has: (type: HomebrewContentType, id: string) => ids.has(`${type}:${id}`),
+      subclassIdsFor: (classId: string) => subclassesByClass.get(classId) ?? new Set<string>()
+    });
   }
 
   /** One pass over the published, live rows, parsed into the nine bundle shapes for both audiences at once. */
@@ -355,21 +430,58 @@ export class HomebrewStore implements HomebrewContentSource {
   }
 
   /**
-   * Replaces the authored body and leaves `state`, `visibleToPlayers` and `deletedAt` alone - correct
-   * PATCH semantics on the ROW even though the body it carries is complete (a partial merge into a
-   * polymorphic body is unspecifiable).
+   * Replaces the authored body, leaving `deletedAt` alone - correct PATCH semantics on the ROW even
+   * though the body it carries is complete (a partial merge into a polymorphic body is
+   * unspecifiable).
+   *
+   * `state` and `visibleToPlayers` are left alone TOO, with exactly one exception, and the exception
+   * is the reason `revalidate` exists.
+   *
+   * This store used to state as its premise that "a published record was valid at publish time", and
+   * that premise was FALSE: nothing re-checked a body on the way in, so a published, player-visible
+   * class could be patched to name a nonexistent spell list, a bogus `fromCatalog` and a ghost
+   * equipment id - three of the publish gate's own refusals, now failing in front of a player instead
+   * of in front of the GM. Worse, a patch that broke the record's SCHEMA left the library reading
+   * "Published - shown to players" while `publishedFor` quietly dropped the row behind a
+   * `console.warn`. The editor autosaves, so no button was ever pressed to earn any of that.
+   *
+   * Refusing the patch was the wrong fix: A DRAFT MAY BE INVALID is the rule the whole feature is
+   * built on, autosave fires mid-keystroke, and a GM who cannot save a half-edited field cannot edit
+   * a published record at all. So the patch always lands - and if the new body would not publish,
+   * the record DEMOTES to an invisible draft in the same transaction. "Published" then means what it
+   * says: valid, and really in the merged catalog. The response carries the new `state`,
+   * `visibleToPlayers` and `validity`, so the GM is told the moment it happens.
    */
-  update(id: string, body: HomebrewBody, expectedRev: number | undefined, authorTag: string): HomebrewRecordRow {
+  update(id: string, body: HomebrewBody, expectedRev: number | undefined, authorTag: string, revalidate?: HomebrewRevalidator): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
+    const type = existing.type as HomebrewContentType;
     const name = recordName(body);
-    const nextBody = normalizeBody(body, id, existing.type as HomebrewContentType);
+    const nextBody = normalizeBody(body, id, type);
     const rev = existing.rev + 1;
     const stamp = this.stamp();
+    let state = existing.state as HomebrewContentState;
+    let visible = existing.visible_to_players === 1;
     this.transaction(() => {
       database.prepare("UPDATE homebrew_records SET name = ?, body_json = ?, rev = ?, updated_at = ? WHERE id = ?").run(name, nextBody, rev, stamp, id);
-      this.snapshotRevision(id, { rev, name, state: existing.state as HomebrewContentState, visibleToPlayers: existing.visible_to_players === 1, bodyJson: nextBody, at: stamp }, authorTag);
       this.bumpRevision();
+      // RE-VALIDATED AFTER THE WRITE, and the order is the whole trick. The catalog the gate reads is
+      // built from the published rows, so validating first asks the question against the record's OWN
+      // PREVIOUS SELF: a published spell list emptied to `add: []` still resolved through the overlay
+      // its old body had already stamped onto the spells, reported itself valid, and stayed published
+      // while being exactly the empty list that makes a caster uncreatable. Writing first (the bump
+      // drops the cached slices, and this connection sees its own uncommitted row) asks the only
+      // question worth asking: as it stands NOW, would this still publish?
+      if (state === "published" && revalidate !== undefined && !stillPublishable(revalidate, type, nextBody, id)) {
+        state = "draft";
+        visible = false;
+        database.prepare("UPDATE homebrew_records SET state = 'draft', visible_to_players = 0 WHERE id = ?").run(id);
+        // A second bump, not an oversight: the slices cached a moment ago still hold this record as
+        // published, and leaving them keyed to a revision that no longer describes the database would
+        // serve a demoted record to a player until the next unrelated write.
+        this.bumpRevision();
+      }
+      this.snapshotRevision(id, { rev, name, state, visibleToPlayers: visible, bodyJson: nextBody, at: stamp }, state === existing.state ? authorTag : `${authorTag}:demoted`);
     });
     return this.get(id)!;
   }
@@ -460,13 +572,18 @@ export class HomebrewStore implements HomebrewContentSource {
     const existing = this.recordRow(id);
     if (existing && !overwrite) throw new HomebrewStateError(`A record already exists at "${id}".`);
     if (existing && existing.type !== type) throw new HomebrewStateError(`"${id}" is a ${existing.type}, not a ${type}.`);
+    const refusal = existing ? overwriteRefusal(projectSummary(existing)) : null;
+    if (refusal) throw new HomebrewStateError(refusal);
     const name = recordName(body);
     const nextBody = normalizeBody(body, id, type);
     const stamp = this.stamp();
     const rev = existing ? existing.rev + 1 : 1;
     this.transaction(() => {
       if (existing) {
-        database.prepare("UPDATE homebrew_records SET name = ?, body_json = ?, state = 'draft', visible_to_players = 0, deleted_at = NULL, rev = ?, updated_at = ? WHERE id = ?")
+        // `deleted_at` is NOT cleared: resurrecting a record the GM deleted is not something a pack
+        // import gets to decide. `overwriteRefusal` already refused a deleted row, so this is the
+        // second belt rather than the first.
+        database.prepare("UPDATE homebrew_records SET name = ?, body_json = ?, state = 'draft', visible_to_players = 0, rev = ?, updated_at = ? WHERE id = ?")
           .run(name, nextBody, rev, stamp, id);
       } else {
         database.prepare("INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, ?, ?, ?)")
@@ -602,6 +719,51 @@ function projectSummary(row: RecordRow): HomebrewSummaryRow {
 
 function projectRecord(row: RecordRow): HomebrewRecordRow {
   return { ...projectSummary(row), body: JSON.parse(row.body_json) as HomebrewBody };
+}
+
+/**
+ * Would this body still publish? A validator that THROWS answers "no".
+ *
+ * The gate is not supposed to throw - it catches the one resolver error it expects and returns
+ * issues for everything else - but it now runs on the autosave path, where the alternatives are both
+ * bad: letting the exception out fails a keystroke-triggered save (and rolls back the GM's edit),
+ * while treating it as "still fine" is the silent lie this whole change exists to remove. Demoting
+ * is the honest reading of "we could not confirm this is publishable", and the log says why.
+ */
+function stillPublishable(revalidate: HomebrewRevalidator, type: HomebrewContentType, bodyJson: string, id: string): boolean {
+  try {
+    return revalidate(type, JSON.parse(bodyJson) as HomebrewBody);
+  } catch (error) {
+    console.error(`[homebrew] could not re-validate ${type} "${id}" on save; demoting it to a draft rather than leaving it published:`, error);
+    return false;
+  }
+}
+
+/**
+ * Why an existing row must not be overwritten by a pack import, as a sentence the GM can act on, or
+ * null when overwriting it is fine.
+ *
+ * Overwrite-import used to reach through EVERY lifecycle column: a published, player-visible record
+ * silently became an invisible draft (players lost content mid-session with no message anywhere),
+ * and a soft-deleted one came back from the dead with `deleted_at` cleared. An imported body is
+ * UNVALIDATED - it must not stay published - so the demotion was not wrong, it was SILENT, and the
+ * report shape has nowhere to say it (`overwritten` is `{id, type, name}` and the contract is
+ * `.strict()`). Refusing is therefore the only loud answer available, and it is a good one: the
+ * refusal rides `rejected[].issues`, which the contract already carries, the GM's live content is
+ * left exactly as it was, and both escapes are one step (unpublish it, or import with `remint`).
+ *
+ * Exported so the router can ask the same question during a DRY RUN, where nothing is written -
+ * the contract promises the dry-run report is the same report, and a check that lived only inside
+ * the write would make that promise false.
+ */
+export function overwriteRefusal(row: Pick<HomebrewSummaryRow, "state" | "visibleToPlayers" | "deletedAt">): string | null {
+  if (row.deletedAt) return "That record was deleted here. Restore it before overwriting it, or import with re-mint to land a fresh copy.";
+  if (row.state === "published") {
+    return row.visibleToPlayers
+      ? "That record is published and shown to players - overwriting it would take it away from them mid-session. Unpublish it first, or import with re-mint."
+      : "That record is published. Unpublish it before overwriting it, or import with re-mint to land a fresh copy.";
+  }
+  return null;
 }
 
 /** The type list is the contract's; a value outside it would otherwise fail as a raw SQLite CHECK error. */

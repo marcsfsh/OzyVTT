@@ -6,10 +6,10 @@ import {
   type ApiErrorCode, type HomebrewContentType, type HomebrewValidationIssue, type HomebrewValidity
 } from "@vtt/api-contract";
 import {
-  HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, copyName,
-  type HomebrewBody, type HomebrewRecordRow, type HomebrewStore, type HomebrewSummaryRow
+  HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, copyName, overwriteRefusal, recordName,
+  type HomebrewBody, type HomebrewRecordRow, type HomebrewRevalidator, type HomebrewStore, type HomebrewSummaryRow
 } from "./homebrew-store.js";
-import { isMintedHomebrewId, mintHomebrewId } from "./homebrew-ids.js";
+import { isMintedHomebrewId, mintHomebrewId, slugify, HOMEBREW_ID_MAX_LENGTH, HOMEBREW_ID_PREFIX } from "./homebrew-ids.js";
 import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.js";
 
 /**
@@ -115,6 +115,21 @@ export type HomebrewRouterOptions = Readonly<{
 }>;
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * A pack record's own id, rendered so it can appear in the import report.
+ *
+ * `HomebrewPackImportSchema` types every `originalId` as `HomebrewIdSchema` - slug-legal and at most
+ * 60 characters - but the ids that most need reporting are exactly the ones that break that rule
+ * (a 200-character id, an id with a colon in it, a record with no id at all). Emitting one verbatim
+ * makes the response fail the contract it is served under, so the GM would get a 500 instead of the
+ * sentence explaining what happened to their record. Slugged and truncated is legible and honest;
+ * silence is neither.
+ */
+function reportableId(raw: string): string {
+  if (raw !== "" && raw.length <= HOMEBREW_ID_MAX_LENGTH && /^[a-z0-9-]+$/.test(raw)) return raw;
+  return slugify(raw, HOMEBREW_ID_MAX_LENGTH) || "unidentified";
+}
 
 function bearer(request: Request): string | undefined {
   return request.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
@@ -244,10 +259,19 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     return envelope(response, 200, { record: documentOf(row) });
   });
 
+  /**
+   * A patch always lands - A DRAFT MAY BE INVALID, and the editor AUTOSAVES, so refusing a
+   * half-typed field would make a published record uneditable. What a patch may NOT do is leave the
+   * library saying "Published - shown to players" about a record that would no longer publish, so
+   * the validator rides along: if the new body fails the gate, the record demotes to an invisible
+   * draft inside the same transaction and the response says so (`state`, `visibleToPlayers` and
+   * `validity` all change). See `HomebrewStore.update`.
+   */
   router.patch(route(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
     try {
       const { record, expectedRev } = UpdateSchema.parse(request.body);
-      return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm"));
+      const revalidate: HomebrewRevalidator = (type, body) => validate(type, body).valid;
+      return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm", revalidate));
     } catch (error) { return storeError(response, error); }
   });
 
@@ -378,6 +402,16 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
    * That is safe here and nowhere else: everything lands as an invisible draft, drafts are in no
    * merged catalog for any audience, and publishing is gated on validation that will catch a
    * dangling reference. Importing an invalid pack is therefore harmless rather than silently wrong.
+   *
+   * TWO THINGS THE LANDING MUST NEVER DO, both learned the hard way:
+   *   1. LAND AT AN ID THAT CAN NEVER PUBLISH. An id outside our shapes was stored verbatim, so
+   *      `wizard`, `fire-bolt`, `my-list-spells` and a 200-character id each produced a row that
+   *      failed the gate's identity tier forever, with `reminted` and `rejected` both empty. Every
+   *      id is now checked against `isMintedHomebrewId` for its own type, and re-minting is reported.
+   *   2. CHANGE A LIVE RECORD BEHIND THE GM'S BACK. `overwrite` used to unpublish, un-share and
+   *      un-delete whatever it landed on without a word - players lost content mid-session and a
+   *      deleted record walked back in. Overwrite now replaces a live DRAFT only; anything else is
+   *      refused into `rejected` with the two ways out, in the dry run identically.
    */
   router.post(route(HOMEBREW_PATHS.packsImport), requireGm, (request, response) => {
     try {
@@ -395,23 +429,42 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
       for (const record of pack.records) {
         const originalId = typeof record.id === "string" ? record.id : "";
+        const reportedId = reportableId(originalId);
         try {
           const type = typeOf(record);
-          const name = typeof record.name === "string" ? record.name : "";
-          // `hb-` is ours and reserved; an id in that namespace that is not one of our shapes is
-          // re-minted rather than trusted, and an id we already hold follows `onIdCollision`.
-          const foreign = originalId.startsWith("hb-") && !isMintedHomebrewId(originalId, type);
-          const held = originalId !== "" && store.get(originalId) !== undefined;
-          const overwrite = held && onIdCollision === "overwrite";
+          // `recordName`, the same check the write itself makes, rather than a lenient local read of
+          // `record.name`. A nameless record used to sail through a DRY RUN into `imported` with
+          // `name: ""` - which the contract's own `min(1)` rejects, so the preview 500'd on a pack
+          // the apply path would have reported cleanly. Dry run and apply now answer identically.
+          const name = recordName(record);
+          // ANY id that is not one of OUR shapes for THIS type is re-minted, not just an `hb-` one.
+          // Storing a foreign id verbatim produced a row that could never publish for as long as it
+          // existed - `wizard`, `fire-bolt`, `my-list-spells` and a 200-character id all fail the
+          // gate's identity tier - and the import reported nothing at all about it.
+          const foreign = originalId !== "" && !isMintedHomebrewId(originalId, type);
+          const heldRow = originalId === "" ? undefined : store.get(originalId);
+          const held = heldRow !== undefined;
+          const overwrite = held && !foreign && onIdCollision === "overwrite";
+          // Checked HERE and not only in the store, because a dry run writes nothing and the
+          // contract promises the dry-run report is the same report.
+          const refusal = overwrite && heldRow ? overwriteRefusal(heldRow) : null;
+          if (refusal) throw new HomebrewStateError(refusal);
           const needsMint = originalId === "" || foreign || claimed.has(originalId) || (held && !overwrite);
           const id = needsMint ? mintHomebrewId(type, name, (candidate) => claimed.has(candidate) || store.get(candidate) !== undefined) : originalId;
-          if (needsMint && originalId !== "") reminted.push({ originalId, id, reason: "homebrew-collision" });
+          // The two reasons the contract allows, assigned by the NAMESPACE the id came from rather
+          // than by guesswork: everything outside `hb-` lives in the bundle's namespace, which is
+          // reserved against us whether or not a bundled record happens to sit on that exact id;
+          // everything inside it is ours, held or misshapen. (A third reason - "not our shape" -
+          // would be more honest for `my-list-spells`; the enum is frozen in the contract.)
+          if (needsMint && originalId !== "") {
+            reminted.push({ originalId: reportedId, id, reason: originalId.startsWith(HOMEBREW_ID_PREFIX) ? "homebrew-collision" : "srd-collision" });
+          }
           claimed.add(id);
           if (!dryRun) store.importRecord(id, type, record, overwrite);
           if (overwrite) overwritten.push({ id, type, name });
-          imported.push({ id, type, name, originalId: originalId || id });
+          imported.push({ id, type, name, originalId: originalId === "" ? id : reportedId });
         } catch (error) {
-          rejected.push({ originalId, issues: [{ path: [], message: error instanceof Error ? error.message : "That record could not be imported.", recordId: null }] });
+          rejected.push({ originalId: reportedId, issues: [{ path: [], message: error instanceof Error ? error.message : "That record could not be imported.", recordId: null }] });
         }
       }
       if (!dryRun && imported.length > 0) options.notifyChanged();

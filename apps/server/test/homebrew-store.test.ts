@@ -11,7 +11,7 @@ import {
 } from "@vtt/content-srd-5.2.1";
 import { ContentLibrary } from "../src/content-library.js";
 import { HOMEBREW_ID_MAX_LENGTH, assertMintable, isMintedHomebrewId, mintHomebrewId, slugify } from "../src/homebrew-ids.js";
-import { HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, HomebrewStore, MIGRATIONS } from "../src/homebrew-store.js";
+import { HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, HomebrewStore, MIGRATIONS, type HomebrewRevalidator } from "../src/homebrew-store.js";
 
 /**
  * Store + id-minting unit tests. The load-bearing ones are the id budget (a >60-character id passes
@@ -311,6 +311,89 @@ describe("HomebrewStore as a ContentLibrary source", () => {
     expect(gm.classSummaries().some((summary) => summary.name === "Blood Hunter")).toBe(false);
     // The revision gate still moves, which is what proves the seam is live rather than dead code.
     expect(store.revision).toBe(1);
+  });
+
+  /**
+   * The authorship index is the third source the publish gate reads, and the ONLY one that can see a
+   * draft. It exists because two of the gate's rules ask "does this record exist" rather than "is it
+   * playable", and answering those from the published catalog deadlocked publishing entirely.
+   */
+  it("sees drafts, keys subclasses by the class they name, and forgets a deleted row", () => {
+    const klass = store.create({ type: "class", body: bodyFor("Blood Hunter") });
+    const subclass = store.create({ type: "subclass", body: { name: "Mutant", classId: klass.id } });
+    const index = store.authoredIndex();
+    expect(index.has("class", klass.id)).toBe(true);
+    expect([...index.subclassIdsFor(klass.id)]).toEqual([subclass.id]);
+    // A type is part of the identity: an id is only "authored" as the thing it actually is.
+    expect(index.has("subclass", klass.id)).toBe(false);
+    expect(index.has("class", "hb-nothing-000000")).toBe(false);
+
+    // A draft that does not PARSE still counts as naming its class - a draft may be invalid, and
+    // requiring a parse here would put half the deadlock straight back.
+    const halfTyped = store.create({ type: "subclass", body: { name: "Half Typed", classId: klass.id, features: "not an array" } });
+    expect([...store.authoredIndex().subclassIdsFor(klass.id)].sort()).toEqual([subclass.id, halfTyped.id].sort());
+
+    // Deleting is how a GM takes a record back, so a soft-deleted subclass must stop propping up its
+    // class - otherwise deleting the only subclass would leave the class standing on nothing.
+    store.softDelete(halfTyped.id);
+    store.softDelete(subclass.id);
+    expect([...store.authoredIndex().subclassIdsFor(klass.id)]).toEqual([]);
+    store.softDelete(klass.id);
+    expect(store.authoredIndex().has("class", klass.id)).toBe(false);
+  });
+
+  it("re-reads the index after a write rather than serving a cached answer", () => {
+    const klass = store.create({ type: "class", body: bodyFor("Blood Hunter") });
+    expect([...store.authoredIndex().subclassIdsFor(klass.id)]).toEqual([]);
+    const subclass = store.create({ type: "subclass", body: { name: "Mutant", classId: klass.id } });
+    expect([...store.authoredIndex().subclassIdsFor(klass.id)]).toEqual([subclass.id]);
+    // Re-pointing a subclass at a different class moves it, which is the exact edit the deadlock fix
+    // depends on ("duplicate Champion, pick the new class").
+    const other = store.create({ type: "class", body: bodyFor("Other") });
+    store.update(subclass.id, { name: "Mutant", classId: other.id }, undefined, "gm");
+    expect([...store.authoredIndex().subclassIdsFor(klass.id)]).toEqual([]);
+    expect([...store.authoredIndex().subclassIdsFor(other.id)]).toEqual([subclass.id]);
+  });
+
+  it("refuses to overwrite-import a published or deleted row, and never resurrects a deleted one", () => {
+    // Overwrite used to reach through every lifecycle column in silence: a published, player-visible
+    // record became an invisible draft with no message anywhere, and a deleted one came back with
+    // `deleted_at` cleared. An imported body is unvalidated, so it must not stay published - which
+    // makes refusing the only loud answer, and the refusal rides `rejected[].issues`.
+    const published = store.create({ type: "feat", body: bodyFor("Live Feat") });
+    store.setState(published.id, "published", undefined);
+    store.setVisibility(published.id, true, undefined);
+    expect(() => store.importRecord(published.id, "feat", bodyFor("Clobbered"), true)).toThrow(HomebrewStateError);
+    expect(store.get(published.id)).toMatchObject({ state: "published", visibleToPlayers: true, name: "Live Feat" });
+
+    const deleted = store.create({ type: "feat", body: bodyFor("Dead Feat") });
+    store.softDelete(deleted.id);
+    expect(() => store.importRecord(deleted.id, "feat", bodyFor("Resurrected"), true)).toThrow(/Restore it/);
+    expect(store.get(deleted.id)!.deletedAt).not.toBeNull();
+
+    // A plain draft is what overwrite was always for, and it still works.
+    const draft = store.create({ type: "feat", body: bodyFor("Draft Feat") });
+    expect(store.importRecord(draft.id, "feat", bodyFor("Updated"), true).name).toBe("Updated");
+  });
+
+  it("demotes a published record whose patched body would no longer publish, and leaves a valid one alone", () => {
+    const record = store.create({ type: "feat", body: bodyFor("Alert") });
+    store.setState(record.id, "published", undefined);
+    store.setVisibility(record.id, true, undefined);
+    // The seam is injected, so the store stays free of the validator - but when it IS supplied, a
+    // patch can no longer leave the library saying "Published - shown to players" about a record the
+    // merged catalog has quietly dropped.
+    const refusesBroken: HomebrewRevalidator = (_type, body) => body.name !== "Broken";
+    const kept = store.update(record.id, bodyFor("Alert II"), undefined, "gm", refusesBroken);
+    expect(kept).toMatchObject({ state: "published", visibleToPlayers: true });
+
+    const demoted = store.update(record.id, bodyFor("Broken"), undefined, "gm", refusesBroken);
+    expect(demoted).toMatchObject({ state: "draft", visibleToPlayers: false, name: "Broken" });
+    // The demotion is in the audit trail, not only in the row.
+    expect(store.listRevisions(record.id)[0]).toMatchObject({ state: "draft", authorTag: "gm:demoted" });
+    // With no validator supplied nothing is re-checked - the store never validates on its own.
+    store.setState(record.id, "published", undefined);
+    expect(store.update(record.id, bodyFor("Broken Again"), undefined, "gm").state).toBe("published");
   });
 
   it("returns the empty slice before initialize, so a synchronous ContentLibrary is safe to construct", async () => {
