@@ -81,20 +81,41 @@ describe("bundled reference content exposed to the client", () => {
   });
 
   /**
-   * The served payload must satisfy its OWN published contract. `ContentClassesData` and
-   * `ContentBackgroundsData` both use `additionalProperties: false`, so adding a field to the wire
-   * shape without adding it to the OpenAPI schema makes the API violate its documentation - and
-   * nothing else in the suite compiles the document against a real payload.
+   * The served payloads must satisfy their OWN published contract. Every Content*Data schema uses
+   * `additionalProperties: false`, so adding a field to a wire shape without adding it to the
+   * OpenAPI schema makes the API violate its documentation - and nothing else in the suite compiles
+   * the document against real payloads. All catalogs are covered so the guard can't be dodged by
+   * touching one the older version of this test didn't compile.
    */
-  it("serves class and background catalogs that validate against the published OpenAPI schemas", () => {
+  it("serves every content catalog validating against its published OpenAPI schema", () => {
     const ajv = new Ajv2020({ strict: false });
     ajv.addSchema(openApiDocument as unknown as Record<string, unknown>, "openapi");
     const validate = (schemaName: string, payload: unknown) => {
       const compiled = ajv.compile({ $ref: `openapi#/components/schemas/${schemaName}` });
       const valid = compiled(payload);
-      expect(valid, JSON.stringify(compiled.errors)).toBe(true);
+      expect(valid, `${schemaName}: ${JSON.stringify(compiled.errors)}`).toBe(true);
     };
     validate("ContentClassesData", { classes: library.classSummaries(), attribution: library.attribution });
+    validate("ContentSubclassesData", { subclasses: library.subclassSummaries(), attribution: library.attribution });
+    validate("ContentSpeciesData", { species: library.speciesSummaries(), attribution: library.attribution });
     validate("ContentBackgroundsData", { backgrounds: library.backgroundSummaries(), attribution: library.attribution });
+    validate("ContentFeatsData", { feats: library.featSummaries(), attribution: library.attribution });
+    validate("ContentSpellsData", { spells: library.spellSummaries(), attribution: library.attribution });
+    validate("ContentSkillsData", { skills: library.skillSummaries(), attribution: library.attribution });
+    validate("ContentEquipmentData", { equipment: library.equipmentSummaries(), attribution: library.attribution });
+    validate("ContentNamesData", { names: library.nameBundles(), attribution: library.attribution });
+    validate("ContentConditionsData", { conditions: library.conditionSummaries(), attribution: library.attribution });
+  });
+
+  it("restores the spell-list link and the ability column on the wire (phase-2 QA must-fix)", () => {
+    const fireball = library.spellSummaries().find((spell) => spell.id === "fireball");
+    expect(fireball?.classes).toContain("wizard");
+    const athletics = library.skillSummaries().find((skill) => skill.id === "athletics");
+    expect(athletics).toEqual({ id: "athletics", name: "Athletics", description: expect.any(String), ability: "str" });
+    const wizard = library.classSummaries().find((entry) => entry.id === "wizard");
+    expect(wizard?.spellcasting?.spellListId).toBe("wizard");
+    // The two halves join: every wizard-list spell id resolves against the class's declared list.
+    const listId = wizard!.spellcasting!.spellListId!;
+    expect(library.spellSummaries().filter((spell) => spell.classes.includes(listId)).length).toBeGreaterThan(100);
   });
 });

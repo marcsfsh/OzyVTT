@@ -412,6 +412,116 @@ describe("public game API over /api/v1", () => {
     expect(catalogRows.names.every((entry) => typeof entry.speciesId === "string" && (entry.pools as unknown[]).length > 0)).toBe(true);
   });
 
+  it("serves the skills catalog and the restored wizard wire fields (proficiencies, multiclass rules, spell-list link)", async () => {
+    const { base, server } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+
+    // content:skills is player-readable reference with the ability column - the data source that
+    // retires the client's hardcoded SKILL_ABILITY table (known-bugs: three edits per homebrew skill).
+    const skills = await fetch(base + CONTENT_PATHS.skills, { headers: bearer(playerToken) });
+    expect(skills.status).toBe(200);
+    const skillsBody = await skills.json();
+    expect(skillsBody.data.skills).toHaveLength(18);
+    expect(skillsBody.data.skills.find((skill: { id: string }) => skill.id === "athletics")).toMatchObject({ ability: "str" });
+    expect(skillsBody.data.attribution).toContain("System Reference Document 5.2.1");
+
+    // QA must-fix 3: the class/species/background/spell fields the wizard renders from must cross the wire.
+    const classes = await (await fetch(base + CONTENT_PATHS.classes, { headers: bearer(playerToken) })).json();
+    const fighter = classes.data.classes.find((entry: { id: string }) => entry.id === "fighter");
+    expect(fighter.armorProficiencies).toEqual(["light", "medium", "heavy", "shields"]);
+    expect(fighter.weaponProficiencies).toEqual(["simple", "martial"]);
+    expect(fighter.multiclassPrerequisites).toEqual({ mode: "any", minimums: [{ ability: "str", minimum: 13 }, { ability: "dex", minimum: 13 }] });
+    expect(fighter.multiclassProficiencies).toMatchObject({ armor: ["light", "medium", "shields"] });
+    const wizard = classes.data.classes.find((entry: { id: string }) => entry.id === "wizard");
+    expect(wizard.spellcasting).toMatchObject({ ability: "int", prepares: "prepared", ritual: true, progression: "full", spellListId: "wizard" });
+    const spells = await (await fetch(base + CONTENT_PATHS.spells, { headers: bearer(playerToken) })).json();
+    const fireball = spells.data.spells.find((spell: { id: string }) => spell.id === "fireball");
+    expect(fireball.classes).toContain("wizard"); // the restored spell-list link, wire side
+    const species = await (await fetch(base + CONTENT_PATHS.species, { headers: bearer(playerToken) })).json();
+    const elf = species.data.species.find((entry: { id: string }) => entry.id === "elf");
+    expect(Array.isArray(elf.abilityBonuses)).toBe(true);
+    expect(elf).toHaveProperty("abilityBonusChoice");
+    const backgrounds = await (await fetch(base + CONTENT_PATHS.backgrounds, { headers: bearer(playerToken) })).json();
+    const soldier = backgrounds.data.backgrounds.find((entry: { id: string }) => entry.id === "soldier");
+    expect(soldier.toolChoices).toEqual({ choose: 1, from: ["gaming-set-dice", "gaming-set-playing-cards"] });
+    expect(soldier).toHaveProperty("skillChoices");
+    expect(soldier).toHaveProperty("languageChoices");
+  });
+
+  it("lets only the GM write the builder policy, validates the formula, and projects the policy to players", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+
+    // Players see the default policy (all four methods) before the GM touches anything.
+    const before = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
+    expect(before.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"], customFormula: null });
+
+    // Player write refused; the policy is the GM's (decision 10).
+    const denied = await post(base, GAME_PATHS.builderPolicy, playerToken, { allowedAbilityMethods: ["standard-array"] });
+    expect(denied.status).toBe(403);
+
+    // A formula outside the 1-30 ability bounds is rejected by the shared validator, not stored.
+    const badFormula = await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["standard-array", "custom"], customFormula: "50d20" });
+    expect(badFormula.status).toBe(400);
+    const duplicated = await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["roll", "roll"] });
+    expect(duplicated.status).toBe(400);
+
+    const accepted = await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6" });
+    expect(accepted.status).toBe(200);
+
+    // Player-READABLE: the stored policy reaches the player projection verbatim.
+    const after = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) })).json();
+    expect(after.data.game.builderPolicy).toEqual({ allowedAbilityMethods: ["standard-array", "custom"], customFormula: "3d6" });
+  });
+
+  it("creates a character from choices over HTTP (GM only); the actor id equals the commandId and the sheet is import-keyed", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    const commandId = randomUUID();
+    const create = {
+      commandId,
+      name: "Robin of the Road",
+      speciesId: "human", backgroundId: "soldier", classId: "fighter", level: 1,
+      abilityMethod: "standard-array",
+      baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+      backgroundBonusAllocation: [{ ability: "str", amount: 2 }, { ability: "con", amount: 1 }],
+      hp: { mode: "average" },
+      choices: [
+        { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+        { level: 1, classId: "fighter", kind: "skill", id: "perception" },
+        { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+        { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+        { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+        { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
+        { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
+        { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+        { level: 1, kind: "tool", id: "gaming-set-dice" },
+        { level: 1, kind: "equipment", id: "fighter-a" },
+        { level: 1, kind: "equipment", id: "soldier-a" }
+      ]
+    };
+
+    // GM-only in phase 2: the player seat is refused outright.
+    expect((await post(base, GAME_PATHS.characters, playerToken, create)).status).toBe(403);
+
+    const created = await post(base, GAME_PATHS.characters, gmToken, create);
+    expect(created.status).toBe(200);
+    const createdBody = await created.json();
+    expect(createdBody.data.actorId).toBe(commandId);
+    // Idempotent retry: same commandId, no second actor.
+    const retried = await post(base, GAME_PATHS.characters, gmToken, create);
+    expect((await retried.json()).data.duplicate).toBe(true);
+
+    const snapshot = await (await fetch(base + GAME_PATHS.snapshot, { headers: bearer(gmToken) })).json();
+    const actor = snapshot.data.game.actors.find((entry: { id: string }) => entry.id === commandId);
+    expect(actor).toMatchObject({ name: "Robin of the Road", kind: "player-character", definitionId: `import-${commandId}` });
+    expect(actor.hp).toEqual({ current: 12, maximum: 12, temporary: 0 }); // d10 max + Con 15 (+2)
+    expect(snapshot.data.game.definitions.some((entry: { id: string }) => entry.id === `import-${commandId}`)).toBe(true);
+    // A rejected build surfaces as a 409 domain rejection, never a half-created actor.
+    const bad = await post(base, GAME_PATHS.characters, gmToken, { ...create, commandId: randomUUID(), speciesId: "gnoll" });
+    expect(bad.status).toBe(409);
+  });
+
   it("runs the player-submitted character import through the HTTP twin: player submits, only the GM resolves", async () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
