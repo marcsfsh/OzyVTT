@@ -59,6 +59,20 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
       pruning effect's deps were incomplete and only worked because `catalogs` rebuilt every render.
       With the accident removed, picking Evoker stopped producing the Evocation Savant offer. Fixed
       by depending on `draft.picks`.
+    - **A tenth reviewer certified the pass and found one defect the other nine missed** — a Wizard
+      2+ could answer all seven steps and be **rejected at Create**. The expertise step (Wizard's
+      Scholar, choose 1 of 6) offered all six enabled while the server accepts only the skills the
+      character is actually proficient in, so a player picking without outside knowledge had roughly
+      **4-in-6** odds of dead-ending at the last step. The flow chain's override was right — greying
+      *held* skills would have made every Wizard 2+ uncreatable — it just stopped one step short. The
+      fix is the **inverse** grey, in `withExpertiseReach`: options the character is *not* proficient
+      in are greyed with a reason. It runs as a second pass because the server's test is a **union**
+      over sources (`character-build.ts:643`), not an accumulation in step order — greying from the
+      running total would have blocked a skill the player picks *later*. A safety valve never greys
+      every option, so a build the client can't fully see falls back to today's behaviour rather than
+      becoming uncreatable. Verified by A/B round-trip through the real server assembly: expertise in
+      `investigation` is now blocked at step 4 ("not one of your proficiencies — pick a different
+      skill") instead of at Create; `arcana` still builds and is accepted.
     - **Verification at the end of the pass:** `npm run check` clean, 767 tests, build green;
       Chromium walkthroughs at 1280×900 and 375×720/780 across Fighter L1/L3/L20, Wizard L5 and
       Cleric L5, in dark, dusk and light, each creating a character end to end — zero horizontal

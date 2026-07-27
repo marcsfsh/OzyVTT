@@ -29,8 +29,22 @@ rather than 2-line clamp (2 re-cut "and 8 GP"), and a third CSS rule the plan di
 app's bare `button:hover` beat the selected state independently). Memoising the catalogs **exposed** a
 latent effect-deps bug rather than fixing a slow one.
 
+A tenth reviewer then certified the pass rather than summarising it, and **found a defect the other
+nine missed**: a Wizard 2+ could complete all seven steps and be rejected at Create, because the
+expertise step offered six skills while the server accepts only the ones the character is proficient
+in (~4-in-6 odds of dead-ending). Fixed with the **inverse** grey in `withExpertiseReach` — a second
+pass, because the server's test is a union over sources rather than a step-order accumulation — plus
+a safety valve that never greys every option. Verified by A/B through the real server assembly.
+
+The same reviewer corrected two figures on the record: step-4 arrival is **class-dependent** (Fighter
+L20 = 62 cards, Wizard L20 = **467**, not the "~306" filed), and the `.nh-step--done` 1.97:1 failure
+is the *glyph*, not the state — the marker's ring measures a passing 3.85:1 and the applicable rule
+is 1.4.11, not 1.4.3.
+
 `check` clean, 767 tests, build green. Deferred items are itemised in `known-bugs.md`; the five rules
-that came out of the pass are in `decision-log.md`.
+that came out of the pass are in `decision-log.md`. **Top follow-up:** `apps/client` and
+`packages/ui` have no tests at all, so the 767 cover none of the changed code — and `build-payload.ts`
+is pure and trivially testable.
 
 ## 2026-07-24 — Sheet open-consistency + Dice toggle (`claude/character-sheet-discovery-a14i7f`, PR #45)
 

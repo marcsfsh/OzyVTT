@@ -209,13 +209,20 @@ const HELD_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool", "expe
  * picks read "choose one of the following skills IN WHICH YOU HAVE PROFICIENCY" and the server
  * enforces exactly that (`character-build.ts:644-646` rejects expertise without proficiency), so
  * greying out the skills you hold would leave only the picks the server refuses. Its answers still
- * feed `HELD_KINDS` above; only the disabling is skipped.
+ * feed `HELD_KINDS` above; only the "already held" disabling is skipped.
+ *
+ * Expertise is not left un-greyed, though - it takes the INVERSE rule, applied in
+ * `withExpertiseReach` once every offer exists, because the server's proficiency test is a union
+ * over sources rather than an accumulation in step order.
  */
 const PROVENANCE_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool", "tool", "language"]);
 
 /** What to call one of these picks in an instruction. */
 const kindNoun = (kind: string) =>
-  kind === "skill" ? "skill" : kind === "tool" ? "tool" : kind === "language" ? "language" : "option";
+  // `expertise` options ARE skills, so a blocked reason saying "pick a different option" would name
+  // the thing more vaguely than the card it points at.
+  kind === "skill" || kind === "expertise" ? "skill"
+    : kind === "tool" ? "tool" : kind === "language" ? "language" : "option";
 
 /**
  * Every pick this build owes, in step order. Mirrors `character-build.ts`'s offer machinery: the
@@ -456,7 +463,54 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
   }
 
-  return offers;
+  return withExpertiseReach(offers, context, catalogs, draft);
+}
+
+/**
+ * Grey the expertise options this build is NOT proficient in.
+ *
+ * `PROVENANCE_KINDS` deliberately excludes `expertise` because the rule there is INVERTED: the SRD
+ * offer reads "choose one of the following skills in which you have proficiency", so greying the
+ * skills you hold would leave only the picks the server refuses (that path makes every Wizard 2+
+ * uncreatable, which is why it is excluded). But nothing greyed the un-held ones either, so all six
+ * Scholar options rendered enabled while at most two were ever legal - a Wizard picked Medicine,
+ * walked four more steps, and was rejected at Create by `character-build.ts:645-646`. Same class of
+ * dead end commit 6115320 exists to prevent; the fix is the inverse grey, not the absence of one.
+ *
+ * Two things make this a SECOND pass rather than part of `unavailableOf`:
+ *
+ * 1. The server's rule is a UNION over sources (`:643` - every skill offer's picks, the background's
+ *    grants, and feature grants, in no particular order), not an accumulation in step order. Reusing
+ *    the running `heldProficiencies` would grey a skill the player picks LATER in the wizard and has
+ *    every right to take expertise in. Only after all offers exist is the skill set knowable.
+ * 2. `heldProficiencies` also carries tools and languages, which are not skills and must not qualify.
+ */
+function withExpertiseReach(
+  offers: BuilderOffer[], context: OfferContext, catalogs: BuilderCatalogs, draft: BuilderDraft
+): BuilderOffer[] {
+  if (!offers.some((offer) => offer.kind === "expertise")) return offers;
+  // The server's own split: a "skill-or-tool" pick counts as a skill only if the id IS one.
+  const skillIds = new Set(catalogs.choice.skills.map((skill) => skill.id));
+  const proficient = new Set<string>(context.background?.skillProficiencies ?? []);
+  for (const offer of offers) {
+    if (offer.kind !== "skill" && offer.kind !== "skill-or-tool") continue;
+    for (const id of draft.picks[offer.key] ?? []) {
+      if (offer.kind === "skill" || skillIds.has(id)) proficient.add(id);
+    }
+  }
+  return offers.map((offer) => {
+    if (offer.kind !== "expertise") return offer;
+    const unavailable: Record<string, string> = {};
+    for (const option of offer.options) {
+      if (!proficient.has(option.id)) unavailable[option.id] = "not one of your proficiencies";
+    }
+    // Never grey an offer into a dead end. A build with none of these skills yet - or one whose
+    // proficiency came from a feature grant the client cannot see, since riders stay server-side -
+    // gets the old fully-enabled list and the server's message, which is strictly today's behaviour.
+    // Greying everything would repeat the exact mistake this function exists to avoid.
+    if (Object.keys(unavailable).length === offer.options.length) return offer;
+    return { ...offer, unavailable };
+  });
 }
 
 /** The built-in "raise two points instead of taking a feat" row id the server understands. */

@@ -91,9 +91,14 @@ reason. They are **findings, not unknowns** — don't re-discover them.
 - **[ui] The `→` glyph has no font coverage** — no loaded Manrope subset declares U+2192, so every
   arrow falls back. The fix is an `IconArrow` primitive plus 7 call sites, and it is all-or-none
   (mixing a drawn arrow with a fallback glyph is worse than either).
-- **[a11y] `.nh-step--done` marker contrast is 1.97:1 in the light theme** — below WCAG for a
-  non-text indicator. The *incomplete* marker was fixed in `584be3a` to carry three signals (dashed
-  ring + caution hue + glyph); the **done** marker still leans on hue. Same shape of fix, not applied.
+- **[a11y] `.nh-step--done` check glyph is 1.97:1 against its own fill in the light theme.**
+  Recomputed independently from the tokens 2026-07-27 — the figure is exact, but two refinements
+  matter. The glyph is an `aria-hidden` SVG with the state also in an `nh-sr-only` label, so the
+  applicable rule is **1.4.11 (3:1)**, not 1.4.3; and the marker's **border** (`--cyan` on `--bg`)
+  measures a **passing 3.85:1**. So the done state stays distinguishable — what fails is the glyph
+  inside it. A real 1.4.11 failure, lower severity than "state invisible". Dark theme is 9.07:1.
+  (While measuring: `.nh-step--incomplete` light = 3.91:1, passes. Pre-existing near-miss not from
+  this pass — the *upcoming* marker's number is real text at 4.47:1, marginally under 4.5:1.)
 - **[character-builder] Skill/tool/language uniqueness is enforced client-side only.** `479cb80`
   makes held proficiencies arrive greyed with their provenance ("Already granted by Soldier"), which
   stops the silent double-spend in the UI — but the **server's duplicate guard is still per-offer**,
@@ -101,10 +106,22 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   the real fix.
 - **[rules-5e] Third-caster multiclass rounding** is unverified against the SRD's rounding rule for
   Eldritch Knight / Arcane Trickster style progressions.
-- **[character-builder] Step 4's *arrival* state is still heavy at high level** — ~306 cards at
-  level 20 before any pick collapses anything. `5c32df9` fixed the *answered* state (24,222px →
-  1,933px at L20); the unanswered state is bounded by how many decisions the character genuinely has,
-  and cutting it further means progressive disclosure — a design change, not a density fix.
+- **[character-builder] Step 4's *arrival* state is still heavy at high level.** Measured per class
+  2026-07-27 (the earlier "~306 cards" figure was wrong — it is class-dependent): **Fighter L20 = 10
+  offers / 62 cards**; **Wizard L20 = 12 offers / 467 cards**. The worst case is 467, materially
+  worse than filed. The composition is the real story — "Wizard prepared spells" is choose 25 of 203,
+  and because collapse is (correctly) derived from `picks.length === capacity`, that one grid stays
+  fully expanded until the 25th spell is picked, so a Wizard 20 sits above 200 cards for the whole
+  step. `5c32df9` fixed the *answered* state (24,222px → 1,933px at L20) and that fix is real; the
+  arrival state is untouched. Cutting it means progressive disclosure — a design change, not a
+  density fix.
+- **[testing] `apps/client` and `packages/ui` have no test script and zero test files.** The 767
+  passing tests cover neither — every readiness commit changed only those two workspaces, so `tsc`
+  was the only automated net under the whole pass. This matters most for
+  `apps/client/src/builder/build-payload.ts`, which is **pure and dependency-light**: `computeOffers`,
+  `prunePicks`, `stepBlockedReason` and `withExpertiseReach` are all functions of `(draft, catalogs)`
+  and were exercised headlessly in a few dozen lines with no React and no socket. Highest-value
+  testing gap in the repo right now.
 
 - **[ux] ~~Maps/scenes/encounter IA redesign~~ — RESOLVED 2026-07-22 (scene-centric IA, this PR).**
   The upload → browse → prepare → start experience was rethought scene-first: a new **Scenes** hub tab
