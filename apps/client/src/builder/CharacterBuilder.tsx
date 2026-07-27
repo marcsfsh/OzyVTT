@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BuilderAbilityMethod, ContentFeatureSummary, GmView, PlayerView } from "@vtt/domain";
 import {
   ABILITIES, ABILITY_ROLL_FORMULA, ABILITY_SCORE_MAXIMUM, ABILITY_SCORE_MINIMUM, abilityModifier,
@@ -7,16 +7,16 @@ import {
 } from "@vtt/rules-5e";
 import {
   AbilityScoreAllocator, Alert, Badge, Button, ChoiceGrid, DiceInputRow, FeatureList, NameField,
-  ReviewSummary, SegmentedControl, Select, Stepper, WizardShell, type ChoiceOption, type DiceEntryMode,
-  type FeatureItem, type ReviewSection
+  ReviewSummary, SegmentedControl, Select, Stepper, useToast, WizardShell, type ChoiceOption, type DiceEntryMode,
+  type FeatureItem, type ReviewSection, type StepItem
 } from "@vtt/ui";
-import { useBuilderCatalogs } from "../content/catalogs";
+import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import {
   ABILITY_LABELS, ABILITY_SCORE_CAP, ASI_SHORTHAND, abilityCapPreview, baseScoresOf, abilityBonusesOf,
-  buildCreatePayload, computeOffers, emptyDraft, isAssignMethod, offerContext, pointBuySpent, prunePicks,
-  rosterCapacity, STEP_IDS, STEP_LABELS, STEP_SHORT, stepBlockedReason,
+  buildCreatePayload, computeOffers, emptyDraft, FEAT_KINDS, isAssignMethod, offerContext, offerFilled,
+  pointBuySpent, prunePicks, rosterCapacity, STEP_IDS, STEP_LABELS, STEP_SHORT, stepBlockedReason,
   type BuilderDraft, type BuilderOffer, type StepId
 } from "./build-payload";
 import { clearDraft, describeWhen, draftHasProgress, loadDraft, saveDraft, type StoredDraft } from "./draft";
@@ -42,6 +42,10 @@ export type CharacterBuilderProps = Readonly<{
   state: BuilderState;
   /** Scopes the saved draft. Phase 3 swaps localStorage for `GameState.characterDrafts[]`. */
   sessionKey: string;
+  /** The table connection. A create is a command, so an offline table blocks the LAST step with a
+      reason - the mechanism the wizard already uses for "not finished yet" - rather than letting
+      Create be pressed into a socket that cannot answer. */
+  connection?: "online" | "reconnecting" | "offline";
   onClose: () => void;
   onCreated: (name: string) => void;
 }>;
@@ -63,9 +67,17 @@ const featureItems = (features: readonly ContentFeatureSummary[], limit = 40): F
     body: <p>{feature.description}</p>
   }));
 
+/** Sentence-case a stored provenance phrase for a card's disabled reason. */
+const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
+
+/** A feat's one-line summary, for the grids whose options ARE feats. All 19 SRD feats carry one. */
+const featSummary = (catalogs: BuilderCatalogs, id: string) =>
+  catalogs.choice.feats.find((entry) => entry.id === id)?.summary ?? undefined;
+
 /** One pick offered by the content: heading, count, and the grid that answers it. */
-function OfferPicker({ offer, draft, onSet }: Readonly<{
-  offer: BuilderOffer; draft: BuilderDraft; onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
+function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
+  offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
+  onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
 }>) {
   const picks = draft.picks[offer.key] ?? [];
   if (offer.unresolvable) {
@@ -76,11 +88,20 @@ function OfferPicker({ offer, draft, onSet }: Readonly<{
       </Alert>
     </section>;
   }
+  const isFeat = FEAT_KINDS.has(offer.kind);
   const options: ChoiceOption[] = offer.options.map((option) => ({
     value: option.id,
     title: offer.kind === "equipment" ? `Option ${option.id.split("-").pop()?.toUpperCase() ?? ""}` : option.name,
-    description: offer.kind === "equipment" ? option.name : undefined,
+    // Every feat in the catalog carries a summary; showing it turns a grid of bare names
+    // ("Alert", "Savage Attacker") into a choice that can actually be made from the card.
+    description: offer.kind === "equipment" ? option.name : isFeat ? featSummary(catalogs, option.id) : undefined,
     meta: option.level != null && option.level > 0 ? `Level ${option.level}` : option.level === 0 ? "Cantrip" : undefined,
+    // A proficiency this build already holds stays IN the list and greys out, saying where it
+    // came from. Picked from a different source it would be merged away server-side, costing the
+    // player the pick and leaving them one proficiency short with nothing said.
+    ...(offer.unavailable?.[option.id]
+      ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
+      : {}),
     keywords: option.id
   }));
   const many = offer.capacity > 1;
@@ -113,8 +134,8 @@ function OfferPicker({ offer, draft, onSet }: Readonly<{
  * the feat list on purpose - it is the same idea as the ability route, and the system shows one
  * idea one way. (The server accepts either; the wizard offers the simpler one.)
  */
-function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
-  offer: BuilderOffer; draft: BuilderDraft;
+function AsiOffer({ offer, draft, catalogs, capBefore, onSet, onIncreases }: Readonly<{
+  offer: BuilderOffer; draft: BuilderDraft; catalogs: BuilderCatalogs;
   /** This build's scores as they stand just BEFORE this improvement, or null while the ability step
       has none yet. With it the row shows what each ability would reach and refuses the ones with no
       room, so the 20 ceiling is met at the point of choice rather than at Create. */
@@ -125,32 +146,45 @@ function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
   const picks = draft.picks[offer.key] ?? [];
   const route = picks[0] === ASI_SHORTHAND ? "asi" : picks.length > 0 ? "feat" : null;
   const increases = draft.asiIncreases[offer.key] ?? [];
-  const split = increases.length === 2 ? "two" : "one";
   const featOptions: ChoiceOption[] = offer.options
     .filter((option) => option.id !== "ability-score-improvement")
-    .map((option) => ({ value: option.id, title: option.name, keywords: option.id }));
+    .map((option) => ({ value: option.id, title: option.name, description: featSummary(catalogs, option.id), keywords: option.id }));
+
+  /**
+   * Which shape of increase is being made. Derived from the draft when it holds an answer (an
+   * amount-1 entry can only come from the +1/+1 split), and only otherwise from the local pick.
+   *
+   * The split is a QUESTION, not an answer: choosing "Raise ability scores" used to write
+   * `+2 Strength` into the draft on the player's behalf, which is wrong for most classes and
+   * illegal at level 20 (five unasked-for +2s put Strength at 27). So the route is recorded, the
+   * abilities stay empty until chosen, and the step's own gate refuses to move on - `offerFilled`
+   * already requires the split to add to 2.
+   */
+  const [pickedSplit, setPickedSplit] = useState<"one" | "two" | null>(null);
+  const split = increases.length > 0 ? (increases.some((entry) => entry.amount === 1) ? "two" : "one") : pickedSplit;
+  const amount = split === "two" ? 1 : 2;
+  const slotCount = split === "two" ? 2 : split === "one" ? 1 : 0;
+  /** The ability shown in each row. `""` is "not answered yet", which the draft cannot represent. */
+  const slots: readonly string[] = Array.from({ length: slotCount }, (_, index) => increases[index]?.ability ?? "");
 
   /** What raising `ability` by this row's amount would make it - null while there is nothing to cap. */
   const projected = (index: number, ability: Ability): number | null => {
     if (!capBefore) return null;
-    const elsewhere = increases.reduce((total, entry, position) => position !== index && entry.ability === ability ? total + entry.amount : total, 0);
-    return capBefore[ability] + elsewhere + (increases[index]?.amount ?? 0);
-  };
-  /** Keep a proposed ability only while it has room for `amount`; otherwise take the first that has. */
-  const withRoom = (candidate: Ability | undefined, amount: number, exclude?: Ability): Ability => {
-    const fits = (ability: Ability) => (capBefore?.[ability] ?? 0) + amount <= ABILITY_SCORE_CAP;
-    if (candidate && candidate !== exclude && fits(candidate)) return candidate;
-    return ABILITIES.find((ability) => ability !== exclude && fits(ability)) ?? candidate ?? "str";
+    const elsewhere = slots.reduce((total, entry, position) => position !== index && entry === ability ? total + amount : total, 0);
+    return capBefore[ability] + elsewhere + amount;
   };
 
-  const setSplit = (next: string) => {
-    if (next === "one") { onIncreases(offer, [{ ability: withRoom(increases[0]?.ability, 2), amount: 2 }]); return; }
-    const first = withRoom(increases[0]?.ability, 1);
-    onIncreases(offer, [{ ability: first, amount: 1 }, { ability: withRoom(increases[1]?.ability, 1, first), amount: 1 }]);
+  const changeSplit = (next: string) => {
+    setPickedSplit(next as "one" | "two");
+    // Changing the split changes the question, so the old answer cannot simply carry: a +2 is not
+    // a +1. The first ability is kept when it still fits, and nothing is invented for the rest.
+    const first = increases[0]?.ability;
+    const keeps = first && (capBefore?.[first] ?? 0) + (next === "two" ? 1 : 2) <= ABILITY_SCORE_CAP;
+    onIncreases(offer, keeps ? [{ ability: first, amount: next === "two" ? 1 : 2 }] : []);
   };
-  const setAbility = (index: number, ability: Ability) => {
-    const next = increases.map((entry, position) => position === index ? { ...entry, ability } : entry);
-    onIncreases(offer, next);
+  const setAbility = (index: number, ability: string) => {
+    const next = slots.map((entry, position) => position === index ? ability : entry);
+    onIncreases(offer, next.filter((entry): entry is Ability => entry !== "").map((entry) => ({ ability: entry, amount })));
   };
 
   return <section className="cb-offer">
@@ -161,8 +195,8 @@ function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
       ariaLabel={`Level ${offer.level} improvement`}
       value={route ?? ""}
       onChange={(next) => {
-        if (next === "asi") { onSet(offer, [ASI_SHORTHAND]); onIncreases(offer, [{ ability: withRoom(undefined, 2), amount: 2 }]); }
-        else onSet(offer, []);
+        if (next === "asi") { onSet(offer, [ASI_SHORTHAND]); setPickedSplit(null); onIncreases(offer, []); }
+        else { onSet(offer, []); setPickedSplit(null); }
       }}
       options={[{ value: "asi", label: "Raise ability scores" }, { value: "feat", label: "Take a feat" }]}
     />
@@ -170,20 +204,21 @@ function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
       <SegmentedControl
         size="sm"
         ariaLabel="How to split the increase"
-        value={split}
-        onChange={setSplit}
+        value={split ?? ""}
+        onChange={changeSplit}
         options={[{ value: "one", label: "+2 to one" }, { value: "two", label: "+1 to two" }]}
       />
       <div className="cb-asi-rows">
-        {increases.map((entry, index) => <label key={index} className="cb-asi-row">
-          <span className="cb-asi-label">+{entry.amount} to</span>
-          <Select value={entry.ability} aria-label={`Ability to raise by ${entry.amount}`} onChange={(event) => setAbility(index, event.target.value as Ability)}>
+        {slots.map((chosen, index) => <label key={index} className="cb-asi-row">
+          <span className="cb-asi-label">+{amount} to</span>
+          <Select value={chosen} aria-label={`Ability to raise by ${amount}`} onChange={(event) => setAbility(index, event.target.value)}>
+            <option value="">Choose an ability…</option>
             {ABILITIES.map((ability) => {
               const total = projected(index, ability);
               const noRoom = total != null && total > ABILITY_SCORE_CAP;
               // The current pick stays selectable even when it no longer fits, or the control would
               // show an answer it refuses to let go of; the step's blocked reason says the rest.
-              return <option key={ability} value={ability} disabled={noRoom && ability !== entry.ability}>
+              return <option key={ability} value={ability} disabled={noRoom && ability !== chosen}>
                 {ABILITY_LABELS[ability]}{total == null ? "" : ` — ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
               </option>;
             })}
@@ -202,11 +237,20 @@ function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
   </section>;
 }
 
-export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: CharacterBuilderProps) {
+export function CharacterBuilder({ state, sessionKey, connection = "online", onClose, onCreated }: CharacterBuilderProps) {
   const catalogs = useBuilderCatalogs();
+  const { toast } = useToast();
   const policy = state.builderPolicy;
   const [draft, setDraft] = useState<BuilderDraft>(() => emptyDraft());
   const [stepIndex, setStepIndex] = useState(0);
+  /**
+   * The furthest step the player has actually REACHED. Position alone cannot tell a rail whether a
+   * step is finished: `stepBlockedReason("equipment", …)` is legitimately null before a class has
+   * been chosen (a build with no equipment offers owes no equipment pick), so a rail that checked
+   * off every step whose reason was null would show Equipment done on a blank wizard. Gating every
+   * ✓ and every jump on "have you been here" is what makes the rail true.
+   */
+  const [furthest, setFurthest] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   /** The one thing that went wrong with a submit, said in the wizard's own words. A rejection and a
@@ -282,11 +326,47 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   const setIncreases = (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) =>
     editDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
 
-  const stepReason = catalogs.loaded ? stepBlockedReason(step, draft, catalogs, offers, policy) : "Loading the content catalogs…";
+  /**
+   * Every step's reason, computed ONCE per draft. The rail, the review sections, and the footer all
+   * ask the same seven questions; recomputing them per consumer meant seven `computeOffers` walks on
+   * every keystroke and on purely visual state (opening the detail pane, rolling a die).
+   */
+  const stepReasons = useMemo(
+    () => STEP_IDS.map((id) => catalogs.loaded ? stepBlockedReason(id, draft, catalogs, offers, policy) : "Loading the content catalogs…"),
+    [draft, catalogs, offers, policy]
+  );
+  const stepReason = stepReasons[stepIndex];
+  /** How far a RESUMED draft had got: the first step it does not satisfy, so everything behind it
+      reads as done and stays clickable, and nothing ahead of it is claimed. */
+  const reachedIn = (resumed: BuilderDraft) => {
+    const resumedOffers = computeOffers(resumed, catalogs);
+    const first = STEP_IDS.findIndex((id) => stepBlockedReason(id, resumed, catalogs, resumedOffers, policy) !== null);
+    return first === -1 ? STEP_IDS.length - 1 : first;
+  };
+  /** `.cb-page` is the scroll container (the shell's header and footer are sticky inside it), so a
+      step change that does not reset ITS scrollTop leaves the next step opened halfway down. */
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => { if (pageRef.current) pageRef.current.scrollTop = 0; }, [stepIndex]);
   // A full table is the LAST thing that can stop a create, so it blocks only once the character
-  // itself is finished - and it blocks rather than letting Create come back as a rejection.
-  const blockedReason = stepReason ?? (step === "review" ? capacity?.blockedReason ?? null : null);
-  const stepsForShell = STEP_IDS.map((id) => ({ label: STEP_LABELS[id], shortLabel: STEP_SHORT[id] }));
+  // itself is finished - and it blocks rather than letting Create come back as a rejection. An
+  // offline table is the same shape of answer: the create cannot land, so the step says so.
+  const reviewBlock = step !== "review" ? null
+    : connection !== "online" ? "The table is offline — reconnecting…"
+      : capacity?.blockedReason ?? null;
+  const blockedReason = stepReason ?? reviewBlock;
+  /**
+   * The rail's state machine, in one place:
+   *   done(i)       ⟺  i <= furthest AND reasons[i] === null AND i !== current
+   *   incomplete(i) ⟺  i <= furthest AND reasons[i] !== null AND i !== current
+   *   clickable(i)  ⟺  i <= furthest AND i !== current      (via `maxSelectable`)
+   * Beyond `furthest` no state is declared, so `Steps` falls back to its own position rule and the
+   * step reads as upcoming. Forward jumps past the frontier stay locked, deliberately.
+   */
+  const stepsForShell: StepItem[] = STEP_IDS.map((id, index) => ({
+    label: STEP_LABELS[id],
+    shortLabel: STEP_SHORT[id],
+    ...(index <= furthest && index !== stepIndex ? { state: stepReasons[index] === null ? "done" as const : "incomplete" as const } : {})
+  }));
 
   /**
    * ONE commandId per attempt. It is also the created actor's id AND the server's idempotency key,
@@ -361,7 +441,26 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
 
   // Leaving IS an answer to a pending resume offer: the player has decided this build is the one
   // worth keeping, so it takes the slot rather than being thrown away in favour of the older draft.
-  const saveAndClose = () => { if (draftHasProgress(draft)) saveDraft(sessionKey, draft); onClose(); };
+  // "Save & close" claims to have saved something, and then the wizard vanishes: the receipt is the
+  // only evidence the claim was true, and it says where the work went.
+  const saveAndClose = () => {
+    const saved = draftHasProgress(draft);
+    if (saved) saveDraft(sessionKey, draft);
+    onClose();
+    if (saved) toast("Draft saved — resume it from Create a character.", { tone: "success" });
+  };
+  // Escape leaves the way the header button does. This is a full page, not a Modal, so nothing
+  // else owns the key - and because the draft is parked on every change, leaving costs nothing.
+  const saveAndCloseRef = useRef(saveAndClose);
+  saveAndCloseRef.current = saveAndClose;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      saveAndCloseRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // ---- Ability scores ------------------------------------------------------------------------
   const base = baseScoresOf(draft);
@@ -379,15 +478,33 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     return check.ok ? { min: check.minimum, max: check.maximum } : { min: ABILITY_SCORE_MINIMUM, max: ABILITY_SCORE_MAXIMUM };
   }, [rollFormula]);
 
+  /**
+   * Switching method clears only what the NEW method OWNS. Clearing everything meant a player who
+   * looked at standard array for a moment came back to a wiped 27-point spread, with no warning and
+   * no undo - so point buy no longer touches the pool, and an assign method no longer touches the
+   * spend spread. Roll -> standard array still replaces the pool: that pool IS the standard array.
+   */
   const setMethod = (next: string) => {
     const chosen = next as BuilderAbilityMethod;
     patch({
       abilityMethod: chosen,
-      poolAssignment: {},
-      abilityPool: chosen === "standard-array" ? STANDARD_ARRAY.map((value, index) => ({ id: `sa-${index}`, value })) : [],
-      spendScores: Object.fromEntries(ABILITIES.map((ability) => [ability, POINT_BUY_MINIMUM]))
+      ...(isAssignMethod(chosen)
+        ? {
+            poolAssignment: {},
+            abilityPool: chosen === "standard-array" ? STANDARD_ARRAY.map((value, index) => ({ id: `sa-${index}`, value })) : []
+          }
+        : {})
     });
   };
+  // A parked draft can come back under a policy that no longer allows its method. The allocator
+  // already FELL BACK for display, but the draft kept the disallowed method, so the controls showed
+  // a legal method selected while the footer said the GM does not allow it. Write the fallback down.
+  // Keyed on the joined list, not the array: `policy.allowedAbilityMethods.filter(...)` mints a new
+  // array every render, which as a dependency would run this on every render instead of on change.
+  const allowedKey = allowedMethods.join(",");
+  useEffect(() => {
+    if (allowedMethods.length > 0 && !allowedMethods.includes(draft.abilityMethod)) setMethod(allowedMethods[0]);
+  }, [allowedKey, draft.abilityMethod]);
   const addRolledScore = (total: number) => editDraft((current) => current.abilityPool.length >= 6
     ? current
     : { ...current, abilityPool: [...current.abilityPool, { id: `r-${current.abilityPool.length}-${total}`, value: total }] });
@@ -436,8 +553,18 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   // ---- Step bodies ---------------------------------------------------------------------------
   const stepOffers = (owner: BuilderOffer["step"]) => offers.filter((offer) => offer.step === owner);
   const renderOffer = (offer: BuilderOffer) => offer.kind === "asi-or-feat"
-    ? <AsiOffer key={offer.key} offer={offer} draft={draft} capBefore={abilityCap.before.get(offer.key) ?? null} onSet={setPicks} onIncreases={setIncreases} />
-    : <OfferPicker key={offer.key} offer={offer} draft={draft} onSet={setPicks} />;
+    ? <AsiOffer key={offer.key} offer={offer} draft={draft} catalogs={catalogs} capBefore={abilityCap.before.get(offer.key) ?? null} onSet={setPicks} onIncreases={setIncreases} />
+    : <OfferPicker key={offer.key} offer={offer} draft={draft} catalogs={catalogs} onSet={setPicks} />;
+
+  /**
+   * The species feat pick the background's granted origin feat took away. A feat is something you
+   * HAVE, so the granted one is dropped from the species' own feat list - and a pick already made
+   * there is then pruned, silently, one step after the player made it. Naming it at the moment of
+   * cause is what makes that legible: the background step is where the collision happens.
+   */
+  const displacedSpeciesFeat = context.originFeat
+    ? stepOffers("species").find((offer) => FEAT_KINDS.has(offer.kind) && !offerFilled(offer, draft))
+    : undefined;
 
   const speciesOptions: ChoiceOption[] = catalogs.choice.species.map((entry) => ({
     value: entry.id, title: entry.name, description: entry.summary ?? undefined,
@@ -475,6 +602,10 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
         return <>
           <ChoiceGrid ariaLabel="Backgrounds" options={backgroundOptions} value={draft.backgroundId} onChange={(value) => patch({ backgroundId: value })} searchPlaceholder="Search backgrounds…" />
           {context.originFeat && <p className="cb-note">{context.background?.name} grants the <strong>{context.originFeat.name}</strong> feat.</p>}
+          {displacedSpeciesFeat && <p className="cb-note">
+            {context.background?.name} grants <strong>{context.originFeat!.name}</strong>, which replaces your{" "}
+            {displacedSpeciesFeat.label} choice — pick a different Origin feat on Species.
+          </p>}
           {stepOffers("background").map(renderOffer)}
         </>;
       case "class":
@@ -500,6 +631,13 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
         const spread = draft.backgroundBonus.map((entry) => entry.amount).join("/");
         return <>
           {problemAlert}
+          {/* What this class actually wants from the six numbers about to be assigned. Every field
+              is already loaded - `primaryAbilities` was being used only as a hidden search keyword
+              on the class grid, one step where the decision is no longer being made. */}
+          {context.classRecord && <p className="cb-note tabular">
+            {context.classRecord.name} · {context.classRecord.hitDie} · {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join("/")}
+            {context.classRecord.primaryAbilities.length > 0 && ` · primary ${context.classRecord.primaryAbilities.map((ability) => ability.toUpperCase()).join(", ")}`}
+          </p>}
           <AbilityScoreAllocator
             mode={assignMode ? "assign" : "spend"}
             rows={allocatorRows}
@@ -631,7 +769,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
 
   function sectionFor(id: StepId, owner: BuilderOffer["step"] | null, items: ReviewSection["items"]): ReviewSection {
     const extra = owner ? stepOffers(owner).map((offer) => ({ label: offer.label, value: pickedNames(offer) })) : [];
-    const reason = catalogs.loaded ? stepBlockedReason(id, draft, catalogs, offers, policy) : null;
+    const reason = catalogs.loaded ? stepReasons[STEP_IDS.indexOf(id)] : null;
     return {
       id, title: STEP_LABELS[id], items: [...items, ...extra],
       onEdit: () => { setStepIndex(STEP_IDS.indexOf(id)); setRejection(null); },
@@ -640,11 +778,18 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   }
 
   function reviewSections(): ReviewSection[] {
-    const scoreItems = ABILITIES.map((ability) => ({
-      label: ABILITY_LABELS[ability],
-      value: base[ability] == null ? "—" : `${base[ability]! + bonuses[ability]}${bonuses[ability] ? ` (${base[ability]} +${bonuses[ability]})` : ""}`,
-      numeric: true
-    }));
+    const scoreItems = ABILITIES.map((ability) => {
+      const total = base[ability] == null ? null : base[ability]! + bonuses[ability];
+      const modifier = total == null ? null : abilityModifier(total);
+      return {
+        label: ABILITY_LABELS[ability],
+        // The score is what the player assigned; the MODIFIER is what they will roll with all
+        // evening, and it was the one number the review did not show.
+        value: total == null ? "—"
+          : `${total}${bonuses[ability] ? ` (${base[ability]} +${bonuses[ability]})` : ""} · ${modifier! >= 0 ? "+" : ""}${modifier}`,
+        numeric: true
+      };
+    });
     return [
       sectionFor("species", "species", [{ label: "Species", value: context.species?.name ?? "—" }]),
       sectionFor("background", "background", [
@@ -698,18 +843,42 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
 
   const detailNode = detail();
   const isLast = stepIndex === STEP_IDS.length - 1;
+  const goTo = (index: number) => { setStepIndex(index); setDetailOpen(false); };
+  /**
+   * A blocked reason may name a control on ANOTHER step: the 20 ceiling is broken by an improvement
+   * chosen on Class features and only becomes visible once these scores exist. Saying which step
+   * owns the fix and not offering the way there is a message that describes a journey.
+   */
+  const breachOffer = step === "abilities" && stepReason === abilityCap.breach?.reason ? abilityCap.breach.offerKey : null;
+  const reasonNode: ReactNode = blockedReason == null ? undefined : breachOffer
+    ? <>{blockedReason}{" "}<Button variant="ghost" size="sm" onClick={() => goTo(STEP_IDS.indexOf("features"))}>Edit that improvement</Button></>
+    : blockedReason;
+  const resumed = resumable?.draft;
+  const resumedNames = resumed ? [
+    resumed.name.trim() || null,
+    catalogs.choice.species.find((entry) => entry.id === resumed.speciesId)?.name ?? null,
+    resumed.classId ? `${catalogs.choice.classes.find((entry) => entry.id === resumed.classId)?.name ?? titleize(resumed.classId)} ${resumed.level}` : null
+  ].filter((part): part is string => part !== null) : [];
 
-  return <div className="cb-page">
+  return <div className="cb-page" ref={pageRef}>
     <WizardShell
       title="Create a character"
       eyebrow="Character builder"
       steps={stepsForShell}
       current={stepIndex}
-      onStepSelect={(index) => { if (index < stepIndex) { setStepIndex(index); setDetailOpen(false); } }}
-      onBack={stepIndex > 0 ? () => { setStepIndex(stepIndex - 1); setDetailOpen(false); } : undefined}
-      onNext={() => { if (isLast) submit(); else { setStepIndex(stepIndex + 1); setDetailOpen(false); } }}
+      /* Every step already reached stays reachable, finished or not - going back to change a
+         species must not cost the walk forward again. Steps PAST the frontier stay locked. */
+      onStepSelect={(index) => { if (index <= furthest && index !== stepIndex) goTo(index); }}
+      maxSelectable={furthest}
+      onBack={stepIndex > 0 ? () => goTo(stepIndex - 1) : undefined}
+      /* Once the end has been reached, an edit made from the review step is a DETOUR, not a
+         restart: one tap returns, instead of six presses of Next. */
+      footerSecondary={furthest === STEP_IDS.length - 1 && stepIndex < furthest
+        ? <Button variant="secondary" onClick={() => goTo(STEP_IDS.length - 1)}>Back to review</Button>
+        : undefined}
+      onNext={() => { if (isLast) submit(); else { setFurthest((reached) => Math.max(reached, stepIndex + 1)); goTo(stepIndex + 1); } }}
       nextLabel={isLast ? "Create character" : "Next"}
-      blockedReason={blockedReason ?? undefined}
+      blockedReason={reasonNode}
       busy={submitting}
       /* The ONE way out. The draft is parked on every change, so a second "leave without saving"
          exit would both lie (it is already saved) and, at 375px, overhang the last card in the step
@@ -718,9 +887,13 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
       onSaveAndClose={saveAndClose}
       resume={resumable
         ? <Alert tone="info" title="Unfinished character found">
-            You started a character on this device {describeWhen(resumable.updatedAt)}. It stays exactly
-            as you left it until you answer — resume it, or discard it to save the one you build now.{" "}
-            <Button variant="secondary" size="sm" onClick={() => { setDraft(resumable.draft); setResumable(null); }}>Resume it</Button>
+            {/* Named, so the offer is a choice rather than a gamble. The stored record carries the
+                identity fields and a timestamp - and NO step, so none is promised. */}
+            {resumedNames.length > 0 ? <>You started <strong>{resumedNames.join(" · ")}</strong> on this device {describeWhen(resumable.updatedAt)}.</>
+              : <>You started a character on this device {describeWhen(resumable.updatedAt)}.</>}{" "}
+            It stays exactly as you left it until you answer — resume it, or discard it to save the
+            one you build now.{" "}
+            <Button variant="secondary" size="sm" onClick={() => { setDraft(resumable.draft); setFurthest(reachedIn(resumable.draft)); setResumable(null); }}>Resume it</Button>
             {/* Discarding is the one action here that destroys work, so it takes the destructive
                 treatment rather than reading as the twin of the button beside it. */}
             <Button variant="destructive" size="sm" onClick={() => { clearDraft(sessionKey); setResumable(null); attemptId.current = null; }}>Discard it</Button>

@@ -14,11 +14,19 @@ export interface WizardShellProps {
   current: number;
   /** Jump back to a completed step from the indicator. Upcoming steps stay locked. */
   onStepSelect?: (index: number) => void;
+  /** Highest step index the indicator may jump to (inclusive) — see `Steps.maxSelectable`.
+      Lets a flow that tracks how far the player has reached keep a visited-but-unfinished
+      step reachable, instead of the indicator guessing from position. */
+  maxSelectable?: number;
 
   children: ReactNode;
 
   /** Back is hidden on the first step — omit the handler there. */
   onBack?: () => void;
+  /** An extra action beside Back, for a flow whose "one step at a time" walk is not the
+      only way out of a step (e.g. "Back to review" once the end has been reached). It sits
+      with Back rather than beside Next: it moves you, it does not commit anything. */
+  footerSecondary?: ReactNode;
   onNext?: () => void;
   backLabel?: string;
   nextLabel?: string;
@@ -73,8 +81,8 @@ export interface WizardShellProps {
     It owns no step state: the flow drives `current`, `blockedReason`, and the
     handlers. */
 export function WizardShell({
-  title, eyebrow, steps, current, onStepSelect, children,
-  onBack, onNext, backLabel = "Back", nextLabel = "Next", blockedReason, busy = false,
+  title, eyebrow, steps, current, onStepSelect, maxSelectable, children,
+  onBack, footerSecondary, onNext, backLabel = "Back", nextLabel = "Next", blockedReason, busy = false,
   onSaveAndClose, saveLabel = "Save & close", resume,
   detail, detailTitle, detailOpen = false,
   onOpenDetail, detailOpenLabel = "Show details", onCloseDetail, detailBackLabel = "Back to the list",
@@ -96,7 +104,7 @@ export function WizardShell({
           </div>
         )}
         <div className="nh-wizard-progress">
-          <Steps steps={steps} current={current} onStepSelect={onStepSelect} ariaLabel={`${typeof title === "string" ? title : "Wizard"} progress`} />
+          <Steps steps={steps} current={current} onStepSelect={onStepSelect} maxSelectable={maxSelectable} ariaLabel={`${typeof title === "string" ? title : "Wizard"} progress`} />
         </div>
       </header>
 
@@ -123,6 +131,7 @@ export function WizardShell({
       <footer className="nh-wizard-foot">
         <div className="nh-wizard-foot-back">
           {onBack && <Button variant="secondary" onClick={onBack} disabled={busy}>{backLabel}</Button>}
+          {footerSecondary}
         </div>
         <p className={cx("nh-wizard-blocked", !blocked && "is-clear")} id={reasonId} role="status">
           {blocked && <><span className="nh-wizard-blocked-icon" aria-hidden="true"><IconWarning /></span>{blockedReason}</>}

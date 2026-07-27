@@ -82,7 +82,11 @@
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
-.nh-wizard-foot-back { justify-self: start; }
+/* Back plus an optional second way out (`footerSecondary`), so the group is a row rather than
+   a single slot. With one child it lays out exactly as it did. It WRAPS rather than squeezing:
+   `.nh-btn` is `white-space: nowrap`, so a shrunk button spills its label outside its own border
+   instead of truncating - two actions in half a 375px footer did exactly that. */
+.nh-wizard-foot-back { justify-self: start; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
 .nh-wizard-foot-next { justify-self: end; }
 /* The gating reason. It keeps its row whether or not it is filled, so the footer
    never jumps as steps validate; role="status" announces it when it appears. */
@@ -126,7 +130,11 @@
   .nh-wizard-foot { grid-template-columns: 1fr 1fr; }
   .nh-wizard-blocked { grid-row: 1; grid-column: 1 / -1; }
   .nh-wizard-foot-back, .nh-wizard-foot-next { grid-row: 2; }
-  .nh-wizard-foot-back .nh-btn, .nh-wizard-foot-next .nh-btn { width: 100%; }
+  /* Back fills its half of the footer alone, and shares it with a second action when both fit —
+     `flex: 1 1 auto` grows to the cell but never shrinks a label past its own button. When they
+     do not fit, the group's `flex-wrap` stacks them instead of overflowing. */
+  .nh-wizard-foot-back .nh-btn { flex: 1 1 auto; }
+  .nh-wizard-foot-next .nh-btn { width: 100%; }
   .nh-wizard-foot-back, .nh-wizard-foot-next { justify-self: stretch; }
 }
 

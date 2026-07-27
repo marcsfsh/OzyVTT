@@ -277,6 +277,9 @@ function App() {
     {mode === "gm" && gmToken && state && builderOpen && <CharacterBuilder
       state={state}
       sessionKey="gm"
+      /* The builder covers the viewport, so the connection banner above is painted over. It gates
+         its own last step on this instead. */
+      connection={connection}
       onClose={() => setBuilderOpen(false)}
       onCreated={(name) => setNotice({ tone: "success", text: `${name} joined the roster — ready to claim.` })}
     />}

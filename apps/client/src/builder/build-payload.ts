@@ -109,6 +109,16 @@ export type BuilderOffer = Readonly<{
   /** Set when a `fromCatalog` slug resolved to nothing - a content gap, not a player error. The
       pick is then deferred rather than required (mirroring the server's own handling). */
   unresolvable: string | null;
+  /**
+   * Option id -> why this build ALREADY has it, for the proficiency kinds a character may only
+   * hold once. Present (possibly empty) on those kinds, null on every other.
+   *
+   * The options themselves are deliberately NOT filtered out. Filtering is what makes a pick vanish
+   * from a parked draft when an earlier step changes underneath it (the origin-feat reset), so the
+   * option stays in the list and is DISABLED with this reason instead - visible, explained, and
+   * still there when the conflict is resolved upstream.
+   */
+  unavailable: Readonly<Record<string, string>> | null;
 }>;
 
 const optionsOfIds = (ids: readonly string[], nameOf: (id: string) => string): CatalogChoiceOption[] =>
@@ -181,8 +191,31 @@ function grantedClassFeatures(classRecord: ContentClassSummary, level: number): 
   return granted;
 }
 
-/** The offer kinds whose answer IS a feat (the server's own `FEAT_KINDS`, `character-build.ts:412`). */
-const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
+/** The offer kinds whose answer IS a feat (the server's own `FEAT_KINDS`, `character-build.ts:491`). */
+export const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
+
+/**
+ * The offer kinds whose answer is a PROFICIENCY - something a character either has or has not, and
+ * can never usefully hold twice. The server dedupes the finished lists (`character-build.ts:650`)
+ * and its offer guard is per-offer only (`:474-478`), so a skill offered by two different sources
+ * and taken twice costs the player a pick and lands them one proficiency short, silently.
+ */
+const HELD_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool", "expertise", "tool", "language"]);
+
+/**
+ * The kinds whose options are DISABLED once already held.
+ *
+ * `expertise` is deliberately absent even though a repeat is just as wasteful: the SRD's expertise
+ * picks read "choose one of the following skills IN WHICH YOU HAVE PROFICIENCY" and the server
+ * enforces exactly that (`character-build.ts:644-646` rejects expertise without proficiency), so
+ * greying out the skills you hold would leave only the picks the server refuses. Its answers still
+ * feed `HELD_KINDS` above; only the disabling is skipped.
+ */
+const PROVENANCE_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool", "tool", "language"]);
+
+/** What to call one of these picks in an instruction. */
+const kindNoun = (kind: string) =>
+  kind === "skill" ? "skill" : kind === "tool" ? "tool" : kind === "language" ? "language" : "option";
 
 /**
  * Every pick this build owes, in step order. Mirrors `character-build.ts`'s offer machinery: the
@@ -210,6 +243,31 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   // shares its option list with the class's Fighting Style, which is how `defense` could be taken
   // twice; Human's Versatile could re-take the Magic Initiate the Acolyte already granted.)
   const heldFeatIds = new Set<string>(context.background?.originFeatId ? [context.background.originFeatId] : []);
+  // The same idea for PROFICIENCIES, which differ from feats in one way that matters: a duplicate is
+  // never rejected, it is merged. Soldier grants Athletics; a Fighter's class skills offer it again;
+  // taking it twice spends two picks and yields one skill, with nothing said. So every source is
+  // accumulated in step order, and each offer carries the provenance of what it can no longer give.
+  const heldProficiencies = new Map<string, string>();
+  for (const skill of context.background?.skillProficiencies ?? []) {
+    heldProficiencies.set(skill, `already granted by ${context.background!.name}`);
+  }
+  /** The already-held subset of these options, or null for a kind that has no such rule. */
+  const unavailableOf = (kind: string, options: readonly CatalogChoiceOption[]): Readonly<Record<string, string>> | null => {
+    if (!PROVENANCE_KINDS.has(kind)) return null;
+    const held: Record<string, string> = {};
+    for (const option of options) {
+      const reason = heldProficiencies.get(option.id);
+      if (reason) held[option.id] = reason;
+    }
+    return held;
+  };
+  /** Record an offer's own answers AFTER it is built, so its own picks stay tappable to un-pick. */
+  const recordHeld = (offerKey: string, kind: string, label: string) => {
+    if (!HELD_KINDS.has(kind)) return;
+    for (const id of draft.picks[offerKey] ?? []) {
+      if (!heldProficiencies.has(id)) heldProficiencies.set(id, `already chosen for "${label}"`);
+    }
+  };
   const featRepeats = (id: string) => {
     const feat = catalogs.choice.feats.find((entry) => entry.id === id);
     if (!feat?.repeatable) return false;
@@ -229,10 +287,14 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
 
   const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: { choose: number; from: readonly string[] } | null | undefined, classId: string | null) => {
     if (!list || list.choose <= 0) return;
+    const offerKey = uniqueKey(key);
+    const options = optionsOfIds(list.from, nameOfKind(kind));
     offers.push({
-      key: uniqueKey(key), step, featureId: null, kind, label, help: null, capacity: list.choose,
-      options: optionsOfIds(list.from, nameOfKind(kind)), maxSpellLevel: null, level: 1, classId, unresolvable: null
+      key: offerKey, step, featureId: null, kind, label, help: null, capacity: list.choose,
+      options, maxSpellLevel: null, level: 1, classId, unresolvable: null,
+      unavailable: unavailableOf(kind, options)
     });
+    recordHeld(offerKey, kind, label);
   };
 
   const featureOffer = (key: string, step: OfferStep, feature: ContentFeatureSummary, level: number, classId: string | null, capacity?: number) => {
@@ -262,11 +324,13 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       help: feature.description || null,
       capacity: capacity ?? choice.choose,
       options: offerable,
-      maxSpellLevel: ceiling ?? null, level, classId, unresolvable
+      maxSpellLevel: ceiling ?? null, level, classId, unresolvable,
+      unavailable: unavailableOf(choice.kind, offerable)
     });
     if (FEAT_KINDS.has(choice.kind)) {
       for (const id of draft.picks[offerKey] ?? []) if (id !== ASI_SHORTHAND) heldFeatIds.add(id);
     }
+    recordHeld(offerKey, choice.kind, feature.name);
   };
 
   // ---- Step 1: species. Its traits' picks, its language choices, and (when the species prints
@@ -279,7 +343,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     if (context.species.sizes.length > 1) {
       offers.push({
         key: uniqueKey("species-size"), step: "species", featureId: null, kind: "size", label: "Size", help: null, capacity: 1,
-        options: optionsOfIds(context.species.sizes, titleize), maxSpellLevel: null, level: 1, classId: null, unresolvable: null
+        options: optionsOfIds(context.species.sizes, titleize), maxSpellLevel: null, level: 1, classId: null, unresolvable: null, unavailable: null
       });
     }
   }
@@ -354,7 +418,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
           key: uniqueKey("class-cantrips"), step: "features", featureId: null, kind: "cantrip",
           label: `${context.classRecord.name} cantrips`, help: null, capacity: row.cantripsKnown!,
           options: list.filter((option) => option.level === 0), maxSpellLevel: 0, level: 1,
-          classId: context.classRecord.id, unresolvable
+          classId: context.classRecord.id, unresolvable, unavailable: null
         });
       }
       const preparedCap = row.preparedCount ?? row.spellsKnown ?? 0;
@@ -364,7 +428,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
           label: context.classRecord.spellcasting?.prepares === "known" ? `${context.classRecord.name} spells known` : `${context.classRecord.name} prepared spells`,
           help: null, capacity: preparedCap,
           options: list.filter((option) => (option.level ?? 0) >= 1 && (option.level ?? 0) <= maxSlotLevel),
-          maxSpellLevel: maxSlotLevel, level: 1, classId: context.classRecord.id, unresolvable
+          maxSpellLevel: maxSlotLevel, level: 1, classId: context.classRecord.id, unresolvable, unavailable: null
         });
       }
     }
@@ -376,7 +440,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       key: uniqueKey("class-equipment"), step: "equipment", featureId: null, kind: "equipment",
       label: `${context.classRecord.name} starting equipment`, help: null, capacity: 1,
       options: context.classRecord.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
-      maxSpellLevel: null, level: 1, classId: context.classRecord.id, unresolvable: null
+      maxSpellLevel: null, level: 1, classId: context.classRecord.id, unresolvable: null, unavailable: null
     });
   }
   if (context.background && context.background.startingEquipmentOptions.length > 0) {
@@ -384,7 +448,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       key: uniqueKey("background-equipment"), step: "equipment", featureId: null, kind: "equipment",
       label: `${context.background.name} starting equipment`, help: null, capacity: 1,
       options: context.background.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
-      maxSpellLevel: null, level: 1, classId: null, unresolvable: null
+      maxSpellLevel: null, level: 1, classId: null, unresolvable: null, unavailable: null
     });
   }
 
@@ -493,7 +557,7 @@ export function abilityBonusesOf(draft: BuilderDraft, catalogs: BuilderCatalogs,
   return bonuses;
 }
 
-/** The hard ceiling a finished score may not pass (`character-build.ts:314` and `:477` both reject). */
+/** The hard ceiling a finished score may not pass (`character-build.ts:380` and `:585` both reject). */
 export const ABILITY_SCORE_CAP = 20;
 
 export type AbilityCapBreach = Readonly<{
@@ -685,45 +749,79 @@ export function stepBlockedReason(
   const context = offerContext(draft, catalogs);
   const unfilled = (owner: OfferStep) => offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
   const pickReason = (offer: BuilderOffer) => {
+    // Two offers on one step can share a LABEL - a level 20 Fighter answers six "Ability Score
+    // Improvement" decisions - and an instruction naming a label that matches six controls names
+    // none of them. Stamp the level exactly when the label alone is ambiguous, and not otherwise.
+    const ambiguous = offersForStep(offers, offer.step).filter((sibling) => sibling.label === offer.label).length > 1;
+    const named = ambiguous ? `level ${offer.level} "${offer.label}"` : `"${offer.label}"`;
     const chosen = (draft.picks[offer.key] ?? []).length;
-    if (offer.kind === "asi-or-feat" && chosen === offer.capacity) return `Split the +2 from "${offer.label}" across your abilities.`;
+    if (offer.kind === "asi-or-feat" && chosen === offer.capacity) return `Split the +2 from ${named} across your abilities.`;
     return offer.capacity === 1
-      ? `Make your "${offer.label}" choice to continue.`
-      : `Choose ${offer.capacity} for "${offer.label}" — ${chosen} of ${offer.capacity} so far.`;
+      ? `Make your ${named} choice to continue.`
+      : `Choose ${offer.capacity} for ${named} — ${chosen} of ${offer.capacity} so far.`;
+  };
+  /**
+   * A pick this build already holds from somewhere else. The options are not filtered out (that is
+   * what silently resets a parked draft), so a pick made BEFORE the collision existed - go back,
+   * change the background, come forward - survives and has to be said rather than merged away.
+   */
+  const heldConflict = (owner: OfferStep) => {
+    for (const offer of offersForStep(offers, owner)) {
+      if (!offer.unavailable) continue;
+      for (const id of draft.picks[offer.key] ?? []) {
+        const held = offer.unavailable[id];
+        if (!held) continue;
+        const name = offer.options.find((option) => option.id === id)?.name ?? titleize(id);
+        return `"${name}" is ${held} — pick a different ${kindNoun(offer.kind)}.`;
+      }
+    }
+    return null;
   };
 
   switch (step) {
     case "species": {
       if (!draft.speciesId) return "Choose a species to continue.";
+      const conflict = heldConflict("species");
+      if (conflict) return conflict;
       const offer = unfilled("species");
       return offer ? pickReason(offer) : null;
     }
     case "background": {
       if (!draft.backgroundId) return "Choose a background to continue.";
+      const conflict = heldConflict("background");
+      if (conflict) return conflict;
       const offer = unfilled("background");
       return offer ? pickReason(offer) : null;
     }
     case "class": {
       if (!draft.classId) return "Choose a class to continue.";
+      const conflict = heldConflict("class");
+      if (conflict) return conflict;
       const offer = unfilled("class");
       return offer ? pickReason(offer) : null;
     }
     case "features": {
       if (!draft.classId) return "Choose a class first.";
       const classRecord = context.classRecord;
+      // A class authored before its subclasses (phase 5 adds nine more) renders a subclass offer
+      // with no options at all. "Choose a subclass" would then be a requirement nothing on screen
+      // can satisfy, so that one IS said first - it is unsatisfiable, and it says how to get past it.
       if (classRecord && draft.level >= classRecord.subclassLevel && !draft.subclassId) {
-        // A class authored before its subclasses (phase 5 adds nine more) renders a subclass offer
-        // with no options at all. "Choose a subclass" would then be a requirement nothing on screen
-        // can satisfy, so say what is actually missing - and how to get past it.
         const subclassOffer = offers.find((offer) => offer.kind === "subclass");
         if (!subclassOffer || subclassOffer.options.length === 0) {
           const escape = classRecord.subclassLevel > 1 ? ` Drop to level ${classRecord.subclassLevel - 1} to continue.` : "";
           return `No ${classRecord.name} subclasses are available yet — a level ${classRecord.subclassLevel} ${classRecord.name} must have one.${escape}`;
         }
-        return `Choose a ${classRecord.subclassLabel ?? "subclass"} to continue.`;
       }
+      const conflict = heldConflict("features");
+      if (conflict) return conflict;
       const offer = unfilled("features");
-      if (offer) return pickReason(offer);
+      // The subclass is named in the class's own words, but only when it is genuinely the first
+      // unmet requirement. Announcing it ahead of `unfilled` named a control the player was not
+      // using: answering Fighting Style, the footer still said "Choose a Fighter Subclass".
+      if (offer) return offer.kind === "subclass"
+        ? `Choose a ${classRecord?.subclassLabel ?? "subclass"} to continue.`
+        : pickReason(offer);
       // An ASI that raises a score past 20 is chosen HERE but only becomes visible once the ability
       // step has scores, so the ceiling is guarded at both of its inputs with the one same sentence.
       const breach = abilityCapPreview(draft, catalogs, offers).breach;

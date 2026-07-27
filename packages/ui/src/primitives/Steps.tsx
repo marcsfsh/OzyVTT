@@ -7,6 +7,11 @@ export interface StepItem {
   label: ReactNode;
   /** Plain-text name for the compact (phone) indicator. Defaults to `label`. */
   shortLabel?: string;
+  /** Overrides the position-derived state for a step that is NOT the current one.
+      Position alone can only say "before" and "after"; a flow that knows whether a
+      visited step is actually finished says so here, so a step the player left
+      unanswered stops claiming a check mark. Never overrides `current`. */
+  state?: "done" | "incomplete";
 }
 
 export interface StepsProps {
@@ -15,6 +20,10 @@ export interface StepsProps {
   current: number;
   /** Allow jumping back to an already-completed step. Upcoming steps stay locked. */
   onStepSelect?: (index: number) => void;
+  /** Highest index the flow will accept a jump to (inclusive). Supplied, it REPLACES
+      the "done steps only" rule: a visited-but-unfinished step stays reachable, and
+      steps past the frontier stay locked. Omitted, nothing changes. */
+  maxSelectable?: number;
   /** Accessible name for the flow — used by the compact indicator's progress bar. */
   ariaLabel?: string;
   className?: string;
@@ -31,7 +40,7 @@ export interface StepsProps {
 
     Only one form is displayed at a time, so `display:none` keeps the other out of
     the accessibility tree too. */
-export function Steps({ steps, current, onStepSelect, ariaLabel = "Progress", className }: StepsProps) {
+export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel = "Progress", className }: StepsProps) {
   const total = Math.max(steps.length, 1);
   const index = Math.min(Math.max(current, 0), total - 1);
   const active = steps[index];
@@ -60,12 +69,24 @@ export function Steps({ steps, current, onStepSelect, ariaLabel = "Progress", cl
 
       <ol className="nh-steps" aria-label={ariaLabel}>
         {steps.map((step, i) => {
-          const state = i < index ? "done" : i === index ? "current" : "upcoming";
-          const jumpable = onStepSelect != null && state === "done";
+          // Precedence, in this order: the current step wins outright; then whatever the flow
+          // declared; then position, exactly as before. With neither new prop supplied this is the
+          // original expression.
+          const state = i === index ? "current" : step.state ?? (i < index ? "done" : "upcoming");
+          const jumpable = onStepSelect != null && i !== index
+            && (maxSelectable != null ? i <= maxSelectable : state === "done");
           const inner = (
             <>
               <span className="nh-step-marker" aria-hidden="true">{state === "done" ? <IconCheck /> : i + 1}</span>
-              <span className="nh-step-label">{step.label}</span>
+              <span className="nh-step-label">
+                {step.label}
+                {/* The check mark is decorative, so "done" and "not finished" would otherwise sound
+                    identical. Said only when the flow declared a state — position-derived rails
+                    keep their original, unannotated names. */}
+                {step.state != null && state !== "current" && (
+                  <span className="nh-sr-only">{state === "done" ? " — done" : " — not finished"}</span>
+                )}
+              </span>
             </>
           );
           return (

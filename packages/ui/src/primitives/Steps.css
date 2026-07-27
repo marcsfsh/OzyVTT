@@ -69,6 +69,13 @@
 .nh-step--current .nh-step-marker { border-color: transparent; background: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
 .nh-step--current .nh-step-label { color: var(--text); }
 
+/* PLACEHOLDER treatment for a step that has been visited but is not finished. It deliberately
+   invents no token and no glyph: it keeps the numbered marker (so it cannot be mistaken for done)
+   and dashes the ring so it is not mistaken for untouched either. The real glyph and tone are the
+   design-language engineer's to assign — see the handoff note. */
+.nh-step--incomplete .nh-step-marker { border-style: dashed; }
+.nh-step--incomplete .nh-step-label { color: var(--text-muted); }
+
 /* Jump back to a completed step. Meets the 44px floor by padding, not by paint. */
 .nh-step-jump {
   display: inline-flex;
