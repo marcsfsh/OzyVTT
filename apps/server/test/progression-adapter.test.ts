@@ -39,8 +39,11 @@ describe("progressionFromClass reconciliation", () => {
     const table = progressionTableFromClasses(authored);
     // Authored: the row IS the adapter output, not the static one (same values today, same object never).
     expect(table.fighter).toEqual(progressionFromClass(authored.find((entry) => entry.id === "fighter")!));
-    // Un-authored (barbarian is not in the phase-2 slice): the SRD row remains, verbatim.
-    expect(table.barbarian).toBe(SRD_CLASS_PROGRESSION.barbarian);
+    // All twelve SRD classes are authored as of phase 5, so the fallback has to be exercised with a
+    // deliberately partial list. It used to lean on barbarian happening to be unwritten, which made
+    // the test quietly stop covering the fallback the moment the content caught up.
+    const partial = progressionTableFromClasses(authored.filter((entry) => entry.id !== "barbarian"));
+    expect(partial.barbarian).toBe(SRD_CLASS_PROGRESSION.barbarian);
   });
 
   it("is the table the content library actually serves to the builder", () => {
@@ -48,6 +51,11 @@ describe("progressionFromClass reconciliation", () => {
     expect(table.wizard.casterProgression).toBe("full");
     expect(table.wizard.hitDie).toBe("d6");
     expect(table.fighter.asiLevels).toEqual([4, 6, 8, 12, 14, 16]);
-    expect(table.barbarian).toBe(SRD_CLASS_PROGRESSION.barbarian);
+    // Barbarian is authored as of phase 5, so it is now the adapter's own row - a different object
+    // that must still agree with the engine's static table field for field. That equality is the
+    // real assertion: it proves the generated content and `@vtt/rules-5e` did not drift apart.
+    expect(table.barbarian).not.toBe(SRD_CLASS_PROGRESSION.barbarian);
+    expect(table.barbarian).toEqual(SRD_CLASS_PROGRESSION.barbarian);
+    expect(table.warlock.casterProgression).toBe("pact");
   });
 });

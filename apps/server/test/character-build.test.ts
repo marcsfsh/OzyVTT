@@ -628,3 +628,51 @@ describe("D5 - multiclass prerequisites are correct but deliberately uncalled in
     expect(meetsMulticlassPrerequisites({ wis: 13 }, "cleric", library.classProgressionTable())).toBe(true);
   });
 });
+
+describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
+  // Pact Magic is the one caster shape that is NOT a sparse nine-column row, and until the Warlock
+  // was authored no class exercised it - the assembly read `spellSlots` only, so a Warlock came out
+  // with a caster block and zero slots. This pins the shape rather than the fix.
+  const warlockInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
+    name: "Vex",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "warlock",
+    level: 5,
+    subclassId: "fiend-patron",
+    abilityMethod: "standard-array",
+    baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    backgroundBonusAllocation: [{ ability: "con", amount: 2 }, { ability: "dex", amount: 1 }],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "skill", id: "acrobatics", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+      { level: 1, kind: "size", id: "small" },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
+      { level: 1, classId: "warlock", kind: "skill", id: "deception" },
+      { level: 1, classId: "warlock", kind: "eldritch-invocation", id: "agonizing-blast", payload: { featureId: "eldritch-invocations" } },
+      { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron", payload: { featureId: "warlock-subclass" } },
+      { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement", payload: { featureId: "ability-score-improvement" } },
+      { level: 4, classId: "warlock", kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+      { level: 4, classId: "warlock", kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } },
+      { level: 1, classId: "warlock", kind: "cantrip", id: "chill-touch" },
+      { level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" },
+      { level: 1, classId: "warlock", kind: "cantrip", id: "mage-hand" },
+      { level: 1, classId: "warlock", kind: "equipment", id: "warlock-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  });
+
+  it("gives a Warlock its Pact Magic slots - all at one level, not a sparse row", () => {
+    const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
+    // SRD: a Warlock 5 has TWO level-3 slots and no level-1 or level-2 slots at all.
+    expect(definition.spellcasting?.slots).toEqual([{ level: 3, max: 2 }]);
+    expect(definition.spellcasting?.ability).toBe("cha");
+    expect(definition.hitPoints.maximum).toBe(38); // d8: 8 + 4x5, then +2 Con x5
+  });
+
+  it("counts Warlock levels as pact progression, not full", () => {
+    expect(library.classProgressionTable().warlock.casterProgression).toBe("pact");
+  });
+});

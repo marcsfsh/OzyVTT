@@ -10,7 +10,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "build-bundle": "node --import tsx scripts/build-bundle.ts"
+    "build-bundle": "node --import tsx scripts/build-bundle.ts",
+    "build-class-bundle": "node --import tsx scripts/build-class-bundle.ts"
   },
   "dependencies": {
     "@vtt/rules-5e": "*",

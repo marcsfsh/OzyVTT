@@ -233,7 +233,9 @@ describe("character-builder content records", () => {
     expect(subclassesForClass("fighter").map((subclass) => subclass.id)).toEqual(["champion"]);
     expect(subclassesForClass("wizard").map((subclass) => subclass.id)).toEqual(["evoker"]);
     expect(subclassesForClass("cleric").map((subclass) => subclass.id)).toEqual(["life-domain"]);
-    expect(subclassesForClass("barbarian")).toEqual([]);
+    // SRD 5.2.1 prints exactly one subclass per class, so every class must offer exactly one - a
+    // class with none is an unfinishable wizard step, and this used to assert `barbarian` had zero.
+    for (const entry of classes) expect(subclassesForClass(entry.id).length, entry.id).toBe(1);
   });
 
   it("models species without hardcoded ability bonuses (SRD 5.2.1 puts them on backgrounds)", () => {

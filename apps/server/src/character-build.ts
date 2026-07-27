@@ -673,7 +673,14 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       if (error instanceof CatalogChoiceError) reject(`The ${classRecord.name} spell list could not be resolved: ${error.message}`);
       throw error;
     }
-    const slots = (levelRow.spellSlots ?? []).map((count, index) => ({ level: index + 1, max: count })).filter((slot) => slot.max > 0);
+    // Pact Magic is not a sparse nine-column row: it is N slots that are ALL of one level, and it
+    // rises by replacing that level rather than by adding columns (a Warlock 5 has two level-3
+    // slots and no level-1 or level-2 slots at all). `pactSlots` therefore REPLACES `spellSlots`
+    // rather than merging with it. This branch was unreachable until the Warlock existed - a
+    // Warlock built before it silently came out with an empty caster block.
+    const slots = levelRow.pactSlots
+      ? (levelRow.pactSlots.slots > 0 ? [{ level: levelRow.pactSlots.level, max: levelRow.pactSlots.slots }] : [])
+      : (levelRow.spellSlots ?? []).map((count, index) => ({ level: index + 1, max: count })).filter((slot) => slot.max > 0);
     const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), 0);
     // SRD: a feature-granted ALWAYS-prepared spell (a Life Domain spell, a racial spell) is always
     // ready and "doesn't count against the number of spells you can prepare". Appending the grants
