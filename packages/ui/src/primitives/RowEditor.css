@@ -1,0 +1,131 @@
+/* RowEditor — repeating rows with a grip, a ⋯ menu and an Add.
+
+   SPECIFICITY NOTE (readiness rule 5 — a primitive defends its own state against the
+   host app's element-selector globals, rather than the app being coupled to a
+   primitive's class name). `apps/client/src/styles.css` carries a bare
+   `button { padding: 1.3rem; border: 1px solid var(--line-strong); background: var(--surface-2); text-align: left }`
+   and `button:hover:not(:disabled) { border-color: … }` at (0,2,1) — `:hover` and
+   `:not(:disabled)` each count as a class, `:not()` taking its argument's specificity.
+   A plain `.nh-roweditor-toggle` at (0,1,0) already beats the bare `button` rule at
+   (0,0,1) for the resting look, but `.nh-roweditor-toggle:hover` is only (0,2,0) and
+   LOSES to (0,2,1). The hover rules below are therefore written as
+   `.nh-roweditor-head .nh-roweditor-toggle:hover` — (0,3,0) — which wins. Do not
+   "simplify" them back to one class. */
+
+.nh-roweditor {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.nh-roweditor-rows {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nh-roweditor-row {
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  transition: border-color var(--dur-hover), background var(--dur-hover), box-shadow var(--dur-base);
+}
+
+.nh-roweditor-head {
+  display: flex;
+  align-items: center;
+  /* Gap budget (design-language §4, route 2): the grip and the ⋯ trigger are each
+     1.75rem of paint carrying a 44px hit AREA, so each overhangs by (44 − 28) / 2 = 8px
+     per side. Their neighbour is the toggle, whose 44px is real paint and overhangs by
+     0 — so 8px is the floor and --space-3 (12px) clears it. */
+  gap: var(--space-3);
+  padding-right: var(--space-2);
+}
+
+/* Pointer-only enhancement (the ⋯ menu carries the same reorder for keyboard and
+   touch), so it is aria-hidden and unfocusable. `touch-action: none` is what stops a
+   drag on a phone from scrolling the page out from under the row. */
+.nh-roweditor-grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: var(--space-2);
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.nh-roweditor-grip:hover { color: var(--text-dim); }
+
+.nh-roweditor-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* 44px floor as real paint (route 1). A stacked list must never take the `.tap-target`
+     route: overlapping invisible extensions steal the neighbouring row's taps. */
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.35 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.nh-roweditor-head .nh-roweditor-toggle:hover { color: var(--text); background: transparent; }
+.nh-roweditor-head .nh-roweditor-toggle:hover .nh-roweditor-caret { color: var(--text); }
+
+.nh-roweditor-caret {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+  transition: transform var(--dur-hover) var(--ease-settle);
+}
+.nh-roweditor-caret.is-open { transform: rotate(180deg); }
+
+.nh-roweditor-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nh-roweditor-label--static {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.35 var(--font-body);
+}
+.nh-roweditor-menu { flex: none; }
+
+.nh-roweditor-body { padding: 0 var(--space-3) var(--space-3); }
+/* `display` is unset above so the `hidden` attribute keeps working; belt and braces. */
+.nh-roweditor-body[hidden] { display: none; }
+
+/* Reorder feedback. Selection owns the edge and the glow (design-language §5), and
+   nothing here uses a group `opacity` — a dimmed subtree cannot be opted back out of. */
+.nh-roweditor.is-reordering { user-select: none; -webkit-user-select: none; }
+.nh-roweditor.is-reordering .nh-roweditor-grip { cursor: grabbing; }
+.nh-roweditor-row.is-dragging { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.nh-roweditor-row.is-drop-target { border-color: var(--line-strong); background: var(--surface-2); }
+
+.nh-roweditor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.nh-roweditor-add-icon { display: grid; place-items: center; font-size: 1.05em; }
+/* Full strength beside a disabled Add — the reason is the one thing that must stay
+   readable when the control it explains is dimmed. */
+.nh-roweditor-reason { margin: 0; font-size: var(--fs-sm); color: var(--caution-hi); }
+
+/* `.nh-empty` reused rather than rebuilt, minus its 12rem min-height: this instance
+   sits inside a form section between other fields, where a half-screen dashed panel
+   would out-weigh everything it is nested in. */
+.nh-roweditor-empty {
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-4);
+  font-size: var(--fs-sm);
+}

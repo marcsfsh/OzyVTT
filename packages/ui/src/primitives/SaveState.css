@@ -1,0 +1,40 @@
+/* SaveState — the autosave readout. Layout only carries three jobs: hold a stable
+   width so the editor head does not jitter as the status cycles, keep icon and word
+   on one baseline, and let the Reload/Retry button wrap on a phone rather than
+   squeezing the word. */
+
+.nh-savestate {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  /* The readout sits next to Publish in a head row; the button next to it is 44px, so
+     matching that height keeps the cluster on one optical line. It is not itself
+     interactive, so this is alignment, not the touch floor. */
+  min-height: var(--tap-min);
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+}
+
+.nh-savestate-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+
+/* Reserve the longest string ("Unsaved changes") so "Saved" → "Saving…" → "Saved"
+   never shifts the buttons beside it. min-width, not width: the label still grows for
+   a longer translation instead of clipping. */
+.nh-savestate-label { min-width: 8.5rem; }
+.nh-savestate-action { flex: none; }
+
+/* Colour is the THIRD signal here, after the word and the glyph. --text-muted is
+   3.61:1 and fails AA, so it is never used for a state (design-language §4). */
+.nh-savestate--rest { color: var(--text-dim); }
+.nh-savestate--rest .nh-savestate-icon { color: var(--success); }
+.nh-savestate--work { color: var(--text-dim); }
+.nh-savestate--caution { color: var(--caution-hi); }
+.nh-savestate--danger { color: var(--danger-hi); }
+
+/* Below the phone step the label stops reserving width — at 375px the editor head is
+   the whole column, and 136px of reserved space would push Reload onto its own row for
+   no benefit (there is nothing beside it left to keep still). */
+@media (max-width: 560px) {
+  .nh-savestate-label { min-width: 0; }
+}

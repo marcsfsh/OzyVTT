@@ -101,6 +101,14 @@
   transition: background var(--dur-hover), color var(--dur-hover);
 }
 .nh-menu-item:hover { background: var(--surface-3); }
+/* A disabled item (RowEditor's "Move up" on the first row) must dim per PROPERTY, never
+   with a group `opacity` (design-language §5). Two reasons this rule has to exist here:
+   the client's styles.css has a bare `button:disabled { opacity: .55 }` at (0,1,1), and
+   a group alpha composites the subtree so an item's icon or reason cannot opt back out.
+   `.nh-menu-item:disabled` is (0,2,0) and wins; `.nh-menu-item:hover` is only (0,2,0)
+   too, hence the explicit `:disabled:hover` reset below. Matches `.nh-tab:disabled`. */
+.nh-menu-item:disabled { opacity: 1; color: var(--text-muted); cursor: not-allowed; }
+.nh-menu-item:disabled:hover { background: transparent; }
 .nh-menu-item--danger { color: var(--danger-hi); }
 .nh-menu-item--danger:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 .nh-menu-item-icon { width: 1.1rem; text-align: center; color: var(--text-dim); }

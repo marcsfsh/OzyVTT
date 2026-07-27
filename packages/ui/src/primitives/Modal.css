@@ -44,6 +44,14 @@
 .nh-modal--accent-violet::before { background: var(--violet); }
 
 .nh-modal-head {
+  /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:
+     the client's styles.css carries a bare `header { max-width: 40rem }` (written for
+     its landing hero) which clamps EVERY <header> in the app — including this one, so a
+     `size="lg"`/`"full"` modal's title bar stopped 640px short of its own surface and
+     the bottom rule ended mid-air. A primitive must not depend on which element
+     selectors its host happens to define, and the app must not become coupled to a
+     primitive's class name, so the fix lives here and never in styles.css. */
+  max-width: none;
   display: flex;
   align-items: center;
   justify-content: space-between;

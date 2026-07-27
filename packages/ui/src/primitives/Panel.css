@@ -22,6 +22,14 @@
 .nh-panel--accent-violet::before { background: var(--violet); }
 
 .nh-panel-head {
+  /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:
+     the client's styles.css carries a bare `header { max-width: 40rem }` (written for
+     its landing hero) which clamps EVERY <header> in the app. In a panel wider than
+     640px that pinned the title to the left 640px and dragged the right-aligned
+     `.nh-panel-actions` in with it, so a panel's own actions floated mid-surface. The
+     fix belongs in the primitive, not in the app global — coupling styles.css to
+     `.nh-panel-head` would invert the dependency (readiness rule 5). */
+  max-width: none;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;

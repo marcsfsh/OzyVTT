@@ -58,9 +58,19 @@ export { Steps, type StepsProps, type StepItem } from "./primitives/Steps";
 export { Skeleton, type SkeletonProps } from "./primitives/Skeleton";
 export { Kbd, type KbdProps } from "./primitives/Kbd";
 
+/* Authoring primitives (Codex + homebrew editors, and any long typed-entity form) */
+export { FieldGrid, type FieldGridProps } from "./primitives/FieldGrid";
+export { NumberField, type NumberFieldProps } from "./primitives/NumberField";
+export { TagInput, slugify, type TagInputProps } from "./primitives/TagInput";
+export { RowEditor, type RowEditorProps } from "./primitives/RowEditor";
+export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/SaveState";
+
 /* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's
    richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
-export { IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil, IconWarning, IconInfo } from "./primitives/icons";
+export {
+  IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil, IconWarning, IconInfo,
+  IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff
+} from "./primitives/icons";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";

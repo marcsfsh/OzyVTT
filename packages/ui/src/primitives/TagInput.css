@@ -1,0 +1,31 @@
+/* TagInput — a chip row over an input. Layout only; the chips and the well are
+   `Chip` and `.nh-input`, which already carry their own look and their own hit areas. */
+
+.nh-taginput {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Gap arithmetic: the only interactive thing in a chip is its ✕, which is 1.1rem of
+   paint carrying a 44px `.tap-target` — 13px of overhang per side. Consecutive ✕s are
+   a whole chip apart (>=40px even for a two-letter tag), so they cannot steal each
+   other's taps; --space-2 is about reading room, not the floor. The chip LABEL is a
+   plain span, so an overhang crossing it takes nothing away. */
+.nh-taginput-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nh-taginput-tags > li { display: flex; min-width: 0; }
+
+/* A tag is a slug; showing it in the data face makes "long-rest" read as an id rather
+   than as prose the GM is expected to have phrased well. */
+.nh-taginput-tags .nh-chip-label { font-family: var(--font-mono); }
+
+.nh-taginput-hint { margin: 0; font-size: var(--fs-sm); color: var(--text-dim); }
+/* Full strength, never dimmed with the disabled input beside it (design-language §5). */
+.nh-taginput-reason { margin: 0; font-size: var(--fs-sm); color: var(--caution-hi); }

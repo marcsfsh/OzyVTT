@@ -271,8 +271,13 @@ body {
   border: 0;
 }
 
-/* Visible keyboard focus in the theme accent */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+/* Visible keyboard focus in the theme accent. `summary` is in the list because
+   <details>/<summary> is how the system builds disclosures — Menu's trigger and
+   FeatureList's rows are both summaries — and without it they fell back to Chromium's
+   default `outline: auto`, i.e. a platform ring in a colour this palette does not own.
+   `:where()` contributes zero specificity, so any primitive that styles its own focus
+   (`.nh-input:focus`, `.nh-choice:focus-visible`) still wins. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
   border-radius: var(--radius-sm);

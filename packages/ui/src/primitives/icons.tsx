@@ -83,3 +83,60 @@ export function IconInfo({ className }: Readonly<{ className?: string }>) {
     </Glyph>
   );
 }
+
+/* ---- Authoring glyphs (RowEditor, TagInput, and the homebrew/Codex editors).
+   Added together because a repeating-row editor needs the whole set at once: add a
+   row, drag it, copy it, throw it away. `IconArrow` is deliberately NOT here — the
+   forward → is all-or-none across seven existing call sites and is its own pass. ---- */
+
+/** Add — the one "make another of these" mark (RowEditor's Add, TagInput's commit). */
+export function IconPlus({ className }: Readonly<{ className?: string }>) {
+  return <Glyph className={className}><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" /></Glyph>;
+}
+
+/** Remove — destructive, so it is always paired with a word ("Remove action 2"). */
+export function IconTrash({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M9.5 2.5h5a1 1 0 0 1 1 1V5H20v2h-1.1l-.86 12.07A2 2 0 0 1 16.05 21H7.95a2 2 0 0 1-2-1.93L5.1 7H4V5h4.5V3.5a1 1 0 0 1 1-1zm1 2.5h3V5h-3zM9.2 9l.5 9.5h1.6L10.8 9zm4 0-.5 9.5h1.6L14.8 9z" />
+    </Glyph>
+  );
+}
+
+/** Drag grip — the pointer affordance for reorder. Never the ONLY way to reorder:
+    the row's ⋯ menu carries Move up / Move down for keyboard and touch (mobile-ux). */
+export function IconDrag({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M9 4.5h2.2v2.2H9zm3.8 0H15v2.2h-2.2zM9 8.9h2.2v2.2H9zm3.8 0H15v2.2h-2.2zM9 13.3h2.2v2.2H9zm3.8 0H15v2.2h-2.2zM9 17.7h2.2v2.2H9zm3.8 0H15v2.2h-2.2z" />
+    </Glyph>
+  );
+}
+
+/** Duplicate — "start from a copy of this one" (the create modal's second route). */
+export function IconCopy({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M8 2h9a2 2 0 0 1 2 2v11h-2V4H8zM5 6h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v12h8V8z" />
+    </Glyph>
+  );
+}
+
+/** Visible to players. Pairs with a WORD — the palette reserves violet for GM-only,
+    so visibility can never be carried by hue alone (design-language §2). */
+export function IconEye({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M12 4.8c4.5 0 8.3 2.9 9.9 7.2-1.6 4.3-5.4 7.2-9.9 7.2S3.7 16.3 2.1 12C3.7 7.7 7.5 4.8 12 4.8zm0 2c-3.4 0-6.4 2-7.8 5.2 1.4 3.2 4.4 5.2 7.8 5.2s6.4-2 7.8-5.2C18.4 8.8 15.4 6.8 12 6.8zm0 1.7a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z" />
+    </Glyph>
+  );
+}
+
+/** GM-only / hidden from players. The slash is the state, not the colour. */
+export function IconEyeOff({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d="M3.5 2.1 21.9 20.5l-1.4 1.4-3.2-3.2a11 11 0 0 1-5.3 1.3c-4.5 0-8.3-2.9-9.9-7.2A11.6 11.6 0 0 1 5.4 7.5L2.1 4.2zm3.3 6.8A9.6 9.6 0 0 0 4.2 12c1.4 3.2 4.4 5.2 7.8 5.2 1.2 0 2.4-.26 3.44-.74l-1.7-1.7a3.5 3.5 0 0 1-4.74-4.74zM12 4.8c4.5 0 8.3 2.9 9.9 7.2a11.7 11.7 0 0 1-2.53 3.86l-1.43-1.43A9.7 9.7 0 0 0 19.8 12C18.4 8.8 15.4 6.8 12 6.8c-.5 0-1 .04-1.48.13L8.85 5.25A11.3 11.3 0 0 1 12 4.8z" />
+    </Glyph>
+  );
+}
