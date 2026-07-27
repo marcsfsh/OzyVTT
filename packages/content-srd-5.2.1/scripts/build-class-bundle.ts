@@ -151,6 +151,8 @@ function featureProse(body: string): Map<string, string> {
 
 type ResourceSpec = { id: string; name: string; dice?: boolean };
 type ClassConfig = {
+  /** See BLURBS. */
+  blurb?: { summary: string; description: string };
   /** Table column -> how it lands in the row. Anything unlisted fails the build. */
   columns: Record<string, "features" | "cantrips" | "prepared" | "pact-slots" | "pact-level" | ResourceSpec>;
   spellcasting?: ClassReference["spellcasting"];
@@ -167,6 +169,55 @@ const ALL_SKILLS = [
 
 const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "general-feats" };
 const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
+
+/**
+ * Short class copy, written for this product - NOT SRD text.
+ *
+ * The SRD does carry a flavour paragraph per class (Fighter, Wizard and Cleric have theirs), but
+ * this transcription is mechanics-only and does not include them. Rather than leave nine cards
+ * reading "Barbarian, one of the twelve SRD 5.2.1 classes" - which is what the first generated pass
+ * shipped, and it looked exactly as unfinished as it was - or invent SRD-sounding prose and tag it
+ * `source: "srd"`, these are deliberately our own words describing what the class DOES mechanically.
+ * If the SRD paragraphs are ever vendored, they should replace these.
+ */
+const BLURBS: Record<string, { summary: string; description: string }> = {
+  barbarian: {
+    summary: "A primal fighter who turns rage into overwhelming physical force.",
+    description: "Barbarians fight in a fury they can enter at will, shrugging off punishment that would drop anyone else. Rage powers their damage and their resilience, and the pool of rages is the resource the class is built around."
+  },
+  bard: {
+    summary: "A performer whose magic works through music, words and sheer presence.",
+    description: "Bards are full casters who support the party as much as they threaten enemies. Bardic Inspiration hands out a die that other characters spend, and expertise makes the Bard the party's most reliable skill user."
+  },
+  druid: {
+    summary: "A full caster drawing on the natural world, able to take animal form.",
+    description: "Druids cast from the nature list and can spend Wild Shape to become a beast. The class trades some direct damage for versatility, control, and the ability to change what it is on the battlefield."
+  },
+  monk: {
+    summary: "An unarmoured martial artist spending focus on fast, precise strikes.",
+    description: "Monks fight without armour, using a martial-arts die that grows with level and Focus Points that buy extra attacks and mobility. Speed and action economy are the class's real weapons."
+  },
+  paladin: {
+    summary: "An oath-bound warrior blending heavy-armour combat with divine magic.",
+    description: "Paladins are half casters who fight on the front line. Channel Divinity and spell slots spent on smites give the class burst damage on top of the durability of full plate and a shield."
+  },
+  ranger: {
+    summary: "A half-caster tracker at home on the borders of the wild.",
+    description: "Rangers combine martial skill with a small nature spell list and strong exploration tools. Expertise and a wide skill list make the class as useful between fights as in them."
+  },
+  rogue: {
+    summary: "A precise, stealthy opportunist who strikes where it hurts most.",
+    description: "Rogues deal their damage through Sneak Attack, which scales to 10d6, and gain more expertise than any other class. The class is built to pick its moment rather than trade blows."
+  },
+  sorcerer: {
+    summary: "A caster whose magic is innate, reshaped on the fly through Metamagic.",
+    description: "Sorcerers know fewer spells than a Wizard but bend the ones they have. Sorcery Points buy Metamagic - twinning, quickening, or subtly casting a spell - which is what the class spends its resources on."
+  },
+  warlock: {
+    summary: "A caster powered by a pact, with few slots that always cast at full strength.",
+    description: "Warlocks use Pact Magic: a small number of slots, all at the highest level available, refreshed on a short rest. Eldritch Invocations are the class's real customisation, reshaping what it can do at will."
+  }
+};
 
 const CONFIG: Record<string, ClassConfig> = {
   barbarian: {
@@ -520,8 +571,8 @@ for (const [id, entry] of parsed) {
     id,
     name: entry.name,
     source: "srd",
-    summary: (entry.prose.get(slug(`Becoming a ${entry.name} …`)) ?? "").slice(0, 200) || `${entry.name}, one of the twelve SRD 5.2.1 classes.`,
-    description: `${entry.name}. ${traits["Primary Ability"] ?? ""}`.trim(),
+    summary: BLURBS[id].summary,
+    description: BLURBS[id].description,
     hitDie: (traits["Hit Point Die"] ?? "").match(/[Dd](\d+)/)?.[0].toLowerCase() ?? "d8",
     // statPriority is NOT in the SRD text - it is the product's own ordering for the random
     // generator, and `@vtt/rules-5e` already owns it for all twelve classes. Reading it here keeps
