@@ -12,7 +12,7 @@ import {
 import type {
   BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureOption, FeatureRecord, SpeciesReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import type { ContentLibrary } from "./content-library.js";
+import type { ContentView } from "./content-library.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -343,7 +343,12 @@ function grantedClassFeatures(entry: ClassReference, level: number): { features:
 // The build.
 // ---------------------------------------------------------------------------------------------
 
-export function buildCharacterDefinition(input: CharacterCreateRequestInput, library: ContentLibrary, policy: BuilderPolicy): ActorDefinition {
+/**
+ * `library` is an audience-scoped view, never the whole `ContentLibrary`: every `*Record(...)`
+ * lookup below then reads the CALLER's catalog automatically, so a player can never build against -
+ * or even successfully name - a homebrew record the GM has not made player-visible.
+ */
+export function buildCharacterDefinition(input: CharacterCreateRequestInput, library: ContentView, policy: BuilderPolicy): ActorDefinition {
   const catalogs = library.catalogChoiceCatalogs();
   const progression: ClassProgressionTable = library.classProgressionTable();
 

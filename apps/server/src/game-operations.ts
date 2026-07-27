@@ -16,7 +16,7 @@ import { setCurrency, setInventoryItem } from "./inventory.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "./character-edit.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "./character-claims.js";
 import type { CombatLogStore } from "./combat-log.js";
-import { actionSummaryOf, type ContentLibrary } from "./content-library.js";
+import { actionSummaryOf, type ContentAudience, type ContentLibrary } from "./content-library.js";
 import { addCombatant, endEncounter, nextInitiativeTurn, rollRemainingInitiative, rollSelfInitiative, setInitiativeScore, startEncounter } from "./encounter.js";
 import { addEffect, endEffect, endEncounterEffects, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { rollDeathSave } from "./death-saves.js";
@@ -142,8 +142,31 @@ export function createGameOperations(context: GameOperationsContext) {
   const { store, contentLibrary } = context;
   const actorName = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
   const actorHidden = (actorId: string) => store.snapshot.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
-  // Imported stat blocks take precedence over the bundle so sheets/actions resolve for both.
-  const resolveDefinition = (definitionId: string) => storedDefinition(store.snapshot, definitionId) ?? contentLibrary.monster(definitionId);
+
+  /**
+   * Which merged catalog this principal may READ. GM-grade covers the GM's own session and the GM's
+   * minted integration credentials (an integration is the GM's trusted automation, ADR-0016); a
+   * player session sees only player-visible records.
+   *
+   * Every content read below derives its audience here rather than taking the whole library, because
+   * the catalogs are about to stop being SRD-only: the moment homebrew merges in, a read that
+   * ignored its principal would serve every GM-only record to every player - and it would do so far
+   * away from `projections.ts`, where a viewer-safety audit looks.
+   */
+  const audienceOf = (principal: GamePrincipal): ContentAudience => isGmGrade(principal) ? "gm" : "player";
+  const catalogFor = (principal: GamePrincipal) => contentLibrary.forAudience(audienceOf(principal));
+
+  /**
+   * PLAY-TIME definition lookup, hoisted so the ten transaction-scoped copies of this expression
+   * cannot drift apart. Imported stat blocks take precedence over the bundle so sheets/actions
+   * resolve for both, and `monsterForInstance` deliberately ignores a homebrew record's
+   * draft/published/deleted status: a live actor's actions, typed defences and recharge behaviour
+   * are read from the definition per use, so anything narrower would silently disarm every token of
+   * a creature the GM soft-deleted mid-fight.
+   */
+  const resolveDefinitionIn = (state: GameState, definitionId: string) => storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
+  /** The same lookup against the current snapshot, for reads that run outside a command transaction. */
+  const resolveDefinition = (definitionId: string) => resolveDefinitionIn(store.snapshot, definitionId);
 
   /** Shared narration fan-out for engine transitions (effect ends, dying, consciousness). */
   const publishNarrations = (events: readonly EffectNarration[]) => {
@@ -170,72 +193,91 @@ export function createGameOperations(context: GameOperationsContext) {
       return context.combatLog.list(isGmGrade(principal), limit);
     },
 
+    // Every content read below scopes its catalog to the CALLING principal through `catalogFor`.
+    // Which of them a player may call at all is unchanged - the bestiary and stat blocks stay
+    // GM-only, the rules catalogs stay open - but "may call it" and "sees everything in it" are now
+    // separate questions, and the second is answered once, structurally, by the audience.
+
     contentMonsters(principal: GamePrincipal) {
       requireGmGrade(principal, "Only the GM can browse bundled content.");
-      return { monsters: contentLibrary.monsterSummaries(), attribution: contentLibrary.attribution };
+      const catalog = catalogFor(principal);
+      return { monsters: catalog.monsterSummaries(), attribution: catalog.attribution };
     },
 
-    contentConditions(_principal: GamePrincipal) {
+    contentConditions(principal: GamePrincipal) {
       // Reference text is public information: any joined session (GM or player) may read it.
       // Attribution rides along like every other catalog: ADR-0015 requires the BUNDLE's canonical
       // statement (author, source URL, license URI) on any surface that displays this content, and a
       // client that has to hand-write a substitute always writes a weaker one.
-      return { conditions: contentLibrary.conditionSummaries(), attribution: contentLibrary.attribution };
+      const catalog = catalogFor(principal);
+      return { conditions: catalog.conditionSummaries(), attribution: catalog.attribution };
     },
 
-    contentSkills(_principal: GamePrincipal) {
+    contentSkills(principal: GamePrincipal) {
       // The skill catalog (reference text + the ability each check uses) is public reference like
       // conditions: any joined session reads it, and the sheet/builder derive skill modifiers from
       // it instead of a hardcoded client table.
-      return { skills: contentLibrary.skillSummaries(), attribution: contentLibrary.attribution };
+      const catalog = catalogFor(principal);
+      return { skills: catalog.skillSummaries(), attribution: catalog.attribution };
     },
 
-    contentSpells(_principal: GamePrincipal) {
+    contentSpells(principal: GamePrincipal) {
       // Spell rules are public reference text (the CC-BY SRD), like conditions - any joined session may read them.
-      return { spells: contentLibrary.spellSummaries(), attribution: contentLibrary.attribution };
+      const catalog = catalogFor(principal);
+      return { spells: catalog.spellSummaries(), attribution: catalog.attribution };
     },
 
-    contentEquipment(_principal: GamePrincipal) {
+    contentEquipment(principal: GamePrincipal) {
       // The SRD equipment catalog is public reference (like spells); the sheet's browse-and-add picker reads it.
       // Attribution rides along so any surface that displays the gear can show the required CC-BY line.
-      return { equipment: contentLibrary.equipmentSummaries(), attribution: contentLibrary.attribution };
+      const catalog = catalogFor(principal);
+      return { equipment: catalog.equipmentSummaries(), attribution: catalog.attribution };
     },
 
     // The six character-builder catalogs. Deliberately NOT gated like the bestiary: a player builds
     // their own character, so any joined session reads them (the same audience as conditions, spells
     // and equipment). Attribution rides on every one - ADR-0015 requires the wizard to display it.
-    contentClasses(_principal: GamePrincipal) {
-      return { classes: contentLibrary.classSummaries(), attribution: contentLibrary.attribution };
+    contentClasses(principal: GamePrincipal) {
+      const catalog = catalogFor(principal);
+      return { classes: catalog.classSummaries(), attribution: catalog.attribution };
     },
 
-    contentSubclasses(_principal: GamePrincipal) {
-      return { subclasses: contentLibrary.subclassSummaries(), attribution: contentLibrary.attribution };
+    contentSubclasses(principal: GamePrincipal) {
+      const catalog = catalogFor(principal);
+      return { subclasses: catalog.subclassSummaries(), attribution: catalog.attribution };
     },
 
-    contentSpecies(_principal: GamePrincipal) {
-      return { species: contentLibrary.speciesSummaries(), attribution: contentLibrary.attribution };
+    contentSpecies(principal: GamePrincipal) {
+      const catalog = catalogFor(principal);
+      return { species: catalog.speciesSummaries(), attribution: catalog.attribution };
     },
 
-    contentBackgrounds(_principal: GamePrincipal) {
-      return { backgrounds: contentLibrary.backgroundSummaries(), attribution: contentLibrary.attribution };
+    contentBackgrounds(principal: GamePrincipal) {
+      const catalog = catalogFor(principal);
+      return { backgrounds: catalog.backgroundSummaries(), attribution: catalog.attribution };
     },
 
-    contentFeats(_principal: GamePrincipal) {
-      return { feats: contentLibrary.featSummaries(), attribution: contentLibrary.attribution };
+    contentFeats(principal: GamePrincipal) {
+      const catalog = catalogFor(principal);
+      return { feats: catalog.featSummaries(), attribution: catalog.attribution };
     },
 
-    contentNames(_principal: GamePrincipal) {
-      return { names: contentLibrary.nameBundles(), attribution: contentLibrary.attribution };
+    contentNames(principal: GamePrincipal) {
+      const catalog = catalogFor(principal);
+      return { names: catalog.nameBundles(), attribution: catalog.attribution };
     },
 
     contentMonsterActions(principal: GamePrincipal, raw: unknown) {
       requireGmGrade(principal, "Only the GM can browse stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The action lookup is malformed.");
+      const catalog = catalogFor(principal);
       const imported = storedDefinition(store.snapshot, request.definitionId);
-      const definition = imported ?? contentLibrary.monster(request.definitionId);
+      // Browse, so the catalog's own lookup (which honours draft/published/deleted) rather than the
+      // play-time resolver: a stat block the GM has not published is not a stat block to browse.
+      const definition = imported ?? catalog.monster(request.definitionId);
       const actions = imported
         ? imported.actions.map(actionSummaryOf)
-        : contentLibrary.monsterActionSummaries(request.definitionId);
+        : catalog.monsterActionSummaries(request.definitionId);
       if (!actions) throw new CommandRejectedError("That stat block is not in the bundled content.");
       // The SRD generic actions (Dodge, Dash, Help, Unarmed Strike, ...) every combatant can take
       // ride along after the stat block's own; a declared id shadows its builtin.
@@ -248,6 +290,9 @@ export function createGameOperations(context: GameOperationsContext) {
     contentMonsterSheet(principal: GamePrincipal, raw: unknown) {
       requireGmGrade(principal, "Only the GM can read stat blocks.");
       const request = parse(ContentActionsSchema, raw, "The stat-block lookup is malformed.");
+      // GM-only, and reached from a LIVE token as often as from the bestiary, so this one uses the
+      // play-time resolver on purpose: the GM must still be able to read the sheet of a creature
+      // that is on the table but has since been soft-deleted from the library.
       const definition = resolveDefinition(request.definitionId);
       if (!definition) throw new CommandRejectedError("That stat block is not in the bundled content.");
       return { definition };
@@ -263,7 +308,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, mapAssetId, entries, rulesMode, playersRollInitiative, expectedRevision } = request;
       const tokenGeometry = await context.tokenGeometryFor(mapAssetId);
       const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
-        startEncounter(state, { mapAssetId, entries, rulesMode, playersRollInitiative }, () => context.random(20), tokenGeometry, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        startEncounter(state, { mapAssetId, entries, rulesMode, playersRollInitiative }, () => context.random(20), tokenGeometry, (definitionId) => resolveDefinitionIn(state, definitionId));
         // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
         // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
         timeline.truncateAll();
@@ -320,7 +365,10 @@ export function createGameOperations(context: GameOperationsContext) {
             // Frenzy's Exhaustion) - the fight's true aftermath, which finalState predates.
             postEncounterState: structuredClone(state),
             endedAt,
-            resolveBundledDefinition: (definitionId) => contentLibrary.monster(definitionId),
+            // Archiving the fight that just ended is a play-time read, not a browse: the archive
+            // must snapshot the definition every combatant actually fought with, whatever the
+            // library has since done with the record.
+            resolveBundledDefinition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
             attribution: contentLibrary.attribution
           });
           timeline.archive({ commandId, startedAt: document.startedAt, endedAt: document.endedAt, turnCount: document.turnCount, documentJson: JSON.stringify(document) });
@@ -399,7 +447,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const effectEvents: EffectNarration[] = [];
       const result = await store.executeTimeline({ id: request.commandId, type: "initiative.next", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         outcome = planNextTurn(state, timeline, request.confirmRewrite === true, (advancing) => nextInitiativeTurn(advancing, effectEvents, {
-          resolveDefinition: (definitionId) => storedDefinition(advancing, definitionId) ?? contentLibrary.monster(definitionId),
+          resolveDefinition: (definitionId) => resolveDefinitionIn(advancing, definitionId),
           rollDie: (sides) => context.random(sides)
         }));
       });
@@ -429,7 +477,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.executeTimeline({ id: request.commandId, type: "turn.end", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         if (state.combat.historyCursor !== null) throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
         planNextTurn(state, timeline, false, (advancing) => endTurn(advancing, scope, effectEvents, {
-          resolveDefinition: (definitionId) => storedDefinition(advancing, definitionId) ?? contentLibrary.monster(definitionId),
+          resolveDefinition: (definitionId) => resolveDefinitionIn(advancing, definitionId),
           rollDie: (sides) => context.random(sides)
         }));
       });
@@ -521,7 +569,7 @@ export function createGameOperations(context: GameOperationsContext) {
               { position: moverPoint, sizeCells: moverToken.sizeCells ?? 1, sizePx: moverToken.sizePx })?.value ?? null;
           },
           override: request.override ?? null,
-          resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId),
+          resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
           newPromptId: context.newId,
           now: Date.now,
           commandId
@@ -550,7 +598,11 @@ export function createGameOperations(context: GameOperationsContext) {
     async actorAddFromDefinition(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       requireGmGrade(principal, "Only the GM can add combatants.");
       const request = parse(ActorAddFromDefinitionSchema, raw, "The add-combatant command is malformed.");
-      const definition = contentLibrary.monster(request.definitionId);
+      // A browse-driven add, so the GM's catalog: a creature that is still a draft is not yet
+      // something to drop on the map. (Library state and TABLE visibility stay independent - a
+      // published, player-invisible monster is perfectly addable as a public token; players fight
+      // it, they just cannot browse its statblock.)
+      const definition = catalogFor(principal).monster(request.definitionId);
       if (!definition) throw new CommandRejectedError("That monster is not in the bundled content.");
       // Like annotation:add, the commandId doubles as the new entity id so a duplicate
       // delivery acks the same actorId instead of minting a fresh unused one.
@@ -584,7 +636,10 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: request.commandId, type: "character.create", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         // Assemble INSIDE the command so validation reads the CURRENT builder policy, then land the
         // definition through the same import path as every other sheet (`import-<actorId>` keying).
-        const definition = buildCharacterDefinition(request, contentLibrary, state.builderPolicy);
+        // The builder gets the CALLER's catalog, never the whole library: a player must not be able
+        // to name a GM-only homebrew class id they were never shown. GM-only today, so the audience
+        // is always "gm" - passing it anyway is what keeps phase 3's player path correct by default.
+        const definition = buildCharacterDefinition(request, catalogFor(principal), state.builderPolicy);
         importActorDefinition(state, definition, actorId, "public");
       });
       if (!result.duplicate) {
@@ -702,7 +757,7 @@ export function createGameOperations(context: GameOperationsContext) {
 
     async actorSetCondition(principal: GamePrincipal, raw: unknown): Promise<GameMutationResult> {
       const request = parse(SetConditionSchema, raw, "The condition command is malformed.");
-      if (!contentLibrary.hasCondition(request.conditionId)) throw new CommandRejectedError("That condition is not in the bundled rules.");
+      if (!catalogFor(principal).hasCondition(request.conditionId)) throw new CommandRejectedError("That condition is not in the bundled rules.");
       if (request.override && !isGmGrade(principal)) throw new GameAccessDeniedError("Only the GM can override movement rules.");
       const scope = actorScopeOf(principal);
       const { commandId, actorId, conditionId, active, level, expectedRevision } = request;
@@ -712,7 +767,7 @@ export function createGameOperations(context: GameOperationsContext) {
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
-        const conditionName = contentLibrary.conditionSummaries().find((entry) => entry.id === conditionId)?.name ?? conditionId;
+        const conditionName = catalogFor(principal).conditionSummaries().find((entry) => entry.id === conditionId)?.name ?? conditionId;
         // Immunity skips narrate through the events instead of the generic applied line.
         const immune = events.some((event) => event.text.includes("is immune to"));
         if (!immune) context.broadcastTableEvent({ kind: "condition", text: active ? `${actorName(actorId)} is ${conditionName}${conditionId === "exhaustion" && level ? ` ${level}` : ""}.` : `${actorName(actorId)} is no longer ${conditionName}.`, actorIds: [actorId] });
@@ -777,7 +832,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const effectiveConditionId = isPlayer ? null : (conditionId ?? null);
       const effectiveCover = isPlayer ? null : (request.cover ?? null);
       const effectiveNote = isPlayer ? null : (request.note ?? null);
-      if (effectiveConditionId !== null && !contentLibrary.hasCondition(effectiveConditionId)) throw new CommandRejectedError("That condition is not in the bundled reference.");
+      if (effectiveConditionId !== null && !catalogFor(principal).hasCondition(effectiveConditionId)) throw new CommandRejectedError("That condition is not in the bundled reference.");
       // The map grid is fetched up front (async) so template containment AND token-distance rules
       // (prone within 5 ft, unconscious auto-crit) can run inside the synchronous mutation.
       const mapAssetId = store.snapshot.combat.mapAssetId;
@@ -796,7 +851,7 @@ export function createGameOperations(context: GameOperationsContext) {
         // policy hook (ADR-0021), so pass the action kind even though it is not read yet.
         const verdict = canInitiateForActor(initiator, state, actorId, "attack");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        const definition = attacker.definitionId ? storedDefinition(state, attacker.definitionId) ?? contentLibrary.monster(attacker.definitionId) : undefined;
+        const definition = attacker.definitionId ? resolveDefinitionIn(state, attacker.definitionId) : undefined;
         // The stat block wins on id collision; the builtin catalog (Dodge, Dash, Unarmed Strike, ...)
         // covers every combatant - including one without a definition.
         const statBlockAction = definition?.actions.find((candidate) => candidate.id === actionId);
@@ -831,11 +886,11 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => contentLibrary.hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId) });
         // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
         // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
         // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.
-        if (isPlayer) playerDamageApplied = settlePlayerHit(state, resolution, attacker.name, actorId, state.combat.playerDamageMode, { resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId), newId: context.newId, now: () => Date.now() }) ?? undefined;
+        if (isPlayer) playerDamageApplied = settlePlayerHit(state, resolution, attacker.name, actorId, state.combat.playerDamageMode, { resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), newId: context.newId, now: () => Date.now() }) ?? undefined;
         // Record the blast as a public shape so the whole table (and viewer) sees it; id=commandId keeps re-delivery idempotent.
         if (template) addAnnotation(state, { id: commandId, kind: "shape", shape: template.shape, origin: template.origin, target: template.target, visibility: "public", actor: { sessionId: gmSessionId, role: "gm" }, now: Date.now() }, geometry!);
       });
@@ -937,7 +992,7 @@ export function createGameOperations(context: GameOperationsContext) {
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const result = await store.execute({ id: commandId, type: "reaction.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         outcome = answerReaction(state, commandId, reactionId, use, chosenActionId, scope, {
-          resolveDefinition: (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId),
+          resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
           random: (sides) => context.random(sides),
           newRollId: context.newId,
           gmSessionId,
@@ -1238,7 +1293,7 @@ export function createGameOperations(context: GameOperationsContext) {
       let healed = 0;
       let events: EffectNarration[] = [];
       const result = await store.execute({ id: commandId, type: "actor.spend-hit-dice", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
-        const outcome = spendHitDice(state, actorId, faces, scope, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        const outcome = spendHitDice(state, actorId, faces, scope, (definitionId) => resolveDefinitionIn(state, definitionId));
         healed = outcome.healed;
         events = outcome.events;
         const actor = state.actors.find((candidate) => candidate.id === actorId)!;
@@ -1269,7 +1324,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "character.set-slot", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        setSpellSlotRemaining(state, actorId, level, remaining, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        setSpellSlotRemaining(state, actorId, level, remaining, (definitionId) => resolveDefinitionIn(state, definitionId));
       });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -1281,7 +1336,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "character.set-prepared", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        setPreparedSpell(state, actorId, spellId, prepared, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        setPreparedSpell(state, actorId, spellId, prepared, (definitionId) => resolveDefinitionIn(state, definitionId));
       });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -1293,7 +1348,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "character.set-inventory", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        setInventoryItem(state, actorId, item, (definitionId) => storedDefinition(state, definitionId) ?? contentLibrary.monster(definitionId));
+        setInventoryItem(state, actorId, item, (definitionId) => resolveDefinitionIn(state, definitionId));
       });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };

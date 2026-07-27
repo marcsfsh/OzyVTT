@@ -4,7 +4,9 @@ import { openApiDocument } from "@vtt/api-contract";
 import { ContentLibrary } from "../src/content-library.js";
 
 describe("bundled reference content exposed to the client", () => {
-  const library = new ContentLibrary();
+  // A catalog is only readable through an audience - there is no defaulted accessor. With no
+  // homebrew source wired in, both audiences resolve to the same SRD-only catalog.
+  const library = new ContentLibrary().forAudience("gm");
 
   it("flattens SRD spells into card-ready summaries (name, components, rules text)", () => {
     const spells = library.spellSummaries();

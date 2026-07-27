@@ -47,7 +47,7 @@ describe("progressionFromClass reconciliation", () => {
   });
 
   it("is the table the content library actually serves to the builder", () => {
-    const table = new ContentLibrary().classProgressionTable();
+    const table = new ContentLibrary().forAudience("gm").classProgressionTable();
     expect(table.wizard.casterProgression).toBe("full");
     expect(table.wizard.hitDie).toBe("d6");
     expect(table.fighter.asiLevels).toEqual([4, 6, 8, 12, 14, 16]);

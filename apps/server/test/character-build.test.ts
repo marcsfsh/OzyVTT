@@ -15,7 +15,9 @@ import { startEncounter } from "../src/encounter.js";
  * the loud-rejection paths (unknown ids, over-cap prepared spells, invalid HP entries, policy).
  */
 
-const library = new ContentLibrary();
+// `buildCharacterDefinition` takes an audience-scoped view, not the library itself; with no
+// homebrew source wired in both audiences resolve to the same SRD-only catalog.
+const library = new ContentLibrary().forAudience("gm");
 const defaultPolicy = BuilderPolicySchema.parse({});
 const ACTOR_ID = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 
