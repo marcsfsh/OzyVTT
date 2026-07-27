@@ -2371,9 +2371,31 @@
         "choice": {
           "kind": "divine-order",
           "choose": 1,
-          "from": [
-            "protector",
-            "thaumaturge"
+          "options": [
+            {
+              "id": "protector",
+              "name": "Protector",
+              "description": "Trained for battle, you gain proficiency with Martial weapons and training with Heavy armor.",
+              "grants": {
+                "weapons": [
+                  "martial"
+                ],
+                "armor": [
+                  "heavy"
+                ]
+              }
+            },
+            {
+              "id": "thaumaturge",
+              "name": "Thaumaturge",
+              "description": "You know one extra cantrip from the Cleric spell list. In addition, your mystical connection to the divine gives you a bonus to your Intelligence (Arcana or Religion) checks. The bonus equals your Wisdom modifier (minimum of +1).",
+              "choice": {
+                "kind": "cantrip",
+                "choose": 1,
+                "fromCatalog": "cleric-spells",
+                "maxSpellLevel": 0
+              }
+            }
           ]
         }
       },
@@ -2390,8 +2412,39 @@
             "id": "divine-spark",
             "name": "Channel Divinity: Divine Spark",
             "activation": "action",
-            "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8).",
-            "damage": []
+            "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8). The rollable below is the damaging branch, recorded as Radiant; the healing branch and the added Wisdom modifier are resolved from this text.",
+            "save": {
+              "ability": "con",
+              "dc": "spellcasting"
+            },
+            "damage": [
+              {
+                "formula": "1d8",
+                "type": "radiant"
+              }
+            ],
+            "damageByLevel": [
+              {
+                "level": 2,
+                "formula": "1d8",
+                "type": "radiant"
+              },
+              {
+                "level": 7,
+                "formula": "2d8",
+                "type": "radiant"
+              },
+              {
+                "level": 13,
+                "formula": "3d8",
+                "type": "radiant"
+              },
+              {
+                "level": 18,
+                "formula": "4d8",
+                "type": "radiant"
+              }
+            ]
           },
           {
             "id": "turn-undead",
@@ -2472,9 +2525,48 @@
         "choice": {
           "kind": "blessed-strikes",
           "choose": 1,
-          "from": [
-            "divine-strike",
-            "potent-spellcasting"
+          "options": [
+            {
+              "id": "divine-strike",
+              "name": "Divine Strike",
+              "description": "Once on each of your turns when you hit a creature with an attack roll using a weapon, you can cause the target to take an extra 1d8 Necrotic or Radiant damage (your choice). The extra damage increases to 2d8 when Improved Blessed Strikes takes effect at Cleric level 14.",
+              "actions": [
+                {
+                  "id": "divine-strike",
+                  "name": "Divine Strike",
+                  "activation": "other",
+                  "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit. The printed damage is Necrotic or Radiant, your choice each time; the rollable below is recorded as Radiant.",
+                  "damage": [
+                    {
+                      "formula": "1d8",
+                      "type": "radiant"
+                    }
+                  ],
+                  "damageByLevel": [
+                    {
+                      "level": 7,
+                      "formula": "1d8",
+                      "type": "radiant"
+                    },
+                    {
+                      "level": 14,
+                      "formula": "2d8",
+                      "type": "radiant"
+                    }
+                  ]
+                }
+              ],
+              "uses": {
+                "limit": 1,
+                "per": "turn",
+                "pool": "blessed-strikes"
+              }
+            },
+            {
+              "id": "potent-spellcasting",
+              "name": "Potent Spellcasting",
+              "description": "Add your Wisdom modifier to the damage you deal with any Cleric cantrip. When Improved Blessed Strikes takes effect at Cleric level 14, casting a Cleric cantrip that damages a creature also grants you or a creature within 60 feet Temporary Hit Points equal to twice your Wisdom modifier."
+            }
           ]
         }
       },

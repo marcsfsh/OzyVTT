@@ -102,9 +102,28 @@ export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
   return definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [];
 }
 
+/**
+ * The flat, NON-equipment Armor Class a sheet carries beyond its armor: the Defense fighting style's
+ * "+1 while you wear armor", a ring of protection, a homebrew rider. `ActorDefinition` models only
+ * the AC TOTAL, so any path that RE-DERIVES AC from the live loadout would drop it - which is exactly
+ * how `definition.armorClass` and the live actor's AC diverged the moment a feature granted flat AC
+ * (task-packet risk 3). The builder records it in the open `open5e.srd-2024` extension bag, the same
+ * fail-open channel that already carries an import's skills and saving throws; a definition without
+ * one (every monster, every PDF import) reads 0 and behaves exactly as before.
+ */
+export function armorClassRiderOf(definition: ActorDefinition): number {
+  const extension = definition.extensions["open5e.srd-2024"];
+  if (extension && typeof extension === "object") {
+    const value = (extension as { armorClassBonus?: unknown }).armorClassBonus;
+    if (typeof value === "number" && Number.isInteger(value) && value >= -10 && value <= 10) return value;
+  }
+  return 0;
+}
+
 function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), inventory);
   state.actors.push({
     id,
     name: dedupedName(state, definition.name),
@@ -112,8 +131,9 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     visibility,
     hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum, temporary: 0 },
     // AC derives from equipped armor/shields when the loadout has any (v6 #5); otherwise the stored
-    // stat-block AC stands (natural/mage armor, monsters).
-    armorClass: armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), inventory) ?? definition.armorClass,
+    // stat-block AC stands (natural/mage armor, monsters). The sheet's flat rider is added back on
+    // top of the derived value, so a builder-made definition and its live actor cannot disagree.
+    armorClass: equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition),
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],

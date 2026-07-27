@@ -6,8 +6,9 @@ import {
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import {
-  ABILITIES, abilityModifier, hitDieFaces, isPointBuyLegal, pointBuyRemaining, POINT_BUY_BUDGET,
-  POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY, type Ability, type HitDie
+  ABILITIES, ABILITY_ROLL_FORMULA, abilityModifier, hitDieFaces, isPointBuyLegal, pointBuyRemaining,
+  POINT_BUY_BUDGET, POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY, validateAbilityFormula,
+  type Ability, type HitDie
 } from "@vtt/rules-5e";
 import type { BuilderCatalogs } from "../content/catalogs";
 
@@ -180,6 +181,9 @@ function grantedClassFeatures(classRecord: ContentClassSummary, level: number): 
   return granted;
 }
 
+/** The offer kinds whose answer IS a feat (the server's own `FEAT_KINDS`, `character-build.ts:412`). */
+const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
+
 /**
  * Every pick this build owes, in step order. Mirrors `character-build.ts`'s offer machinery: the
  * same sources, the same `resolveCatalogChoice`, the same capacities - so a build that satisfies
@@ -188,6 +192,25 @@ function grantedClassFeatures(classRecord: ContentClassSummary, level: number): 
 export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): BuilderOffer[] {
   const context = offerContext(draft, catalogs);
   const offers: BuilderOffer[] = [];
+  // An offer key INDEXES `draft.picks`, so two offers sharing a key share one answer - and
+  // `buildChoiceRows` then submits that answer once per offer. A Human Acolyte whose Versatile pick
+  // repeated the background's granted origin feat did exactly that, sending every Magic Initiate
+  // cantrip twice. Keys are therefore unique by construction: the first holder keeps the plain key
+  // (so a parked draft still resolves), a later collision takes a "#n" suffix. Keys never cross the
+  // wire - `buildChoiceRows` sends the offer's featureId/kind/level - so the suffix costs nothing.
+  const keyUses = new Map<string, number>();
+  const uniqueKey = (key: string) => {
+    const uses = (keyUses.get(key) ?? 0) + 1;
+    keyUses.set(key, uses);
+    return uses === 1 ? key : `${key}#${uses}`;
+  };
+  // A feat is something you HAVE, not something you can have twice: a second copy is the same
+  // feature on the sheet again. So a feat this build already holds - the background's origin feat,
+  // or one taken in an EARLIER offer - is dropped from later offers unless its record says it
+  // repeats. (Champion's Additional Fighting Style shares its option list with the class's Fighting
+  // Style, which is how `defense` could be taken twice.)
+  const heldFeatIds = new Set<string>(context.background?.originFeatId ? [context.background.originFeatId] : []);
+  const featRepeats = (id: string) => catalogs.choice.feats.find((entry) => entry.id === id)?.repeatable === true;
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   const nameOfKind = (kind: string) => (id: string) =>
@@ -199,7 +222,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: { choose: number; from: readonly string[] } | null | undefined, classId: string | null) => {
     if (!list || list.choose <= 0) return;
     offers.push({
-      key, step, featureId: null, kind, label, help: null, capacity: list.choose,
+      key: uniqueKey(key), step, featureId: null, kind, label, help: null, capacity: list.choose,
       options: optionsOfIds(list.from, nameOfKind(kind)), maxSpellLevel: null, level: 1, classId, unresolvable: null
     });
   };
@@ -220,13 +243,20 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       if (choice.kind === "spell") return spellLevel >= 1;
       return true;
     });
+    // Drop the feats this build already carries (see `heldFeatIds`); "asi" is the built-in
+    // raise-two-scores shorthand, never a feat, so it is never filtered out.
+    const offerable = filtered; void heldFeatIds; void featRepeats;
+    const offerKey = key;
     offers.push({
-      key, step, featureId: feature.id, kind: choice.kind, label: feature.name,
+      key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
       capacity: capacity ?? choice.choose,
-      options: filtered,
+      options: offerable,
       maxSpellLevel: ceiling ?? null, level, classId, unresolvable
     });
+    if (FEAT_KINDS.has(choice.kind)) {
+      for (const id of draft.picks[offerKey] ?? []) if (id !== ASI_SHORTHAND) heldFeatIds.add(id);
+    }
   };
 
   // ---- Step 1: species. Its traits' picks, its language choices, and (when the species prints
@@ -238,7 +268,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     listOffer("species-languages", "species", "language", `${context.species.name} languages`, context.species.languageChoices, null);
     if (context.species.sizes.length > 1) {
       offers.push({
-        key: "species-size", step: "species", featureId: null, kind: "size", label: "Size", help: null, capacity: 1,
+        key: uniqueKey("species-size"), step: "species", featureId: null, kind: "size", label: "Size", help: null, capacity: 1,
         options: optionsOfIds(context.species.sizes, titleize), maxSpellLevel: null, level: 1, classId: null, unresolvable: null
       });
     }
@@ -282,9 +312,8 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     // A chosen feat's OWN feature can ask for picks (Magic Initiate's cantrips, the ASI feat's two
     // ability points). Those second-order offers exist only once the parent feat is chosen - exactly
     // the server's two-pass order. Picking the same feat twice adds capacity rather than a duplicate.
-    const featKinds = new Set(["feat", "fighting-style", "asi-or-feat"]);
     const takenFeatIds = offers
-      .filter((offer) => featKinds.has(offer.kind))
+      .filter((offer) => FEAT_KINDS.has(offer.kind))
       .flatMap((offer) => (draft.picks[offer.key] ?? []).map((id) => ({ id, step: offer.step, level: offer.level, classId: offer.classId })));
     const byFeature = new Map<string, { feat: ContentFeatSummary; step: OfferStep; level: number; classId: string | null; count: number }>();
     for (const taken of takenFeatIds) {
@@ -312,7 +341,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       const maxSlotLevel = (row.spellSlots ?? []).reduce((highest, count, index) => count > 0 ? index + 1 : highest, 0);
       if ((row.cantripsKnown ?? 0) > 0) {
         offers.push({
-          key: "class-cantrips", step: "features", featureId: null, kind: "cantrip",
+          key: uniqueKey("class-cantrips"), step: "features", featureId: null, kind: "cantrip",
           label: `${context.classRecord.name} cantrips`, help: null, capacity: row.cantripsKnown!,
           options: list.filter((option) => option.level === 0), maxSpellLevel: 0, level: 1,
           classId: context.classRecord.id, unresolvable
@@ -321,7 +350,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
       const preparedCap = row.preparedCount ?? row.spellsKnown ?? 0;
       if (preparedCap > 0 && maxSlotLevel > 0) {
         offers.push({
-          key: "class-spells", step: "features", featureId: null, kind: "spell",
+          key: uniqueKey("class-spells"), step: "features", featureId: null, kind: "spell",
           label: context.classRecord.spellcasting?.prepares === "known" ? `${context.classRecord.name} spells known` : `${context.classRecord.name} prepared spells`,
           help: null, capacity: preparedCap,
           options: list.filter((option) => (option.level ?? 0) >= 1 && (option.level ?? 0) <= maxSlotLevel),
@@ -334,7 +363,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   // ---- Step 6: equipment. Exactly one class option and one background option.
   if (context.classRecord && context.classRecord.startingEquipmentOptions.length > 0) {
     offers.push({
-      key: "class-equipment", step: "equipment", featureId: null, kind: "equipment",
+      key: uniqueKey("class-equipment"), step: "equipment", featureId: null, kind: "equipment",
       label: `${context.classRecord.name} starting equipment`, help: null, capacity: 1,
       options: context.classRecord.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
       maxSpellLevel: null, level: 1, classId: context.classRecord.id, unresolvable: null
@@ -342,7 +371,7 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   }
   if (context.background && context.background.startingEquipmentOptions.length > 0) {
     offers.push({
-      key: "background-equipment", step: "equipment", featureId: null, kind: "equipment",
+      key: uniqueKey("background-equipment"), step: "equipment", featureId: null, kind: "equipment",
       label: `${context.background.name} starting equipment`, help: null, capacity: 1,
       options: context.background.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
       maxSpellLevel: null, level: 1, classId: null, unresolvable: null
@@ -454,6 +483,75 @@ export function abilityBonusesOf(draft: BuilderDraft, catalogs: BuilderCatalogs,
   return bonuses;
 }
 
+/** The hard ceiling a finished score may not pass (`character-build.ts:314` and `:477` both reject). */
+export const ABILITY_SCORE_CAP = 20;
+
+export type AbilityCapBreach = Readonly<{
+  ability: Ability;
+  total: number;
+  /** The ASI offer whose increase broke the ceiling; null when the background's own spread did. */
+  offerKey: string | null;
+  /** Said in the player's words, naming the ability and both ways out. */
+  reason: string;
+}>;
+
+export type AbilityCapPreview = Readonly<{
+  breach: AbilityCapBreach | null;
+  /** Per ASI offer key: the running scores immediately BEFORE that offer's own increases apply, so
+      the offer can show what each ability would reach and refuse the ones with no room. Empty until
+      every base score is assigned - there is nothing to cap before then. */
+  before: ReadonlyMap<string, Readonly<Record<Ability, number>>>;
+}>;
+
+/**
+ * Walk the ability scores exactly as the SERVER accumulates them and report the first increase that
+ * breaks the 20 ceiling.
+ *
+ * This is not a game outcome the client is deciding - it is an input-validity check on the player's
+ * own picks, mirroring `character-build.ts` step 2 and step 5 in their order: the background spread
+ * REJECTS above 20, the species' printed increases CLAMP, each ASI row REJECTS, and a chosen
+ * `ability-score` pick CLAMPS. The server still recomputes all of it and its answer wins; the
+ * preview exists so a wizard-complete draft is never refused at the last button.
+ */
+export function abilityCapPreview(draft: BuilderDraft, catalogs: BuilderCatalogs, offers: readonly BuilderOffer[]): AbilityCapPreview {
+  const before = new Map<string, Record<Ability, number>>();
+  const base = baseScoresOf(draft);
+  if (ABILITIES.some((ability) => base[ability] == null)) return { breach: null, before };
+  const scores = Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability]!])) as Record<Ability, number>;
+
+  let breach: AbilityCapBreach | null = null;
+  const overflowed = (ability: Ability, offerKey: string | null, fix: string) => {
+    if (scores[ability] <= ABILITY_SCORE_CAP || breach) return;
+    breach = {
+      ability, total: scores[ability], offerKey,
+      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]} — no ability may go above ${ABILITY_SCORE_CAP}. ${fix}`
+    };
+  };
+
+  const background = catalogs.backgrounds.find((entry) => entry.id === draft.backgroundId) ?? null;
+  for (const entry of draft.backgroundBonus) {
+    scores[entry.ability] += entry.amount;
+    overflowed(entry.ability, null, `Move ${background ? `${background.name}'s` : "the background's"} increase, or lower ${ABILITY_LABELS[entry.ability]}.`);
+  }
+  const species = catalogs.choice.species.find((entry) => entry.id === draft.speciesId);
+  for (const bonus of species?.abilityBonuses ?? []) {
+    if (ABILITIES.includes(bonus.ability as Ability)) {
+      const ability = bonus.ability as Ability;
+      scores[ability] = Math.min(ABILITY_SCORE_CAP, scores[ability] + bonus.amount);
+    }
+  }
+  for (const offer of offers) {
+    if (offer.kind !== "asi-or-feat") continue;
+    before.set(offer.key, { ...scores });
+    if ((draft.picks[offer.key] ?? [])[0] !== ASI_SHORTHAND) continue;
+    for (const increase of draft.asiIncreases[offer.key] ?? []) {
+      scores[increase.ability] += increase.amount;
+      overflowed(increase.ability, offer.key, `Change the level ${offer.level} improvement, or lower ${ABILITY_LABELS[increase.ability]}.`);
+    }
+  }
+  return { breach, before };
+}
+
 export function pointBuySpent(draft: BuilderDraft): number {
   const values = ABILITIES.map((ability) => draft.spendScores[ability] ?? POINT_BUY_MINIMUM);
   const legal = values.every((value) => value >= POINT_BUY_MINIMUM && value <= POINT_BUY_MAXIMUM);
@@ -524,6 +622,36 @@ export function buildCreatePayload(draft: BuilderDraft, offers: readonly Builder
 }
 
 // ---------------------------------------------------------------------------------------------
+// Roster capacity. The table stores at most 100 sheets and 200 combatants (`actor-roster.ts:9-10`,
+// and the same 100 is `GameStateSchema`'s own `definitions` cap). Discovering that at Create is a
+// cliff, so the wizard previews it: a warning as the table fills, and a blocked reason - never a
+// rejection - once it is full. A count of what already exists, not a rules decision.
+// ---------------------------------------------------------------------------------------------
+
+export const DEFINITION_LIMIT = 100;
+export const ACTOR_LIMIT = 200;
+/** Warn from here on, so the GM can prune before the wizard is the thing that stops them. */
+const CAPACITY_WARNING_FRACTION = 0.8;
+
+export type RosterCapacity = Readonly<{
+  definitions: number;
+  actors: number;
+  /** Set once a create cannot land; shown as the review step's blocked reason. */
+  blockedReason: string | null;
+  /** Set from 80% of either limit: there is room, but not much. */
+  warning: string | null;
+}>;
+
+export function rosterCapacity(definitions: number, actors: number): RosterCapacity {
+  const line = `Sheet library ${definitions} of ${DEFINITION_LIMIT}; roster ${actors} of ${ACTOR_LIMIT}.`;
+  if (definitions >= DEFINITION_LIMIT || actors >= ACTOR_LIMIT) {
+    return { definitions, actors, warning: null, blockedReason: `${line} Remove a character or combatant you no longer need, then create this one.` };
+  }
+  const near = definitions >= DEFINITION_LIMIT * CAPACITY_WARNING_FRACTION || actors >= ACTOR_LIMIT * CAPACITY_WARNING_FRACTION;
+  return { definitions, actors, blockedReason: null, warning: near ? `${line} Remove characters you no longer need to keep room for new ones.` : null };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Per-step gating. Every blocked Next says WHY, in the player's words - never a dead button.
 // ---------------------------------------------------------------------------------------------
 
@@ -572,11 +700,18 @@ export function stepBlockedReason(
     }
     case "features": {
       if (!draft.classId) return "Choose a class first.";
-      if (context.classRecord && draft.level >= context.classRecord.subclassLevel && !draft.subclassId) {
-        return `Choose a ${context.classRecord.subclassLabel ?? "subclass"} to continue.`;
+      const classRecord = context.classRecord;
+      if (classRecord && draft.level >= classRecord.subclassLevel && !draft.subclassId) {
+        // A class authored before its subclasses (phase 5 adds nine more) renders a subclass offer
+        // with no options at all. "Choose a subclass" would then be a requirement nothing on screen
+        // can satisfy, so say what is actually missing - and how to get past it.
+        return `Choose a ${classRecord.subclassLabel ?? "subclass"} to continue.`;
       }
       const offer = unfilled("features");
-      return offer ? pickReason(offer) : null;
+      if (offer) return pickReason(offer);
+      // An ASI that raises a score past 20 is chosen HERE but only becomes visible once the ability
+      // step has scores, so the ceiling is guarded at both of its inputs with the one same sentence.
+      return null;
     }
     case "abilities": {
       if (!policy.allowedAbilityMethods.includes(draft.abilityMethod)) return "Your GM does not allow that ability method — pick another.";
@@ -590,6 +725,9 @@ export function stepBlockedReason(
         const sorted = ABILITIES.map((ability) => base[ability]!).sort((left, right) => right - left).join(",");
         if (sorted !== [...STANDARD_ARRAY].join(",")) return `Use each standard-array value once (${STANDARD_ARRAY.join(", ")}).`;
       }
+      // A rolled or GM-formula score is a number the player typed, and the server bound-checks each
+      // one against what the formula can actually produce - so the step checks the same bounds
+      // rather than letting a hand-typed 22 pass six steps and fail at Create.
       const options = context.background?.abilityOptions ?? null;
       if (options) {
         const total = draft.backgroundBonus.reduce((sum, entry) => sum + entry.amount, 0);
@@ -602,6 +740,8 @@ export function stepBlockedReason(
           return "Each background increase must go to a different ability.";
         }
       }
+      // The 20 ceiling, checked once the scores exist: this is the step that owns them, and the
+      // features step owns the improvements, so both refuse rather than letting Create dead-end.
       if (draft.hpMode === "entries") {
         const needed = draft.level - 1;
         const faces = context.hitDie ? hitDieFaces(context.hitDie) : 12;

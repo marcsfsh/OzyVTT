@@ -73,6 +73,11 @@ anything consumes it.
   optional structured riders reusing the actor-side `ActionSchema` / `EffectGrantSchema` /
   `ActionUsesSchema` shapes. Every record carries `source: "srd" | "homebrew"`, identity ids
   stay open slugs, and no feature needs hardcoded behavior — homebrew authors the same record.
+  A **choice option** (`FeatureChoice.options`) is that same `FeatureRecord` shape, so an
+  option carries its own mechanics — Divine Order's Protector grants Martial weapons and Heavy
+  armor training right where it is printed, rather than being a bare id nothing consumes.
+  `choice.from` remains the canonical id list and is derived from `options` when those are
+  authored, so a consumer that only wants ids never changes.
 - `src/index.ts` — typed, validated loaders (`loadMonsterDefinitions`, `loadConditions`,
   `loadSpells`, `loadWeapons`, `loadWeaponProperties`, `loadArmor`, `loadSkills`,
   `loadDamageTypes`, `loadRules`, `loadAttribution`, plus `loadClasses`, `loadSubclasses`,
@@ -100,6 +105,29 @@ anything consumes it.
   in-license (phase-2 content pass). The seeded Elf's `sizes` was also corrected to
   `["medium"]` (the SRD prints "Medium (about 5–6 feet tall)" only).
 - Still deferred (not bundled): magic items and other loot content.
+
+## What deliberately stays prose (ADR-0008)
+
+The rider vocabulary is bounded on purpose. These printed effects have **no** structured
+encoding, so they are authored as description text and adjudicated at the table rather than
+mis-encoded into a rider that means something else:
+
+- **Weapon Mastery** (Fighter level 1). The pick is real and lands in the choice ledger, but
+  the eight mastery properties (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) are combat
+  behaviors with no counterpart in `EffectModifier`/`onHit`, and the SRD's per-weapon mastery
+  column is not in the vendored fixtures. The chosen weapons are provenance and display only.
+- **Potent Spellcasting** (Cleric Blessed Strikes) — "add your Wisdom modifier to Cleric cantrip
+  damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived
+  bonus scoped to cantrips.
+- **Thaumaturge's Arcana/Religion bonus** — an ability-derived bonus to specific skill checks;
+  there is no skill-check modifier in the vocabulary. The extra cantrip *is* modeled.
+- **Stone's Endurance / Divine Spark healing** — damage reduction and "restore Hit Points equal
+  to the roll" have no rider; both actions carry their prose and their use counter.
+- **Frost's Chill's Speed reduction** and **Hill's Tumble's Prone** — `onHit` riders only fire
+  from an attack roll *on the same action*, and these ride an attack made with another action.
+  Encoding them as `onHit` would silently never trigger.
+- **"Necrotic or Radiant, your choice"** (Divine Strike, Divine Spark) — a damage part carries
+  one type; both are recorded as Radiant with the choice stated in the action text.
 
 ## License
 

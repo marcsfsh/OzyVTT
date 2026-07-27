@@ -10,6 +10,9 @@
  *    bounded vocabulary that REUSES the shapes already proven on `ActorDefinition` (`ActionSchema`,
  *    `EffectGrantSchema`, `ActionUsesSchema`). No feature may need hardcoded client or server
  *    behavior - a homebrew author writes the same record and the engine cannot tell it apart.
+ *    This reaches all the way down: ONE pickable option inside a choice (`FeatureChoice.options`)
+ *    is that same shape, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor
+ *    training itself instead of being a bare id string that nothing downstream can interpret.
  * 2. ONE SOURCE DISCRIMINATOR. Every record carries `source: "srd" | "homebrew"` (default "srd").
  *    Merging happens once, in the server's content library, exactly as `loadEquipment()` already
  *    folds weapons + armor + gear together. Homebrew is the next source, never a fork.
@@ -67,28 +70,6 @@ export const FeatureUsesSchema = z.object({
 export type FeatureUses = z.infer<typeof FeatureUsesSchema>;
 
 /**
- * A pick the feature asks the player to make. Writing one of these is what puts a row in the
- * character's `choices[]` provenance ledger, which is what makes level-up and respec possible.
- * `kind` is an OPEN slug ("fighting-style", "skill", "expertise", "subclass", "asi", "feat", "spell",
- * "cantrip", "language", "tool", or anything homebrew invents) - the wizard renders it generically.
- */
-export const FeatureChoiceSchema = z.object({
-  kind: ContentIdSchema,
-  choose: z.number().int().min(1).max(10).default(1),
-  /** Explicit option ids. Omit when `fromCatalog` names an open list instead. */
-  from: z.array(ContentIdSchema).max(80).optional(),
-  /** An open catalog slug the wizard resolves at pick time ("skills", "feats", "wizard-spells"). */
-  fromCatalog: ContentIdSchema.optional(),
-  /** Only options at or below this level are legal (spell picks). */
-  maxSpellLevel: z.number().int().min(0).max(9).optional(),
-  /** The same option may be picked more than once (Expertise across levels). */
-  repeatable: z.boolean().default(false)
-}).strict().superRefine((choice, context) => {
-  if (!choice.from && !choice.fromCatalog) context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs either an explicit `from` list or a `fromCatalog` slug." });
-});
-export type FeatureChoice = z.infer<typeof FeatureChoiceSchema>;
-
-/**
  * An attack a feature grants. Same vocabulary as `ActionSchema.attack`, except the to-hit BONUS is
  * derived rather than authored: a class feature cannot know the character's ability scores, so it
  * names the ability instead and the builder resolves the number.
@@ -103,10 +84,34 @@ export const FeatureAttackSchema = z.object({
   criticalBonusDice: z.number().int().min(1).max(4).optional()
 }).strict();
 
-/** A save a feature forces; the DC is either the character's spell save DC or a flat printed number. */
+/**
+ * The DC of a save a feature forces, in the three forms the SRD actually prints:
+ *
+ *   - `"spellcasting"` - the character's own spell save DC (Channel Divinity, most class features);
+ *   - a flat number - a printed constant (monster-style features, homebrew);
+ *   - a DERIVED DC - `base + <ability> modifier (+ proficiency bonus)`. This is the SRD's standard
+ *     "DC 8 plus your Constitution modifier and Proficiency Bonus" wording (Dragonborn Breath
+ *     Weapon, Orc/Goliath-style species features). It is DATA, not a formula language: three bounded
+ *     fields, nothing evaluable (ADR-0008 - anything richer stays prose).
+ */
+export const FeatureSaveDcSchema = z.union([
+  z.literal("spellcasting"),
+  z.number().int().min(1).max(40),
+  z.object({
+    /** The printed constant the modifiers are added to; 8 in every SRD 5.2.1 printing. */
+    base: z.number().int().min(1).max(30).default(8),
+    /** Whose modifier is added - the CASTER's ability, not the ability the target rolls. */
+    ability: AbilitySchema,
+    /** Whether the character's proficiency bonus is added too (every SRD printing: yes). */
+    proficiencyBonus: z.boolean().default(true)
+  }).strict()
+]);
+export type FeatureSaveDc = z.infer<typeof FeatureSaveDcSchema>;
+
+/** A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived. */
 export const FeatureSaveSchema = z.object({
   ability: AbilitySchema,
-  dc: z.union([z.literal("spellcasting"), z.number().int().min(1).max(40)])
+  dc: FeatureSaveDcSchema
 }).strict();
 
 /**
@@ -150,7 +155,15 @@ export const FeatureModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("ability-score"), ability: AbilitySchema, amount: z.number().int().min(-5).max(5), maximum: z.number().int().min(1).max(30).optional() }).strict(),
   z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5) }).strict(),
   z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60) }).strict(),
-  z.object({ type: z.literal("armor-class"), amount: z.number().int().min(-5).max(5) }).strict(),
+  /**
+   * A flat Armor Class rider. `whileArmored` is the ONE bounded condition the SRD's printed AC
+   * bonuses actually need: the Defense fighting style reads "While you're wearing Light, Medium, or
+   * Heavy armor, you gain a +1 bonus to Armor Class", and applying it to an unarmoured character
+   * would be wrong. Default `false` = the unconditional bonus every pre-existing record means, so
+   * this is additive and back-compatible (ADR-0007). It is a boolean, not a condition language
+   * (ADR-0008): a richer gate stays prose until the SRD prints one.
+   */
+  z.object({ type: z.literal("armor-class"), amount: z.number().int().min(-5).max(5), whileArmored: z.boolean().default(false) }).strict(),
   z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10) }).strict(),
   z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3) }).strict(),
   /** AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it). */
@@ -158,6 +171,119 @@ export const FeatureModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("darkvision"), feet: z.number().int().min(0).max(240) }).strict()
 ]);
 export type FeatureModifier = z.infer<typeof FeatureModifierSchema>;
+
+/**
+ * THE rider vocabulary, spelled exactly once. Both a `FeatureRecord` and a `FeatureOption` (one
+ * pickable option inside a `FeatureChoice`) carry these identical fields, so there is ONE vocabulary
+ * to author and ONE interpreter to write - a chosen option is interpreted by the very same code path
+ * that interprets a class feature, a species trait, or a feat.
+ */
+const featureRiders = {
+  /** Open grouping slugs for the sheet ("spellcasting", "fighting-style", "channel-divinity"). */
+  tags: z.array(ContentIdSchema).max(8).default([]),
+  /** Rollable actions this feature adds to the sheet. */
+  actions: z.array(FeatureActionSchema).max(8).default([]),
+  /** Effects the feature can grant, in the actor-side EffectGrant vocabulary (Rage, Bardic Inspiration). */
+  effects: z.array(EffectGrantSchema).max(4).default([]),
+  /** Limited uses recovered on a rest. */
+  uses: FeatureUsesSchema.optional(),
+  /** Flat proficiency/language/spell grants. */
+  grants: FeatureGrantsSchema.optional(),
+  /** Typed numeric riders. */
+  modifiers: z.array(FeatureModifierSchema).max(8).default([])
+} as const;
+
+/** The fields that describe WHAT is being picked, shared by a feature's choice and an option's own. */
+const featureChoiceBase = {
+  kind: ContentIdSchema,
+  choose: z.number().int().min(1).max(10).default(1),
+  /**
+   * Explicit option ids. Must name at least one option: an empty list is not "no options offered",
+   * it is an authoring mistake that would leave a wizard step (and the server's validator) with
+   * nothing to resolve. Omit the field entirely when `fromCatalog` or `options` supplies the list.
+   */
+  from: z.array(ContentIdSchema).min(1, "An explicit `from` list must name at least one option (omit it entirely to use `fromCatalog` or `options`).").max(80).optional(),
+  /** An open catalog slug the wizard resolves at pick time ("skills", "feats", "wizard-spells"). */
+  fromCatalog: ContentIdSchema.optional(),
+  /** Only options at or below this level are legal (spell picks). */
+  maxSpellLevel: z.number().int().min(0).max(9).optional(),
+  /** The same option may be picked more than once (Expertise across levels). */
+  repeatable: z.boolean().default(false)
+} as const;
+
+/**
+ * A pick offered BY one option (Divine Order's Thaumaturge role, which itself grants a cantrip of
+ * your choice). Deliberately depth-limited: an option's own choice may name ids or a catalog slug
+ * but cannot nest a further `options` list, so the vocabulary is bounded and non-recursive.
+ */
+export const FeatureOptionChoiceSchema = z.object(featureChoiceBase).strict().superRefine((choice, context) => {
+  if (!choice.from && !choice.fromCatalog) context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs either an explicit `from` list or a `fromCatalog` slug." });
+});
+export type FeatureOptionChoice = z.infer<typeof FeatureOptionChoiceSchema>;
+
+/**
+ * ONE pickable option that carries its OWN mechanics. This is the fix for options-as-bare-strings:
+ * before, `from: ["protector", "thaumaturge"]` recorded WHICH role a Cleric took but could not say
+ * what the role granted, so the pick was validated, written to the ledger, and then discarded.
+ *
+ * An option is structurally a `FeatureRecord` minus `level`/`replacesFeatureId` - identical rider
+ * fields, identical meanings - so the builder interprets a chosen option by handing it to the same
+ * feature interpreter it already runs for feats (`FeatureReference.feature` is the precedent: a feat
+ * has always been "a FeatureRecord plus catalog metadata", and now so is a choice option).
+ */
+export const FeatureOptionSchema = z.object({
+  id: ContentIdSchema,
+  name: z.string().min(1).max(120),
+  /** Printed text for this option. Always the display source of truth; riders only add mechanics. */
+  description: z.string().min(1).max(20000),
+  /** A pick this OPTION asks for once chosen (Thaumaturge's extra Cleric cantrip). */
+  choice: FeatureOptionChoiceSchema.optional(),
+  ...featureRiders
+}).strict();
+export type FeatureOption = z.infer<typeof FeatureOptionSchema>;
+
+/**
+ * A pick the feature asks the player to make. Writing one of these is what puts a row in the
+ * character's `choices[]` provenance ledger, which is what makes level-up and respec possible.
+ * `kind` is an OPEN slug ("fighting-style", "skill", "expertise", "subclass", "asi", "feat", "spell",
+ * "cantrip", "language", "tool", or anything homebrew invents) - the wizard renders it generically.
+ *
+ * Three ways to state the options, in increasing richness:
+ *   - `fromCatalog` - an open catalog slug resolved at pick time (skills, spells, feats);
+ *   - `from`        - explicit ids whose mechanics live elsewhere (a feat id resolves to a real
+ *                     `FeatReference`), or nowhere (a pick that is pure provenance);
+ *   - `options`     - the ids WITH their mechanics inline, for options that exist only here (Divine
+ *                     Order's two sacred roles, Giant Ancestry's six boons).
+ *
+ * `options` and `from` are mutually exclusive: after parsing, `from` ALWAYS holds the canonical id
+ * list, derived from `options` when they were authored. Every existing consumer that reads
+ * `choice.from` therefore keeps working unchanged, and only a consumer that wants the mechanics
+ * needs to look at `options`.
+ */
+export const FeatureChoiceSchema = z.object({
+  ...featureChoiceBase,
+  /** Options carrying their own mechanics. Mutually exclusive with `from`, which is derived from these. */
+  options: z.array(FeatureOptionSchema).min(1).max(40).optional()
+}).strict().superRefine((choice, context) => {
+  if (!choice.from && !choice.fromCatalog && !choice.options) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A choice needs an explicit `from` list, inline `options`, or a `fromCatalog` slug." });
+  }
+  if (choice.from && choice.options) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["from"], message: "Author `options` alone - `from` is derived from the option ids." });
+  }
+  if (choice.options) {
+    const duplicate = choice.options.find((option, index) => choice.options!.findIndex((other) => other.id === option.id) !== index);
+    if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: `Duplicate option id "${duplicate.id}".` });
+  }
+}).transform((choice) => {
+  // Early return rather than a rewritten object, so `from` stays an OPTIONAL property on the output
+  // type. Spreading a `from: string[] | undefined` back in would make it required-with-undefined,
+  // and a `FeatureOptionChoice` (which has no `options` key at all) would stop being assignable to
+  // a `FeatureChoice` - breaking the single-vocabulary guarantee at the type level.
+  if (!choice.options) return choice;
+  return { ...choice, from: choice.options.map((option) => option.id) };
+});
+export type FeatureChoice = z.infer<typeof FeatureChoiceSchema>;
 
 /**
  * THE shared feature record. A class feature, a subclass feature, a species trait, a background
@@ -171,20 +297,9 @@ export const FeatureRecordSchema = z.object({
   /** Class/subclass level this feature is gained at. Absent for always-on records (species traits, feats). */
   level: ContentLevelSchema.optional(),
   description: z.string().min(1).max(20000),
-  /** Open grouping slugs for the sheet ("spellcasting", "fighting-style", "channel-divinity"). */
-  tags: z.array(ContentIdSchema).max(8).default([]),
   /** A pick this feature asks the player to make; writes a `choices[]` row. */
   choice: FeatureChoiceSchema.optional(),
-  /** Rollable actions this feature adds to the sheet. */
-  actions: z.array(FeatureActionSchema).max(8).default([]),
-  /** Effects the feature can grant, in the actor-side EffectGrant vocabulary (Rage, Bardic Inspiration). */
-  effects: z.array(EffectGrantSchema).max(4).default([]),
-  /** Limited uses recovered on a rest. */
-  uses: FeatureUsesSchema.optional(),
-  /** Flat proficiency/language/spell grants. */
-  grants: FeatureGrantsSchema.optional(),
-  /** Typed numeric riders. */
-  modifiers: z.array(FeatureModifierSchema).max(8).default([]),
+  ...featureRiders,
   /** This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17). */
   replacesFeatureId: ContentIdSchema.optional()
 }).strict();

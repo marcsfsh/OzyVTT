@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, resolveSpellcasting, type GameState } from "@vtt/domain";
+import { meetsMulticlassPrerequisites } from "@vtt/rules-5e";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
+import { CommandRejectedError, RulesBlockedError } from "../src/game-store.js";
+import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
+import { startEncounter } from "../src/encounter.js";
 
 /**
  * End-to-end `character.create` assembly against the REAL content bundles: a Fighter 5 and a
@@ -96,11 +100,27 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.hitPoints.maximum).toBe(48);
   });
 
-  it("derives AC from the equipped starting armor via the shared rules function", () => {
-    expect(definition.armorClass).toBe(16); // chain mail, no Dex
+  it("derives AC from the equipped starting armor via the shared rules function, plus the Defense rider", () => {
+    // Chain mail 16 (no Dex) + the Defense fighting style's "+1 while you're wearing armor".
+    expect(definition.armorClass).toBe(17);
     const chainMail = definition.startingInventory?.find((item) => item.id === "chain-mail");
     expect(chainMail?.equipped).toBe(true);
     expect(chainMail?.armor?.acBase).toBe(16);
+    // The flat, non-equipment part travels with the sheet so every path that RE-DERIVES AC from the
+    // live loadout can add it back instead of silently dropping it (task-packet risk 3).
+    expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBe(1);
+  });
+
+  it("holds a whileArmored AC rider back when no armor is worn", () => {
+    // Same Defense pick, but the "just take the gold" equipment option: no body armor, so the rider
+    // must NOT apply and the sheet must fall back to 10 + Dex.
+    const unarmored = fighterInput();
+    unarmored.choices = unarmored.choices.map((row) => row.kind === "equipment" && row.id === "fighter-a" ? { ...row, id: "fighter-c" } : row);
+    const built = buildCharacterDefinition(unarmored, library, defaultPolicy);
+    const wearsArmor = (built.startingInventory ?? []).some((item) => item.equipped && item.category === "armor");
+    expect(wearsArmor).toBe(false);
+    expect((built.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBeUndefined();
+    expect(built.armorClass).toBe(11); // 10 + Dex 13, and no Defense bonus
   });
 
   it("fills saves, chosen + granted skills, and the armor/weapon/tool/language lists", () => {
@@ -167,7 +187,10 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(actor.definitionId).toBe(`import-${ACTOR_ID}`);
     expect(state.definitions.map((entry) => entry.id)).toEqual([`import-${ACTOR_ID}`]);
     expect(actor.hp).toEqual({ current: 48, maximum: 48, temporary: 0 });
-    expect(actor.armorClass).toBe(16); // instantiate's own armorClassFromEquipment agrees with the builder's
+    // Task-packet risk 3: `instantiate` RE-DERIVES AC from the loadout, so the builder's flat rider
+    // (Defense +1) has to survive the round trip. Both the concrete number and the invariant.
+    expect(actor.armorClass).toBe(17);
+    expect(actor.armorClass).toBe(definition.armorClass);
     expect(actor.hitDice).toMatchObject({ die: "d10", maximum: 5, remaining: 5, entries: [{ die: "d10", maximum: 5, remaining: 5 }] });
     expect(actor.spellSlots).toBeNull();
     expect(GameStateSchema.parse(state)).toBeTruthy(); // the whole state (definition included) re-parses
@@ -320,5 +343,288 @@ describe("buildCharacterDefinition - loud rejections", () => {
     malformed.choices = malformed.choices.filter((row) => row.kind !== "asi-or-feat" && row.kind !== "ability-score");
     malformed.choices.push({ level: 4, classId: "fighter", kind: "asi-or-feat", id: "asi" });
     expect(() => buildCharacterDefinition(malformed, library, defaultPolicy)).toThrowError(/payload.increases/);
+  });
+});
+
+// =================================================================================================
+// Phase-2 rules regressions. Each block pins ONE adversarial-QA finding; the comment on each names
+// the wrong behaviour it replaces, so a revert fails here loudly rather than shipping quietly.
+// =================================================================================================
+
+/** The real library with one accessor swapped, so a malformed content SHAPE can be exercised without touching the bundles. */
+function libraryWith(overrides: Partial<ContentLibrary>): ContentLibrary {
+  return Object.assign(Object.create(library) as ContentLibrary, overrides);
+}
+
+const clericInput = (): CharacterCreateRequestInput & { choices: Array<CharacterCreateRequestInput["choices"][number]> } => ({
+  name: "Sister Ael",
+  speciesId: "human",
+  backgroundId: "acolyte",
+  classId: "cleric",
+  level: 3,
+  subclassId: "life-domain",
+  abilityMethod: "standard-array",
+  baseScores: { str: 8, dex: 12, con: 14, int: 10, wis: 15, cha: 13 },
+  backgroundBonusAllocation: [{ ability: "wis", amount: 2 }, { ability: "cha", amount: 1 }],
+  hp: { mode: "average" },
+  choices: [
+    { level: 1, classId: "cleric", kind: "skill", id: "history" },
+    { level: 1, classId: "cleric", kind: "skill", id: "medicine" },
+    { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+    { level: 1, classId: "cleric", kind: "divine-order", id: "protector" },
+    // The Acolyte's origin feat (Magic Initiate (Cleric)) asks for two cantrips of its own.
+    { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "resistance", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "cantrip", id: "light" },
+    { level: 1, kind: "cantrip", id: "sacred-flame" },
+    { level: 1, kind: "cantrip", id: "spare-the-dying" },
+    { level: 3, classId: "cleric", kind: "subclass", id: "life-domain" },
+    // SEVEN prepared rows against a cap of 6 - legal only because one of them (cure-wounds) is a
+    // Life Domain spell the subclass already grants as always-prepared.
+    { level: 1, kind: "spell", id: "cure-wounds" },
+    { level: 1, kind: "spell", id: "guiding-bolt" },
+    { level: 1, kind: "spell", id: "healing-word" },
+    { level: 1, kind: "spell", id: "shield-of-faith" },
+    { level: 2, kind: "spell", id: "hold-person" },
+    { level: 2, kind: "spell", id: "spiritual-weapon" },
+    { level: 2, kind: "spell", id: "prayer-of-healing" },
+    { level: 1, kind: "equipment", id: "cleric-a" },
+    { level: 1, kind: "equipment", id: "acolyte-a" }
+  ]
+});
+
+describe("M4 - always-prepared grants are not charged to the prepared count", () => {
+  const definition = buildCharacterDefinition(clericInput(), library, defaultPolicy);
+  const spells = new Map((definition.spellcasting?.spells ?? []).map((spell) => [spell.id, spell]));
+
+  it("keeps a Life Domain spell the player ALSO prepared as the grant's always-prepared form", () => {
+    // The bug: grants were appended last and skipped when the id was already present, so a domain
+    // spell the player also listed stayed `alwaysPrepared: false` - a downgrade - AND spent one of
+    // the six prepared slots on a spell that is free by the rules.
+    expect(spells.get("cure-wounds")).toMatchObject({ level: 1, prepared: true, alwaysPrepared: true });
+    expect(spells.get("cure-wounds")).not.toHaveProperty("classId"); // the grant's entry, not a class pick
+    for (const domainSpell of ["aid", "bless", "cure-wounds", "lesser-restoration"]) {
+      expect(spells.get(domainSpell)?.alwaysPrepared, domainSpell).toBe(true);
+    }
+  });
+
+  it("charges exactly the six spells that are not granted against the level-3 cap", () => {
+    // Six charged picks + one that deferred to the grant = the seven authored rows.
+    const charged = (definition.spellcasting?.spells ?? []).filter((spell) => spell.level > 0 && !spell.alwaysPrepared);
+    expect(charged.map((spell) => spell.id).sort())
+      .toEqual(["guiding-bolt", "healing-word", "hold-person", "prayer-of-healing", "shield-of-faith", "spiritual-weapon"]);
+    expect(definition.spellcasting?.classes?.[0]).toMatchObject({ classId: "cleric", prepared: 6 });
+    // One more genuinely-charged pick DOES exceed the cap - the exclusion is scoped to grants, not a blanket bypass.
+    const overCap = clericInput();
+    overCap.choices.push({ level: 1, kind: "spell", id: "bane" });
+    expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(/prepares 6 spells at level 3; got 7/);
+  });
+
+  it("still rejects the same spell recorded twice", () => {
+    const twice = clericInput();
+    twice.choices.push({ level: 1, kind: "spell", id: "cure-wounds" });
+    expect(() => buildCharacterDefinition(twice, library, defaultPolicy)).toThrowError(/"cure-wounds" is chosen twice/);
+  });
+
+  it("interprets the chosen Divine Order option's OWN riders (per-option mechanics)", () => {
+    // Protector grants Martial weapon training and Heavy armour training. Before options carried
+    // mechanics the pick was validated, written to the ledger, and then discarded.
+    expect(definition.proficiencies?.armor).toContain("heavy");
+    expect(definition.proficiencies?.weapons).toContain("martial");
+    const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }).traits.map((trait) => trait.name);
+    expect(traits).toContain("Protector");
+  });
+
+  it("gives Thaumaturge's own cantrip pick an offer OUTSIDE the class cantrip budget", () => {
+    const thaumaturge = clericInput();
+    thaumaturge.choices = thaumaturge.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
+    // The option's second-order pick, tagged with the option's own id...
+    thaumaturge.choices.push({ level: 1, kind: "cantrip", id: "mending", payload: { featureId: "thaumaturge" } });
+    const built = buildCharacterDefinition(thaumaturge, library, defaultPolicy);
+    expect((built.spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
+    expect(built.proficiencies?.armor).not.toContain("heavy"); // the other role's grant does NOT apply
+    // ...or with the parent feature's id, which is just as unambiguous.
+    const viaParent = clericInput();
+    viaParent.choices = viaParent.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
+    viaParent.choices.push({ level: 1, kind: "cantrip", id: "mending", payload: { featureId: "divine-order" } });
+    expect((buildCharacterDefinition(viaParent, library, defaultPolicy).spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
+    // Omitting the option's pick entirely is still a loud, actionable rejection.
+    const missing = clericInput();
+    missing.choices = missing.choices.map((row) => row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row);
+    expect(() => buildCharacterDefinition(missing, library, defaultPolicy)).toThrowError(/"Thaumaturge" needs 1 pick\(s\) of kind "cantrip"/);
+  });
+});
+
+describe("M3 - the same feat cannot be taken twice across different offers", () => {
+  it("rejects a Versatile pick that repeats the background's origin feat", () => {
+    // A Human Acolyte already holds Magic Initiate (Cleric) from the background. Taking it AGAIN
+    // with the Human's Versatile feat interpreted the whole feature twice: two cantrip offers of two
+    // picks each, so the sheet ended up with 7 cantrips instead of 5.
+    const duplicate = clericInput();
+    duplicate.choices = duplicate.choices.map((row) => row.kind === "feat" ? { ...row, id: "magic-initiate-cleric" } : row);
+    expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy))
+      .toThrowError(/Magic Initiate \(Cleric\) may be taken again only with a DIFFERENT spell list/);
+  });
+
+  it("rejects a duplicate of a feat that is not repeatable at all", () => {
+    // The Criminal background grants Alert; spending Versatile on Alert again is simply illegal.
+    const duplicate = clericInput();
+    duplicate.backgroundId = "criminal";
+    duplicate.backgroundBonusAllocation = [{ ability: "dex", amount: 2 }, { ability: "con", amount: 1 }];
+    duplicate.choices = duplicate.choices.map((row) => row.kind === "equipment" && row.id === "acolyte-a" ? { ...row, id: "criminal-a" } : row);
+    // The Criminal's origin feat is Alert, and the ledger already spends Versatile on Alert.
+    expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy))
+      .toThrowError(/Alert is already on this character - a feat can only be taken once/);
+  });
+
+  it("still allows a repeatable feat with a DIFFERENT spell list, and the ASI feat at every ASI level", () => {
+    // Positive control 1: Magic Initiate (Wizard) alongside the background's Magic Initiate (Cleric).
+    const differentList = clericInput();
+    differentList.choices = differentList.choices.map((row) => row.kind === "feat" ? { ...row, id: "magic-initiate-wizard" } : row);
+    differentList.choices.push(
+      { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } }
+    );
+    const built = buildCharacterDefinition(differentList, library, defaultPolicy);
+    // The Versatile pick REPLACED Alert here, so the sheet holds the background's Cleric flavour
+    // plus the Wizard one - the same feat name, a different spell list, exactly as the SRD allows.
+    expect(built.character?.feats.map((feat) => feat.id).sort()).toEqual(["magic-initiate-cleric", "magic-initiate-wizard"]);
+
+    // Positive control 2: a Fighter 6 spends the level-4 AND level-6 ASI on the same repeatable feat.
+    const twoAsis = fighterInput();
+    twoAsis.level = 6;
+    twoAsis.hp = { mode: "entries", entries: [1, 10, 4, 6, 5] };
+    twoAsis.choices.push(
+      { level: 6, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: 6, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+      { level: 6, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+    );
+    const fighter6 = buildCharacterDefinition(twoAsis, library, defaultPolicy);
+    expect(fighter6.abilityScores).toMatchObject({ str: 19, con: 16, dex: 14 });
+  });
+});
+
+describe("M7 - a feature whose only rider is limited USES still lands as a trackable action", () => {
+  const definition = buildCharacterDefinition(fighterInput(), library, defaultPolicy);
+
+  it("synthesizes an activation carrying the resolved use count", () => {
+    // `interpretAction` was the only consumer of `feature.uses`, so 20 authored features that print
+    // a use count but no action (Action Surge, Indomitable, Arcane Recovery, Divine Intervention,
+    // Relentless Endurance, the tiefling legacy tiers...) were prose with no trackable pool at all.
+    const actionSurge = definition.actions.find((action) => action.id === "action-surge");
+    expect(actionSurge).toBeDefined();
+    expect(actionSurge?.activation).toBe("other");
+    expect(actionSurge?.uses).toEqual({ limit: 1, per: "short-rest" }); // by-level table, 1 until level 17
+    // The Soldier's origin feat is uses-only too, on a different rest scope.
+    expect(definition.actions.find((action) => action.id === "savage-attacker")?.uses).toEqual({ limit: 1, per: "turn" });
+  });
+
+  it("makes that action resolvable, so the counter can actually be spent", () => {
+    // A counter nothing can decrement is decoration. `resolveDefinitionAction` used to reject any
+    // action with no attack/save/damage/grants as "no structured effect to resolve" - spending a
+    // limited use IS the structured effect, and a self-only feature needs no target.
+    const state = emptyState();
+    importActorDefinition(state, definition, ACTOR_ID, "public");
+    const other = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d11";
+    state.actors.push({ ...state.actors[0], id: other, name: "Sparring Partner", definitionId: null });
+    startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: other, score: 20 }, { actorId: ACTOR_ID, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    const surge = definition.actions.find((action) => action.id === "action-surge")!;
+    const deps: ResolveDependencies = { random: () => 1, newRollId: () => "40000000-0000-4000-8000-000000000001", gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition };
+    resolveDefinitionAction(state, surge, { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" }, deps);
+    expect(state.actors[0].actionUses["action-surge"]).toBe(1);
+    // ...and the second attempt is correctly refused, because the pool really is 1/short rest.
+    expect(() => resolveDefinitionAction(state, surge, { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" }, deps))
+      .toThrowError(/no uses remaining \(1\/short rest\)/);
+  });
+});
+
+describe("M5 - an action that shares a pool is gated on the POOL's size", () => {
+  const definition = buildCharacterDefinition(clericInput(), library, defaultPolicy);
+  const CLERIC = ACTOR_ID;
+  const FOE = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d12";
+
+  function encounter(): GameState {
+    const state = emptyState();
+    importActorDefinition(state, definition, CLERIC, "public");
+    state.actors.push({ ...state.actors[0], id: FOE, name: "Ghoul", kind: "monster", definitionId: null, actionUses: {} });
+    // The FOE holds the turn, so the action-economy slot never masks the limited-use gate.
+    startEncounter(state, { mapAssetId: "20000000-0000-5000-8000-000000000001", entries: [{ actorId: FOE, score: 20 }, { actorId: CLERIC, score: 5 }] }, () => 1, { width: 900, height: 600, calibration: null });
+    return state;
+  }
+  const deps = (): ResolveDependencies => ({ random: () => 3, newRollId: () => `40000000-0000-4000-8000-00000000000${Math.floor(Math.random() * 9)}`, gmSessionId: "30000000-0000-4000-8000-00000000000a", now: () => "2026-07-27T00:00:00.000Z", definition });
+
+  it("authors Preserve Life and Divine Spark onto one Channel Divinity counter", () => {
+    const preserveLife = definition.actions.find((action) => action.id === "preserve-life");
+    const divineSpark = definition.actions.find((action) => action.id === "divine-spark");
+    expect(preserveLife?.uses).toMatchObject({ pool: "channel-divinity", limit: 1 });
+    expect(divineSpark?.uses).toMatchObject({ pool: "channel-divinity", limit: 2 }); // 2 charges at Cleric 3
+  });
+
+  it("lets a Cleric 3 use Preserve Life after a Divine Spark, then blocks the third", () => {
+    // The bug: the counter is keyed on the POOL ("channel-divinity") but the gate read the ACTION's
+    // own limit, so Preserve Life (printed "1") reported no uses left the moment any sibling had
+    // spent one - a Cleric 3 lost half their Channel Divinity.
+    const state = encounter();
+    const spark = definition.actions.find((action) => action.id === "divine-spark")!;
+    const preserve = definition.actions.find((action) => action.id === "preserve-life")!;
+    resolveDefinitionAction(state, spark, { actorId: CLERIC, targetIds: [FOE], commandId: "50000000-0000-4000-8000-00000000000a" }, deps());
+    expect(state.actors[0].actionUses["channel-divinity"]).toBe(1);
+    resolveDefinitionAction(state, preserve, { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000b" }, deps());
+    expect(state.actors[0].actionUses["channel-divinity"]).toBe(2);
+    // Both charges spent: the third attempt is refused, naming the POOL's size, not "1".
+    expect(() => resolveDefinitionAction(state, preserve, { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000c" }, deps()))
+      .toThrowError(/no uses remaining \(2\/long rest\)/);
+  });
+});
+
+describe("D3 - a malformed content record rejects instead of throwing a raw TypeError", () => {
+  const malformedLibrary = libraryWith({
+    speciesRecord: (id: string) => {
+      const real = library.speciesRecord(id);
+      if (!real || id !== "human") return real;
+      return { ...real, traits: [...real.traits, {
+        id: "broken-boon", name: "Broken Boon", description: "A boon whose option list was never authored.",
+        tags: [], actions: [], effects: [], modifiers: [],
+        // `{kind, choose, from: []}` used to PARSE (an empty array is truthy, so the schema's
+        // "needs from OR fromCatalog" refinement never fired) and then hand `undefined` to
+        // resolveCatalogChoice - a TypeError, which is neither a CatalogChoiceError nor a
+        // CommandRejectedError, so the socket handler echoed the internal message to the client.
+        choice: { kind: "boon", choose: 1, from: [], repeatable: false }
+      }] };
+    }
+  });
+
+  it("rejects with an actionable message, as a CommandRejectedError", () => {
+    let thrown: unknown;
+    try { buildCharacterDefinition(fighterInput(), malformedLibrary, defaultPolicy); } catch (error) { thrown = error; }
+    expect(thrown).toBeInstanceOf(CommandRejectedError);
+    expect(thrown).not.toBeInstanceOf(TypeError);
+    expect((thrown as Error).message).toMatch(/"Broken Boon" offers a "boon" choice with no options/);
+    expect((thrown as Error).message).toMatch(/needs a non-empty "from" list or a "fromCatalog" slug/);
+  });
+});
+
+describe("D5 - multiclass prerequisites are correct but deliberately uncalled in phase 2", () => {
+  it("cannot gate anything yet: `character.create` carries exactly one class", () => {
+    // The wire shape is the whole argument - one `classId`, one `level`. SRD ability minimums attach
+    // to TAKING A SECOND CLASS, never to a starting class, so enforcing them here would reject legal
+    // level-1 characters. This test is the pin: when the request grows a second class entry (packet
+    // phase 6, level-up), it fails and the check has to be wired in.
+    const input = fighterInput();
+    expect(Object.keys(input)).toContain("classId");
+    expect(Object.keys(input)).not.toContain("classes");
+    const built = buildCharacterDefinition(input, library, defaultPolicy);
+    expect(built.character?.classes).toHaveLength(1);
+    // A Fighter needs STR 13 or DEX 13 to MULTICLASS into. This sheet has STR 19 - but a character
+    // who did not would still be a perfectly legal starting Fighter, which is why creation is silent.
+    expect(meetsMulticlassPrerequisites({ str: 8, dex: 8 }, "fighter")).toBe(false);
+    expect(meetsMulticlassPrerequisites({ str: 8, dex: 13 }, "fighter")).toBe(true); // mode "any"
+    expect(meetsMulticlassPrerequisites({ dex: 13 }, "monk")).toBe(false); // mode "all": needs WIS 13 too
+    expect(meetsMulticlassPrerequisites({ dex: 13, wis: 13 }, "monk")).toBe(true);
+    expect(meetsMulticlassPrerequisites({}, "moon-warden")).toBe(true); // unknown/homebrew: no declared minimum
+    // And the authored bundle drives it, not just the static table (the class record's own minimums).
+    expect(meetsMulticlassPrerequisites({ wis: 12 }, "cleric", library.classProgressionTable())).toBe(false);
+    expect(meetsMulticlassPrerequisites({ wis: 13 }, "cleric", library.classProgressionTable())).toBe(true);
   });
 });

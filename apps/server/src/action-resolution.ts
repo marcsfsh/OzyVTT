@@ -136,6 +136,25 @@ type EconomyPlan = Readonly<{
   spendLegendary: Readonly<{ cost: number }> | null;
 }>;
 
+/**
+ * How many uses the counter this action spends from actually holds. An action that declares
+ * `uses.pool` shares ONE counter with its siblings - a Cleric's Channel Divinity feeds Divine Spark,
+ * Turn Undead AND Preserve Life - so its gate is the POOL's size: the largest limit any action
+ * declaring that same pool (and rest scope) carries. Reading the shared counter but gating on the
+ * action's own printed number told a Cleric 3 that Preserve Life ("1") had no uses left after a
+ * single Divine Spark, even though two Channel Divinity charges were authored. An action with no
+ * pool is its own pool and keeps its own limit, unchanged.
+ */
+export function useLimitFor(definition: ActorDefinition | undefined, action: DefinitionAction): number {
+  const uses = action.uses;
+  if (!uses) return 0;
+  if (!uses.pool) return uses.limit;
+  return (definition?.actions ?? []).reduce((limit, candidate) => {
+    const sibling = candidate.uses;
+    return sibling && sibling.pool === uses.pool && sibling.per === uses.per ? Math.max(limit, sibling.limit) : limit;
+  }, uses.limit);
+}
+
 /** The multiattack parents (sibling actions) that list `action` as a component. */
 function multiattackParents(definition: ActorDefinition | undefined, action: DefinitionAction): DefinitionAction[] {
   if (!definition) return [];
@@ -190,14 +209,16 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
   let spendUse: EconomyPlan["spendUse"] = null;
   if (action.uses) {
     const key = action.uses.pool ?? action.id;
+    // The counter is keyed on the POOL, so the gate must be the pool's size too (see `useLimitFor`).
+    const limit = useLimitFor(definition, action);
     const spent = action.uses.per === "turn" ? (turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
-    if (spent >= action.uses.limit) {
+    if (spent >= limit) {
       const scopeLabel = action.uses.per === "turn" ? "turn"
         : action.uses.per === "encounter" ? "encounter"
         : action.uses.per === "short-rest" ? "short rest"
         : action.uses.per === "recharge" ? `spent - recharges on ${action.uses.recharge}+ at the start of its turn`
         : "long rest";
-      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.per === "recharge" ? scopeLabel : `${action.uses.limit}/${scopeLabel}`}).` });
+      violations.push({ rule: "feature.no-uses-remaining", message: `${action.name}: no uses remaining (${action.uses.per === "recharge" ? scopeLabel : `${limit}/${scopeLabel}`}).` });
     }
     spendUse = { key, per: action.uses.per };
   }
@@ -352,7 +373,9 @@ export function actionAvailability(state: GameState, attacker: LiveActor, action
     if (action.uses) {
       const key = action.uses.pool ?? action.id;
       const spent = action.uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
-      usesRemaining = Math.max(0, action.uses.limit - spent);
+      // Same pool arithmetic as the gate above, so what the API reports remaining and what resolution
+      // allows can never drift (the whole point of sharing `evaluateActionEconomy`).
+      usesRemaining = Math.max(0, useLimitFor(definition, action) - spent);
     }
     const instance = state.combat.turn.actionInstance;
     let componentsRemaining: number | null = null;
@@ -521,9 +544,16 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   if (action.attack && targets.length !== 1) throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient.
   if (action.grants?.target === "target" && targets.length !== 1) throw new CommandRejectedError("Choose exactly one target for this action.");
-  const structuredWithoutTargets = (action.grants !== undefined && action.grants.target !== "target") || action.multiattack !== undefined || input.builtin === true;
+  // LIMITED USES are themselves a structured effect: spending the charge IS the mechanic, and the
+  // spend is what makes the pool trackable at the table. Action Surge, Indomitable, Arcane Recovery,
+  // Relentless Endurance and the tiefling legacy tiers have nothing to roll - they have a counter -
+  // and a self-only feature needs no target either. Without both carve-outs the counter the builder
+  // now assembles could be displayed but never decremented (the same dead end 34 bundled monster
+  // actions with `uses` and no roll already sit in).
+  const spendsALimitedUse = action.uses !== undefined;
+  const structuredWithoutTargets = (action.grants !== undefined && action.grants.target !== "target") || action.multiattack !== undefined || spendsALimitedUse || input.builtin === true;
   if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target") throw new CommandRejectedError("Choose at least one target.");
-  if (!action.attack && !action.save && action.damage.length === 0 && action.grants === undefined && input.builtin !== true) {
+  if (!action.attack && !action.save && action.damage.length === 0 && action.grants === undefined && !spendsALimitedUse && input.builtin !== true) {
     if (action.multiattack === undefined) throw new CommandRejectedError("That action has no structured effect to resolve - run it from its description.");
   }
 

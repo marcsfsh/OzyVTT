@@ -500,7 +500,11 @@ const conditionRecords = conditions
     description: condition.fields.desc
   }));
 
-const titleCase = (slug: string) => slug.split("-").map((part) => `${part[0].toUpperCase()}${part.slice(1)}`).join(" ");
+/** Printed English title case: interior particles stay lowercase ("sleight-of-hand" -> "Sleight of Hand"). */
+const TITLE_CASE_PARTICLES = new Set(["of", "the", "and", "or", "a", "an", "to", "in", "on"]);
+const titleCase = (slug: string) => slug.split("-")
+  .map((part, index) => index > 0 && TITLE_CASE_PARTICLES.has(part) ? part : `${part[0].toUpperCase()}${part.slice(1)}`)
+  .join(" ");
 const abilityShort: Record<string, "str" | "dex" | "con" | "int" | "wis" | "cha"> = { strength: "str", dexterity: "dex", constitution: "con", intelligence: "int", wisdom: "wis", charisma: "cha" };
 const onlySrd = <T extends { document: string }>(rows: Fixture<T>[]) => rows.filter((row) => row.fields.document === "srd-2024").sort((left, right) => left.pk.localeCompare(right.pk));
 

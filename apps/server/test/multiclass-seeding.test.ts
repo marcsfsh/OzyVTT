@@ -114,7 +114,7 @@ describe("multiclass seeding", () => {
     expect(actorOf(game).preparedSpellIds).toEqual(["magic-missile"]);
   });
 
-  it("rounds half-caster levels down into the shared multiclass table", () => {
+  it("rounds half-caster levels UP into the shared multiclass table", () => {
     // Paladin 6 (half -> 3) + Wizard 4 (full -> 4) = caster level 7: 4/3/3/1.
     const paladinWizard = fighterWizard({
       hitPoints: { maximum: 70, formula: "10d10" },
@@ -126,6 +126,16 @@ describe("multiclass seeding", () => {
       die: "d10", maximum: 10, remaining: 10,
       entries: [{ die: "d10", maximum: 6, remaining: 6 }, { die: "d6", maximum: 4, remaining: 4 }]
     });
+    // An ODD half-caster level is where the rounding actually shows. SRD 5.2.1: "Half your levels
+    // (round up) in the Paladin and Ranger classes" - Paladin 3 (-> 2) + Wizard 1 = caster level 3,
+    // so the seeded actor gets 4/2. Rounding down seeded 4/0 and deleted the 2nd-level row entirely.
+    const paladin3Wizard1 = fighterWizard({
+      hitPoints: { maximum: 34, formula: "4d10" },
+      character: { classes: [{ id: "paladin", name: "Paladin", level: 3 }, { id: "wizard", name: "Wizard", level: 1 }], feats: [] },
+      spellcasting: { ability: "cha", slots: [], classes: [{ classId: "paladin", ability: "cha" }, { classId: "wizard", ability: "int" }], spells: [] }
+    });
+    expect(spellSlotMaxima(paladin3Wizard1)).toEqual([{ level: 1, max: 4 }, { level: 2, max: 2 }]);
+    expect(actorOf(gameWith(paladin3Wizard1)).spellSlots).toEqual([{ level: 1, remaining: 4 }, { level: 2, remaining: 2 }]);
   });
 
   it("derives Pact Magic from the Warlock levels alone", () => {

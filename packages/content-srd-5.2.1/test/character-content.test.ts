@@ -6,9 +6,10 @@ import {
   spellSlotsForClass, statPriorityFor
 } from "@vtt/rules-5e";
 import {
-  ClassReferenceSchema, FeatureRecordSchema, NamePoolReferenceSchema, SpeciesReferenceSchema,
+  ClassReferenceSchema, FeatureChoiceSchema, FeatureRecordSchema, NamePoolReferenceSchema, SpeciesReferenceSchema,
   loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadNames, loadSkills,
-  loadSpecies, loadSpells, loadSubclasses, namesForSpecies, subclassesForClass
+  loadSpecies, loadSpells, loadSubclasses, namesForSpecies, subclassesForClass,
+  type FeatureRecord
 } from "../src/index.js";
 
 /**
@@ -301,7 +302,13 @@ describe("character-builder content records", () => {
       "copper-dragon": "acid", "gold-dragon": "fire", "green-dragon": "poison", "red-dragon": "fire",
       "silver-dragon": "cold", "white-dragon": "cold"
     });
-    expect(dragonborn.traits.find((trait) => trait.id === "dragonborn-breath-weapon")!.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
+    // Breath Weapon's MECHANICS ride the lineage (only the ancestry knows the damage type), exactly
+    // as Damage Resistance already does; the species-level trait stays the printed prose.
+    const speciesBreath = dragonborn.traits.find((trait) => trait.id === "dragonborn-breath-weapon")!;
+    expect(speciesBreath.actions).toEqual([]);
+    expect(speciesBreath.uses).toBeUndefined();
+    expect(dragonborn.lineages.find((lineage) => lineage.id === "white-dragon")!.traits.find((trait) => trait.id === "white-dragon-breath")!.uses)
+      .toMatchObject({ per: "long-rest", pool: "breath-weapon", scaling: { type: "proficiency-bonus" } });
     expect(dragonborn.traits.find((trait) => trait.id === "dragonborn-draconic-flight")!.level).toBe(5);
     // Goliath: six ancestry boons behind one PB-per-Long-Rest choice; Large Form gates at level 5.
     const goliath = byId("goliath");
@@ -541,6 +548,133 @@ describe("character-builder content records", () => {
     expect(spellGrants).toBeGreaterThanOrEqual(20);
   });
 
+  it("gives every authored choice OPTION its printed mechanics (options are FeatureRecords, not bare ids)", () => {
+    const cleric = classes.find((entry) => entry.id === "cleric")!;
+    const optionsOf = (owner: { features?: readonly FeatureRecord[]; traits?: readonly FeatureRecord[] }, featureId: string) =>
+      [...(owner.features ?? []), ...(owner.traits ?? [])].find((feature) => feature.id === featureId)!.choice!.options!;
+
+    // Divine Order: Protector is Martial weapons + Heavy armor training, Thaumaturge is one extra
+    // Cleric cantrip. Both were validated, written to the ledger, and then dropped on the floor.
+    const order = optionsOf(cleric, "divine-order");
+    expect(order.map((option) => option.id)).toEqual(["protector", "thaumaturge"]);
+    const protector = order.find((option) => option.id === "protector")!;
+    expect(protector.grants!.weapons).toEqual(["martial"]);
+    expect(protector.grants!.armor).toEqual(["heavy"]);
+    // A Protector Cleric's PROFICIENCIES are the class's plus the option's - the SRD's printed result.
+    expect([...cleric.weaponProficiencies, ...protector.grants!.weapons]).toEqual(["simple", "martial"]);
+    expect([...cleric.armorProficiencies, ...protector.grants!.armor]).toEqual(["light", "medium", "shields", "heavy"]);
+    const thaumaturge = order.find((option) => option.id === "thaumaturge")!;
+    expect(thaumaturge.choice).toMatchObject({ kind: "cantrip", choose: 1, fromCatalog: "cleric-spells", maxSpellLevel: 0 });
+    expect(thaumaturge.grants).toBeUndefined();
+
+    // Blessed Strikes: Divine Strike is a once-per-turn rollable that grows 1d8 -> 2d8 at level 14.
+    const strikes = optionsOf(cleric, "blessed-strikes");
+    expect(strikes.map((option) => option.id)).toEqual(["divine-strike", "potent-spellcasting"]);
+    const divineStrike = strikes[0];
+    expect(divineStrike.uses).toEqual({ limit: 1, per: "turn", pool: "blessed-strikes" });
+    expect(divineStrike.actions[0].damageByLevel).toEqual([
+      { level: 7, formula: "1d8", type: "radiant" }, { level: 14, formula: "2d8", type: "radiant" }
+    ]);
+    // Potent Spellcasting is honest prose: "add your Wisdom modifier to cantrip damage" has no rider
+    // in the bounded vocabulary (no ability-derived damage bonus), so it carries none (ADR-0008).
+    expect(strikes[1].actions).toEqual([]);
+    expect(strikes[1].modifiers).toEqual([]);
+
+    // Giant Ancestry: all six boons carry their own action AND their own PB-per-Long-Rest counter on
+    // one shared pool - the parent feature's `uses` alone had no action to ride and was dropped.
+    const goliath = species.find((entry) => entry.id === "goliath")!;
+    const boons = optionsOf(goliath, "goliath-giant-ancestry");
+    expect(boons.map((option) => option.id)).toEqual(["clouds-jaunt", "fires-burn", "frosts-chill", "hills-tumble", "stones-endurance", "storms-thunder"]);
+    for (const boon of boons) {
+      expect(boon.actions.length, boon.id).toBe(1);
+      expect(boon.uses, boon.id).toEqual({ per: "long-rest", pool: "giant-ancestry", scaling: { type: "proficiency-bonus" } });
+    }
+    expect(boons.map((boon) => [boon.id, boon.actions[0].activation])).toEqual([
+      ["clouds-jaunt", "bonus-action"], ["fires-burn", "other"], ["frosts-chill", "other"],
+      ["hills-tumble", "other"], ["stones-endurance", "reaction"], ["storms-thunder", "reaction"]
+    ]);
+    // The printed damage dice, per boon (the three boons the SRD prints without damage carry none).
+    expect(Object.fromEntries(boons.map((boon) => [boon.id, boon.actions[0].damage.map((part) => `${part.formula} ${part.type}`)]))).toEqual({
+      "clouds-jaunt": [], "fires-burn": ["1d10 fire"], "frosts-chill": ["1d6 cold"],
+      "hills-tumble": [], "stones-endurance": [], "storms-thunder": ["1d8 thunder"]
+    });
+
+    // ONE vocabulary: an option is structurally a FeatureRecord, so the SAME interpreter reads both.
+    for (const option of [...order, ...strikes, ...boons]) {
+      const asFeature: FeatureRecord = option;
+      expect(FeatureRecordSchema.safeParse(asFeature).success, option.id).toBe(true);
+    }
+  });
+
+  it("keeps `choice.from` the canonical id list, derived from `options` (every existing consumer is untouched)", () => {
+    const cleric = classes.find((entry) => entry.id === "cleric")!;
+    const order = cleric.features.find((feature) => feature.id === "divine-order")!.choice!;
+    expect(order.from).toEqual(["protector", "thaumaturge"]);
+    expect(order.from).toEqual(order.options!.map((option) => option.id));
+    const ancestry = species.find((entry) => entry.id === "goliath")!.traits.find((trait) => trait.id === "goliath-giant-ancestry")!.choice!;
+    expect(ancestry.from).toEqual(["clouds-jaunt", "fires-burn", "frosts-chill", "hills-tumble", "stones-endurance", "storms-thunder"]);
+    // Authoring the ids WITHOUT mechanics still works unchanged (back-compat for every other record).
+    const legacy = FeatureRecordSchema.parse({ id: "x", name: "X", description: "d", choice: { kind: "skill", from: ["stealth", "arcana"] } });
+    expect(legacy.choice!.from).toEqual(["stealth", "arcana"]);
+    expect(legacy.choice!.options).toBeUndefined();
+  });
+
+  it("gives the Defense fighting style the +1 AC it only gets WHILE ARMORED", () => {
+    const defense = feats.find((feat) => feat.id === "defense")!;
+    expect(defense.category).toBe("fighting-style");
+    expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true }]);
+    // Every other SRD fighting style stays prose - none of the three has a modeled rider.
+    for (const id of ["archery", "great-weapon-fighting", "two-weapon-fighting"]) {
+      expect(feats.find((feat) => feat.id === id)!.feature.modifiers, id).toEqual([]);
+    }
+    // An unconditional +1 AC is still expressible and still means "always" (back-compat).
+    const always = FeatureRecordSchema.parse({ id: "x", name: "X", description: "d", modifiers: [{ type: "armor-class", amount: 1 }] });
+    expect(always.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: false });
+  });
+
+  it("derives the Breath Weapon save DC from an ability, and gives it the printed damage", () => {
+    const dragonborn = species.find((entry) => entry.id === "dragonborn")!;
+    const expectedTypes: Record<string, string> = {
+      "black-dragon": "acid", "blue-dragon": "lightning", "brass-dragon": "fire", "bronze-dragon": "lightning",
+      "copper-dragon": "acid", "gold-dragon": "fire", "green-dragon": "poison", "red-dragon": "fire",
+      "silver-dragon": "cold", "white-dragon": "cold"
+    };
+    for (const lineage of dragonborn.lineages) {
+      const trait = lineage.traits.find((candidate) => candidate.id === `${lineage.id}-breath`)!;
+      const action = trait.actions.find((candidate) => candidate.id === "breath-weapon")!;
+      // DC 8 + Constitution modifier + Proficiency Bonus, as DATA - the target rolls Dexterity.
+      expect(action.save, lineage.id).toEqual({ ability: "dex", dc: { base: 8, ability: "con", proficiencyBonus: true } });
+      // 1d10, rising by 1d10 at character levels 5, 11, and 17 - in the ancestry's own damage type.
+      const type = expectedTypes[lineage.id];
+      expect(action.damage, lineage.id).toEqual([{ formula: "1d10", type }]);
+      expect(action.damageByLevel, lineage.id).toEqual([
+        { level: 1, formula: "1d10", type }, { level: 5, formula: "2d10", type },
+        { level: 11, formula: "3d10", type }, { level: 17, formula: "4d10", type }
+      ]);
+      // The damage type agrees with the resistance the same ancestry grants.
+      expect(lineage.traits[0].grants!.damageResistances, lineage.id).toEqual([type]);
+    }
+    // Divine Spark: a Channel Divinity save (the class's own spell save DC) AND the scaling damage.
+    const spark = classes.find((entry) => entry.id === "cleric")!.features.find((feature) => feature.id === "channel-divinity")!
+      .actions.find((action) => action.id === "divine-spark")!;
+    expect(spark.save).toEqual({ ability: "con", dc: "spellcasting" });
+    expect(spark.damage).toEqual([{ formula: "1d8", type: "radiant" }]);
+    expect(spark.damageByLevel).toEqual([
+      { level: 2, formula: "1d8", type: "radiant" }, { level: 7, formula: "2d8", type: "radiant" },
+      { level: 13, formula: "3d8", type: "radiant" }, { level: 18, formula: "4d8", type: "radiant" }
+    ]);
+    // A flat printed DC and the spell-save DC both still parse (additive, back-compatible).
+    const save = (dc: unknown) => FeatureRecordSchema.safeParse({
+      id: "x", name: "X", description: "d",
+      actions: [{ id: "a", name: "A", activation: "action", description: "d", save: { ability: "con", dc } }]
+    }).success;
+    expect(save("spellcasting")).toBe(true);
+    expect(save(15)).toBe(true);
+    expect(save({ ability: "wis" })).toBe(true);
+    expect(save({ ability: "not-an-ability" })).toBe(false);
+    expect(save({ base: 8 })).toBe(false);
+  });
+
   it("carries the SRD ability column on every skill (raw bundle - a bundle rebuild must preserve it)", () => {
     const require = createRequire(import.meta.url);
     const raw = require("../bundles/skills.v1.json") as Array<{ id: string; ability?: string }>;
@@ -599,6 +733,79 @@ describe("content-record schema guards", () => {
     expect(FeatureRecordSchema.safeParse({ id: "x", name: "X", description: "d", uses: { per: "long-rest", scaling: { type: "proficiency-bonus" } } }).success).toBe(true);
     // A choice with neither an explicit list nor a catalog is rejected the same way.
     expect(FeatureRecordSchema.safeParse({ id: "x", name: "X", description: "d", choice: { kind: "skill" } }).success).toBe(false);
+  });
+
+  it("rejects a choice whose option list is EMPTY rather than parsing into a downstream crash", () => {
+    // `{from: []}` used to be schema-legal: it satisfied "has a `from`", then every consumer fell
+    // through to `fromCatalog` - which is undefined - and died with a raw TypeError. An empty option
+    // list is never "no options offered"; it is an authoring mistake, and it fails here, loudly.
+    const empty = FeatureChoiceSchema.safeParse({ kind: "skill", from: [] });
+    expect(empty.success).toBe(false);
+    expect(!empty.success && JSON.stringify(empty.error.issues)).toContain("at least one option");
+    expect(FeatureRecordSchema.safeParse({ id: "x", name: "X", description: "d", choice: { kind: "skill", from: [] } }).success).toBe(false);
+    expect(FeatureRecordSchema.safeParse({ id: "x", name: "X", description: "d", choice: { kind: "skill", from: [], fromCatalog: "skills" } }).success).toBe(false);
+    expect(FeatureChoiceSchema.safeParse({ kind: "x", options: [] }).success).toBe(false);
+    // The fix is to OMIT the field, not to empty it.
+    expect(FeatureChoiceSchema.safeParse({ kind: "skill", fromCatalog: "skills" }).success).toBe(true);
+    // No authored record anywhere in the bundles smuggles one in.
+    const everyChoice = [
+      ...loadClasses().flatMap((entry) => entry.features),
+      ...loadSubclasses().flatMap((entry) => entry.features),
+      ...loadSpecies().flatMap((entry) => [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)]),
+      ...loadBackgrounds().flatMap((entry) => entry.features),
+      ...loadFeats().map((feat) => feat.feature)
+    ].flatMap((feature) => feature.choice ? [{ id: feature.id, choice: feature.choice }] : []);
+    for (const { id, choice } of everyChoice) {
+      expect(choice.from === undefined || choice.from.length > 0, `${id}: empty from`).toBe(true);
+      for (const option of choice.options ?? []) {
+        expect(option.choice?.from === undefined || option.choice.from.length > 0, `${id}/${option.id}: empty from`).toBe(true);
+      }
+    }
+  });
+
+  it("keeps ONE option vocabulary: `options` carry riders, exclude `from`, and nest only one level deep", () => {
+    // An option is a FeatureRecord in all but name: same riders, same meanings, one interpreter.
+    const parsed = FeatureRecordSchema.parse({
+      id: "sacred-role", name: "Sacred Role", level: 1, description: "Choose a role.",
+      choice: {
+        kind: "sacred-role",
+        options: [{
+          id: "warden", name: "Warden", description: "You are trained for battle.",
+          tags: ["martial"],
+          grants: { weapons: ["martial"], armor: ["heavy"] },
+          modifiers: [{ type: "armor-class", amount: 1, whileArmored: true }],
+          actions: [{ id: "warden-strike", name: "Warden Strike", activation: "other", description: "Strike.", damage: [{ formula: "1d8", type: "radiant" }] }],
+          effects: [{ tags: ["warded"], duration: { type: "encounter" } }],
+          uses: { per: "long-rest", scaling: { type: "proficiency-bonus" } },
+          choice: { kind: "cantrip", choose: 1, fromCatalog: "cleric-spells", maxSpellLevel: 0 }
+        }]
+      }
+    });
+    const option = parsed.choice!.options![0];
+    // Defaults fill in identically to a FeatureRecord's, so a consumer reads both unconditionally.
+    expect(option.actions[0].damage).toEqual([{ formula: "1d8", type: "radiant" }]);
+    expect(option.effects[0].target).toBe("self");
+    expect(option.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: true });
+    expect(option.grants!.skills).toEqual([]);
+    const asFeature: FeatureRecord = option;
+    expect(FeatureRecordSchema.safeParse(asFeature).success).toBe(true);
+    // `from` is DERIVED, never co-authored - two lists could disagree, so only one is authorable.
+    expect(parsed.choice!.from).toEqual(["warden"]);
+    expect(FeatureChoiceSchema.safeParse({ kind: "k", from: ["warden"], options: [{ id: "warden", name: "W", description: "d" }] }).success).toBe(false);
+    // Option ids are unique within one choice.
+    expect(FeatureChoiceSchema.safeParse({ kind: "k", options: [{ id: "a", name: "A", description: "d" }, { id: "a", name: "A2", description: "d" }] }).success).toBe(false);
+    // Depth is bounded at one: an option's own choice may not carry a further `options` list.
+    expect(FeatureChoiceSchema.safeParse({
+      kind: "k",
+      options: [{ id: "a", name: "A", description: "d", choice: { kind: "n", options: [{ id: "b", name: "B", description: "d" }] } }]
+    }).success).toBe(false);
+    // An option still needs printed text - it lands on the sheet as a trait exactly like a feature.
+    expect(FeatureChoiceSchema.safeParse({ kind: "k", options: [{ id: "a", name: "A" }] }).success).toBe(false);
+    // Homebrew authors the identical record; nothing about the SRD's options is special-cased.
+    expect(FeatureChoiceSchema.safeParse({
+      kind: "moon-phase",
+      options: [{ id: "waxing", name: "Waxing", description: "Homebrew.", modifiers: [{ type: "speed", amount: 10 }] }]
+    }).success).toBe(true);
   });
 
   it("accepts a feature carrying the full rider vocabulary (actions, effects, grants, modifiers)", () => {

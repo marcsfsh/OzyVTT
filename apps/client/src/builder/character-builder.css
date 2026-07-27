@@ -81,6 +81,13 @@
   line-height: var(--lh-body);
 }
 
+/* The server's rejection. It is not a control, so it carries no focus ring of its own — it is only
+   made focusable so it can be scrolled to and announced when Create comes back refused, which on a
+   long review step happens well above the sticky footer the eye is on. `scroll-margin` keeps it
+   clear of that footer when the browser brings it into view. */
+.cb-rejection { scroll-margin-block: var(--space-8); }
+.cb-rejection:focus { outline: none; }
+
 /* The ability-increase rows (an ASI's +2 split, a background's +2/+1). Each row is a label plus a
    Select — the same gesture the allocator already uses to hand out a score, rather than a second
    invention for the same act. */

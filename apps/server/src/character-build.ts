@@ -10,7 +10,7 @@ import {
   validateAbilityFormula, type Ability, type ClassProgressionTable
 } from "@vtt/rules-5e";
 import type {
-  BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureRecord, SpeciesReference, SubclassReference
+  BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureOption, FeatureRecord, SpeciesReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import type { ContentLibrary } from "./content-library.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -66,6 +66,20 @@ export type CharacterCreateRequestInput = Readonly<{
 function reject(message: string): never { throw new CommandRejectedError(message); }
 function dedupe(values: readonly string[]): string[] { return [...new Set(values)]; }
 
+/**
+ * SRD "Repeatable" on a feat means the same feat may simply be taken again (Ability Score
+ * Improvement, Skilled) - EXCEPT Magic Initiate, whose repeat clause reads "you must choose a
+ * different spell list each time". In this catalog a spell list IS a separate feat id
+ * (magic-initiate-cleric / -druid / -wizard), and a `<list>-spells` catalog slug is how a feature
+ * names one - the same convention step 9 resolves the class spell list through. So for such a feat
+ * "a different spell list" reads exactly as "a different feat id", and repeating the same id is not
+ * legal. If the content vocabulary later carries an explicit repeat constraint, this is the one
+ * place that has to change.
+ */
+function repeatsOnlyWithADifferentSpellList(feat: FeatReference): boolean {
+  return feat.feature.choice?.fromCatalog?.endsWith("-spells") ?? false;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Choice offers: everything the content ASKED the player to pick, with its legal options.
 // ---------------------------------------------------------------------------------------------
@@ -79,11 +93,20 @@ function dedupe(values: readonly string[]): string[] { return [...new Set(values
 type ChoiceOffer = {
   key: string;
   featureId: string | null;
+  /**
+   * Other feature ids a `payload.featureId` tag may name for this offer. A pick offered BY a chosen
+   * option (Divine Order's Thaumaturge asks for an extra Cleric cantrip) is keyed on the OPTION's id,
+   * but the wizard may just as reasonably tag the row with the parent feature ("divine-order"), so
+   * both are accepted rather than rejecting a ledger that is unambiguous either way.
+   */
+  featureAliases: readonly string[];
   kind: string;
   capacity: number;
   options: ReadonlySet<string>;
   /** Spell level per option id, when the options came from a `*-spells` catalog (drives maxSpellLevel). */
   optionLevels: ReadonlyMap<string, number> | null;
+  /** Inline options carrying their OWN mechanics (Divine Order's roles, Giant Ancestry's boons); null when the ids are bare. */
+  optionRecords: readonly FeatureOption[] | null;
   unresolvable: string | null;
   repeatable: boolean;
   maxSpellLevel: number | null;
@@ -92,7 +115,24 @@ type ChoiceOffer = {
 };
 
 function offerOf(partial: Pick<ChoiceOffer, "key" | "kind" | "capacity" | "options" | "label"> & Partial<ChoiceOffer>): ChoiceOffer {
-  return { featureId: null, optionLevels: null, unresolvable: null, maxSpellLevel: null, repeatable: false, taken: [], ...partial };
+  return { featureId: null, featureAliases: [], optionLevels: null, optionRecords: null, unresolvable: null, maxSpellLevel: null, repeatable: false, taken: [], ...partial };
+}
+
+/**
+ * A chosen inline option IS a feature: identical rider fields, identical meanings (see the content
+ * package's `FeatureOptionSchema`). Re-shaping it into a `FeatureRecord` means one interpreter runs
+ * for class features, species traits, feats AND chosen options - no second code path to keep honest.
+ */
+function optionAsFeature(option: FeatureOption): FeatureRecord {
+  return {
+    id: option.id, name: option.name, description: option.description, tags: option.tags,
+    actions: option.actions, effects: option.effects, modifiers: option.modifiers,
+    ...(option.uses ? { uses: option.uses } : {}),
+    ...(option.grants ? { grants: option.grants } : {}),
+    // An option's own choice cannot nest further options (the vocabulary is depth-limited), but the
+    // feature-level type states `from` explicitly because its schema derives it - restate it here.
+    ...(option.choice ? { choice: { ...option.choice, from: option.choice.from } } : {})
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -124,6 +164,8 @@ type InterpretedFeatures = {
   hitPointsPerLevel: number;
   speedBonus: number;
   armorClassBonus: number;
+  /** Flat AC that only applies while body armor is worn (the Defense fighting style's "+1 while you wear armor"). */
+  armorClassBonusWhileArmored: number;
   initiativeBonus: number;
   extraAttacks: number;
   unarmoredDefense: { ability: Ability; allowShield: boolean } | null;
@@ -175,12 +217,22 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
     const interpreted = interpretAction(feature, action, context);
     if (!into.actions.some((existing) => existing.id === interpreted.id)) into.actions.push(interpreted);
   }
-  // An effect grant with no action to carry it gets a synthesized activation, so the sheet can
-  // actually grant it (EffectGrant IS modeled vocabulary; a rider with no trigger would be inert).
-  if (feature.effects.length > 0 && feature.actions.length === 0 && !into.actions.some((existing) => existing.id === feature.id)) {
+  // A feature with NO action of its own but with a rider that needs a trigger gets a synthesized
+  // activation, so the sheet can actually use it. Two riders qualify:
+  //   - an effect grant (EffectGrant IS modeled vocabulary; a rider with no trigger would be inert);
+  //   - LIMITED USES. `interpretAction` was the only consumer of `feature.uses`, so every authored
+  //     feature that prints a use count but no action (Action Surge, Indomitable, Arcane Recovery,
+  //     Divine Intervention, Relentless Endurance, Overchannel, the six tiefling legacy tiers, ...)
+  //     landed as prose with no trackable pool at all. A pool that recharges on a rest is exactly
+  //     the mechanic the rest/encounter code already resets by action id, so it belongs here.
+  const synthesizedUses = feature.uses ? Math.min(20, resolvedUseLimit(feature.uses, context)) : 0;
+  const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
+  if (feature.actions.length === 0 && (feature.effects.length > 0 || carriesUses) && !into.actions.some((existing) => existing.id === feature.id)) {
     into.actions.push({
       id: feature.id, name: feature.name, activation: "other",
-      description: feature.description.slice(0, 12000), damage: [], grants: feature.effects[0]
+      description: feature.description.slice(0, 12000), damage: [],
+      ...(feature.effects.length > 0 ? { grants: feature.effects[0] } : {}),
+      ...(carriesUses ? { uses: { limit: synthesizedUses, per: feature.uses!.per, ...(feature.uses!.pool ? { pool: feature.uses!.pool } : {}) } } : {})
     } as unknown as ActorAction);
   }
   if (feature.grants) {
@@ -201,7 +253,13 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
       case "ability-score": into.abilityIncreases.push({ ability: modifier.ability, amount: modifier.amount, maximum: modifier.maximum }); break;
       case "hit-points-per-level": into.hitPointsPerLevel += modifier.amount; break;
       case "speed": into.speedBonus += modifier.amount; break;
-      case "armor-class": into.armorClassBonus += modifier.amount; break;
+      // The Defense fighting style is "+1 AC WHILE you're wearing armor", so an `armor-class` rider
+      // that sets `whileArmored` is held back for step 11, which is the only place that knows the
+      // final loadout. An unconditional rider (a ring of protection) applies either way.
+      case "armor-class":
+        if (modifier.whileArmored) into.armorClassBonusWhileArmored += modifier.amount;
+        else into.armorClassBonus += modifier.amount;
+        break;
       case "initiative": into.initiativeBonus += modifier.amount; break;
       case "extra-attack": into.extraAttacks += modifier.count; break;
       case "unarmored-defense": into.unarmoredDefense = { ability: modifier.ability, allowShield: modifier.allowShield }; break;
@@ -290,6 +348,14 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const progression: ClassProgressionTable = library.classProgressionTable();
 
   // ---- 1. Identity ids resolve against the catalogs (unknown ids reject loudly). ----
+  // NO multiclass prerequisite check here, deliberately. `CharacterCreateRequestInput` carries ONE
+  // `classId` and ONE `level`: a Phase-2 character is single-class by construction, and the SRD
+  // attaches ability minimums to TAKING A SECOND CLASS, never to a starting class - enforcing them
+  // on creation would reject legal level-1 characters. `meetsMulticlassPrerequisites`
+  // (`@vtt/rules-5e` class-data.ts) and the wire's `multiclassPrerequisites` are therefore correct
+  // but uncalled until the second class entry exists (packet phase 6, level-up). The intent is
+  // pinned by a test in `apps/server/test/character-build.test.ts` so the gap stays a documented
+  // sequencing fact rather than a forgotten check.
   const classRecord: ClassReference = library.classRecord(input.classId) ?? reject(`No class "${input.classId}" is in the content catalog.`);
   const species: SpeciesReference = library.speciesRecord(input.speciesId) ?? reject(`No species "${input.speciesId}" is in the content catalog.`);
   const background: BackgroundReference = library.backgroundRecord(input.backgroundId) ?? reject(`No background "${input.backgroundId}" is in the content catalog.`);
@@ -330,6 +396,8 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const originFeat: FeatReference | null = background.originFeatId
     ? library.featRecord(background.originFeatId) ?? reject(`${background.name} grants unknown feat "${background.originFeatId}".`)
     : null;
+  // Every feat this character already holds, granted or chosen - the cross-offer duplicate guard in pass A.
+  const heldFeatIds = new Set<string>(originFeat ? [originFeat.id] : []);
   const granted: Array<{ record: FeatureRecord; count: number }> = [
     ...classFeatures.values(),
     ...subclassFeatures.map((record) => ({ record, count: 1 })),
@@ -354,14 +422,23 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   listOffer("background-tools", "tool", `${background.name} tools`, background.toolChoices);
   listOffer("background-languages", "language", `${background.name} languages`, background.languageChoices);
   listOffer("species-languages", "language", `${species.name} languages`, species.languageChoices);
-  const featureOffer = (record: FeatureRecord, count: number): void => {
+  const featureOffer = (record: FeatureRecord, count: number, featureAliases: readonly string[] = []): void => {
     const choice = record.choice;
     if (!choice || choice.choose * count === 0) return;
     let options: ReadonlySet<string>;
     let optionLevels: ReadonlyMap<string, number> | null = null;
     let unresolvable: string | null = null;
+    // Inline `options` carry their own mechanics; the content schema derives `from` from their ids,
+    // so the id list below is identical either way and only the RIDERS need the extra reference.
     if (choice.from && choice.from.length > 0) options = new Set(choice.from);
-    else {
+    else if (!choice.fromCatalog) {
+      // A schema-legal but unusable record: `{kind, choose, from: []}` passes the content schema's
+      // "needs from OR fromCatalog" refinement (an empty array is truthy), then asks the resolver to
+      // resolve `undefined`. That used to be a raw TypeError - not a CatalogChoiceError, not a
+      // CommandRejectedError - so the socket handler echoed an internal message to the client.
+      // Reject it as content, loudly and actionably, the way every other bad record rejects.
+      reject(`"${record.name}" offers a "${choice.kind}" choice with no options - its content record needs a non-empty "from" list or a "fromCatalog" slug.`);
+    } else {
       try {
         const resolved = resolveCatalogChoice(choice.fromCatalog!, catalogs);
         options = new Set(resolved.map((option) => option.id));
@@ -375,17 +452,18 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       }
     }
     offers.push(offerOf({
-      key: `feature:${record.id}`, featureId: record.id, kind: choice.kind, capacity: choice.choose * count,
-      options, optionLevels, unresolvable, repeatable: choice.repeatable, maxSpellLevel: choice.maxSpellLevel ?? null, label: record.name
+      key: `feature:${record.id}`, featureId: record.id, featureAliases, kind: choice.kind, capacity: choice.choose * count,
+      options, optionLevels, optionRecords: choice.options ?? null, unresolvable, repeatable: choice.repeatable,
+      maxSpellLevel: choice.maxSpellLevel ?? null, label: record.name
     }));
   };
   for (const { record, count } of granted) featureOffer(record, count);
 
   const featureTagOf = (row: CharacterChoice): string | null =>
     row.payload && typeof row.payload.featureId === "string" ? row.payload.featureId : null;
-  const matchRow = (row: CharacterChoice, candidates: readonly ChoiceOffer[]): void => {
+  const matchRow = (row: CharacterChoice, candidates: readonly ChoiceOffer[]): ChoiceOffer => {
     const featureTag = featureTagOf(row);
-    const scoped = featureTag ? candidates.filter((offer) => offer.featureId === featureTag) : candidates;
+    const scoped = featureTag ? candidates.filter((offer) => offer.featureId === featureTag || offer.featureAliases.includes(featureTag)) : candidates;
     if (scoped.length === 0) reject(featureTag ? `No feature "${featureTag}" offers a "${row.kind}" choice.` : `Nothing in this build offers a "${row.kind}" choice.`);
     const gap = scoped.find((offer) => offer.unresolvable !== null);
     if (gap && !scoped.some((offer) => offer.options.has(row.id))) reject(`This build needs "${gap.label}" resolved, but ${gap.unresolvable}`);
@@ -405,6 +483,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
         : `"${row.id}" is not an offered option for the "${row.kind}" choice (${scoped.map((candidate) => candidate.label).join(", ")}).`);
     }
     offer.taken.push(row.id);
+    return offer;
   };
 
   // Pass A: feat selections. "asi" is the built-in shorthand (payload.increases) that stays legal
@@ -420,13 +499,42 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       continue;
     }
     matchRow(row, offers.filter((offer) => offer.kind === row.kind));
-    chosenFeats.push(library.featRecord(row.id) ?? reject(`No feat "${row.id}" is in the content catalog.`));
+    const feat = library.featRecord(row.id) ?? reject(`No feat "${row.id}" is in the content catalog.`);
+    // The SAME feat may not be taken twice across DIFFERENT offers. `repeatable:false` on a choice
+    // only ever guarded within one offer, so a Human Acolyte could spend Versatile on the feat the
+    // background already grants (interpreting Magic Initiate twice - 7 cantrips instead of 5) and a
+    // Champion could take "defense" from both of its fighting-style offers. The held set includes
+    // the background's origin feat, which is granted rather than chosen.
+    if (heldFeatIds.has(feat.id)) {
+      if (!feat.repeatable) reject(`${feat.name} is already on this character - a feat can only be taken once unless it says it is repeatable.`);
+      if (repeatsOnlyWithADifferentSpellList(feat)) reject(`${feat.name} may be taken again only with a DIFFERENT spell list - choose another one.`);
+    }
+    heldFeatIds.add(feat.id);
+    chosenFeats.push(feat);
   }
   // The chosen feats' features join the granted set: their own choices become offers for pass B,
   // and their riders/prose interpret exactly like any class or species feature.
   for (const feat of chosenFeats) {
     granted.push({ record: feat.feature, count: 1 });
     featureOffer(feat.feature, 1);
+  }
+
+  // Pass A2: picks whose OPTIONS carry their own mechanics - Divine Order's two sacred roles, Giant
+  // Ancestry's six boons, Blessed Strikes' two forms. Settled here, before pass B, for exactly the
+  // reason feats are: a chosen option can itself ask for a pick (Thaumaturge's extra Cleric cantrip),
+  // and that second-order offer has to exist before pass B matches the remaining rows. Without this,
+  // a chosen option was validated and written to the ledger and then thrown away - the Protector
+  // Cleric got no martial weapons or heavy armour, the Goliath's chosen boon no action.
+  const optionKinds = new Set(offers.filter((offer) => offer.optionRecords !== null).map((offer) => offer.kind));
+  for (const row of input.choices) {
+    if (!optionKinds.has(row.kind) || FEAT_KINDS.has(row.kind)) continue;
+    const offer = matchRow(row, offers.filter((candidate) => candidate.kind === row.kind));
+    const option = offer.optionRecords?.find((candidate) => candidate.id === row.id);
+    if (!option) continue; // a bare id in a mixed-kind offer: provenance only, nothing to interpret
+    const asFeature = optionAsFeature(option);
+    granted.push({ record: asFeature, count: 1 });
+    // The option's own pick is keyed on the option id, with the parent feature id as an accepted alias.
+    featureOffer(asFeature, 1, offer.featureId ? [offer.featureId] : []);
   }
 
   // Pass B: everything else. Rows the offer machinery does not own: the class's own prepared
@@ -438,7 +546,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   const preparedSpellRows: CharacterChoice[] = [];
   const classCantripRows: CharacterChoice[] = [];
   for (const row of input.choices) {
-    if (separateKinds.has(row.kind) || FEAT_KINDS.has(row.kind)) continue;
+    if (separateKinds.has(row.kind) || FEAT_KINDS.has(row.kind) || optionKinds.has(row.kind)) continue; // optionKinds were settled in pass A2
     if (row.kind === "subclass") {
       if (row.id !== input.subclassId) reject(`The subclass choice row ("${row.id}") disagrees with the chosen subclass "${input.subclassId ?? "none"}".`);
       const offer = offers.find((candidate) => candidate.kind === "subclass");
@@ -448,7 +556,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     if (row.kind === "spell" || row.kind === "cantrip") {
       const featureTag = featureTagOf(row);
       const featureOffers = offers.filter((offer) => offer.kind === row.kind && offer.featureId !== null);
-      const scoped = featureTag ? featureOffers.filter((offer) => offer.featureId === featureTag) : [];
+      const scoped = featureTag ? featureOffers.filter((offer) => offer.featureId === featureTag || offer.featureAliases.includes(featureTag)) : [];
       if (scoped.length > 0) { matchRow(row, scoped); continue; }
       if (featureTag) reject(`No feature "${featureTag}" offers a "${row.kind}" choice.`);
       (row.kind === "spell" ? preparedSpellRows : classCantripRows).push(row);
@@ -502,7 +610,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     actions: [], traits: [], grantedSkills: [], grantedExpertise: [], grantedTools: [], grantedLanguages: [],
     grantedArmor: [], grantedWeapons: [], grantedSaves: [], damageResistances: [], damageImmunities: [],
     conditionImmunities: [], grantedSpells: [], abilityIncreases: [], hitPointsPerLevel: 0, speedBonus: 0,
-    armorClassBonus: 0, initiativeBonus: 0, extraAttacks: 0, unarmoredDefense: null
+    armorClassBonus: 0, armorClassBonusWhileArmored: 0, initiativeBonus: 0, extraAttacks: 0, unarmoredDefense: null
   };
   for (const { record } of granted) interpretFeature(record, interpreted, context);
   for (const increase of interpreted.abilityIncreases) {
@@ -567,15 +675,28 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     }
     const slots = (levelRow.spellSlots ?? []).map((count, index) => ({ level: index + 1, max: count })).filter((slot) => slot.max > 0);
     const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), 0);
+    // SRD: a feature-granted ALWAYS-prepared spell (a Life Domain spell, a racial spell) is always
+    // ready and "doesn't count against the number of spells you can prepare". Appending the grants
+    // LAST and skipping ids already present did the opposite: a domain spell the player also listed
+    // stayed `alwaysPrepared: false` AND ate one of their prepared slots. The grant wins, and the
+    // matching pick is not charged to the cap.
+    const alwaysPreparedGrants = new Set(interpreted.grantedSpells.filter((granted) => granted.alwaysPrepared).map((granted) => granted.id));
+    const chargedCantripRows = classCantripRows.filter((row) => !alwaysPreparedGrants.has(row.id));
+    const chargedPreparedRows = preparedSpellRows.filter((row) => !alwaysPreparedGrants.has(row.id));
     const cantripCap = levelRow.cantripsKnown ?? 0;
-    if (classCantripRows.length > cantripCap) reject(`${classRecord.name} knows ${cantripCap} cantrips at level ${input.level}; got ${classCantripRows.length}.`);
+    if (chargedCantripRows.length > cantripCap) reject(`${classRecord.name} knows ${cantripCap} cantrips at level ${input.level}; got ${chargedCantripRows.length}.`);
     const preparedCap = levelRow.preparedCount ?? levelRow.spellsKnown ?? 0;
-    if (preparedSpellRows.length > preparedCap) reject(`${classRecord.name} ${casting.prepares === "prepared" ? "prepares" : "knows"} ${preparedCap} spells at level ${input.level}; got ${preparedSpellRows.length}.`);
+    if (chargedPreparedRows.length > preparedCap) reject(`${classRecord.name} ${casting.prepares === "prepared" ? "prepares" : "knows"} ${preparedCap} spells at level ${input.level}; got ${chargedPreparedRows.length}.`);
     const spells: Array<Record<string, unknown>> = [];
+    // Every id the ledger claimed, whether or not it produced an entry - so "chosen twice" still
+    // rejects for a pair of rows that both defer to the same grant.
+    const claimedSpellIds = new Set<string>();
     for (const row of classCantripRows) {
       const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${classRecord.name} spell list.`);
       if (option.level !== 0) reject(`"${row.id}" is a level-${option.level} spell, not a cantrip.`);
-      if (spells.some((existing) => existing.id === option.id)) reject(`"${row.id}" is chosen twice.`);
+      if (claimedSpellIds.has(option.id)) reject(`"${row.id}" is chosen twice.`);
+      claimedSpellIds.add(option.id);
+      if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged
       spells.push({ id: option.id, name: option.name, level: 0, prepared: true, alwaysPrepared: true });
     }
     for (const row of preparedSpellRows) {
@@ -583,16 +704,20 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
       const spellLevel = option.level ?? 0;
       if (spellLevel < 1) reject(`"${row.id}" is a cantrip - record it as a "cantrip" choice.`);
       if (spellLevel > maxSlotLevel) reject(`"${row.id}" is level ${spellLevel}, above the highest slot level (${maxSlotLevel}) at ${classRecord.name} ${input.level}.`);
-      if (spells.some((existing) => existing.id === option.id)) reject(`"${row.id}" is chosen twice.`);
+      if (claimedSpellIds.has(option.id)) reject(`"${row.id}" is chosen twice.`);
+      claimedSpellIds.add(option.id);
+      if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged and always prepared
       spells.push({ id: option.id, name: option.name, level: spellLevel, prepared: true, alwaysPrepared: false, classId: classRecord.id });
     }
+    // A feature pick that duplicates an always-prepared grant defers to the grant for the same reason
+    // a class pick does (below): the grant is the stronger, uncharged form.
     for (const id of featureCantripPicks) {
       const record = library.spellRecord(id);
-      if (!spells.some((existing) => existing.id === id)) spells.push({ id, name: record?.name ?? id, level: record?.level ?? 0, prepared: true, alwaysPrepared: true });
+      if (!alwaysPreparedGrants.has(id) && !spells.some((existing) => existing.id === id)) spells.push({ id, name: record?.name ?? id, level: record?.level ?? 0, prepared: true, alwaysPrepared: true });
     }
     for (const id of featureSpellPicks) {
       const record = library.spellRecord(id);
-      if (!spells.some((existing) => existing.id === id)) spells.push({ id, name: record?.name ?? id, level: record?.level ?? 1, prepared: true, alwaysPrepared: false, classId: classRecord.id });
+      if (!alwaysPreparedGrants.has(id) && !spells.some((existing) => existing.id === id)) spells.push({ id, name: record?.name ?? id, level: record?.level ?? 1, prepared: true, alwaysPrepared: false, classId: classRecord.id });
     }
     for (const grantedSpell of interpreted.grantedSpells) {
       if (!spells.some((existing) => existing.id === grantedSpell.id)) spells.push(grantedSpellEntry(grantedSpell));
@@ -679,7 +804,13 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   // Defense while nothing is worn, then the unarmored 10 + DEX floor; flat riders stack on top.
   const equipmentAc = armorClassFromEquipment(dexModifier, inventory);
   const unarmoredAc = interpreted.unarmoredDefense ? 10 + dexModifier + abilityModifier(finalScores[interpreted.unarmoredDefense.ability]) : null;
-  const armorClass = (equipmentAc ?? unarmoredAc ?? 10 + dexModifier) + interpreted.armorClassBonus;
+  const wearingArmor = inventory.some((item) => item.equipped && item.category === "armor" && item.armor);
+  // The flat, NON-equipment part of this character's AC. `instantiate` re-derives AC from the live
+  // loadout, so it has to be told about the rider or it silently drops it (task-packet risk 3):
+  // it travels in the definition's open extension bag, the same fail-open channel that already
+  // carries an import's skills and saves. `armorClassRiderOf` in actor-roster.ts is the reader.
+  const armorClassRider = interpreted.armorClassBonus + (wearingArmor ? interpreted.armorClassBonusWhileArmored : 0);
+  const armorClass = (equipmentAc ?? unarmoredAc ?? 10 + dexModifier) + armorClassRider;
   const initiativeBonus = dexModifier + interpreted.initiativeBonus;
   if (interpreted.extraAttacks > 0) {
     // The modeled vocabulary for Extra Attack is `attack.count`; weapon attacks themselves ride the
@@ -708,7 +839,7 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
     token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
     // The prose layer: EVERY feature lands as a trait (riders only ADD mechanics on top), in the
     // extensions block CharacterSheet.tsx already renders for imported sheets.
-    extensions: { "open5e.srd-2024": { traits: interpreted.traits } },
+    extensions: { "open5e.srd-2024": { traits: interpreted.traits, ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}) } },
     ...(interpreted.damageResistances.length > 0 ? { damageResistances: dedupe(interpreted.damageResistances) } : {}),
     ...(interpreted.damageImmunities.length > 0 ? { damageImmunities: dedupe(interpreted.damageImmunities) } : {}),
     ...(interpreted.conditionImmunities.length > 0 ? { conditionImmunities: dedupe(interpreted.conditionImmunities) } : {}),

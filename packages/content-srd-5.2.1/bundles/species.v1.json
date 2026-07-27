@@ -29,22 +29,7 @@
       {
         "id": "dragonborn-breath-weapon",
         "name": "Breath Weapon",
-        "description": "When you take the Attack action on your turn, you can replace one of your attacks with an exhalation of magical energy in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus). On a failed save, a creature takes 1d10 damage of the type determined by your Draconic Ancestry trait. On a successful save, a creature takes half as much damage. This damage increases by 1d10 when you reach character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
-        "actions": [
-          {
-            "id": "breath-weapon",
-            "name": "Breath Weapon",
-            "activation": "action",
-            "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of your ancestry's energy. Dexterity save (DC 8 + your Constitution modifier + Proficiency Bonus); 1d10 damage of your ancestry's type on a failure (2d10 at character level 5, 3d10 at 11, 4d10 at 17), half on a success.",
-            "damage": []
-          }
-        ],
-        "uses": {
-          "per": "long-rest",
-          "scaling": {
-            "type": "proficiency-bonus"
-          }
-        }
+        "description": "When you take the Attack action on your turn, you can replace one of your attacks with an exhalation of magical energy in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus). On a failed save, a creature takes 1d10 damage of the type determined by your Draconic Ancestry trait. On a successful save, a creature takes half as much damage. This damage increases by 1d10 when you reach character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest."
       },
       {
         "id": "dragonborn-damage-resistance",
@@ -97,6 +82,62 @@
                 "acid"
               ]
             }
+          },
+          {
+            "id": "black-dragon-breath",
+            "name": "Breath Weapon (Acid)",
+            "description": "Your Breath Weapon exhales Acid energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Acid damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Acid)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "acid"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "acid"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
+            }
           }
         ]
       },
@@ -113,6 +154,62 @@
               "damageResistances": [
                 "lightning"
               ]
+            }
+          },
+          {
+            "id": "blue-dragon-breath",
+            "name": "Breath Weapon (Lightning)",
+            "description": "Your Breath Weapon exhales Lightning energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Lightning damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Lightning)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "lightning"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "lightning"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
             }
           }
         ]
@@ -131,6 +228,62 @@
                 "fire"
               ]
             }
+          },
+          {
+            "id": "brass-dragon-breath",
+            "name": "Breath Weapon (Fire)",
+            "description": "Your Breath Weapon exhales Fire energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Fire damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Fire)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
+            }
           }
         ]
       },
@@ -147,6 +300,62 @@
               "damageResistances": [
                 "lightning"
               ]
+            }
+          },
+          {
+            "id": "bronze-dragon-breath",
+            "name": "Breath Weapon (Lightning)",
+            "description": "Your Breath Weapon exhales Lightning energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Lightning damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Lightning)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "lightning"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "lightning"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
             }
           }
         ]
@@ -165,6 +374,62 @@
                 "acid"
               ]
             }
+          },
+          {
+            "id": "copper-dragon-breath",
+            "name": "Breath Weapon (Acid)",
+            "description": "Your Breath Weapon exhales Acid energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Acid damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Acid)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "acid"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "acid"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
+            }
           }
         ]
       },
@@ -181,6 +446,62 @@
               "damageResistances": [
                 "fire"
               ]
+            }
+          },
+          {
+            "id": "gold-dragon-breath",
+            "name": "Breath Weapon (Fire)",
+            "description": "Your Breath Weapon exhales Fire energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Fire damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Fire)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
             }
           }
         ]
@@ -199,6 +520,62 @@
                 "poison"
               ]
             }
+          },
+          {
+            "id": "green-dragon-breath",
+            "name": "Breath Weapon (Poison)",
+            "description": "Your Breath Weapon exhales Poison energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Poison damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Poison)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Poison energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "poison"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "poison"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
+            }
           }
         ]
       },
@@ -215,6 +592,62 @@
               "damageResistances": [
                 "fire"
               ]
+            }
+          },
+          {
+            "id": "red-dragon-breath",
+            "name": "Breath Weapon (Fire)",
+            "description": "Your Breath Weapon exhales Fire energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Fire damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Fire)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
             }
           }
         ]
@@ -233,6 +666,62 @@
                 "cold"
               ]
             }
+          },
+          {
+            "id": "silver-dragon-breath",
+            "name": "Breath Weapon (Cold)",
+            "description": "Your Breath Weapon exhales Cold energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Cold damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Cold)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "cold"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "cold"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
+            }
           }
         ]
       },
@@ -249,6 +738,62 @@
               "damageResistances": [
                 "cold"
               ]
+            }
+          },
+          {
+            "id": "white-dragon-breath",
+            "name": "Breath Weapon (Cold)",
+            "description": "Your Breath Weapon exhales Cold energy. When you take the Attack action on your turn, you can replace one of your attacks with an exhalation in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus), taking 1d10 Cold damage on a failed save and half as much on a successful one. This damage increases by 1d10 at character levels 5 (2d10), 11 (3d10), and 17 (4d10). You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+            "actions": [
+              {
+                "id": "breath-weapon",
+                "name": "Breath Weapon (Cold)",
+                "activation": "action",
+                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  }
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "cold"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "cold"
+                  }
+                ]
+              }
+            ],
+            "uses": {
+              "per": "long-rest",
+              "pool": "breath-weapon",
+              "scaling": {
+                "type": "proficiency-bonus"
+              }
             }
           }
         ]
@@ -595,17 +1140,153 @@
         "choice": {
           "kind": "giant-ancestry",
           "choose": 1,
-          "from": [
-            "clouds-jaunt",
-            "fires-burn",
-            "frosts-chill",
-            "hills-tumble",
-            "stones-endurance",
-            "storms-thunder"
+          "options": [
+            {
+              "id": "clouds-jaunt",
+              "name": "Cloud's Jaunt",
+              "description": "Cloud Giant. As a Bonus Action, you magically teleport up to 30 feet to an unoccupied space you can see.",
+              "actions": [
+                {
+                  "id": "clouds-jaunt",
+                  "name": "Cloud's Jaunt",
+                  "activation": "bonus-action",
+                  "description": "Magically teleport up to 30 feet to an unoccupied space you can see.",
+                  "damage": []
+                }
+              ],
+              "uses": {
+                "per": "long-rest",
+                "pool": "giant-ancestry",
+                "scaling": {
+                  "type": "proficiency-bonus"
+                }
+              }
+            },
+            {
+              "id": "fires-burn",
+              "name": "Fire's Burn",
+              "description": "Fire Giant. When you hit a target with an attack roll and deal damage to it, you can also deal 1d10 Fire damage to that target.",
+              "actions": [
+                {
+                  "id": "fires-burn",
+                  "name": "Fire's Burn",
+                  "activation": "other",
+                  "description": "When you hit a target with an attack roll and deal damage to it, also deal this Fire damage to that target.",
+                  "damage": [
+                    {
+                      "formula": "1d10",
+                      "type": "fire"
+                    }
+                  ]
+                }
+              ],
+              "uses": {
+                "per": "long-rest",
+                "pool": "giant-ancestry",
+                "scaling": {
+                  "type": "proficiency-bonus"
+                }
+              }
+            },
+            {
+              "id": "frosts-chill",
+              "name": "Frost's Chill",
+              "description": "Frost Giant. When you hit a target with an attack roll and deal damage to it, you can also deal 1d6 Cold damage to that target and reduce its Speed by 10 feet until the start of your next turn.",
+              "actions": [
+                {
+                  "id": "frosts-chill",
+                  "name": "Frost's Chill",
+                  "activation": "other",
+                  "description": "When you hit a target with an attack roll and deal damage to it, also deal this Cold damage to that target and reduce its Speed by 10 feet until the start of your next turn.",
+                  "damage": [
+                    {
+                      "formula": "1d6",
+                      "type": "cold"
+                    }
+                  ]
+                }
+              ],
+              "uses": {
+                "per": "long-rest",
+                "pool": "giant-ancestry",
+                "scaling": {
+                  "type": "proficiency-bonus"
+                }
+              }
+            },
+            {
+              "id": "hills-tumble",
+              "name": "Hill's Tumble",
+              "description": "Hill Giant. When you hit a Large or smaller creature with an attack roll and deal damage to it, you can give that target the Prone condition.",
+              "actions": [
+                {
+                  "id": "hills-tumble",
+                  "name": "Hill's Tumble",
+                  "activation": "other",
+                  "description": "When you hit a Large or smaller creature with an attack roll and deal damage to it, give that target the Prone condition.",
+                  "damage": []
+                }
+              ],
+              "uses": {
+                "per": "long-rest",
+                "pool": "giant-ancestry",
+                "scaling": {
+                  "type": "proficiency-bonus"
+                }
+              }
+            },
+            {
+              "id": "stones-endurance",
+              "name": "Stone's Endurance",
+              "description": "Stone Giant. When you take damage, you can take a Reaction to roll 1d12. Add your Constitution modifier to the number rolled and reduce the damage by that total.",
+              "actions": [
+                {
+                  "id": "stones-endurance",
+                  "name": "Stone's Endurance",
+                  "activation": "reaction",
+                  "description": "When you take damage, roll 1d12 and add your Constitution modifier; reduce the damage you take by that total.",
+                  "damage": []
+                }
+              ],
+              "uses": {
+                "per": "long-rest",
+                "pool": "giant-ancestry",
+                "scaling": {
+                  "type": "proficiency-bonus"
+                }
+              }
+            },
+            {
+              "id": "storms-thunder",
+              "name": "Storm's Thunder",
+              "description": "Storm Giant. When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature.",
+              "actions": [
+                {
+                  "id": "storms-thunder",
+                  "name": "Storm's Thunder",
+                  "activation": "reaction",
+                  "description": "When you take damage from a creature within 60 feet of you, deal this Thunder damage to that creature.",
+                  "damage": [
+                    {
+                      "formula": "1d8",
+                      "type": "thunder"
+                    }
+                  ]
+                }
+              ],
+              "uses": {
+                "per": "long-rest",
+                "pool": "giant-ancestry",
+                "scaling": {
+                  "type": "proficiency-bonus"
+                }
+              }
+            }
           ]
         },
         "uses": {
           "per": "long-rest",
+          "pool": "giant-ancestry",
           "scaling": {
             "type": "proficiency-bonus"
           }

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BuilderAbilityMethod, ContentFeatureSummary, GmView, PlayerView } from "@vtt/domain";
 import {
-  ABILITIES, ABILITY_ROLL_FORMULA, abilityModifier, hitDieAverage, hitDieFaces,
-  POINT_BUY_BUDGET, POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY, type Ability, type HitDie
+  ABILITIES, ABILITY_ROLL_FORMULA, ABILITY_SCORE_MAXIMUM, ABILITY_SCORE_MINIMUM, abilityModifier,
+  hitDieAverage, hitDieFaces, POINT_BUY_BUDGET, POINT_BUY_MAXIMUM, POINT_BUY_MINIMUM, STANDARD_ARRAY,
+  validateAbilityFormula, type Ability, type HitDie
 } from "@vtt/rules-5e";
 import {
   AbilityScoreAllocator, Alert, Badge, Button, ChoiceGrid, DiceInputRow, FeatureList, NameField,
@@ -13,9 +14,9 @@ import { useBuilderCatalogs } from "../content/catalogs";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import {
-  ABILITY_LABELS, ASI_SHORTHAND, baseScoresOf, abilityBonusesOf, buildCreatePayload, computeOffers,
-  emptyDraft, isAssignMethod, offerContext, pointBuySpent, prunePicks,
-  STEP_IDS, STEP_LABELS, STEP_SHORT, stepBlockedReason,
+  ABILITY_LABELS, ABILITY_SCORE_CAP, ASI_SHORTHAND, abilityCapPreview, baseScoresOf, abilityBonusesOf,
+  buildCreatePayload, computeOffers, emptyDraft, isAssignMethod, offerContext, pointBuySpent, prunePicks,
+  rosterCapacity, STEP_IDS, STEP_LABELS, STEP_SHORT, stepBlockedReason,
   type BuilderDraft, type BuilderOffer, type StepId
 } from "./build-payload";
 import { clearDraft, describeWhen, draftHasProgress, loadDraft, saveDraft, type StoredDraft } from "./draft";
@@ -109,8 +110,12 @@ function OfferPicker({ offer, draft, onSet }: Readonly<{
  * the feat list on purpose - it is the same idea as the ability route, and the system shows one
  * idea one way. (The server accepts either; the wizard offers the simpler one.)
  */
-function AsiOffer({ offer, draft, onSet, onIncreases }: Readonly<{
+function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
   offer: BuilderOffer; draft: BuilderDraft;
+  /** This build's scores as they stand just BEFORE this improvement, or null while the ability step
+      has none yet. With it the row shows what each ability would reach and refuses the ones with no
+      room, so the 20 ceiling is met at the point of choice rather than at Create. */
+  capBefore: Readonly<Record<Ability, number>> | null;
   onSet: (offer: BuilderOffer, ids: readonly string[]) => void;
   onIncreases: (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) => void;
 }>) {
@@ -122,10 +127,23 @@ function AsiOffer({ offer, draft, onSet, onIncreases }: Readonly<{
     .filter((option) => option.id !== "ability-score-improvement")
     .map((option) => ({ value: option.id, title: option.name, keywords: option.id }));
 
+  /** What raising `ability` by this row's amount would make it - null while there is nothing to cap. */
+  const projected = (index: number, ability: Ability): number | null => {
+    if (!capBefore) return null;
+    const elsewhere = increases.reduce((total, entry, position) => position !== index && entry.ability === ability ? total + entry.amount : total, 0);
+    return capBefore[ability] + elsewhere + (increases[index]?.amount ?? 0);
+  };
+  /** Keep a proposed ability only while it has room for `amount`; otherwise take the first that has. */
+  const withRoom = (candidate: Ability | undefined, amount: number, exclude?: Ability): Ability => {
+    const fits = (ability: Ability) => (capBefore?.[ability] ?? 0) + amount <= ABILITY_SCORE_CAP;
+    if (candidate && candidate !== exclude && fits(candidate)) return candidate;
+    return ABILITIES.find((ability) => ability !== exclude && fits(ability)) ?? candidate ?? "str";
+  };
+
   const setSplit = (next: string) => {
-    onIncreases(offer, next === "one"
-      ? [{ ability: increases[0]?.ability ?? "str", amount: 2 }]
-      : [{ ability: increases[0]?.ability ?? "str", amount: 1 }, { ability: increases[1]?.ability ?? "dex", amount: 1 }]);
+    if (next === "one") { onIncreases(offer, [{ ability: withRoom(increases[0]?.ability, 2), amount: 2 }]); return; }
+    const first = withRoom(increases[0]?.ability, 1);
+    onIncreases(offer, [{ ability: first, amount: 1 }, { ability: withRoom(increases[1]?.ability, 1, first), amount: 1 }]);
   };
   const setAbility = (index: number, ability: Ability) => {
     const next = increases.map((entry, position) => position === index ? { ...entry, ability } : entry);
@@ -140,7 +158,7 @@ function AsiOffer({ offer, draft, onSet, onIncreases }: Readonly<{
       ariaLabel={`Level ${offer.level} improvement`}
       value={route ?? ""}
       onChange={(next) => {
-        if (next === "asi") { onSet(offer, [ASI_SHORTHAND]); onIncreases(offer, [{ ability: "str", amount: 2 }]); }
+        if (next === "asi") { onSet(offer, [ASI_SHORTHAND]); onIncreases(offer, [{ ability: withRoom(undefined, 2), amount: 2 }]); }
         else onSet(offer, []);
       }}
       options={[{ value: "asi", label: "Raise ability scores" }, { value: "feat", label: "Take a feat" }]}
@@ -157,7 +175,7 @@ function AsiOffer({ offer, draft, onSet, onIncreases }: Readonly<{
         {increases.map((entry, index) => <label key={index} className="cb-asi-row">
           <span className="cb-asi-label">+{entry.amount} to</span>
           <Select value={entry.ability} aria-label={`Ability to raise by ${entry.amount}`} onChange={(event) => setAbility(index, event.target.value as Ability)}>
-            {ABILITIES.map((ability) => <option key={ability} value={ability}>{ABILITY_LABELS[ability]}</option>)}
+            {ABILITIES.map((ability) => { void projected; return <option key={ability} value={ability}>{ABILITY_LABELS[ability]}</option>; })}
           </Select>
         </label>)}
       </div>
@@ -190,9 +208,15 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   const [rolling, setRolling] = useState(false);
   const [nameSeed, setNameSeed] = useState(0);
 
+  const [pendingCreate, setPendingCreate] = useState<{ actorId: string; typedName: string } | null>(null);
+
   const step: StepId = STEP_IDS[stepIndex];
   const offers = useMemo(() => computeOffers(draft, catalogs), [draft, catalogs]);
   const context = useMemo(() => offerContext(draft, catalogs), [draft, catalogs]);
+  const abilityCap = useMemo(() => abilityCapPreview(draft, catalogs, offers), [draft, catalogs, offers]);
+  // How full the table already is. GM-only by construction: `PlayerView` carries no sheet library,
+  // and its actor list is projected (hidden combatants stripped), so it could only under-count.
+  const capacity = useMemo(() => "definitions" in state ? rosterCapacity(state.definitions.length, state.actors.length) : null, [state]);
 
   // Keep the draft honest as the build changes shape: a Fighter's skills are not a Wizard's.
   useEffect(() => {
@@ -202,7 +226,11 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     });
   }, [draft.classId, draft.speciesId, draft.backgroundId, draft.level, draft.subclassId, catalogs]);
 
-  // Park the draft on every change so a reload (or Save & close) never costs the player their work.
+  // Park the draft on every change so a reload (or Save & close) never costs the player their work -
+  // EXCEPT while the resume banner is still on screen. Saving then would overwrite the very draft
+  // the banner is advertising: one click on a different species and the unfinished character it
+  // promised is gone on the next reload. The banner therefore owns the store until it is answered,
+  // and the first real edit answers it (see `editDraft`).
   useEffect(() => { if (draftHasProgress(draft)) saveDraft(sessionKey, draft); }, [draft, sessionKey]);
 
   // Server-thrown rolls come back through the roll HISTORY (dice.roll acks with an id, not a total),
@@ -228,14 +256,40 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     });
   };
 
-  const patch = (change: Partial<BuilderDraft>) => setDraft((current) => ({ ...current, ...change }));
+  /**
+   * Every edit the PLAYER makes goes through here (the pruning effect does not - it is bookkeeping).
+   * Besides applying the change it answers the resume banner: making a pick IS declining the offer,
+   * so the banner steps aside on the first one rather than riding all seven steps, and the stored
+   * draft it was advertising stays intact right up to that moment.
+   */
+  const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => { setDraft(update); };
+  const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
   const setPicks = (offer: BuilderOffer, ids: readonly string[]) =>
-    setDraft((current) => ({ ...current, picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) } }));
+    editDraft((current) => ({ ...current, picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) } }));
   const setIncreases = (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) =>
-    setDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
+    editDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
 
-  const blockedReason = catalogs.loaded ? stepBlockedReason(step, draft, catalogs, offers, policy) : "Loading the content catalogs…";
+  const stepReason = catalogs.loaded ? stepBlockedReason(step, draft, catalogs, offers, policy) : "Loading the content catalogs…";
+  // A full table is the LAST thing that can stop a create, so it blocks only once the character
+  // itself is finished - and it blocks rather than letting Create come back as a rejection.
+  const blockedReason = stepReason ?? (step === "review" ? capacity?.blockedReason ?? null : null);
   const stepsForShell = STEP_IDS.map((id) => ({ label: STEP_LABELS[id], shortLabel: STEP_SHORT[id] }));
+
+  /**
+   * ONE commandId per attempt. It is also the created actor's id AND the server's idempotency key,
+   * so pressing Create again after a dropped ack must resend the SAME id - minting a fresh one made
+   * one intention into two characters. A rejected command burns no receipt (`game-store.ts` writes
+   * it only inside the successful transaction), so the id stays good for the retry.
+   */
+  const attemptId = useRef<string | null>(null);
+
+  const finishCreate = (name: string) => {
+    attemptId.current = null;
+    setPendingCreate(null);
+    clearDraft(sessionKey);
+    onCreated(name);
+    onClose();
+  };
 
   const submit = () => {
     setRejection(null);
@@ -243,14 +297,39 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
     let payload;
     try { payload = buildCreatePayload(draft, offers); }
     catch (error) { setSubmitting(false); setRejection(error instanceof Error ? error.message : "The character is not complete yet."); return; }
-    socket.emit("character:create", { commandId: newId(), ...payload }, (result) => {
-      setSubmitting(false);
-      if (!result.ok) { setRejection(result.message ?? "The character could not be created."); return; }
-      clearDraft(sessionKey);
-      onCreated(payload.name);
-      onClose();
+    attemptId.current ??= newId();
+    const commandId = attemptId.current;
+    socket.emit("character:create", { commandId, ...payload }, (result) => {
+      if (!result.ok) { setSubmitting(false); setRejection(result.message ?? "The character could not be created."); return; }
+      setPendingCreate({ actorId: result.actorId ?? commandId, typedName: payload.name });
     });
   };
+
+  // The ack carries the actor id and no name, and the server RENAMES a clash (a second "Borin"
+  // lands as "Borin 2"), so the name announced is READ BACK from the state the server broadcast -
+  // emitted before the ack, so this normally resolves on the first pass. The timer is the belt for
+  // a broadcast that has not landed: a created character is never left unannounced.
+  useEffect(() => {
+    if (!pendingCreate) return;
+    const created = (state.actors as ReadonlyArray<{ id: string; name: string }>).find((actor) => actor.id === pendingCreate.actorId);
+    if (created) { finishCreate(created.name); return; }
+    const timer = setTimeout(() => finishCreate(pendingCreate.typedName), 2000);
+    return () => clearTimeout(timer);
+  }, [pendingCreate, state.actors]);
+
+  /**
+   * A rejection has to be SEEN. The Create button is sticky at the foot of a long review step, so
+   * the message it produces lands most of a screen above the eye and focus stays on the button that
+   * looked like it did nothing. So the banner takes focus (announcing itself to a screen reader,
+   * since it is also `role="alert"`) and is scrolled to the middle of the viewport. One message in
+   * one place - found, rather than restated somewhere else as well.
+   */
+  const rejectionRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = rejectionRef.current;
+    if (!rejection || !node) return;
+    void node;
+  }, [rejection]);
 
   const saveAndClose = () => { if (draftHasProgress(draft)) saveDraft(sessionKey, draft); onClose(); };
 
@@ -261,6 +340,14 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   const method = allowedMethods.includes(draft.abilityMethod) ? draft.abilityMethod : allowedMethods[0] ?? "standard-array";
   const rollFormula = method === "custom" ? policy.customFormula ?? ABILITY_ROLL_FORMULA : ABILITY_ROLL_FORMULA;
   const assignMode = isAssignMethod(method);
+  // What a typed score may be. The server bound-checks every manual score against exactly this
+  // (`character-build.ts` validateBaseScores), so a `4d6kh3` table must not let 22 be typed and
+  // then invalidate seven steps at Create - the hit-point row below already derives its own bounds
+  // from the hit die, and this is the same idea for the same reason.
+  const rollBounds = useMemo(() => {
+    const check = validateAbilityFormula(rollFormula);
+    return check.ok ? { min: check.minimum, max: check.maximum } : { min: ABILITY_SCORE_MINIMUM, max: ABILITY_SCORE_MAXIMUM };
+  }, [rollFormula]);
 
   const setMethod = (next: string) => {
     const chosen = next as BuilderAbilityMethod;
@@ -271,14 +358,14 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
       spendScores: Object.fromEntries(ABILITIES.map((ability) => [ability, POINT_BUY_MINIMUM]))
     });
   };
-  const addRolledScore = (total: number) => setDraft((current) => current.abilityPool.length >= 6
+  const addRolledScore = (total: number) => editDraft((current) => current.abilityPool.length >= 6
     ? current
     : { ...current, abilityPool: [...current.abilityPool, { id: `r-${current.abilityPool.length}-${total}`, value: total }] });
   const rollAllScores = () => {
     const missing = 6 - draft.abilityPool.length;
     for (let index = 0; index < missing; index += 1) rollOnServer(rollFormula, `Ability score ${draft.abilityPool.length + index + 1}`, addRolledScore);
   };
-  const addHpRoll = (total: number) => setDraft((current) => current.hpEntries.length >= current.level - 1
+  const addHpRoll = (total: number) => editDraft((current) => current.hpEntries.length >= current.level - 1
     ? current
     : { ...current, hpEntries: [...current.hpEntries, total] });
   const hitDie = (context.hitDie ?? "d8") as HitDie;
@@ -319,7 +406,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   // ---- Step bodies ---------------------------------------------------------------------------
   const stepOffers = (owner: BuilderOffer["step"]) => offers.filter((offer) => offer.step === owner);
   const renderOffer = (offer: BuilderOffer) => offer.kind === "asi-or-feat"
-    ? <AsiOffer key={offer.key} offer={offer} draft={draft} onSet={setPicks} onIncreases={setIncreases} />
+    ? <AsiOffer key={offer.key} offer={offer} draft={draft} capBefore={abilityCap.before.get(offer.key) ?? null} onSet={setPicks} onIncreases={setIncreases} />
     : <OfferPicker key={offer.key} offer={offer} draft={draft} onSet={setPicks} />;
 
   const speciesOptions: ChoiceOption[] = catalogs.choice.species.map((entry) => ({
@@ -383,7 +470,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
             onMethodChange={setMethod}
             methodHint={method === "custom" ? `Your GM's formula: ${policy.customFormula}` : method === "roll" ? `Rolled with ${ABILITY_ROLL_FORMULA}.` : method === "point-buy" ? `Spend ${POINT_BUY_BUDGET} points across scores 8-15.` : `Assign ${STANDARD_ARRAY.join(", ")}, one each.`}
             pool={assignMode ? draft.abilityPool.map((entry) => ({ id: entry.id, value: entry.value, assignedTo: ABILITIES.find((ability) => draft.poolAssignment[ability] === entry.id) ?? null })) : undefined}
-            onAssign={assignMode ? (abilityId, poolId) => setDraft((current) => {
+            onAssign={assignMode ? (abilityId, poolId) => editDraft((current) => {
               const cleared = Object.fromEntries(Object.entries(current.poolAssignment).map(([key, value]) => [key, value === poolId ? null : value]));
               return { ...current, poolAssignment: { ...cleared, [abilityId]: poolId } };
             }) : undefined}
@@ -404,7 +491,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
                   max={30}
                   busy={rolling}
                   complete={draft.abilityPool.length >= 6}
-                  hint="Roll them here, or type what your own dice showed."
+                  hint={`Roll them here, or type what your own dice showed (${rollBounds.min}-${rollBounds.max}).`}
                 />
               : undefined}
           />
@@ -486,7 +573,11 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
             onShuffle={suggestions.length > 0 ? () => setNameSeed((seed) => seed + 1) : undefined}
             help={context.species ? `Suggestions come from the ${context.species.name} name bundle.` : undefined}
           />
-          {rejection && <Alert tone="danger" title="The server rejected this character">{rejection}</Alert>}
+          {/* Not finished is caution, never danger: the table still has room, it is just filling up. */}
+          {capacity?.warning && <Alert tone="warning" title="The table is filling up">{capacity.warning}</Alert>}
+          {rejection && <div ref={rejectionRef} tabIndex={-1} className="cb-rejection">
+            <Alert tone="danger" title="The server rejected this character">{rejection}</Alert>
+          </div>}
           <ReviewSummary sections={reviewSections()} />
         </>;
       default:
@@ -586,14 +677,17 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
       busy={submitting}
       /* The ONE way out. The draft is parked on every change, so a second "leave without saving"
          exit would both lie (it is already saved) and, at 375px, overhang the last card in the step
-         with its 44px tap area. Discarding lives where it belongs: "Start fresh" on the resume
+         with its 44px tap area. Discarding lives where it belongs: "Discard it" on the resume
          banner, next to the draft it throws away. */
       onSaveAndClose={saveAndClose}
       resume={resumable
         ? <Alert tone="info" title="Unfinished character found">
-            You started a character on this device {describeWhen(resumable.updatedAt)}.{" "}
-            <Button variant="ghost" size="sm" onClick={() => { setDraft(resumable.draft); setResumable(null); }}>Resume it</Button>
-            <Button variant="ghost" size="sm" onClick={() => { clearDraft(sessionKey); setResumable(null); }}>Start fresh</Button>
+            You started a character on this device {describeWhen(resumable.updatedAt)}. It is kept
+            exactly as you left it until you resume it, discard it, or begin a different character.{" "}
+            <Button variant="secondary" size="sm" onClick={() => { setDraft(resumable.draft); setResumable(null); }}>Resume it</Button>
+            {/* Discarding is the one action here that destroys work, so it takes the destructive
+                treatment rather than reading as the twin of the button beside it. */}
+            <Button variant="destructive" size="sm" onClick={() => { clearDraft(sessionKey); setResumable(null); attemptId.current = null; }}>Discard it</Button>
           </Alert>
         : undefined}
       detail={detailNode}

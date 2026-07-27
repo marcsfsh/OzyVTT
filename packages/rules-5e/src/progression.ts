@@ -154,16 +154,23 @@ export function pactSlotsForLevel(level: number): { level: number; slots: number
 }
 
 /**
- * The SRD multiclass caster level: full-caster levels count whole, Paladin/Ranger levels count half
- * (rounded down), third-caster subclass levels count a third (rounded down), and Warlock levels
- * count not at all (Pact Magic stays separate).
+ * The SRD multiclass caster level: full-caster levels count whole, Paladin/Ranger levels count
+ * "half your levels (ROUND UP)" - SRD 5.2.1 Multiclassing/Spell Slots, one of the explicit
+ * exceptions to the game's round-down default - and Warlock levels count not at all (Pact Magic
+ * stays separate). Rounding half-caster levels DOWN cost a Paladin 3 / Wizard 1 a whole 2nd-level
+ * slot row and disagreed with `spellSlotsForClass`, which already reads the table at ceil(level/2).
+ *
+ * Third-caster subclass levels keep the round-DOWN default: SRD 5.2.1's multiclass list names only
+ * the Paladin and Ranger for round-up, and third-casters (Eldritch Knight, Arcane Trickster) are not
+ * in this SRD at all. Note that `spellSlotsForClass` reads ceil(level/3) for a SINGLE-class third
+ * caster - that is reproducing a printed class table, not applying a rounding rule.
  */
 export function multiclassCasterLevel(classLevels: readonly ClassLevelEntry[], table: ClassProgressionTable = SRD_CLASS_PROGRESSION): number {
   return classLevels.reduce((total, entry) => {
     const progression = entry.casterProgression ?? casterProgressionFor(entry.classId, table);
     const level = Math.max(0, Math.trunc(entry.level));
     if (progression === "full") return total + level;
-    if (progression === "half") return total + Math.floor(level / 2);
+    if (progression === "half") return total + Math.ceil(level / 2);
     if (progression === "third") return total + Math.floor(level / 3);
     return total;
   }, 0);
