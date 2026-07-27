@@ -6,6 +6,8 @@ paths:
   - "apps/server/src/viewer-http.ts"
   - "apps/server/src/map-http.ts"
   - "apps/server/src/token-http.ts"
+  - "apps/server/src/codex-http.ts"
+  - "apps/server/src/homebrew-http.ts"
 ---
 
 # Public API contract (hard invariant — ADR-0016)

@@ -60,6 +60,11 @@ const GROUPS: ReadonlyArray<{ title: string; intro: string; match: (path: string
     match: (path) => path.startsWith(`${API_NAMESPACE}/content`)
   },
   {
+    title: "Homebrew authoring (GM-only)",
+    intro: "The GM's homebrew library: one polymorphic authoring collection for every content type, its draft/published + player-visibility state machine, soft delete, usage lookups, and pack export/import. Every operation here is GM-only - there is no player read on this surface at all. Players reach homebrew exclusively through the merged reference-content catalogs above, and only records that are published, visible to players, and not deleted.",
+    match: (path) => path.startsWith(`${API_NAMESPACE}/homebrew`)
+  },
+  {
     title: "Encounter archives (Time Machine)",
     intro: "Permanent, machine-readable records of ended encounters - see the archive document section above for the full v2 shape. GM-grade principals only.",
     match: (path) => path.startsWith(`${API_NAMESPACE}/encounters`)
@@ -166,6 +171,48 @@ function fieldRows(schema: Schema, referenced: Set<string>): string[] {
     }
   }
   return rows;
+}
+
+/**
+ * Expands a set of component names over top-level `oneOf` branch `$ref`s, transitively.
+ *
+ * `fieldRows` only collects PROPERTY-level refs, so a component whose top level is a `oneOf`
+ * (a discriminated union like a polymorphic authoring body) contributed nothing: it rendered as a
+ * bare heading and its branch components were documented NOWHERE. Bounded by a visited set, so a
+ * union that refers back to itself terminates instead of looping.
+ */
+export function expandOneOfBranches(schemas: Record<string, Schema>, seed: Iterable<string>): Set<string> {
+  const expanded = new Set<string>(seed);
+  const pending = [...expanded];
+  while (pending.length > 0) {
+    const branches = schemas[pending.pop() as string]?.oneOf;
+    if (!Array.isArray(branches)) continue;
+    for (const branch of branches as Schema[]) {
+      if (typeof branch.$ref !== "string") continue;
+      const name = branch.$ref.replace("#/components/schemas/", "");
+      if (!schemas[name]) throw new Error(`Unresolvable $ref in openApiDocument: ${branch.$ref}`);
+      if (expanded.has(name)) continue;
+      expanded.add(name);
+      pending.push(name);
+    }
+  }
+  return expanded;
+}
+
+/** The branch list for a `oneOf` component, naming its discriminator when it declares one. Empty for anything else. */
+export function oneOfBranchLines(schema: Schema, schemas: Record<string, Schema> = components): string[] {
+  const branches = schema.oneOf;
+  if (!Array.isArray(branches)) return [];
+  const propertyName = (schema.discriminator as { propertyName?: string } | undefined)?.propertyName;
+  const lines = [propertyName ? `One of the following, discriminated by \`${propertyName}\`:` : "One of the following:", ""];
+  for (const branch of branches as Schema[]) {
+    const name = typeof branch.$ref === "string" ? branch.$ref.replace("#/components/schemas/", "") : null;
+    if (name && !schemas[name]) throw new Error(`Unresolvable $ref in openApiDocument: ${branch.$ref as string}`);
+    const description = typeof branch.description === "string" ? ` - ${escapeCell(branch.description)}` : "";
+    lines.push(`- ${name ? `\`${name}\`` : typeLabel(branch)}${description}`);
+  }
+  lines.push("");
+  return lines;
 }
 
 function securityLabel(operation: Operation): string {
@@ -345,8 +392,10 @@ export function renderApiReference(): string {
     }
   }
 
-  // Shared shapes referenced from request bodies, so field tables above stay self-contained.
-  const shared = [...referenced].filter((name) => !name.endsWith("Request") && !name.endsWith("Response") && !name.endsWith("Envelope")).sort();
+  // Shared shapes referenced from request bodies, so field tables above stay self-contained. The
+  // closure over top-level oneOf branches is what keeps a polymorphic body's branches documented:
+  // without it a union renders as a bare heading and its branches appear nowhere at all.
+  const shared = [...expandOneOfBranches(components, referenced)].filter((name) => !name.endsWith("Request") && !name.endsWith("Response") && !name.endsWith("Envelope")).sort();
   if (shared.length > 0) {
     out.push("## Shared shapes");
     out.push("");
@@ -355,6 +404,7 @@ export function renderApiReference(): string {
       out.push(`### \`${name}\``);
       out.push("");
       if (typeof schema.description === "string") { out.push(schema.description); out.push(""); }
+      out.push(...oneOfBranchLines(schema));
       if (schema.properties) {
         out.push("| Field | Type | Required | Notes |");
         out.push("| --- | --- | --- | --- |");

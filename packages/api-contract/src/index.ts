@@ -90,6 +90,28 @@ export const CODEX_ASSET_PATHS = {
 } as const;
 
 /**
+ * The GM homebrew authoring surface (`homebrew-http.ts`), a router mounted separately from `api-v1.ts`
+ * like the codex, map-asset, and viewer routers. **Every operation is GM-only** - there is no player
+ * read here at all. Players reach homebrew exclusively through the merged `CONTENT_PATHS` catalogs,
+ * and only records that are `state: "published"` **and** `visibleToPlayers: true` **and** not deleted.
+ * One polymorphic collection serves all nine content types via the `type` discriminator, the same way
+ * `CODEX_PATHS.pages` serves eight entity types. `{id}` is OpenAPI-style; the Express router
+ * substitutes `:id`. The id is a content slug (`hb-<slug>-<6 hex>`, <=60 chars), not a UUID.
+ */
+export const HOMEBREW_PATHS = {
+  content: `${API_NAMESPACE}/homebrew/content`,
+  contentById: `${API_NAMESPACE}/homebrew/content/{id}`,
+  contentRestore: `${API_NAMESPACE}/homebrew/content/{id}/restore`,
+  contentDuplicate: `${API_NAMESPACE}/homebrew/content/{id}/duplicate`,
+  contentPublish: `${API_NAMESPACE}/homebrew/content/{id}/publish`,
+  contentUnpublish: `${API_NAMESPACE}/homebrew/content/{id}/unpublish`,
+  contentVisibility: `${API_NAMESPACE}/homebrew/content/{id}/visibility`,
+  contentUsages: `${API_NAMESPACE}/homebrew/content/{id}/usages`,
+  packsExport: `${API_NAMESPACE}/homebrew/packs/export`,
+  packsImport: `${API_NAMESPACE}/homebrew/packs/import`
+} as const;
+
+/**
  * The live-game integration surface (`game-http.ts`): reads project per principal, writes dispatch
  * through the exact same operations the built-in UI's Socket.IO commands use (ADR-0016 - adapters,
  * never forks). `{param}` is OpenAPI-style; the Express router substitutes `:param`.
@@ -515,6 +537,105 @@ export const EncounterArchiveDocumentResponseSchema = successEnvelopeSchema(Enco
 export const EncounterArchiveDeletedResponseSchema = successEnvelopeSchema(EncounterArchiveDeletedSchema);
 export const PlayerSessionIssuedResponseSchema = successEnvelopeSchema(PlayerSessionIssuedSchema);
 
+// ---- Homebrew authoring wire shapes (HOMEBREW_PATHS / homebrew-http.ts). GM-only end to end.
+// Each of these is mirrored by a hand-written OpenAPI component below; `test/contract-parity.test.ts`
+// keeps the two representations honest in BOTH directions (a fixture must validate against the
+// component, and the component's `required` must equal the Zod schema's non-optional keys).
+
+/** The nine content types the one polymorphic authoring collection serves (decision-log 2026-07-26). */
+export const HomebrewContentTypeSchema = z.enum(["class", "subclass", "species", "background", "feat", "class-feature", "spell", "item", "monster"]);
+/** Set only by `/publish` and `/unpublish`; orthogonal to `visibleToPlayers`, which only `/visibility` sets. */
+export const HomebrewContentStateSchema = z.enum(["draft", "published"]);
+/**
+ * A persisted homebrew id (`hb-<slug>-<6 hex>`). 60 characters, NOT the 80 a bare content slug allows:
+ * every persisted ActorDefinition id caps at 60, so a longer id passes creation and then fails
+ * `GameStateSchema.parse` on the next boot, bricking campaign load.
+ */
+const HomebrewIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
+/** The offending field, machine-addressable, so a form editor can point at it instead of parsing prose. */
+export const HomebrewValidationIssueSchema = z.object({
+  path: z.array(z.union([z.string(), z.number().int()])),
+  message: z.string().min(1).max(500),
+  recordId: HomebrewIdSchema.nullable()
+}).strict();
+export const HomebrewValiditySchema = z.object({ valid: z.boolean(), issues: z.array(HomebrewValidationIssueSchema) }).strict();
+/** The authored content body only - never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
+export const HomebrewRecordSchema = z.record(z.unknown());
+export const HomebrewRecordDocumentSchema = z.object({
+  id: HomebrewIdSchema,
+  type: HomebrewContentTypeSchema,
+  state: HomebrewContentStateSchema,
+  visibleToPlayers: z.boolean(),
+  deletedAt: TimestampSchema.nullable(),
+  rev: z.number().int().nonnegative(),
+  createdAt: TimestampSchema,
+  updatedAt: TimestampSchema,
+  validity: HomebrewValiditySchema,
+  record: HomebrewRecordSchema
+}).strict();
+/** The flat, NON-polymorphic list row: a name and a badge, so the union stays out of the library's hot path. */
+export const HomebrewRecordSummarySchema = z.object({
+  id: HomebrewIdSchema,
+  type: HomebrewContentTypeSchema,
+  name: z.string().min(1).max(120),
+  source: z.literal("homebrew"),
+  state: HomebrewContentStateSchema,
+  visibleToPlayers: z.boolean(),
+  deletedAt: TimestampSchema.nullable(),
+  rev: z.number().int().nonnegative(),
+  updatedAt: TimestampSchema,
+  valid: z.boolean(),
+  usageCount: z.number().int().nonnegative()
+}).strict();
+export const HomebrewContentListSchema = z.object({
+  records: z.array(HomebrewRecordSummarySchema),
+  nextCursor: z.string().max(200).nullable(),
+  total: z.number().int().nonnegative()
+}).strict();
+export const HomebrewContentSchema = z.object({ record: HomebrewRecordDocumentSchema }).strict();
+export const HomebrewDeletedSchema = z.object({ id: HomebrewIdSchema, deleted: z.literal(true), deletedAt: TimestampSchema }).strict();
+export const HomebrewUsageSchema = z.object({
+  actorId: z.string().uuid(),
+  actorName: z.string().min(1).max(200),
+  kind: z.string().regex(/^[a-z0-9-]+$/).max(60),
+  detail: z.string().max(300).nullable()
+}).strict();
+export const HomebrewUsagesSchema = z.object({ id: HomebrewIdSchema, usages: z.array(HomebrewUsageSchema), safeToDelete: z.boolean() }).strict();
+/** The GM-to-GM interchange format: authored bodies only, so an import can never inherit the exporter's visibility policy. */
+export const HomebrewPackSchema = z.object({
+  schemaId: z.literal("vtt.homebrew-pack"),
+  schemaVersion: z.literal(1),
+  name: z.string().min(1).max(120),
+  attribution: z.string().max(400).nullable(),
+  exportedAt: TimestampSchema,
+  records: z.array(HomebrewRecordSchema)
+}).strict();
+export const HomebrewPackExportSchema = z.object({ pack: HomebrewPackSchema }).strict();
+export const HomebrewPackImportSchema = z.object({
+  imported: z.array(z.object({ id: HomebrewIdSchema, type: HomebrewContentTypeSchema, name: z.string().min(1).max(120), originalId: HomebrewIdSchema }).strict()),
+  reminted: z.array(z.object({ originalId: HomebrewIdSchema, id: HomebrewIdSchema, reason: z.enum(["srd-collision", "homebrew-collision"]) }).strict()),
+  overwritten: z.array(z.object({ id: HomebrewIdSchema, type: HomebrewContentTypeSchema, name: z.string().min(1).max(120) }).strict()),
+  rejected: z.array(z.object({ originalId: HomebrewIdSchema, issues: z.array(HomebrewValidationIssueSchema) }).strict()),
+  dryRun: z.boolean()
+}).strict();
+export const HomebrewCreateRequestSchema = z.object({ record: HomebrewRecordSchema }).strict();
+export const HomebrewUpdateRequestSchema = z.object({ record: HomebrewRecordSchema, expectedRev: z.number().int().nonnegative().optional() }).strict();
+export const HomebrewDuplicateRequestSchema = z.object({ name: z.string().min(1).max(120).optional() }).strict();
+export const HomebrewStateChangeRequestSchema = z.object({ expectedRev: z.number().int().nonnegative().optional() }).strict();
+export const HomebrewVisibilityRequestSchema = z.object({ visibleToPlayers: z.boolean(), expectedRev: z.number().int().nonnegative().optional() }).strict();
+export const HomebrewPackImportRequestSchema = z.object({
+  pack: HomebrewPackSchema,
+  onIdCollision: z.enum(["remint", "overwrite"]).default("remint"),
+  dryRun: z.boolean().default(false)
+}).strict();
+
+export const HomebrewContentListResponseSchema = successEnvelopeSchema(HomebrewContentListSchema);
+export const HomebrewContentResponseSchema = successEnvelopeSchema(HomebrewContentSchema);
+export const HomebrewDeletedResponseSchema = successEnvelopeSchema(HomebrewDeletedSchema);
+export const HomebrewUsagesResponseSchema = successEnvelopeSchema(HomebrewUsagesSchema);
+export const HomebrewPackExportResponseSchema = successEnvelopeSchema(HomebrewPackExportSchema);
+export const HomebrewPackImportResponseSchema = successEnvelopeSchema(HomebrewPackImportSchema);
+
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
 export type IntegrationScope = z.infer<typeof IntegrationScopeSchema>;
 export type ApiErrorEnvelope = z.infer<typeof ApiErrorEnvelopeSchema>;
@@ -536,6 +657,16 @@ export type GameSnapshot = z.infer<typeof GameSnapshotSchema>;
 export type GameLogEntry = z.infer<typeof GameLogEntrySchema>;
 export type GameCommandDescriptor = z.infer<typeof GameCommandDescriptorSchema>;
 export type EncounterArchiveSummary = z.infer<typeof EncounterArchiveSummarySchema>;
+export type HomebrewContentType = z.infer<typeof HomebrewContentTypeSchema>;
+export type HomebrewContentState = z.infer<typeof HomebrewContentStateSchema>;
+export type HomebrewValidationIssue = z.infer<typeof HomebrewValidationIssueSchema>;
+export type HomebrewValidity = z.infer<typeof HomebrewValiditySchema>;
+export type HomebrewRecordDocument = z.infer<typeof HomebrewRecordDocumentSchema>;
+export type HomebrewRecordSummary = z.infer<typeof HomebrewRecordSummarySchema>;
+export type HomebrewContentList = z.infer<typeof HomebrewContentListSchema>;
+export type HomebrewUsages = z.infer<typeof HomebrewUsagesSchema>;
+export type HomebrewPack = z.infer<typeof HomebrewPackSchema>;
+export type HomebrewPackImport = z.infer<typeof HomebrewPackImportSchema>;
 
 const envelopeSchema = (dataRef: string) => ({
   type: "object",
@@ -684,6 +815,42 @@ const codexOp = (operationId: string, security: readonly unknown[], okRef: strin
     "401": apiError,
     ...(options.notFound ? { "404": apiError } : {}),
     ...(options.conflict ? { "409": apiError } : {})
+  }
+});
+
+// Homebrew operation builders. Two deliberate differences from codexOp: `security` is NOT a parameter
+// (this surface is structurally GM-only - no player read, no integration scope - so there is nothing to
+// vary), and `conflict` takes a DESCRIPTION rather than a boolean so publish/visibility/import can each
+// document what their own 409 carries, the way mutationResponses does for the game surface.
+const homebrewGmOnly = [{ gmAuth: [] }] as const;
+const homebrewJson = (schemaRef: string) => ({ content: { "application/json": { schema: { $ref: `#/components/schemas/${schemaRef}` } } } });
+/**
+ * A persisted homebrew id. `contentSlug` allows 80 characters but every persisted ActorDefinition id
+ * caps at 60: a longer id passes creation, then fails `GameStateSchema.parse` on the next boot and
+ * bricks campaign load. The contract is the right place to publish the real budget.
+ */
+const homebrewId = { ...contentSlug, maxLength: 60 } as const;
+const homebrewIdParam = { name: "id", in: "path", required: true, schema: homebrewId } as const;
+const homebrewContentType = { type: "string", enum: HomebrewContentTypeSchema.options } as const;
+const homebrewState = { type: "string", enum: HomebrewContentStateSchema.options } as const;
+const homebrewExpectedRev = { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on." } as const;
+const homebrewDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
+/** One homebrew operation. Security is never a parameter - it is always `homebrewGmOnly`. */
+const homebrewOp = (operationId: string, okRef: string, options: { ok?: string; params?: readonly unknown[]; body?: string; bodyRequired?: boolean; description?: string; bad?: boolean; notFound?: boolean; conflict?: string; tooLarge?: boolean } = {}) => ({
+  operationId,
+  security: homebrewGmOnly,
+  ...(options.description ? { description: options.description } : {}),
+  ...(options.params ? { parameters: options.params } : {}),
+  ...(options.body ? { requestBody: { required: options.bodyRequired ?? true, ...homebrewJson(options.body) } } : {}),
+  responses: {
+    [options.ok ?? "200"]: { description: "Success", ...homebrewJson(okRef) },
+    ...(options.bad === false ? {} : { "400": apiError }),
+    "401": apiError,
+    // A player session is authenticated and denied, which is a 403 - never the 401 an unauthenticated caller gets.
+    "403": apiError,
+    ...(options.notFound ? { "404": apiError } : {}),
+    ...(options.conflict ? { "409": { description: options.conflict, content: { "application/json": { schema: { $ref: "#/components/schemas/ApiErrorEnvelope" } } } } } : {}),
+    ...(options.tooLarge ? { "413": apiError } : {})
   }
 });
 
@@ -887,7 +1054,36 @@ export const openApiDocument = {
     },
     [CODEX_PATHS.export]: { get: codexOp("exportCodex", codexGmOnly, "CodexExportResponse", { bad: false, description: "A full codex backup bundle for round-trip." }) },
     [CODEX_ASSET_PATHS.collection]: { post: { operationId: "uploadCodexAsset", security: codexGmOnly, description: "Uploads a page image (banner or inline) as raw bytes in the request body; `filename` is a query parameter. Content-addressed: identical bytes return the existing asset with 200 instead of 201.", parameters: [{ name: "filename", in: "query", schema: { type: "string" } }], requestBody: { required: true, content: { "image/*": { schema: { type: "string", format: "binary" } } } }, responses: { "201": { description: "New image stored", ...codexJson("CodexAssetUploadResponse") }, "200": { description: "Identical bytes already stored; the existing asset is returned", ...codexJson("CodexAssetUploadResponse") }, "400": apiError, "401": apiError } } },
-    [CODEX_ASSET_PATHS.content]: { get: { operationId: "getCodexAssetContent", security: codexReadRoles, description: "Original image bytes for a page banner/inline image. GM always; a player only when the asset is used by a revealed page. Supports ETag/If-None-Match (304); sent with `Cache-Control: private, no-store`.", parameters: [uuidParam("id")], responses: { "200": { description: "Full image bytes" }, "304": { description: "Not modified" }, "403": apiError, "404": apiError } } }
+    [CODEX_ASSET_PATHS.content]: { get: { operationId: "getCodexAssetContent", security: codexReadRoles, description: "Original image bytes for a page banner/inline image. GM always; a player only when the asset is used by a revealed page. Supports ETag/If-None-Match (304); sent with `Cache-Control: private, no-store`.", parameters: [uuidParam("id")], responses: { "200": { description: "Full image bytes" }, "304": { description: "Not modified" }, "403": apiError, "404": apiError } } },
+    // ===== Homebrew authoring (homebrew-http.ts). GM-only end to end: no player read, no integration scope. =====
+    [HOMEBREW_PATHS.content]: {
+      get: homebrewOp("listHomebrewContent", "HomebrewContentListResponse", {
+        description: "The GM's homebrew library as flat summaries - the authored body stays out of the list, so a few-hundred-record library is a small payload. Filters compose; \"all types\" is simply `type` omitted. Soft-deleted rows are hidden from this listing too unless `includeDeleted` is set. Paging is keyset, not offset (the GM publishing mid-scroll must not skip or duplicate a row): `cursor` is OPAQUE - never construct or parse one - and `nextCursor: null` means this was the last page. `total` counts every row matching the filter, ignoring `limit`/`cursor`.",
+        params: [
+          { name: "type", in: "query", required: false, schema: homebrewContentType, description: "Single-valued; omit for every type." },
+          { name: "state", in: "query", required: false, schema: homebrewState },
+          { name: "visibleToPlayers", in: "query", required: false, schema: { type: "boolean" } },
+          { name: "q", in: "query", required: false, schema: { type: "string", maxLength: 120 }, description: "Case-insensitive name substring. Deliberately not full-text search." },
+          { name: "includeDeleted", in: "query", required: false, schema: { type: "boolean", default: false } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 50 } },
+          { name: "cursor", in: "query", required: false, schema: { type: "string", maxLength: 200 } }
+        ]
+      }),
+      post: homebrewOp("createHomebrewContent", "HomebrewContentResponse", { ok: "201", body: "HomebrewCreateRequest", conflict: "The record's id collides with an existing one (`error.details.collidesWith`)", description: "Creates a homebrew record. It always lands as `state: \"draft\"`, `visibleToPlayers: false`: a draft is allowed to be invalid, and nothing reaches a player until it is BOTH published and made visible." })
+    },
+    [HOMEBREW_PATHS.contentById]: {
+      get: homebrewOp("getHomebrewContent", "HomebrewContentResponse", { bad: false, notFound: true, params: [homebrewIdParam], description: "One record with its row state and its full validity report (`validity.issues`), so an editor can show what still blocks publishing without a round-trip per field." }),
+      patch: homebrewOp("updateHomebrewContent", "HomebrewContentResponse", { body: "HomebrewUpdateRequest", params: [homebrewIdParam], notFound: true, conflict: "A stale `expectedRev`; `error.currentRevision` carries the row's revision", description: "Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - genuinely correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record." }),
+      delete: homebrewOp("deleteHomebrewContent", "HomebrewDeletedResponse", { bad: false, params: [homebrewIdParam], description: "Soft-deletes a record (sets `deletedAt`); idempotent, so deleting an unknown or already-deleted id is still a 200. A soft-deleted record leaves the merged catalogs immediately and is restorable via `/restore`." })
+    },
+    [HOMEBREW_PATHS.contentRestore]: { post: homebrewOp("restoreHomebrewContent", "HomebrewContentResponse", { bad: false, params: [homebrewIdParam], notFound: true, description: "Clears `deletedAt`. Soft delete is a one-way state transition rather than an ordinary field, so this is its explicit inverse - never a PATCH of `deletedAt: null`." }) },
+    [HOMEBREW_PATHS.contentDuplicate]: { post: homebrewOp("duplicateHomebrewContent", "HomebrewContentResponse", { ok: "201", body: "HomebrewDuplicateRequest", bodyRequired: false, params: [homebrewIdParam], notFound: true, description: "Deep-copies a record under a freshly minted homebrew id. `{id}` may be an SRD id (`wizard`), which is what makes a 20-row class table tractable to author: the server reads the full bundled record and mints a namespaced homebrew copy. The copy lands as a draft, invisible to players." }) },
+    [HOMEBREW_PATHS.contentPublish]: { post: homebrewOp("publishHomebrewContent", "HomebrewContentResponse", { body: "HomebrewStateChangeRequest", bodyRequired: false, params: [homebrewIdParam], notFound: true, conflict: "The draft is not valid: `error.details.invalid.issues` lists every blocking issue with its machine-addressable `path`", description: "Moves a record to `state: \"published\"`, which requires it to be valid. Publishing does NOT show it to players - that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a draft the stored state refuses is a 409." }) },
+    [HOMEBREW_PATHS.contentUnpublish]: { post: homebrewOp("unpublishHomebrewContent", "HomebrewContentResponse", { body: "HomebrewStateChangeRequest", bodyRequired: false, params: [homebrewIdParam], notFound: true, description: "Returns a record to `state: \"draft\"`. It leaves the merged catalogs at once and may be invalid again while the GM reworks it." }) },
+    [HOMEBREW_PATHS.contentVisibility]: { post: homebrewOp("setHomebrewContentVisibility", "HomebrewContentResponse", { body: "HomebrewVisibilityRequest", params: [homebrewIdParam], notFound: true, conflict: "The record is still a draft; publish it first", description: "Sets whether players may see a published record. `state` and `visibleToPlayers` are orthogonal, but the COMBINATION draft + visible is meaningless: asking for it on a draft is a loud 409, never a silent no-op, which is what keeps `visibleToPlayers` from becoming a lie." }) },
+    [HOMEBREW_PATHS.contentUsages]: { get: homebrewOp("getHomebrewContentUsages", "HomebrewUsagesResponse", { bad: false, params: [homebrewIdParam], notFound: true, description: "Which characters took this record, computed on demand from the character choice ledger (no persisted reverse index at this data volume). `safeToDelete` is always true and says so calmly: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks one." }) },
+    [HOMEBREW_PATHS.packsExport]: { get: homebrewOp("exportHomebrewPack", "HomebrewPackExportResponse", { description: "Exports published, non-deleted records as a shareable pack. Optional `type` and repeatable `id` narrow it to one class rather than the whole table. The pack carries authored bodies ONLY - no `state`, `visibleToPlayers`, `deletedAt`, or `rev` - so an importing table can never inherit this one's visibility policy.", params: [{ name: "type", in: "query", required: false, schema: homebrewContentType }, { name: "id", in: "query", required: false, style: "form", explode: true, schema: { type: "array", maxItems: 500, items: homebrewId }, description: "Repeatable: `?id=a&id=b`. Omit for every published record." }] }) },
+    [HOMEBREW_PATHS.packsImport]: { post: homebrewOp("importHomebrewPack", "HomebrewPackImportResponse", { body: "HomebrewPackImportRequest", conflict: "One or more records failed validation after id rewriting; `error.details.invalid.issues` carries each issue with its `recordId`, and nothing was written", tooLarge: true, description: "Imports a pack. Everything lands as `state: \"draft\"`, `visibleToPlayers: false`, which makes importing an invalid pack harmless. Ids that collide with an SRD id are ALWAYS re-minted; ids colliding with existing homebrew follow `onIdCollision`. `dryRun` runs the whole collision + cross-reference-rewrite + re-validate pass and returns the identical report without writing - use it to see the plan before the only destructive path in the feature runs. This route mounts its own body parser above the server's 512kb default (about 4mb); a larger pack is a 413." }) }
   },
   components: {
     securitySchemes: {
@@ -1116,7 +1312,37 @@ export const openApiDocument = {
       CodexExportData: { type: "object", additionalProperties: false, required: ["codex", "exportedAt"], properties: { codex: { type: "object", additionalProperties: true, description: "Opaque backup bundle (round-trips via the codex import surface)." }, exportedAt: { type: "string", format: "date-time" } } },
       CodexExportResponse: envelopeSchema("#/components/schemas/CodexExportData"),
       CodexAssetUploadData: codexDataObject("asset", { $ref: "#/components/schemas/CodexAsset" }),
-      CodexAssetUploadResponse: envelopeSchema("#/components/schemas/CodexAssetUploadData")
+      CodexAssetUploadResponse: envelopeSchema("#/components/schemas/CodexAssetUploadData"),
+      // ---- Homebrew authoring (homebrew-http.ts). Three distinct shapes, deliberately not one:
+      // HomebrewRecord is the authored body alone, HomebrewRecordDocument is that body PLUS row state,
+      // and HomebrewRecordSummary is the flat list row. `state` and `visibleToPlayers` appear ONLY here
+      // and must NEVER be added to a CONTENT_PATHS component: the merged catalog contains only records
+      // that already passed the audience filter, and it carries `source` alone.
+      HomebrewValidationIssue: { type: "object", additionalProperties: false, required: ["path", "message", "recordId"], properties: { path: { type: "array", items: { type: ["string", "integer"] }, description: "Field path into the authored record, e.g. [\"levelTable\", 3, \"spellSlots\"] - the offending field, machine-addressable, so a form editor can point at it instead of parsing prose" }, message: { type: "string", minLength: 1, maxLength: 500 }, recordId: { type: ["string", "null"], maxLength: 60, description: "Which record in a pack the issue belongs to; null for a single-record publish. Present-but-null, so a consumer never branches on key presence" } } },
+      HomebrewValidity: { type: "object", additionalProperties: false, required: ["valid", "issues"], description: "Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say \"3 drafts can't publish yet\" without a round-trip per record.", properties: { valid: { type: "boolean" }, issues: { type: "array", items: { $ref: "#/components/schemas/HomebrewValidationIssue" } } } },
+      HomebrewRecord: { type: "object", additionalProperties: true, description: "The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. The body carries its own `type` discriminator. Published as an open object for now: it becomes a nine-branch `oneOf` (class, subclass, species, background, feat, class-feature, spell, item, monster) with `discriminator: { propertyName: \"type\" }` as each type's authored shape lands. Until then the server's Zod schemas are the authority on this body, and a client should treat it as opaque round-trip data." },
+      HomebrewRecordDocument: { type: "object", additionalProperties: false, required: ["id", "type", "state", "visibleToPlayers", "deletedAt", "rev", "createdAt", "updatedAt", "validity", "record"], description: "One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published AND visible AND not deleted - and even then only through the merged CONTENT_PATHS catalogs, never through this component.", properties: { id: homebrewId, type: homebrewContentType, state: homebrewState, visibleToPlayers: { type: "boolean", description: "Publishing does not reveal: this is the separate, deliberate second step" }, deletedAt: { type: ["string", "null"], format: "date-time", description: "Soft delete; a deleted row leaves every merged catalog at once and is restorable" }, rev: { type: "integer", minimum: 0 }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" }, validity: { $ref: "#/components/schemas/HomebrewValidity" }, record: { $ref: "#/components/schemas/HomebrewRecord" } } },
+      HomebrewRecordSummary: { type: "object", additionalProperties: false, required: ["id", "type", "name", "source", "state", "visibleToPlayers", "deletedAt", "rev", "updatedAt", "valid", "usageCount"], description: "The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `valid` alone - the issue list costs a GET - so listing a 300-record library never ships a 20-row level table.", properties: { id: homebrewId, type: homebrewContentType, name: { type: "string", minLength: 1, maxLength: 120 }, source: { const: "homebrew", description: "Always \"homebrew\" on this surface; the field exists so a summary and a merged-catalog row read the same" }, state: homebrewState, visibleToPlayers: { type: "boolean" }, deletedAt: { type: ["string", "null"], format: "date-time" }, rev: { type: "integer", minimum: 0 }, updatedAt: { type: "string", format: "date-time" }, valid: { type: "boolean" }, usageCount: { type: "integer", minimum: 0, description: "How many characters took this record; 0 is the common case" } } },
+      HomebrewUsage: { type: "object", additionalProperties: false, required: ["actorId", "actorName", "kind", "detail"], properties: { actorId: { type: "string", format: "uuid" }, actorName: { type: "string", minLength: 1, maxLength: 200 }, kind: { ...contentSlug, maxLength: 60, description: "How the record is used - open slug (character-choice, class, species, ...), never a closed enum" }, detail: { type: ["string", "null"], maxLength: 300 } } },
+      HomebrewContentListData: { type: "object", additionalProperties: false, required: ["records", "nextCursor", "total"], properties: { records: { type: "array", items: { $ref: "#/components/schemas/HomebrewRecordSummary" } }, nextCursor: { type: ["string", "null"], maxLength: 200, description: "Opaque keyset cursor - never construct or parse one. null means this was the last page" }, total: { type: "integer", minimum: 0, description: "Rows matching the filter, ignoring limit/cursor" } } },
+      HomebrewContentListResponse: envelopeSchema("#/components/schemas/HomebrewContentListData"),
+      HomebrewContentData: homebrewDataObject("record", { $ref: "#/components/schemas/HomebrewRecordDocument" }),
+      HomebrewContentResponse: envelopeSchema("#/components/schemas/HomebrewContentData"),
+      HomebrewDeletedData: { type: "object", additionalProperties: false, required: ["id", "deleted", "deletedAt"], properties: { id: homebrewId, deleted: { const: true }, deletedAt: { type: "string", format: "date-time" } } },
+      HomebrewDeletedResponse: envelopeSchema("#/components/schemas/HomebrewDeletedData"),
+      HomebrewUsagesData: { type: "object", additionalProperties: false, required: ["id", "usages", "safeToDelete"], properties: { id: homebrewId, usages: { type: "array", items: { $ref: "#/components/schemas/HomebrewUsage" } }, safeToDelete: { type: "boolean", description: "Always true: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks an existing character. The usage list is context, not a blocker" } } },
+      HomebrewUsagesResponse: envelopeSchema("#/components/schemas/HomebrewUsagesData"),
+      HomebrewPack: { type: "object", additionalProperties: false, required: ["schemaId", "schemaVersion", "name", "attribution", "exportedAt", "records"], description: "The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One FLAT record array rather than a by-type object: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design.", properties: { schemaId: { const: "vtt.homebrew-pack" }, schemaVersion: { const: 1 }, name: { type: "string", minLength: 1, maxLength: 120 }, attribution: { type: ["string", "null"], maxLength: 400 }, exportedAt: { type: "string", format: "date-time" }, records: { type: "array", items: { $ref: "#/components/schemas/HomebrewRecord" }, description: "Authored bodies only - no state, visibility, deletion, or revision" } } },
+      HomebrewPackExportData: homebrewDataObject("pack", { $ref: "#/components/schemas/HomebrewPack" }),
+      HomebrewPackExportResponse: envelopeSchema("#/components/schemas/HomebrewPackExportData"),
+      HomebrewPackImportData: { type: "object", additionalProperties: false, required: ["imported", "reminted", "overwritten", "rejected", "dryRun"], description: "The import plan or its result - byte-for-byte the same report either way, which is what makes `dryRun` trustworthy.", properties: { imported: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "type", "name", "originalId"], properties: { id: homebrewId, type: homebrewContentType, name: { type: "string", minLength: 1, maxLength: 120 }, originalId: homebrewId } } }, reminted: { type: "array", items: { type: "object", additionalProperties: false, required: ["originalId", "id", "reason"], properties: { originalId: homebrewId, id: homebrewId, reason: { type: "string", enum: ["srd-collision", "homebrew-collision"], description: "An SRD collision is ALWAYS re-minted; a homebrew collision follows onIdCollision" } } } }, overwritten: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "type", "name"], properties: { id: homebrewId, type: homebrewContentType, name: { type: "string", minLength: 1, maxLength: 120 } } } }, rejected: { type: "array", items: { type: "object", additionalProperties: false, required: ["originalId", "issues"], properties: { originalId: homebrewId, issues: { type: "array", items: { $ref: "#/components/schemas/HomebrewValidationIssue" } } } } }, dryRun: { type: "boolean" } } },
+      HomebrewPackImportResponse: envelopeSchema("#/components/schemas/HomebrewPackImportData"),
+      HomebrewCreateRequest: { type: "object", additionalProperties: false, required: ["record"], description: "The authored body only. Row state is never client-supplied: a new record is always a draft, invisible to players.", properties: { record: { $ref: "#/components/schemas/HomebrewRecord" } } },
+      HomebrewUpdateRequest: { type: "object", additionalProperties: false, required: ["record"], description: "Replaces the whole authored body and touches no row state.", properties: { record: { $ref: "#/components/schemas/HomebrewRecord" }, expectedRev: homebrewExpectedRev } },
+      HomebrewDuplicateRequest: { type: "object", additionalProperties: false, properties: { name: { type: "string", minLength: 1, maxLength: 120, description: "Name for the copy; omitted derives one server-side." } } },
+      HomebrewStateChangeRequest: { type: "object", additionalProperties: false, properties: { expectedRev: homebrewExpectedRev } },
+      HomebrewVisibilityRequest: { type: "object", additionalProperties: false, required: ["visibleToPlayers"], properties: { visibleToPlayers: { type: "boolean" }, expectedRev: homebrewExpectedRev } },
+      HomebrewPackImportRequest: { type: "object", additionalProperties: false, required: ["pack"], properties: { pack: { $ref: "#/components/schemas/HomebrewPack" }, onIdCollision: { type: "string", enum: ["remint", "overwrite"], default: "remint", description: "How to resolve a collision with an EXISTING HOMEBREW id; an SRD collision is always re-minted regardless." }, dryRun: { type: "boolean", default: false, description: "Run the whole collision + rewrite + re-validate pass and return the identical report without writing." } } }
     }
   }
 } as const;

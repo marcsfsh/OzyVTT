@@ -1855,6 +1855,182 @@ Per-species name pools for the builder's random generator. Pool `kind` is an ope
 
 **Responses:** `200` Catalog entries - envelope of `ContentNamesData` · errors `401` `403`
 
+## Homebrew authoring (GM-only)
+
+The GM's homebrew library: one polymorphic authoring collection for every content type, its draft/published + player-visibility state machine, soft delete, usage lookups, and pack export/import. Every operation here is GM-only - there is no player read on this surface at all. Players reach homebrew exclusively through the merged reference-content catalogs above, and only records that are published, visible to players, and not deleted.
+
+### `GET /api/v1/homebrew/content`
+
+The GM's homebrew library as flat summaries - the authored body stays out of the list, so a few-hundred-record library is a small payload. Filters compose; "all types" is simply `type` omitted. Soft-deleted rows are hidden from this listing too unless `includeDeleted` is set. Paging is keyset, not offset (the GM publishing mid-scroll must not skip or duplicate a row): `cursor` is OPAQUE - never construct or parse one - and `nextCursor: null` means this was the last page. `total` counts every row matching the filter, ignoring `limit`/`cursor`.
+
+**Auth:** GM session
+
+**Parameters:** `type` (query, optional) - `class` \| `subclass` \| `species` \| `background` \| `feat` \| `class-feature` \| `spell` \| `item` \| `monster` · `state` (query, optional) - `draft` \| `published` · `visibleToPlayers` (query, optional) - boolean · `q` (query, optional) - string · `includeDeleted` (query, optional) - boolean · `limit` (query, optional) - integer (1–200) · `cursor` (query, optional) - string
+
+**Responses:** `200` Success - envelope of `HomebrewContentListData` · errors `400` `401` `403`
+
+### `POST /api/v1/homebrew/content`
+
+Creates a homebrew record. It always lands as `state: "draft"`, `visibleToPlayers: false`: a draft is allowed to be invalid, and nothing reaches a player until it is BOTH published and made visible.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `record` | HomebrewRecord | yes |  |
+
+**Responses:** `201` Success - envelope of `HomebrewContentData` · errors `400` `401` `403` `409`
+
+### `GET /api/v1/homebrew/content/{id}`
+
+One record with its row state and its full validity report (`validity.issues`), so an editor can show what still blocks publishing without a round-trip per field.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Responses:** `200` Success - envelope of `HomebrewContentData` · errors `401` `403` `404`
+
+### `PATCH /api/v1/homebrew/content/{id}`
+
+Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - genuinely correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `record` | HomebrewRecord | yes |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on. |
+
+**Responses:** `200` Success - envelope of `HomebrewContentData` · errors `400` `401` `403` `404` `409`
+
+### `DELETE /api/v1/homebrew/content/{id}`
+
+Soft-deletes a record (sets `deletedAt`); idempotent, so deleting an unknown or already-deleted id is still a 200. A soft-deleted record leaves the merged catalogs immediately and is restorable via `/restore`.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Responses:** `200` Success - envelope of `HomebrewDeletedData` · errors `401` `403`
+
+### `POST /api/v1/homebrew/content/{id}/restore`
+
+Clears `deletedAt`. Soft delete is a one-way state transition rather than an ordinary field, so this is its explicit inverse - never a PATCH of `deletedAt: null`.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Responses:** `200` Success - envelope of `HomebrewContentData` · errors `401` `403` `404`
+
+### `POST /api/v1/homebrew/content/{id}/duplicate`
+
+Deep-copies a record under a freshly minted homebrew id. `{id}` may be an SRD id (`wizard`), which is what makes a 20-row class table tractable to author: the server reads the full bundled record and mints a namespaced homebrew copy. The copy lands as a draft, invisible to players.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | no | Name for the copy; omitted derives one server-side. |
+
+**Responses:** `201` Success - envelope of `HomebrewContentData` · errors `400` `401` `403` `404`
+
+### `POST /api/v1/homebrew/content/{id}/publish`
+
+Moves a record to `state: "published"`, which requires it to be valid. Publishing does NOT show it to players - that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a draft the stored state refuses is a 409.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on. |
+
+**Responses:** `200` Success - envelope of `HomebrewContentData` · errors `400` `401` `403` `404` `409`
+
+### `POST /api/v1/homebrew/content/{id}/unpublish`
+
+Returns a record to `state: "draft"`. It leaves the merged catalogs at once and may be invalid again while the GM reworks it.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Request body** (JSON, optional):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on. |
+
+**Responses:** `200` Success - envelope of `HomebrewContentData` · errors `400` `401` `403` `404`
+
+### `POST /api/v1/homebrew/content/{id}/visibility`
+
+Sets whether players may see a published record. `state` and `visibleToPlayers` are orthogonal, but the COMBINATION draft + visible is meaningless: asking for it on a draft is a loud 409, never a silent no-op, which is what keeps `visibleToPlayers` from becoming a lie.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `visibleToPlayers` | boolean | yes |  |
+| `expectedRev` | integer (≥ 0) | no | Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on. |
+
+**Responses:** `200` Success - envelope of `HomebrewContentData` · errors `400` `401` `403` `404` `409`
+
+### `GET /api/v1/homebrew/content/{id}/usages`
+
+Which characters took this record, computed on demand from the character choice ledger (no persisted reverse index at this data volume). `safeToDelete` is always true and says so calmly: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks one.
+
+**Auth:** GM session
+
+**Parameters:** `id` (path) - string (pattern)
+
+**Responses:** `200` Success - envelope of `HomebrewUsagesData` · errors `401` `403` `404`
+
+### `GET /api/v1/homebrew/packs/export`
+
+Exports published, non-deleted records as a shareable pack. Optional `type` and repeatable `id` narrow it to one class rather than the whole table. The pack carries authored bodies ONLY - no `state`, `visibleToPlayers`, `deletedAt`, or `rev` - so an importing table can never inherit this one's visibility policy.
+
+**Auth:** GM session
+
+**Parameters:** `type` (query, optional) - `class` \| `subclass` \| `species` \| `background` \| `feat` \| `class-feature` \| `spell` \| `item` \| `monster` · `id` (query, optional) - string (pattern)[]
+
+**Responses:** `200` Success - envelope of `HomebrewPackExportData` · errors `400` `401` `403`
+
+### `POST /api/v1/homebrew/packs/import`
+
+Imports a pack. Everything lands as `state: "draft"`, `visibleToPlayers: false`, which makes importing an invalid pack harmless. Ids that collide with an SRD id are ALWAYS re-minted; ids colliding with existing homebrew follow `onIdCollision`. `dryRun` runs the whole collision + cross-reference-rewrite + re-validate pass and returns the identical report without writing - use it to see the plan before the only destructive path in the feature runs. This route mounts its own body parser above the server's 512kb default (about 4mb); a larger pack is a 413.
+
+**Auth:** GM session
+
+**Request body** (JSON):
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `pack` | HomebrewPack | yes |  |
+| `onIdCollision` | `remint` \| `overwrite` | no | How to resolve a collision with an EXISTING HOMEBREW id; an SRD collision is always re-minted regardless. Default: `"remint"`. |
+| `dryRun` | boolean | no | Run the whole collision + rewrite + re-validate pass and return the identical report without writing. Default: `false`. |
+
+**Responses:** `200` Success - envelope of `HomebrewPackImportData` · errors `400` `401` `403` `409` `413`
+
 ## Encounter archives (Time Machine)
 
 Permanent, machine-readable records of ended encounters - see the archive document section above for the full v2 shape. GM-grade principals only.
@@ -2604,6 +2780,23 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `year` | integer | yes |  |
 | `month` | integer (0–23) | yes |  |
 | `day` | integer (1–400) | yes |  |
+
+### `HomebrewPack`
+
+The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One FLAT record array rather than a by-type object: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `schemaId` | const `"vtt.homebrew-pack"` | yes |  |
+| `schemaVersion` | const `1` | yes |  |
+| `name` | string | yes |  |
+| `attribution` | string \| null | yes |  |
+| `exportedAt` | string (date-time) | yes |  |
+| `records` | HomebrewRecord[] | yes | Authored bodies only - no state, visibility, deletion, or revision |
+
+### `HomebrewRecord`
+
+The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. The body carries its own `type` discriminator. Published as an open object for now: it becomes a nine-branch `oneOf` (class, subclass, species, background, feat, class-feature, spell, item, monster) with `discriminator: { propertyName: "type" }` as each type's authored shape lands. Until then the server's Zod schemas are the authority on this body, and a client should treat it as opaque round-trip data.
 
 ### `ImagePoint`
 
