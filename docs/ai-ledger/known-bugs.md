@@ -77,6 +77,37 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
   deliberately not retuned mid-flight. Needs its own pass.
 
+### Homebrew system — open items (2026-07-27)
+
+- **[homebrew] Validity is point-in-time.** The publish gate checks a record against the world as it
+  stands at that moment. Nothing re-checks **dependents** when the world changes underneath them, so
+  deleting or editing a dependency can leave a dependent record published-and-invalid (`restore`
+  included). The merge drops an unparseable record with a `console.warn`, so the failure is quiet.
+- **[homebrew] `reminted.reason` has no honest value for "not our shape"** — the contract enum is
+  frozen, so a pack id that is re-minted for shape reasons reports a collision that did not happen.
+  Needs a `packages/api-contract` enum addition.
+- **[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
+  components document nowhere — 11 homebrew (`HomebrewRecordDocument`, `HomebrewRecordSummary`,
+  `HomebrewValidity`, `HomebrewValidationIssue`, `HomebrewUsage`, the six `*Data`) and ~73 mostly
+  Codex. Proven by injecting a response-side ghost component: all 32 api-contract tests pass and it
+  renders nowhere. The request side IS genuinely covered — the same injection on a request-reachable
+  path fails the test. Pre-existing seeding choice, not a regression; a one-line change with a large
+  doc diff.
+- **[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
+  `--violet` (`#7A3FD0`). The "violet is reserved for GM-only" rule is violated by the caution token
+  itself. Harmless today only because the team held the every-state-is-a-word rule, so colour
+  carries no signal rather than the wrong one. Worth resolving before anything relies on hue.
+- **[homebrew] Packs have no UI** — export and import are 2 of the 13 operations, HTTP-only,
+  deliberately deferred.
+- **[homebrew] Magic-item riders are not authorable yet.** `EquipmentReferenceSchema` is `.strict()`
+  and carries no magic vocabulary, so `isMagic`/`riders`/`casts` would be **rejected**, not ignored.
+  `RiderEditor` ships built and ready (`ITEM_RIDERS`, `uses` relabelled "Charges"); the section is a
+  handful of `FieldDef`s the day the schema grows. **This is the largest remaining piece of the
+  approved scope** — the product decision was full item riders in v1.
+- **[homebrew] A caster subclass still needs its class published first** (the third-caster check
+  reads the class's level table). Not a deadlock — the class side now waits for nothing — but an
+  ordering a GM can hit.
+
 ### Found by the 2026-07-27 phase-5 content pass
 
 - **[character-builder] ~~Repeated class choices were under-offered, making level-8+ characters

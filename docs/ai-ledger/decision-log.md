@@ -7,6 +7,43 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-27 — Homebrew: six rules that bind anything authoring content
+
+1. **The audience filter lives at the MERGE POINT, not in projections.** Ten content operations took
+   a principal and ignored it; nine of eleven content read paths accept player auth. A viewer-safety
+   audit that only reads `projections.ts` will miss this entire class of leak. Corollary: homebrew
+   never enters `GameState`, which is *why* `PlayerView` being a `Pick` allow-list keeps working.
+2. **A capability that knows about drafts must not be reachable from the player path.** The
+   draft-aware authorship index sits on the store and deliberately not on `HomebrewContentSource`.
+   Same instinct as keeping homebrew out of `GameState`: put the dangerous capability where the
+   dangerous path cannot reach it.
+3. **Re-validate AFTER the write, never before.** Validating a proposed body first asks the question
+   against the record's *previous* self — an emptied spell list still resolved through the overlay
+   its old body had stamped, and reported itself valid.
+4. **When a patch would fail the gate, land it and demote — do not refuse.** Drafts may legitimately
+   be invalid and the editor autosaves mid-keystroke, so refusing makes published records
+   uneditable. The record demotes in the same transaction and the response carries the truth; a GM
+   must never be told something is live when it is not, and a `console.warn` is not where that truth
+   belongs.
+5. **Make the invalid state unauthorable, not merely reported.** A choice-bearing feature that no
+   level row grants produces a class whose wizard offers a pick the server will not build — an
+   uncreatable character. The fix is that a new feature arrives *already on the table* in the same
+   edit, and the last level cannot be cleared. Publish still refuses the shape, as a backstop for the
+   paths the editor does not own.
+6. **A required argument beats a safe default when you want an audit.** `forAudience(audience)` and
+   `isMintedHomebrewId(id, type)` both take required arguments so `tsc` names every call site. Known
+   limit: `apps/server`'s tsconfig includes only `src`, so the property stops at the test boundary —
+   a stale test call compiles and fails at runtime instead.
+
+**On process, from the same pass.** Five HIGH defects survived nine commits, four planning documents
+and six research intakes; not one was found by reading. Each came from running the flow — duplicate
+Fighter and press publish (deadlocked both ways), open a feat and watch the network tab (an
+unsolicited PATCH that made it permanently unpublishable). Two of the five lived in the *seam*
+between engineers who had each verified their own slice honestly. **Verify by injection**: break the
+guard, confirm the failure, revert. It repeatedly found guards that did not fire, one that did not
+exist at all, and one test whose obligation set came from the renderer it was testing — so it could
+not fail.
+
 ## 2026-07-27 — Phase 5 content: how the character bundles are sourced from now on
 
 The other nine SRD classes landed. Four rules came out of it that bind any future content work.

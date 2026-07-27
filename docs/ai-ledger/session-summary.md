@@ -8,6 +8,36 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-27 — Homebrew content system (`claude/dndbeyond-sheet-importer-0k6u2e`)
+
+Eleven commits, ~15k lines. A GM can author, publish and play nine content types. Built by a staged
+team: 6 research intakes → 3 implementation plans → 3 rounds of 3 implementers → 3 adversarial QA
+passes → remediation. 923 tests.
+
+Sixteen product decisions were settled up front (own SQLite tables Codex-style; GM-only; all nine
+types; full typed riders; structured forms; duplicate AND blank slate; invalid drafts, valid publish;
+auto-namespaced ids; soft-delete; a creation-time visibility toggle; export/import; own GM tab; no
+balance guardrails). The durable engineering rules that came out of it are in `decision-log.md`.
+
+**QA is what made this work.** Five HIGH defects survived nine commits, four planning documents and
+six research intakes — and not one was found by reading. A homebrew class could not be published in
+either order (each rule waited on the other). The editor's default "add a feature" produced an
+uncreatable character. Editing a published record bypassed the publish gate entirely, silently, via
+autosave. A monster's name reached players through an imported pack id. And **no feat had ever been
+publishable** — two independent causes pointing at the same wrong key, in a type that had shipped
+three rounds earlier.
+
+Two of those lived in the seam between engineers who had each verified their own slice honestly,
+which is the argument for adversarial QA as its own stage rather than more careful implementation.
+
+Also worth remembering: a test written in round 2 and praised at the time turned out to be
+self-referential — its obligation set came from the renderer it was testing, so it could not fail.
+A different engineer found it in round 3 while working on something else, and fixing it exposed a
+pre-existing documentation hole unrelated to this project.
+
+Open items, including the largest remaining piece of approved scope (magic-item riders are not yet
+authorable — the equipment schema is `.strict()` and would reject them), are in `known-bugs.md`.
+
 ## 2026-07-27 — Phase 5: all twelve SRD classes (`claude/dndbeyond-sheet-importer-0k6u2e`)
 
 The bundle had 3 of 12 classes. It now has 12, with one subclass each. The interesting part was not

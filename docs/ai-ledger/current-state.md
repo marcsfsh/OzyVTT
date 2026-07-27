@@ -78,6 +78,34 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
       Cleric L5, in dark, dusk and light, each creating a character end to end — zero horizontal
       overflow on all seven steps in every run.
 
+- **Homebrew content system (2026-07-27, branch `claude/dndbeyond-sheet-importer-0k6u2e`).** A GM
+  can author, publish and play **nine content types** — class, subclass, species, background, feat,
+  spell, equipment, monster, spell-list. 11 commits, ~15k lines.
+  - **Storage is Codex-shaped, never `GameState`.** `homebrew-store.ts` owns its tables, migrations,
+    revisions and `expectedRev`; `homebrew-http.ts` carries all 13 operations, GM-gated, **HTTP-only
+    with a content-free `homebrew:changed` ping** and no socket handlers. That is not a preference:
+    `GameCommandDescriptor.run` must return a revision from `store.execute` on `GameState`, and
+    homebrew rows are not in it. Keeping out of `GameState` is also what leaves `projections.ts`
+    untouched — `PlayerView` is a `Pick` allow-list.
+  - **The audience filter is at the merge point**, not in projections. `ContentLibrary.forAudience()`
+    takes a **required** argument so the compiler enumerates every call site. Draft reaches nobody;
+    published + `visibleToPlayers` reaches both; published without it is GM-only.
+  - **`monsterForInstance()` is deliberately status- and delete-blind** — monster actions and typed
+    defences are late-bound per use, so a status-aware lookup would disarm live tokens mid-fight.
+    That carve-out is what makes soft-delete safe.
+  - **Editing is honest.** A patch that would fail the publish gate lands and **demotes the record in
+    the same transaction** — refusing was wrong, because drafts may be invalid and the editor
+    autosaves. Re-validation runs *after* the write, because validating first asks the question
+    against the record's previous self.
+  - **The editor is one schema renderer plus nine field schemas**, not nine forms — and it added no
+    new field kind across two scope expansions. The class level table generates ~270 of its ~280
+    cells (PB is arithmetic, features are a projection, nine slot columns derive from one
+    caster-progression pick) with per-row override.
+  - **Verified:** 923 tests; every operation × six credential types with zero getting through;
+    zero horizontal overflow and zero undersized touch targets at 375px **and** the 320px floor in
+    three themes; a homebrew Fighter clone builds a level-5 character matching the SRD exactly
+    (48 HP, +3 PB, AC 17).
+
 - **All twelve SRD classes (2026-07-27, phase 5, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
   The bundle went from **3 classes to 12** and 3 subclasses to 12 — Barbarian, Bard, Druid, Monk,
   Paladin, Ranger, Rogue, Sorcerer, Warlock, each with its one SRD subclass. **185 features, 46 of
