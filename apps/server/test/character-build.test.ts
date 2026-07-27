@@ -4,7 +4,7 @@ import { meetsMulticlassPrerequisites } from "@vtt/rules-5e";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
-import { CommandRejectedError, RulesBlockedError } from "../src/game-store.js";
+import { CommandRejectedError } from "../src/game-store.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
 

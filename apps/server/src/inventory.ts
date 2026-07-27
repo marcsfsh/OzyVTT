@@ -1,6 +1,7 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { ActorDefinition, Currency, InventoryItem } from "@vtt/schemas";
 import { abilityModifier, armorClassFromEquipment } from "@vtt/rules-5e";
+import { armorClassRiderOf } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ITEMS = 200;
@@ -10,11 +11,15 @@ const MAX_ITEMS = 200;
  * armor or shield, AC becomes the derived value; otherwise it reverts to the definition's stored AC (so a
  * character with no tracked armor keeps their stat-block AC). Needs the definition for Dex + the base AC;
  * without it, leaves AC untouched.
+ *
+ * A builder-granted flat bonus (the Defense fighting style's +1 while armored) rides on top of the derived
+ * value, exactly as `instantiate` re-applies it - otherwise equipping or unequipping ANY item silently
+ * dropped the bonus, because re-deriving from equipment alone cannot know about it.
  */
 function reconcileArmorClass(actor: Actor, definition: ActorDefinition | undefined): void {
   if (!definition) return;
   const derived = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), actor.inventory);
-  actor.armorClass = derived ?? definition.armorClass;
+  actor.armorClass = derived === null ? definition.armorClass : derived + armorClassRiderOf(definition);
 }
 
 /** Upsert one inventory item by id; quantity 0 removes it. Owner-scoped by the caller. Re-derives AC from

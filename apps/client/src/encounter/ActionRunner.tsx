@@ -12,9 +12,14 @@ import { socket } from "../socket";
 /** Per-definition cache: stat blocks are immutable content, one lookup per session is plenty. */
 const actionCache = new Map<string, readonly ContentActionSummary[]>();
 
-const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null || action.builtin === true;
-/** Rage/Reckless (grants), a Multiattack plan, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
-const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.builtin === true);
+/* A LIMITED USE is itself the mechanic (`action-resolution.ts` resolveDefinitionAction: "limited uses
+   are themselves a structured effect"). Action Surge, Indomitable, Arcane Recovery, Relentless
+   Endurance and the tiefling legacy tiers have nothing to roll - they have a counter - so without
+   this they listed as static reference rows the table could read but never spend. Both predicates
+   mirror the server's, or the sheet and the resolver disagree about what is usable. */
+const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true;
+/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
+const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const tagLabel = (tag: string) => tag.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 /** The action's mechanics as discrete lines - each renders as its own bullet beneath the name. */

@@ -204,13 +204,21 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     keyUses.set(key, uses);
     return uses === 1 ? key : `${key}#${uses}`;
   };
-  // A feat is something you HAVE, not something you can have twice: a second copy is the same
-  // feature on the sheet again. So a feat this build already holds - the background's origin feat,
-  // or one taken in an EARLIER offer - is dropped from later offers unless its record says it
-  // repeats. (Champion's Additional Fighting Style shares its option list with the class's Fighting
-  // Style, which is how `defense` could be taken twice.)
+  // A feat is something you HAVE, not something you can have twice. So a feat this build already
+  // holds - the background's granted origin feat, or one taken in an EARLIER offer - is dropped
+  // from later offers unless it may genuinely be repeated. (Champion's Additional Fighting Style
+  // shares its option list with the class's Fighting Style, which is how `defense` could be taken
+  // twice; Human's Versatile could re-take the Magic Initiate the Acolyte already granted.)
   const heldFeatIds = new Set<string>(context.background?.originFeatId ? [context.background.originFeatId] : []);
-  const featRepeats = (id: string) => catalogs.choice.feats.find((entry) => entry.id === id)?.repeatable === true;
+  const featRepeats = (id: string) => {
+    const feat = catalogs.choice.feats.find((entry) => entry.id === id);
+    if (!feat?.repeatable) return false;
+    // The server's rule verbatim (`character-build.ts` repeatsOnlyWithADifferentSpellList): a feat
+    // whose own choice draws from a `<list>-spells` catalog is Magic Initiate, whose repeat clause
+    // reads "a different spell list each time" - and here a spell list IS a separate feat id, so
+    // repeating the SAME id is not legal however the `repeatable` flag reads.
+    return !(feat.feature.choice?.fromCatalog?.endsWith("-spells") ?? false);
+  };
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
   const nameOfKind = (kind: string) => (id: string) =>
@@ -245,8 +253,10 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
     });
     // Drop the feats this build already carries (see `heldFeatIds`); "asi" is the built-in
     // raise-two-scores shorthand, never a feat, so it is never filtered out.
-    const offerable = filtered; void heldFeatIds; void featRepeats;
-    const offerKey = key;
+    const offerable = FEAT_KINDS.has(choice.kind)
+      ? filtered.filter((option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id))
+      : filtered;
+    const offerKey = uniqueKey(key);
     offers.push({
       key: offerKey, step, featureId: feature.id, kind: choice.kind, label: feature.name,
       help: feature.description || null,
@@ -705,13 +715,19 @@ export function stepBlockedReason(
         // A class authored before its subclasses (phase 5 adds nine more) renders a subclass offer
         // with no options at all. "Choose a subclass" would then be a requirement nothing on screen
         // can satisfy, so say what is actually missing - and how to get past it.
+        const subclassOffer = offers.find((offer) => offer.kind === "subclass");
+        if (!subclassOffer || subclassOffer.options.length === 0) {
+          const escape = classRecord.subclassLevel > 1 ? ` Drop to level ${classRecord.subclassLevel - 1} to continue.` : "";
+          return `No ${classRecord.name} subclasses are available yet — a level ${classRecord.subclassLevel} ${classRecord.name} must have one.${escape}`;
+        }
         return `Choose a ${classRecord.subclassLabel ?? "subclass"} to continue.`;
       }
       const offer = unfilled("features");
       if (offer) return pickReason(offer);
       // An ASI that raises a score past 20 is chosen HERE but only becomes visible once the ability
       // step has scores, so the ceiling is guarded at both of its inputs with the one same sentence.
-      return null;
+      const breach = abilityCapPreview(draft, catalogs, offers).breach;
+      return breach && breach.offerKey !== null ? breach.reason : null;
     }
     case "abilities": {
       if (!policy.allowedAbilityMethods.includes(draft.abilityMethod)) return "Your GM does not allow that ability method — pick another.";
@@ -728,6 +744,14 @@ export function stepBlockedReason(
       // A rolled or GM-formula score is a number the player typed, and the server bound-checks each
       // one against what the formula can actually produce - so the step checks the same bounds
       // rather than letting a hand-typed 22 pass six steps and fail at Create.
+      if (draft.abilityMethod === "roll" || draft.abilityMethod === "custom") {
+        const formula = draft.abilityMethod === "custom" ? policy.customFormula ?? ABILITY_ROLL_FORMULA : ABILITY_ROLL_FORMULA;
+        const check = validateAbilityFormula(formula);
+        if (check.ok) {
+          const outside = ABILITIES.find((ability) => base[ability]! < check.minimum || base[ability]! > check.maximum);
+          if (outside) return `A ${formula} roll produces ${check.minimum}-${check.maximum} — ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
+        }
+      }
       const options = context.background?.abilityOptions ?? null;
       if (options) {
         const total = draft.backgroundBonus.reduce((sum, entry) => sum + entry.amount, 0);
@@ -742,6 +766,8 @@ export function stepBlockedReason(
       }
       // The 20 ceiling, checked once the scores exist: this is the step that owns them, and the
       // features step owns the improvements, so both refuse rather than letting Create dead-end.
+      const breach = abilityCapPreview(draft, catalogs, offers).breach;
+      if (breach) return breach.reason;
       if (draft.hpMode === "entries") {
         const needed = draft.level - 1;
         const faces = context.hitDie ? hitDieFaces(context.hitDie) : 12;

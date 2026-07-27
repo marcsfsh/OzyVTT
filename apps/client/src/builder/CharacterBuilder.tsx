@@ -175,7 +175,15 @@ function AsiOffer({ offer, draft, capBefore, onSet, onIncreases }: Readonly<{
         {increases.map((entry, index) => <label key={index} className="cb-asi-row">
           <span className="cb-asi-label">+{entry.amount} to</span>
           <Select value={entry.ability} aria-label={`Ability to raise by ${entry.amount}`} onChange={(event) => setAbility(index, event.target.value as Ability)}>
-            {ABILITIES.map((ability) => { void projected; return <option key={ability} value={ability}>{ABILITY_LABELS[ability]}</option>; })}
+            {ABILITIES.map((ability) => {
+              const total = projected(index, ability);
+              const noRoom = total != null && total > ABILITY_SCORE_CAP;
+              // The current pick stays selectable even when it no longer fits, or the control would
+              // show an answer it refuses to let go of; the step's blocked reason says the rest.
+              return <option key={ability} value={ability} disabled={noRoom && ability !== entry.ability}>
+                {ABILITY_LABELS[ability]}{total == null ? "" : ` — ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
+              </option>;
+            })}
           </Select>
         </label>)}
       </div>
@@ -231,7 +239,10 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   // the banner is advertising: one click on a different species and the unfinished character it
   // promised is gone on the next reload. The banner therefore owns the store until it is answered,
   // and the first real edit answers it (see `editDraft`).
-  useEffect(() => { if (draftHasProgress(draft)) saveDraft(sessionKey, draft); }, [draft, sessionKey]);
+  useEffect(() => {
+    if (resumable) return;
+    if (draftHasProgress(draft)) saveDraft(sessionKey, draft);
+  }, [draft, sessionKey, resumable]);
 
   // Server-thrown rolls come back through the roll HISTORY (dice.roll acks with an id, not a total),
   // which is exactly what makes them auditable: the number the wizard uses is the number the table
@@ -262,7 +273,7 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
    * so the banner steps aside on the first one rather than riding all seven steps, and the stored
    * draft it was advertising stays intact right up to that moment.
    */
-  const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => { setDraft(update); };
+  const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => { setResumable(null); setDraft(update); };
   const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
   const setPicks = (offer: BuilderOffer, ids: readonly string[]) =>
     editDraft((current) => ({ ...current, picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) } }));
@@ -328,7 +339,9 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
   useEffect(() => {
     const node = rejectionRef.current;
     if (!rejection || !node) return;
-    void node;
+    node.focus({ preventScroll: true });
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
   }, [rejection]);
 
   const saveAndClose = () => { if (draftHasProgress(draft)) saveDraft(sessionKey, draft); onClose(); };
@@ -487,8 +500,8 @@ export function CharacterBuilder({ state, sessionKey, onClose, onCreated }: Char
                   onManual={addRolledScore}
                   onReroll={draft.abilityPool.length > 0 ? () => patch({ abilityPool: [], poolAssignment: {} }) : undefined}
                   result={draft.abilityPool.length > 0 ? draft.abilityPool.map((entry) => entry.value).join(", ") : undefined}
-                  min={1}
-                  max={30}
+                  min={rollBounds.min}
+                  max={rollBounds.max}
                   busy={rolling}
                   complete={draft.abilityPool.length >= 6}
                   hint={`Roll them here, or type what your own dice showed (${rollBounds.min}-${rollBounds.max}).`}

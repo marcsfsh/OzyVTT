@@ -112,7 +112,9 @@ export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
  * one (every monster, every PDF import) reads 0 and behaves exactly as before.
  */
 export function armorClassRiderOf(definition: ActorDefinition): number {
-  const extension = definition.extensions["open5e.srd-2024"];
+  // Fail-open: `extensions` is schema-defaulted, but a hand-built definition (tests, older callers)
+  // can reach here without it - a missing bag means no rider, never a crash.
+  const extension = definition.extensions?.["open5e.srd-2024"];
   if (extension && typeof extension === "object") {
     const value = (extension as { armorClassBonus?: unknown }).armorClassBonus;
     if (typeof value === "number" && Number.isInteger(value) && value >= -10 && value <= 10) return value;
