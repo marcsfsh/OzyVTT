@@ -79,15 +79,18 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ### Found by the 2026-07-27 phase-5 content pass
 
-- **[content] The vendored SRD source and the hand-authored Champion disagree about feature levels.**
-  `sources/dnd-5e-srd-markdown/classes.md` prints Champion as six features — Improved Critical (3),
-  Remarkable Athlete (**3**), Additional Fighting Style (**7**), **Heroic Warrior (10)**, Superior
-  Critical (15), Survivor (18). The committed `subclasses.v1.json` has five — Remarkable Athlete at
-  **7**, Additional Fighting Style at **10**, no Heroic Warrior. One of them is wrong and **it has
-  not been resolved**: the generator's cross-check covers class-level data (hit die, saves, skills,
-  proficiency bonus, spell slots — all agreeing) but not subclass feature levels. Champion is
-  hand-authored so nothing was overwritten; decide it against the SRD text and, either way, extend
-  the cross-check to subclass features so the next one is caught by the build.
+- **[content] ~~Champion's feature levels disagreed with the source~~ — FIXED 2026-07-27.** The
+  hand-authored record carried 2024 feature **text** at 2014 feature **levels**: Remarkable Athlete
+  at 7 and Additional Fighting Style at 10 are the old progression, and **Heroic Warrior (level 10)
+  was missing entirely**. Resolved against the SRD in favour of the source — corroborated by the
+  Fighter class table, which grants subclass features at 3/7/10/15/18. Champion is now Improved
+  Critical (3), Remarkable Athlete (3), Additional Fighting Style (7), Heroic Warrior (10), Superior
+  Critical (15), Survivor (18). Same family of error as the `tough` feat, in reverse: wrong-edition
+  content in an SRD 5.2.1 repo. **The cross-check now covers subclass feature ids and levels** and
+  fails the build on drift, and a test pins Champion's six levels for CI (the build script is
+  manual). Life Domain's `life-domain-spells-5/-7/-9` are allowlisted in `STAGED_FEATURES`: the
+  source prints one entry whose body is a table of Cleric 3/5/7/9 grants, and splitting it into four
+  staged features is better modelling than the source, not drift.
 - **[testing] The nine generated classes have prose-only features.** Only the choice-bearing ones
   (46 of 185) carry structured riders; the rest are description text, which ADR-0008 permits but
   means a Barbarian's Rage grants nothing mechanically — the resource counts are in `classResources`

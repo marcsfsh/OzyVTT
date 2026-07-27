@@ -615,8 +615,31 @@ if (unresolvedItems.length) {
 /** `#### Level 7: Remarkable Athlete` -> { level, name }. */
 const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;
 
-for (const [id, entry] of parsed) {
-  if (HAND_AUTHORED.has(id)) continue;
+/**
+ * Bundle features that deliberately have no counterpart heading in the source, and why.
+ *
+ * Life Domain prints ONE "Level 3: Life Domain Spells" entry whose body is a table of which spells
+ * arrive at Cleric levels 3/5/7/9. The hand-authored record splits that into four staged grants so
+ * each set lands at the level it is actually gained - strictly better modelling than the source's
+ * single entry, so the cross-check must not treat it as drift. Anything NOT listed here that the
+ * source does not print is a real defect.
+ */
+const STAGED_FEATURES = new Set(["life-domain-spells-5", "life-domain-spells-7", "life-domain-spells-9"]);
+
+type ParsedSubclass = {
+  title: string;
+  intro: string;
+  features: { id: string; name: string; level: number; description: string }[];
+};
+
+/**
+ * The one subclass printed for a class, as title + intro + level-stamped features.
+ *
+ * Shared by generation AND by the cross-check, deliberately: if the check parsed the source through
+ * a second code path it could agree with the bundle while disagreeing with what actually gets
+ * written. One parse, two consumers.
+ */
+function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
   const heading = [...entry.body.matchAll(/^### (.+ Subclass: .+)$/gm)][0];
   if (!heading) throw new Error(`${entry.name}: no subclass section`);
   const title = strip(heading[1]).split(": ")[1];
@@ -624,7 +647,7 @@ for (const [id, entry] of parsed) {
   const parts = tail.split(/^#### (.+)$/m);
   const intro = parts[0].split("\n").map((line) => line.trim()).filter(Boolean)
     .filter((line) => !line.startsWith("_")).join(" ").replace(/[*_]/g, "").trim();
-  const features: unknown[] = [];
+  const features: ParsedSubclass["features"] = [];
   for (let i = 1; i < parts.length; i += 2) {
     const match = strip(parts[i]).match(LEVEL_HEADING);
     if (!match) continue;
@@ -635,6 +658,12 @@ for (const [id, entry] of parsed) {
     if (!description) continue;
     features.push({ id: slug(match[2]), name: strip(match[2]), level: Number(match[1]), description: description.slice(0, 4000) });
   }
+  return { title, intro, features };
+}
+
+for (const [id, entry] of parsed) {
+  if (HAND_AUTHORED.has(id)) continue;
+  const { title, intro, features } = parseSubclass(entry);
   builtSubclasses.push({
     id: slug(title), name: title, source: "srd", classId: id,
     subclassLevel: CONFIG[id].subclassLevel,
@@ -653,6 +682,10 @@ for (const [id, entry] of parsed) {
 // be idempotent because it writes over its own input.
 const existingClasses = (JSON.parse(readFileSync(join(bundles, "classes.v1.json"), "utf8")) as ClassReference[])
   .filter((record) => HAND_AUTHORED.has(record.id));
+// Read BEFORE the write below, and typed for the feature comparison.
+const existingSubclassRecords = (JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as {
+  id: string; name: string; classId: string; features: { id: string; level?: number }[];
+}[]).filter((record) => HAND_AUTHORED.has(record.classId));
 const disagreements: string[] = [];
 for (const record of existingClasses) {
   const entry = parsed.get(record.id);
@@ -685,6 +718,32 @@ for (const record of existingClasses) {
     const b = JSON.stringify(mine.spellSlots ?? null);
     if (a !== b) disagreements.push(`${record.id}.L${row.level}.spellSlots: source ${a} vs bundle ${b}`);
   });
+
+  // Subclass features: which features exist, and the level each is granted at.
+  //
+  // This was the gap that let a wrong Champion sit in the bundle - the check covered class-level
+  // data only, so a subclass carrying 2024 feature TEXT at 2014 feature LEVELS passed cleanly. Ids
+  // and levels are compared, not prose: the descriptions are legitimately reworded in places, but a
+  // feature appearing at the wrong level, or not at all, is always a defect.
+  const authoredSubclass = existingSubclassRecords.find((sub) => sub.classId === record.id);
+  if (authoredSubclass) {
+    const fromSource = parseSubclass(entry);
+    if (slug(fromSource.title) !== authoredSubclass.id) {
+      disagreements.push(`${record.id}: source prints subclass "${fromSource.title}" vs bundle "${authoredSubclass.name}"`);
+    } else {
+      const sourceLevels = new Map(fromSource.features.map((feature) => [feature.id, feature.level]));
+      const bundleLevels = new Map(authoredSubclass.features.map((feature) => [feature.id, feature.level]));
+      for (const [id, level] of sourceLevels) {
+        if (!bundleLevels.has(id)) disagreements.push(`${authoredSubclass.id}: source has "${id}" at level ${level}; the bundle does not have it at all`);
+        else if (bundleLevels.get(id) !== level) disagreements.push(`${authoredSubclass.id}.${id}: source level ${level} vs bundle level ${bundleLevels.get(id)}`);
+      }
+      for (const id of bundleLevels.keys()) {
+        if (!sourceLevels.has(id) && !STAGED_FEATURES.has(id)) {
+          disagreements.push(`${authoredSubclass.id}: bundle has "${id}", which the source does not print`);
+        }
+      }
+    }
+  }
 }
 if (disagreements.length) {
   console.error(`\nCROSS-CHECK: ${disagreements.length} disagreement(s) between the source and the hand-authored bundle:`);
@@ -700,8 +759,7 @@ console.log(`cross-check: ${existingClasses.length} hand-authored classes agree 
 
 const allClasses = [...existingClasses, ...built].sort((left, right) =>
   (left as ClassReference).name.localeCompare((right as ClassReference).name));
-const existingSubclasses = (JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as { classId: string }[])
-  .filter((record) => HAND_AUTHORED.has(record.classId));
+const existingSubclasses = existingSubclassRecords;
 const allSubclasses = [...existingSubclasses, ...builtSubclasses].sort((left, right) =>
   (left as { name: string }).name.localeCompare((right as { name: string }).name));
 

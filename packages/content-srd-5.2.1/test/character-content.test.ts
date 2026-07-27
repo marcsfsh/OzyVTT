@@ -238,6 +238,23 @@ describe("character-builder content records", () => {
     for (const entry of classes) expect(subclassesForClass(entry.id).length, entry.id).toBe(1);
   });
 
+  it("gates Champion's features at the SRD 5.2.1 levels, not the 2014 ones", () => {
+    // This shipped wrong: the record carried 2024 feature TEXT at 2014 feature LEVELS - Remarkable
+    // Athlete at 7 and Additional Fighting Style at 10 are the old progression - and Heroic Warrior
+    // was missing entirely. Nothing caught it because the generator's cross-check covered
+    // class-level data only. It covers subclass features now; this pins it for the test suite too,
+    // which is what runs in CI.
+    const champion = subclassesForClass("fighter")[0];
+    expect(champion.features.map((feature) => [feature.id, feature.level])).toEqual([
+      ["improved-critical", 3],
+      ["remarkable-athlete", 3],
+      ["additional-fighting-style", 7],
+      ["heroic-warrior", 10],
+      ["superior-critical", 15],
+      ["survivor", 18]
+    ]);
+  });
+
   it("models species without hardcoded ability bonuses (SRD 5.2.1 puts them on backgrounds)", () => {
     for (const entry of species) {
       expect(entry.abilityBonuses, entry.id).toEqual([]);
