@@ -296,19 +296,32 @@ describe("HomebrewStore revision counter", () => {
 });
 
 describe("HomebrewStore as a ContentLibrary source", () => {
-  it("merges nothing yet, so both audiences keep sharing the SRD-only catalog", () => {
-    // Slice 1 stores records but merges none of them: `publishedFor` is empty, so `ContentLibrary`
-    // returns one shared view and every existing table costs exactly what it did before homebrew.
+  it("keeps a DRAFT out of every merged catalog, so both audiences still share one SRD-only view", () => {
+    // Belt 1 of the visibility guarantee, at the store: `publishedFor` asks for `state='published'`,
+    // so there is no draft downstream to filter and no filter downstream to forget. A table with only
+    // drafts therefore costs exactly what it did before homebrew existed.
     const library = new ContentLibrary(store);
     store.create({ type: "class", body: bodyFor("Blood Hunter") });
     const gm = library.forAudience("gm");
     const player = library.forAudience("player");
     // Same underlying catalog objects for both audiences - not merely equal contents. That identity
-    // is the proof the no-homebrew path costs exactly what it did before homebrew existed.
+    // is the proof the no-published-homebrew path costs exactly what it did before.
     expect(gm.classSummaries()).toBe(player.classSummaries());
     expect(gm.monsterSummaries()).toBe(player.monsterSummaries());
     expect(gm.classSummaries().some((summary) => summary.name === "Blood Hunter")).toBe(false);
     // The revision gate still moves, which is what proves the seam is live rather than dead code.
     expect(store.revision).toBe(1);
+  });
+
+  it("returns the empty slice before initialize, so a synchronous ContentLibrary is safe to construct", async () => {
+    // `ContentLibrary` is built at `server.ts` module scope against a store that initialises inside an
+    // async `initialize()`. A pre-initialize read must be an SRD-only view, never a throw.
+    const uninitialised = new HomebrewStore(join(directory, "second.sqlite"));
+    expect(uninitialised.revision).toBe(-1);
+    expect(uninitialised.publishedFor("gm").classes).toEqual([]);
+    expect(uninitialised.monsterForInstance("hb-m-4f19c8b02de7")).toBeUndefined();
+    expect(new ContentLibrary(uninitialised).forAudience("player").classSummaries().length).toBeGreaterThan(0);
+    await uninitialised.initialize();
+    uninitialised.close();
   });
 });

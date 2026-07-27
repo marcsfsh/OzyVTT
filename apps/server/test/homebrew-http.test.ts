@@ -9,9 +9,14 @@ import {
   HomebrewDeletedResponseSchema, HomebrewPackExportResponseSchema, HomebrewPackImportResponseSchema,
   HomebrewUsagesResponseSchema, openApiDocument
 } from "@vtt/api-contract";
+import { GameStateSchema } from "@vtt/domain";
 import { createServer as createAppServer } from "../src/server.js";
 import { HomebrewStore } from "../src/homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH, type HomebrewValidator } from "../src/homebrew-http.js";
+import { ContentLibrary } from "../src/content-library.js";
+import { findCatalogRecord } from "../src/homebrew-srd-copy.js";
+import { createHomebrewValidator } from "../src/homebrew-validate.js";
+import { buildHomebrewUsageIndex } from "../src/homebrew-usages.js";
 
 /**
  * HTTP-boundary tests for the homebrew router.
@@ -26,11 +31,14 @@ import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
 
-async function fixture(options: { validate?: HomebrewValidator } = {}) {
+async function fixture(options: { validate?: HomebrewValidator; realValidation?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-http-"));
   const store = new HomebrewStore(join(directory, "vtt.sqlite"), () => Date.parse("2026-07-27T03:00:00.000Z"));
   await store.initialize();
   const pings: number[] = [];
+  // The SRD catalog behind `/duplicate`. Wired in every fixture because duplicating a bundled record
+  // is a first-class entry point, not an extra - a 20-row class table is not typed into a form.
+  const contentLibrary = new ContentLibrary(store);
   const app = express();
   // Mirrors server.ts: the pack parser runs FIRST, so its larger limit wins for that one route.
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
@@ -40,7 +48,11 @@ async function fixture(options: { validate?: HomebrewValidator } = {}) {
     authorizeGm: (token) => token === "gm-token",
     authorizePlayer: (token) => token === "player-token",
     notifyChanged: () => { pings.push(store.revision); },
-    validate: options.validate
+    validate: options.validate ?? (options.realValidation
+      ? createHomebrewValidator({ forAudience: (audience) => contentLibrary.forAudience(audience), publishedSpellLists: () => store.publishedFor("gm").spellLists })
+      : undefined),
+    usagesOf: (type, id) => buildHomebrewUsageIndex(GameStateSchema.parse({ schemaVersion: 1 })).of(type, id),
+    catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
   }));
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -271,6 +283,43 @@ describe("homebrew HTTP CRUD", () => {
     expect(copied.id).not.toBe(record.id);
     expect(copied).toMatchObject({ state: "draft", visibleToPlayers: false });
     expect(copied.record).toMatchObject({ type: "class", name: "Blood Hunter (copy)", hitDie: "d10" });
+  });
+
+  it("duplicates an SRD record into an editable, publishable draft", async () => {
+    // The headline authoring path: a `ClassReference` carries a mandatory 20-row level table plus its
+    // full feature list, so "duplicate Wizard and edit" is what makes authoring a class possible.
+    const { base } = await fixture({ realValidation: true });
+    const response = await post(base, sub(HOMEBREW_PATHS.contentDuplicate, "wizard"), GM, {});
+    expect(response.status).toBe(201);
+    const copy = (await body(response)).data.record;
+    expect(HomebrewContentResponseSchema.safeParse(await body(await get(base, byId(copy.id), GM))).success).toBe(true);
+    expect(copy).toMatchObject({ type: "class", state: "draft", visibleToPlayers: false });
+    expect(copy.id.startsWith("hb-")).toBe(true);
+    expect(copy.record.name).toBe("Wizard (copy)");
+    expect(copy.record.source).toBe("homebrew");
+    expect(copy.record.levelTable).toHaveLength(20);
+    // Self-referential slugs follow the copy; shared references stay pointed at the SRD ecosystem.
+    const slugs = (copy.record.features as Json[]).map((feature) => feature.choice?.fromCatalog).filter(Boolean);
+    expect(slugs).toContain(`${copy.id}-subclasses`);
+    expect(slugs).toContain("wizard-spells");
+
+    // The one thing a fresh copy legitimately cannot do yet - and it says so on the publish button.
+    const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, copy.id), GM, {});
+    expect(refused.status).toBe(409);
+    expect((await body(refused)).error.details.invalid.issues[0].message).toContain("no subclasses name");
+  });
+
+  it("duplicates an SRD spell, which publishes with no further authoring", async () => {
+    const { base } = await fixture({ realValidation: true });
+    const copy = (await body(await post(base, sub(HOMEBREW_PATHS.contentDuplicate, "acid-arrow"), GM, {}))).data.record;
+    expect(copy.type).toBe("spell");
+    expect(copy.record.source).toBe("homebrew");
+    expect((await post(base, sub(HOMEBREW_PATHS.contentPublish, copy.id), GM, {})).status).toBe(200);
+  });
+
+  it("still 404s an id that names nothing at all", async () => {
+    const { base } = await fixture();
+    expect((await post(base, sub(HOMEBREW_PATHS.contentDuplicate, "not-a-real-id"), GM, {})).status).toBe(404);
   });
 
   it("reports usages calmly and matches the contract's usages envelope", async () => {

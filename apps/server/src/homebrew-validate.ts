@@ -1,0 +1,391 @@
+import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } from "@vtt/api-contract";
+import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
+import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import {
+  BackgroundReferenceSchema, ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema,
+  SpeciesReferenceSchema, SpellListReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema,
+  resolveSpellLists, spellListMemberIds,
+  type BackgroundReference, type ClassReference, type ContentSpellcasting, type FeatReference,
+  type FeatureChoice, type FeatureOptionChoice, type FeatureRecord, type SpeciesReference,
+  type SpellListReference, type SubclassReference
+} from "@vtt/content-srd-5.2.1";
+import type { ContentView } from "./content-library.js";
+import { homebrewIdProblem } from "./homebrew-ids.js";
+
+/**
+ * The publish gate. A DRAFT MAY BE INVALID (decision 7) - that is what drafts are for - so nothing
+ * here runs until the GM presses Publish, and when it does the answer has to be actionable: a
+ * machine-addressable `path` into the authored record plus a sentence the GM can act on.
+ *
+ * The gate exists because of ONE property of this codebase: almost every way a homebrew record can
+ * be wrong fails SILENTLY at play time rather than loudly at authoring time.
+ *
+ *   - a typo'd `fromCatalog` slug is swallowed into `unresolvable` on both the client and the server
+ *     and the pick simply DISAPPEARS while the build succeeds. Right for partially-authored SRD
+ *     content; exactly wrong for homebrew, where the author made the mistake.
+ *   - a caster whose spell list resolves to nothing is not a bad picker, it is a HARD
+ *     `character.create` rejection - `resolveCatalogChoice` refuses to return an empty option list.
+ *     The GM must hear that from the publish button, not from a player who cannot roll a character.
+ *   - a `startingEquipment` item id that resolves to nothing grants no attack and no AC, silently.
+ *   - a species lineage choice whose `kind` is not the literal string "lineage" validates, records
+ *     the pick, and then never grants the lineage's traits.
+ *
+ * Four tiers, in order; a later tier only runs when the earlier one passed, because a
+ * cross-reference check against a body that failed its own schema reports noise on top of the real
+ * error.
+ *
+ *   1. SCHEMA        the record's own Zod schema - the SAME one the SRD bundle is parsed through.
+ *   2. IDENTITY      `hb-` prefixed, <= 60 characters, slug-legal, and (monsters) self-consistent.
+ *   3. REFERENTIAL   every id this record names resolves in the merged GM catalog.
+ *   4. UNSUPPORTED   shapes that parse and are then read by nothing.
+ *
+ * DELIBERATELY NOT HERE: the plan's tier of ADVISORIES (fields that parse and do nothing -
+ * `classResources`, `preparedFormula`, `abilityBonusChoice`, `effects[1..3]`, ...).
+ * `HomebrewValiditySchema` is `.strict()` with exactly `{ valid, issues }`, so a warning has nowhere
+ * to travel and emitting one as an issue would BLOCK a publish that should succeed. Carrying
+ * advisories needs a `warnings` array on the contract; filed, not smuggled.
+ */
+
+export type HomebrewValidationContext = Readonly<{
+  /** The merged GM catalog - already spell-list-overlaid, so `spellSummaries()` carries real membership. */
+  catalog: ContentView;
+  /** Published spell-list overlays, so a list under validation resolves in the graph it will join. */
+  spellLists: readonly SpellListReference[];
+}>;
+
+type Issue = HomebrewValidationIssue;
+type Path = (string | number)[];
+type Add = (path: Path, message: string) => void;
+/** Named record header shared by every authorable type, so the messages can say what is wrong with WHAT. */
+type Owner = Readonly<{ id: string; name: string }>;
+
+/**
+ * How a catalog slug DERIVED FROM THE RECORD'S OWN ID resolves.
+ *
+ * `resolveCatalogChoice` answers `<classId>-subclasses` and `<speciesId>-lineages` by looking the
+ * owning record up in the published catalog - and the record being validated is a DRAFT, so it is not
+ * there. Without this, every class would fail publish with "No class hb-... is in the catalog",
+ * including a fully-authored one whose subclasses are already published: the class cannot publish
+ * until its subclasses exist and the subclasses cannot resolve until the class publishes. That is a
+ * deadlock, not a validation.
+ *
+ * These two families - and only these two - are therefore answered from the record itself, which is
+ * also what makes the message useful ("no subclasses name this class yet" rather than "no class").
+ * `-spells` keys on a spell-list id, `-feats` on a free category slug, and `skills`/`weapons` are
+ * global, so none of them are self-referential and none need this.
+ */
+type SelfCatalog = Readonly<{ slug: string; count: number; whenEmpty: string }> | undefined;
+
+/** The context plus the two things worth resolving once per record rather than once per check. */
+type Checks = Readonly<{
+  catalog: ContentView;
+  spellLists: readonly SpellListReference[];
+  catalogs: CatalogChoiceCatalogs;
+  add: Add;
+}>;
+
+/**
+ * ONE schema per type - the very schemas `loadClasses()` and friends parse the bundle through
+ * (ADR-0016: one shape, never a fork). A body that passes here parses identically when
+ * `publishedFor` reads it back, which is what makes the store's fail-soft drop a
+ * schema-tightening alarm rather than a routine occurrence.
+ */
+const SCHEMAS: Record<HomebrewContentType, {
+  safeParse: (value: unknown) => {
+    success: boolean; data?: unknown;
+    error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
+  };
+}> = {
+  class: ClassReferenceSchema,
+  subclass: SubclassReferenceSchema,
+  species: SpeciesReferenceSchema,
+  background: BackgroundReferenceSchema,
+  feat: FeatReferenceSchema,
+  spell: SpellReferenceSchema,
+  equipment: EquipmentReferenceSchema,
+  monster: ActorDefinitionSchema,
+  "spell-list": SpellListReferenceSchema
+};
+
+/**
+ * Validate a stored body for publication.
+ *
+ * `recordId` rides on every issue because the same function serves pack import, where one response
+ * carries issues from many records. A single-record publish passes null - the contract's documented
+ * meaning - present-but-null, so a consumer never branches on key presence.
+ */
+export function validateForPublish(
+  type: HomebrewContentType, body: unknown, context: HomebrewValidationContext, recordId: string | null = null
+): HomebrewValidity {
+  const issues: Issue[] = [];
+  const add: Add = (path, message) => { issues.push({ path, message, recordId }); };
+
+  // ---- Tier 1: the record's own schema. ----
+  const parsed = SCHEMAS[type].safeParse(body);
+  if (!parsed.success) {
+    for (const issue of parsed.error?.issues ?? []) {
+      add(issue.path.map((key) => (typeof key === "number" ? key : String(key))), issue.message);
+    }
+    return { valid: false, issues };
+  }
+
+  // ---- Tier 2: identity. ----
+  // Read the id from the RAW body, never the parsed one: `ActorDefinitionSchema` has no `id` field
+  // and strips it, so a monster's identity would vanish exactly where it matters most.
+  const id = idOf(body);
+  const problem = homebrewIdProblem(id);
+  if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record rather than editing its id.`);
+
+  // ---- Tiers 3 and 4, per type. ----
+  const checks: Checks = { catalog: context.catalog, spellLists: context.spellLists, catalogs: context.catalog.catalogChoiceCatalogs(), add };
+  const record = parsed.data;
+  switch (type) {
+    case "class": classIssues(record as ClassReference, checks); break;
+    case "subclass": subclassIssues(record as SubclassReference, checks); break;
+    case "species": speciesIssues(record as SpeciesReference, checks); break;
+    case "background": backgroundIssues(record as BackgroundReference, checks); break;
+    case "feat": featIssues(record as FeatReference, checks); break;
+    case "monster": monsterIssues(record as ActorDefinition, id, checks); break;
+    case "spell-list": spellListIssues(record as SpellListReference, checks); break;
+    // A spell and an equipment record name no other record. `SpellReference.classes` entries are open
+    // membership TAGS (a list that does not exist yet is not an error - it may be authored later),
+    // and `EquipmentReferenceSchema` is the one `.strict()` content schema, so a typo'd key is
+    // already a tier-1 failure rather than a silently-stripped one.
+    case "spell": case "equipment": break;
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+/** The record's identity as stored: `normalizeBody` forces `body.id` to the row's primary key. */
+function idOf(body: unknown): string {
+  const value = (body as { id?: unknown } | null)?.id;
+  return typeof value === "string" ? value : "";
+}
+
+// ---------------------------------------------------------------------------------------------
+// Per-type checks
+// ---------------------------------------------------------------------------------------------
+
+function classIssues(entry: ClassReference, checks: Checks) {
+  spellcastingIssues(entry.spellcasting, entry, ["spellcasting"], checks);
+  // The level table is the ONLY place that knows a feature repeats, and capacity is
+  // `choose x (times granted)`. Resolve the repeat count here, where the table is in hand.
+  const grants = new Map<string, number>();
+  for (const row of entry.levelTable) for (const featureId of row.features) grants.set(featureId, (grants.get(featureId) ?? 0) + 1);
+  const self: SelfCatalog = {
+    slug: `${entry.id}-subclasses`,
+    count: checks.catalog.subclassSummaries().filter((summary) => summary.classId === entry.id).length,
+    whenEmpty: `no subclasses name "${entry.name}" yet. Publish at least one subclass for it first (duplicating an SRD subclass and re-pointing its class is the quick way).`
+  };
+  entry.features.forEach((feature, index) => featureIssues(feature, ["features", index], checks, grants.get(feature.id) ?? 1, self));
+  startingEquipmentIssues(entry.startingEquipment, ["startingEquipment"], checks);
+  if (entry.skillChoices.from.length < entry.skillChoices.choose) {
+    checks.add(["skillChoices", "from"], `This class asks for ${entry.skillChoices.choose} skills but offers only ${entry.skillChoices.from.length}.`);
+  }
+}
+
+function subclassIssues(entry: SubclassReference, checks: Checks) {
+  const parent = checks.catalog.classRecord(entry.classId);
+  if (!parent) {
+    checks.add(["classId"], `No class "${entry.classId}" is in the catalog. Publish the class before its subclasses.`);
+  } else if (entry.spellcasting) {
+    // TIER 4, and it is a DEFERRAL wearing a rejection's clothes. A subclass's own `levelTable` is
+    // dead data today - nothing reads it: not the builder, not the catalog projection, not the wire
+    // summary. So a third-caster subclass on a non-caster class produces a character with zero
+    // slots, no spell picker, and a rejection on every prepared spell. Refusing to publish it is
+    // strictly better than shipping that. Delete this branch when the table overlay lands.
+    const classCasts = parent.levelTable.some((row) => (row.spellSlots?.length ?? 0) > 0 || row.pactSlots !== undefined);
+    if (!classCasts) {
+      checks.add(["spellcasting"], `"${parent.name}" has no spell slots in its level table, and a subclass's own table is not applied yet - this subclass would create a caster with no slots. Third-caster subclasses are not supported yet.`);
+    }
+  }
+  spellcastingIssues(entry.spellcasting, entry, ["spellcasting"], checks);
+  entry.features.forEach((feature, index) => featureIssues(feature, ["features", index], checks, 1));
+}
+
+function speciesIssues(entry: SpeciesReference, checks: Checks) {
+  const seen = new Set<string>();
+  entry.lineages.forEach((lineage, index) => {
+    if (seen.has(lineage.id)) checks.add(["lineages", index, "id"], `Two lineages share the id "${lineage.id}"; only the first would ever be granted.`);
+    seen.add(lineage.id);
+    // `content-library.ts` flattens lineage traits into ONE features list with no lineage tag, so a
+    // choice on a lineage trait is offered for EVERY lineage and the build then rejects the picks the
+    // player could not have avoided making. Refuse it rather than ship an uncreatable species.
+    lineage.traits.forEach((trait, traitIndex) => {
+      if (trait.choice) checks.add(["lineages", index, "traits", traitIndex, "choice"], `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet - move the choice up to a species trait.`);
+    });
+  });
+
+  const self: SelfCatalog = { slug: `${entry.id}-lineages`, count: entry.lineages.length, whenEmpty: `"${entry.name}" asks for a lineage but declares none.` };
+  entry.traits.forEach((trait, index) => {
+    featureIssues(trait, ["traits", index], checks, 1, self);
+    const choice = trait.choice;
+    if (!choice) return;
+    if (choice.fromCatalog !== `${entry.id}-lineages` && choice.kind !== "lineage") return;
+    // `character-build.ts` finds the chosen lineage by looking for a choice row whose `kind` is the
+    // LITERAL string "lineage". Any other kind validates, records the pick, and silently never grants
+    // the lineage's traits - precisely the class of failure this gate exists for.
+    if (choice.kind !== "lineage") checks.add(["traits", index, "choice", "kind"], `A lineage pick must use the kind "lineage" (this one uses "${choice.kind}"), or the chosen lineage's traits are silently never granted.`);
+    if (choice.fromCatalog !== `${entry.id}-lineages`) checks.add(["traits", index, "choice", "fromCatalog"], `A lineage pick must read from "${entry.id}-lineages" (this one reads "${choice.fromCatalog ?? "an inline list"}").`);
+  });
+}
+
+function backgroundIssues(entry: BackgroundReference, checks: Checks) {
+  // Today this rejects loudly, but only inside `character-build.ts` - seven wizard steps in.
+  if (entry.originFeatId && !checks.catalog.featRecord(entry.originFeatId)) {
+    checks.add(["originFeatId"], `No feat "${entry.originFeatId}" is in the catalog. Publish the origin feat before the background that grants it.`);
+  }
+  entry.features.forEach((feature, index) => featureIssues(feature, ["features", index], checks, 1));
+  startingEquipmentIssues(entry.startingEquipment, ["startingEquipment"], checks);
+}
+
+function featIssues(entry: FeatReference, checks: Checks) {
+  featureIssues(entry.feature, ["feature"], checks, 1);
+}
+
+function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) {
+  if (definition.schemaId !== "vtt.actor-monster") {
+    checks.add(["schemaId"], `A homebrew creature must be a "vtt.actor-monster" stat block (this one is "${definition.schemaId}").`);
+  }
+  // `source.externalId` IS a monster's identity: it keys the bestiary, and `actor-roster.ts` writes
+  // it straight into `Actor.definitionId` without re-parsing. The store forces it on every write, so
+  // a mismatch here means the body reached the database past the store.
+  if (definition.source.externalId !== id) {
+    checks.add(["source", "externalId"], `This creature's content id ("${definition.source.externalId ?? "missing"}") disagrees with its record id ("${id}"); its live tokens would resolve to nothing.`);
+  }
+  // Not cosmetic: the picker row renders "CR 0 - <size> unknown" and the creature is unfindable by
+  // type search. Both fields live in the untyped extension bag, so no schema can catch this.
+  const extension = statblockExtension(definition);
+  if (typeof extension?.challengeRating !== "number") checks.add(["extensions"], "This creature has no challenge rating, so the bestiary will list it as CR 0.");
+  if (typeof extension?.type !== "string" || extension.type.length === 0) checks.add(["extensions"], "This creature has no creature type, so the bestiary will list it as \"unknown\" and type search will never find it.");
+}
+
+function spellListIssues(list: SpellListReference, checks: Checks) {
+  const spells = checks.catalog.spellSummaries();
+  // Resolve this list ALONGSIDE the published ones: `basedOn` may name a peer, and a draft has to be
+  // checked in the same graph it is about to join.
+  const peers = [list, ...checks.spellLists.filter((other) => other.id !== list.id)];
+  const resolution = resolveSpellLists(peers, spells);
+  if (resolution.cyclicListIds.includes(list.id)) {
+    checks.add(["basedOn"], "This list's \"based on\" chain loops back to itself, so the whole chain is ignored. Break the loop.");
+  }
+  list.basedOn.forEach((base, index) => {
+    if (resolution.unknownBasedOn.includes(base)) checks.add(["basedOn", index], `Nothing is on the "${base}" list, so basing this one on it adds no spells.`);
+  });
+  // THE check. An empty list is a hard `character.create` rejection downstream, not a soft one:
+  // `resolveCatalogChoice` refuses to return an empty option set, so a caster pointed at this list
+  // yields a character that cannot be created at all.
+  if ((resolution.memberIds.get(list.id)?.size ?? 0) === 0) {
+    checks.add(["add"], "This spell list resolves to no spells. A caster pointed at an empty list cannot be created at all - add spell ids, base it on an existing list, or tag spells with this list's id.");
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Shared checks
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A caster must name a spell list that resolves to at least one spell.
+ *
+ * `character-build.ts` falls back to the CLASS RECORD's own id when `spellcasting.spellListId` is
+ * absent, so an unset list on `hb-necromancer-a1b2c3` silently becomes
+ * `hb-necromancer-a1b2c3-spells` -> zero options -> `CatalogChoiceError` -> hard build rejection.
+ * The fallback is doubly wrong on a subclass, where it uses the *class's* id rather than the
+ * subclass's. "Declare a list" and "the list has a spell on it" are therefore not separable checks:
+ * either one alone still leaves an uncreatable caster.
+ */
+function spellcastingIssues(spellcasting: ContentSpellcasting | undefined, owner: Owner, path: Path, checks: Checks) {
+  if (!spellcasting) return;
+  const listId = spellcasting.spellListId;
+  if (!listId) {
+    checks.add([...path, "spellListId"], `"${owner.name}" casts spells but names no spell list, so the builder would look for a list called "${owner.id}" and find nothing. Name an existing list (for example "wizard") or publish one.`);
+    return;
+  }
+  // `catalog.spellSummaries()` is ALREADY overlaid with this audience's published lists, so asking it
+  // asks exactly what `resolveCatalogChoice("<listId>-spells")` will ask at build time.
+  const members = spellListMemberIds(listId, checks.spellLists, checks.catalog.spellSummaries());
+  if (members.size === 0) {
+    checks.add([...path, "spellListId"], `No spells are on the "${listId}" list, so a ${owner.name} could not be created at all. Publish the spell list (and its spells) first.`);
+  }
+}
+
+/** Every `fromCatalog` slug a feature - or one of its inline options - names must resolve to a NON-EMPTY list. */
+function featureIssues(feature: FeatureRecord, path: Path, checks: Checks, grants: number, self: SelfCatalog = undefined) {
+  choiceIssues(feature.choice, [...path, "choice"], feature.name, checks, grants, self);
+  (feature.choice?.options ?? []).forEach((option, index) => {
+    choiceIssues(option.choice, [...path, "choice", "options", index, "choice"], `${feature.name} / ${option.name}`, checks, grants, self);
+  });
+}
+
+function choiceIssues(choice: FeatureChoice | FeatureOptionChoice | undefined, path: Path, label: string, checks: Checks, grants: number, self: SelfCatalog) {
+  if (!choice) return;
+  let optionCount: number;
+  if (self && choice.fromCatalog === self.slug) {
+    // Self-referential: answered from the record under validation, which the catalog cannot see yet.
+    if (self.count === 0) { checks.add([...path, "fromCatalog"], `"${label}" reads its options from "${self.slug}", but ${self.whenEmpty}`); return; }
+    optionCount = self.count;
+  } else if (choice.fromCatalog) {
+    try {
+      optionCount = resolveCatalogChoice(choice.fromCatalog, checks.catalogs).length;
+    } catch (error) {
+      if (!(error instanceof CatalogChoiceError)) throw error;
+      // The single highest-value check in this file. At build time this is swallowed into
+      // `unresolvable` on BOTH sides and the pick silently DISAPPEARS while the build succeeds -
+      // right for partially-authored SRD content, exactly wrong for homebrew.
+      checks.add([...path, "fromCatalog"], `"${label}" reads its options from "${choice.fromCatalog}", which resolves to nothing: ${error.message}`);
+      return;
+    }
+  } else {
+    optionCount = choice.from?.length ?? 0;
+  }
+  // Capacity is `choose x (times granted)` and the build-time completeness check is EXACT equality,
+  // never "at most" - so a non-repeatable choice offering fewer distinct options than its capacity
+  // can never be completed. `repeatable: true` (an ASI taking the same option twice) needs only one.
+  const capacity = choice.choose * Math.max(1, grants);
+  if (!choice.repeatable && optionCount > 0 && optionCount < capacity) {
+    checks.add(path, `"${label}" asks for ${capacity} distinct pick(s) but offers only ${optionCount}; the character could never be completed.`);
+  }
+}
+
+/** A starting-equipment item id that resolves to nothing grants no attack and no AC, and says nothing. */
+function startingEquipmentIssues(
+  options: ReadonlyArray<{ label: string; items: ReadonlyArray<{ id: string }> }>, path: Path, checks: Checks
+) {
+  options.forEach((option, optionIndex) => {
+    option.items.forEach((item, itemIndex) => {
+      if (!checks.catalog.equipmentRecord(item.id)) {
+        checks.add([...path, optionIndex, "items", itemIndex, "id"], `No equipment "${item.id}" is in the catalog, so "${option.label}" would grant nothing for it.`);
+      }
+    });
+  });
+}
+
+/** `vtt.statblock` first so a homebrew record can override an SRD-duplicated field; the open5e bag is the fallback. */
+function statblockExtension(definition: ActorDefinition): { challengeRating?: unknown; type?: unknown } | undefined {
+  const bag = definition.extensions ?? {};
+  const extension = bag["vtt.statblock"] ?? bag["open5e.srd-2024"];
+  return extension && typeof extension === "object" ? extension as { challengeRating?: unknown; type?: unknown } : undefined;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The router seam
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The `(type, body) => HomebrewValidity` closure `homebrew-http.ts` injects.
+ *
+ * Validation always reads the GM audience: it is a GM-only route acting on GM-only content, and a
+ * class whose spell list is published-but-not-player-visible is perfectly valid.
+ *
+ * The catalog is resolved PER CALL rather than captured, because publishes come in runs - the class
+ * published thirty seconds ago must be visible to the subclass being published now - and
+ * `forAudience` is revision-gated, so this costs a map lookup once the catalog is warm.
+ */
+export function createHomebrewValidator(source: {
+  forAudience: (audience: "gm" | "player") => ContentView;
+  publishedSpellLists: () => readonly SpellListReference[];
+}) {
+  return (type: HomebrewContentType, body: unknown): HomebrewValidity =>
+    validateForPublish(type, body, { catalog: source.forAudience("gm"), spellLists: source.publishedSpellLists() });
+}

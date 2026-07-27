@@ -1,15 +1,17 @@
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   BackgroundReferenceSchema, ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema,
-  SpeciesReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema
+  SpeciesReferenceSchema, SpellListReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema, loadSpells
 } from "@vtt/content-srd-5.2.1";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { CombatLogStore } from "../src/combat-log.js";
 import { ContentLibrary, type ContentAudience, type HomebrewCatalogSlice, type HomebrewContentSource } from "../src/content-library.js";
 import { createGameOperations, GameAccessDeniedError, type GameOperations, type GameOperationsContext, type GamePrincipal } from "../src/game-operations.js";
 import { GameStore } from "../src/game-store.js";
+import { HomebrewStore } from "../src/homebrew-store.js";
 
 /**
  * THE regression test for the homebrew leak.
@@ -58,15 +60,22 @@ function sliceFor(tier: Tier): HomebrewCatalogSlice {
       feature: { id: `hb-${tier}-feat-feature`, name: `${name} Feat`, description: "A homebrew feat." }
     })],
     spells: [SpellReferenceSchema.parse({
-      id: `hb-${tier}-spell`, name: `${name} Spell`, level: 1, school: "evocation", castingTime: "1 action",
+      // `source` now exists on spells and equipment (it did not when this file was written), and it
+      // DEFAULTS to "srd" - so a fake that omits it would quietly assert that homebrew is bundled
+      // content, which is the one thing this file exists to disprove.
+      id: `hb-${tier}-spell`, name: `${name} Spell`, source: "homebrew", level: 1, school: "evocation", castingTime: "1 action",
       reactionCondition: null, range: { distance: 30, unit: "feet", text: "30 feet" },
       components: { verbal: true, somatic: false, material: false, materialText: null, materialConsumed: false },
       duration: "Instantaneous", concentration: false, ritual: false, attackRoll: false,
       damage: { roll: null, types: [] }, save: null, target: { type: null, count: null }, shape: null,
       classes: [], description: "A homebrew spell.", higherLevel: null, castingOptions: []
     })],
-    equipment: [EquipmentReferenceSchema.parse({ id: `hb-${tier}-item`, name: `${name} Item`, category: "wondrous", costGp: null, weightLb: null, description: null })],
-    monsters: [monsterFor(tier)]
+    equipment: [EquipmentReferenceSchema.parse({ id: `hb-${tier}-item`, name: `${name} Item`, source: "homebrew", category: "wondrous", costGp: null, weightLb: null, description: null })],
+    monsters: [monsterFor(tier)],
+    // A membership overlay rather than a record: it stamps this tier's list id into the tier's own
+    // spell, so an overlay that crossed the audience boundary would show up as a leaked id inside a
+    // player-visible spell's `classes` array - which the marker assertions below already catch.
+    spellLists: [SpellListReferenceSchema.parse({ id: `hb-${tier}-list`, name: `${name} List`, source: "homebrew", add: [`hb-${tier}-spell`] })]
   };
 }
 
@@ -87,7 +96,8 @@ const concatSlices = (...slices: readonly HomebrewCatalogSlice[]): HomebrewCatal
   classes: slices.flatMap((slice) => slice.classes), subclasses: slices.flatMap((slice) => slice.subclasses),
   species: slices.flatMap((slice) => slice.species), backgrounds: slices.flatMap((slice) => slice.backgrounds),
   feats: slices.flatMap((slice) => slice.feats), spells: slices.flatMap((slice) => slice.spells),
-  equipment: slices.flatMap((slice) => slice.equipment), monsters: slices.flatMap((slice) => slice.monsters)
+  equipment: slices.flatMap((slice) => slice.equipment), monsters: slices.flatMap((slice) => slice.monsters),
+  spellLists: slices.flatMap((slice) => slice.spellLists)
 });
 
 /**
@@ -264,5 +274,154 @@ describe("homebrew never reaches an audience it was not published to", () => {
     const library = new ContentLibrary();
     expect(library.forAudience("gm").classSummaries()).toBe(library.forAudience("player").classSummaries());
     expect(library.forAudience("player").classSummaries().every((entry) => entry.source === "srd")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// The same guarantee, driven by the REAL store.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The fake above pins the CONTRACT (`publishedFor` must not return a draft); these pin the
+ * IMPLEMENTATION that has to satisfy it. Both are kept: the fake proves `ContentLibrary` is correct
+ * for any source, and these prove `HomebrewStore` is such a source. Deleting either leaves a real
+ * hole - a store that filtered nothing would pass the fake-driven suite untouched.
+ */
+describe("HomebrewStore.publishedFor, end to end through the content operations", () => {
+  const directories: string[] = [];
+  const stores: HomebrewStore[] = [];
+  afterEach(async () => {
+    while (stores.length) stores.pop()!.close();
+    while (directories.length) await rm(directories.pop()!, { recursive: true, force: true });
+  });
+
+  async function seededStore() {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-visibility-"));
+    directories.push(directory);
+    const store = new HomebrewStore(join(directory, "vtt.sqlite"));
+    stores.push(store);
+    await store.initialize();
+    // One class and one monster per tier, taken through the REAL transitions the GM would use.
+    const ids: Record<Tier, { classId: string; monsterId: string }> = {} as never;
+    for (const tier of TIERS) {
+      const created = store.create({ type: "class", body: SLICES[tier].classes[0] as unknown as Record<string, unknown> });
+      const monster = store.create({ type: "monster", body: SLICES[tier].monsters[0] as unknown as Record<string, unknown> });
+      if (tier !== "draftonly") {
+        store.setState(created.id, "published", undefined);
+        store.setState(monster.id, "published", undefined);
+      }
+      if (tier === "playersafe") {
+        store.setVisibility(created.id, true, undefined);
+        store.setVisibility(monster.id, true, undefined);
+      }
+      ids[tier] = { classId: created.id, monsterId: monster.id };
+    }
+    return { store, ids };
+  }
+
+  it("keeps a draft out of both catalogs, a published-invisible record out of the player's, and serves the visible one", async () => {
+    const { store } = await seededStore();
+    const operations = operationsWith(new ContentLibrary(store));
+
+    // Belt 1, structurally: the draft is in NO merged catalog for ANY principal.
+    for (const principal of [GM, INTEGRATION, PLAYER]) {
+      expect(carries(operations.contentClasses(principal), "draftonly class"), `${principal.kind} saw a draft`).toBe(false);
+    }
+    expect(carries(operations.contentMonsters(GM), "draftonly monster")).toBe(false);
+
+    // Belt 2: published without player visibility is the GM's alone.
+    expect(carries(operations.contentClasses(PLAYER), "gmonly class")).toBe(false);
+    expect(carries(operations.contentClasses(GM), "gmonly class")).toBe(true);
+    expect(carries(operations.contentClasses(INTEGRATION), "gmonly class")).toBe(true);
+
+    // ... and the merge really happens, or every assertion above would pass vacuously.
+    expect(carries(operations.contentClasses(PLAYER), "playersafe class")).toBe(true);
+    expect(carries(operations.contentMonsters(GM), "playersafe monster")).toBe(true);
+  });
+
+  it("drops a record from both catalogs on soft delete while its live tokens keep resolving", async () => {
+    const { store, ids } = await seededStore();
+    const library = new ContentLibrary(store);
+    expect(library.forAudience("gm").monster(ids.playersafe.monsterId)?.actions).toHaveLength(1);
+
+    store.softDelete(ids.playersafe.monsterId);
+    expect(library.forAudience("gm").monster(ids.playersafe.monsterId)).toBeUndefined();
+    expect(library.forAudience("player").monster(ids.playersafe.monsterId)).toBeUndefined();
+    // THE carve-out. Actions, typed defences and recharge behaviour are re-read from the definition
+    // per use, so a status-aware play-time lookup would disarm every token already on the table.
+    expect(library.monsterForInstance(ids.playersafe.monsterId)?.actions).toHaveLength(1);
+    // Even for a record that was never published at all.
+    expect(library.monsterForInstance(ids.draftonly.monsterId)?.actions).toHaveLength(1);
+  });
+
+  it("applies a published spell list to the audience that can see it, and to no other", async () => {
+    const { store } = await seededStore();
+    const spell = store.create({ type: "spell", body: SLICES.playersafe.spells[0] as unknown as Record<string, unknown> });
+    store.setState(spell.id, "published", undefined);
+    store.setVisibility(spell.id, true, undefined);
+    // The list is published but NOT player-visible: its id must never appear inside a player-visible
+    // spell's `classes` array, or the list's existence leaks through /v1/content/spells.
+    const list = store.create({ type: "spell-list", body: { name: "Secret Order", add: [spell.id, "fireball"] } });
+    store.setState(list.id, "published", undefined);
+
+    const library = new ContentLibrary(store);
+    const gmSpell = library.forAudience("gm").spellSummaries().find((entry) => entry.id === spell.id);
+    const playerSpell = library.forAudience("player").spellSummaries().find((entry) => entry.id === spell.id);
+    expect(gmSpell?.classes).toContain(list.id);
+    expect(playerSpell?.classes).not.toContain(list.id);
+    // An SRD spell joins the list too - membership is an overlay, never an edit to the bundle.
+    expect(library.forAudience("gm").spellSummaries().find((entry) => entry.id === "fireball")?.classes).toContain(list.id);
+    expect(library.forAudience("player").spellSummaries().find((entry) => entry.id === "fireball")?.classes).not.toContain(list.id);
+    // The bundle itself is untouched: the loader caches parsed rows by identity, so a mutation here
+    // would corrupt every later reader in the process.
+    expect(loadSpells().find((entry) => entry.id === "fireball")?.classes).not.toContain(list.id);
+  });
+
+  it("treats a slice holding ONLY a spell list as non-empty, or the overlay would never be applied", async () => {
+    // A spell-list overlay carries no records of its own - it only changes existing spells' `classes`.
+    // A cheap "is this slice empty?" test that counted records would send this table down the shared
+    // SRD-only path, and the list would publish, appear in the library, and do absolutely nothing.
+    const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-listonly-"));
+    directories.push(directory);
+    const store = new HomebrewStore(join(directory, "vtt.sqlite"));
+    stores.push(store);
+    await store.initialize();
+    const list = store.create({ type: "spell-list", body: { name: "Only A List", add: ["fireball"] } });
+    store.setState(list.id, "published", undefined);
+    store.setVisibility(list.id, true, undefined);
+
+    const library = new ContentLibrary(store);
+    expect(library.forAudience("player").spellSummaries().find((entry) => entry.id === "fireball")?.classes).toContain(list.id);
+  });
+
+  it("drops a published row that no longer parses instead of taking down every catalog", async () => {
+    const { store } = await seededStore();
+    const good = store.create({ type: "class", body: SLICES.playersafe.classes[0] as unknown as Record<string, unknown> });
+    store.setState(good.id, "published", undefined);
+    store.setVisibility(good.id, true, undefined);
+    // A body the schema refuses - what a tightened schema looks like from underneath stored data.
+    // It CANNOT be published through the router (validation refuses it), so this reaches past the
+    // store's own API on purpose: the point is that one bad row must not blank the catalogs.
+    const rotten = store.create({ type: "class", body: { name: "Half-Formed", hitDie: "d10" } });
+    store.setState(rotten.id, "published", undefined);
+    store.setVisibility(rotten.id, true, undefined);
+
+    const summaries = new ContentLibrary(store).forAudience("player").classSummaries();
+    expect(summaries.some((entry) => entry.id === rotten.id)).toBe(false);
+    expect(summaries.some((entry) => entry.id === good.id)).toBe(true);
+    expect(summaries.some((entry) => entry.id === "wizard")).toBe(true);
+  });
+
+  it("forces a monster's content id to its row id, so a live token always resolves back", async () => {
+    const { store } = await seededStore();
+    // `source.externalId` carries NO regex on `ActorDefinitionSchema` and is written unparsed into
+    // `Actor.definitionId`; a value the GM (or an importer) chose would save fine and then fail
+    // `GameStateSchema.parse` on the next boot.
+    const created = store.create({
+      type: "monster",
+      body: { ...(SLICES.playersafe.monsters[0] as unknown as Record<string, unknown>), source: { name: "Homebrew", version: "1", externalId: "not:a:slug" } }
+    });
+    expect((created.body.source as { externalId: string }).externalId).toBe(created.id);
+    expect(new ContentLibrary(store).monsterForInstance(created.id)?.name).toContain("Monster");
   });
 });

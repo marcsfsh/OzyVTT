@@ -22,6 +22,9 @@ import { CodexStore } from "./codex-store.js";
 import { createCodexRouter } from "./codex-http.js";
 import { HomebrewStore } from "./homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
+import { createHomebrewValidator } from "./homebrew-validate.js";
+import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
+import { findCatalogRecord } from "./homebrew-srd-copy.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -77,9 +80,9 @@ export function createServer(options: CreateServerOptions) {
   const codexStore = new CodexStore(options.databasePath);
   const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), { maxBytes: 10 * 1024 * 1024, maxDimensionPx: 4096, maxPixels: 4096 * 4096 });
   const homebrewStore = new HomebrewStore(options.databasePath);
-  // The homebrew seam is wired from the first slice so the revision gate is exercised in production
-  // from the start. `publishedFor` returns the empty slice until per-type publish validation lands,
-  // so both audiences keep sharing the module-level SRD-only catalog - identical cost to before.
+  // THE merge point. `publishedFor(audience)` hands `ContentLibrary` only records that are published
+  // and (for a player) player-visible; drafts are in neither slice at all. With no homebrew stored,
+  // both audiences keep sharing the module-level SRD-only catalog - identical cost to before.
   const contentLibrary = new ContentLibrary(homebrewStore);
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
@@ -136,6 +139,23 @@ export function createServer(options: CreateServerOptions) {
   function notifyHomebrewChanged() {
     io.emit("homebrew:changed", { revision: homebrewStore.revision });
   }
+  /**
+   * "What refers to this homebrew record?", scanned over the live campaign.
+   *
+   * Memoised for exactly one turn of the event loop, and that is load-bearing rather than fussy: the
+   * library list asks this once PER ROW, and `GameStore.snapshot` structured-clones the whole
+   * campaign on every read - so an unmemoised lookup clones the campaign fifty times to render one
+   * page. A microtask-scoped cache is built once inside a synchronous request handler and is gone
+   * before the next request runs, so it can never serve a stale answer.
+   */
+  let usageIndex: ReturnType<typeof buildHomebrewUsageIndex> | undefined;
+  const homebrewUsagesFor = (type: Parameters<ReturnType<typeof buildHomebrewUsageIndex>["of"]>[0], id: string) => {
+    if (!usageIndex) {
+      usageIndex = buildHomebrewUsageIndex(store.snapshot);
+      queueMicrotask(() => { usageIndex = undefined; });
+    }
+    return usageIndex.of(type, id);
+  };
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
    * GM-only AND every referenced actor is public - so a hidden combatant is never narrated to players.
@@ -394,7 +414,15 @@ export function createServer(options: CreateServerOptions) {
     store: homebrewStore,
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
-    notifyChanged: notifyHomebrewChanged
+    notifyChanged: notifyHomebrewChanged,
+    // Publish validation and `/duplicate` both read the GM catalog: this router is GM-only end to
+    // end, and a record whose dependencies are published-but-not-player-visible is perfectly valid.
+    validate: createHomebrewValidator({
+      forAudience: (audience) => contentLibrary.forAudience(audience),
+      publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists
+    }),
+    usagesOf: homebrewUsagesFor,
+    catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
   }));
   const gameApiRouter = createGameApiRouter({
     operations,

@@ -6,10 +6,11 @@ import {
   type ApiErrorCode, type HomebrewContentType, type HomebrewValidationIssue, type HomebrewValidity
 } from "@vtt/api-contract";
 import {
-  HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError,
+  HomebrewNotFoundError, HomebrewRevisionConflictError, HomebrewStateError, copyName,
   type HomebrewBody, type HomebrewRecordRow, type HomebrewStore, type HomebrewSummaryRow
 } from "./homebrew-store.js";
 import { isMintedHomebrewId, mintHomebrewId } from "./homebrew-ids.js";
+import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.js";
 
 /**
  * The homebrew authoring REST surface (`/api/v1/homebrew/*`), mounted in `server.ts` beside the
@@ -77,17 +78,24 @@ export const HOMEBREW_PACK_BODY_LIMIT = "4mb";
 const MAX_PACK_RECORDS = 500;
 
 /**
- * Publish-time validation, injected so `homebrew-validate.ts` (slice 2) can land without touching
- * this file. SLICE 1 REPORTS EVERY RECORD AS VALID because nothing validates yet and nothing merges
- * yet - `validity` is a promise about the *catalog*, and with an empty catalog it is vacuously kept.
- * The moment a type merges, its validator must arrive with it.
+ * Publish-time validation, injected so `homebrew-validate.ts` lands without touching this file. The
+ * fallback reports every record as valid, which is only ever right for a router wired with no
+ * catalog to validate against (a store-only test fixture) - `server.ts` always supplies the real one.
  */
 export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody) => HomebrewValidity;
 const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [] });
 
-/** Reference scan over GameState, injected for the same reason (`homebrew-usages.ts`, slice 2). */
+/** Reference scan over GameState, injected for the same reason (`homebrew-usages.ts`). */
 export type HomebrewUsageLookup = (type: HomebrewContentType, id: string) => readonly { actorId: string; actorName: string; kind: string; detail: string | null }[];
 const NO_USAGES: HomebrewUsageLookup = () => [];
+
+/**
+ * The merged GM catalog behind `/duplicate`, injected the same way. Returns the SRD (or already-
+ * merged homebrew) record an id names, deep-copied, or undefined. Without it an SRD id 404s -
+ * which is the whole reason duplicate-an-SRD-record has to be wired, not merely wireable.
+ */
+export type HomebrewCatalogLookup = (id: string) => HomebrewSourceRecord | undefined;
+const NO_CATALOG: HomebrewCatalogLookup = () => undefined;
 
 export type HomebrewRouterOptions = Readonly<{
   store: HomebrewStore;
@@ -101,6 +109,8 @@ export type HomebrewRouterOptions = Readonly<{
   notifyChanged: () => void;
   validate?: HomebrewValidator;
   usagesOf?: HomebrewUsageLookup;
+  /** Resolves a catalog id for `/duplicate` so an SRD record can be forked into an editable draft. */
+  catalogRecord?: HomebrewCatalogLookup;
   newId?: () => string;
 }>;
 
@@ -124,6 +134,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   const { store } = options;
   const validate = options.validate ?? UNVALIDATED;
   const usagesOf = options.usagesOf ?? NO_USAGES;
+  const catalogRecord = options.catalogRecord ?? NO_CATALOG;
   const newId = options.newId ?? randomUUID;
 
   router.use((request, response, next) => {
@@ -255,14 +266,29 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   /**
-   * SLICE 1: duplicates a HOMEBREW record only. The contract also allows an SRD source id (`wizard`),
-   * which is what makes a 20-row class table tractable to author - that needs the full bundle record
-   * out of `ContentView`, so it lands with the merge (slice 9) and an SRD id 404s until then.
+   * Duplicate. The source may be a HOMEBREW row or an SRD CATALOG RECORD, and the second is not a
+   * nicety: a `ClassReference` carries a mandatory twenty-row level table plus its full feature list,
+   * so "duplicate Wizard and edit it" is what makes authoring a class possible at all. Both land as
+   * fresh, invisible drafts under a newly minted id.
+   *
+   * The homebrew row is tried first because a homebrew record can never be shadowed by an SRD id -
+   * `hb-` is a reserved prefix - so the branch is unambiguous in both directions.
    */
   router.post(route(HOMEBREW_PATHS.contentDuplicate), requireGm, (request, response) => {
     try {
       const { name } = DuplicateSchema.parse(request.body ?? {});
-      return sent(response, store.duplicate(pathParam(request, "id"), name), 201);
+      const id = pathParam(request, "id");
+      if (store.get(id)) return sent(response, store.duplicate(id, name), 201);
+
+      const source = catalogRecord(id);
+      if (!source) return failure(response, 404, "not_found", "That record was not found.");
+      const copied = copyName(name ?? String((source.body as { name?: unknown }).name ?? id));
+      // The id is minted BEFORE the rewrite because the rewrite needs it: a species' lineage pick and
+      // a class's subclass pick are both derived from the record's own id, so a copy that kept the
+      // source's slug would silently keep reading the SOURCE record's rows. See `homebrew-srd-copy.ts`.
+      const mintedId = mintHomebrewId(source.type, copied, (candidate) => store.get(candidate) !== undefined);
+      const body = rewriteForNewId(source.type, { ...source.body, name: copied }, id, mintedId);
+      return sent(response, store.importRecord(mintedId, source.type, body, false, "homebrew:duplicate"), 201);
     } catch (error) { return storeError(response, error); }
   });
 

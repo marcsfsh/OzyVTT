@@ -1,7 +1,7 @@
 import type { CatalogChoiceCatalogs, ContentActionSummary, ContentBackgroundSummary, ContentChoiceList, ContentClassLevelRow, ContentClassSummary, ContentConditionSummary, ContentEquipmentSummary, ContentFeatSummary, ContentFeatureSummary, ContentMonsterSummary, ContentNameBundle, ContentSkillSummary, ContentSpeciesSummary, ContentSpellcastingSummary, ContentSpellSummary, ContentStartingEquipmentOption, ContentSubclassSummary } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
-import { loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
+import { applySpellListOverlay, loadAttribution, loadBackgrounds, loadClasses, loadConditions, loadEquipment, loadFeats, loadMonsterDefinitions, loadNames, loadSkills, loadSpecies, loadSpells, loadSubclasses, type BackgroundReference, type ClassLevelRow, type ClassReference, type ContentSpellcasting, type EquipmentReference, type FeatReference, type FeatureRecord, type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference } from "@vtt/content-srd-5.2.1";
 import { parseAreaProse } from "./area-targeting.js";
 
 /**
@@ -365,7 +365,12 @@ const merged = <T>(srd: readonly T[], homebrew: readonly T[]): readonly T[] => h
 
 const sliceIsEmpty = (slice: HomebrewCatalogSlice): boolean =>
   slice.classes.length === 0 && slice.subclasses.length === 0 && slice.species.length === 0 && slice.backgrounds.length === 0
-  && slice.feats.length === 0 && slice.spells.length === 0 && slice.equipment.length === 0 && slice.monsters.length === 0;
+  && slice.feats.length === 0 && slice.spells.length === 0 && slice.equipment.length === 0 && slice.monsters.length === 0
+  // A published spell-list overlay carries no records of its own but DOES change every spell's
+  // `classes` array, so a slice holding only lists is not empty. Omitting this line is a silent
+  // failure of exactly the kind this module is full of: the list would publish, the GM would see it
+  // in the library, and no spell would ever join it.
+  && slice.spellLists.length === 0;
 
 /**
  * Every derived catalog structure for one audience's merged content, built once. Homebrew must land
@@ -381,7 +386,19 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
   const species = merged(loadSpecies(), homebrew.species);
   const backgrounds = merged(loadBackgrounds(), homebrew.backgrounds);
   const feats = merged(loadFeats(), homebrew.feats);
-  const spells = merged(loadSpells(), homebrew.spells);
+  /**
+   * The spell-list overlay is applied HERE, once, PER AUDIENCE - the single line that makes a
+   * homebrew spell list real. `spells.v1.json` is generated from vendored CC-BY fixtures, so
+   * membership can never be an edit to the bundle; a `SpellListReference` declares membership and
+   * this fold stamps the list id into each member's `classes` array, which is exactly what
+   * `resolveCatalogChoice("<listId>-spells")` already filters on. Nothing downstream learns that
+   * overlays exist.
+   *
+   * PER AUDIENCE IS LOAD-BEARING: only lists in THIS audience's slice contribute. A GM-only list
+   * stamping its id into a player-visible spell would leak the list's existence and its id through
+   * `/v1/content/spells` - the same leak class as serving the record itself, one indirection away.
+   */
+  const spells = applySpellListOverlay(merged(loadSpells(), homebrew.spells), homebrew.spellLists);
   const equipment = merged(loadEquipment(), homebrew.equipment);
 
   const conditionSummaries: readonly ContentConditionSummary[] = loadConditions().map(({ id, name, description }) => ({ id, name, description }));

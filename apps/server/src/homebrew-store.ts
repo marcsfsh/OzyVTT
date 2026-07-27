@@ -2,7 +2,13 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewContentType } from "@vtt/api-contract";
-import type { ActorDefinition } from "@vtt/schemas";
+import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import {
+  BackgroundReferenceSchema, ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema,
+  SpeciesReferenceSchema, SpellListReferenceSchema, SpellReferenceSchema, SubclassReferenceSchema,
+  type BackgroundReference, type ClassReference, type EquipmentReference, type FeatReference,
+  type SpeciesReference, type SpellListReference, type SpellReference, type SubclassReference
+} from "@vtt/content-srd-5.2.1";
 import { EMPTY_HOMEBREW_SLICE, type ContentAudience, type HomebrewCatalogSlice, type HomebrewContentSource } from "./content-library.js";
 import { mintHomebrewId } from "./homebrew-ids.js";
 
@@ -136,6 +142,10 @@ export class HomebrewStore implements HomebrewContentSource {
    * rebuilds, with no construction-order change anywhere.
    */
   private revisionValue = -1;
+  /** Parsed catalog slices for both audiences, rebuilt only when `revisionValue` moves. */
+  private slices?: { revision: number; gm: HomebrewCatalogSlice; player: HomebrewCatalogSlice };
+  /** Status-blind monster index for live-instance resolution, on the same revision gate. */
+  private monsters?: { revision: number; byId: Map<string, ActorDefinition> };
 
   constructor(private readonly databasePath: string, private readonly now: () => number = Date.now) {}
 
@@ -159,7 +169,15 @@ export class HomebrewStore implements HomebrewContentSource {
     }
   }
 
-  close() { this.database?.close(); this.database = undefined; this.revisionValue = -1; }
+  close() {
+    this.database?.close();
+    this.database = undefined;
+    this.revisionValue = -1;
+    // Dropped rather than left to the revision gate: a reopened store restarts its counter from the
+    // persisted value, which could coincide with a cached one from the previous handle.
+    this.slices = undefined;
+    this.monsters = undefined;
+  }
 
   /** The coarse counter bumped inside every write transaction - drives `homebrew:changed` and the view cache. */
   get revision(): number { return this.revisionValue; }
@@ -169,27 +187,81 @@ export class HomebrewStore implements HomebrewContentSource {
   /**
    * Published, non-deleted records for one audience, parsed into their bundle shapes.
    *
-   * SLICE 1: intentionally EMPTY for both audiences. Bodies are opaque JSON until the per-type
-   * publish validation lands, so there is nothing safe to merge yet and `ContentLibrary` keeps
-   * returning its shared SRD-only view - byte-identical to the pre-homebrew path. The seam is wired
-   * now (server.ts passes this store to `new ContentLibrary(...)`) so the revision gate is exercised
-   * from the first slice rather than being introduced alongside the merge it guards.
+   * THIS IS BELT 1 OF THE VISIBILITY GUARANTEE, and it is the structural one. The SQL below asks for
+   * `state = 'published' AND deleted_at IS NULL`, so a DRAFT IS IN NO MERGED CATALOG FOR ANY
+   * AUDIENCE - there is no draft here to filter, so there is no filter downstream to forget. On top
+   * of that, a published row reaches the player slice only when `visible_to_players = 1`. Ten of the
+   * eleven `content*` read operations accept a player session; every one of them is safe because of
+   * these two lines, not because of anything they do themselves.
    *
-   * When it is filled in: parse `body_json` through the record's own Zod schema and DROP anything
-   * that fails, logging once. A published record was valid at publish time, so a failure here means
-   * the schema tightened underneath stored data - fail soft, never throw, because one bad row must
-   * not take down every catalog.
+   * `body_json` is parsed through the record's OWN Zod schema and anything that fails is DROPPED,
+   * logged once. A published record was valid at publish time, so a failure here means the schema
+   * tightened underneath stored data - fail soft, never throw, because one bad row must not take
+   * down every catalog for every audience.
+   *
+   * Cached per revision because `ContentLibrary.forAudience` calls this on any catalog read that
+   * follows a write, and parsing a class record is not free.
    */
-  publishedFor(_audience: ContentAudience): HomebrewCatalogSlice { return EMPTY_HOMEBREW_SLICE; }
+  publishedFor(audience: ContentAudience): HomebrewCatalogSlice {
+    if (!this.database) return EMPTY_HOMEBREW_SLICE; // pre-initialize: revision -1, SRD-only view
+    if (!this.slices || this.slices.revision !== this.revisionValue) this.slices = { revision: this.revisionValue, ...this.buildSlices() };
+    return audience === "gm" ? this.slices.gm : this.slices.player;
+  }
 
   /**
    * The play-time escape hatch: any monster row regardless of state or `deleted_at`, so a live actor
    * never loses its actions, typed defences or recharge behaviour mid-fight.
    *
-   * SLICE 1: always undefined - monsters merge in slice 3, and returning a half-parsed definition
-   * would be worse than returning none.
+   * DELIBERATELY STATUS-BLIND AND DELETE-BLIND. Actions, typed defences and recharge behaviour are
+   * resolved from the definition per use rather than copied onto the actor, and every one of those
+   * call sites returns/skips on `undefined` - so a status-aware lookup here would silently disarm
+   * every token of a creature the GM unpublished or soft-deleted mid-fight. That carve-out is what
+   * makes soft delete safe; it is not an oversight.
+   *
+   * Not a leak: reaching this needs an `Actor.definitionId` the GM already put on the table.
    */
-  monsterForInstance(_definitionId: string): ActorDefinition | undefined { return undefined; }
+  monsterForInstance(definitionId: string): ActorDefinition | undefined {
+    if (!this.database) return undefined;
+    if (!this.monsters || this.monsters.revision !== this.revisionValue) {
+      this.monsters = { revision: this.revisionValue, byId: this.buildMonsterIndex() };
+    }
+    return this.monsters.byId.get(definitionId);
+  }
+
+  /** One pass over the published, live rows, parsed into the nine bundle shapes for both audiences at once. */
+  private buildSlices(): { gm: HomebrewCatalogSlice; player: HomebrewCatalogSlice } {
+    const gm = emptyDraft();
+    const player = emptyDraft();
+    const rows = this.requireDatabase()
+      .prepare("SELECT id, type, visible_to_players, body_json FROM homebrew_records WHERE state = 'published' AND deleted_at IS NULL")
+      .all() as Array<{ id: string; type: string; visible_to_players: number; body_json: string }>;
+    const dropped: string[] = [];
+    for (const row of rows) {
+      const parsed = parseBody(row.type as HomebrewContentType, row.body_json);
+      if (!parsed) { dropped.push(`${row.type} "${row.id}"`); continue; }
+      pushInto(gm, row.type as HomebrewContentType, parsed);
+      if (row.visible_to_players === 1) pushInto(player, row.type as HomebrewContentType, parsed);
+    }
+    if (dropped.length > 0) {
+      // Once per rebuild, not once per row: a schema tightening drops every row of a type at once and
+      // a per-row log would bury the operator in duplicates of the same fact.
+      console.warn(`[homebrew] ${dropped.length} published record(s) no longer parse and were left out of the catalogs: ${dropped.join(", ")}`);
+    }
+    return { gm: freezeSlice(gm), player: freezeSlice(player) };
+  }
+
+  /** Every monster row, ignoring `state` and `deleted_at` - see `monsterForInstance`. */
+  private buildMonsterIndex(): Map<string, ActorDefinition> {
+    const byId = new Map<string, ActorDefinition>();
+    const rows = this.requireDatabase().prepare("SELECT id, body_json FROM homebrew_records WHERE type = 'monster'").all() as Array<{ id: string; body_json: string }>;
+    for (const row of rows) {
+      const parsed = parseBody("monster", row.body_json);
+      // Keyed by the ROW id, which `create`/`importRecord` force `source.externalId` to equal - and
+      // `source.externalId` is what `instantiate` writes into `Actor.definitionId`.
+      if (parsed) byId.set(row.id, parsed as ActorDefinition);
+    }
+    return byId;
+  }
 
   // ---------- Reads ----------
 
@@ -271,7 +343,7 @@ export class HomebrewStore implements HomebrewContentSource {
     const type = contentType(input.type);
     const name = recordName(input.body);
     const id = mintHomebrewId(type, name, this.isTaken);
-    const body = normalizeBody(input.body, id);
+    const body = normalizeBody(input.body, id, type);
     const stamp = this.stamp();
     this.transaction(() => {
       database.prepare("INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, 1, ?, ?)")
@@ -291,7 +363,7 @@ export class HomebrewStore implements HomebrewContentSource {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
     const name = recordName(body);
-    const nextBody = normalizeBody(body, id);
+    const nextBody = normalizeBody(body, id, existing.type as HomebrewContentType);
     const rev = existing.rev + 1;
     const stamp = this.stamp();
     this.transaction(() => {
@@ -383,13 +455,13 @@ export class HomebrewStore implements HomebrewContentSource {
    * collision + re-mint policy). Always lands as an invisible draft, which is what makes importing
    * an invalid pack harmless.
    */
-  importRecord(id: string, type: HomebrewContentType, body: HomebrewBody, overwrite: boolean): HomebrewRecordRow {
+  importRecord(id: string, type: HomebrewContentType, body: HomebrewBody, overwrite: boolean, authorTag = "homebrew:import"): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.recordRow(id);
     if (existing && !overwrite) throw new HomebrewStateError(`A record already exists at "${id}".`);
     if (existing && existing.type !== type) throw new HomebrewStateError(`"${id}" is a ${existing.type}, not a ${type}.`);
     const name = recordName(body);
-    const nextBody = normalizeBody(body, id);
+    const nextBody = normalizeBody(body, id, type);
     const stamp = this.stamp();
     const rev = existing ? existing.rev + 1 : 1;
     this.transaction(() => {
@@ -400,7 +472,7 @@ export class HomebrewStore implements HomebrewContentSource {
         database.prepare("INSERT INTO homebrew_records (id, type, name, state, visible_to_players, deleted_at, body_json, rev, created_at, updated_at) VALUES (?, ?, ?, 'draft', 0, NULL, ?, ?, ?, ?)")
           .run(id, type, name, nextBody, rev, stamp, stamp);
       }
-      this.snapshotRevision(id, { rev, name, state: "draft", visibleToPlayers: false, bodyJson: nextBody, at: stamp }, "homebrew:import");
+      this.snapshotRevision(id, { rev, name, state: "draft", visibleToPlayers: false, bodyJson: nextBody, at: stamp }, authorTag);
       this.bumpRevision();
     });
     return this.get(id)!;
@@ -464,6 +536,54 @@ export class HomebrewStore implements HomebrewContentSource {
   }
 }
 
+// ---------- Parsing stored bodies back into their bundle shapes ----------
+
+/**
+ * ONE schema per type, shared by the SRD bundle and by homebrew (ADR-0016's "never a fork" made
+ * literal): the merge in `content-library.ts` is a concat precisely because these are the very
+ * schemas `loadClasses()` and friends already parse.
+ */
+const BODY_SCHEMAS = {
+  class: ClassReferenceSchema,
+  subclass: SubclassReferenceSchema,
+  species: SpeciesReferenceSchema,
+  background: BackgroundReferenceSchema,
+  feat: FeatReferenceSchema,
+  spell: SpellReferenceSchema,
+  equipment: EquipmentReferenceSchema,
+  monster: ActorDefinitionSchema,
+  "spell-list": SpellListReferenceSchema
+} as const satisfies Record<HomebrewContentType, { safeParse: (value: unknown) => { success: boolean } }>;
+
+/** Fail-soft by contract: a body that no longer parses is dropped by the caller, never thrown from. */
+function parseBody(type: HomebrewContentType, json: string): unknown {
+  try {
+    const parsed = BODY_SCHEMAS[type].safeParse(JSON.parse(json) as unknown);
+    return parsed.success ? parsed.data : undefined;
+  } catch { return undefined; }
+}
+
+/** The slice under construction - the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */
+type DraftSlice = {
+  classes: ClassReference[]; subclasses: SubclassReference[]; species: SpeciesReference[];
+  backgrounds: BackgroundReference[]; feats: FeatReference[]; spells: SpellReference[];
+  equipment: EquipmentReference[]; monsters: ActorDefinition[]; spellLists: SpellListReference[];
+};
+const emptyDraft = (): DraftSlice => ({ classes: [], subclasses: [], species: [], backgrounds: [], feats: [], spells: [], equipment: [], monsters: [], spellLists: [] });
+const freezeSlice = (draft: DraftSlice): HomebrewCatalogSlice => Object.freeze(draft);
+
+/** The one place a content type becomes a catalog bucket. A `satisfies` map, so a tenth type fails to compile. */
+const BUCKETS = {
+  class: "classes", subclass: "subclasses", species: "species", background: "backgrounds",
+  feat: "feats", spell: "spells", equipment: "equipment", monster: "monsters", "spell-list": "spellLists"
+} as const satisfies Record<HomebrewContentType, keyof DraftSlice>;
+
+function pushInto(draft: DraftSlice, type: HomebrewContentType, record: unknown) {
+  // The bucket is derived from the ROW's type column, which is CHECK-constrained in SQL and parsed
+  // through the contract's enum on write, so the cast is narrowing a proven-correct pairing.
+  (draft[BUCKETS[type]] as unknown[]).push(record);
+}
+
 // ---------- Row projection + body hygiene ----------
 
 function projectSummary(row: RecordRow): HomebrewSummaryRow {
@@ -508,15 +628,28 @@ export function recordName(body: unknown): string {
  * Serialize the body with `id` forced to the row's id and `type` stripped. The client's `record.id`
  * is never trusted: the row's primary key is the identity, and a body whose `id` drifted from it
  * would resolve to nothing once the merge reads `body_json` through the bundle schemas.
+ *
+ * A MONSTER additionally has `source.externalId` forced to the same id. `ActorDefinition` has no
+ * `id` field of its own - `externalId` IS its identity, it is what `buildCatalogData` keys the
+ * bestiary by, and `actor-roster.ts` writes it straight into `Actor.definitionId` without
+ * re-parsing. `ActorDefinitionSchema` puts NO regex on it, so a `:` or a 200-character value in
+ * there saves fine and then fails `GameStateSchema.parse` on the next boot. Forcing it here (rather
+ * than only rejecting it at publish) means the GM never has to know the field exists, and a live
+ * instance always resolves back through `monsterForInstance`.
  */
-function normalizeBody(body: HomebrewBody, id: string): string {
+function normalizeBody(body: HomebrewBody, id: string, type: HomebrewContentType): string {
   const { type: _type, ...rest } = body as Record<string, unknown>;
-  const json = JSON.stringify({ ...rest, id });
+  const source = rest.source;
+  const withIdentity = type === "monster"
+    ? { ...rest, id, source: { ...(source && typeof source === "object" && !Array.isArray(source) ? source : { name: "Homebrew", version: "1" }), externalId: id } }
+    : { ...rest, id };
+  const json = JSON.stringify(withIdentity);
   if (json.length > MAX_BODY_BYTES) throw new HomebrewStateError("That record is too large to store.");
   return json;
 }
 
-function copyName(name: string): string {
+/** "(copy)" once, never "(copy) (copy)". Exported so the SRD-duplicate path names its copies the same way. */
+export function copyName(name: string): string {
   const copy = /\(copy( \d+)?\)$/.test(name) ? name : `${name} (copy)`;
   return copy.length > MAX_NAME ? copy.slice(0, MAX_NAME) : copy;
 }

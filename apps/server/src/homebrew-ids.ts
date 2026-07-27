@@ -71,18 +71,33 @@ export function slugify(raw: string, maxLength: number): string {
 }
 
 /**
+ * Why an id is unmintable, as a sentence completing `Homebrew id "x" ...`, or null when it is fine.
+ *
+ * Split out of `assertMintable` so the PUBLISH GATE can report exactly the rule the MINTER enforces
+ * rather than restating it. Two copies of these four rules is how they drift, and the drift that
+ * matters is silent: a 61-character id written by an importer or a hand-edited body passes every
+ * content schema (`ContentIdSchema` allows 80) and only fails on the next boot, inside
+ * `GameStateSchema.parse`, as a campaign that will not load.
+ */
+export function homebrewIdProblem(id: string): string | null {
+  if (!id.startsWith(HOMEBREW_ID_PREFIX)) return `must start with "${HOMEBREW_ID_PREFIX}"`;
+  if (id.length > HOMEBREW_ID_MAX_LENGTH) return `is ${id.length} characters; the persisted budget is ${HOMEBREW_ID_MAX_LENGTH}`;
+  if (!SLUG_LEGAL.test(id)) return `must match ${SLUG_LEGAL} - lowercase letters, digits and hyphens only`;
+  for (const suffix of RESERVED_SUFFIXES) {
+    if (id.endsWith(suffix)) return `ends with the reserved catalog-choice family suffix "${suffix}"`;
+  }
+  if ((RESERVED_WORDS as readonly string[]).includes(id)) return "is a reserved catalog-choice slug";
+  return null;
+}
+
+/**
  * The backstop for the campaign-bricking failure in constraint 2. A THROW, never a log: an id that
  * escapes this function is a corrupted campaign on the next restart, so failing the write is the
  * strictly better outcome.
  */
 export function assertMintable(id: string): string {
-  if (!id.startsWith(HOMEBREW_ID_PREFIX)) throw new Error(`Homebrew id "${id}" must start with "${HOMEBREW_ID_PREFIX}".`);
-  if (id.length > HOMEBREW_ID_MAX_LENGTH) throw new Error(`Homebrew id "${id}" is ${id.length} characters; the persisted budget is ${HOMEBREW_ID_MAX_LENGTH}.`);
-  if (!SLUG_LEGAL.test(id)) throw new Error(`Homebrew id "${id}" must match ${SLUG_LEGAL}.`);
-  for (const suffix of RESERVED_SUFFIXES) {
-    if (id.endsWith(suffix)) throw new Error(`Homebrew id "${id}" ends with the reserved catalog-choice family suffix "${suffix}".`);
-  }
-  if ((RESERVED_WORDS as readonly string[]).includes(id)) throw new Error(`Homebrew id "${id}" is a reserved catalog-choice slug.`);
+  const problem = homebrewIdProblem(id);
+  if (problem) throw new Error(`Homebrew id "${id}" ${problem}.`);
   return id;
 }
 
