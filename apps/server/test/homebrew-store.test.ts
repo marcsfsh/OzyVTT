@@ -56,7 +56,7 @@ describe("homebrew id minting", () => {
       // because every id ends in `-<hex>`; assert it so nobody "simplifies" the suffix away.
       for (const family of ["-spells", "-subclasses", "-feats", "-lineages"]) expect(id.endsWith(family)).toBe(false);
       expect(["skills", "weapons"]).not.toContain(id);
-      expect(isMintedHomebrewId(id)).toBe(true);
+      expect(isMintedHomebrewId(id, type)).toBe(true);
     }
   });
 

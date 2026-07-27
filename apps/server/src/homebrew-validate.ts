@@ -133,7 +133,7 @@ export function validateForPublish(
   // Read the id from the RAW body, never the parsed one: `ActorDefinitionSchema` has no `id` field
   // and strips it, so a monster's identity would vanish exactly where it matters most.
   const id = idOf(body);
-  const problem = homebrewIdProblem(id);
+  const problem = homebrewIdProblem(id, type);
   if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record rather than editing its id.`);
 
   // ---- Tiers 3 and 4, per type. ----

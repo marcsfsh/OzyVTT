@@ -79,8 +79,14 @@ export function slugify(raw: string, maxLength: number): string {
  * content schema (`ContentIdSchema` allows 80) and only fails on the next boot, inside
  * `GameStateSchema.parse`, as a campaign that will not load.
  */
-export function homebrewIdProblem(id: string): string | null {
+export function homebrewIdProblem(id: string, type: HomebrewContentType): string | null {
   if (!id.startsWith(HOMEBREW_ID_PREFIX)) return `must start with "${HOMEBREW_ID_PREFIX}"`;
+  // Constraint 3 is TYPE-SPECIFIC and has to be re-applied here, not only at mint time. A monster's
+  // id reaches every player through `Actor.definitionId` (not stripped by `PlayerActor`'s Omit), so
+  // it must be opaque - a name-derived one announces a creature before anyone meets it. Without this
+  // branch a hand-written pack could import `hb-acererak-the-devourer-9f9f9f` for a monster, and
+  // because that shape is a legal BUILDER id the generic rule below would wave it through.
+  if (type === "monster" && !isOpaqueMonsterId(id)) return "must be an opaque monster id - a name-derived one reaches players through definitionId before the creature is revealed";
   if (id.length > HOMEBREW_ID_MAX_LENGTH) return `is ${id.length} characters; the persisted budget is ${HOMEBREW_ID_MAX_LENGTH}`;
   if (!SLUG_LEGAL.test(id)) return `must match ${SLUG_LEGAL} - lowercase letters, digits and hyphens only`;
   for (const suffix of RESERVED_SUFFIXES) {
@@ -95,16 +101,34 @@ export function homebrewIdProblem(id: string): string | null {
  * escapes this function is a corrupted campaign on the next restart, so failing the write is the
  * strictly better outcome.
  */
-export function assertMintable(id: string): string {
-  const problem = homebrewIdProblem(id);
+export function assertMintable(id: string, type: HomebrewContentType): string {
+  const problem = homebrewIdProblem(id, type);
   if (problem) throw new Error(`Homebrew id "${id}" ${problem}.`);
   return id;
 }
 
-/** Does this id have the shape this module mints? Used by pack import to spot a foreign `hb-` id. */
-export function isMintedHomebrewId(id: string): boolean {
+/** `hb-m-<12hex>` exactly - the opaque shape a monster id must have. */
+function isOpaqueMonsterId(id: string): boolean {
+  if (!id.startsWith(MONSTER_PREFIX)) return false;
+  const rest = id.slice(MONSTER_PREFIX.length);
+  return rest.length === 12 && HEX.test(rest);
+}
+
+/**
+ * Does this id have the shape this module mints FOR THIS TYPE? Used by pack import to spot a foreign
+ * `hb-` id that must be re-minted.
+ *
+ * The type is required rather than optional on purpose. This was type-blind, and a monster id that
+ * merely looked like a builder id (`hb-<slug>-<6hex>`) was accepted as ours - so an imported pack
+ * kept a name-derived monster id, publish never re-checked it, and `normalizeBody` then forced it
+ * onto `source.externalId`, which reaches every player as `definitionId`. Making the argument
+ * required means the compiler names every call site rather than leaving one silently wrong.
+ */
+export function isMintedHomebrewId(id: string, type: HomebrewContentType): boolean {
   if (!id.startsWith(HOMEBREW_ID_PREFIX) || id.length > HOMEBREW_ID_MAX_LENGTH || !SLUG_LEGAL.test(id)) return false;
-  if (id.startsWith(MONSTER_PREFIX)) return HEX.test(id.slice(MONSTER_PREFIX.length)) && id.slice(MONSTER_PREFIX.length).length === 12;
+  if (type === "monster") return isOpaqueMonsterId(id);
+  // A builder id must NOT wear the monster prefix either - one shape per type, both directions.
+  if (id.startsWith(MONSTER_PREFIX)) return false;
   const suffix = id.slice(id.lastIndexOf("-") + 1);
   return id.lastIndexOf("-") > HOMEBREW_ID_PREFIX.length - 1 && HEX.test(suffix) && (suffix.length === 6 || suffix.length === 8);
 }
@@ -124,7 +148,7 @@ export function mintHomebrewId(type: HomebrewContentType, name: string, isTaken:
     const candidate = type === "monster"
       ? `${MONSTER_PREFIX}${hex(suffixLength)}`
       : `${HOMEBREW_ID_PREFIX}${slugFor(type, name, HOMEBREW_ID_MAX_LENGTH - HOMEBREW_ID_PREFIX.length - 1 - suffixLength)}-${hex(suffixLength)}`;
-    if (!isTaken(candidate)) return assertMintable(candidate);
+    if (!isTaken(candidate)) return assertMintable(candidate, type);
   }
   throw new Error("Could not mint a unique homebrew id.");
 }

@@ -400,7 +400,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
           const name = typeof record.name === "string" ? record.name : "";
           // `hb-` is ours and reserved; an id in that namespace that is not one of our shapes is
           // re-minted rather than trusted, and an id we already hold follows `onIdCollision`.
-          const foreign = originalId.startsWith("hb-") && !isMintedHomebrewId(originalId);
+          const foreign = originalId.startsWith("hb-") && !isMintedHomebrewId(originalId, type);
           const held = originalId !== "" && store.get(originalId) !== undefined;
           const overwrite = held && onIdCollision === "overwrite";
           const needsMint = originalId === "" || foreign || claimed.has(originalId) || (held && !overwrite);
