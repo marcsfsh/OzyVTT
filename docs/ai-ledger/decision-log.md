@@ -7,6 +7,44 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-27 — Readiness pass: five rules the polish pass settled
+
+A dedicated readiness pass (flow/IA, density/layout, design language/copy) reviewed the wizard as a
+shipping product rather than as a feature. Commits `479cb80`, `5c32df9`, `584be3a`. Five rules came
+out of it that bind future builder work — and, where noted, the whole UI.
+
+1. **Annotate options; never filter them.** A pick the character can't take renders greyed *with its
+   reason* ("Already granted by Soldier"), never removed. Filtering is what produced the bug this
+   fixed — a background silently grants skills, so picking Athletics on the class step burned both
+   picks and the character ended a proficiency short with no message ever shown. The corollary is the
+   **expertise exception**: held skills are accumulated but deliberately **not** disabled there,
+   because the SRD's expertise offer reads "choose one of the following skills in which you have
+   proficiency" — greying them would leave only picks the server refuses and make every Wizard level
+   2+ uncreatable. Reasoning is recorded in the code; don't "fix" the inconsistency.
+2. **Progress means "this is done", not "you walked past this."** Step completeness derives from the
+   same `stepBlockedReason` the footer uses, so a step invalidated by a later choice loses its
+   checkmark the moment it happens. The `i <= furthest` conjunct is load-bearing — without it a step
+   with no offers reads as complete before its prerequisites exist.
+3. **Collapse is derived, never stored.** An answered offer folds to title + count + chips from
+   `picks.length === capacity`. Nothing to invalidate, and un-picking re-expands for free. The chips
+   are display-only spans on purpose: a readout must never become a second place the pick can be made.
+4. **State a constraint once per group, not once per option.** At level 20 the per-card capacity
+   notice was 409 copies of one sentence — a third of step 4's DOM. It now renders once per grid,
+   with `aria-describedby` preserving it for screen readers; genuinely per-option reasons (rule 1)
+   still render per card.
+5. **A primitive defends its own state against app globals.** `apps/client/src/styles.css` has a bare
+   `button:hover:not(:disabled)` at specificity (0,2,1) that beats `.nh-choice.is-selected` at (0,2,0)
+   — independently of anything the primitive does. The fix belongs in the primitive (exclude the state
+   from the aggressive selector, with the numbers in a comment), **not** in the app global, because
+   coupling `styles.css` to a primitive's class name inverts the dependency. Same technique closed a
+   selected card having no keyboard focus ring at all.
+
+Also settled: **one copy template** for "answer this control", replacing five sentence shapes — which
+deletes at source the lowercasing that produced "fighter starting equipment" under a heading reading
+"Fighter". And a status readout that overlays content is `pointer-events: none` and makes room for
+itself; the connection banner took three attempts because an in-flow strip covered all seven rail
+labels and a centred pill clipped the title at 375px.
+
 ## 2026-07-27 — Character builder wizard: three UI decisions worth not relitigating
 
 Settled while building the phase-2 wizard screens; each was a fork with a defensible other answer.

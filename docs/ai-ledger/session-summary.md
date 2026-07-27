@@ -8,6 +8,30 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-27 — Character-builder readiness pass (`claude/dndbeyond-sheet-importer-0k6u2e`)
+
+A dedicated shipping-readiness review of the seven-step wizard, bounded to small/medium lift (deep
+system reworks explicitly out of scope). Three chains — flow/IA, density/layout, design language +
+copy — each reviewing adversarially, then implementing. Landed as `479cb80`, `5c32df9`, `584be3a`.
+
+Highest-value outcomes: one real **correctness** bug (a background silently grants skills, so
+re-picking one burned both picks and left the character a proficiency short, silently — now greyed
+with provenance); **step 4 made readable at high level** (L5: 9,545px/2,007 elements → 782px/92;
+L20: 24,222px → 1,933px) by folding answered offers to chips and stating the capacity notice once
+per grid rather than 409 times; the **step rail now means "done" rather than "visited"**; the wizard
+**stopped defaulting all three ASI improvements to +2 Strength**; and a selected choice card
+**had no keyboard focus ring at all** (a (0,4,0) glow-suppressor out-specified both the primitive's
+ring and the global `:where()` one, which also sets `outline:none`).
+
+Three times an implementer overrode its own handed plan and was right to — all recorded in the commit
+messages: refusing to disable `expertise` (would have made every Wizard L2+ uncreatable), a 3-line
+rather than 2-line clamp (2 re-cut "and 8 GP"), and a third CSS rule the plan didn't anticipate (the
+app's bare `button:hover` beat the selected state independently). Memoising the catalogs **exposed** a
+latent effect-deps bug rather than fixing a slow one.
+
+`check` clean, 767 tests, build green. Deferred items are itemised in `known-bugs.md`; the five rules
+that came out of the pass are in `decision-log.md`.
+
 ## 2026-07-24 — Sheet open-consistency + Dice toggle (`claude/character-sheet-discovery-a14i7f`, PR #45)
 
 Three GM-reported follow-ups on how the player sheet opens. (1) The `IconButton` ✕ rode high/off-centre —

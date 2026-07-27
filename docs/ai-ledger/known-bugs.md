@@ -77,6 +77,35 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
   deliberately not retuned mid-flight. Needs its own pass.
 
+### Deferred by the 2026-07-27 readiness pass (found, scoped, not fixed)
+
+The polish pass was bounded to small/medium lift; these were found by it and left, each for a stated
+reason. They are **findings, not unknowns** — don't re-discover them.
+
+- **[character-builder] `patch(...)` spreads a stale `draft`** across 5 call sites. Latent, not
+  currently reproducible in the wizard's own flows, but the shape is the classic one (a second patch
+  in the same tick loses the first). Fixing it properly is a state-model change, not a polish edit.
+- **[ui] `h1, h2, h3 { font-weight: 400 }`** in `apps/client/src/styles.css` reaches 32 app-side
+  sites, including the Bungee wordmark, which the browser then renders faux-bold. App-wide typography;
+  out of scope for a builder pass.
+- **[ui] The `→` glyph has no font coverage** — no loaded Manrope subset declares U+2192, so every
+  arrow falls back. The fix is an `IconArrow` primitive plus 7 call sites, and it is all-or-none
+  (mixing a drawn arrow with a fallback glyph is worse than either).
+- **[a11y] `.nh-step--done` marker contrast is 1.97:1 in the light theme** — below WCAG for a
+  non-text indicator. The *incomplete* marker was fixed in `584be3a` to carry three signals (dashed
+  ring + caution hue + glyph); the **done** marker still leans on hue. Same shape of fix, not applied.
+- **[character-builder] Skill/tool/language uniqueness is enforced client-side only.** `479cb80`
+  makes held proficiencies arrive greyed with their provenance ("Already granted by Soldier"), which
+  stops the silent double-spend in the UI — but the **server's duplicate guard is still per-offer**,
+  so a hand-built API payload can still burn two picks on one skill. Server-side global uniqueness is
+  the real fix.
+- **[rules-5e] Third-caster multiclass rounding** is unverified against the SRD's rounding rule for
+  Eldritch Knight / Arcane Trickster style progressions.
+- **[character-builder] Step 4's *arrival* state is still heavy at high level** — ~306 cards at
+  level 20 before any pick collapses anything. `5c32df9` fixed the *answered* state (24,222px →
+  1,933px at L20); the unanswered state is bounded by how many decisions the character genuinely has,
+  and cutting it further means progressive disclosure — a design change, not a density fix.
+
 - **[ux] ~~Maps/scenes/encounter IA redesign~~ — RESOLVED 2026-07-22 (scene-centric IA, this PR).**
   The upload → browse → prepare → start experience was rethought scene-first: a new **Scenes** hub tab
   is the prep home (a gallery of scene cards — thumbnail, LIVE/staging badge, go-live, private staging,

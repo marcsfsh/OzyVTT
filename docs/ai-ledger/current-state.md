@@ -37,6 +37,32 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     Evoker) created end-to-end in Chromium at 1440px and again at 375px with touch — HP 52/AC 16 and
     HP 20/AC 12/DC 13/slots 4+2 on their sheets, matching `character-build.test.ts` exactly; zero
     horizontal overflow on all seven steps at 375px; 0 controls under the 44px floor.
+  - **A readiness pass then reviewed it as a shipping product** (`479cb80`, `5c32df9`, `584be3a` —
+    flow/IA, density/layout, design language + copy). What changed materially:
+    - **One correctness bug, not a polish item:** a background silently grants skills, so re-picking
+      one on the class step burned both picks and left the character permanently a proficiency short
+      with no message. Held proficiencies now arrive greyed with their provenance. (The server guard
+      is still per-offer — see `known-bugs.md`.)
+    - **Step 4 is readable at high level.** Answered offers fold to title + count + chips; the
+      capacity notice is stated once per grid instead of once per card. Level 5: 9,545px / 2,007
+      elements → **782px / 92**. Level 20: 24,222px → **1,933px**. Every other step already sat
+      between 1.0 and 2.1 screens at every level.
+    - **The step rail tells the truth** — completeness derives from the same blocked-reason function
+      the footer uses, so an answer invalidated five steps later loses its tick immediately instead
+      of surfacing at review.
+    - **The wizard stopped writing answers nobody gave** — "Raise ability scores" used to default all
+      three improvements to +2 Strength (wrong for a Wizard, illegal at 20).
+    - **A selected card had no keyboard focus ring at all**, and hover took the cyan edge *away* from
+      the chosen card, so "the pointer is here" and "this is my answer" rendered identically. Both
+      closed in the primitive (see decision-log rule 5).
+    - Memoising the builder catalogs **exposed a latent bug** rather than fixing a slow one: the
+      pruning effect's deps were incomplete and only worked because `catalogs` rebuilt every render.
+      With the accident removed, picking Evoker stopped producing the Evocation Savant offer. Fixed
+      by depending on `draft.picks`.
+    - **Verification at the end of the pass:** `npm run check` clean, 767 tests, build green;
+      Chromium walkthroughs at 1280×900 and 375×720/780 across Fighter L1/L3/L20, Wizard L5 and
+      Cleric L5, in dark, dusk and light, each creating a character end to end — zero horizontal
+      overflow on all seven steps in every run.
 
 - **Worldbuilding codex (2026-07-24, branch `claude/world-maps-geospatial-db-1kiqez`).** A GM
   worldbuilding suite + campaign journal + living atlas, on a new **Codex** GM tab (Pages | Atlas |
