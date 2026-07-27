@@ -7,11 +7,203 @@ export const ACTOR_SCHEMA_VERSION = 1;
 const DamageTypeIdSchema = z.string().min(1).max(40);
 const ConditionIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
 const EffectTagSchema = z.string().regex(/^[a-z0-9-]+$/).max(40);
+/** Open identity slug, matching the content catalog's `ContentIdSchema` (no new closed enums for identity). */
+const RiderSlugSchema = z.string().regex(/^[a-z0-9-]+$/).max(80);
+const SizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
+/** A safe dice expression, one die term plus at most one flat modifier - never an evaluable string (ADR-0008). */
+export const DiceFormulaSchema = z.string().regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
+export type AbilityId = z.infer<typeof AbilitySchema>;
+
+// ---------------------------------------------------------------------------------------------
+// Rider gates - the ONE trigger vocabulary an item, a feature, a feat, or an effect all share.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * WHERE an item is worn or held. A CLOSED enum, deliberately, and the one exception to the content
+ * catalog's "no new closed enums" rule - because `slot` is not IDENTITY (that stays the open
+ * `category` slug), it is the MECHANICAL hook the engine exhaustively switches on: what derives AC,
+ * what may be equipped twice, what an attunement gate applies to. A homebrew `category: "relic"`
+ * with `slot: "armor"` derives AC; the open slug alone never could.
+ */
+export const ItemSlotSchema = z.enum([
+  "weapon", "shield", "armor",                                    // the three the engine already knows
+  "head", "neck", "shoulders", "hands", "ring", "belt", "feet",   // worn
+  "held",        // wand, orb, rod, staff, focus
+  "wondrous",    // attunable, no body location
+  "consumable",  // potion, scroll
+  "ammunition",
+  "none"         // pure gear, no equip semantics
+]);
+export type ItemSlot = z.infer<typeof ItemSlotSchema>;
+
+/**
+ * WHEN a rider applies. Thirty named triggers in four KINDS, and the kind is what decides the
+ * evaluation layer so a GM never picks one (see `RIDER_TRIGGER_KINDS`):
+ *
+ *   - `static-gate`  resolvable from the sheet alone   -> a standing number ("AC 17")
+ *   - `dynamic-gate` live actor state                  -> a labelled note, re-checked per roll
+ *   - `moment`       the named roll or event           -> fires at that moment only
+ *   - `filter`       narrows whatever moment it accompanies
+ *
+ * This is DATA, not an expression language. Every member is a `.strict()` object with bounded
+ * parameters; there is no OR, no NOT, no nesting and no arithmetic. ADR-0008 exists to stop this
+ * becoming a parser, and `armor-class.whileArmored` is the same idea in miniature - one named
+ * boolean gate - now enumerated instead of grown one flag at a time.
+ */
+export const RiderTriggerSchema = z.discriminatedUnion("type", [
+  // ---- static gates (6) ----------------------------------------------------------------------
+  /** The bearer is attuned. Redundant (and harmless) when the item's own `attunement.required` is true. */
+  z.object({ type: z.literal("attuned") }).strict(),
+  /** Wearing armor. Omitting `weights` is exactly the pre-existing `whileArmored: true` meaning. */
+  z.object({ type: z.literal("while-armored"), weights: z.array(z.enum(["light", "medium", "heavy"])).min(1).max(3).optional() }).strict(),
+  z.object({ type: z.literal("while-unarmored"), allowShield: z.boolean().default(false) }).strict(),
+  /** `wielding: false` expresses the Dueling-style "only while NOT holding a shield". */
+  z.object({ type: z.literal("while-shield"), wielding: z.boolean().default(true) }).strict(),
+  /** Two lists in ONE trigger so "Paladin or Cleric" is a single entry rather than an OR. */
+  z.object({ type: z.literal("while-character-is"), classIds: z.array(RiderSlugSchema).max(8).default([]), speciesIds: z.array(RiderSlugSchema).max(8).default([]) }).strict(),
+  z.object({ type: z.literal("while-proficient-with"), kind: z.enum(["weapon", "armor", "tool", "skill"]), ids: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  // ---- dynamic gates (3) ---------------------------------------------------------------------
+  /** Any-of against `actor.effects[].tags`; the `ActionSchema.requiresEffectTag` precedent, widened to a list. */
+  z.object({ type: z.literal("while-effect-tag"), tags: z.array(EffectTagSchema).min(1).max(4) }).strict(),
+  z.object({ type: z.literal("while-hp-at-or-below"), percent: z.number().int().min(1).max(99) }).strict(),
+  z.object({ type: z.literal("while-condition"), conditionIds: z.array(ConditionIdSchema).min(1).max(6), present: z.boolean().default(true) }).strict(),
+  // ---- moments (11) --------------------------------------------------------------------------
+  z.object({ type: z.literal("on-attack-roll") }).strict(),
+  z.object({ type: z.literal("on-hit") }).strict(),
+  z.object({ type: z.literal("on-critical-hit") }).strict(),
+  /** The curse mirror of `on-critical-hit`: a natural 1. */
+  z.object({ type: z.literal("on-critical-miss") }).strict(),
+  z.object({ type: z.literal("on-damage-roll") }).strict(),
+  z.object({ type: z.literal("on-saving-throw") }).strict(),
+  z.object({ type: z.literal("on-ability-check") }).strict(),
+  z.object({ type: z.literal("on-initiative-roll") }).strict(),
+  z.object({ type: z.literal("on-death-save") }).strict(),
+  z.object({ type: z.literal("on-taking-damage") }).strict(),
+  z.object({ type: z.literal("on-spell-cast") }).strict(),
+  // ---- filters (10) --------------------------------------------------------------------------
+  /** `reaction` and `opportunity` require the resolver to ANNOUNCE the trigger; until it does they never match. */
+  z.object({ type: z.literal("attack-kind-is"), kinds: z.array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity"])).min(1).max(7) }).strict(),
+  z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("damage-type-is"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("ability-is"), abilities: z.array(AbilitySchema).min(1).max(6) }).strict(),
+  z.object({ type: z.literal("skill-is"), skills: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("spell-school-is"), schools: z.array(RiderSlugSchema).min(1).max(8) }).strict(),
+  z.object({ type: z.literal("spell-level-is"), levels: z.array(z.number().int().min(0).max(9)).min(1).max(10) }).strict(),
+  /** Authorable but INERT until `ActorDefinition` carries a creature type - see the vocabulary notes. */
+  z.object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
+  z.object({ type: z.literal("versus-condition"), conditionIds: z.array(ConditionIdSchema).min(1).max(6) }).strict()
+]);
+export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
+export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
+
+/**
+ * The static table that decides a rider's evaluation LAYER, so the GM never has to. All-static (or
+ * empty) = a standing number baked by whatever reconciles the carrier; any dynamic gate = a
+ * conditional note re-checked per roll; any moment or filter = momentary, evaluated at that moment.
+ * One table, shared by every consumer, so the layer can never be decided two different ways.
+ */
+export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTriggerKind>> = Object.freeze({
+  attuned: "static-gate", "while-armored": "static-gate", "while-unarmored": "static-gate",
+  "while-shield": "static-gate", "while-character-is": "static-gate", "while-proficient-with": "static-gate",
+  "while-effect-tag": "dynamic-gate", "while-hp-at-or-below": "dynamic-gate", "while-condition": "dynamic-gate",
+  "on-attack-roll": "moment", "on-hit": "moment", "on-critical-hit": "moment", "on-critical-miss": "moment",
+  "on-damage-roll": "moment", "on-saving-throw": "moment", "on-ability-check": "moment",
+  "on-initiative-roll": "moment", "on-death-save": "moment", "on-taking-damage": "moment", "on-spell-cast": "moment",
+  "attack-kind-is": "filter", "weapon-property-is": "filter", "damage-type-is": "filter", "ability-is": "filter",
+  "skill-is": "filter", "spell-school-is": "filter", "spell-level-is": "filter",
+  "versus-creature-type": "filter", "versus-size": "filter", "versus-condition": "filter"
+});
+
+/** Which layer a `when` list belongs to. Pure lookup over `RIDER_TRIGGER_KINDS`; no state, no policy. */
+export function riderLayer(when: readonly RiderTrigger[]): "standing" | "conditional" | "momentary" {
+  const kinds = when.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
+  if (kinds.some((kind) => kind === "moment" || kind === "filter")) return "momentary";
+  if (kinds.some((kind) => kind === "dynamic-gate")) return "conditional";
+  return "standing";
+}
+
+/**
+ * An AND-list of at most four triggers, with at most ONE moment. A rider fires at one moment, not
+ * two, and a filter with no moment is an authoring mistake (a `versus-size` on a rider that never
+ * sees a target), not "always" - so both are rejected with the sentence that explains them.
+ */
+export const RiderWhenSchema = z.array(RiderTriggerSchema).max(4).superRefine((triggers, context) => {
+  const kinds = triggers.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
+  if (kinds.filter((kind) => kind === "moment").length > 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A rider fires at one moment, not two." });
+  }
+  if (kinds.includes("filter") && !kinds.includes("moment")) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A filter needs a moment to narrow - add the roll or event it applies to." });
+  }
+  const identity = triggers.find((trigger) => trigger.type === "while-character-is" && trigger.classIds.length === 0 && trigger.speciesIds.length === 0);
+  if (identity) context.addIssue({ code: z.ZodIssueCode.custom, message: "`while-character-is` needs at least one class or species." });
+  const duplicate = triggers.find((trigger, index) => triggers.findIndex((other) => other.type === trigger.type) !== index);
+  if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.` });
+}).default([]);
+
+/**
+ * The two gate fields every rider carries. `scope` has a DERIVED default so a GM never sets it: on
+ * an item with a weapon block the attack/damage/crit family means "with this weapon", everything
+ * else means "the bearer". On a non-item carrier `"this-item"` has nothing to bind to and resolves
+ * to `"bearer"` - it parses, and the authoring UI warns.
+ */
+export const riderGate = {
+  when: RiderWhenSchema,
+  scope: z.enum(["bearer", "this-item"]).optional()
+} as const;
+
+// ---------------------------------------------------------------------------------------------
+// The three riders BOTH vocabularies carry. Declared once here and spread into `EffectModifier`
+// (below) and `FeatureModifier` (@vtt/content-srd-5.2.1), so the two can never drift apart.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit is
+ * `action.attack.bonus + exhaustionPenalty(attacker)` and nothing else could reach it.
+ */
+export const AttackBonusVariantSchema = z.object({
+  type: z.literal("attack-bonus"),
+  amount: z.number().int().min(-10).max(10),
+  ...riderGate
+}).strict();
+
+/**
+ * Extra typed damage as DICE. Neither existing channel can serve this: the effect-side
+ * `damage-bonus` is a flat integer, and `attack.criticalBonusDice` is a bare COUNT applied to the
+ * first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults FALSE because 5e
+ * does not double dice added after the attack.
+ */
+export const ExtraDamageVariantSchema = z.object({
+  type: z.literal("extra-damage"),
+  formula: DiceFormulaSchema,
+  damageType: DamageTypeIdSchema,
+  doubleOnCritical: z.boolean().default(false),
+  ...riderGate
+}).strict();
+
+/**
+ * Advantage or disadvantage on a NAMED roll: one variant with a `mode` field rather than 2 x N
+ * types. It feeds `aggregateRollMode`, which already implements 5e cancellation (any advantage plus
+ * any disadvantage is normal) and labels each source for the roll card, so a curse is just
+ * `mode: "disadvantage"` and needs no separate machinery.
+ */
+export const RollModeVariantSchema = z.object({
+  type: z.literal("roll-mode"),
+  roll: z.enum(["attack", "incoming-attack", "save", "check", "initiative", "death-save", "concentration"]),
+  mode: z.enum(["advantage", "disadvantage"]),
+  ...riderGate
+}).strict();
 
 /**
  * Typed modifiers an active effect contributes to the rules engine (ADR-0020). The vocabulary is
  * deliberately small and grows additively - unmodeled mechanics stay prose per ADR-0008.
  * `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics).
+ *
+ * The last three are the SHARED riders, identical objects to the ones `FeatureModifierSchema`
+ * carries. The six legacy advantage/disadvantage variants stay exactly as they were: `roll-mode` is
+ * the general form, and `toRollModes` below normalises both shapes so no consumer branches on eight.
  */
 export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
@@ -24,9 +216,33 @@ export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("incoming-attack-disadvantage") }).strict(),
   /** The bearer's saving throws have advantage; absent ability = all saves (Dodge grants Dex only). */
   z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
-  z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict()
+  z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
+  AttackBonusVariantSchema,
+  ExtraDamageVariantSchema,
+  RollModeVariantSchema
 ]);
 export type EffectModifier = z.infer<typeof EffectModifierSchema>;
+
+/** One normalised advantage/disadvantage claim: which roll, which way. */
+export type NormalisedRollMode = Readonly<{ roll: z.infer<typeof RollModeVariantSchema>["roll"]; mode: "advantage" | "disadvantage"; ability?: AbilityId }>;
+
+/**
+ * ONE normaliser for both shapes, so a consumer never branches on eight variants: the six legacy
+ * advantage/disadvantage members and the general `roll-mode` come back as the same claim. Anything
+ * else (a damage bonus, an attack bonus) normalises to no claims at all.
+ */
+export function toRollModes(modifier: EffectModifier): readonly NormalisedRollMode[] {
+  switch (modifier.type) {
+    case "attack-advantage": return [{ roll: "attack", mode: "advantage" }];
+    case "attack-disadvantage": return [{ roll: "attack", mode: "disadvantage" }];
+    case "incoming-attack-advantage": return [{ roll: "incoming-attack", mode: "advantage" }];
+    case "incoming-attack-disadvantage": return [{ roll: "incoming-attack", mode: "disadvantage" }];
+    case "save-advantage": return [{ roll: "save", mode: "advantage", ...(modifier.ability ? { ability: modifier.ability } : {}) }];
+    case "save-disadvantage": return [{ roll: "save", mode: "disadvantage", ...(modifier.ability ? { ability: modifier.ability } : {}) }];
+    case "roll-mode": return [{ roll: modifier.roll, mode: modifier.mode }];
+    default: return [];
+  }
+}
 
 /** What happens when an effect ends (Frenzy: one level of Exhaustion when the rage ends). */
 export const EffectOnEndSchema = z.object({ type: z.literal("condition"), conditionId: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict();
@@ -106,6 +322,20 @@ export const ItemWeaponSchema = z.object({
   properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
 }).strict();
 export const ItemArmorSchema = z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).strict();
+/**
+ * The NON-SECRET marker for a carried magic item, copied when the item was added. It exists so the
+ * sheet can render the Attune control and the magic styling without a catalog lookup.
+ *
+ * It deliberately carries NO riders, NO casts and NO `cursed` flag. The owner is handed their whole
+ * inventory verbatim in their projection, so anything placed on this row reaches the player the
+ * instant they pick the item up. Mechanics resolve by `item.id` against the content catalog, which
+ * never leaves the server - the same rule feature riders already follow. Additive-optional.
+ */
+export const ItemMagicMarkerSchema = z.object({
+  isMagic: z.boolean().default(false),
+  attunementRequired: z.boolean().default(false),
+  slot: ItemSlotSchema.optional()
+}).strict();
 export const InventoryItemSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/).max(80),
   name: z.string().min(1).max(120),
@@ -117,7 +347,9 @@ export const InventoryItemSchema = z.object({
   /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping and (with weapon/armor below) mechanical effect. Additive. */
   category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional(),
   weapon: ItemWeaponSchema.optional(),
-  armor: ItemArmorSchema.optional()
+  armor: ItemArmorSchema.optional(),
+  /** Display-only marker so the sheet can offer Attune without the catalog; NEVER the riders. Additive-optional. */
+  magic: ItemMagicMarkerSchema.optional()
 }).strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 /** SRD coin purse; all five currencies, each defaulting to 0. */
@@ -261,9 +493,8 @@ export type Actor = z.infer<typeof ActorSchema>;
 
 /** Immutable reusable content imported from JSON; mutable HP/position/ownership live elsewhere. */
 export const ACTOR_DEFINITION_SCHEMA_VERSION = 1;
-export const DiceFormulaSchema = z.string().regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
-export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
-export type AbilityId = z.infer<typeof AbilitySchema>;
+// `DiceFormulaSchema` and `AbilitySchema` are declared at the top of this file: the shared rider
+// variants need them, and a `const` cannot be referenced before its declaration is evaluated.
 /** SRD hit die by class (d4-d12); shared by per-class hit dice and content records. */
 export const HitDieSchema = z.enum(["d4", "d6", "d8", "d10", "d12"]);
 export type HitDie = z.infer<typeof HitDieSchema>;

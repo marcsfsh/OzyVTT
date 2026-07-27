@@ -6,9 +6,10 @@ import {
   spellSlotsForClass, statPriorityFor
 } from "@vtt/rules-5e";
 import {
-  ClassReferenceSchema, FeatureChoiceSchema, FeatureRecordSchema, NamePoolReferenceSchema, SpeciesReferenceSchema,
+  ClassReferenceSchema, EquipmentReferenceSchema, FeatReferenceSchema, FeatureChoiceSchema, FeatureModifierSchema,
+  FeatureRecordSchema, NamePoolReferenceSchema, RiderWhenSchema, SpeciesReferenceSchema,
   loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadNames, loadSkills,
-  loadSpecies, loadSpells, loadSubclasses, namesForSpecies, subclassesForClass,
+  loadSpecies, loadSpells, loadSubclasses, namesForSpecies, riderLayer, subclassesForClass,
   type FeatureRecord
 } from "../src/index.js";
 
@@ -115,7 +116,7 @@ describe("character-builder content records", () => {
     const style = fighter.features.find((feature) => feature.id === "fighting-style")!;
     expect(style.choice).toMatchObject({ kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" });
     // Extra Attack is a typed modifier, not a special case in the engine.
-    expect(fighter.features.find((feature) => feature.id === "extra-attack")!.modifiers).toEqual([{ type: "extra-attack", count: 1 }]);
+    expect(fighter.features.find((feature) => feature.id === "extra-attack")!.modifiers).toEqual([{ type: "extra-attack", count: 1, when: [] }]);
     // Second Wind is a rollable action with scaling uses.
     const secondWind = fighter.features.find((feature) => feature.id === "second-wind")!;
     expect(secondWind.actions[0]).toMatchObject({ id: "second-wind", activation: "bonus-action" });
@@ -264,7 +265,7 @@ describe("character-builder content records", () => {
     const elf = species.find((entry) => entry.id === "elf")!;
     expect(elf.darkvisionFeet).toBe(60);
     expect(elf.lineages.map((lineage) => lineage.id)).toEqual(["drow", "high-elf", "wood-elf"]);
-    expect(elf.lineages.find((lineage) => lineage.id === "drow")!.traits[0].modifiers).toEqual([{ type: "darkvision", feet: 120 }]);
+    expect(elf.lineages.find((lineage) => lineage.id === "drow")!.traits[0].modifiers).toEqual([{ type: "darkvision", feet: 120, when: [] }]);
     const human = species.find((entry) => entry.id === "human")!;
     expect(human.darkvisionFeet).toBeNull();
     // Human's whole identity is choices, exactly as the SRD prints it.
@@ -311,7 +312,7 @@ describe("character-builder content records", () => {
     // Dwarf: poison resistance, the +1 HP/level rider, and PB-scaling Stonecunning.
     const dwarf = byId("dwarf");
     expect(dwarf.traits.find((trait) => trait.id === "dwarf-resilience")!.grants!.damageResistances).toEqual(["poison"]);
-    expect(dwarf.traits.find((trait) => trait.id === "dwarf-toughness")!.modifiers).toEqual([{ type: "hit-points-per-level", amount: 1 }]);
+    expect(dwarf.traits.find((trait) => trait.id === "dwarf-toughness")!.modifiers).toEqual([{ type: "hit-points-per-level", amount: 1, when: [] }]);
     expect(dwarf.traits.find((trait) => trait.id === "dwarf-stonecunning")!.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
     // Dragonborn: ten ancestries, each granting the printed damage resistance as data.
     const dragonborn = byId("dragonborn");
@@ -641,14 +642,14 @@ describe("character-builder content records", () => {
   it("gives the Defense fighting style the +1 AC it only gets WHILE ARMORED", () => {
     const defense = feats.find((feat) => feat.id === "defense")!;
     expect(defense.category).toBe("fighting-style");
-    expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true }]);
+    expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true, when: [] }]);
     // Every other SRD fighting style stays prose - none of the three has a modeled rider.
     for (const id of ["archery", "great-weapon-fighting", "two-weapon-fighting"]) {
       expect(feats.find((feat) => feat.id === id)!.feature.modifiers, id).toEqual([]);
     }
     // An unconditional +1 AC is still expressible and still means "always" (back-compat).
     const always = FeatureRecordSchema.parse({ id: "x", name: "X", description: "d", modifiers: [{ type: "armor-class", amount: 1 }] });
-    expect(always.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: false });
+    expect(always.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: false, when: [] });
   });
 
   it("derives the Breath Weapon save DC from an ability, and gives it the printed damage", () => {
@@ -804,7 +805,7 @@ describe("content-record schema guards", () => {
     // Defaults fill in identically to a FeatureRecord's, so a consumer reads both unconditionally.
     expect(option.actions[0].damage).toEqual([{ formula: "1d8", type: "radiant" }]);
     expect(option.effects[0].target).toBe("self");
-    expect(option.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: true });
+    expect(option.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: true, when: [] });
     expect(option.grants!.skills).toEqual([]);
     const asFeature: FeatureRecord = option;
     expect(FeatureRecordSchema.safeParse(asFeature).success).toBe(true);
@@ -849,7 +850,257 @@ describe("content-record schema guards", () => {
     expect(rich.actions[0].attack).toEqual({ ability: "str", proficient: true, reachFeet: 5 });
     expect(rich.grants!.tools).toEqual([]);
     expect(rich.grants!.spells[0]).toEqual({ id: "guidance", level: 0, alwaysPrepared: true });
-    expect(rich.modifiers[0]).toEqual({ type: "unarmored-defense", ability: "con", allowShield: false });
+    expect(rich.modifiers[0]).toEqual({ type: "unarmored-defense", ability: "con", allowShield: false, when: [] });
     expect(rich.effects[0].target).toBe("self");
+  });
+});
+
+/**
+ * THE ACCEPTANCE TEST for the magic-item rider vocabulary: one fixture per criterion the product
+ * owner actually asked for, parsed through the real schemas. A vocabulary that typechecks but
+ * cannot express "an extra 1d6 fire on a critical hit" has failed, and only a fixture says so.
+ *
+ * Every item fixture goes through `EquipmentReferenceSchema`, which is `.strict()` - so a criterion
+ * "passing" here means the exact authored keys were ACCEPTED, not silently dropped.
+ */
+describe("the magic-item vocabulary expresses what a GM asks for", () => {
+  /** The three fields an equipment record requires but that say nothing about the criterion. */
+  const bare = { costGp: null, weightLb: null, description: null } as const;
+  const item = (patch: Record<string, unknown>) => EquipmentReferenceSchema.parse({ id: "hb-item", name: "Item", category: "wondrous", ...bare, ...patch });
+  /** The same riders on a FEAT carrier - criterion 14 is only true if this parses the identical array. */
+  const feat = (modifiers: readonly unknown[], patch: Record<string, unknown> = {}) =>
+    FeatReferenceSchema.parse({ id: "hb-feat", name: "Feat", feature: { id: "hb-feat", name: "Feat", description: "The same riders, on a feat.", modifiers, ...patch } });
+
+  const SHORTSWORD = { category: "martial", damageDice: "1d6", damageType: "piercing", rangeFeet: null, longRangeFeet: null } as const;
+  const HALF_PLATE = { acBase: 15, addDexModifier: true, dexModifierCap: 2, stealthDisadvantage: true, strengthRequired: null } as const;
+
+  it("1. a short sword of lightning: +1 to hit AND an extra 1d4 lightning", () => {
+    const sword = item({
+      id: "hb-shortsword-lightning", name: "Short Sword of Lightning", category: "weapon", slot: "weapon", isMagic: true, rarity: "uncommon", weapon: SHORTSWORD,
+      modifiers: [
+        { type: "attack-bonus", amount: 1, scope: "this-item" },
+        { type: "extra-damage", formula: "1d4", damageType: "lightning", scope: "this-item" }
+      ]
+    });
+    expect(sword.modifiers.map((modifier) => modifier.type)).toEqual(["attack-bonus", "extra-damage"]);
+    // Both are STANDING riders on this weapon: no gate, so they are part of the weapon's own numbers.
+    expect(sword.modifiers.every((modifier) => riderLayer(modifier.when) === "standing")).toBe(true);
+    expect(feat(sword.modifiers).feature.modifiers).toHaveLength(2);
+  });
+
+  it("2. wands, orbs, potions, amulets, rings, cloaks, circlets and shields each have a slot", () => {
+    const kinds = [["wand", "held"], ["orb", "held"], ["potion", "consumable"], ["amulet", "neck"], ["ring", "ring"], ["cloak", "shoulders"], ["circlet", "head"], ["shield", "shield"]] as const;
+    for (const [category, slot] of kinds) {
+      // `category` stays the OPEN identity slug; `slot` is the closed mechanical hook beside it.
+      expect(item({ id: `hb-${category}`, name: category, category, slot }).slot, category).toBe(slot);
+    }
+  });
+
+  it("3. a ring that increases Armour Class by 1", () => {
+    const ring = item({ id: "hb-ring-protection", name: "Ring of Protection", category: "ring", slot: "ring", isMagic: true, attunement: { required: true }, modifiers: [{ type: "armor-class", amount: 1 }] });
+    expect(ring.modifiers[0]).toMatchObject({ type: "armor-class", amount: 1, whileArmored: false });
+    expect(ring.attunement).toEqual({ required: true, restrictedTo: [] });
+  });
+
+  it("4. an amulet that casts Message once per day while attuned", () => {
+    const amulet = item({
+      id: "hb-amulet-message", name: "Amulet of Whispers", category: "amulet", slot: "neck", isMagic: true,
+      attunement: { required: true, restrictedTo: ["cleric"] },
+      casts: [{ spellId: "message", uses: { limit: 1, per: "long-rest" } }]
+    });
+    // "Once per day" is a long rest: this app already treats a long rest as the day.
+    expect(amulet.casts[0]).toMatchObject({ spellId: "message", consumesSpellSlot: false, uses: { limit: 1, per: "long-rest" } });
+    // `restrictedTo` is advisory - it parses and displays, it never blocks.
+    expect(amulet.attunement!.restrictedTo).toEqual(["cleric"]);
+  });
+
+  it("5. a cloak granting advantage on initiative", () => {
+    const modifiers = [{ type: "roll-mode", roll: "initiative", mode: "advantage", when: [{ type: "attuned" }] }];
+    const cloak = item({ id: "hb-cloak-quickness", name: "Cloak of Quickness", category: "cloak", slot: "shoulders", isMagic: true, attunement: { required: true }, modifiers });
+    expect(cloak.modifiers[0]).toMatchObject({ type: "roll-mode", roll: "initiative", mode: "advantage" });
+    expect(feat(modifiers).feature.modifiers[0]).toMatchObject({ type: "roll-mode", roll: "initiative" });
+  });
+
+  it("6. a shield granting a Paladin one more use of Lay on Hands", () => {
+    const shield = item({
+      id: "hb-shield-mercy", name: "Shield of Mercy", category: "shield", slot: "shield", isMagic: true, armor: { acBase: 2, addDexModifier: false, dexModifierCap: null, stealthDisadvantage: false, strengthRequired: null },
+      modifiers: [{ type: "resource-bonus", poolId: "lay-on-hands", amount: 1, when: [{ type: "while-character-is", classIds: ["paladin"] }] }]
+    });
+    const rider = shield.modifiers[0];
+    expect(rider).toMatchObject({ type: "resource-bonus", poolId: "lay-on-hands", amount: 1 });
+    // A class gate is STATIC - resolvable from the sheet, so it shows as a real number, not a note.
+    expect(riderLayer(rider.when)).toBe("standing");
+  });
+
+  it("7. a dagger granting advantage on OPPORTUNITY attacks specifically", () => {
+    const dagger = item({
+      id: "hb-dagger-riposte", name: "Dagger of Riposte", category: "weapon", slot: "weapon", isMagic: true,
+      weapon: { category: "simple", damageDice: "1d4", damageType: "piercing", rangeFeet: 20, longRangeFeet: 60 },
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage", when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["opportunity"] }] }]
+    });
+    // A moment plus a filter narrowing it - the only legal way to write "on opportunity attacks".
+    expect(riderLayer(dagger.modifiers[0].when)).toBe("momentary");
+    expect(dagger.modifiers[0].when.map((trigger) => trigger.type)).toEqual(["on-attack-roll", "attack-kind-is"]);
+  });
+
+  it("8. an amulet granting one extra 1st-level spell slot", () => {
+    const amulet = item({ id: "hb-amulet-slots", name: "Amulet of the Adept", category: "amulet", slot: "neck", isMagic: true, attunement: { required: true }, modifiers: [{ type: "spell-slot", level: 1, amount: 1, when: [{ type: "attuned" }] }] });
+    expect(amulet.modifiers[0]).toMatchObject({ type: "spell-slot", level: 1, amount: 1 });
+  });
+
+  it("9. a mace dealing an extra 1d6 fire ON A CRITICAL HIT", () => {
+    const mace = item({
+      id: "hb-mace-emberfall", name: "Emberfall", category: "weapon", slot: "weapon", isMagic: true,
+      weapon: { category: "simple", damageDice: "1d6", damageType: "bludgeoning", rangeFeet: null, longRangeFeet: null },
+      modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] }]
+    });
+    const rider = mace.modifiers[0];
+    expect(rider).toMatchObject({ type: "extra-damage", formula: "1d6", damageType: "fire" });
+    // 5e does not double dice added AFTER the attack, so the default is false and a GM opts in.
+    expect(rider).toMatchObject({ doubleOnCritical: false });
+    expect(riderLayer(rider.when)).toBe("momentary");
+    // This is the typed case `critical-bonus-dice` deliberately cannot express: that one is a bare
+    // untyped COUNT of extra weapon dice, and both exist because they are different things.
+    expect(FeatureModifierSchema.parse({ type: "critical-bonus-dice", count: 2 })).toMatchObject({ count: 2 });
+  });
+
+  it("10. half-plate that raises the wearer's spell save DC", () => {
+    const plate = item({ id: "hb-half-plate-sigils", name: "Sigil Half Plate", category: "armor", slot: "armor", isMagic: true, armor: HALF_PLATE, modifiers: [{ type: "spell-save-dc", amount: 1, classId: "wizard" }, { type: "spell-attack-bonus", amount: 1 }] });
+    expect(plate.modifiers.map((modifier) => modifier.type)).toEqual(["spell-save-dc", "spell-attack-bonus"]);
+  });
+
+  it("11. a circlet granting proficiency OR expertise in a skill", () => {
+    const proficient = item({ id: "hb-circlet-p", name: "Circlet of Insight", category: "circlet", slot: "head", isMagic: true, grants: { skills: ["arcana"] } });
+    const expert = item({ id: "hb-circlet-e", name: "Circlet of Mastery", category: "circlet", slot: "head", isMagic: true, grants: { expertise: ["arcana"] } });
+    expect(proficient.grants!.skills).toEqual(["arcana"]);
+    expect(expert.grants!.expertise).toEqual(["arcana"]);
+    // Same authored shape a feature uses - `FeatureGrantsSchema`, reused whole rather than restated.
+    expect(proficient.grants!.tools).toEqual([]);
+  });
+
+  it("12. a shortbow granting a bonus AND/OR advantage on saving throws", () => {
+    const bow = item({
+      id: "hb-shortbow-warding", name: "Warding Shortbow", category: "weapon", slot: "weapon", isMagic: true,
+      weapon: { category: "simple", damageDice: "1d6", damageType: "piercing", rangeFeet: 80, longRangeFeet: 320 },
+      modifiers: [
+        { type: "save-bonus", amount: 1 },
+        { type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] }
+      ]
+    });
+    expect(bow.modifiers.map((modifier) => modifier.type)).toEqual(["save-bonus", "roll-mode"]);
+    expect(riderLayer(bow.modifiers[0].when)).toBe("standing");
+    expect(riderLayer(bow.modifiers[1].when)).toBe("momentary");
+  });
+
+  it("13. curses and debuffs - the same vocabulary with a negative number", () => {
+    const cursed = item({
+      id: "hb-cloak-weakness", name: "Cloak of Weakness", category: "cloak", slot: "shoulders", isMagic: true,
+      cursed: true, attunement: { required: true },
+      modifiers: [
+        { type: "armor-class", amount: -2 },
+        { type: "save-bonus", amount: -1 },
+        { type: "attack-bonus", amount: -1 },
+        { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+        { type: "extra-damage", formula: "1d4", damageType: "necrotic", when: [{ type: "on-taking-damage" }] }
+      ]
+    });
+    expect(cursed.cursed).toBe(true);
+    expect(cursed.modifiers).toHaveLength(5);
+    // A curse you can drop by taking the hat off is not a curse: `cursed` REQUIRES attunement, so
+    // the hiding boundary is exactly one thing - hidden until attuned, and nothing beyond that.
+    const orphanCurse = EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "cloak", ...bare, cursed: true });
+    expect(orphanCurse.success).toBe(false);
+    expect(!orphanCurse.success && JSON.stringify(orphanCurse.error.issues)).toContain("must require attunement");
+    expect(EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "cloak", ...bare, cursed: true, attunement: { required: false } }).success).toBe(false);
+  });
+
+  it("14. a FEAT carries every one of these riders, by construction rather than by duplication", () => {
+    // The whole architectural bet: the new riders extend `FeatureModifierSchema`, which a feat's
+    // `feature` already carries. A parallel item-only union would give items everything, feats
+    // nothing, and the difference would be invisible until a GM authored the feat.
+    const everyRider = [
+      { type: "attack-bonus", amount: 1 },
+      { type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] },
+      { type: "roll-mode", roll: "save", mode: "advantage" },
+      { type: "save-bonus", amount: 2 },
+      { type: "check-bonus", amount: 2, when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }] },
+      { type: "spell-save-dc", amount: 1 },
+      { type: "spell-attack-bonus", amount: 1 },
+      { type: "spell-slot", level: 3, amount: 1 }
+    ];
+    const secondHalf = [
+      { type: "resource-bonus", poolId: "lay-on-hands", amount: 5 },
+      { type: "critical-range", threshold: 19 },
+      { type: "critical-bonus-dice", count: 1 },
+      { type: "damage-reduction", amount: 3, when: [{ type: "on-taking-damage" }, { type: "damage-type-is", damageTypes: ["fire"] }] },
+      { type: "sense", sense: "tremorsense", feet: 30 },
+      { type: "armor-class", amount: 1, when: [{ type: "while-armored", weights: ["medium", "heavy"] }] },
+      { type: "initiative", amount: 2 },
+      { type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }
+    ];
+    // Eight riders is the authored cap, so the proof runs in two records rather than one.
+    expect(feat(everyRider).feature.modifiers).toHaveLength(8);
+    expect(feat(secondHalf).feature.modifiers).toHaveLength(8);
+    expect(item({ id: "hb-a", modifiers: everyRider }).modifiers).toHaveLength(8);
+    expect(item({ id: "hb-b", modifiers: secondHalf }).modifiers).toHaveLength(8);
+    // ...and the identical array parses on a chosen OPTION inside a choice, and on a plain feature.
+    expect(FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers).toHaveLength(8);
+    // 21 variants: the 8 that existed, the 3 shared with EffectModifierSchema, the 10 new ones.
+    expect(FeatureModifierSchema.options).toHaveLength(21);
+  });
+
+  it("15. an item that grants a feat", () => {
+    const gauntlets = item({ id: "hb-gauntlets", name: "Gauntlets of the Bulwark", category: "hands", slot: "hands", isMagic: true, attunement: { required: true }, grantsFeatIds: ["shield-master"] });
+    expect(gauntlets.grantsFeatIds).toEqual(["shield-master"]);
+    // The grant edge is ONE-DIRECTIONAL: no feature, feat, or option has a `grants.items`, so a
+    // cycle cannot be drawn rather than merely being checked for.
+    expect(Object.keys(FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", grants: {} }).grants!)).not.toContain("items");
+  });
+
+  // ---- the refusals, verified by injection ------------------------------------------------------
+
+  it("refuses hit points and ability scores on an ITEM carrier only - a feat keeps both", () => {
+    for (const modifier of [{ type: "hit-points-per-level", amount: 1 }, { type: "ability-score", ability: "str", amount: 2 }]) {
+      const refused = EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "wondrous", ...bare, modifiers: [modifier] });
+      expect(refused.success, modifier.type).toBe(false);
+      expect(!refused.success && JSON.stringify(refused.error.issues), modifier.type).toContain("cannot change hit points or an ability score");
+      // The SAME rider on a feat is fine, and must stay fine: a feat is granted once and never
+      // un-granted, so baking it is correct. It is the CARRIER that makes this a refusal.
+      expect(feat([modifier]).feature.modifiers, modifier.type).toHaveLength(1);
+      expect(FeatureModifierSchema.safeParse(modifier).success, modifier.type).toBe(true);
+    }
+    // A flat `hit-points` maximum is not in the vocabulary at all, so it is refused one level
+    // earlier - by the discriminated union - on every carrier including a feat.
+    expect(FeatureModifierSchema.safeParse({ type: "hit-points", amount: 5 }).success).toBe(false);
+  });
+
+  it("keeps `when` an AND-list, not an expression language", () => {
+    // Thirty triggers in four kinds, and the kind is what decides the evaluation layer.
+    expect(riderLayer([])).toBe("standing");
+    expect(riderLayer([{ type: "while-hp-at-or-below", percent: 50 }])).toBe("conditional");
+    expect(riderLayer([{ type: "attuned" }, { type: "while-shield", wielding: true }])).toBe("standing");
+    // At most four triggers.
+    expect(RiderWhenSchema.safeParse([{ type: "attuned" }, { type: "while-shield" }, { type: "while-unarmored" }, { type: "on-hit" }, { type: "damage-type-is", damageTypes: ["fire"] }]).success).toBe(false);
+    // A rider fires at ONE moment, not two.
+    const twoMoments = RiderWhenSchema.safeParse([{ type: "on-hit" }, { type: "on-critical-hit" }]);
+    expect(twoMoments.success).toBe(false);
+    expect(!twoMoments.success && JSON.stringify(twoMoments.error.issues)).toContain("one moment, not two");
+    // A filter with no moment is an authoring mistake, not "always".
+    const orphanFilter = RiderWhenSchema.safeParse([{ type: "versus-size", sizes: ["large"] }]);
+    expect(orphanFilter.success).toBe(false);
+    expect(!orphanFilter.success && JSON.stringify(orphanFilter.error.issues)).toContain("needs a moment to narrow");
+    // "Paladin or Cleric" is ONE trigger with two ids - never two triggers OR'd together.
+    expect(RiderWhenSchema.safeParse([{ type: "while-character-is", classIds: ["paladin", "cleric"] }]).success).toBe(true);
+    expect(RiderWhenSchema.safeParse([{ type: "while-character-is" }]).success).toBe(false);
+    expect(RiderWhenSchema.safeParse([{ type: "while-character-is", classIds: ["paladin"] }, { type: "while-character-is", classIds: ["cleric"] }]).success).toBe(false);
+    // There is no free text and no arithmetic: an unnamed trigger is simply not a trigger.
+    expect(RiderWhenSchema.safeParse([{ type: "while-in-sunlight" }]).success).toBe(false);
+    expect(RiderWhenSchema.safeParse([{ type: "while-hp-at-or-below", percent: 50, unless: "raging" }]).success).toBe(false);
+  });
+
+  it("still refuses an undeclared key on the one .strict() content record", () => {
+    // The magic-item block is a LONGER LIST of declared keys, not a loosened schema.
+    expect(EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "wondrous", ...bare, requiresAttunement: true }).success).toBe(false);
+    expect(EquipmentReferenceSchema.safeParse({ id: "hb-x", name: "X", category: "wondrous", ...bare, slot: "backpack" }).success).toBe(false);
   });
 });

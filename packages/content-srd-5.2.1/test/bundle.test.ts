@@ -290,7 +290,19 @@ describe("homebrew source discriminator and open item categories", () => {
     // a hand-authored homebrew item is the only place a mistyped key is likely, and it is the only
     // schema in the system that will tell you about it.
     expect(() => EquipmentReferenceSchema.parse({ ...gearBody, weight: 2 })).toThrow();
-    expect(() => EquipmentReferenceSchema.parse({ ...gearBody, rarity: "rare" })).toThrow();
+    expect(() => EquipmentReferenceSchema.parse({ ...gearBody, requiresAttunement: true })).toThrow();
+    // ...and the OTHER half of that contract: declaring a field is what makes it real. `rarity` and
+    // `isMagic` used to throw here for exactly the same reason `weight` still does. The magic-item
+    // vocabulary is not a loosened schema; it is a longer list of declared keys.
+    const magic = EquipmentReferenceSchema.parse({ ...gearBody, rarity: "rare", isMagic: true, slot: "wondrous" });
+    expect(magic.rarity).toBe("rare");
+    expect(magic.isMagic).toBe(true);
+    expect(magic.slot).toBe("wondrous");
+    // Every unauthored rider field materialises as its empty default, so a consumer never branches on undefined.
+    expect({ cursed: magic.cursed, casts: magic.casts, grantsFeatIds: magic.grantsFeatIds, modifiers: magic.modifiers })
+      .toEqual({ cursed: false, casts: [], grantsFeatIds: [], modifiers: [] });
+    // A mundane row is untouched by any of it - `isMagic` stays false and the strictness is unchanged.
+    expect(EquipmentReferenceSchema.parse(gearBody).isMagic).toBe(false);
   });
 });
 

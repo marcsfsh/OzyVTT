@@ -6,7 +6,7 @@ import torva from "../../test-fixtures/actors/torva-grimtusk.v1.json";
 import pip from "../../test-fixtures/actors/pip-underbough.v1.json";
 import sable from "../../test-fixtures/actors/sable-vex.v1.json";
 import jsonSchema from "../json/actor-definition.v1.schema.json";
-import { ActorDefinitionSchema, ActorSchema, characterChoices, makeHitDicePool, resolveSpellcasting } from "../src/index.js";
+import { ActorDefinitionSchema, ActorSchema, EffectModifierSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, characterChoices, makeHitDicePool, resolveSpellcasting, riderLayer, toRollModes } from "../src/index.js";
 
 describe("actor definition v1", () => {
   const jsonValidate = new Ajv2020({ strict: false }).compile(jsonSchema);
@@ -259,6 +259,104 @@ describe("actor definition v1", () => {
     // Garbage still fails loudly rather than being normalised into something plausible.
     expect(ActorSchema.safeParse({ ...base, hitDice: { die: "d7", maximum: 1, remaining: 1 } }).success).toBe(false);
     expect(ActorSchema.safeParse({ ...base, hitDice: { die: "d6", maximum: 1, remaining: 1, entries: "nope" } }).success).toBe(false);
+  });
+
+  // ---- the shared rider vocabulary (magic items, feats, effects) --------------------------------
+  // `EffectModifierSchema` grew three variants that `FeatureModifierSchema` carries as the very same
+  // objects. The JSON twin has to grow with them or the two documents disagree about the wire.
+
+  it("carries the three shared riders through BOTH schemas, gates and all", () => {
+    const withRiders = structuredClone(legacyDefinition) as Record<string, any>;
+    withRiders.actions = [{
+      id: "ember-strike", name: "Ember Strike", activation: "action", description: "A burning swing.",
+      grants: {
+        tags: ["ember"], duration: { type: "encounter" },
+        modifiers: [
+          { type: "attack-bonus", amount: 1, scope: "this-item" },
+          { type: "extra-damage", formula: "1d6", damageType: "fire", doubleOnCritical: false, when: [{ type: "on-critical-hit" }] },
+          { type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] },
+          // The six legacy advantage/disadvantage variants keep working unchanged - `roll-mode` is
+          // the general form beside them, never a replacement that would break a stored effect.
+          { type: "attack-advantage" }, { type: "save-disadvantage", ability: "con" }
+        ]
+      }
+    }];
+    const parsed = ActorDefinitionSchema.safeParse(withRiders);
+    expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
+    expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
+    // Eleven variants: the eight that existed plus the three shared with FeatureModifierSchema.
+    expect(EffectModifierSchema.options).toHaveLength(11);
+    // ...and the JSON twin declares exactly as many branches, which is the lockstep this test buys.
+    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(11);
+  });
+
+  it("normalises every advantage shape through ONE function, so no consumer branches on eleven", () => {
+    // The point of `roll-mode`: the legacy variants and the general form come back identical, and
+    // 5e cancellation (`aggregateRollMode`) then works on the labelled sources without knowing which
+    // shape produced them. A curse is `mode: "disadvantage"` and needs no separate machinery.
+    expect(toRollModes(EffectModifierSchema.parse({ type: "attack-advantage" }))).toEqual([{ roll: "attack", mode: "advantage" }]);
+    expect(toRollModes(EffectModifierSchema.parse({ type: "roll-mode", roll: "attack", mode: "advantage" }))).toEqual([{ roll: "attack", mode: "advantage" }]);
+    expect(toRollModes(EffectModifierSchema.parse({ type: "save-advantage", ability: "dex" }))).toEqual([{ roll: "save", mode: "advantage", ability: "dex" }]);
+    expect(toRollModes(EffectModifierSchema.parse({ type: "incoming-attack-disadvantage" }))).toEqual([{ roll: "incoming-attack", mode: "disadvantage" }]);
+    // A rider that is not an advantage claim normalises to nothing rather than to a wrong claim.
+    expect(toRollModes(EffectModifierSchema.parse({ type: "damage-bonus", amount: 2 }))).toEqual([]);
+    expect(toRollModes(EffectModifierSchema.parse({ type: "attack-bonus", amount: 1 }))).toEqual([]);
+  });
+
+  it("declares thirty named triggers, every one classified and accepted by the JSON twin", () => {
+    // One sample per trigger. The JSON twin folds the eleven parameterless moments into a single
+    // enum branch, so a branch COUNT would not prove agreement - running every name through both
+    // documents does. A trigger added to Zod and forgotten in the mirror fails right here.
+    const samples: Record<string, Record<string, unknown>> = {
+      attuned: {}, "while-armored": { weights: ["heavy"] }, "while-unarmored": { allowShield: true },
+      "while-shield": { wielding: false }, "while-character-is": { classIds: ["paladin"], speciesIds: ["dwarf"] },
+      "while-proficient-with": { kind: "tool", ids: ["thieves-tools"] },
+      "while-effect-tag": { tags: ["raging"] }, "while-hp-at-or-below": { percent: 50 },
+      "while-condition": { conditionIds: ["frightened"], present: false },
+      "on-attack-roll": {}, "on-hit": {}, "on-critical-hit": {}, "on-critical-miss": {}, "on-damage-roll": {},
+      "on-saving-throw": {}, "on-ability-check": {}, "on-initiative-roll": {}, "on-death-save": {},
+      "on-taking-damage": {}, "on-spell-cast": {},
+      "attack-kind-is": { kinds: ["opportunity"] }, "weapon-property-is": { properties: ["finesse"] },
+      "damage-type-is": { damageTypes: ["fire"] }, "ability-is": { abilities: ["dex"] },
+      "skill-is": { skills: ["stealth"] }, "spell-school-is": { schools: ["evocation"] },
+      "spell-level-is": { levels: [0, 3] }, "versus-creature-type": { creatureTypes: ["undead"] },
+      "versus-size": { sizes: ["large"] }, "versus-condition": { conditionIds: ["prone"] }
+    };
+    const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
+    expect(declared).toHaveLength(30);
+    expect(Object.keys(samples).sort()).toEqual([...declared].sort());
+    // Six static gates, three dynamic gates, eleven moments, ten filters - and every trigger is
+    // classified, because an unclassified one would silently evaluate in the wrong layer.
+    const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
+    expect(kinds.filter((kind) => kind === undefined)).toEqual([]);
+    expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
+    expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
+    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(11);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(10);
+
+    for (const type of declared) {
+      const trigger = { type, ...samples[type] };
+      // A filter needs a moment beside it, and only a moment may accompany itself: build the
+      // smallest legal `when` for each kind rather than special-casing the assertion.
+      const when = RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS] === "filter" ? [{ type: "on-hit" }, trigger] : [trigger];
+      expect(RiderWhenSchema.safeParse(when).success, type).toBe(true);
+      const definition = structuredClone(legacyDefinition) as Record<string, any>;
+      definition.actions = [{ id: "x", name: "X", activation: "action", description: "d", grants: { tags: ["x"], duration: { type: "encounter" }, modifiers: [{ type: "attack-bonus", amount: 1, when }] } }];
+      expect(ActorDefinitionSchema.safeParse(definition).success, `Zod: ${type}`).toBe(true);
+      expect(jsonValidate(definition), `JSON twin: ${type}: ${JSON.stringify(jsonValidate.errors)}`).toBe(true);
+    }
+  });
+
+  it("rejects a `when` list the JSON twin would also reject", () => {
+    // Structural refinements (one moment, a filter needs a moment) live in Zod alone; the shapes
+    // themselves must agree, and an unnamed trigger must fail on both sides.
+    const bad = structuredClone(legacyDefinition) as Record<string, any>;
+    bad.actions = [{ id: "x", name: "X", activation: "action", description: "d", grants: { tags: ["x"], duration: { type: "encounter" }, modifiers: [{ type: "attack-bonus", amount: 1, when: [{ type: "while-it-is-tuesday" }] }] } }];
+    expect(ActorDefinitionSchema.safeParse(bad).success).toBe(false);
+    expect(jsonValidate(bad)).toBe(false);
+    // The layer table is a pure lookup, shared by every consumer so it cannot be decided twice.
+    expect(riderLayer(RiderWhenSchema.parse([{ type: "while-effect-tag", tags: ["raging"] }]))).toBe("conditional");
+    expect(riderLayer(RiderWhenSchema.parse([]))).toBe("standing");
   });
 
   it("rejects malformed builder input under both schemas", () => {

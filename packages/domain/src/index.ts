@@ -6,6 +6,17 @@ export * from "./catalog-choice.js";
 
 export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier, type HealthDisplay, type HealthDisplayAudience, type HealthDisplayStyle } from "@vtt/schemas";
 /**
+ * The rider gate vocabulary, for the same reason: the homebrew authoring UI has to offer the fifteen
+ * item slots and the thirty named triggers, and the client cannot reach `@vtt/schemas`. Anything
+ * missing here gets re-typed as a hardcoded array in a `.tsx` file, and the two lists drift the
+ * first time one of them grows. `RIDER_TRIGGER_KINDS` is what lets the editor group and label them
+ * without a second opinion about which trigger is a moment.
+ */
+export {
+  ItemMagicMarkerSchema, ItemSlotSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, riderLayer, toRollModes,
+  type ItemSlot, type NormalisedRollMode, type RiderTrigger, type RiderTriggerKind
+} from "@vtt/schemas";
+/**
  * Character-sheet helpers and their types. These MUST travel through `@vtt/domain`: the client has no
  * `@vtt/schemas` dependency, so anything missing here gets re-implemented ad hoc on the client - which
  * is exactly how the multiclass spellcasting resolution order drifted. `resolveSpellcasting` is THE

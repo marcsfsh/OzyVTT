@@ -22,7 +22,13 @@
  *    later SRD printings need no schema change.
  */
 import { z } from "zod";
-import { AbilitySchema, ActionSchema, DiceFormulaSchema, EffectGrantSchema, HitDieSchema } from "@vtt/schemas";
+import {
+  AbilitySchema, ActionSchema, AttackBonusVariantSchema, DiceFormulaSchema, EffectGrantSchema,
+  ExtraDamageVariantSchema, HitDieSchema, RollModeVariantSchema, riderGate
+} from "@vtt/schemas";
+
+/** Re-exported so the rider gate vocabulary reads as one thing regardless of which package declares it. */
+export { ItemSlotSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, riderLayer, riderGate, type ItemSlot, type RiderTrigger, type RiderTriggerKind } from "@vtt/schemas";
 
 /** Every identity in the content catalog is an open slug - never a closed enum (principle 3). */
 export const ContentIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(80);
@@ -154,11 +160,24 @@ export const FeatureGrantsSchema = z.object({
 /**
  * Typed numeric riders. A bounded union, deliberately small and grown additively - the same contract
  * `EffectModifierSchema` follows on the actor side. Anything not modeled here stays prose (ADR-0008).
+ *
+ * THIS UNION IS THE ONE AUTHORED RIDER VOCABULARY, and that is a load-bearing architectural call
+ * rather than a convenience. A feat IS a `FeatureRecord` (`FeatReferenceSchema.feature`), a chosen
+ * `FeatureOption` carries the identical `featureRiders` block, and a magic item spreads that same
+ * block too. So "feats carry the same buffs and debuffs items do" is true BY CONSTRUCTION here - a
+ * parallel `ItemModifierSchema` would hand items everything, hand feats nothing, and the difference
+ * would be invisible until someone authored the feat and it silently did nothing.
+ *
+ * Every `amount` is a SIGNED integer, so a curse or a debuff is the same vocabulary with a negative
+ * number rather than a second one. Every variant carries `...riderGate` (`when` + `scope`), so the
+ * condition a rider applies under is data drawn from a closed list of thirty named triggers - never
+ * an expression to parse (ADR-0008).
  */
 export const FeatureModifierSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("ability-score"), ability: AbilitySchema, amount: z.number().int().min(-5).max(5), maximum: z.number().int().min(1).max(30).optional() }).strict(),
-  z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5) }).strict(),
-  z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60) }).strict(),
+  // ---- the eight that existed before, now gateable -------------------------------------------
+  z.object({ type: z.literal("ability-score"), ability: AbilitySchema, amount: z.number().int().min(-5).max(5), maximum: z.number().int().min(1).max(30).optional(), ...riderGate }).strict(),
+  z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate }).strict(),
+  z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
   /**
    * A flat Armor Class rider. `whileArmored` is the ONE bounded condition the SRD's printed AC
    * bonuses actually need: the Defense fighting style reads "While you're wearing Light, Medium, or
@@ -166,23 +185,83 @@ export const FeatureModifierSchema = z.discriminatedUnion("type", [
    * would be wrong. Default `false` = the unconditional bonus every pre-existing record means, so
    * this is additive and back-compatible (ADR-0007). It is a boolean, not a condition language
    * (ADR-0008): a richer gate stays prose until the SRD prints one.
+   *
+   * `when: [{type: "while-armored"}]` now says the same thing in the general vocabulary. The boolean
+   * STAYS: it is authored in shipped bundles and read by the builder, so a collector normalises
+   * `whileArmored: true` into that trigger rather than anyone deprecating the field.
    */
-  z.object({ type: z.literal("armor-class"), amount: z.number().int().min(-5).max(5), whileArmored: z.boolean().default(false) }).strict(),
-  z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10) }).strict(),
-  z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3) }).strict(),
+  z.object({ type: z.literal("armor-class"), amount: z.number().int().min(-5).max(5), whileArmored: z.boolean().default(false), ...riderGate }).strict(),
+  z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10), ...riderGate }).strict(),
+  z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it). */
-  z.object({ type: z.literal("unarmored-defense"), ability: AbilitySchema, allowShield: z.boolean().default(false) }).strict(),
-  z.object({ type: z.literal("darkvision"), feet: z.number().int().min(0).max(240) }).strict()
+  z.object({ type: z.literal("unarmored-defense"), ability: AbilitySchema, allowShield: z.boolean().default(false), ...riderGate }).strict(),
+  z.object({ type: z.literal("darkvision"), feet: z.number().int().min(0).max(240), ...riderGate }).strict(),
+  // ---- the three shared with EffectModifierSchema, declared once in @vtt/schemas --------------
+  AttackBonusVariantSchema,
+  ExtraDamageVariantSchema,
+  RollModeVariantSchema,
+  // ---- the ten the magic-item vocabulary adds -------------------------------------------------
+  /** A flat bonus to saving throws. Narrow it with `when: [{type: "ability-is", abilities: ["dex"]}]`. */
+  z.object({ type: z.literal("save-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
+  /** A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is literally this. */
+  z.object({ type: z.literal("check-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
+  /** `classId` targets one caster on a multiclass sheet; absent = every caster the bearer has. */
+  z.object({ type: z.literal("spell-save-dc"), amount: z.number().int().min(-5).max(5), classId: ContentIdSchema.optional(), ...riderGate }).strict(),
+  /** The sibling of the above. A Wand of the War Mage is exactly this and nothing else. */
+  z.object({ type: z.literal("spell-attack-bonus"), amount: z.number().int().min(-5).max(5), classId: ContentIdSchema.optional(), ...riderGate }).strict(),
+  /** An extra spell slot of one level. Layered over the single-sourced slot maxima, so the seed, the long rest and the spend-clamp cannot disagree. */
+  z.object({ type: z.literal("spell-slot"), level: z.number().int().min(1).max(9), amount: z.number().int().min(-4).max(4), ...riderGate }).strict(),
+  /**
+   * One more use of a limited resource. `poolId` is the live `actionUses` KEY (`uses.pool` or the
+   * action id) - the namespace that is actually spent and re-armed. It is deliberately NOT the
+   * class level table's `classResources`, which is display-only content data with no server reads:
+   * a rider pointed there would parse, store, project, and change nothing at the table.
+   */
+  z.object({ type: z.literal("resource-bonus"), poolId: ContentIdSchema, amount: z.number().int().min(-20).max(20), ...riderGate }).strict(),
+  /** Score a critical hit on this natural roll or higher (19-20 keen weapons). */
+  z.object({ type: z.literal("critical-range"), threshold: z.number().int().min(15).max(20), ...riderGate }).strict(),
+  /** Extra UNTYPED weapon dice on a crit (Savage Attacks). A typed crit-only 1d6 fire is `extra-damage` + `when: [{on-critical-hit}]` instead. */
+  z.object({ type: z.literal("critical-bonus-dice"), count: z.number().int().min(1).max(4), ...riderGate }).strict(),
+  /** Flat reduction of incoming damage. Resistance itself stays `grants.damageResistances`. */
+  z.object({ type: z.literal("damage-reduction"), amount: z.number().int().min(1).max(30), ...riderGate }).strict(),
+  /** The missing sibling of `darkvision`. Display-level, like `darkvision`, until a senses model exists. */
+  z.object({ type: z.literal("sense"), sense: ContentIdSchema, feet: z.number().int().min(0).max(240), ...riderGate }).strict()
 ]);
 export type FeatureModifier = z.infer<typeof FeatureModifierSchema>;
 
 /**
- * THE rider vocabulary, spelled exactly once. Both a `FeatureRecord` and a `FeatureOption` (one
- * pickable option inside a `FeatureChoice`) carry these identical fields, so there is ONE vocabulary
- * to author and ONE interpreter to write - a chosen option is interpreted by the very same code path
- * that interprets a class feature, a species trait, or a feat.
+ * The rider families an ITEM carrier may not use, and the only refusal in this vocabulary.
+ *
+ * It is narrow on purpose. Granted proficiencies and granted feats were both candidates for refusal
+ * and are NOT refused: they are reversible as long as an item contribution is recomputed whole from
+ * `(definition, inventory, catalog)` and never merged into the stored definition. These two are
+ * different in kind:
+ *
+ *   - `hit-points-per-level` changes `hp.maximum`, which is live state that `hp.current` is tracked
+ *     against. Equipping would have to decide what happens to current HP and unequipping could
+ *     strand `current > maximum`. There is no correct silent answer.
+ *   - `ability-score` cascades into AC, saves, skills, spell DC, hit points and initiative, and
+ *     every one of those consumers reads the BAKED `definition.abilityScores`. Layering one score
+ *     means layering the whole sheet.
+ *
+ * Both stay fully available on a FEATURE or FEAT carrier, where baking is correct: a feat is granted
+ * once and never un-granted. (`hit-points` as a flat maximum is not in the vocabulary at all, so an
+ * item naming it is refused one level earlier, by the discriminated union itself.)
  */
-const featureRiders = {
+export const ITEM_REFUSED_MODIFIER_TYPES: readonly FeatureModifier["type"][] = Object.freeze(["hit-points-per-level", "ability-score"]);
+export const ITEM_REFUSED_MODIFIER_MESSAGE =
+  "An item cannot change hit points or an ability score yet - those are baked into the sheet and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (Both stay available on a feat.)";
+
+/**
+ * THE rider vocabulary, spelled exactly once. A `FeatureRecord`, a `FeatureOption` (one pickable
+ * option inside a `FeatureChoice`) and a magic ITEM all carry these identical fields, so there is
+ * ONE vocabulary to author and ONE interpreter to write - a chosen option is interpreted by the very
+ * same code path that interprets a class feature, a species trait, or a feat.
+ *
+ * Exported so `EquipmentReferenceSchema` spreads the very same object instead of restating it; a
+ * second copy is exactly how items and feats would drift apart.
+ */
+export const featureRiders = {
   /** Open grouping slugs for the sheet ("spellcasting", "fighting-style", "channel-divinity"). */
   tags: z.array(ContentIdSchema).max(8).default([]),
   /** Rollable actions this feature adds to the sheet. */
