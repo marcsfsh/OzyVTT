@@ -7,6 +7,36 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-27 — Phase 5 content: how the character bundles are sourced from now on
+
+The other nine SRD classes landed. Four rules came out of it that bind any future content work.
+
+1. **Character-builder content is generated, not typed.** The open5e fixtures carry no class,
+   subclass, species, background or feat data, so those seven bundles had no machine-checkable
+   source — and that is precisely where the `tough` feat and the elf name pools got in. New content
+   of those kinds comes from a vendored, commit-pinned source through a script that fails closed.
+2. **A vendored transcription is SECONDARY.** A community CC BY transcription is a cross-check and a
+   transcription source, never an authority that silently overrides a reviewed bundle; a
+   disagreement is a reviewed correction decided against the SRD text. It earns that standing by
+   reproducing what was already hand-transcribed — see rule 3. Check the **edition** before the
+   licence: a 2014-SRD transcription would reintroduce the exact violation class this prevents.
+3. **Hand-authored records are the generator's oracle, not its input.** Fighter, Wizard and Cleric
+   carry typed riders prose cannot express, so regenerating them would downgrade the three best
+   records in the bundle. They are copied through untouched and the build re-parses them from the
+   source, failing on any mechanical disagreement. A generator that cannot reproduce what a human
+   already verified has not earned the right to write the rest.
+4. **One owner per field.** `statPriority` is not in the SRD — it is the product's ordering for the
+   random generator, and `@vtt/rules-5e` already owned all twelve. The generator reads it rather
+   than keeping a second copy. Where a value legitimately has two independent derivations (hit die,
+   saves, ASI levels — both in the engine and in the printed table), keep both and let the agreement
+   test enforce it; where it has one owner, read from the owner.
+
+Corollary for tests: **don't pin the incomplete state.** Two tests asserted Barbarian had no
+subclasses and used Barbarian as the example of an un-authored class for the progression fallback.
+Both passed for the wrong reason and would have stopped covering anything the moment content caught
+up. Assert the invariant (every class offers exactly one subclass; the fallback is exercised with a
+deliberately partial list), not the current shortfall.
+
 ## 2026-07-27 — Readiness pass: five rules the polish pass settled
 
 A dedicated readiness pass (flow/IA, density/layout, design language/copy) reviewed the wizard as a

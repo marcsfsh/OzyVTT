@@ -8,6 +8,38 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-27 — Phase 5: all twelve SRD classes (`claude/dndbeyond-sheet-importer-0k6u2e`)
+
+The bundle had 3 of 12 classes. It now has 12, with one subclass each. The interesting part was not
+the content but discovering **why** it was missing: the open5e fixtures this package vendors ship no
+class, subclass, species, background or feat data at all, so the seven bundles that drive character
+creation were hand-authored against nothing — which is exactly where both licensing violations
+landed. Backgrounds, incidentally, were never a gap: SRD 5.2.1 licenses exactly four.
+
+Fixed by vendoring a commit-pinned CC BY 4.0 SRD 5.2.1 markdown transcription and generating from it
+(`scripts/build-class-bundle.ts`). Edition was checked before licence — a 2014-SRD transcription
+would have reintroduced the same violation class. The source is **secondary** by construction and
+earned that standing by reproducing the three hand-authored classes exactly; the generator uses them
+as its oracle and fails the build on disagreement rather than regenerating them, because they carry
+typed riders prose cannot express.
+
+Numbers were checked against the SRD, not assumed: Warlock pact slots 1@1 → 2@2 → 2@3 → 3@5 → 4@5,
+full casters 4/3/3/3/3/2/2/1/1, half casters 4/3/3/3/2, Barbarian rages 2–6, Rogue sneak attack
+1d6–10d6, Monk martial arts 1d6–1d12. Rogue's ASI levels came out [4,8,10,12,16] — the extra one at
+10 is Rogue-specific and the parser found it unprompted.
+
+**One real bug the new content exposed:** the assembly read `spellSlots` only, so a Warlock — whose
+slots are all of one level and rise by replacing it — came out with a caster block and no slots. The
+branch was unreachable until a class with pact magic existed. Fixed and pinned by a test.
+
+Two tests were pinning the incomplete state (Barbarian having no subclasses; Barbarian as the
+example of an un-authored class) and now assert the real invariant instead.
+
+`check` clean, **778 tests** (was 767), build green. Verified by creating one level-5 character of
+every class through the real server assembly: 12/12, HP correct per hit die, slots correct per
+caster type. Champion feature-level discrepancy and the prose-only-features caveat are in
+`known-bugs.md`.
+
 ## 2026-07-27 — Character-builder readiness pass (`claude/dndbeyond-sheet-importer-0k6u2e`)
 
 A dedicated shipping-readiness review of the seven-step wizard, bounded to small/medium lift (deep

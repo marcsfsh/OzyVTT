@@ -78,6 +78,27 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
       Cleric L5, in dark, dusk and light, each creating a character end to end — zero horizontal
       overflow on all seven steps in every run.
 
+- **All twelve SRD classes (2026-07-27, phase 5, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
+  The bundle went from **3 classes to 12** and 3 subclasses to 12 — Barbarian, Bard, Druid, Monk,
+  Paladin, Ranger, Rogue, Sorcerer, Warlock, each with its one SRD subclass. **185 features, 46 of
+  them choice-bearing, 42 authored choice options.**
+  - **The content now has a source.** `sources/dnd-5e-srd-markdown/` vendors a CC BY 4.0 SRD 5.2.1
+    transcription pinned to a commit, and `scripts/build-class-bundle.ts` generates from it. This
+    closes a structural hole: the open5e fixtures ship **no** class/subclass/species/background/feat
+    data at all, so those seven bundles were hand-authored with nothing to check them — which is
+    exactly where both licensing violations landed. Re-run with
+    `npm run build-class-bundle -w @vtt/content-srd-5.2.1`; it is idempotent.
+  - **It adds, never regenerates.** Fighter/Wizard/Cleric carry typed riders the prose cannot
+    express, so they are copied through untouched and used as the build's **oracle**: the generator
+    re-parses them from the source and fails on any disagreement about hit die, saving throws, skill
+    choices, proficiency bonus or spell slots. All three agree — that is what earns the source its
+    (secondary) standing.
+  - `statPriority` is **read from `@vtt/rules-5e`**, not hand-listed — it is not SRD text, the engine
+    already owned all twelve, and the content/engine agreement test caught four drifts on the first run.
+  - **Verified by creating one level-5 character of every class** through the real server assembly:
+    12/12 clean; HP 50/44/38/32 by hit die (d12/d10/d8/d6 at CON 15); full casters 4/3/2, half
+    casters 4/2, Warlock 2 slots at level 3.
+
 - **Worldbuilding codex (2026-07-24, branch `claude/world-maps-geospatial-db-1kiqez`).** A GM
   worldbuilding suite + campaign journal + living atlas, on a new **Codex** GM tab (Pages | Atlas |
   Journal) plus a read-only **player Codex** (Lore | Atlas | Journal, behind a player "Codex" button).

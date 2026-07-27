@@ -77,6 +77,27 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
   deliberately not retuned mid-flight. Needs its own pass.
 
+### Found by the 2026-07-27 phase-5 content pass
+
+- **[content] The vendored SRD source and the hand-authored Champion disagree about feature levels.**
+  `sources/dnd-5e-srd-markdown/classes.md` prints Champion as six features — Improved Critical (3),
+  Remarkable Athlete (**3**), Additional Fighting Style (**7**), **Heroic Warrior (10)**, Superior
+  Critical (15), Survivor (18). The committed `subclasses.v1.json` has five — Remarkable Athlete at
+  **7**, Additional Fighting Style at **10**, no Heroic Warrior. One of them is wrong and **it has
+  not been resolved**: the generator's cross-check covers class-level data (hit die, saves, skills,
+  proficiency bonus, spell slots — all agreeing) but not subclass feature levels. Champion is
+  hand-authored so nothing was overwritten; decide it against the SRD text and, either way, extend
+  the cross-check to subclass features so the next one is caught by the build.
+- **[testing] The nine generated classes have prose-only features.** Only the choice-bearing ones
+  (46 of 185) carry structured riders; the rest are description text, which ADR-0008 permits but
+  means a Barbarian's Rage grants nothing mechanically — the resource counts are in `classResources`
+  but nothing interprets them. The three hand-authored classes are richer than the nine new ones.
+  Expected for a first pass; worth knowing before anyone assumes parity.
+- **[content] `weaponProficiencies` gained two qualified slugs** — `martial-light` (Monk) and
+  `martial-finesse-or-light` (Rogue), because the SRD grants those classes a *slice* of Martial
+  rather than all of it. Flattening them to `martial` would have handed a Rogue a greatsword.
+  Nothing consumes the qualifier yet, so equipment filtering by proficiency is not enforced.
+
 ### Deferred by the 2026-07-27 readiness pass (found, scoped, not fixed)
 
 The polish pass was bounded to small/medium lift; these were found by it and left, each for a stated
