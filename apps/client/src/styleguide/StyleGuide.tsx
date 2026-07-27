@@ -669,13 +669,31 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Two forms, one component, swapped by media query: the full horizontal rail above 760px (done steps check off, the current step glows, it scrolls rather than wraps) and a 'Step 3 of 7' + progress bar below it, so a seven-step flow never blobs into rows at 375px. Pass onStepSelect to let a completed step be revisited.">
+          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Two forms, one component, swapped by media query: the full horizontal rail above 760px (done steps check off, the current step glows, it scrolls rather than wraps) and a 'Step 3 of 7' + progress bar below it, so a seven-step flow never blobs into rows at 375px. Pass onStepSelect to let a completed step be revisited. Position alone can only say 'before' and 'after', so a flow that knows whether a visited step is actually FINISHED declares state='done' | 'incomplete' per step — the third rail below. Each of the four states differs in three ways at once, never by hue alone: done is a solid cyan ring with a check, incomplete a dashed caution-violet ring with the system's one caution mark (rose is reserved for damage and destruction — an unanswered step is not an error), current a filled magenta disc, and upcoming a quiet grey ring with its number. Steps that declare a state also say 'done' / 'not finished' to a screen reader, because the marks themselves are decorative.">
             <Steps
               current={1}
               steps={[{ label: "Upload map" }, { label: "Calibrate grid" }, { label: "Verify scale" }, { label: "Save" }]}
             />
             <div style={{ marginTop: "var(--space-5)" }}>
               <Steps current={3} ariaLabel="Character builder progress" onStepSelect={() => {}} steps={WIZARD_STEPS} />
+            </div>
+            {/* All four states at once — the only place they can be compared side by side. */}
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <Steps
+                current={3}
+                ariaLabel="Declared step states"
+                onStepSelect={() => {}}
+                maxSelectable={5}
+                steps={[
+                  { label: "Species", state: "done" },
+                  { label: "Background", state: "incomplete" },
+                  { label: "Class & level", state: "done" },
+                  { label: "Class features" },
+                  { label: "Ability scores", state: "incomplete" },
+                  { label: "Equipment" },
+                  { label: "Name & review" }
+                ]}
+              />
             </div>
           </Section>
 
@@ -686,17 +704,17 @@ export function StyleGuide() {
             </p>
           </Section>
 
-          <Section id="choicecard" title="Choice card" blurb="The selectable content card behind every pick-one step (species, class, background, feat). Radio semantics — role=radio + aria-checked — because these grids are single-select. There is exactly ONE chosen treatment in the system: a cyan edge with the selection glow plus a check. Slots: icon, description, mono meta line, and the provenance Badge (info = SRD, primary = Homebrew — reuse those, don't invent a third).">
+          <Section id="choicecard" title="Choice card" blurb="The selectable content card behind every pick-one step (species, class, background, feat). Radio semantics — role=radio + aria-checked — because these grids are single-select. There is exactly ONE chosen treatment in the system: a cyan edge with the selection glow plus a check. Slots: icon, description, mono meta line, and the provenance Badge. BADGE THE EXCEPTION, NOT THE RULE: the tones are fixed (info = SRD, primary = Homebrew — reuse those, don't invent a third), but a badge every card carries distinguishes nothing and takes ~46px out of the title row at 375px, so the badge goes on what is unusual. Here that is the homebrew class; in the builder, where every shipped option is SRD, only homebrew is badged at all. Badge both sides only when both are genuinely present and the grid can be filtered by them — see the faceted grid below.">
             <div className="sg-grid3" role="radiogroup" aria-label="Class">
               <ChoiceCard
                 selected={cardPick === "fighter"} onSelect={() => setCardPick("fighter")}
-                title="Fighter" meta="d10 hit die · STR or DEX" badge={<Badge tone="info">SRD</Badge>}
+                title="Fighter" meta="d10 hit die · STR or DEX"
                 icon={<IconDie />}
                 description="A master of martial combat, skilled with every weapon and all armor."
               />
               <ChoiceCard
                 selected={cardPick === "wizard"} onSelect={() => setCardPick("wizard")}
-                title="Wizard" meta="d6 hit die · INT" badge={<Badge tone="info">SRD</Badge>}
+                title="Wizard" meta="d6 hit die · INT"
                 description="A scholarly magic-user capable of manipulating the structures of reality."
               />
               <ChoiceCard
@@ -706,7 +724,7 @@ export function StyleGuide() {
               />
               <ChoiceCard
                 selected={false} onSelect={() => {}} disabled
-                title="Artificer" meta="d8 hit die · INT" badge={<Badge tone="info">SRD</Badge>}
+                title="Artificer" meta="d8 hit die · INT"
                 description="Not in the SRD bundle yet."
                 disabledReason="Not available at level 1 in this campaign."
               />

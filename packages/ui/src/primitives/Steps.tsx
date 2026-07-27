@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cx } from "./util";
-import { IconCheck } from "./icons";
+import { IconCheck, IconWarning } from "./icons";
 import "./Steps.css";
 
 export interface StepItem {
@@ -77,7 +77,13 @@ export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel =
             && (maxSelectable != null ? i <= maxSelectable : state === "done");
           const inner = (
             <>
-              <span className="nh-step-marker" aria-hidden="true">{state === "done" ? <IconCheck /> : i + 1}</span>
+              {/* Three marks, never three colours: the check for done, the system's one caution mark
+                  for a step left unfinished, the number for one not reached yet. The caution mark is
+                  the SAME glyph the footer's blocked reason uses, so "not finished" reads the same
+                  in the rail as it does in the sentence explaining it. */}
+              <span className="nh-step-marker" aria-hidden="true">
+                {state === "done" ? <IconCheck /> : state === "incomplete" ? <IconWarning /> : i + 1}
+              </span>
               <span className="nh-step-label">
                 {step.label}
                 {/* The check mark is decorative, so "done" and "not finished" would otherwise sound

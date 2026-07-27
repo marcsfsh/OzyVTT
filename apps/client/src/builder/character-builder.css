@@ -60,11 +60,11 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-/* The running count is data, so it takes the mono face — and it is only ever a readout, never a
-   second place the pick can be made. */
+/* The running count. NUMBERS ONLY — never a word, and never a second place the pick can be made.
+   The mono face comes from `.tabular` on the element itself (design-tokens.css), which is also what
+   gives it tabular figures; restating `font-family` here was a second declaration of one fact. */
 .cb-offer-count {
   color: var(--text-dim);
-  font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
 /* An answered offer, folded down to its answer: display chips plus the one way back in. */

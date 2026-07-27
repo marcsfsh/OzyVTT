@@ -7,6 +7,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 main { width: min(100% - 2rem, 1720px); margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem) 0; }
+/* Height of the fixed connection strip (see .connection-banner). Declared here so the page
+   padding, the strip, and the builder's top inset all read one number. */
+:root { --connection-banner-h: 2.5rem; }
 header { max-width: 40rem; }
 
 h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 10vw, 5rem); line-height: 1; letter-spacing: var(--tracking-display); margin: .35rem 0 1rem; }
@@ -190,7 +193,49 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .notice-success { border-left-color: var(--success); }
 .notice-error { border-left-color: var(--danger); background: color-mix(in srgb, var(--surface-2) 85%, var(--danger)); }
 .notice-info { border-left-color: var(--info); }
-.connection-banner { margin-top: 1.5rem; padding: .7rem 1rem; border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--line-strong); border-left: 3px solid var(--caution); color: var(--text-dim); font-size: .9rem; text-align: center; }
+/* "The table is offline" outranks whatever is on top of the page, because every command the surface
+   above it can issue is one that will not land. As a STATIC in-flow <p> it had no z-index to compare
+   at all, so any positioned overlay won by default and the builder (`.cb-page`, z-index 40) simply
+   painted over it.
+   41 is chosen against the app's whole ladder, not just the builder: it clears the full-viewport
+   40s (.cb-page, .encounter-overlay-backdrop, .encounter-map-interaction.enlarged, .nh-menu) and
+   stays UNDER everything transient that is answering a live gesture — .encounter-menu (42),
+   Tooltip (50), .sheet-float / .token-context-menu / .codex-palette-scrim (60), Toast (80) — and
+   under every Modal, which is a native <dialog> in the top layer and so above all of these.
+   Its placement and its `pointer-events` are explained on the rule itself. */
+.connection-banner {
+  /* FIXED, not in flow. In flow it takes `main`'s page padding, which put it 88px down the viewport
+     — straight across the builder's step rail, hiding all seven step labels behind an opaque card.
+     Floating it as a centred pill instead only moved the collision: at 375px it clipped the wizard's
+     title and half of Save & close, because a full-viewport surface leaves no empty band at phone
+     width. So it takes a strip of its own at the very top and the page GIVES it that strip (below),
+     rather than painting over whatever happens to be there. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 41;
+  /* A role="status" readout is never clicked, so it must never catch a click. Measured: without
+     this it swallowed the taps on two step-rail buttons that were still visible either side of it. */
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--connection-banner-h);
+  margin: 0;
+  padding: .5rem 1rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-strong);
+  border-left: 3px solid var(--caution);
+  color: var(--text-dim);
+  font-size: .9rem;
+  text-align: center;
+}
+/* Reserve the strip's room. `:has()` keys off the banner's own presence, so nothing needs to be
+   told the connection dropped: the page's top padding grows by exactly the strip, and the one
+   full-viewport surface that would otherwise start underneath it starts below it instead. */
+main:has(> .connection-banner) { padding-top: calc(clamp(1.5rem, 5vw, 4rem) + var(--connection-banner-h)); }
+main:has(> .connection-banner) .cb-page { top: var(--connection-banner-h); }
 
 /* Confirm/prompt dialogs and the feature modals (scene prep, character sheet, monster browser, spell
    card, token library) now render through the shared @vtt/ui Modal primitive - no bespoke backdrops. */

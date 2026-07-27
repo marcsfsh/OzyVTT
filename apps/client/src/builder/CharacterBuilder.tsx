@@ -58,7 +58,14 @@ const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
 };
 
 const titleize = (id: string) => id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
-const sourceBadge = (source: string) => source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : <Badge tone="info">SRD</Badge>;
+/**
+ * Mark the EXCEPTION, not the rule. Every option the wizard ships today is SRD, so an "SRD" badge on
+ * 16 of 16 species distinguished nothing while costing ~46px of a 293px card's title row — the badge
+ * is `flex: none`, so that width came straight out of `.nh-choice-title`. Homebrew is the fact worth
+ * a badge, because it is the one that is not always true. `ChoiceCard` guards `badge != null`, so
+ * `undefined` collapses the slot rather than reserving an empty one.
+ */
+const sourceBadge = (source: string) => source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : undefined;
 /**
  * One row per distinct trait NAME. Content lists a species' per-lineage variants as separate
  * features, so Dragonborn's ten ancestries printed 25 rows for 15 titles — "Breath Weapon (Fire)"
@@ -155,9 +162,12 @@ function OfferPicker({ offer, draft, catalogs, onSet }: Readonly<{
   return <section className="cb-offer">
     <div className="cb-offer-head">
       <h3 className="cb-offer-title">{offer.label}</h3>
-      <span className="cb-offer-count tabular" role="status">
-        {many ? `${picks.length} of ${offer.capacity} chosen` : picks.length === 1 ? "Chosen" : "Choose one"}
-      </span>
+      {/* NUMBERS ONLY. A choose-N offer has a running count nothing else on screen carries, so it is
+          said here. A choose-ONE offer had "Chosen" / "Choose one" in the same slot, and both were
+          already on screen twice over: "Chosen" restates the check disc and the cyan edge on the card
+          itself, and "Choose one" restates the radiogroup the cards ARE and the footer sentence that
+          names this very offer. The slot is a readout, not a seventh vocabulary. */}
+      {many && <span className="cb-offer-count tabular" role="status">{picks.length} of {offer.capacity} chosen</span>}
     </div>
     {collapsed
       /* DISPLAY chips, never `.nh-chip--pressable`: a readout is not a second place the pick can be
@@ -623,16 +633,16 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   // ---- Step bodies ---------------------------------------------------------------------------
   /**
    * Species, Background, and Class are the three PRIMARY picks, and they were the only decisions in
-   * the wizard rendered as a bare grid: no heading, no count. That made "Species" carry less
-   * typographic weight than "Keen Senses" — a sub-choice of the thing it decides — and it left the
-   * step's first element unlabelled. Same `.cb-offer` shell as every other decision, so a player who
-   * has answered one has answered all of them.
+   * the wizard rendered as a bare grid: no heading at all. That made "Species" carry less typographic
+   * weight than "Keen Senses" — a sub-choice of the thing it decides — and it left the step's first
+   * element unlabelled. Same `.cb-offer` shell as every other decision, so a player who has answered
+   * one has answered all of them. A heading, and nothing else: these are choose-one, and choose-one
+   * needs no count (see `OfferPicker` — the two must stay in step).
    */
-  const primaryPick = (label: string, answered: boolean, grid: ReactNode): ReactNode =>
+  const primaryPick = (label: string, grid: ReactNode): ReactNode =>
     <section className="cb-offer">
       <div className="cb-offer-head">
         <h3 className="cb-offer-title">{label}</h3>
-        <span className="cb-offer-count tabular" role="status">{answered ? "Chosen" : "Choose one"}</span>
       </div>
       {grid}
     </section>;
@@ -652,22 +662,25 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     ? stepOffers("species").find((offer) => FEAT_KINDS.has(offer.kind) && !offerFilled(offer, draft))
     : undefined;
 
+  /* No `facet`: `ChoiceGrid` only reads it when the caller also passes `facets`, and none of these
+     three do — one source means a "Source" filter with one live value. It was dead weight on every
+     option in every catalog. Add it back with the facet row, if a second source ever ships. */
   const speciesOptions: ChoiceOption[] = catalogs.choice.species.map((entry) => ({
     value: entry.id, title: entry.name, description: entry.summary ?? undefined,
     badge: sourceBadge(entry.source), meta: `${entry.speedFeet} ft.${entry.darkvisionFeet ? ` · darkvision ${entry.darkvisionFeet} ft.` : ""}`,
-    facet: entry.source, keywords: `${entry.creatureType} ${entry.languages.join(" ")}`
+    keywords: `${entry.creatureType} ${entry.languages.join(" ")}`
   }));
   const backgroundOptions: ChoiceOption[] = catalogs.backgrounds.map((entry) => ({
     value: entry.id, title: entry.name, description: entry.summary ?? undefined,
     badge: sourceBadge(entry.source),
     meta: entry.abilityOptions ? entry.abilityOptions.from.map((ability) => ability.toUpperCase()).join(" / ") : undefined,
-    facet: entry.source, keywords: entry.skillProficiencies.join(" ")
+    keywords: entry.skillProficiencies.join(" ")
   }));
   const classOptions: ChoiceOption[] = catalogs.choice.classes.map((entry) => ({
     value: entry.id, title: entry.name, description: entry.summary ?? undefined,
     badge: sourceBadge(entry.source),
     meta: `${entry.hitDie} · ${entry.savingThrows.map((ability) => ability.toUpperCase()).join("/")}${entry.spellcasting ? ` · ${entry.spellcasting.ability.toUpperCase()} caster` : ""}`,
-    facet: entry.source, keywords: entry.primaryAbilities.join(" ")
+    keywords: entry.primaryAbilities.join(" ")
   }));
 
   /* ONE failure surface, rendered on the two steps that can produce one: a rejected server roll
@@ -681,14 +694,14 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
     switch (step) {
       case "species":
         return <>
-          {primaryPick("Species", draft.speciesId != null,
+          {primaryPick("Species",
             <ChoiceGrid ariaLabel="Species" options={speciesOptions} value={draft.speciesId} onChange={(value) => patch({ speciesId: value })}
               searchable={speciesOptions.length > 8} searchPlaceholder="Search species…" />)}
           {stepOffers("species").map(renderOffer)}
         </>;
       case "background":
         return <>
-          {primaryPick("Background", draft.backgroundId != null,
+          {primaryPick("Background",
             <ChoiceGrid ariaLabel="Backgrounds" options={backgroundOptions} value={draft.backgroundId} onChange={(value) => patch({ backgroundId: value })}
               searchable={backgroundOptions.length > 8} searchPlaceholder="Search backgrounds…" />)}
           {context.originFeat && <p className="cb-note">{context.background?.name} grants the <strong>{context.originFeat.name}</strong> feat.</p>}
@@ -700,13 +713,13 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         </>;
       case "class":
         return <>
-          {primaryPick("Class", draft.classId != null,
+          {primaryPick("Class",
             <ChoiceGrid ariaLabel="Classes" options={classOptions} value={draft.classId} onChange={(value) => patch({ classId: value })}
               searchable={classOptions.length > 8} searchPlaceholder="Search classes…" />)}
           <section className="cb-offer">
             <div className="cb-offer-head">
+              {/* No readout: the `Stepper` below IS the readout, and it is the control as well. */}
               <h3 className="cb-offer-title">Level</h3>
-              <span className="cb-offer-count tabular" role="status">Level {draft.level}</span>
             </div>
             <p className="cb-offer-help">Your GM grants the level; every choice it opens is yours to make.</p>
             <Stepper value={draft.level} min={1} max={20} aria-label="Character level" onChange={(level) => patch({ level, hpEntries: draft.hpEntries.slice(0, Math.max(0, level - 1)) })} />
@@ -720,7 +733,6 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       case "abilities": {
         const spent = pointBuySpent(draft);
         const options = context.background?.abilityOptions ?? null;
-        const spread = draft.backgroundBonus.map((entry) => entry.amount).join("/");
         return <>
           {problemAlert}
           {/* What this class actually wants from the six numbers about to be assigned. Every field
@@ -766,8 +778,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
 
           {options && <section className="cb-offer">
             <div className="cb-offer-head">
+              {/* No readout: the `SegmentedControl` below shows the spread as its pressed option, and
+                  the two Selects under it name the abilities. */}
               <h3 className="cb-offer-title">{context.background?.name} ability increases</h3>
-              <span className="cb-offer-count tabular" role="status">{spread ? `+${spread.split("/").join(" / +")}` : "Not spent"}</span>
             </div>
             <SegmentedControl
               ariaLabel="Ability increase spread"
@@ -796,9 +809,14 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
           <section className="cb-offer">
             <div className="cb-offer-head">
               <h3 className="cb-offer-title">Hit points</h3>
+              {/* KEPT: two numbers that decide the hit points about to be rolled, and the only place
+                  in the wizard where the hit die and the CON modifier are said together. */}
               <span className="cb-offer-count tabular" role="status">{hitDie} · CON {base.con == null ? "—" : abilityModifier(base.con + bonuses.con) >= 0 ? `+${abilityModifier(base.con + bonuses.con)}` : abilityModifier(base.con + bonuses.con)}</span>
             </div>
-            <p className="cb-offer-help">Level 1 is always the full die. From level 2 up, take the average or roll — rolling can only help, so the server keeps the better of your roll and the average.</p>
+            {/* Said to the PLAYER, about their character. The rule is the same one `character-build.ts`
+                applies ("max-of-both"); the wizard just does not tell a player at a table that there
+                is a server, or make them reason about which machine keeps which number. */}
+            <p className="cb-offer-help">Level 1 is always the full die. From level 2 up, take the average or roll — a roll below the average is topped up to it, so rolling can only help.</p>
             <SegmentedControl
               ariaLabel="How to gain hit points"
               value={draft.hpMode}
@@ -854,13 +872,24 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
   function pickedNames(offer: BuilderOffer): string {
     const picks = draft.picks[offer.key] ?? [];
     if (picks.length === 0) return "—";
+    // The FULL ability name, so the review says "+2 Strength" in the same words as the "Strength /
+    // 17" row three tiles above it. The three-letter form belongs to the dense `.tabular` strips and
+    // the allocator's own column, not to a value read as a phrase.
     return picks.map((id) => id === ASI_SHORTHAND
-      ? (draft.asiIncreases[offer.key] ?? []).map((entry) => `+${entry.amount} ${entry.ability.toUpperCase()}`).join(", ")
+      ? (draft.asiIncreases[offer.key] ?? []).map((entry) => `+${entry.amount} ${ABILITY_LABELS[entry.ability]}`).join(", ")
       : offer.options.find((option) => option.id === id)?.name ?? titleize(id)).join(", ");
   }
 
   function sectionFor(id: StepId, owner: BuilderOffer["step"] | null, items: ReviewSection["items"]): ReviewSection {
-    const extra = owner ? stepOffers(owner).map((offer) => ({ label: offer.label, value: pickedNames(offer) })) : [];
+    // Stamp the level exactly where the footer does. A level 6+ Fighter answers several "Ability
+    // Score Improvement" decisions, so the bare label names all of them and identifies none - and
+    // the review saying "Ability Score Improvement" twice while the footer says "level 4" and
+    // "level 6" would leave the two surfaces disagreeing about what one decision is called.
+    const siblings = owner ? stepOffers(owner) : [];
+    const extra = siblings.map((offer) => ({
+      label: siblings.filter((other) => other.label === offer.label).length > 1 ? `${offer.label} (level ${offer.level})` : offer.label,
+      value: pickedNames(offer)
+    }));
     const reason = catalogs.loaded ? stepReasons[STEP_IDS.indexOf(id)] : null;
     return {
       id, title: STEP_LABELS[id], items: [...items, ...extra],
@@ -893,7 +922,12 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
         { label: "Level", value: String(draft.level), numeric: true },
         { label: "Hit die", value: context.hitDie ?? "—", numeric: true }
       ]),
-      sectionFor("features", "features", context.subclass ? [{ label: context.classRecord?.subclassLabel ?? "Subclass", value: context.subclass.name }] : []),
+      /* No explicit subclass item: the subclass IS a feature offer, so `sectionFor` already emits it
+         from `stepOffers("features")` — and `subclassLabel` is byte-identical to the granting
+         feature's name in all three SRD classes, so the two printed the same `Fighter Subclass /
+         Champion` tile twice. The offer extra is the one kept: it is generated uniformly for every
+         feature offer, where this was a hand-written special case for one of them. */
+      sectionFor("features", "features", []),
       sectionFor("abilities", null, [
         ...scoreItems,
         { label: "Method", value: METHOD_LABELS[method] },
@@ -920,7 +954,9 @@ export function CharacterBuilder({ state, sessionKey, connection = "online", onC
       return <>
         <p>{context.classRecord.description ?? context.classRecord.summary}</p>
         <p className="tabular">Hit die {context.classRecord.hitDie} · saves {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join(", ")}</p>
-        <p className="tabular">Armor: {context.classRecord.armorProficiencies.join(", ") || "none"} · weapons: {context.classRecord.weaponProficiencies.join(", ") || "none"}</p>
+        {/* "—" for absent, matching the line above and every review row and allocator cell: one mark
+            for "there is nothing here", not a word in one place and a dash in the next. */}
+        <p className="tabular">Armor: {context.classRecord.armorProficiencies.join(", ") || "—"} · weapons: {context.classRecord.weaponProficiencies.join(", ") || "—"}</p>
         <FeatureList items={featureItems(context.classRecord.features.filter((feature) => (feature.level ?? 1) <= draft.level))} allowExpandAll ariaLabel={`${context.classRecord.name} features`} />
       </>;
     }

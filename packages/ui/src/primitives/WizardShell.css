@@ -69,6 +69,16 @@
    only place them, and hide each one at the width where it makes no sense. */
 .nh-wizard-detail-open { display: none; margin-bottom: var(--space-3); }
 .nh-wizard-detail-back { display: none; align-self: flex-start; }
+/* The system's disclosure caret, turned a quarter clockwise to point back at the list. A STATIC
+   transform, not a transition: nothing animates, so there is nothing for reduced-motion to suppress. */
+.nh-wizard-detail-back-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-right: var(--space-1);
+  font-size: 1.05em;
+  transform: rotate(90deg);
+}
 
 .nh-wizard-foot {
   position: sticky;

@@ -279,10 +279,14 @@ export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): B
   };
   const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
   const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
+  // An OPTION is named, not abbreviated: this string is the card's title and the review's value, and
+  // "STR" beside a review row already reading "Strength / 17" is one ability under two names. The
+  // three-letter form stays where density earns it - the allocator's own column, and the `.tabular`
+  // meta strips - and nowhere a name is being said in a sentence.
   const nameOfKind = (kind: string) => (id: string) =>
     kind === "skill" || kind === "expertise" || kind === "skill-or-tool" ? skillName(id)
       : kind === "spell" || kind === "cantrip" ? spellName(id)
-        : kind === "ability-score" ? (ABILITIES.includes(id as Ability) ? id.toUpperCase() : titleize(id))
+        : kind === "ability-score" ? (ABILITIES.includes(id as Ability) ? ABILITY_LABELS[id as Ability] : titleize(id))
           : titleize(id);
 
   const listOffer = (key: string, step: OfferStep, kind: string, label: string, list: { choose: number; from: readonly string[] } | null | undefined, classId: string | null) => {
@@ -735,8 +739,11 @@ export const STEP_LABELS: Readonly<Record<StepId, string>> = {
   species: "Species", background: "Background", class: "Class & level", features: "Class features",
   abilities: "Ability scores", equipment: "Equipment", review: "Name & review"
 };
+/** The phone rail's names. Shorter than `STEP_LABELS` where shortening loses nothing - but never
+    where it renames the step: the level control lives on the class step, so "Class" would be the
+    wrong name at exactly the width the short form is used. */
 export const STEP_SHORT: Readonly<Record<StepId, string>> = {
-  species: "Species", background: "Background", class: "Class", features: "Features",
+  species: "Species", background: "Background", class: "Class & level", features: "Features",
   abilities: "Abilities", equipment: "Equipment", review: "Review"
 };
 
@@ -748,17 +755,26 @@ export function stepBlockedReason(
 ): string | null {
   const context = offerContext(draft, catalogs);
   const unfilled = (owner: OfferStep) => offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
+  /**
+   * ONE template for "this pick is not answered yet", in every step that has picks.
+   *
+   * There were five sentence shapes for the single instruction "answer this control": one per step,
+   * plus the equipment step's own, which lower-cased the label and so asked for a "fighter starting
+   * equipment" under a heading reading "Fighter". The label is a NAME - it is printed as the content
+   * prints it, and it is never quoted: the heading it points at carries no quotes either, and two
+   * spellings of one name is the duplication this template exists to remove.
+   */
   const pickReason = (offer: BuilderOffer) => {
     // Two offers on one step can share a LABEL - a level 20 Fighter answers six "Ability Score
     // Improvement" decisions - and an instruction naming a label that matches six controls names
     // none of them. Stamp the level exactly when the label alone is ambiguous, and not otherwise.
     const ambiguous = offersForStep(offers, offer.step).filter((sibling) => sibling.label === offer.label).length > 1;
-    const named = ambiguous ? `level ${offer.level} "${offer.label}"` : `"${offer.label}"`;
+    const named = ambiguous ? `level ${offer.level} ${offer.label}` : offer.label;
     const chosen = (draft.picks[offer.key] ?? []).length;
     if (offer.kind === "asi-or-feat" && chosen === offer.capacity) return `Split the +2 from ${named} across your abilities.`;
     return offer.capacity === 1
-      ? `Make your ${named} choice to continue.`
-      : `Choose ${offer.capacity} for ${named} — ${chosen} of ${offer.capacity} so far.`;
+      ? `Choose your ${named} to continue.`
+      : `Choose ${offer.capacity} for ${named} to continue — ${chosen} of ${offer.capacity} so far.`;
   };
   /**
    * A pick this build already holds from somewhere else. The options are not filtered out (that is
@@ -876,7 +892,7 @@ export function stepBlockedReason(
     }
     case "equipment": {
       const offer = unfilled("equipment");
-      return offer ? `Choose your ${offer.label.toLowerCase()} to continue.` : null;
+      return offer ? pickReason(offer) : null;
     }
     case "review": {
       if (draft.name.trim().length === 0) return "Name your character to create them.";

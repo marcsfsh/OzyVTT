@@ -123,10 +123,15 @@ export function AbilityScoreAllocator({
           <Meter
             value={Math.max(0, budget.total - budget.spent)}
             max={budget.total}
+            /* Overspent CLAMPS the value to 0, so this tone paints a zero-width fill and is never
+               seen. Left as-is deliberately: churning a token that renders nothing is noise. */
             tone={overspent ? "magenta" : "cyan"}
             label={budget.label ?? "Points remaining"}
           />
-          {overspent && <Alert tone="danger" title="Over budget">You have spent {budget.spent} of {budget.total} points. Lower a score to continue.</Alert>}
+          {/* CAUTION, not danger: rose-red is damage and destruction (§2), and an over-budget spread
+              is simply not finished. The Alert owns the FACT; the flow's footer owns the fix, so the
+              two no longer print the same instruction one above the other. */}
+          {overspent && <Alert tone="warning" title="Over budget">You have spent {budget.spent} of {budget.total} points.</Alert>}
         </div>
       )}
 

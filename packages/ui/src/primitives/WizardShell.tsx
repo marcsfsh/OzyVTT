@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { cx } from "./util";
 import { Button } from "./Button";
-import { IconWarning } from "./icons";
+import { IconChevron, IconWarning } from "./icons";
 import { Steps, type StepItem } from "./Steps";
 import "./WizardShell.css";
 
@@ -120,7 +120,15 @@ export function WizardShell({
         {detail != null && (
           <aside className="nh-wizard-detail" aria-label={typeof detailTitle === "string" ? detailTitle : "Details"}>
             {onCloseDetail && (
-              <Button variant="ghost" size="sm" className="nh-wizard-detail-back" onClick={onCloseDetail}>‹ {detailBackLabel}</Button>
+              <Button variant="ghost" size="sm" className="nh-wizard-detail-back" onClick={onCloseDetail}>
+                {/* A PRIMITIVE NEVER RENDERS A GLYPH AS TEXT. "‹" (U+2039) does sit inside Manrope's
+                    declared U+2000-206F subset, so unlike "→" it very probably did render in the
+                    body face - but it rendered at 8.19px beside a 13px label, because a single
+                    guillemet is drawn small by design. The system already owns this shape: the
+                    disclosure caret, turned a quarter clockwise, at `currentColor` and 1.05em. */}
+                <span className="nh-wizard-detail-back-icon" aria-hidden="true"><IconChevron /></span>
+                {detailBackLabel}
+              </Button>
             )}
             {detailTitle != null && <h2 className="nh-wizard-detail-title">{detailTitle}</h2>}
             <div className="nh-wizard-detail-body">{detail}</div>

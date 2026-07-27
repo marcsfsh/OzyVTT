@@ -69,12 +69,23 @@
 .nh-step--current .nh-step-marker { border-color: transparent; background: var(--primary); color: var(--text-on-neon); box-shadow: var(--glow-magenta); }
 .nh-step--current .nh-step-label { color: var(--text); }
 
-/* PLACEHOLDER treatment for a step that has been visited but is not finished. It deliberately
-   invents no token and no glyph: it keeps the numbered marker (so it cannot be mistaken for done)
-   and dashes the ring so it is not mistaken for untouched either. The real glyph and tone are the
-   design-language engineer's to assign — see the handoff note. */
-.nh-step--incomplete .nh-step-marker { border-style: dashed; }
-.nh-step--incomplete .nh-step-label { color: var(--text-muted); }
+/* Visited, and NOT finished. CAUTION violet, never rose: §2 reserves rose-red for damage and
+   destruction, and nothing has gone wrong here — a step is simply owed an answer. It is the same
+   family (and the same glyph) the wizard's blocked reason already speaks in.
+
+   Three signals, so it never rests on hue alone and survives all three themes:
+     ring STYLE   dashed, against done/upcoming/current's solid — readable in greyscale;
+     ring HUE     --caution, against done's cyan and upcoming's --line-strong;
+     GLYPH        the caution mark, against done's check and upcoming's number.
+   The LABEL takes --text-dim, the same weight as done: both are steps the player has been to, and
+   only --text-muted (upcoming) means "not yet". */
+.nh-step--incomplete .nh-step-marker {
+  border-style: dashed;
+  border-color: var(--caution);
+  background: color-mix(in srgb, var(--caution) 22%, transparent);
+  color: var(--caution-hi);
+}
+.nh-step--incomplete .nh-step-label { color: var(--text-dim); }
 
 /* Jump back to a completed step. Meets the 44px floor by padding, not by paint. */
 .nh-step-jump {

@@ -15,7 +15,21 @@
   text-align: left;
   cursor: pointer;
 }
-.nh-choice:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-2); }
+/* Hover owns the SURFACE; it must not own the EDGE of a card that is already chosen.
+   `:not()` takes its argument's specificity, so `.nh-choice:hover:not(:disabled)` is (0,3,0) and
+   out-specified `.nh-choice.is-selected` at (0,2,0): pointing at your own answer repainted its cyan
+   border grey. Excluded here rather than fixed by out-specifying it on the selected rule - a
+   specificity race is silently lost by whoever edits next. */
+.nh-choice:hover:not(:disabled) { background: var(--surface-2); }
+.nh-choice:hover:not(:disabled):not(.is-selected) { border-color: var(--line-strong); }
+/* And defend the edge against the CONSUMING APP's element-selector globals, the same way
+   `.nh-wizard-head` defends its width. A `.nh-choice` IS a <button>, and the client's styles.css
+   carries a bare `button:hover:not(:disabled) { border-color: color-mix(--cyan 55%, transparent) }`
+   at (0,2,1) — which out-specifies `.nh-choice.is-selected` at (0,2,0) all on its own. Excluding
+   hover above therefore got the chosen edge only as far as 55%-alpha cyan (measured: dark theme
+   rgb(38,135,165) composited, against rgb(45,226,255) at rest). This restates it at (0,3,0), one
+   class clear of any bare-element hover rule a host might define. */
+.nh-choice.is-selected:hover { border-color: var(--cyan); }
 
 .nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
@@ -90,8 +104,14 @@
 /* Choose-N grids keep the chosen EDGE and CHECK — the treatment is unchanged — but spend no glow.
    §8.1 budgets one glowing element per region, and a "choose 6 spells" region has six answers by
    definition; six glowing cards is precisely the wallpaper that rule exists to prevent. The cyan
-   edge plus the check still say "chosen" without colour alone, so nothing is lost but the bloom. */
-.nh-choicegrid-items[role="group"] .nh-choice.is-selected { box-shadow: none; }
+   edge plus the check still say "chosen" without colour alone, so nothing is lost but the bloom.
+
+   ...EXCEPT while it is focused. At (0,4,0) this selector out-specified BOTH keyboard rings - the
+   local `.nh-choice:focus-visible` (0,2,0) and the global `:where(…)` one (0,1,0), which also sets
+   `outline: none` - so a ticked card in a choose-N grid had no focus indicator at all: tabbing onto
+   your own answer showed nothing. `:not(:focus-visible)` takes this rule out of the way instead of
+   restating the ring at a higher weight; the ring below then wins on source order at equal (0,2,0). */
+.nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
 
 /* Disabled dims PER PROPERTY, never with a group `opacity`: group alpha composites the
    whole subtree, so a child can't opt back out of it (the old `.nh-choice-locked
