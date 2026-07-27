@@ -12,14 +12,26 @@
    `.nh-roweditor-head .nh-roweditor-toggle:hover` — (0,3,0) — which wins. Do not
    "simplify" them back to one class. */
 
+/* `minmax(0, 1fr)` and `min-width: 0` all the way down, and this is measured rather than
+   defensive. A grid track and a grid/flex ITEM both default to an `auto` minimum, so the
+   row head's intrinsic width (grip + toggle + ⋯ menu, each with a 44px hit area
+   overhanging its paint by 8px a side) propagated outwards and pushed the DOCUMENT 8px
+   sideways at 375px: `document.documentElement.scrollWidth` read 383 against a 375
+   viewport wherever a RowEditor sat inside a narrow column. A primitive must never widen
+   its container — least of all when nested, which is exactly what the homebrew feature
+   and rider forms do. */
 .nh-roweditor {
   box-sizing: border-box;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: var(--space-3);
 }
 
 .nh-roweditor-rows {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: var(--space-2);
   margin: 0;
   padding: 0;
@@ -28,6 +40,7 @@
 
 .nh-roweditor-row {
   box-sizing: border-box;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-1);
@@ -36,6 +49,7 @@
 
 .nh-roweditor-head {
   display: flex;
+  min-width: 0;
   align-items: center;
   /* Gap budget (design-language §4, route 2): the grip and the ⋯ trigger are each
      1.75rem of paint carrying a 44px hit AREA, so each overhangs by (44 − 28) / 2 = 8px
@@ -103,7 +117,7 @@
 }
 .nh-roweditor-menu { flex: none; }
 
-.nh-roweditor-body { padding: 0 var(--space-3) var(--space-3); }
+.nh-roweditor-body { min-width: 0; padding: 0 var(--space-3) var(--space-3); }
 /* `display` is unset above so the `hidden` attribute keeps working; belt and braces. */
 .nh-roweditor-body[hidden] { display: none; }
 
@@ -114,7 +128,7 @@
 .nh-roweditor-row.is-dragging { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
 .nh-roweditor-row.is-drop-target { border-color: var(--line-strong); background: var(--surface-2); }
 
-.nh-roweditor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.nh-roweditor-foot { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--space-3); }
 .nh-roweditor-add-icon { display: grid; place-items: center; font-size: 1.05em; }
 /* Full strength beside a disabled Add — the reason is the one thing that must stay
    readable when the control it explains is dimmed. */

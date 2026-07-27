@@ -8,9 +8,15 @@ import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect
 import { useRollPreference } from "../dice/roll-preference";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 
-/** Per-definition cache: stat blocks are immutable content, one lookup per session is plenty. */
+/** Per-definition cache: one lookup per stat block per session.
+    NOT immutable any more — a GM can publish a homebrew creature edit mid-session, so the
+    cache is dropped on `homebrew:changed` (`content/invalidate.ts`) and the next resolve
+    refetches. Actions and typed defences are late-bound at every use, which is exactly
+    why a stale entry here would show the wrong attack on a creature already on the table. */
 const actionCache = new Map<string, readonly ContentActionSummary[]>();
+registerContentCache(() => actionCache.clear());
 
 /* A LIMITED USE is itself the mechanic (`action-resolution.ts` resolveDefinitionAction: "limited uses
    are themselves a structured effect"). Action Surge, Indomitable, Arcane Recovery, Relentless

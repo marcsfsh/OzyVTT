@@ -31,6 +31,18 @@ export interface AutosaveConfig<T> {
   draft: T;
   /** The server revision the draft is known to match. Seed it from the record's `rev`. */
   rev: number;
+  /**
+   * What the server actually holds, when that differs from the draft at mount.
+   *
+   * The homebrew editor fills a record with sensible defaults on the way in
+   * (`withDefaults`), so a blank spell shows level 1 / evocation / 60 feet the moment it
+   * opens. Baselining on `draft` would treat all of that as already saved and never send
+   * it: the form would show eight filled fields the server had never heard of, and the
+   * record would refuse to publish for reasons visibly contradicted by the screen.
+   * Passing the stored record here makes the filled-in defaults dirty, so they park on
+   * the first debounce. Omit it and the baseline is `draft`, as before.
+   */
+  baseline?: T;
   /** PATCHes `draft` with `expectedRev` and resolves the row's NEW revision. */
   save: (draft: T, expectedRev: number) => Promise<number>;
   /** Re-reads the row after a 409 and resolves its current revision. */
@@ -62,6 +74,7 @@ export interface Autosave<T> {
 export function useAutosave<T>({
   draft,
   rev,
+  baseline,
   save,
   resync,
   isConflict,
@@ -70,7 +83,7 @@ export function useAutosave<T>({
 }: AutosaveConfig<T>): Autosave<T> {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const revRef = useRef(rev);
-  const savedRef = useRef(serialize(draft));
+  const savedRef = useRef(serialize(baseline === undefined ? draft : baseline));
   const draftRef = useRef(draft);
   const savingRef = useRef(false);
   const dirtyRef = useRef(false);

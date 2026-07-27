@@ -14,9 +14,14 @@ import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 
-/** Definitions are immutable bundled content; one fetch per stat block per session. */
+/** One fetch per stat block per session.
+    NOT immutable any more: homebrew definitions can be republished while the sheet is
+    open, so this is cleared on `homebrew:changed` (`content/invalidate.ts`). A stale
+    entry here is already a known failure mode — see the note at the save path below. */
 const sheetCache = new Map<string, ActorDefinition>();
+registerContentCache(() => sheetCache.clear());
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));

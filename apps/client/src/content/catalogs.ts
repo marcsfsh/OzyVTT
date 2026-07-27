@@ -6,6 +6,7 @@ import type {
 import { useEquipmentReference } from "../encounter/equipment";
 import { useSpellReference } from "../encounter/spells";
 import { socket } from "../socket";
+import { registerContentCache } from "./invalidate";
 
 /**
  * The character-builder content catalogs, read once per session and shared by every surface that
@@ -36,8 +37,10 @@ function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attrib
   let inFlight: Promise<void> | null = null;
   const listeners = new Set<() => void>();
 
-  const request = () => {
-    if (cache) return;
+  /** `force` is how a homebrew publish gets past the one-fetch-per-session guard. The
+      previous list stays served until the new one lands, so nothing flashes empty. */
+  const request = (force = false) => {
+    if (cache && !force) return;
     inFlight ??= new Promise<void>((resolve) => {
       fetcher((items, line) => {
         inFlight = null;
@@ -52,10 +55,18 @@ function makeCatalog<T>(fetcher: (done: (items: readonly T[] | undefined, attrib
     });
   };
 
+  // Content is no longer immutable: a GM can publish a class mid-session. Nothing happens
+  // for a cold cache — the next mount fetches anyway. See `content/invalidate.ts`.
+  registerContentCache(() => { if (cache) request(true); });
+
   function useCatalog(): CatalogRead<T> {
     const [, bump] = useState(0);
     useEffect(() => {
-      if (cache) return;
+      // ALWAYS subscribe, even when the cache is warm. The early return this replaces
+      // meant a consumer that mounted after the fetch had landed held no listener, so a
+      // later invalidation could refetch and re-render nobody: the builder would keep
+      // offering the list it read at page load. `items` is read at render from the
+      // module cache, so the bump is the only thing that makes a swap visible.
       const listener = () => bump((count) => count + 1);
       listeners.add(listener);
       request();

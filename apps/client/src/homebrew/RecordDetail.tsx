@@ -1,17 +1,16 @@
 /**
- * The selected record's detail pane: identity, the state cluster, and a read-only
- * view of the authored body.
+ * The selected record's detail pane: identity, the state cluster, and the editor.
  *
- * **Scope.** The schema-driven editor is the next slice. What ships here is everything
- * that is *about the record* rather than *inside* it — the name, the draft/publish/
- * visibility machine, remove and restore, and the autosave that parks all of it. The
- * body is rendered read-only from whatever keys the record carries, so a duplicated
- * SRD class is legible the moment it lands rather than showing a blank pane; the
- * `SchemaForm` drops into the same slot without moving anything around it.
+ * Two halves that never mix. Everything *about* the record — the draft/publish/
+ * visibility machine, remove and restore, the autosave — lives in the head here.
+ * Everything *inside* it is `SchemaForm` over one of nine data schemas, with four
+ * bespoke components wired in below. There is no per-type branch in this file beyond
+ * choosing which of those four to mount.
  *
- * **Why the name is editable here and nothing else is.** It is the identity the GM
- * sees in every picker and the only field common to all nine types, and autosave with
- * nothing to save is untestable. One field exercises the whole `expectedRev` path.
+ * **No type switcher, ever.** The Codex's `PageEditor` silently drops field values not
+ * in the new type's schema when the entity type changes. Type is chosen at creation and
+ * fixed thereafter, so that bug cannot arise — and no one may add a switcher without
+ * solving it first.
  *
  * **The six states are words, never colour alone** (design-language §2 — violet is
  * reserved for GM-only and `--caution` shares its hue family):
@@ -21,67 +20,55 @@
  * between GM-only and removed), never "live", never "active".
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, Input, Menu, MenuItem, SaveState } from "@vtt/ui";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Alert, Badge, Button, Menu, MenuItem, SaveState } from "@vtt/ui";
 import { RevealSwitch } from "../codex/SecretMarkers";
 import { useConfirm } from "../components/feedback";
-import { HomebrewRequestError, homebrewApi, type HomebrewRecordDocument } from "./api";
+import { HomebrewRequestError, homebrewApi, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
+import { FeatureEditor } from "./FeatureEditor";
+import { LevelTableEditor } from "./LevelTableEditor";
+import { ITEM_RIDERS, RiderEditor } from "./RiderEditor";
+import { SchemaForm, sectionDomId } from "./SchemaForm";
+import { SpellListContents } from "./SpellListContents";
+import { withDefaults } from "./defaults";
+import { SCHEMAS, fieldAt, sectionTitle } from "./schemas";
 import { useAutosave } from "./useAutosave";
+import { useSchemaContext } from "./useSchemaContext";
+import { duplicateNameNote, publishBlockedReason, serverBlockedReason } from "./validate";
+import type { CustomRenderer } from "./FieldRenderer";
 import { typeLabel } from "./types";
 
 type Body = Readonly<Record<string, unknown>>;
 
 const nameOf = (record: Body): string => (typeof record.name === "string" ? record.name : "");
 
-/** camelCase / kebab-case key to a sentence-case label. */
-function humanise(key: string): string {
-  const spaced = key.replace(/[-_]/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-/** A read-only rendering of one authored value. Structure is summarised rather than
-    dumped: a class's twenty level rows are "20 entries", not a wall of JSON. */
-function readValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "Not set";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "number") return String(value);
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "None";
-    if (value.every((entry) => typeof entry === "string" || typeof entry === "number")) return value.join(", ");
-    return `${value.length} ${value.length === 1 ? "entry" : "entries"}`;
-  }
-  if (typeof value === "object") {
-    const keys = Object.keys(value as object);
-    return keys.length === 0 ? "Not set" : `${keys.length} ${keys.length === 1 ? "field" : "fields"}`;
-  }
-  return String(value);
-}
-
-/** Never shown: `name` has its own field, and ids/source/type are the system's problem. */
-const HIDDEN_KEYS = new Set(["name", "id", "source", "type"]);
-
 export function RecordDetail({
   gmToken,
   record: initial,
+  records,
   usageCount,
   onChanged,
   onRemoved
 }: Readonly<{
   gmToken: string;
   record: HomebrewRecordDocument;
+  records: readonly HomebrewRecordSummary[];
   usageCount: number;
   onChanged: (record: HomebrewRecordDocument) => void;
   onRemoved: () => void;
 }>) {
   const { confirm, dialog } = useConfirm();
   const [doc, setDoc] = useState(initial);
-  const [draft, setDraft] = useState<Body>(initial.record);
+  // Filled in from `defaults.ts` on the way in, so the renderer never writes `?? []` at
+  // every call site — and so a record created before this schema existed, duplicated
+  // from an SRD record, or imported from a pack all arrive complete.
+  const [draft, setDraft] = useState<Body>(() => withDefaults(initial.type, initial.record));
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const nameId = useId();
   const reasonId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const { ctx, spells } = useSchemaContext(initial.id, initial.type, records);
+  const schema = SCHEMAS[initial.type];
 
   // `docRef` shadows `doc` because publish/visibility read the revision immediately
   // after `await flush()`, in the same closure — React has not re-rendered yet.
@@ -107,6 +94,9 @@ export function RecordDetail({
   const autosave = useAutosave<Body>({
     draft,
     rev: initial.rev,
+    // What the SERVER holds, not what the form shows: the defaults `withDefaults` filled
+    // in above have to be dirty, or they never reach the store.
+    baseline: initial.record,
     save: async (body, expectedRev) => {
       const next = await homebrewApi.update(gmToken, docRef.current.id, body, expectedRev);
       adopt(next);
@@ -122,8 +112,9 @@ export function RecordDetail({
     try {
       const next = await homebrewApi.get(gmToken, docRef.current.id);
       adopt(next);
-      setDraft(next.record);
-      autosave.markSaved(next.rev, next.record);
+      const filled = withDefaults(next.type, next.record);
+      setDraft(filled);
+      autosave.markSaved(next.rev, filled);
       setActionError(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Couldn't reload that record.");
@@ -132,22 +123,67 @@ export function RecordDetail({
 
   /**
    * Why publishing is blocked, as ONE sentence, in ONE place, beneath the button it
-   * blocks. Never a red asterisk, never a checklist, never per-field errors: drafts
-   * are allowed to be invalid, so "this requirement is not met yet" is a different
-   * thing from "this field is wrong now" and must not look like it.
+   * blocks. Never a red asterisk, never a checklist, never per-field errors: **drafts
+   * show no errors at all** — a draft is allowed to be invalid, so "this requirement is
+   * not met yet" is a different thing from "this field is wrong now" and must not look
+   * like it. (The second thing — a malformed dice formula — still shows inline, on its
+   * own field, because that IS wrong now.)
    *
-   * Two sources, one slot: the name check is the only one this slice can make locally
-   * (it owns the only editable field); everything else is the server's validity
-   * report, which already carries a machine-addressable path per issue. The full
-   * client-side `publishBlockedReason` — "{Imperative} — it's under {Section}." —
-   * arrives with the schemas, and replaces the second branch, not the slot.
+   * Two sources, one slot: the client's own `publishBlockedReason` disables the button
+   * before the call, so the server's 409 is the rare server-wins case and renders in the
+   * same sentence. Never a second error region.
    */
-  const blockedReason =
-    nameOf(draft).trim() === ""
-      ? `Give this ${typeLabel(doc.type)} a name.`
-      : doc.validity.valid
-        ? null
-        : (doc.validity.issues[0]?.message ?? "This record isn't ready to publish yet.");
+  const blocked = useMemo(() => {
+    const local = publishBlockedReason(doc.type, draft, ctx);
+    if (local) return local;
+    if (doc.validity.valid) return null;
+    return serverBlockedReason(doc.type, doc.validity.issues[0], (path) => fieldAt(doc.type, path));
+  }, [doc.type, doc.validity, draft, ctx]);
+  const blockedReason = blocked?.text ?? null;
+  const blockedSection = blocked?.sectionId ? sectionTitle(doc.type, blocked.sectionId) : null;
+
+  /** Scroll to the section the reason names and focus it — one control, no restatement,
+      and it removes the hunt. */
+  const jumpToSection = () => {
+    if (!blocked?.sectionId) return;
+    const element = document.getElementById(sectionDomId(doc.type, blocked.sectionId));
+    if (!element) return;
+    element.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    (element as HTMLElement).focus?.();
+  };
+
+  const nameNote = duplicateNameNote(doc.type, nameOf(draft), ctx);
+
+  /* The four bespoke components. Everything else on all nine types is data. */
+  const custom: Readonly<Record<string, CustomRenderer>> = {
+    levelTable: () => <LevelTableEditor draft={draft} onDraft={setDraft} classId={doc.id} />,
+    features: ({ field }) => (
+      <FeatureEditor
+        draft={draft}
+        onDraft={setDraft}
+        ctx={ctx}
+        featuresKey={field.key}
+        // Only class and subclass have a level table for a feature to be placed on.
+        levelAware={doc.type === "class" || doc.type === "subclass"}
+        singular={doc.type === "species" ? "trait" : "feature"}
+        idPrefix={`hb-${doc.type}`}
+      />
+    ),
+    riders: () => (
+      <RiderEditor
+        value={draft}
+        onChange={setDraft}
+        // `grants` is deliberately absent for an item: there is no model for an item
+        // conferring a proficiency, and authoring one would produce records the server
+        // silently ignores. See the table at the top of RiderEditor.tsx.
+        enabled={doc.type === "equipment" ? ITEM_RIDERS : doc.type === "monster" ? ["actions", "tags"] : undefined}
+        scope={doc.type === "equipment" ? "item" : "feature"}
+        ctx={ctx}
+        idPrefix={`hb-${doc.type}`}
+      />
+    ),
+    spellListContents: () => <SpellListContents draft={draft} onDraft={setDraft} ctx={ctx} listId={doc.id} spells={spells} />
+  };
 
   /** Every state change bumps the revision server-side, so each one re-baselines the
       autosave. Without that the very next keystroke would 409 against a revision the
@@ -209,7 +245,6 @@ export function RecordDetail({
 
   const removed = !!doc.deletedAt;
   const published = doc.state === "published";
-  const bodyKeys = Object.keys(draft).filter((key) => !HIDDEN_KEYS.has(key));
 
   return (
     <article className="hb-detail">
@@ -253,9 +288,20 @@ export function RecordDetail({
           </div>
         </div>
 
-        {/* ONE sentence slot, shared by the local blocker and the server's rejection. */}
+        {/* ONE sentence slot, shared by the local blocker and the server's rejection.
+            `{Section}` is a control, not a restatement — it removes the hunt. */}
         {(blockedReason || actionError) && !removed && (
-          <p className="hb-blocked" id={reasonId} role={actionError ? "alert" : undefined}>{actionError ?? blockedReason}</p>
+          <p className="hb-blocked" id={reasonId} role={actionError ? "alert" : undefined}>
+            {actionError ?? blockedReason}
+            {!actionError && blockedSection && (
+              <>
+                {" "}
+                <Button variant="ghost" size="sm" onClick={jumpToSection}>
+                  {blockedSection}
+                </Button>
+              </>
+            )}
+          </p>
         )}
 
         {/* "In use" is the sixth state and it is a count, not a badge — a badge would
@@ -273,24 +319,16 @@ export function RecordDetail({
       )}
 
       <div className="hb-detail-body">
-        <Field label="Name" htmlFor={nameId} help="One line for the pick list — this is what you'll see everywhere it's offered.">
-          <Input
-            id={nameId}
-            value={nameOf(draft)}
-            disabled={removed}
-            onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-          />
-        </Field>
+        {/* Annotated, never blocked: the name is the identity the GM sees, and ids are
+            the system's problem. No error tone, no block. */}
+        {nameNote && <p className="hb-name-note">{nameNote}</p>}
 
-        {bodyKeys.length > 0 && (
-          <dl className="hb-readonly">
-            {bodyKeys.map((key) => (
-              <div key={key} className="hb-readonly-row">
-                <dt>{humanise(key)}</dt>
-                <dd>{readValue(draft[key])}</dd>
-              </div>
-            ))}
-          </dl>
+        {schema ? (
+          <SchemaForm schema={schema} draft={draft} onDraft={setDraft} ctx={ctx} custom={custom} disabled={removed} />
+        ) : (
+          <Alert tone="warning" title="No editor for this kind yet">
+            <p>Nothing here knows how to author a {typeLabel(doc.type)}. Your record is safe — it just can&rsquo;t be edited from this screen.</p>
+          </Alert>
         )}
       </div>
 

@@ -22,6 +22,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 import {
   useBackgroundCatalog,
   useClassCatalog,
@@ -52,8 +53,8 @@ let monsterCache: readonly ContentMonsterSummary[] | null = null;
 let monsterInFlight: Promise<void> | null = null;
 const monsterListeners = new Set<(monsters: readonly ContentMonsterSummary[]) => void>();
 
-function requestMonsterReference() {
-  if (monsterCache) return;
+function requestMonsterReference(force = false) {
+  if (monsterCache && !force) return;
   monsterInFlight ??= new Promise<void>((resolve) => {
     socket.emit("content:monsters", {}, (result) => {
       monsterInFlight = null;
@@ -66,13 +67,15 @@ function requestMonsterReference() {
   });
 }
 
+// A homebrew creature published mid-session must reach this picker without a reload.
+registerContentCache(() => { if (monsterCache) requestMonsterReference(true); });
+
 function useMonsterReference(): readonly ContentMonsterSummary[] {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[]>(monsterCache ?? []);
   useEffect(() => {
-    if (monsterCache) {
-      setMonsters(monsterCache);
-      return;
-    }
+    // Subscribe unconditionally, warm cache or not — otherwise an invalidation refetches
+    // for nobody and the picker keeps the list it read at page load.
+    if (monsterCache) setMonsters(monsterCache);
     monsterListeners.add(setMonsters);
     requestMonsterReference();
     return () => {

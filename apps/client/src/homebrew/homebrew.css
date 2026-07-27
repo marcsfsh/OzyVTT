@@ -130,14 +130,124 @@
 .hb-usage { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
 .hb-detail-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+/* Annotated, never blocked — so it is a quiet line, not an error tone. */
+.hb-name-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
 
-.hb-readonly { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; }
-.hb-readonly-row {
-  display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr; gap: var(--space-3);
-  padding-bottom: var(--space-2); border-bottom: 1px solid var(--line);
+/* ---- The schema form ---- */
+.hb-form { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.hb-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hb-section:focus-visible { outline: 2px solid var(--cyan); outline-offset: 6px; border-radius: var(--radius-md); }
+/* Never a bare <h3>: the app global's `h1,h2,h3 { font-weight: 400 }` would synthesise
+   faux-bold on the single-weight display face. The full shorthand carries its weight. */
+.hb-section-title {
+  margin: 0;
+  font: 400 var(--fs-h3) / var(--lh-tight) var(--font-display);
+  color: var(--text);
 }
-.hb-readonly-row dt { color: var(--text-dim); font-size: var(--fs-sm); }
-.hb-readonly-row dd { margin: 0; color: var(--text); font-size: var(--fs-sm); min-width: 0; overflow-wrap: anywhere; }
+.hb-section-blurb { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); max-width: 60ch; }
+
+.hb-section--advanced {
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  padding: var(--space-3); background: var(--surface-2);
+}
+.hb-section-summary {
+  cursor: pointer; min-height: var(--tap-min); display: flex; align-items: center;
+  font: 400 var(--fs-sm) / 1.3 var(--font-display);
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim);
+}
+.hb-section-summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+.hb-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+/* The honesty line for a field nothing reads yet. Dim, never muted (3.61:1 fails AA). */
+.hb-note { color: var(--text-dim); font-style: italic; }
+
+.hb-chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+/* 20 level chips: narrow, uniform, and still over the 44px floor via `.nh-chip`'s own
+   min-height. The gap is the (44 − paint) / 2 budget for adjacent small targets. */
+.hb-levels > * { min-width: 2.75rem; justify-content: center; }
+
+.hb-fieldset {
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  padding: var(--space-3); margin: 0; min-width: 0;
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.hb-fieldset-legend {
+  padding: 0 var(--space-2);
+  font: 400 var(--fs-xs) / 1.3 var(--font-display);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
+}
+
+/* ---- Riders, features, choices ---- */
+.hb-riders { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hb-riders-when { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.hb-feature { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.hb-choice {
+  display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
+  border-left: 2px solid var(--line-strong); padding-left: var(--space-3);
+}
+/* The `choose × grants` readout. Words, not a colour: it is arithmetic, not a state. */
+.hb-picks { margin: 0; color: var(--text); font-size: var(--fs-sm); }
+
+/* ---- Catalog picker ---- */
+.hb-catalog-grid { max-height: 50vh; overflow-y: auto; }
+.hb-catalog-foot { margin-top: var(--space-3); }
+
+/* ---- Level table ----
+   Seven columns, of which the Slots cell replaces NINE: `4 3 3 3 2 – – – –` in one
+   `.tabular` cell with an aria-label spelling it out. That single decision removes
+   eight columns and ~160 DOM nodes per table, and is why this reads as a table rather
+   than a spreadsheet. */
+.hb-lt { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hb-lt-summary { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* The table scrolls inside itself so the page body never scrolls sideways. */
+.hb-lt-scroll { overflow-x: auto; min-width: 0; }
+.hb-lt-table { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.hb-lt-head, .hb-lt-row {
+  display: grid;
+  grid-template-columns: 3.5rem 3rem minmax(10rem, 1.4fr) minmax(9rem, 1fr) 5.5rem 5.5rem minmax(8rem, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+.hb-lt-head {
+  padding: var(--space-1) var(--space-2);
+  font: 400 var(--fs-2xs) / 1.3 var(--font-display);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim);
+}
+.hb-lt-row {
+  padding: var(--space-2);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+}
+.hb-lt-cell { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.hb-lt-wrapcell { overflow-wrap: anywhere; }
+/* Derived cells are plain text at --text-dim with no input affordance. A disabled input
+   would claim an interactivity it does not have. */
+.hb-lt-derived { color: var(--text-dim); }
+.hb-lt-level { font-variant-numeric: tabular-nums; }
+.hb-lt-slots { flex-wrap: wrap; }
+.hb-lt-edit { margin-left: auto; }
+/* Micro-labels live in the DOM at every width and turn on only in the card fold. */
+.hb-lt-micro { display: none; color: var(--text-dim); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* `min-width: 0` is load-bearing, not tidy-up. A grid item defaults to `min-width: auto`,
+   so this strip — which holds a nested RowEditor with an intrinsically wide Add button —
+   refused to shrink below its content and pushed the document 8px sideways at 375px.
+   Measured, not guessed: `document.documentElement.scrollWidth` was 383 against a 375
+   viewport until this landed. */
+.hb-lt-strip {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding-top: var(--space-3); margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.hb-lt-slotstrip { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+/* Nine adjacent number fields: 3.5rem paint + var(--space-3) gap keeps every one of them
+   over the 44px floor with room either side. */
+.hb-lt-slotfield { display: flex; flex-direction: column; gap: var(--space-1); width: 3.75rem; }
+.hb-lt-resources { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 
 /* ---- Create modal ---- */
 .hb-create-body { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -157,8 +267,24 @@
   .hb-workspace { grid-template-columns: 1fr; min-height: 0; }
   .hb-workspace.has-selection .hb-rail { display: none; }
   .hb-workspace.has-selection .hb-back { display: inline-flex; }
-  .hb-readonly-row { grid-template-columns: 1fr; gap: var(--space-1); }
   .hb-create-grid { max-height: 50dvh; }
+
+  /* ---- Level table: one card per level.
+     Folds at 760, not the allocator's 650, and the arithmetic is why: seven columns of
+     which two are wide (Features, Resources) need ~103px each at 720px of content, which
+     truncates both. 760 is already on the breakpoint ladder, so no new number is
+     introduced. Do not "tidy" this back to 650. */
+  .hb-lt-head { display: none; }
+  .hb-lt-row {
+    /* minmax(0, 1fr), never a bare 1fr: an implicit `auto` minimum lets a wide child
+       (the nested resources RowEditor) widen the track past the viewport. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+  .hb-lt-cell { justify-content: space-between; }
+  .hb-lt-micro { display: inline; }
+  .hb-lt-slotfield { width: 4rem; }
   /* The state cluster wraps to its own line rather than squeezing the Publish button
      under the 44px floor. */
   .hb-state-actions { margin-left: 0; width: 100%; }

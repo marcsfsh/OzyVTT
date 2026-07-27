@@ -261,6 +261,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
                   key={selected.id}
                   gmToken={gmToken}
                   record={selected}
+                  records={records}
                   usageCount={usageCount}
                   onChanged={(next) => { setSelected(next); patchRow(next); }}
                   onRemoved={() => setFilters((prev) => ({ ...prev, status: "removed" }))}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ContentEquipmentSummary } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 
 /**
  * One shared fetch of the SRD equipment catalog (the framework the browse-and-add picker and the
@@ -13,8 +14,8 @@ let catalogCache: readonly ContentEquipmentSummary[] | null = null;
 let attributionCache: string | null = null;
 let inFlight: Promise<void> | null = null;
 const listeners = new Set<(catalog: readonly ContentEquipmentSummary[]) => void>();
-function requestEquipmentReference() {
-  if (catalogCache) return;
+function requestEquipmentReference(force = false) {
+  if (catalogCache && !force) return;
   inFlight ??= new Promise((resolve) => {
     socket.emit("content:equipment", {}, (result) => {
       inFlight = null;
@@ -28,10 +29,16 @@ function requestEquipmentReference() {
   });
 }
 
+// A homebrew item can be published mid-session, so this catalog is not fixed for the
+// session any more. Nothing happens for a cold cache. See `content/invalidate.ts`.
+registerContentCache(() => { if (catalogCache) requestEquipmentReference(true); });
+
 export function useEquipmentReference(): Readonly<{ catalog: readonly ContentEquipmentSummary[]; attribution: string | null }> {
   const [catalog, setCatalog] = useState<readonly ContentEquipmentSummary[]>(catalogCache ?? []);
   useEffect(() => {
-    if (catalogCache) { setCatalog(catalogCache); return; }
+    // Subscribe unconditionally: a consumer mounting with a warm cache still has to hear
+    // about the swap when a publish invalidates it.
+    if (catalogCache) setCatalog(catalogCache);
     listeners.add(setCatalog);
     requestEquipmentReference();
     return () => { listeners.delete(setCatalog); };
