@@ -2773,6 +2773,13 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `origin` | ImagePoint | yes |  |
 | `target` | ImagePoint | yes |  |
 
+### `CodexCalendarMonth`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `days` | integer (1–400) | yes |  |
+
 ### `CodexInWorldDate`
 
 | Field | Type | Required | Notes |
@@ -2780,6 +2787,639 @@ Original image bytes for a page banner/inline image. GM always; a player only wh
 | `year` | integer | yes |  |
 | `month` | integer (0–23) | yes |  |
 | `day` | integer (1–400) | yes |  |
+
+### `HomebrewActionOnHit`
+
+On-hit riders: conditions applied to the target as ONE source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `conditions` | object[] | yes |  |
+| `conditions[].id` | string (pattern) | yes |  |
+| `conditions[].level` | integer (1–6) | no |  |
+| `escapeDc` | integer (1–40) | no |  |
+| `maxTargetSize` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` | no | The rider only applies to targets of at most this size |
+
+### `HomebrewActionUses`
+
+Limited uses for an ACTION. Unlike a feature's, this vocabulary includes "recharge" - a start-of-turn d6 at or above `recharge` (and any rest) restores it. `recharge` must be present when `per` is "recharge" and absent otherwise; the server enforces the biconditional.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `limit` | integer (1–20) | yes |  |
+| `per` | `turn` \| `encounter` \| `long-rest` \| `short-rest` \| `recharge` | yes |  |
+| `pool` | string (pattern) | no | Shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon) |
+| `recharge` | integer (2–6) | no | The d6 threshold, e.g. 5 for "Recharge 5-6" |
+
+### `HomebrewBackgroundRecord`
+
+A background. In SRD 5.2.1 this is where ability increases and the origin feat live, so it is the record a homebrew origin is authored on.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `summary` | string | no | Short blurb for the wizard's pick card |
+| `description` | string | no | Long prose. Always the display source of truth; the structured riders only add mechanics on top |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `type` | const `"background"` | yes |  |
+| `abilityOptions` | object | no | SRD 5.2.1 ability increases: which abilities, and the legal distributions as data (+2/+1 or +1/+1/+1) so a homebrew background can print its own |
+| `abilityOptions.from` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes |  |
+| `abilityOptions.spreads` | integer (1–3)[][] | no | Default: `[[2,1],[1,1,1]]`. |
+| `originFeatId` | string (pattern) | no | The origin feat this background grants, keyed into the feat catalog - one of the seven derived-id fields a pack import rewrites |
+| `skillProficiencies` | string (pattern)[] | no |  |
+| `skillChoices` | HomebrewChoiceList | no |  |
+| `toolProficiencies` | string (pattern)[] | no |  |
+| `toolChoices` | HomebrewChoiceList | no |  |
+| `languages` | string (pattern)[] | no |  |
+| `languageChoices` | HomebrewChoiceList | no |  |
+| `startingEquipment` | HomebrewStartingEquipmentOption[] | no |  |
+| `features` | HomebrewFeature[] | no |  |
+
+### `HomebrewChoiceList`
+
+A "choose N from this list" proficiency grant (class skills, background tools).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `choose` | integer (0–10) | yes |  |
+| `from` | string (pattern)[] | no |  |
+
+### `HomebrewClassLevelRow`
+
+ONE row of a class's 20-level table. `features` lists the ids granted at that level, resolved against the owning record's own `features[]`. The optional columns carry whatever the printed table carries - omit a column this class does not have rather than sending zeroes.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `level` | integer (1–20) | yes |  |
+| `proficiencyBonus` | integer (2–6) | yes |  |
+| `features` | string (pattern)[] | no |  |
+| `spellSlots` | integer (0–4)[] | no | Nine counts, index 0 = 1st-level slots. Omitted on a non-caster row |
+| `pactSlots` | object | no | Warlock Pact Magic: one uniform slot level with its own count |
+| `pactSlots.level` | integer (1–9) | yes |  |
+| `pactSlots.slots` | integer (0–4) | yes |  |
+| `cantripsKnown` | integer (0–10) | no |  |
+| `spellsKnown` | integer (0–40) | no |  |
+| `preparedFormula` | string | no | The prepared-spell rule as data ("<ability> modifier + <class> level") so a homebrew class prints its own wording |
+| `preparedCount` | integer (0–60) | no |  |
+| `classResources` | object[] | no | Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3) |
+| `classResources[].id` | string (pattern) | yes |  |
+| `classResources[].name` | string | yes |  |
+| `classResources[].amount` | integer (0–999) \| string | yes | A count, or a dice string |
+
+### `HomebrewClassRecord`
+
+A character class. The heaviest of the nine: a full 20-row printed table plus every feature it can grant. Duplicating an SRD class (`POST /content/{id}/duplicate` with `wizard`) is what makes that tractable to author.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `summary` | string | no | Short blurb for the wizard's pick card |
+| `description` | string | no | Long prose. Always the display source of truth; the structured riders only add mechanics on top |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `type` | const `"class"` | yes |  |
+| `hitDie` | `d4` \| `d6` \| `d8` \| `d10` \| `d12` | yes | The multiclass hit-dice pool keys on this |
+| `statPriority` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes | All six abilities, best first - the random generator's core input as DATA, so a homebrew class supplies its own without touching @vtt/rules-5e |
+| `primaryAbilities` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes |  |
+| `savingThrows` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes |  |
+| `skillChoices` | HomebrewChoiceList | yes |  |
+| `armorProficiencies` | string (pattern)[] | no |  |
+| `weaponProficiencies` | string (pattern)[] | no |  |
+| `toolProficiencies` | string (pattern)[] | no |  |
+| `toolChoices` | HomebrewChoiceList | no |  |
+| `startingEquipment` | HomebrewStartingEquipmentOption[] | no |  |
+| `multiclassProficiencies` | object | no | Proficiencies gained when the class is taken as a MULTICLASS - narrower than the level-1 set |
+| `multiclassProficiencies.armor` | string (pattern)[] | no |  |
+| `multiclassProficiencies.weapons` | string (pattern)[] | no |  |
+| `multiclassProficiencies.tools` | string (pattern)[] | no |  |
+| `multiclassProficiencies.skills` | HomebrewChoiceList | no |  |
+| `multiclassPrerequisites` | HomebrewMulticlassPrerequisite | no |  |
+| `subclassLevel` | integer (1–20) | yes |  |
+| `subclassLabel` | string | no | What this class calls its subclass ("Martial Archetype") |
+| `asiLevels` | integer (1–20)[] | no |  |
+| `spellcasting` | HomebrewSpellcasting | no |  |
+| `levelTable` | HomebrewClassLevelRow[] | yes | Exactly 20 rows, row N at level N. Each row's `features` must resolve against this record's own `features[]` - the server refuses the record otherwise, which is why re-minting an id on import never rewrites intra-record ids |
+| `features` | HomebrewFeature[] | no |  |
+
+### `HomebrewEffectAttackAdvantage`
+
+The bearer's attack rolls have advantage, on its own turn only.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"attack-advantage"` | yes |  |
+
+### `HomebrewEffectAttackDisadvantage`
+
+The bearer's attack rolls have disadvantage, always-on.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"attack-disadvantage"` | yes |  |
+
+### `HomebrewEffectDamageBonus`
+
+Flat damage added to the bearer's hits.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-bonus"` | yes |  |
+| `amount` | integer (-20–20) | yes |  |
+| `appliesTo` | `melee` \| `all` | no | Default: `"all"`. |
+
+### `HomebrewEffectDamageResistance`
+
+Resistance to the listed damage types.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-resistance"` | yes |  |
+| `damageTypes` | string[] | yes |  |
+
+### `HomebrewEffectDurationEncounter`
+
+Until the encounter ends.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"encounter"` | yes |  |
+
+### `HomebrewEffectDurationManual`
+
+Until the GM clears it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"manual"` | yes |  |
+
+### `HomebrewEffectDurationRounds`
+
+A fixed number of rounds.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"rounds"` | yes |  |
+| `rounds` | integer (1–100) | yes |  |
+
+### `HomebrewEffectDurationUntilSourceNextTurn`
+
+Until the granting creature's next turn begins.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"until-source-next-turn"` | yes |  |
+
+### `HomebrewEffectGrant`
+
+An effect a feature or action grants, in the SAME vocabulary the live rules engine already resolves on an actor - reused rather than re-invented, so a homebrew Rage behaves exactly like the bundled one.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | string | no |  |
+| `tags` | string (pattern)[] | yes |  |
+| `duration` | HomebrewEffectDurationRounds \| HomebrewEffectDurationUntilSourceNextTurn \| HomebrewEffectDurationEncounter \| HomebrewEffectDurationManual | yes | How long the effect lasts. |
+| `modifiers` | HomebrewEffectModifier[] | no |  |
+| `onEnd` | HomebrewEffectOnEnd[] | no |  |
+| `endsWithTag` | string (pattern) | no | The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage) |
+| `target` | `self` \| `target` | no | Who receives it: the acting creature, or the action's single chosen target (Help) Default: `"self"`. |
+| `voidWhileIncapacitated` | boolean | no | Benefits lapse while the bearer is incapacitated (Dodge) Default: `false`. |
+| `concentration` | boolean | no | Default: `false`. |
+
+### `HomebrewEffectIncomingAttackAdvantage`
+
+Attack rolls against the bearer have advantage.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"incoming-attack-advantage"` | yes |  |
+
+### `HomebrewEffectIncomingAttackDisadvantage`
+
+Attack rolls against the bearer have disadvantage (Dodge).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"incoming-attack-disadvantage"` | yes |  |
+
+### `HomebrewEffectModifier`
+
+What an active EFFECT contributes to the rules engine. A DIFFERENT and smaller vocabulary than HomebrewFeatureModifier (which is what a feature contributes permanently); the two are deliberately not merged. `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics).
+
+One of the following, discriminated by `type`:
+
+- `HomebrewEffectDamageBonus`
+- `HomebrewEffectDamageResistance`
+- `HomebrewEffectAttackAdvantage`
+- `HomebrewEffectIncomingAttackAdvantage`
+- `HomebrewEffectAttackDisadvantage`
+- `HomebrewEffectIncomingAttackDisadvantage`
+- `HomebrewEffectSaveAdvantage`
+- `HomebrewEffectSaveDisadvantage`
+
+### `HomebrewEffectOnEnd`
+
+What happens when the effect ends - Frenzy leaves one level of Exhaustion behind.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"condition"` | yes |  |
+| `conditionId` | string (pattern) | yes |  |
+| `level` | integer (1–6) | no |  |
+
+### `HomebrewEffectSaveAdvantage`
+
+The bearer's saving throws have advantage; omit `ability` for all saves (Dodge grants Dex only).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"save-advantage"` | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
+
+### `HomebrewEffectSaveDisadvantage`
+
+The bearer's saving throws have disadvantage; omit `ability` for all saves.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"save-disadvantage"` | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
+
+### `HomebrewEquipmentArmor`
+
+Body armor carries its full base AC (11-18); a shield carries its +2 bonus.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `acBase` | integer (2–25) | yes |  |
+| `addDexModifier` | boolean | yes |  |
+| `dexModifierCap` | integer \| null | yes |  |
+| `stealthDisadvantage` | boolean | yes |  |
+| `strengthRequired` | integer \| null | yes |  |
+
+### `HomebrewEquipmentRecord`
+
+Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, or a homebrew kind nobody has invented yet. NO `summary` and NO `attribution`: `EquipmentReferenceSchema` is the ONE `.strict()` content schema, so an undeclared key THROWS rather than being dropped - documenting either here would publish a field that makes the request fail. Only `weapon`, `armor` and `shield` are mechanically live; a homebrew `category` displays and stacks but derives no AC or attack until an explicit slot field lands.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"equipment"` | yes |  |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `category` | string (pattern) | yes | Open slug, never a closed enum - "relic", "vehicle", "trinket" need no schema change |
+| `costGp` | number \| null | yes |  |
+| `weightLb` | number \| null | yes |  |
+| `description` | string \| null | yes |  |
+| `weapon` | HomebrewEquipmentWeapon \| null | no | Populated for weapons only |
+| `armor` | HomebrewEquipmentArmor \| null | no | Populated for armor and shields only |
+
+### `HomebrewEquipmentWeapon`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `category` | `simple` \| `martial` | yes |  |
+| `damageDice` | string | yes |  |
+| `damageType` | string | yes |  |
+| `rangeFeet` | integer \| null | yes |  |
+| `longRangeFeet` | integer \| null | yes | Attacks past `rangeFeet` up to this roll at disadvantage |
+
+### `HomebrewFeatRecord`
+
+A feat: catalog metadata plus ONE HomebrewFeature carrying all the mechanics. Nothing about a feat is special-cased - it is literally the same feature record a class or species uses, which is why the smallest of the nine still exercises the whole rider vocabulary.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `summary` | string | no | Short blurb for the wizard's pick card |
+| `description` | string | no | Long prose. Always the display source of truth; the structured riders only add mechanics on top |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `type` | const `"feat"` | yes |  |
+| `category` | string (pattern) | no | Open slug: origin, general, fighting-style, epic-boon, or anything homebrew adds. Feeds the `<category>-feats` catalog slug a feature choice can point at Default: `"general"`. |
+| `prerequisite` | object | no | The SERVER decides whether a prerequisite is met - never the client |
+| `prerequisite.level` | integer (1–20) | no |  |
+| `prerequisite.abilityScores` | object[] | no |  |
+| `prerequisite.requires` | string (pattern)[] | no | Proficiency or feature slugs the character must already have |
+| `prerequisite.text` | string | no | Anything not modeled above, printed for the player to judge (ADR-0008 prose fallback) |
+| `repeatable` | boolean | no | Default: `false`. |
+| `feature` | HomebrewFeature | yes |  |
+
+### `HomebrewFeature`
+
+THE shared feature record: a class feature, a subclass feature, a species trait, a background feature, and a feat's mechanics are all this one shape. `description` is always the display source of truth, and every rider is optional - a prose-only feature is perfectly valid and is how most text starts life. This is the AUTHORING counterpart of `ContentFeature`, which publishes the same feature with its riders stripped.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `name` | string | yes |  |
+| `level` | integer (1–20) | no | Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats) |
+| `description` | string | yes |  |
+| `choice` | HomebrewFeatureChoice | no | A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible |
+| `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
+| `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
+| `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
+| `uses` | HomebrewFeatureUses | no | Limited uses recovered on a rest |
+| `grants` | HomebrewFeatureGrants | no | Flat proficiency/language/spell grants |
+| `modifiers` | HomebrewFeatureModifier[] | no | Typed numeric riders |
+| `replacesFeatureId` | string (pattern) | no | This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17) |
+
+### `HomebrewFeatureAction`
+
+A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Breath Weapon). Identical to HomebrewStatblockAction except for `attack`/`save`: a class feature cannot know the character's ability scores, so it names the ability and the builder DERIVES the number, where a stat block prints it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `name` | string | yes |  |
+| `activation` | `action` \| `bonus-action` \| `reaction` \| `other` | yes |  |
+| `description` | string | yes | Always the display source of truth; every rider below only adds mechanics on top |
+| `damage` | object[] | no |  |
+| `damage[].formula` | string (pattern) | yes | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `damage[].type` | string | yes |  |
+| `multiattack` | object[] | no | Compound action: resolving a component consumes the shared action slot once and tracks the rest |
+| `multiattack[].actionId` | string (pattern) | yes |  |
+| `multiattack[].count` | integer (1–4) | yes |  |
+| `onHit` | HomebrewActionOnHit[] | no | Conditions applied to the target as one source-linked effect |
+| `targetRules` | `not-grappled-by-source`[] | no | Targeting restrictions the engine enforces |
+| `grants` | HomebrewEffectGrant | no | Resolving this action grants an effect to the actor itself (Rage, Reckless Attack) |
+| `requiresEffectTag` | string (pattern) | no | The action requires an active self effect carrying this tag (Frenzy requires "raging") |
+| `uses` | HomebrewActionUses | no | Limited uses; unlike a feature's, an action's may recharge on a d6 |
+| `reaction` | object | no | A declared reaction the engine can offer as a pending prompt (Uncanny Dodge). Only meaningful on activation "reaction" |
+| `reaction.trigger` | const `"hit-by-attack"` | yes |  |
+| `reaction.response` | const `"half-damage"` | yes |  |
+| `legendary` | object | no | SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation "other" |
+| `legendary.cost` | integer (1–5) | yes |  |
+| `attack` | HomebrewFeatureAttack | no |  |
+| `save` | HomebrewFeatureSave | no |  |
+| `damageByLevel` | object[] | no | Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite) |
+| `damageByLevel[].level` | integer (1–20) | yes |  |
+| `damageByLevel[].formula` | string (pattern) | yes | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `damageByLevel[].type` | string | yes |  |
+
+### `HomebrewFeatureAttack`
+
+An attack a FEATURE grants. Same vocabulary as a stat block's attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` \| `spellcasting` | yes |  |
+| `proficient` | boolean | no | Default: `true`. |
+| `reachFeet` | integer (≥ 1) | no |  |
+| `rangeFeet` | integer (≥ 1) | no |  |
+| `rangeNormalFeet` | integer (≥ 1) | no |  |
+| `count` | integer (1–10) | no |  |
+| `criticalBonusDice` | integer (1–4) | no |  |
+
+### `HomebrewFeatureChoice`
+
+A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an open catalog slug resolved at pick time), `from` (explicit ids whose mechanics live elsewhere or nowhere), or `options` (the ids WITH their mechanics inline, for options that exist only here - Divine Order's two sacred roles, Giant Ancestry's six boons). `options` and `from` are mutually exclusive: after parsing, `from` always holds the canonical id list, derived from `options` when they were authored.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | string (pattern) | yes | Open slug the wizard renders generically: fighting-style, skill, expertise, subclass, asi, feat, spell, cantrip, language, tool, or anything homebrew invents |
+| `choose` | integer (1–10) | no | Default: `1`. |
+| `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
+| `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
+| `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
+| `options` | HomebrewFeatureOption[] | no | Options carrying their own mechanics. Mutually exclusive with `from` |
+
+### `HomebrewFeatureGrants`
+
+Flat things a feature simply hands the character. All open slugs, so a homebrew language, tool, or armor group needs no schema change.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `skills` | string (pattern)[] | no |  |
+| `expertise` | string (pattern)[] | no |  |
+| `tools` | string (pattern)[] | no |  |
+| `languages` | string (pattern)[] | no |  |
+| `armor` | string (pattern)[] | no |  |
+| `weapons` | string (pattern)[] | no |  |
+| `saves` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | no |  |
+| `damageResistances` | string (pattern)[] | no |  |
+| `damageImmunities` | string (pattern)[] | no |  |
+| `conditionImmunities` | string (pattern)[] | no |  |
+| `spells` | object[] | no | Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites |
+| `spells[].id` | string (pattern) | yes |  |
+| `spells[].level` | integer (0–9) | no |  |
+| `spells[].alwaysPrepared` | boolean | no | Default: `true`. |
+| `spells[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no |  |
+
+### `HomebrewFeatureModifier`
+
+Typed numeric riders a feature contributes. A bounded union, deliberately small and grown additively - anything not modeled stays prose (ADR-0008). Distinct from HomebrewEffectModifier, which is the smaller vocabulary a live EFFECT contributes; do not merge them.
+
+One of the following, discriminated by `type`:
+
+- `HomebrewModifierAbilityScore`
+- `HomebrewModifierHitPointsPerLevel`
+- `HomebrewModifierSpeed`
+- `HomebrewModifierArmorClass`
+- `HomebrewModifierInitiative`
+- `HomebrewModifierExtraAttack`
+- `HomebrewModifierUnarmoredDefense`
+- `HomebrewModifierDarkvision`
+
+### `HomebrewFeatureOption`
+
+ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeature minus `level`/`replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `name` | string | yes |  |
+| `description` | string | yes |  |
+| `choice` | HomebrewFeatureOptionChoice | no | A SECOND-ORDER pick this option owes once chosen (Thaumaturge's extra Cleric cantrip) |
+| `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
+| `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
+| `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
+| `uses` | HomebrewFeatureUses | no | Limited uses recovered on a rest |
+| `grants` | HomebrewFeatureGrants | no | Flat proficiency/language/spell grants |
+| `modifiers` | HomebrewFeatureModifier[] | no | Typed numeric riders |
+
+### `HomebrewFeatureOptionChoice`
+
+THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureChoice except that it HAS NO `options` KEY AT ALL, so the recursion is bounded by the schema rather than by a promise in prose: an option's own pick may name ids or a catalog slug, and can never open a third level.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | string (pattern) | yes | Open slug the wizard renders generically: fighting-style, skill, expertise, subclass, asi, feat, spell, cantrip, language, tool, or anything homebrew invents |
+| `choose` | integer (1–10) | no | Default: `1`. |
+| `from` | string (pattern)[] | no | Explicit option ids. Must name at least one - an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list |
+| `fromCatalog` | string (pattern) | no | An open catalog slug resolved at pick time (skills, feats, wizard-spells) |
+| `maxSpellLevel` | integer (0–9) | no | Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only) |
+| `repeatable` | boolean | no | The same option may be picked more than once (Expertise across levels) Default: `false`. |
+
+### `HomebrewFeatureSave`
+
+A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `dc` | const `"spellcasting"` \| integer (1–40) \| HomebrewFeatureSaveDc | yes | Three forms, all of them data rather than a formula language (ADR-0008): the character's own spell save DC, a printed constant, or the SRD's "DC 8 plus your <ability> modifier and Proficiency Bonus" wording as three bounded fields. |
+
+### `HomebrewFeatureSaveDc`
+
+A DERIVED save DC: `base` plus the CASTER's ability modifier, plus proficiency bonus. Every SRD 5.2.1 printing uses base 8 with proficiency, which is why both default.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `base` | integer (1–30) | no | The printed constant the modifiers are added to Default: `8`. |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes | Whose modifier is added - the CASTER's ability, not the one the target rolls |
+| `proficiencyBonus` | boolean | no | Default: `true`. |
+
+### `HomebrewFeatureUses`
+
+Uses a feature gets back on a rest, as DATA rather than a formula language. Either `limit` or `scaling` must be present. The `per` vocabulary is deliberately NARROWER than an action's: there is no "recharge", because a recharge roll belongs to a stat block, not a character feature.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `limit` | integer (1–20) | no | A flat count |
+| `scaling` | HomebrewUsesByProficiency \| HomebrewUsesByAbility \| HomebrewUsesByLevel | no | The three ways 5e actually scales a feature's uses. |
+| `per` | `turn` \| `encounter` \| `short-rest` \| `long-rest` | yes |  |
+| `pool` | string (pattern) | no | Shares ONE counter across every feature carrying the same pool id |
+
+### `HomebrewModifierAbilityScore`
+
+Raise (or lower) one ability score, optionally past the usual cap.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"ability-score"` | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `amount` | integer (-5–5) | yes |  |
+| `maximum` | integer (1–30) | no |  |
+
+### `HomebrewModifierArmorClass`
+
+A flat AC rider. `whileArmored` is the ONE bounded condition the SRD's printed bonuses need (the Defense fighting style reads "While you're wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"armor-class"` | yes |  |
+| `amount` | integer (-5–5) | yes |  |
+| `whileArmored` | boolean | no | Default: `false`. |
+
+### `HomebrewModifierDarkvision`
+
+Grant or extend darkvision.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"darkvision"` | yes |  |
+| `feet` | integer (0–240) | yes |  |
+
+### `HomebrewModifierExtraAttack`
+
+Additional attacks on the Attack action.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"extra-attack"` | yes |  |
+| `count` | integer (1–3) | yes |  |
+
+### `HomebrewModifierHitPointsPerLevel`
+
+Extra hit points at every level (Tough, Dwarven Toughness).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"hit-points-per-level"` | yes |  |
+| `amount` | integer (-5–5) | yes |  |
+
+### `HomebrewModifierInitiative`
+
+Change the initiative bonus.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"initiative"` | yes |  |
+| `amount` | integer (-5–10) | yes |  |
+
+### `HomebrewModifierSpeed`
+
+Change walking speed in feet.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"speed"` | yes |  |
+| `amount` | integer (-30–60) | yes |  |
+
+### `HomebrewModifierUnarmoredDefense`
+
+AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"unarmored-defense"` | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `allowShield` | boolean | no | Default: `false`. |
+
+### `HomebrewMonsterRecord`
+
+A creature stat block: a canonical ActorDefinition, authored flat. The ONE branch with no content-catalog Zod schema behind it - a monster is an `ActorDefinition` (`@vtt/schemas`), the same shape `actor.import-definition` and the bundled bestiary already use, so this mirrors that instead of inventing a parallel record. Note `source` here is bundle PROVENANCE (`{name, version, externalId}`), deliberately NOT the srd/homebrew discriminator the other eight carry: that name was already taken, and a sibling key meaning the same thing twice is worse than deriving homebrew-ness from the row (which is what the merge does). The row's id becomes `source.externalId`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"monster"` | yes |  |
+| `id` | string (pattern) | yes | The row's id. NOT part of ActorDefinitionSchema - the server stamps it into the stored body so the merged bestiary can resolve the record back to its row |
+| `name` | string | yes |  |
+| `schemaId` | `vtt.actor-character` \| `vtt.actor-monster` | yes |  |
+| `schemaVersion` | const `1` | yes | ADR-0007 integer schema version; discoverable at /system/version |
+| `source` | object | yes | Bundle provenance, not the content discriminator |
+| `source.name` | string | yes |  |
+| `source.version` | string | yes |  |
+| `source.externalId` | string | no |  |
+| `summary` | string | no |  |
+| `size` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` | yes |  |
+| `abilityScores` | object | yes |  |
+| `abilityScores.str` | integer (1–30) | yes |  |
+| `abilityScores.dex` | integer (1–30) | yes |  |
+| `abilityScores.con` | integer (1–30) | yes |  |
+| `abilityScores.int` | integer (1–30) | yes |  |
+| `abilityScores.wis` | integer (1–30) | yes |  |
+| `abilityScores.cha` | integer (1–30) | yes |  |
+| `proficiencyBonus` | integer (0–12) | yes |  |
+| `armorClass` | integer (1–40) | yes |  |
+| `hitPoints` | object | yes |  |
+| `hitPoints.maximum` | integer (≥ 1) | yes |  |
+| `hitPoints.formula` | string (pattern) | no | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `initiativeBonus` | integer (-20–30) | no | Default: `0`. |
+| `speedFeet` | integer (≥ 0) | yes |  |
+| `actions` | HomebrewStatblockAction[] | no |  |
+| `token` | object | no | The battlemap PIECE - disposition and grid footprint. Nothing to do with credentials |
+| `token.disposition` | `friendly` \| `hostile` \| `neutral` | no | Default: `"neutral"`. |
+| `token.footprint` | object | no | Default: `{"width":1,"height":1}`. |
+| `extensions` | object (free-form) | no | Free-form passthrough an importer may carry; the engine reads nothing from it Default: `{}`. |
+| `damageResistances` | string[] | no |  |
+| `damageImmunities` | string[] | no |  |
+| `damageVulnerabilities` | string[] | no |  |
+| `conditionImmunities` | string (pattern)[] | no | Reference-level for now: displayed, not yet enforced on actor.set-condition |
+| `legendary` | object | no | SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a long rest |
+| `legendary.actionsPerRound` | integer (1–5) | no |  |
+| `legendary.resistancesPerDay` | integer (1–6) | no |  |
+| `character` | object (free-form) | no | The CHARACTER half of an ActorDefinition (class/level/species/background/feats and the choice-provenance ledger). A monster leaves it absent; it is documented as an open object here for the same reason `ActorImportRequest.definition` is - a homebrew author never writes it, the character builder does |
+| `proficiencies` | object (free-form) | no | Save/skill proficiency selections; the character half, see `character` |
+| `spellcasting` | object (free-form) | no | A spellcasting creature's ability, slot maxima, and known/prepared list; the character half, see `character` |
+| `startingInventory` | object (free-form)[] | no | Immutable starting loadout; the character half, see `character` |
+| `startingCurrency` | object (free-form) | no | Immutable starting coins; the character half, see `character` |
+
+### `HomebrewMulticlassPrerequisite`
+
+Ability minimums for taking this class as a multiclass; `mode: "any"` covers "STR 13 or DEX 13". Display data - the server re-validates.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `mode` | `all` \| `any` | no | Default: `"all"`. |
+| `minimums` | object[] | yes |  |
+| `minimums[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `minimums[].minimum` | integer (1–20) | yes |  |
 
 ### `HomebrewPack`
 
@@ -2796,7 +3436,237 @@ The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One
 
 ### `HomebrewRecord`
 
-The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. The body carries its own `type` discriminator. Published as an open object for now: it becomes a nine-branch `oneOf` (class, subclass, species, background, feat, spell, equipment, monster, spell-list) with `discriminator: { propertyName: "type" }` as each type's authored shape lands. Until then the server's Zod schemas are the authority on this body, and a client should treat it as opaque round-trip data.
+The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. Every branch mirrors the Zod schema the server actually parses the body with, so `required` here is exactly that schema's non-optional keys: a field with a server-side default is OPTIONAL on the wire, and an optional field is ABSENT rather than null (an authoring body is an input, and a Zod `.optional()` rejects an explicit null).
+
+One of the following, discriminated by `type`:
+
+- `HomebrewClassRecord`
+- `HomebrewSubclassRecord`
+- `HomebrewSpeciesRecord`
+- `HomebrewBackgroundRecord`
+- `HomebrewFeatRecord`
+- `HomebrewSpellRecord`
+- `HomebrewEquipmentRecord`
+- `HomebrewMonsterRecord`
+- `HomebrewSpellListRecord`
+
+### `HomebrewSpeciesRecord`
+
+A playable species. NOTE the deliberate absence of required ability bonuses: SRD 5.2.1 puts ability increases on the BACKGROUND. `abilityBonuses` exists anyway as optional data so a 2014-style or homebrew species can still carry them, and the builder applies whatever a record declares instead of assuming an edition.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `summary` | string | no | Short blurb for the wizard's pick card |
+| `description` | string | no | Long prose. Always the display source of truth; the structured riders only add mechanics on top |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `type` | const `"species"` | yes |  |
+| `sizes` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan`[] | no | A list because several 2024 species let the player pick Small or Medium Default: `["medium"]`. |
+| `speedFeet` | integer (0–120) | yes |  |
+| `darkvisionFeet` | integer \| null | no | Default: `null`. |
+| `creatureType` | string (pattern) | no | Default: `"humanoid"`. |
+| `abilityBonuses` | object[] | no |  |
+| `abilityBonuses[].ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `abilityBonuses[].amount` | integer (-2–3) | yes |  |
+| `abilityBonusChoice` | object | no | "Choose N abilities to raise by M" - the 2014 variant-human pattern |
+| `abilityBonusChoice.choose` | integer (1–6) | yes |  |
+| `abilityBonusChoice.amount` | integer (1–3) | yes |  |
+| `abilityBonusChoice.from` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | no | Default: `["str","dex","con","int","wis","cha"]`. |
+| `languages` | string (pattern)[] | no |  |
+| `languageChoices` | HomebrewChoiceList | no |  |
+| `traits` | HomebrewFeature[] | no |  |
+| `lineages` | object[] | no | Lineages / subraces, each adding its own traits on top |
+| `lineages[].id` | string (pattern) | yes |  |
+| `lineages[].name` | string | yes |  |
+| `lineages[].description` | string | no |  |
+| `lineages[].traits` | HomebrewFeature[] | no |  |
+
+### `HomebrewSpellListRecord`
+
+A spell list as a membership OVERLAY, never an edit to the generated spell bundle: `basedOn` expands existing lists, `add` layers ids on top, and `remove` always wins. That is what keeps "the Wizard list plus my three spells" ONE row instead of 221. A list resolving to ZERO spells is a hard character-creation rejection downstream, so publish-time validation refuses an empty one.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `summary` | string | no | Short blurb for the wizard's pick card |
+| `description` | string | no | Long prose. Always the display source of truth; the structured riders only add mechanics on top |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `type` | const `"spell-list"` | yes |  |
+| `basedOn` | string (pattern)[] | no | Start from these existing list ids - SRD (`wizard`) or another overlay. Empty starts blank |
+| `add` | string (pattern)[] | no | Spell ids added on top of the `basedOn` expansion. SRD spell ids are perfectly legal here |
+| `remove` | string (pattern)[] | no | Spell ids removed last, after everything else |
+
+### `HomebrewSpellRecord`
+
+A spell. NO `summary`: `SpellReferenceSchema` never declared one, and the schema is a plain (non-strict) object, so a `summary` sent here would be silently dropped rather than rejected. `classes` carries the spell-list ids this spell belongs to - it is how a homebrew spell joins a list, paired with the class record's `spellcasting.spellListId`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell"` | yes |  |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `level` | integer (0–9) | yes | 0 is a cantrip |
+| `school` | string | yes |  |
+| `castingTime` | string | yes |  |
+| `reactionCondition` | string \| null | yes | What triggers the reaction, for a spell cast as one; null otherwise |
+| `range` | object | yes |  |
+| `range.distance` | number \| null | yes |  |
+| `range.unit` | string \| null | yes |  |
+| `range.text` | string \| null | yes |  |
+| `components` | object | yes |  |
+| `components.verbal` | boolean | yes |  |
+| `components.somatic` | boolean | yes |  |
+| `components.material` | boolean | yes |  |
+| `components.materialText` | string \| null | yes |  |
+| `components.materialConsumed` | boolean | yes |  |
+| `duration` | string | yes |  |
+| `concentration` | boolean | yes |  |
+| `ritual` | boolean | yes |  |
+| `attackRoll` | boolean | yes |  |
+| `damage` | object | yes |  |
+| `damage.roll` | string \| null | yes | Base damage/healing roll ("8d6"), or null when the spell rolls nothing |
+| `damage.types` | string[] | yes |  |
+| `save` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` \| null | yes | Which save the target rolls; null when the spell forces none |
+| `target` | object | yes |  |
+| `target.type` | string \| null | yes |  |
+| `target.count` | integer \| null | yes |  |
+| `shape` | HomebrewSpellShape \| null | yes | The area of effect; null for a single-target spell |
+| `classes` | string (pattern)[] | yes | Spell-list ids this spell belongs to ("wizard", a homebrew list slug). A HomebrewSpellListRecord can also pull a spell in without touching this |
+| `description` | string | yes |  |
+| `higherLevel` | string \| null | yes |  |
+| `castingOptions` | object[] | yes | Per-slot-level upcast scaling; the sheet applies the row matching the chosen cast level |
+| `castingOptions[].type` | string | yes |  |
+| `castingOptions[].damageRoll` | string \| null | yes |  |
+| `castingOptions[].targetCount` | integer \| null | yes |  |
+| `castingOptions[].description` | string \| null | yes |  |
+
+### `HomebrewSpellShape`
+
+A spell's area of effect.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | string | yes |  |
+| `size` | number \| null | yes |  |
+| `unit` | string \| null | yes |  |
+
+### `HomebrewSpellcasting`
+
+Spellcasting a class - or a third-caster subclass - grants.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `prepares` | `known` \| `prepared` | yes | known = a fixed spells-known list; prepared = re-chosen on a long rest |
+| `ritual` | boolean | no | Default: `false`. |
+| `focus` | string \| null | no | Spellcasting focus slug (arcane-focus, holy-symbol, druidic-focus); null = none Default: `null`. |
+| `multiclassProgression` | `full` \| `half` \| `third` \| `pact` | no | How this class's levels count toward the shared multiclass caster level Default: `"full"`. |
+| `spellListId` | string (pattern) | no | The spell list this class draws from - an open slug, so a HomebrewSpellListRecord works. One of the seven derived-id fields a pack import rewrites (it also implies the `<listId>-spells` catalog slug) |
+
+### `HomebrewStartingEquipmentOption`
+
+A named starting-equipment bundle ("A: chain mail and a martial weapon", "C: 155 gp"). The chosen option's id is what lands in the character's choice ledger, so the items must be RESOLVABLE - a label alone can be displayed but never turned into inventory.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `label` | string | yes |  |
+| `items` | object[] | no |  |
+| `items[].id` | string (pattern) | yes |  |
+| `items[].name` | string | yes |  |
+| `items[].quantity` | integer (1–99) | no | Default: `1`. |
+| `goldPieces` | integer (0–1000) | no | Default: `0`. |
+
+### `HomebrewStatblockAction`
+
+A stat block's action, in the exact `ActionSchema` vocabulary the live rules engine already resolves. Every mechanics field is optional: absent means "prose only", and the engine falls back to reference behavior.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes |  |
+| `name` | string | yes |  |
+| `activation` | `action` \| `bonus-action` \| `reaction` \| `other` | yes |  |
+| `description` | string | yes | Always the display source of truth; every rider below only adds mechanics on top |
+| `damage` | object[] | no |  |
+| `damage[].formula` | string (pattern) | yes | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `damage[].type` | string | yes |  |
+| `multiattack` | object[] | no | Compound action: resolving a component consumes the shared action slot once and tracks the rest |
+| `multiattack[].actionId` | string (pattern) | yes |  |
+| `multiattack[].count` | integer (1–4) | yes |  |
+| `onHit` | HomebrewActionOnHit[] | no | Conditions applied to the target as one source-linked effect |
+| `targetRules` | `not-grappled-by-source`[] | no | Targeting restrictions the engine enforces |
+| `grants` | HomebrewEffectGrant | no | Resolving this action grants an effect to the actor itself (Rage, Reckless Attack) |
+| `requiresEffectTag` | string (pattern) | no | The action requires an active self effect carrying this tag (Frenzy requires "raging") |
+| `uses` | HomebrewActionUses | no | Limited uses; unlike a feature's, an action's may recharge on a d6 |
+| `reaction` | object | no | A declared reaction the engine can offer as a pending prompt (Uncanny Dodge). Only meaningful on activation "reaction" |
+| `reaction.trigger` | const `"hit-by-attack"` | yes |  |
+| `reaction.response` | const `"half-damage"` | yes |  |
+| `legendary` | object | no | SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation "other" |
+| `legendary.cost` | integer (1–5) | yes |  |
+| `attack` | object | no | A printed to-hit bonus - the stat block knows its own numbers |
+| `attack.bonus` | integer | yes |  |
+| `attack.reachFeet` | integer (≥ 1) | no |  |
+| `attack.rangeFeet` | integer (≥ 1) | no |  |
+| `attack.rangeNormalFeet` | integer (≥ 1) | no | Normal range for a two-range weapon ("80/320" -> 80); attacks beyond it up to rangeFeet roll at disadvantage |
+| `attack.count` | integer (1–10) | no |  |
+| `attack.criticalBonusDice` | integer (1–4) | no |  |
+| `save` | object | no | A printed save DC |
+| `save.ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `save.dc` | integer (1–40) | yes |  |
+
+### `HomebrewSubclassRecord`
+
+A subclass. Third-caster subclasses (Eldritch Knight, Arcane Trickster) declare their own `spellcasting` and overlay extra table rows on the parent class's.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
+| `name` | string | yes |  |
+| `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
+| `summary` | string | no | Short blurb for the wizard's pick card |
+| `description` | string | no | Long prose. Always the display source of truth; the structured riders only add mechanics on top |
+| `attribution` | string | no | Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead |
+| `type` | const `"subclass"` | yes |  |
+| `classId` | string (pattern) | yes | The class this subclass belongs to. Re-minting a class id on pack import rewrites this - it is one of the seven derived-id fields |
+| `subclassLevel` | integer (1–20) | no | The class level this subclass is taken at; omitted inherits the parent class's |
+| `spellcasting` | HomebrewSpellcasting | no |  |
+| `levelTable` | HomebrewClassLevelRow[] | no |  |
+| `features` | HomebrewFeature[] | no |  |
+
+### `HomebrewUsesByAbility`
+
+Uses equal to an ability modifier, floored at `minimum`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"ability-modifier"` | yes |  |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
+| `minimum` | integer (0–5) | no | Default: `1`. |
+
+### `HomebrewUsesByLevel`
+
+A printed per-level column.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"by-level"` | yes |  |
+| `table` | object[] | yes |  |
+| `table[].level` | integer (1–20) | yes |  |
+| `table[].limit` | integer (0–99) | yes |  |
+
+### `HomebrewUsesByProficiency`
+
+Uses equal to the character's proficiency bonus.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"proficiency-bonus"` | yes |  |
 
 ### `ImagePoint`
 

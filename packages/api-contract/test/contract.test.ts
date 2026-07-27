@@ -240,6 +240,10 @@ describe("public API contracts", () => {
       for (const property of properties) {
         if (issuance.has(`${name}.${property}`)) continue;
         if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces, not credentials
+        // Same reason, spelled out rather than pattern-matched: an ActorDefinition's `token` is its
+        // battlemap piece (disposition + grid footprint). The name is fixed by ActorDefinitionSchema,
+        // which a homebrew creature body mirrors, so renaming it here would be a documented lie.
+        if (`${name}.${property}` === "HomebrewMonsterRecord.token") continue;
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }

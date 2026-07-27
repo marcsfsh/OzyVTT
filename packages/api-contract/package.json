@@ -11,6 +11,8 @@
   },
   "dependencies": { "zod": "^3.24.2" },
   "devDependencies": {
+    "@vtt/content-srd-5.2.1": "*",
+    "@vtt/schemas": "*",
     "ajv": "^8.20.0",
     "typescript": "^5.8.2",
     "vitest": "^4.1.10"

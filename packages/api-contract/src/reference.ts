@@ -159,6 +159,10 @@ function fieldRows(schema: Schema, referenced: Set<string>): string[] {
   for (const [name, property] of Object.entries(properties)) {
     if (typeof property.$ref === "string") referenced.add(resolveRef(property.$ref).name);
     if (Array.isArray(property.oneOf)) for (const branch of property.oneOf as Schema[]) if (typeof branch.$ref === "string") referenced.add(resolveRef(branch.$ref).name);
+    // A list OF a shared shape (`months: CodexCalendarMonth[]`, `features: HomebrewFeature[]`) is by
+    // far the commonest way a body names one, and it was the one way that collected nothing.
+    const itemRef = (property.items as Schema | undefined)?.$ref;
+    if (typeof itemRef === "string") referenced.add(resolveRef(itemRef).name);
     rows.push(`| \`${name}\` | ${typeLabel(property)} | ${required.has(name) ? "yes" : "no"} | ${noteFor(property)} |`);
     const nestedObject = property.type === "object" && property.properties ? property : property.type === "array" && (property.items as Schema | undefined)?.type === "object" && (property.items as Schema).properties ? (property.items as Schema) : undefined;
     if (nestedObject) {
@@ -173,24 +177,42 @@ function fieldRows(schema: Schema, referenced: Set<string>): string[] {
   return rows;
 }
 
+/** Every `$ref` a schema node names directly: itself, a `oneOf`/`anyOf`/`allOf` branch, a property, or an array's items. */
+function directRefs(schema: Schema | undefined, into: string[]): void {
+  if (!schema || typeof schema !== "object") return;
+  if (typeof schema.$ref === "string") into.push(schema.$ref);
+  for (const key of ["oneOf", "anyOf", "allOf"] as const) {
+    for (const branch of (schema[key] ?? []) as Schema[]) directRefs(branch, into);
+  }
+  for (const property of Object.values((schema.properties ?? {}) as Record<string, Schema>)) directRefs(property, into);
+  directRefs(schema.items as Schema | undefined, into);
+  if (typeof schema.additionalProperties === "object") directRefs(schema.additionalProperties as Schema, into);
+}
+
 /**
- * Expands a set of component names over top-level `oneOf` branch `$ref`s, transitively.
+ * Expands a set of component names over every `$ref` they reach, transitively.
  *
- * `fieldRows` only collects PROPERTY-level refs, so a component whose top level is a `oneOf`
- * (a discriminated union like a polymorphic authoring body) contributed nothing: it rendered as a
- * bare heading and its branch components were documented NOWHERE. Bounded by a visited set, so a
- * union that refers back to itself terminates instead of looping.
+ * `fieldRows` only ever collected PROPERTY-level refs of the components it was handed, and the
+ * "Shared shapes" loop discards what it collects, so the set of documented components was whatever a
+ * request body named DIRECTLY. Two holes followed, and both are silent:
+ *   - a component whose top level is a `oneOf` (a polymorphic authoring body) rendered as a bare
+ *     heading, and its branch components were documented NOWHERE;
+ *   - a component a branch reaches through a property or an `items` ref - which is every hoisted
+ *     rider on the homebrew authoring surface - was documented nowhere either.
+ *
+ * The SEED is unchanged: still request bodies only, so a response-side `*Data` component still gets
+ * no field table. This closes over what those seeds actually reach. Bounded by a visited set, so a
+ * cyclic vocabulary (feature -> choice -> option -> feature) terminates instead of looping.
  */
-export function expandOneOfBranches(schemas: Record<string, Schema>, seed: Iterable<string>): Set<string> {
+export function expandReferencedComponents(schemas: Record<string, Schema>, seed: Iterable<string>): Set<string> {
   const expanded = new Set<string>(seed);
   const pending = [...expanded];
   while (pending.length > 0) {
-    const branches = schemas[pending.pop() as string]?.oneOf;
-    if (!Array.isArray(branches)) continue;
-    for (const branch of branches as Schema[]) {
-      if (typeof branch.$ref !== "string") continue;
-      const name = branch.$ref.replace("#/components/schemas/", "");
-      if (!schemas[name]) throw new Error(`Unresolvable $ref in openApiDocument: ${branch.$ref}`);
+    const refs: string[] = [];
+    directRefs(schemas[pending.pop() as string], refs);
+    for (const ref of refs) {
+      const name = ref.replace("#/components/schemas/", "");
+      if (!schemas[name]) throw new Error(`Unresolvable $ref in openApiDocument: ${ref}`);
       if (expanded.has(name)) continue;
       expanded.add(name);
       pending.push(name);
@@ -393,9 +415,9 @@ export function renderApiReference(): string {
   }
 
   // Shared shapes referenced from request bodies, so field tables above stay self-contained. The
-  // closure over top-level oneOf branches is what keeps a polymorphic body's branches documented:
-  // without it a union renders as a bare heading and its branches appear nowhere at all.
-  const shared = [...expandOneOfBranches(components, referenced)].filter((name) => !name.endsWith("Request") && !name.endsWith("Response") && !name.endsWith("Envelope")).sort();
+  // transitive closure is what keeps a polymorphic body documented: without it a union renders as a
+  // bare heading, its branches appear nowhere, and every rider those branches hoist is invisible too.
+  const shared = [...expandReferencedComponents(components, referenced)].filter((name) => !name.endsWith("Request") && !name.endsWith("Response") && !name.endsWith("Envelope")).sort();
   if (shared.length > 0) {
     out.push("## Shared shapes");
     out.push("");

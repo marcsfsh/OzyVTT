@@ -846,6 +846,129 @@ const homebrewContentType = { type: "string", enum: HomebrewContentTypeSchema.op
 const homebrewState = { type: "string", enum: HomebrewContentStateSchema.options } as const;
 const homebrewExpectedRev = { type: "integer", minimum: 0, description: "Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on." } as const;
 const homebrewDataObject = (key: string, valueSchema: unknown) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: valueSchema } });
+
+// ---- Homebrew AUTHORING vocabulary -------------------------------------------------------------
+// Every fragment below mirrors a Zod schema the SERVER already parses - `contentRecordBase`,
+// `FeatureRecordSchema` and friends in `@vtt/content-srd-5.2.1/src/character-content.ts`,
+// `ActionSchema`/`EffectGrantSchema` in `@vtt/schemas` - field for field.
+// `test/contract-parity.test.ts` compares the two representations mechanically in both directions,
+// so a field that reaches `properties` but not `required` fails the build rather than shipping as a
+// documented lie.
+//
+// THE INVERSION that makes a parallel vocabulary necessary: `ContentFeature` is the PUBLISHED
+// PROJECTION, and its own description says a feature's structured riders "stay server-side - the
+// server applies them when it builds the character, so the wizard never becomes a second rules
+// engine". Homebrew authoring inverts exactly that: the GM must now WRITE those riders, so they
+// become public schema here. `ContentFeature` is therefore NOT reused; it stays as-is for reading.
+//
+// Two conventions differ from the published catalogs, both because these are AUTHORED INPUTS:
+//   1. ABSENT, never present-but-null. A catalog projection uses present-but-null so a reader never
+//      branches on key presence; a Zod `.optional()` field REJECTS an explicit null, so an authoring
+//      body must omit it instead. `required` here is exactly the Zod schema's non-optional keys - a
+//      field carrying a Zod `.default()` is optional on the wire, because the server supplies it.
+//   2. Riders are HOISTED into named components, never inlined. `reference.ts` flattens exactly one
+//      level of nesting, so an inlined rider three levels down renders as a bare `object`.
+const homebrewAbility = { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] } as const;
+const homebrewLevel = { type: "integer", minimum: 1, maximum: 20 } as const;
+const homebrewSize = { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] } as const;
+/** ADR-0008's bounded dice grammar: ONE die term plus at most one flat modifier. "2d6 + 1d4" is deliberately unrepresentable. */
+const homebrewDiceFormula = { type: "string", pattern: "^\\d+[dD](4|6|8|10|12|20|100)(\\s*[+-]\\s*\\d+)?$", description: "One die term plus at most one flat modifier (\"1d8 + 3\"). Anything richer stays prose (ADR-0008)" } as const;
+const homebrewDamageType = { type: "string", minLength: 1, maxLength: 40 } as const;
+const homebrewConditionId = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 } as const;
+const homebrewEffectTag = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 } as const;
+const homebrewActionId = { type: "string", pattern: "^[a-z0-9-]+$" } as const;
+const homebrewRef = (schemaRef: string) => ({ $ref: `#/components/schemas/${schemaRef}` });
+const homebrewRefArray = (schemaRef: string, maxItems: number) => ({ type: "array", maxItems, items: { $ref: `#/components/schemas/${schemaRef}` } });
+const homebrewSlugArray = (maxItems: number) => ({ type: "array", maxItems, items: contentSlug });
+/** A discriminated union: `oneOf` over HOISTED branches plus the `discriminator` mapping, keyed by each branch's own `type` const. Branches are `$ref`s so the reference renderer can name and document them. */
+const homebrewUnion = (description: string, mapping: Readonly<Record<string, string>>) => ({
+  description,
+  discriminator: { propertyName: "type", mapping: Object.fromEntries(Object.entries(mapping).map(([value, schemaRef]) => [value, `#/components/schemas/${schemaRef}`])) },
+  oneOf: Object.values(mapping).map((schemaRef) => ({ $ref: `#/components/schemas/${schemaRef}` }))
+});
+/** One branch of a discriminated union: the `type` const plus whatever that variant adds. */
+const homebrewVariant = (constant: string, description: string, required: readonly string[], properties: Readonly<Record<string, unknown>> = {}) => ({
+  type: "object", additionalProperties: false, description,
+  required: ["type", ...required],
+  properties: { type: { const: constant }, ...properties }
+});
+/**
+ * Mirrors `contentRecordBase`, which is spelled once in Zod and spread into SIX of the nine record
+ * schemas (class, subclass, species, background, feat, spell-list).
+ *
+ * Spell, equipment and monster deliberately do NOT compose it, because their Zod schemas do not:
+ * `SpellReferenceSchema` has no `summary`, `EquipmentReferenceSchema` has neither `summary` nor
+ * `attribution` AND is `.strict()` (documenting a field it never declared would publish one that
+ * makes the request FAIL), and a monster body is an `ActorDefinition`, whose `source` is bundle
+ * provenance rather than the srd/homebrew discriminator.
+ */
+const homebrewRecordBase = {
+  id: { ...homebrewId, description: "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas" },
+  name: { type: "string", minLength: 1, maxLength: 120 },
+  source: { ...contentSource, default: "srd", description: "Always \"homebrew\" once stored; the field exists so an authored record and a merged-catalog row read the same" },
+  summary: { type: "string", maxLength: 400, description: "Short blurb for the wizard's pick card" },
+  description: { type: "string", maxLength: 20000, description: "Long prose. Always the display source of truth; the structured riders only add mechanics on top" },
+  attribution: { type: "string", maxLength: 400, description: "Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead" }
+} as const;
+/**
+ * `type` is the wire discriminator and it is required on every branch. It lives on the ROW: the
+ * server strips it before storing the body, because leaving it in would make
+ * `EquipmentReferenceSchema` - the one `.strict()` content schema - reject its own record. It is put
+ * back on every record that goes out, because a pack is a bare array and each record must be
+ * self-describing.
+ */
+const homebrewRecordBaseRequired = ["type", "id", "name"] as const;
+/** THE rider vocabulary, spelled once - mirrors Zod's `featureRiders`, which a FeatureRecord and a FeatureOption share so there is one vocabulary to author and one interpreter to write. */
+const homebrewFeatureRiders = {
+  tags: { ...homebrewSlugArray(8), description: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)" },
+  actions: { ...homebrewRefArray("HomebrewFeatureAction", 8), description: "Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon)" },
+  effects: { ...homebrewRefArray("HomebrewEffectGrant", 4), description: "Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration)" },
+  uses: { ...homebrewRef("HomebrewFeatureUses"), description: "Limited uses recovered on a rest" },
+  grants: { ...homebrewRef("HomebrewFeatureGrants"), description: "Flat proficiency/language/spell grants" },
+  modifiers: { ...homebrewRefArray("HomebrewFeatureModifier", 8), description: "Typed numeric riders" }
+} as const;
+/** The fields describing WHAT is being picked, shared by a feature's choice and an option's own (Zod's `featureChoiceBase`). */
+const homebrewChoiceBase = {
+  kind: { ...contentSlug, description: "Open slug the wizard renders generically: fighting-style, skill, expertise, subclass, asi, feat, spell, cantrip, language, tool, or anything homebrew invents" },
+  choose: { type: "integer", minimum: 1, maximum: 10, default: 1 },
+  from: { type: "array", minItems: 1, maxItems: 80, items: contentSlug, description: "Explicit option ids. Must name at least one - an empty list is an authoring mistake, not \"no options offered\". Omit the field entirely when `fromCatalog` or `options` supplies the list" },
+  fromCatalog: { ...contentSlug, description: "An open catalog slug resolved at pick time (skills, feats, wizard-spells)" },
+  maxSpellLevel: { type: "integer", minimum: 0, maximum: 9, description: "Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only)" },
+  repeatable: { type: "boolean", default: false, description: "The same option may be picked more than once (Expertise across levels)" }
+} as const;
+/** Everything an action carries EXCEPT `attack`/`save`, which is the only place a statblock action (flat numbers) and a feature action (derived from the character) differ. Mirrors `ActionSchema` minus those two - the same omit Zod's `FeatureActionSchema` performs. */
+const homebrewActionBase = {
+  id: homebrewActionId,
+  name: { type: "string", minLength: 1, maxLength: 120 },
+  activation: { type: "string", enum: ["action", "bonus-action", "reaction", "other"] },
+  description: { type: "string", minLength: 1, maxLength: 12000, description: "Always the display source of truth; every rider below only adds mechanics on top" },
+  damage: { type: "array", maxItems: 8, items: { type: "object", additionalProperties: false, required: ["formula", "type"], properties: { formula: homebrewDiceFormula, type: homebrewDamageType } } },
+  multiattack: { type: "array", minItems: 1, maxItems: 4, items: { type: "object", additionalProperties: false, required: ["actionId", "count"], properties: { actionId: homebrewActionId, count: { type: "integer", minimum: 1, maximum: 4 } } }, description: "Compound action: resolving a component consumes the shared action slot once and tracks the rest" },
+  onHit: { ...homebrewRefArray("HomebrewActionOnHit", 2), description: "Conditions applied to the target as one source-linked effect" },
+  targetRules: { type: "array", maxItems: 2, items: { type: "string", enum: ["not-grappled-by-source"] }, description: "Targeting restrictions the engine enforces" },
+  grants: { ...homebrewRef("HomebrewEffectGrant"), description: "Resolving this action grants an effect to the actor itself (Rage, Reckless Attack)" },
+  requiresEffectTag: { ...homebrewEffectTag, description: "The action requires an active self effect carrying this tag (Frenzy requires \"raging\")" },
+  uses: { ...homebrewRef("HomebrewActionUses"), description: "Limited uses; unlike a feature's, an action's may recharge on a d6" },
+  reaction: { type: "object", additionalProperties: false, required: ["trigger", "response"], properties: { trigger: { const: "hit-by-attack" }, response: { const: "half-damage" } }, description: "A declared reaction the engine can offer as a pending prompt (Uncanny Dodge). Only meaningful on activation \"reaction\"" },
+  legendary: { type: "object", additionalProperties: false, required: ["cost"], properties: { cost: { type: "integer", minimum: 1, maximum: 5 } }, description: "SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool. Pairs with activation \"other\"" }
+} as const;
+const homebrewActionBaseRequired = ["id", "name", "activation", "description"] as const;
+/**
+ * The nine authored bodies, one per `HomebrewContentTypeSchema` option. `satisfies` is the point:
+ * adding a tenth content type is a COMPILE error here until its branch component exists, so the enum
+ * and the union cannot drift apart.
+ */
+const HOMEBREW_RECORD_COMPONENTS = {
+  class: "HomebrewClassRecord",
+  subclass: "HomebrewSubclassRecord",
+  species: "HomebrewSpeciesRecord",
+  background: "HomebrewBackgroundRecord",
+  feat: "HomebrewFeatRecord",
+  spell: "HomebrewSpellRecord",
+  equipment: "HomebrewEquipmentRecord",
+  monster: "HomebrewMonsterRecord",
+  "spell-list": "HomebrewSpellListRecord"
+} as const satisfies Record<HomebrewContentType, string>;
 /** One homebrew operation. Security is never a parameter - it is always `homebrewGmOnly`. */
 const homebrewOp = (operationId: string, okRef: string, options: { ok?: string; params?: readonly unknown[]; body?: string; bodyRequired?: boolean; description?: string; bad?: boolean; notFound?: boolean; conflict?: string; tooLarge?: boolean } = {}) => ({
   operationId,
@@ -1331,7 +1454,288 @@ export const openApiDocument = {
       // that already passed the audience filter, and it carries `source` alone.
       HomebrewValidationIssue: { type: "object", additionalProperties: false, required: ["path", "message", "recordId"], properties: { path: { type: "array", items: { type: ["string", "integer"] }, description: "Field path into the authored record, e.g. [\"levelTable\", 3, \"spellSlots\"] - the offending field, machine-addressable, so a form editor can point at it instead of parsing prose" }, message: { type: "string", minLength: 1, maxLength: 500 }, recordId: { type: ["string", "null"], maxLength: 60, description: "Which record in a pack the issue belongs to; null for a single-record publish. Present-but-null, so a consumer never branches on key presence" } } },
       HomebrewValidity: { type: "object", additionalProperties: false, required: ["valid", "issues"], description: "Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say \"3 drafts can't publish yet\" without a round-trip per record.", properties: { valid: { type: "boolean" }, issues: { type: "array", items: { $ref: "#/components/schemas/HomebrewValidationIssue" } } } },
-      HomebrewRecord: { type: "object", additionalProperties: true, description: "The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. The body carries its own `type` discriminator. Published as an open object for now: it becomes a nine-branch `oneOf` (class, subclass, species, background, feat, spell, equipment, monster, spell-list) with `discriminator: { propertyName: \"type\" }` as each type's authored shape lands. Until then the server's Zod schemas are the authority on this body, and a client should treat it as opaque round-trip data." },
+      HomebrewRecord: homebrewUnion("The AUTHORED CONTENT ONLY - never row state. `state`, `visibleToPlayers`, and `deletedAt` live on HomebrewRecordDocument and never here, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. Every branch mirrors the Zod schema the server actually parses the body with, so `required` here is exactly that schema's non-optional keys: a field with a server-side default is OPTIONAL on the wire, and an optional field is ABSENT rather than null (an authoring body is an input, and a Zod `.optional()` rejects an explicit null).", HOMEBREW_RECORD_COMPONENTS),
+
+      // ---- The nine authored bodies. Six of them spread `homebrewRecordBase` because their Zod
+      // schemas spread `contentRecordBase`; spell, equipment and monster do not, because theirs do
+      // not - see the fragment's own comment for why copying the header there would be a lie.
+      HomebrewClassRecord: {
+        type: "object", additionalProperties: false,
+        description: "A character class. The heaviest of the nine: a full 20-row printed table plus every feature it can grant. Duplicating an SRD class (`POST /content/{id}/duplicate` with `wizard`) is what makes that tractable to author.",
+        required: [...homebrewRecordBaseRequired, "hitDie", "statPriority", "primaryAbilities", "savingThrows", "skillChoices", "subclassLevel", "levelTable"],
+        properties: {
+          ...homebrewRecordBase, type: { const: "class" },
+          hitDie: { type: "string", enum: ["d4", "d6", "d8", "d10", "d12"], description: "The multiclass hit-dice pool keys on this" },
+          statPriority: { type: "array", minItems: 6, maxItems: 6, items: homebrewAbility, description: "All six abilities, best first - the random generator's core input as DATA, so a homebrew class supplies its own without touching @vtt/rules-5e" },
+          primaryAbilities: { type: "array", minItems: 1, maxItems: 2, items: homebrewAbility },
+          savingThrows: { type: "array", minItems: 1, maxItems: 6, items: homebrewAbility },
+          skillChoices: homebrewRef("HomebrewChoiceList"),
+          armorProficiencies: homebrewSlugArray(10),
+          weaponProficiencies: homebrewSlugArray(40),
+          toolProficiencies: homebrewSlugArray(20),
+          toolChoices: homebrewRef("HomebrewChoiceList"),
+          startingEquipment: homebrewRefArray("HomebrewStartingEquipmentOption", 6),
+          multiclassProficiencies: { type: "object", additionalProperties: false, required: [], description: "Proficiencies gained when the class is taken as a MULTICLASS - narrower than the level-1 set", properties: { armor: homebrewSlugArray(10), weapons: homebrewSlugArray(40), tools: homebrewSlugArray(20), skills: homebrewRef("HomebrewChoiceList") } },
+          multiclassPrerequisites: homebrewRef("HomebrewMulticlassPrerequisite"),
+          subclassLevel: homebrewLevel,
+          subclassLabel: { type: "string", maxLength: 60, description: "What this class calls its subclass (\"Martial Archetype\")" },
+          asiLevels: { type: "array", maxItems: 10, items: homebrewLevel },
+          spellcasting: homebrewRef("HomebrewSpellcasting"),
+          levelTable: { type: "array", minItems: 20, maxItems: 20, items: { $ref: "#/components/schemas/HomebrewClassLevelRow" }, description: "Exactly 20 rows, row N at level N. Each row's `features` must resolve against this record's own `features[]` - the server refuses the record otherwise, which is why re-minting an id on import never rewrites intra-record ids" },
+          features: homebrewRefArray("HomebrewFeature", 160)
+        }
+      },
+      HomebrewSubclassRecord: {
+        type: "object", additionalProperties: false,
+        description: "A subclass. Third-caster subclasses (Eldritch Knight, Arcane Trickster) declare their own `spellcasting` and overlay extra table rows on the parent class's.",
+        required: [...homebrewRecordBaseRequired, "classId"],
+        properties: {
+          ...homebrewRecordBase, type: { const: "subclass" },
+          classId: { ...contentSlug, description: "The class this subclass belongs to. Re-minting a class id on pack import rewrites this - it is one of the seven derived-id fields" },
+          subclassLevel: { ...homebrewLevel, description: "The class level this subclass is taken at; omitted inherits the parent class's" },
+          spellcasting: homebrewRef("HomebrewSpellcasting"),
+          levelTable: homebrewRefArray("HomebrewClassLevelRow", 20),
+          features: homebrewRefArray("HomebrewFeature", 40)
+        }
+      },
+      HomebrewSpeciesRecord: {
+        type: "object", additionalProperties: false,
+        description: "A playable species. NOTE the deliberate absence of required ability bonuses: SRD 5.2.1 puts ability increases on the BACKGROUND. `abilityBonuses` exists anyway as optional data so a 2014-style or homebrew species can still carry them, and the builder applies whatever a record declares instead of assuming an edition.",
+        required: [...homebrewRecordBaseRequired, "speedFeet"],
+        properties: {
+          ...homebrewRecordBase, type: { const: "species" },
+          sizes: { type: "array", minItems: 1, maxItems: 6, items: homebrewSize, default: ["medium"], description: "A list because several 2024 species let the player pick Small or Medium" },
+          speedFeet: { type: "integer", minimum: 0, maximum: 120 },
+          darkvisionFeet: { type: ["integer", "null"], minimum: 0, maximum: 240, default: null },
+          creatureType: { ...contentSlug, default: "humanoid" },
+          abilityBonuses: { type: "array", maxItems: 6, items: { type: "object", additionalProperties: false, required: ["ability", "amount"], properties: { ability: homebrewAbility, amount: { type: "integer", minimum: -2, maximum: 3 } } } },
+          abilityBonusChoice: { type: "object", additionalProperties: false, required: ["choose", "amount"], description: "\"Choose N abilities to raise by M\" - the 2014 variant-human pattern", properties: { choose: { type: "integer", minimum: 1, maximum: 6 }, amount: { type: "integer", minimum: 1, maximum: 3 }, from: { type: "array", minItems: 1, maxItems: 6, items: homebrewAbility, default: ["str", "dex", "con", "int", "wis", "cha"] } } },
+          languages: homebrewSlugArray(10),
+          languageChoices: homebrewRef("HomebrewChoiceList"),
+          traits: homebrewRefArray("HomebrewFeature", 30),
+          lineages: { type: "array", maxItems: 12, description: "Lineages / subraces, each adding its own traits on top", items: { type: "object", additionalProperties: false, required: ["id", "name"], properties: { id: contentSlug, name: { type: "string", minLength: 1, maxLength: 120 }, description: { type: "string", maxLength: 8000 }, traits: homebrewRefArray("HomebrewFeature", 20) } } }
+        }
+      },
+      HomebrewBackgroundRecord: {
+        type: "object", additionalProperties: false,
+        description: "A background. In SRD 5.2.1 this is where ability increases and the origin feat live, so it is the record a homebrew origin is authored on.",
+        required: [...homebrewRecordBaseRequired],
+        properties: {
+          ...homebrewRecordBase, type: { const: "background" },
+          abilityOptions: { type: "object", additionalProperties: false, required: ["from"], description: "SRD 5.2.1 ability increases: which abilities, and the legal distributions as data (+2/+1 or +1/+1/+1) so a homebrew background can print its own", properties: { from: { type: "array", minItems: 1, maxItems: 6, items: homebrewAbility }, spreads: { type: "array", minItems: 1, maxItems: 4, items: { type: "array", minItems: 1, maxItems: 3, items: { type: "integer", minimum: 1, maximum: 3 } }, default: [[2, 1], [1, 1, 1]] } } },
+          originFeatId: { ...contentSlug, description: "The origin feat this background grants, keyed into the feat catalog - one of the seven derived-id fields a pack import rewrites" },
+          skillProficiencies: homebrewSlugArray(10),
+          skillChoices: homebrewRef("HomebrewChoiceList"),
+          toolProficiencies: homebrewSlugArray(10),
+          toolChoices: homebrewRef("HomebrewChoiceList"),
+          languages: homebrewSlugArray(10),
+          languageChoices: homebrewRef("HomebrewChoiceList"),
+          startingEquipment: homebrewRefArray("HomebrewStartingEquipmentOption", 6),
+          features: homebrewRefArray("HomebrewFeature", 10)
+        }
+      },
+      HomebrewFeatRecord: {
+        type: "object", additionalProperties: false,
+        description: "A feat: catalog metadata plus ONE HomebrewFeature carrying all the mechanics. Nothing about a feat is special-cased - it is literally the same feature record a class or species uses, which is why the smallest of the nine still exercises the whole rider vocabulary.",
+        required: [...homebrewRecordBaseRequired, "feature"],
+        properties: {
+          ...homebrewRecordBase, type: { const: "feat" },
+          category: { ...contentSlug, default: "general", description: "Open slug: origin, general, fighting-style, epic-boon, or anything homebrew adds. Feeds the `<category>-feats` catalog slug a feature choice can point at" },
+          prerequisite: { type: "object", additionalProperties: false, required: [], description: "The SERVER decides whether a prerequisite is met - never the client", properties: { level: homebrewLevel, abilityScores: { type: "array", maxItems: 6, items: { type: "object", additionalProperties: false, required: ["ability", "minimum"], properties: { ability: homebrewAbility, minimum: { type: "integer", minimum: 1, maximum: 20 } } } }, requires: { ...homebrewSlugArray(10), description: "Proficiency or feature slugs the character must already have" }, text: { type: "string", maxLength: 400, description: "Anything not modeled above, printed for the player to judge (ADR-0008 prose fallback)" } } },
+          repeatable: { type: "boolean", default: false },
+          feature: homebrewRef("HomebrewFeature")
+        }
+      },
+      HomebrewSpellRecord: {
+        type: "object", additionalProperties: false,
+        description: "A spell. NO `summary`: `SpellReferenceSchema` never declared one, and the schema is a plain (non-strict) object, so a `summary` sent here would be silently dropped rather than rejected. `classes` carries the spell-list ids this spell belongs to - it is how a homebrew spell joins a list, paired with the class record's `spellcasting.spellListId`.",
+        required: [...homebrewRecordBaseRequired, "level", "school", "castingTime", "reactionCondition", "range", "components", "duration", "concentration", "ritual", "attackRoll", "damage", "save", "target", "shape", "classes", "description", "higherLevel", "castingOptions"],
+        properties: {
+          type: { const: "spell" }, id: homebrewRecordBase.id, name: homebrewRecordBase.name, source: homebrewRecordBase.source, attribution: homebrewRecordBase.attribution,
+          level: { type: "integer", minimum: 0, maximum: 9, description: "0 is a cantrip" },
+          school: { type: "string", minLength: 1, maxLength: 40 },
+          castingTime: { type: "string", minLength: 1, maxLength: 80 },
+          reactionCondition: { type: ["string", "null"], maxLength: 400, description: "What triggers the reaction, for a spell cast as one; null otherwise" },
+          range: { type: "object", additionalProperties: false, required: ["distance", "unit", "text"], properties: { distance: { type: ["number", "null"] }, unit: { type: ["string", "null"] }, text: { type: ["string", "null"] } } },
+          components: { type: "object", additionalProperties: false, required: ["verbal", "somatic", "material", "materialText", "materialConsumed"], properties: { verbal: { type: "boolean" }, somatic: { type: "boolean" }, material: { type: "boolean" }, materialText: { type: ["string", "null"] }, materialConsumed: { type: "boolean" } } },
+          duration: { type: "string", minLength: 1, maxLength: 120 },
+          concentration: { type: "boolean" },
+          ritual: { type: "boolean" },
+          attackRoll: { type: "boolean" },
+          damage: { type: "object", additionalProperties: false, required: ["roll", "types"], properties: { roll: { type: ["string", "null"], description: "Base damage/healing roll (\"8d6\"), or null when the spell rolls nothing" }, types: { type: "array", items: homebrewDamageType } } },
+          save: { description: "Which save the target rolls; null when the spell forces none", oneOf: [homebrewAbility, { type: "null" }] },
+          target: { type: "object", additionalProperties: false, required: ["type", "count"], properties: { type: { type: ["string", "null"] }, count: { type: ["integer", "null"] } } },
+          shape: { description: "The area of effect; null for a single-target spell", oneOf: [{ $ref: "#/components/schemas/HomebrewSpellShape" }, { type: "null" }] },
+          classes: { type: "array", items: contentSlug, description: "Spell-list ids this spell belongs to (\"wizard\", a homebrew list slug). A HomebrewSpellListRecord can also pull a spell in without touching this" },
+          description: { type: "string", minLength: 1, maxLength: 20000 },
+          higherLevel: { type: ["string", "null"], maxLength: 4000 },
+          castingOptions: { type: "array", description: "Per-slot-level upcast scaling; the sheet applies the row matching the chosen cast level", items: { type: "object", additionalProperties: false, required: ["type", "damageRoll", "targetCount", "description"], properties: { type: { type: "string" }, damageRoll: { type: ["string", "null"] }, targetCount: { type: ["integer", "null"] }, description: { type: ["string", "null"] } } } }
+        }
+      },
+      HomebrewEquipmentRecord: {
+        type: "object", additionalProperties: false,
+        description: "Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, or a homebrew kind nobody has invented yet. NO `summary` and NO `attribution`: `EquipmentReferenceSchema` is the ONE `.strict()` content schema, so an undeclared key THROWS rather than being dropped - documenting either here would publish a field that makes the request fail. Only `weapon`, `armor` and `shield` are mechanically live; a homebrew `category` displays and stacks but derives no AC or attack until an explicit slot field lands.",
+        required: [...homebrewRecordBaseRequired, "category", "costGp", "weightLb", "description"],
+        properties: {
+          type: { const: "equipment" }, id: homebrewRecordBase.id, name: homebrewRecordBase.name, source: homebrewRecordBase.source,
+          category: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40, description: "Open slug, never a closed enum - \"relic\", \"vehicle\", \"trinket\" need no schema change" },
+          costGp: { type: ["number", "null"], minimum: 0, maximum: 1000000 },
+          weightLb: { type: ["number", "null"], minimum: 0, maximum: 1000 },
+          description: { type: ["string", "null"], maxLength: 2000 },
+          weapon: { description: "Populated for weapons only", oneOf: [{ $ref: "#/components/schemas/HomebrewEquipmentWeapon" }, { type: "null" }] },
+          armor: { description: "Populated for armor and shields only", oneOf: [{ $ref: "#/components/schemas/HomebrewEquipmentArmor" }, { type: "null" }] }
+        }
+      },
+      HomebrewMonsterRecord: {
+        type: "object", additionalProperties: false,
+        description: "A creature stat block: a canonical ActorDefinition, authored flat. The ONE branch with no content-catalog Zod schema behind it - a monster is an `ActorDefinition` (`@vtt/schemas`), the same shape `actor.import-definition` and the bundled bestiary already use, so this mirrors that instead of inventing a parallel record. Note `source` here is bundle PROVENANCE (`{name, version, externalId}`), deliberately NOT the srd/homebrew discriminator the other eight carry: that name was already taken, and a sibling key meaning the same thing twice is worse than deriving homebrew-ness from the row (which is what the merge does). The row's id becomes `source.externalId`.",
+        required: [...homebrewRecordBaseRequired, "schemaId", "schemaVersion", "source", "size", "abilityScores", "proficiencyBonus", "armorClass", "hitPoints", "speedFeet"],
+        properties: {
+          type: { const: "monster" },
+          id: { ...homebrewId, description: "The row's id. NOT part of ActorDefinitionSchema - the server stamps it into the stored body so the merged bestiary can resolve the record back to its row" },
+          name: homebrewRecordBase.name,
+          schemaId: { type: "string", enum: ["vtt.actor-character", "vtt.actor-monster"] },
+          schemaVersion: { const: 1, description: "ADR-0007 integer schema version; discoverable at /system/version" },
+          source: { type: "object", additionalProperties: false, required: ["name", "version"], description: "Bundle provenance, not the content discriminator", properties: { name: { type: "string", minLength: 1, maxLength: 200 }, version: { type: "string", minLength: 1, maxLength: 80 }, externalId: { type: "string", maxLength: 200 } } },
+          summary: { type: "string", maxLength: 280 },
+          size: homebrewSize,
+          abilityScores: { type: "object", additionalProperties: false, required: ["str", "dex", "con", "int", "wis", "cha"], properties: { str: { type: "integer", minimum: 1, maximum: 30 }, dex: { type: "integer", minimum: 1, maximum: 30 }, con: { type: "integer", minimum: 1, maximum: 30 }, int: { type: "integer", minimum: 1, maximum: 30 }, wis: { type: "integer", minimum: 1, maximum: 30 }, cha: { type: "integer", minimum: 1, maximum: 30 } } },
+          proficiencyBonus: { type: "integer", minimum: 0, maximum: 12 },
+          armorClass: { type: "integer", minimum: 1, maximum: 40 },
+          hitPoints: { type: "object", additionalProperties: false, required: ["maximum"], properties: { maximum: { type: "integer", minimum: 1 }, formula: homebrewDiceFormula } },
+          initiativeBonus: { type: "integer", minimum: -20, maximum: 30, default: 0 },
+          speedFeet: { type: "integer", minimum: 0 },
+          actions: homebrewRefArray("HomebrewStatblockAction", 100),
+          token: { type: "object", additionalProperties: false, required: [], description: "The battlemap PIECE - disposition and grid footprint. Nothing to do with credentials", properties: { disposition: { type: "string", enum: ["friendly", "hostile", "neutral"], default: "neutral" }, footprint: { type: "object", additionalProperties: false, required: ["width", "height"], properties: { width: { type: "integer", minimum: 1, maximum: 4 }, height: { type: "integer", minimum: 1, maximum: 4 } }, default: { width: 1, height: 1 } } } },
+          extensions: { type: "object", additionalProperties: true, default: {}, description: "Free-form passthrough an importer may carry; the engine reads nothing from it" },
+          damageResistances: { type: "array", maxItems: 20, items: homebrewDamageType },
+          damageImmunities: { type: "array", maxItems: 20, items: homebrewDamageType },
+          damageVulnerabilities: { type: "array", maxItems: 20, items: homebrewDamageType },
+          conditionImmunities: { type: "array", maxItems: 20, items: homebrewConditionId, description: "Reference-level for now: displayed, not yet enforced on actor.set-condition" },
+          legendary: { type: "object", additionalProperties: false, required: [], description: "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a long rest", properties: { actionsPerRound: { type: "integer", minimum: 1, maximum: 5 }, resistancesPerDay: { type: "integer", minimum: 1, maximum: 6 } } },
+          character: { type: "object", additionalProperties: true, description: "The CHARACTER half of an ActorDefinition (class/level/species/background/feats and the choice-provenance ledger). A monster leaves it absent; it is documented as an open object here for the same reason `ActorImportRequest.definition` is - a homebrew author never writes it, the character builder does" },
+          proficiencies: { type: "object", additionalProperties: true, description: "Save/skill proficiency selections; the character half, see `character`" },
+          spellcasting: { type: "object", additionalProperties: true, description: "A spellcasting creature's ability, slot maxima, and known/prepared list; the character half, see `character`" },
+          startingInventory: { type: "array", maxItems: 200, items: { type: "object", additionalProperties: true }, description: "Immutable starting loadout; the character half, see `character`" },
+          startingCurrency: { type: "object", additionalProperties: true, description: "Immutable starting coins; the character half, see `character`" }
+        }
+      },
+      HomebrewSpellListRecord: {
+        type: "object", additionalProperties: false,
+        description: "A spell list as a membership OVERLAY, never an edit to the generated spell bundle: `basedOn` expands existing lists, `add` layers ids on top, and `remove` always wins. That is what keeps \"the Wizard list plus my three spells\" ONE row instead of 221. A list resolving to ZERO spells is a hard character-creation rejection downstream, so publish-time validation refuses an empty one.",
+        required: [...homebrewRecordBaseRequired],
+        properties: {
+          ...homebrewRecordBase, type: { const: "spell-list" },
+          basedOn: { ...homebrewSlugArray(8), description: "Start from these existing list ids - SRD (`wizard`) or another overlay. Empty starts blank" },
+          add: { ...homebrewSlugArray(500), description: "Spell ids added on top of the `basedOn` expansion. SRD spell ids are perfectly legal here" },
+          remove: { ...homebrewSlugArray(500), description: "Spell ids removed last, after everything else" }
+        }
+      },
+
+      // ---- Record support shapes.
+      HomebrewChoiceList: { type: "object", additionalProperties: false, required: ["choose"], description: "A \"choose N from this list\" proficiency grant (class skills, background tools).", properties: { choose: { type: "integer", minimum: 0, maximum: 10 }, from: homebrewSlugArray(60) } },
+      HomebrewStartingEquipmentOption: { type: "object", additionalProperties: false, required: ["id", "label"], description: "A named starting-equipment bundle (\"A: chain mail and a martial weapon\", \"C: 155 gp\"). The chosen option's id is what lands in the character's choice ledger, so the items must be RESOLVABLE - a label alone can be displayed but never turned into inventory.", properties: { id: contentSlug, label: { type: "string", minLength: 1, maxLength: 200 }, items: { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false, required: ["id", "name"], properties: { id: contentSlug, name: { type: "string", minLength: 1, maxLength: 120 }, quantity: { type: "integer", minimum: 1, maximum: 99, default: 1 } } } }, goldPieces: { type: "integer", minimum: 0, maximum: 1000, default: 0 } } },
+      HomebrewClassLevelRow: { type: "object", additionalProperties: false, required: ["level", "proficiencyBonus"], description: "ONE row of a class's 20-level table. `features` lists the ids granted at that level, resolved against the owning record's own `features[]`. The optional columns carry whatever the printed table carries - omit a column this class does not have rather than sending zeroes.", properties: { level: homebrewLevel, proficiencyBonus: { type: "integer", minimum: 2, maximum: 6 }, features: homebrewSlugArray(12), spellSlots: { type: "array", minItems: 9, maxItems: 9, items: { type: "integer", minimum: 0, maximum: 4 }, description: "Nine counts, index 0 = 1st-level slots. Omitted on a non-caster row" }, pactSlots: { type: "object", additionalProperties: false, required: ["level", "slots"], description: "Warlock Pact Magic: one uniform slot level with its own count", properties: { level: { type: "integer", minimum: 1, maximum: 9 }, slots: { type: "integer", minimum: 0, maximum: 4 } } }, cantripsKnown: { type: "integer", minimum: 0, maximum: 10 }, spellsKnown: { type: "integer", minimum: 0, maximum: 40 }, preparedFormula: { type: "string", maxLength: 60, description: "The prepared-spell rule as data (\"<ability> modifier + <class> level\") so a homebrew class prints its own wording" }, preparedCount: { type: "integer", minimum: 0, maximum: 60 }, classResources: { type: "array", maxItems: 8, description: "Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3)", items: { type: "object", additionalProperties: false, required: ["id", "name", "amount"], properties: { id: contentSlug, name: { type: "string", minLength: 1, maxLength: 60 }, amount: { oneOf: [{ type: "integer", minimum: 0, maximum: 999 }, { type: "string", minLength: 1, maxLength: 20 }], description: "A count, or a dice string" } } } } } },
+      HomebrewSpellcasting: { type: "object", additionalProperties: false, required: ["ability", "prepares"], description: "Spellcasting a class - or a third-caster subclass - grants.", properties: { ability: homebrewAbility, prepares: { type: "string", enum: ["known", "prepared"], description: "known = a fixed spells-known list; prepared = re-chosen on a long rest" }, ritual: { type: "boolean", default: false }, focus: { type: ["string", "null"], pattern: "^[a-z0-9-]+$", maxLength: 80, default: null, description: "Spellcasting focus slug (arcane-focus, holy-symbol, druidic-focus); null = none" }, multiclassProgression: { type: "string", enum: ["full", "half", "third", "pact"], default: "full", description: "How this class's levels count toward the shared multiclass caster level" }, spellListId: { ...contentSlug, description: "The spell list this class draws from - an open slug, so a HomebrewSpellListRecord works. One of the seven derived-id fields a pack import rewrites (it also implies the `<listId>-spells` catalog slug)" } } },
+      HomebrewMulticlassPrerequisite: { type: "object", additionalProperties: false, required: ["minimums"], description: "Ability minimums for taking this class as a multiclass; `mode: \"any\"` covers \"STR 13 or DEX 13\". Display data - the server re-validates.", properties: { mode: { type: "string", enum: ["all", "any"], default: "all" }, minimums: { type: "array", minItems: 1, maxItems: 6, items: { type: "object", additionalProperties: false, required: ["ability", "minimum"], properties: { ability: homebrewAbility, minimum: { type: "integer", minimum: 1, maximum: 20 } } } } } },
+      HomebrewSpellShape: { type: "object", additionalProperties: false, required: ["type", "size", "unit"], description: "A spell's area of effect.", properties: { type: { type: "string" }, size: { type: ["number", "null"] }, unit: { type: ["string", "null"] } } },
+      HomebrewEquipmentWeapon: { type: "object", additionalProperties: false, required: ["category", "damageDice", "damageType", "rangeFeet", "longRangeFeet"], properties: { category: { type: "string", enum: ["simple", "martial"] }, damageDice: { type: "string", maxLength: 20 }, damageType: { type: "string", maxLength: 40 }, rangeFeet: { type: ["integer", "null"], minimum: 1 }, longRangeFeet: { type: ["integer", "null"], minimum: 1, description: "Attacks past `rangeFeet` up to this roll at disadvantage" } } },
+      HomebrewEquipmentArmor: { type: "object", additionalProperties: false, required: ["acBase", "addDexModifier", "dexModifierCap", "stealthDisadvantage", "strengthRequired"], description: "Body armor carries its full base AC (11-18); a shield carries its +2 bonus.", properties: { acBase: { type: "integer", minimum: 2, maximum: 25 }, addDexModifier: { type: "boolean" }, dexModifierCap: { type: ["integer", "null"] }, stealthDisadvantage: { type: "boolean" }, strengthRequired: { type: ["integer", "null"] } } },
+
+      // ---- The feature rider vocabulary. THE authoring inversion: `ContentFeature` publishes prose
+      // and keeps riders server-side so the wizard never becomes a second rules engine; a homebrew
+      // author has to write them, so they are public schema here. The two components stay separate.
+      HomebrewFeature: {
+        type: "object", additionalProperties: false,
+        description: "THE shared feature record: a class feature, a subclass feature, a species trait, a background feature, and a feat's mechanics are all this one shape. `description` is always the display source of truth, and every rider is optional - a prose-only feature is perfectly valid and is how most text starts life. This is the AUTHORING counterpart of `ContentFeature`, which publishes the same feature with its riders stripped.",
+        required: ["id", "name", "description"],
+        properties: {
+          id: contentSlug, name: { type: "string", minLength: 1, maxLength: 120 },
+          level: { ...homebrewLevel, description: "Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats)" },
+          description: { type: "string", minLength: 1, maxLength: 20000 },
+          choice: { ...homebrewRef("HomebrewFeatureChoice"), description: "A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible" },
+          ...homebrewFeatureRiders,
+          replacesFeatureId: { ...contentSlug, description: "This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17)" }
+        }
+      },
+      HomebrewFeatureChoice: {
+        type: "object", additionalProperties: false,
+        description: "A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an open catalog slug resolved at pick time), `from` (explicit ids whose mechanics live elsewhere or nowhere), or `options` (the ids WITH their mechanics inline, for options that exist only here - Divine Order's two sacred roles, Giant Ancestry's six boons). `options` and `from` are mutually exclusive: after parsing, `from` always holds the canonical id list, derived from `options` when they were authored.",
+        required: ["kind"],
+        properties: { ...homebrewChoiceBase, options: { ...homebrewRefArray("HomebrewFeatureOption", 40), minItems: 1, description: "Options carrying their own mechanics. Mutually exclusive with `from`" } }
+      },
+      HomebrewFeatureOption: {
+        type: "object", additionalProperties: false,
+        description: "ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeature minus `level`/`replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so \"Divine Order: Protector\" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.",
+        required: ["id", "name", "description"],
+        properties: {
+          id: contentSlug, name: { type: "string", minLength: 1, maxLength: 120 },
+          description: { type: "string", minLength: 1, maxLength: 20000 },
+          choice: { ...homebrewRef("HomebrewFeatureOptionChoice"), description: "A SECOND-ORDER pick this option owes once chosen (Thaumaturge's extra Cleric cantrip)" },
+          ...homebrewFeatureRiders
+        }
+      },
+      HomebrewFeatureOptionChoice: {
+        type: "object", additionalProperties: false,
+        description: "THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureChoice except that it HAS NO `options` KEY AT ALL, so the recursion is bounded by the schema rather than by a promise in prose: an option's own pick may name ids or a catalog slug, and can never open a third level.",
+        required: ["kind"],
+        properties: { ...homebrewChoiceBase }
+      },
+      HomebrewFeatureAction: {
+        type: "object", additionalProperties: false,
+        description: "A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Breath Weapon). Identical to HomebrewStatblockAction except for `attack`/`save`: a class feature cannot know the character's ability scores, so it names the ability and the builder DERIVES the number, where a stat block prints it.",
+        required: [...homebrewActionBaseRequired],
+        properties: {
+          ...homebrewActionBase,
+          attack: homebrewRef("HomebrewFeatureAttack"),
+          save: homebrewRef("HomebrewFeatureSave"),
+          damageByLevel: { type: "array", maxItems: 20, description: "Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite)", items: { type: "object", additionalProperties: false, required: ["level", "formula", "type"], properties: { level: homebrewLevel, formula: homebrewDiceFormula, type: homebrewDamageType } } }
+        }
+      },
+      HomebrewStatblockAction: {
+        type: "object", additionalProperties: false,
+        description: "A stat block's action, in the exact `ActionSchema` vocabulary the live rules engine already resolves. Every mechanics field is optional: absent means \"prose only\", and the engine falls back to reference behavior.",
+        required: [...homebrewActionBaseRequired],
+        properties: {
+          ...homebrewActionBase,
+          attack: { type: "object", additionalProperties: false, required: ["bonus"], description: "A printed to-hit bonus - the stat block knows its own numbers", properties: { bonus: { type: "integer" }, reachFeet: { type: "integer", minimum: 1 }, rangeFeet: { type: "integer", minimum: 1 }, rangeNormalFeet: { type: "integer", minimum: 1, description: "Normal range for a two-range weapon (\"80/320\" -> 80); attacks beyond it up to rangeFeet roll at disadvantage" }, count: { type: "integer", minimum: 1, maximum: 10 }, criticalBonusDice: { type: "integer", minimum: 1, maximum: 4 } } },
+          save: { type: "object", additionalProperties: false, required: ["ability", "dc"], description: "A printed save DC", properties: { ability: homebrewAbility, dc: { type: "integer", minimum: 1, maximum: 40 } } }
+        }
+      },
+      HomebrewFeatureAttack: { type: "object", additionalProperties: false, required: ["ability"], description: "An attack a FEATURE grants. Same vocabulary as a stat block's attack except the to-hit bonus is DERIVED: the feature names the ability (or \"spellcasting\") and the builder resolves the number.", properties: { ability: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha", "spellcasting"] }, proficient: { type: "boolean", default: true }, reachFeet: { type: "integer", minimum: 1 }, rangeFeet: { type: "integer", minimum: 1 }, rangeNormalFeet: { type: "integer", minimum: 1 }, count: { type: "integer", minimum: 1, maximum: 10 }, criticalBonusDice: { type: "integer", minimum: 1, maximum: 4 } } },
+      HomebrewFeatureSave: { type: "object", additionalProperties: false, required: ["ability", "dc"], description: "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived.", properties: { ability: homebrewAbility, dc: { description: "Three forms, all of them data rather than a formula language (ADR-0008): the character's own spell save DC, a printed constant, or the SRD's \"DC 8 plus your <ability> modifier and Proficiency Bonus\" wording as three bounded fields.", oneOf: [{ const: "spellcasting" }, { type: "integer", minimum: 1, maximum: 40 }, { $ref: "#/components/schemas/HomebrewFeatureSaveDc" }] } } },
+      HomebrewFeatureSaveDc: { type: "object", additionalProperties: false, required: ["ability"], description: "A DERIVED save DC: `base` plus the CASTER's ability modifier, plus proficiency bonus. Every SRD 5.2.1 printing uses base 8 with proficiency, which is why both default.", properties: { base: { type: "integer", minimum: 1, maximum: 30, default: 8, description: "The printed constant the modifiers are added to" }, ability: { ...homebrewAbility, description: "Whose modifier is added - the CASTER's ability, not the one the target rolls" }, proficiencyBonus: { type: "boolean", default: true } } },
+      HomebrewFeatureUses: { type: "object", additionalProperties: false, required: ["per"], description: "Uses a feature gets back on a rest, as DATA rather than a formula language. Either `limit` or `scaling` must be present. The `per` vocabulary is deliberately NARROWER than an action's: there is no \"recharge\", because a recharge roll belongs to a stat block, not a character feature.", properties: { limit: { type: "integer", minimum: 1, maximum: 20, description: "A flat count" }, scaling: { description: "The three ways 5e actually scales a feature's uses.", discriminator: { propertyName: "type", mapping: { "proficiency-bonus": "#/components/schemas/HomebrewUsesByProficiency", "ability-modifier": "#/components/schemas/HomebrewUsesByAbility", "by-level": "#/components/schemas/HomebrewUsesByLevel" } }, oneOf: [{ $ref: "#/components/schemas/HomebrewUsesByProficiency" }, { $ref: "#/components/schemas/HomebrewUsesByAbility" }, { $ref: "#/components/schemas/HomebrewUsesByLevel" }] }, per: { type: "string", enum: ["turn", "encounter", "short-rest", "long-rest"] }, pool: { ...contentSlug, description: "Shares ONE counter across every feature carrying the same pool id" } } },
+      HomebrewUsesByProficiency: homebrewVariant("proficiency-bonus", "Uses equal to the character's proficiency bonus.", []),
+      HomebrewUsesByAbility: homebrewVariant("ability-modifier", "Uses equal to an ability modifier, floored at `minimum`.", ["ability"], { ability: homebrewAbility, minimum: { type: "integer", minimum: 0, maximum: 5, default: 1 } }),
+      HomebrewUsesByLevel: homebrewVariant("by-level", "A printed per-level column.", ["table"], { table: { type: "array", minItems: 1, maxItems: 20, items: { type: "object", additionalProperties: false, required: ["level", "limit"], properties: { level: homebrewLevel, limit: { type: "integer", minimum: 0, maximum: 99 } } } } }),
+      HomebrewFeatureGrants: { type: "object", additionalProperties: false, required: [], description: "Flat things a feature simply hands the character. All open slugs, so a homebrew language, tool, or armor group needs no schema change.", properties: { skills: homebrewSlugArray(20), expertise: homebrewSlugArray(20), tools: homebrewSlugArray(20), languages: homebrewSlugArray(20), armor: homebrewSlugArray(10), weapons: homebrewSlugArray(40), saves: { type: "array", maxItems: 6, items: homebrewAbility }, damageResistances: homebrewSlugArray(20), damageImmunities: homebrewSlugArray(20), conditionImmunities: homebrewSlugArray(20), spells: { type: "array", maxItems: 30, description: "Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites", items: { type: "object", additionalProperties: false, required: ["id"], properties: { id: contentSlug, level: { type: "integer", minimum: 0, maximum: 9 }, alwaysPrepared: { type: "boolean", default: true }, ability: homebrewAbility } } } } },
+      HomebrewFeatureModifier: homebrewUnion("Typed numeric riders a feature contributes. A bounded union, deliberately small and grown additively - anything not modeled stays prose (ADR-0008). Distinct from HomebrewEffectModifier, which is the smaller vocabulary a live EFFECT contributes; do not merge them.", { "ability-score": "HomebrewModifierAbilityScore", "hit-points-per-level": "HomebrewModifierHitPointsPerLevel", speed: "HomebrewModifierSpeed", "armor-class": "HomebrewModifierArmorClass", initiative: "HomebrewModifierInitiative", "extra-attack": "HomebrewModifierExtraAttack", "unarmored-defense": "HomebrewModifierUnarmoredDefense", darkvision: "HomebrewModifierDarkvision" }),
+      HomebrewModifierAbilityScore: homebrewVariant("ability-score", "Raise (or lower) one ability score, optionally past the usual cap.", ["ability", "amount"], { ability: homebrewAbility, amount: { type: "integer", minimum: -5, maximum: 5 }, maximum: { type: "integer", minimum: 1, maximum: 30 } }),
+      HomebrewModifierHitPointsPerLevel: homebrewVariant("hit-points-per-level", "Extra hit points at every level (Tough, Dwarven Toughness).", ["amount"], { amount: { type: "integer", minimum: -5, maximum: 5 } }),
+      HomebrewModifierSpeed: homebrewVariant("speed", "Change walking speed in feet.", ["amount"], { amount: { type: "integer", minimum: -30, maximum: 60 } }),
+      HomebrewModifierArmorClass: homebrewVariant("armor-class", "A flat AC rider. `whileArmored` is the ONE bounded condition the SRD's printed bonuses need (the Defense fighting style reads \"While you're wearing Light, Medium, or Heavy armor\"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant.", ["amount"], { amount: { type: "integer", minimum: -5, maximum: 5 }, whileArmored: { type: "boolean", default: false } }),
+      HomebrewModifierInitiative: homebrewVariant("initiative", "Change the initiative bonus.", ["amount"], { amount: { type: "integer", minimum: -5, maximum: 10 } }),
+      HomebrewModifierExtraAttack: homebrewVariant("extra-attack", "Additional attacks on the Attack action.", ["count"], { count: { type: "integer", minimum: 1, maximum: 3 } }),
+      HomebrewModifierUnarmoredDefense: homebrewVariant("unarmored-defense", "AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it).", ["ability"], { ability: homebrewAbility, allowShield: { type: "boolean", default: false } }),
+      HomebrewModifierDarkvision: homebrewVariant("darkvision", "Grant or extend darkvision.", ["feet"], { feet: { type: "integer", minimum: 0, maximum: 240 } }),
+      HomebrewActionOnHit: { type: "object", additionalProperties: false, required: ["conditions"], description: "On-hit riders: conditions applied to the target as ONE source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15).", properties: { conditions: { type: "array", minItems: 1, maxItems: 3, items: { type: "object", additionalProperties: false, required: ["id"], properties: { id: homebrewConditionId, level: { type: "integer", minimum: 1, maximum: 6 } } } }, escapeDc: { type: "integer", minimum: 1, maximum: 40 }, maxTargetSize: { ...homebrewSize, description: "The rider only applies to targets of at most this size" } } },
+      HomebrewActionUses: { type: "object", additionalProperties: false, required: ["limit", "per"], description: "Limited uses for an ACTION. Unlike a feature's, this vocabulary includes \"recharge\" - a start-of-turn d6 at or above `recharge` (and any rest) restores it. `recharge` must be present when `per` is \"recharge\" and absent otherwise; the server enforces the biconditional.", properties: { limit: { type: "integer", minimum: 1, maximum: 20 }, per: { type: "string", enum: ["turn", "encounter", "long-rest", "short-rest", "recharge"] }, pool: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60, description: "Shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon)" }, recharge: { type: "integer", minimum: 2, maximum: 6, description: "The d6 threshold, e.g. 5 for \"Recharge 5-6\"" } } },
+      HomebrewEffectGrant: { type: "object", additionalProperties: false, required: ["tags", "duration"], description: "An effect a feature or action grants, in the SAME vocabulary the live rules engine already resolves on an actor - reused rather than re-invented, so a homebrew Rage behaves exactly like the bundled one.", properties: { name: { type: "string", minLength: 1, maxLength: 120 }, tags: { type: "array", minItems: 1, maxItems: 8, items: homebrewEffectTag }, duration: { description: "How long the effect lasts.", discriminator: { propertyName: "type", mapping: { rounds: "#/components/schemas/HomebrewEffectDurationRounds", "until-source-next-turn": "#/components/schemas/HomebrewEffectDurationUntilSourceNextTurn", encounter: "#/components/schemas/HomebrewEffectDurationEncounter", manual: "#/components/schemas/HomebrewEffectDurationManual" } }, oneOf: [{ $ref: "#/components/schemas/HomebrewEffectDurationRounds" }, { $ref: "#/components/schemas/HomebrewEffectDurationUntilSourceNextTurn" }, { $ref: "#/components/schemas/HomebrewEffectDurationEncounter" }, { $ref: "#/components/schemas/HomebrewEffectDurationManual" }] }, modifiers: homebrewRefArray("HomebrewEffectModifier", 8), onEnd: homebrewRefArray("HomebrewEffectOnEnd", 2), endsWithTag: { ...homebrewEffectTag, description: "The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage)" }, target: { type: "string", enum: ["self", "target"], default: "self", description: "Who receives it: the acting creature, or the action's single chosen target (Help)" }, voidWhileIncapacitated: { type: "boolean", default: false, description: "Benefits lapse while the bearer is incapacitated (Dodge)" }, concentration: { type: "boolean", default: false } } },
+      HomebrewEffectDurationRounds: homebrewVariant("rounds", "A fixed number of rounds.", ["rounds"], { rounds: { type: "integer", minimum: 1, maximum: 100 } }),
+      HomebrewEffectDurationUntilSourceNextTurn: homebrewVariant("until-source-next-turn", "Until the granting creature's next turn begins.", []),
+      HomebrewEffectDurationEncounter: homebrewVariant("encounter", "Until the encounter ends.", []),
+      HomebrewEffectDurationManual: homebrewVariant("manual", "Until the GM clears it.", []),
+      HomebrewEffectOnEnd: homebrewVariant("condition", "What happens when the effect ends - Frenzy leaves one level of Exhaustion behind.", ["conditionId"], { conditionId: homebrewConditionId, level: { type: "integer", minimum: 1, maximum: 6 } }),
+      HomebrewEffectModifier: homebrewUnion("What an active EFFECT contributes to the rules engine. A DIFFERENT and smaller vocabulary than HomebrewFeatureModifier (which is what a feature contributes permanently); the two are deliberately not merged. `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics).", { "damage-bonus": "HomebrewEffectDamageBonus", "damage-resistance": "HomebrewEffectDamageResistance", "attack-advantage": "HomebrewEffectAttackAdvantage", "incoming-attack-advantage": "HomebrewEffectIncomingAttackAdvantage", "attack-disadvantage": "HomebrewEffectAttackDisadvantage", "incoming-attack-disadvantage": "HomebrewEffectIncomingAttackDisadvantage", "save-advantage": "HomebrewEffectSaveAdvantage", "save-disadvantage": "HomebrewEffectSaveDisadvantage" }),
+      HomebrewEffectDamageBonus: homebrewVariant("damage-bonus", "Flat damage added to the bearer's hits.", ["amount"], { amount: { type: "integer", minimum: -20, maximum: 20 }, appliesTo: { type: "string", enum: ["melee", "all"], default: "all" } }),
+      HomebrewEffectDamageResistance: homebrewVariant("damage-resistance", "Resistance to the listed damage types.", ["damageTypes"], { damageTypes: { type: "array", minItems: 1, maxItems: 20, items: homebrewDamageType } }),
+      HomebrewEffectAttackAdvantage: homebrewVariant("attack-advantage", "The bearer's attack rolls have advantage, on its own turn only.", []),
+      HomebrewEffectIncomingAttackAdvantage: homebrewVariant("incoming-attack-advantage", "Attack rolls against the bearer have advantage.", []),
+      HomebrewEffectAttackDisadvantage: homebrewVariant("attack-disadvantage", "The bearer's attack rolls have disadvantage, always-on.", []),
+      HomebrewEffectIncomingAttackDisadvantage: homebrewVariant("incoming-attack-disadvantage", "Attack rolls against the bearer have disadvantage (Dodge).", []),
+      HomebrewEffectSaveAdvantage: homebrewVariant("save-advantage", "The bearer's saving throws have advantage; omit `ability` for all saves (Dodge grants Dex only).", [], { ability: homebrewAbility }),
+      HomebrewEffectSaveDisadvantage: homebrewVariant("save-disadvantage", "The bearer's saving throws have disadvantage; omit `ability` for all saves.", [], { ability: homebrewAbility }),
       HomebrewRecordDocument: { type: "object", additionalProperties: false, required: ["id", "type", "state", "visibleToPlayers", "deletedAt", "rev", "createdAt", "updatedAt", "validity", "record"], description: "One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published AND visible AND not deleted - and even then only through the merged CONTENT_PATHS catalogs, never through this component.", properties: { id: homebrewId, type: homebrewContentType, state: homebrewState, visibleToPlayers: { type: "boolean", description: "Publishing does not reveal: this is the separate, deliberate second step" }, deletedAt: { type: ["string", "null"], format: "date-time", description: "Soft delete; a deleted row leaves every merged catalog at once and is restorable" }, rev: { type: "integer", minimum: 0 }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" }, validity: { $ref: "#/components/schemas/HomebrewValidity" }, record: { $ref: "#/components/schemas/HomebrewRecord" } } },
       HomebrewRecordSummary: { type: "object", additionalProperties: false, required: ["id", "type", "name", "source", "state", "visibleToPlayers", "deletedAt", "rev", "updatedAt", "valid", "usageCount"], description: "The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `valid` alone - the issue list costs a GET - so listing a 300-record library never ships a 20-row level table.", properties: { id: homebrewId, type: homebrewContentType, name: { type: "string", minLength: 1, maxLength: 120 }, source: { const: "homebrew", description: "Always \"homebrew\" on this surface; the field exists so a summary and a merged-catalog row read the same" }, state: homebrewState, visibleToPlayers: { type: "boolean" }, deletedAt: { type: ["string", "null"], format: "date-time" }, rev: { type: "integer", minimum: 0 }, updatedAt: { type: "string", format: "date-time" }, valid: { type: "boolean" }, usageCount: { type: "integer", minimum: 0, description: "How many characters took this record; 0 is the common case" } } },
       HomebrewUsage: { type: "object", additionalProperties: false, required: ["actorId", "actorName", "kind", "detail"], properties: { actorId: { type: "string", format: "uuid" }, actorName: { type: "string", minLength: 1, maxLength: 200 }, kind: { ...contentSlug, maxLength: 60, description: "How the record is used - open slug (character-choice, class, species, ...), never a closed enum" }, detail: { type: ["string", "null"], maxLength: 300 } } },
