@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import {
+  applySpellListOverlay, ArmorReferenceSchema, ConditionReferenceSchema, EquipmentReferenceSchema,
   loadArmor, loadAttribution, loadConditions, loadDamageTypes, loadEquipment, loadMonsterDefinitions,
-  loadRules, loadSkills, loadSpells, loadWeaponProperties, loadWeapons
+  loadRules, loadSkills, loadSpells, loadWeaponProperties, loadWeapons, resolveSpellLists,
+  RuleReferenceSchema, SkillReferenceSchema, spellListMemberIds, SpellListReferenceSchema,
+  SpellReferenceSchema, WeaponPropertyReferenceSchema, WeaponReferenceSchema
 } from "../src/index.js";
 
 describe("SRD 5.2.1 monster bundle", () => {
@@ -216,6 +220,148 @@ describe("SRD 5.2.1 reference bundles", () => {
     expect(rules.length).toBe(56);
     expect(rules.some((rule) => rule.ruleset === "Combat")).toBe(true);
     expect(rules.some((rule) => rule.name === "Saving Throws")).toBe(true);
+  });
+});
+
+/**
+ * The homebrew seam on the reference records: one source discriminator, an open item category, and
+ * the strictness that stays. These assertions exist because the failure they cover is SILENT - a
+ * plain `z.object` strips an undeclared key with no error, so a schema that does not declare
+ * `source` loses `source: "homebrew"` on the way in and nothing anywhere reports it.
+ */
+describe("homebrew source discriminator and open item categories", () => {
+  const spellBody = {
+    id: "hb-grave-touch", name: "Grave Touch", level: 1, school: "necromancy", castingTime: "1 action",
+    reactionCondition: null, range: { distance: null, unit: null, text: "Touch" },
+    components: { verbal: true, somatic: true, material: false, materialText: null, materialConsumed: false },
+    duration: "Instantaneous", concentration: false, ritual: false, attackRoll: true,
+    damage: { roll: "1d10", types: ["necrotic"] }, save: null, target: { type: "creature", count: 1 },
+    shape: null, classes: ["hb-necromancer"], description: "A withering touch.", higherLevel: null, castingOptions: []
+  };
+  const gearBody = { id: "hb-grave-lantern", name: "Grave Lantern", category: "relic", costGp: 250, weightLb: 2, description: null };
+  const records: ReadonlyArray<readonly [string, z.ZodTypeAny, Record<string, unknown>]> = [
+    ["spell", SpellReferenceSchema, spellBody],
+    ["equipment", EquipmentReferenceSchema, gearBody],
+    ["weapon", WeaponReferenceSchema, { id: "hb-scythe", name: "Scythe", category: "martial", improvised: false, damage: { dice: "1d10", type: "slashing" }, rangeFeet: null, longRangeFeet: null }],
+    ["armor", ArmorReferenceSchema, { id: "hb-bone-mail", name: "Bone Mail", acBase: 14, addDexModifier: true, dexModifierCap: 2, stealthDisadvantage: false, strengthRequired: null }],
+    ["weapon property", WeaponPropertyReferenceSchema, { id: "hb-withering", name: "Withering", kind: "property", description: "x" }],
+    ["condition", ConditionReferenceSchema, { id: "hb-marked", name: "Marked", description: "x" }],
+    ["skill", SkillReferenceSchema, { id: "hb-lore", name: "Lore", description: "x" }],
+    ["rule", RuleReferenceSchema, { id: "hb-grave-rules", name: "Grave Rules", ruleset: "Combat", order: 1, description: "x" }]
+  ];
+
+  it("round-trips `source: \"homebrew\"` on every reference record instead of stripping it", () => {
+    for (const [label, schema, body] of records) {
+      const parsed = schema.parse({ ...body, source: "homebrew" }) as { source?: string };
+      expect(parsed.source, label).toBe("homebrew");
+    }
+  });
+
+  it("strips an UNdeclared key from the very same schemas - which is what `source` used to be", () => {
+    // The injection that proves the test above bites: same schema, same call, a key that is NOT
+    // declared comes back gone, with no error raised. Declaring the field is the entire fix.
+    for (const [label, schema, body] of records) {
+      if (schema === EquipmentReferenceSchema) continue; // the one .strict() record - covered below
+      const parsed = schema.parse({ ...body, contentSource: "homebrew" }) as Record<string, unknown>;
+      expect(parsed.contentSource, label).toBeUndefined();
+    }
+  });
+
+  it("defaults every committed bundle row to \"srd\", so no bundle needed rewriting", () => {
+    expect(loadSpells().every((spell) => spell.source === "srd")).toBe(true);
+    expect(loadWeapons().every((weapon) => weapon.source === "srd")).toBe(true);
+    expect(loadArmor().every((piece) => piece.source === "srd")).toBe(true);
+    expect(loadWeaponProperties().every((entry) => entry.source === "srd")).toBe(true);
+    expect(loadConditions().every((entry) => entry.source === "srd")).toBe(true);
+    expect(loadSkills().every((entry) => entry.source === "srd")).toBe(true);
+    expect(loadRules().every((entry) => entry.source === "srd")).toBe(true);
+    // The folded catalog carries each mapped-in row's own source through the fold.
+    expect(loadEquipment().every((item) => item.source === "srd")).toBe(true);
+  });
+
+  it("accepts any homebrew category slug while keeping the slug shape", () => {
+    expect(EquipmentReferenceSchema.parse(gearBody).category).toBe("relic");
+    expect(EquipmentReferenceSchema.parse({ ...gearBody, category: "wondrous" }).category).toBe("wondrous");
+    expect(() => EquipmentReferenceSchema.parse({ ...gearBody, category: "Relic Item" })).toThrow();
+  });
+
+  it("keeps .strict() on the equipment record, so a typo'd key is caught rather than lost", () => {
+    // The opposite failure mode from the strip above, and the reason this ONE record stays strict:
+    // a hand-authored homebrew item is the only place a mistyped key is likely, and it is the only
+    // schema in the system that will tell you about it.
+    expect(() => EquipmentReferenceSchema.parse({ ...gearBody, weight: 2 })).toThrow();
+    expect(() => EquipmentReferenceSchema.parse({ ...gearBody, rarity: "rare" })).toThrow();
+  });
+});
+
+/**
+ * The spell-list overlay: membership declared as a record and folded into `classes` at the merge
+ * point, so `bundles/spells.v1.json` - a GENERATED, vendored CC-BY artifact - is never edited.
+ */
+describe("spell-list overlay", () => {
+  const spells = loadSpells();
+  const list = (id: string, patch: Partial<{ basedOn: string[]; add: string[]; remove: string[] }> = {}) =>
+    SpellListReferenceSchema.parse({ id, name: id, source: "homebrew", ...patch });
+
+  it("folds basedOn + add - remove into `classes`, which is all resolveCatalogChoice reads", () => {
+    const necromancer = list("hb-necromancer", { basedOn: ["wizard"], add: ["cure-wounds"], remove: ["fireball"] });
+    const overlaid = applySpellListOverlay(spells, [necromancer]);
+    const onList = overlaid.filter((spell) => spell.classes.includes("hb-necromancer")).map((spell) => spell.id);
+
+    const wizardList = spells.filter((spell) => spell.classes.includes("wizard")).map((spell) => spell.id);
+    expect(wizardList.length).toBeGreaterThan(200);              // the SRD Wizard list, inherited whole
+    expect(onList).toContain("magic-missile");                   // via basedOn
+    expect(onList).toContain("cure-wounds");                     // an SRD CLERIC spell, added by id
+    expect(onList).not.toContain("fireball");                    // removed after expansion
+    expect(onList.length).toBe(wizardList.length + 1 - 1);
+    // The overlay only ever APPENDS a tag: the SRD Wizard list is untouched by this list's `remove`.
+    expect(overlaid.find((spell) => spell.id === "fireball")?.classes).toContain("wizard");
+  });
+
+  it("never mutates the loaded bundle (loaders cache their parsed array by identity)", () => {
+    const fireballBefore = [...spells.find((spell) => spell.id === "fireball")!.classes];
+    applySpellListOverlay(spells, [list("hb-necromancer", { basedOn: ["wizard"] })]);
+    expect(loadSpells().find((spell) => spell.id === "fireball")!.classes).toEqual(fireballBefore);
+    expect(loadSpells()).toBe(spells);
+    // With no lists at all the merge point pays nothing and hands the same array straight back.
+    expect(applySpellListOverlay(spells, [])).toBe(spells);
+  });
+
+  it("reports an empty list at PUBLISH time, before a player hits the hard build rejection", () => {
+    // resolveCatalogChoice refuses to return an empty option list and the server turns that into a
+    // rejected character.create - so a caster pointed at an empty list is an UNCREATABLE character,
+    // not an empty picker. This is where that becomes detectable.
+    const blank = list("hb-empty");
+    const phantom = list("hb-phantom", { add: ["no-such-spell"], basedOn: ["no-such-list"] });
+    const resolution = resolveSpellLists([blank, phantom, list("hb-real", { basedOn: ["cleric"] })], spells);
+    expect(resolution.emptyListIds.sort()).toEqual(["hb-empty", "hb-phantom"]);
+    expect(resolution.unknownBasedOn).toEqual(["no-such-list"]);
+    expect(spellListMemberIds("hb-empty", [blank], spells).size).toBe(0);
+    // The same probe answers for a bare SRD tag, so a publish gate needs no special case.
+    expect(spellListMemberIds("wizard", [], spells).size).toBeGreaterThan(200);
+    expect(spellListMemberIds("not-a-list", [], spells).size).toBe(0);
+  });
+
+  it("counts a spell that tags the list itself, so a wholly-homebrew list needs no `add`", () => {
+    const homebrewSpell = { id: "hb-grave-touch", classes: ["hb-necromancer"] };
+    const members = spellListMemberIds("hb-necromancer", [list("hb-necromancer")], [...spells, homebrewSpell]);
+    expect([...members]).toEqual(["hb-grave-touch"]);
+  });
+
+  it("terminates on a basedOn cycle and names it, rather than looping or throwing at read time", () => {
+    const a = list("hb-a", { basedOn: ["hb-b"], add: ["fireball"] });
+    const b = list("hb-b", { basedOn: ["hb-a"] });
+    const downstream = list("hb-c", { basedOn: ["hb-a"] });          // points AT the loop, is not in it
+    const resolution = resolveSpellLists([a, b, downstream], spells);
+    expect(resolution.cyclicListIds.sort()).toEqual(["hb-a", "hb-b"]);
+    expect(resolution.cyclicListIds).not.toContain("hb-c");
+    expect([...resolution.memberIds.get("hb-a")!]).toEqual(["fireball"]);   // basedOn dropped, `add` kept
+  });
+
+  it("flags a list id that shadows an existing spell tag instead of silently merging into it", () => {
+    // An unnamespaced `wizard` list would extend the SRD Wizard list rather than create a new one.
+    expect(resolveSpellLists([list("wizard", { add: ["cure-wounds"] })], spells).shadowedListIds).toEqual(["wizard"]);
+    expect(resolveSpellLists([list("hb-wizard", { basedOn: ["wizard"] })], spells).shadowedListIds).toEqual([]);
   });
 });
 

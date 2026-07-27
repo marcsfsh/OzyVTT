@@ -474,8 +474,18 @@ export type ContentSpellSummary = Readonly<{ id: string; name: string; level: nu
   /** Per-slot-level upcast scaling parsed from the SRD (Fireball's 9d6 at 4th, Scorching Ray's 4 rays at 3rd): the sheet auto-applies the entry matching the chosen cast level. */
   castingOptions: ReadonlyArray<{ level: number; damageRoll: string | null; targetCount: number | null }> }>;
 export type ContentSpellsResult = { ok: boolean; message?: string; spells?: readonly ContentSpellSummary[]; /** The bundle's canonical CC BY 4.0 line (ADR-0015), exactly as for every other catalog read. */ attribution?: string };
-/** One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only for those categories. */
-export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: "weapon" | "armor" | "shield" | "ammunition" | "adventuring-gear" | "tool" | "equipment-pack" | "consumable" | "focus" | "wondrous"; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+/**
+ * One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD
+ * reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only
+ * for those categories.
+ *
+ * `category` is an OPEN SLUG, matching the catalog record and `InventoryItem.category` (which was
+ * always open). Homebrew declares "relic" or "trinket" with no wire change; a surface that groups by
+ * category must derive its groups from the data, because there is no closed list to switch on. Four
+ * values still carry mechanical meaning - "weapon", "armor" and "shield" drive AC and attack
+ * derivation, everything else is inert - so a new slug displays and stacks but derives nothing.
+ */
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
 
 // ---------- Character-builder catalogs ----------

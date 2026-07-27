@@ -68,6 +68,33 @@ describe("resolveCatalogChoice", () => {
     expect(resolveCatalogChoice("cleric-spells", catalogs).map((option) => option.id)).toEqual(["cure-wounds"]);
   });
 
+  it("resolves a homebrew list id the spell-list overlay stamped into `classes`, unchanged", () => {
+    // The other half of the spell-list overlay seam: the overlay's ONLY output is an extra tag in
+    // `classes`, and this resolver already filters on exactly that - so a homebrew list needs no
+    // resolver change at all. `hb-necromancer` here is what the merge point produced.
+    const overlaid: CatalogChoiceCatalogs = {
+      ...catalogs,
+      spells: [
+        spellSummary("fire-bolt", 0, ["wizard", "hb-necromancer"]),
+        spellSummary("magic-missile", 1, ["wizard"]),
+        spellSummary("hb-grave-touch", 1, ["hb-necromancer"])
+      ]
+    };
+    expect(resolveCatalogChoice("hb-necromancer-spells", overlaid).map((option) => option.id)).toEqual(["fire-bolt", "hb-grave-touch"]);
+    // And an overlay that resolved to nothing is still the loud rejection, never a silent empty picker.
+    expect(() => resolveCatalogChoice("hb-empty-spells", overlaid)).toThrowError(/No spells are tagged/);
+  });
+
+  it("keeps `weapons` keyed on the category literal now that category is an open slug", () => {
+    // Opening the category is strictly permissive, so a homebrew kind must neither break the weapon
+    // filter nor sneak into it - a new slug is inert until an explicit mechanical `slot` field lands.
+    const withHomebrew: CatalogChoiceCatalogs = {
+      ...catalogs,
+      equipment: [...catalogs.equipment, equipmentSummary("hb-grave-lantern", "relic"), equipmentSummary("hb-scythe", "weapon")]
+    };
+    expect(resolveCatalogChoice("weapons", withHomebrew).map((option) => option.id)).toEqual(["longsword", "hb-scythe"]);
+  });
+
   it("resolves <classId>-subclasses against the parent classId", () => {
     expect(resolveCatalogChoice("fighter-subclasses", catalogs).map((option) => option.id)).toEqual(["champion"]);
     expect(resolveCatalogChoice("wizard-subclasses", catalogs).map((option) => option.id)).toEqual(["evoker"]);

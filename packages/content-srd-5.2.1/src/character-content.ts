@@ -32,8 +32,12 @@ export const ContentLevelSchema = z.number().int().min(1).max(20);
 export const ContentSourceSchema = z.enum(["srd", "homebrew"]).default("srd");
 export type ContentSource = z.infer<typeof ContentSourceSchema>;
 
-/** Fields every content record shares, so the browse UI and the merge step can treat them uniformly. */
-const contentRecordBase = {
+/**
+ * Fields every content record shares, so the browse UI and the merge step can treat them uniformly.
+ * Exported so a homebrew authoring/request schema composes the SAME header rather than restating it -
+ * a second copy is how `source` ends up meaning two different things.
+ */
+export const contentRecordBase = {
   id: ContentIdSchema,
   name: z.string().min(1).max(120),
   source: ContentSourceSchema,
@@ -557,3 +561,36 @@ export const NamePoolReferenceSchema = z.object({
   }).strict()).min(1).max(10)
 }).strict();
 export type NamePoolReference = z.infer<typeof NamePoolReferenceSchema>;
+
+// ---------------------------------------------------------------------------------------------
+// Spell lists
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A spell list as a membership OVERLAY, never an edit to `spells.v1.json`.
+ *
+ * `bundles/spells.v1.json` is GENERATED (`scripts/build-bundle.ts`, which sets each spell's
+ * `classes` straight from the vendored open5e fixtures). Hand-editing a homebrew tag into it is
+ * destroyed by the next rebuild, and editorialising a CC-BY vendored artifact is wrong on principle.
+ * So "an SRD spell on a homebrew list" is expressed as a record here and folded into `classes` at
+ * the server's content merge point (`applySpellListOverlay`) - the ETL and `resolveCatalogChoice`
+ * both need zero change, because the resolver already filters on `classes.includes(listId)`.
+ *
+ * `basedOn` is what keeps "the Wizard list plus my three spells" ONE row instead of 221; `add` and
+ * `remove` handle the surgical cases. A list's members are additionally seeded by any spell that
+ * tags this id in its own `classes`, so a wholly-homebrew list needs no `add` entries at all.
+ *
+ * A list resolving to ZERO spells is a hard `character.create` rejection downstream
+ * (`resolveCatalogChoice` refuses to return an empty option list), so publish-time validation must
+ * check it - see `spellListMemberIds`.
+ */
+export const SpellListReferenceSchema = z.object({
+  ...contentRecordBase,
+  /** Start from these existing list ids - SRD (`wizard`) or another overlay. Empty = start blank. */
+  basedOn: z.array(ContentIdSchema).max(8).default([]),
+  /** Spell ids added on top of the `basedOn` expansion. SRD spell ids are perfectly legal here. */
+  add: z.array(ContentIdSchema).max(500).default([]),
+  /** Spell ids removed last, after everything else - a `remove` always wins. */
+  remove: z.array(ContentIdSchema).max(500).default([])
+}).strict();
+export type SpellListReference = z.infer<typeof SpellListReferenceSchema>;

@@ -7,20 +7,40 @@ import { createRequire } from "node:module";
 import { z } from "zod";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import {
-  BackgroundReferenceSchema, ClassReferenceSchema, FeatReferenceSchema, NamePoolReferenceSchema,
-  SpeciesReferenceSchema, SubclassReferenceSchema,
+  BackgroundReferenceSchema, ClassReferenceSchema, ContentSourceSchema, FeatReferenceSchema,
+  NamePoolReferenceSchema, SpeciesReferenceSchema, SubclassReferenceSchema,
   type BackgroundReference, type ClassReference, type FeatReference, type NamePoolReference,
   type SpeciesReference, type SubclassReference
 } from "./character-content.js";
 
-/** Character-builder content shapes (classes, subclasses, species, backgrounds, feats, names). */
+/** Character-builder content shapes (classes, subclasses, species, backgrounds, feats, names, spell lists). */
 export * from "./character-content.js";
+/** Spell-list membership as an overlay over the generated spell bundle - applied at the content merge point. */
+export * from "./spell-lists.js";
 
 const require = createRequire(import.meta.url);
 
+/**
+ * ONE SOURCE DISCRIMINATOR, on every reference record in this package (`character-content.ts`
+ * principle 2). `ContentSourceSchema` defaults to `"srd"`, so every committed bundle row parses
+ * unchanged and comes out tagged `"srd"` - zero data migration, and no bundle is rewritten
+ * (`build-bundle.ts` validates but writes the RAW ETL records, never the parsed output).
+ *
+ * Declaring the field is what makes it real: these schemas are plain `z.object`, whose Zod default
+ * is STRIP, so writing `source: "homebrew"` into a record whose schema does not declare it vanishes
+ * silently - no error, no field. The record schemas below are the authoritative list of what a
+ * homebrew author may write.
+ *
+ * MONSTERS ARE DELIBERATELY ABSENT. `ActorDefinitionSchema.source` (`@vtt/schemas`) already exists
+ * as a PROVENANCE object `{name, version, externalId?}` - the name is taken, and a sibling
+ * `contentSource` key would be a second thing meaning the same thing. Homebrew-ness for a monster is
+ * derived where the merge happens (the server knows which definitions came from the homebrew slice),
+ * which needs no `ActorDefinition` change and so no ADR-0008 JSON-Schema mirror change either.
+ */
 export const ConditionReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(60),
+  source: ContentSourceSchema,
   description: z.string().min(1).max(4000)
 });
 export type ConditionReference = z.infer<typeof ConditionReferenceSchema>;
@@ -30,6 +50,13 @@ const AbilityShortSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export const SpellReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(120),
+  source: ContentSourceSchema,
+  /**
+   * Credit line for a homebrew spell whose text came from somewhere else. SRD rows leave it unset
+   * and inherit the bundle-wide CC BY notice; a surface that hardcodes "SRD 5.2.1, CC BY 4.0" on
+   * every card makes a false claim about a homebrew one.
+   */
+  attribution: z.string().max(400).optional(),
   level: z.number().int().min(0).max(9),
   school: z.string().min(1).max(40),
   castingTime: z.string().min(1).max(80),
@@ -54,6 +81,7 @@ export type SpellReference = z.infer<typeof SpellReferenceSchema>;
 export const WeaponReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),
+  source: ContentSourceSchema,
   category: z.enum(["simple", "martial"]),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
@@ -65,6 +93,7 @@ export type WeaponReference = z.infer<typeof WeaponReferenceSchema>;
 export const WeaponPropertyReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(60),
+  source: ContentSourceSchema,
   kind: z.enum(["property", "mastery"]),
   description: z.string().min(1).max(4000)
 });
@@ -73,6 +102,7 @@ export type WeaponPropertyReference = z.infer<typeof WeaponPropertyReferenceSche
 export const ArmorReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),
+  source: ContentSourceSchema,
   /** Body armor carries its full base AC (11-18); the shield row carries its +2 bonus. */
   acBase: z.number().int().min(2).max(25),
   addDexModifier: z.boolean(),
@@ -83,15 +113,33 @@ export const ArmorReferenceSchema = z.object({
 export type ArmorReference = z.infer<typeof ArmorReferenceSchema>;
 
 /**
- * Unified equipment catalog entry - the framework the browse-&-add flow and the future homebrew
- * update build on. `loadEquipment` maps weapons and armor in from their own bundles; the
+ * Unified equipment catalog entry - the framework the browse-&-add flow and the homebrew update
+ * build on. `loadEquipment` maps weapons and armor in from their own bundles; the
  * `equipment.v1.json` bundle carries adventuring gear, tools, packs, focuses, ammunition, and
  * consumables. The `weapon`/`armor` sub-objects are present only for those categories.
+ *
+ * THIS RECORD KEEPS `.strict()`, alone among the content schemas, ON PURPOSE. The two failure modes
+ * are opposite and both real: a strict schema THROWS on an undeclared key, a plain one LOSES it
+ * without a trace. For a hand-authored homebrew item, throwing is the useful half - it is the only
+ * thing in the system that catches `weight` for `weightLb`. The fix for a field you want is to
+ * DECLARE it here, never to drop the strictness.
  */
 export const EquipmentReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),
-  category: z.enum(["weapon", "armor", "shield", "ammunition", "adventuring-gear", "tool", "equipment-pack", "consumable", "focus", "wondrous"]),
+  source: ContentSourceSchema,
+  /**
+   * What KIND of thing this is, as an open slug - never a closed enum (`character-content.ts`
+   * principle 3). Homebrew declares "relic", "vehicle", "trinket" with no schema change, and the
+   * live-play side (`InventoryItemSchema.category`) has always been an open slug, so this makes the
+   * catalog consistent with the actor rather than the reverse.
+   *
+   * The four values the ENGINE reads are "weapon", "armor", "shield" and everything-else: AC
+   * derivation, what starts equipped, and the `weapons` catalog slug all compare against those
+   * literals. A homebrew category is therefore inert by design until an explicit mechanical `slot`
+   * field lands - it displays and stacks, it does not derive AC or an attack.
+   */
+  category: z.string().regex(/^[a-z0-9-]+$/).max(40),
   costGp: z.number().nonnegative().max(1_000_000).nullable(),
   weightLb: z.number().nonnegative().max(1000).nullable(),
   description: z.string().max(2000).nullable(),
@@ -103,6 +151,7 @@ export type EquipmentReference = z.infer<typeof EquipmentReferenceSchema>;
 export const RuleReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(120),
+  source: ContentSourceSchema,
   ruleset: z.string().min(1).max(80),
   order: z.number().int(),
   description: z.string().min(1).max(40000)
@@ -201,12 +250,14 @@ export function loadEquipment(): readonly EquipmentReference[] {
   const gear: EquipmentReference[] = loadBundle("equipment.v1.json", z.array(EquipmentReferenceSchema)).map((item) => ({
     ...item, weapon: item.weapon ?? null, armor: item.armor ?? null
   }));
+  // The mapped-in rows carry their OWN bundle's source through the fold, so a homebrew weapon or
+  // armor row stays homebrew once it is in the unified catalog.
   const weapons: EquipmentReference[] = loadWeapons().filter((weapon) => !weapon.improvised).map((weapon) => ({
-    id: weapon.id, name: weapon.name, category: "weapon", costGp: null, weightLb: null, description: null,
+    id: weapon.id, name: weapon.name, source: weapon.source, category: "weapon", costGp: null, weightLb: null, description: null,
     weapon: { category: weapon.category, damageDice: weapon.damage.dice, damageType: weapon.damage.type, rangeFeet: weapon.rangeFeet, longRangeFeet: weapon.longRangeFeet }, armor: null
   }));
   const armor: EquipmentReference[] = loadArmor().map((piece) => ({
-    id: piece.id, name: piece.name, category: piece.acBase <= 3 ? "shield" : "armor", costGp: null, weightLb: null, description: null,
+    id: piece.id, name: piece.name, source: piece.source, category: piece.acBase <= 3 ? "shield" : "armor", costGp: null, weightLb: null, description: null,
     weapon: null, armor: { acBase: piece.acBase, addDexModifier: piece.addDexModifier, dexModifierCap: piece.dexModifierCap, stealthDisadvantage: piece.stealthDisadvantage, strengthRequired: piece.strengthRequired }
   }));
   return [...gear, ...weapons, ...armor].sort((left, right) => left.name.localeCompare(right.name));
