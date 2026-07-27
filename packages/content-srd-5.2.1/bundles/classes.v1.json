@@ -1661,5 +1661,859 @@
         }
       }
     ]
+  },
+  {
+    "id": "cleric",
+    "name": "Cleric",
+    "source": "srd",
+    "summary": "A priestly champion who channels divine magic from the Outer Planes.",
+    "description": "Clerics can reach out to the divine magic of the Outer Planes and channel it to bolster people and battle foes. Blessed by a deity, a pantheon, or another immortal entity, a Cleric works miracles: mending wounds, turning away the Undead, and calling down intervention from on high.",
+    "hitDie": "d8",
+    "statPriority": [
+      "wis",
+      "con",
+      "str",
+      "dex",
+      "cha",
+      "int"
+    ],
+    "primaryAbilities": [
+      "wis"
+    ],
+    "savingThrows": [
+      "wis",
+      "cha"
+    ],
+    "skillChoices": {
+      "choose": 2,
+      "from": [
+        "history",
+        "insight",
+        "medicine",
+        "persuasion",
+        "religion"
+      ]
+    },
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple"
+    ],
+    "toolProficiencies": [],
+    "startingEquipment": [
+      {
+        "id": "cleric-a",
+        "label": "Chain Shirt, Shield, Mace, Holy Symbol, Priest's Pack, and 7 GP",
+        "items": [
+          {
+            "id": "chain-shirt",
+            "name": "Chain Shirt"
+          },
+          {
+            "id": "shield",
+            "name": "Shield"
+          },
+          {
+            "id": "mace",
+            "name": "Mace"
+          },
+          {
+            "id": "holy-symbol-amulet",
+            "name": "Holy Symbol"
+          },
+          {
+            "id": "priests-pack",
+            "name": "Priest's Pack"
+          }
+        ],
+        "goldPieces": 7
+      },
+      {
+        "id": "cleric-b",
+        "label": "110 GP",
+        "items": [],
+        "goldPieces": 110
+      }
+    ],
+    "multiclassProficiencies": {
+      "armor": [
+        "light",
+        "medium",
+        "shields"
+      ],
+      "weapons": [],
+      "tools": []
+    },
+    "multiclassPrerequisites": {
+      "mode": "all",
+      "minimums": [
+        {
+          "ability": "wis",
+          "minimum": 13
+        }
+      ]
+    },
+    "subclassLevel": 3,
+    "subclassLabel": "Cleric Subclass",
+    "asiLevels": [
+      4,
+      8,
+      12,
+      16
+    ],
+    "spellcasting": {
+      "ability": "wis",
+      "prepares": "prepared",
+      "ritual": true,
+      "focus": "holy-symbol",
+      "multiclassProgression": "full",
+      "spellListId": "cleric"
+    },
+    "levelTable": [
+      {
+        "level": 1,
+        "proficiencyBonus": 2,
+        "features": [
+          "spellcasting",
+          "divine-order"
+        ],
+        "spellSlots": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 3,
+        "preparedCount": 4,
+        "classResources": []
+      },
+      {
+        "level": 2,
+        "proficiencyBonus": 2,
+        "features": [
+          "channel-divinity"
+        ],
+        "spellSlots": [
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 3,
+        "preparedCount": 5,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "proficiencyBonus": 2,
+        "features": [
+          "cleric-subclass"
+        ],
+        "spellSlots": [
+          4,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 3,
+        "preparedCount": 6,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 4,
+        "proficiencyBonus": 2,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 7,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 5,
+        "proficiencyBonus": 3,
+        "features": [
+          "sear-undead"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 9,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "level": 6,
+        "proficiencyBonus": 3,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 10,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 7,
+        "proficiencyBonus": 3,
+        "features": [
+          "blessed-strikes"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 11,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 8,
+        "proficiencyBonus": 3,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 12,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 9,
+        "proficiencyBonus": 4,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 4,
+        "preparedCount": 14,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          }
+        ]
+      },
+      {
+        "level": 10,
+        "proficiencyBonus": 4,
+        "features": [
+          "divine-intervention"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 15,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 11,
+        "proficiencyBonus": 4,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 16,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 12,
+        "proficiencyBonus": 4,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          0,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 16,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 13,
+        "proficiencyBonus": 5,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 17,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 14,
+        "proficiencyBonus": 5,
+        "features": [
+          "improved-blessed-strikes"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          0,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 17,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 15,
+        "proficiencyBonus": 5,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 18,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 16,
+        "proficiencyBonus": 5,
+        "features": [
+          "ability-score-improvement"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1,
+          0
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 18,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 17,
+        "proficiencyBonus": 6,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 19,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 3
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 18,
+        "proficiencyBonus": 6,
+        "features": [],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          3,
+          1,
+          1,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 20,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 4
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 19,
+        "proficiencyBonus": 6,
+        "features": [
+          "epic-boon"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          3,
+          2,
+          1,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 21,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 4
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "level": 20,
+        "proficiencyBonus": 6,
+        "features": [
+          "greater-divine-intervention"
+        ],
+        "spellSlots": [
+          4,
+          3,
+          3,
+          3,
+          3,
+          2,
+          2,
+          1,
+          1
+        ],
+        "cantripsKnown": 5,
+        "preparedCount": 22,
+        "classResources": [
+          {
+            "id": "channel-divinity",
+            "name": "Channel Divinity",
+            "amount": 4
+          },
+          {
+            "id": "divine-intervention",
+            "name": "Divine Intervention",
+            "amount": 1
+          }
+        ]
+      }
+    ],
+    "features": [
+      {
+        "id": "spellcasting",
+        "name": "Spellcasting",
+        "level": 1,
+        "description": "You have learned to cast spells through prayer and meditation. Wisdom is your spellcasting ability for your Cleric spells, and you can use a Holy Symbol as a Spellcasting Focus for them. You know three cantrips of your choice from the Cleric spell list (Guidance, Sacred Flame, and Thaumaturgy are recommended), and whenever you gain a Cleric level, you can replace one of your cantrips with another cantrip from that list. You prepare a list of level 1+ Cleric spells that are available for you to cast - four to start (Bless, Cure Wounds, Guiding Bolt, and Shield of Faith are recommended) - and the number grows as shown in the Prepared Spells column of the Cleric Features table. The chosen spells must be of a level for which you have spell slots, and whenever you finish a Long Rest, you can replace any spell on your list with another Cleric spell for which you have spell slots.",
+        "tags": [
+          "spellcasting"
+        ]
+      },
+      {
+        "id": "divine-order",
+        "name": "Divine Order",
+        "level": 1,
+        "description": "You have dedicated yourself to one of the following sacred roles of your choice. Protector: Trained for battle, you gain proficiency with Martial weapons and training with Heavy armor. Thaumaturge: You know one extra cantrip from the Cleric spell list. In addition, your mystical connection to the divine gives you a bonus to your Intelligence (Arcana or Religion) checks. The bonus equals your Wisdom modifier (minimum of +1).",
+        "tags": [
+          "divine-order"
+        ],
+        "choice": {
+          "kind": "divine-order",
+          "choose": 1,
+          "from": [
+            "protector",
+            "thaumaturge"
+          ]
+        }
+      },
+      {
+        "id": "channel-divinity",
+        "name": "Channel Divinity",
+        "level": 2,
+        "description": "You can channel divine energy directly from the Outer Planes to fuel magical effects. You start with two such effects: Divine Spark and Turn Undead. Each time you use this class's Channel Divinity, choose which Channel Divinity effect from this class to create; you gain additional effect options at higher Cleric levels. You can use this class's Channel Divinity twice. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. You gain additional uses when you reach certain Cleric levels, as shown in the Channel Divinity column of the Cleric Features table. If a Channel Divinity effect requires a saving throw, the DC equals the spell save DC from this class's Spellcasting feature.",
+        "tags": [
+          "channel-divinity"
+        ],
+        "actions": [
+          {
+            "id": "divine-spark",
+            "name": "Channel Divinity: Divine Spark",
+            "activation": "action",
+            "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8).",
+            "damage": []
+          },
+          {
+            "id": "turn-undead",
+            "name": "Channel Divinity: Turn Undead",
+            "activation": "action",
+            "description": "As a Magic action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute. For that duration, it tries to move as far from you as it can on its turns. This effect ends early on the creature if it takes any damage, if you have the Incapacitated condition, or if you die.",
+            "save": {
+              "ability": "wis",
+              "dc": "spellcasting"
+            },
+            "damage": []
+          }
+        ],
+        "uses": {
+          "per": "long-rest",
+          "pool": "channel-divinity",
+          "scaling": {
+            "type": "by-level",
+            "table": [
+              {
+                "level": 2,
+                "limit": 2
+              },
+              {
+                "level": 6,
+                "limit": 3
+              },
+              {
+                "level": 18,
+                "limit": 4
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "cleric-subclass",
+        "name": "Cleric Subclass",
+        "level": 3,
+        "description": "You gain a Cleric subclass of your choice. A subclass is a specialization that grants you features at certain Cleric levels. For the rest of your career, you gain each of your subclass's features that are of your Cleric level or lower.",
+        "tags": [
+          "subclass"
+        ],
+        "choice": {
+          "kind": "subclass",
+          "choose": 1,
+          "fromCatalog": "cleric-subclasses"
+        }
+      },
+      {
+        "id": "ability-score-improvement",
+        "name": "Ability Score Improvement",
+        "description": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Cleric levels 8, 12, and 16.",
+        "tags": [
+          "asi"
+        ],
+        "choice": {
+          "kind": "asi-or-feat",
+          "choose": 1,
+          "fromCatalog": "general-feats",
+          "repeatable": true
+        }
+      },
+      {
+        "id": "sear-undead",
+        "name": "Sear Undead",
+        "level": 5,
+        "description": "Whenever you use Turn Undead, you can roll a number of d8s equal to your Wisdom modifier (minimum of 1d8) and add the rolls together. Each Undead that fails its saving throw against that use of Turn Undead takes Radiant damage equal to the roll's total. This damage doesn't end the turn effect.",
+        "tags": [
+          "channel-divinity"
+        ]
+      },
+      {
+        "id": "blessed-strikes",
+        "name": "Blessed Strikes",
+        "level": 7,
+        "description": "Divine power infuses you in battle. You gain one of the following options of your choice (if you get either option from a Cleric subclass in an older book, use only the option you choose for this feature). Divine Strike: Once on each of your turns when you hit a creature with an attack roll using a weapon, you can cause the target to take an extra 1d8 Necrotic or Radiant damage (your choice). Potent Spellcasting: Add your Wisdom modifier to the damage you deal with any Cleric cantrip.",
+        "choice": {
+          "kind": "blessed-strikes",
+          "choose": 1,
+          "from": [
+            "divine-strike",
+            "potent-spellcasting"
+          ]
+        }
+      },
+      {
+        "id": "divine-intervention",
+        "name": "Divine Intervention",
+        "level": 10,
+        "description": "You can call on your deity or pantheon to intervene on your behalf. As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. You can't use this feature again until you finish a Long Rest.",
+        "uses": {
+          "limit": 1,
+          "per": "long-rest"
+        }
+      },
+      {
+        "id": "improved-blessed-strikes",
+        "name": "Improved Blessed Strikes",
+        "level": 14,
+        "description": "The option you chose for Blessed Strikes grows more powerful. Divine Strike: The extra damage of your Divine Strike increases to 2d8. Potent Spellcasting: When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier."
+      },
+      {
+        "id": "epic-boon",
+        "name": "Epic Boon",
+        "level": 19,
+        "description": "You gain an Epic Boon feat or another feat of your choice for which you qualify. Boon of Fate is recommended.",
+        "tags": [
+          "feat"
+        ],
+        "choice": {
+          "kind": "feat",
+          "choose": 1,
+          "fromCatalog": "epic-boon-feats"
+        }
+      },
+      {
+        "id": "greater-divine-intervention",
+        "name": "Greater Divine Intervention",
+        "level": 20,
+        "description": "You can call on even more powerful divine intervention. When you use your Divine Intervention feature, you can choose Wish when you select a spell. If you do so, you can't use Divine Intervention again until you finish 2d4 Long Rests."
+      }
+    ]
   }
 ]

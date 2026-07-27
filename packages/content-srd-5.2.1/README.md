@@ -35,19 +35,38 @@ anything consumes it.
   - `armor.v1.json` — the armor table (13) with AC-derivation fields; the shield row carries
     its +2 bonus in `acBase`.
   - `skills.v1.json` (18) and `damage-types.v1.json` (13) — short reference descriptions.
+    Skills additionally carry the SRD `ability` column (`acrobatics` → `dex`, …), hand-added on
+    top of the ETL output — a bundle rebuild must preserve it (`build-bundle.ts` does not emit it
+    yet; the ability-column test guards against a silent clobber).
   - `rules.v1.json` — the 56 core-rules glossary entries grouped by ruleset (D20 Tests,
     Combat, Damage and Healing, ...).
   - `attribution.json` — the required CC BY 4.0 attribution (wording verified against the
     SRD's own Legal Information page); any surface that displays this content must show it.
-  - **Character-builder bundles — currently PHASE-1 SEEDS, not full transcriptions:**
-    `classes.v1.json` (Fighter + Wizard, each with a complete 20-row level table),
-    `subclasses.v1.json` (Champion, Evoker), `species.v1.json` (Human, Elf),
-    `backgrounds.v1.json` (Soldier, Sage), `feats.v1.json` (Alert, Tough, Savage Attacker,
-    Magic Initiate), `names.v1.json` (per-species name pools). These exist to prove the
-    record schemas parse and the loaders work while the wizard, rules math, and UI are built
-    in parallel. Transcribing the remaining 10 classes, 10 subclasses, 7 species, 2
-    backgrounds, and ~16 feats is phases 2 and 5 of the character-builder task packet — a
-    missing class is a content gap, not a schema gap.
+  - **Character-builder bundles — PHASE-2 state (vertical slice complete):**
+    - `classes.v1.json` — Fighter, Wizard, **Cleric**, each a complete 20-row transcription
+      (Cleric's slot columns are asserted equal to `FULL_CASTER_SLOTS` row-for-row).
+    - `subclasses.v1.json` — Champion, Evoker, **Life Domain** (domain spells as staged
+      always-prepared grants at Cleric levels 3/5/7/9; Preserve Life draws on the shared
+      `channel-divinity` uses pool).
+    - `species.v1.json` — **all nine** SRD 5.2.1 species (Dragonborn, Dwarf, Elf, Gnome,
+      Goliath, Halfling, Human, Orc, Tiefling). Lineage-style choices (Draconic Ancestry,
+      Gnomish Lineage, Fiendish Legacy) are `lineages` behind `<speciesId>-lineages`
+      catalog slugs; typed riders carry darkvision, resistances, HP-per-level, and
+      PB-scaling uses. The SRD grants **no** species languages beyond what character
+      creation hands out, so new species list only `common` (the seeded Elf's `elvish` is a
+      pre-existing liberty).
+    - `backgrounds.v1.json` — all four (Acolyte, Criminal, Sage, Soldier), each with
+      ability-score options, an origin feat, and catalog-resolvable equipment/tools.
+    - `feats.v1.json` — the **complete SRD 5.2.1 feat chapter** (19 records): Origin (Alert,
+      Magic Initiate ×3 per-list variants, Savage Attacker, Skilled), General (Ability Score
+      Improvement, Grappler), Fighting Style (Archery, Defense, Great Weapon Fighting,
+      Two-Weapon Fighting), Epic Boon (Combat Prowess, Dimensional Travel, Fate, Irresistible
+      Offense, Spell Recall, the Night Spirit, Truesight). The formerly seeded **Tough** feat
+      was removed: it is PHB-2024-only, not SRD 5.2.1 content (a test pins this).
+    - `names.v1.json` — hand-written, original name pools for every species (name lists are
+      not SRD text; the seeded Elf pools were replaced for the same reason).
+    Remaining: the other 9 classes and their subclasses (phase 5) — a missing class is a
+    content gap, not a schema gap.
 - `src/character-content.ts` — the character-builder record schemas
   (`ClassReference`, `SubclassReference`, `SpeciesReference`, `BackgroundReference`,
   `FeatReference`, `NamePoolReference`) built on ONE shared `FeatureRecord`: prose plus
@@ -74,7 +93,12 @@ anything consumes it.
 - **`greater-invisibility`** — upstream ships an empty description; restored from the SRD.
 - Classes, species, feats, and backgrounds were previously deferred as "outside this VTT's
   not-a-character-builder scope". That scope changed (ADR-0021 / the character-builder task
-  packet): they are now first-class bundles, seeded above and transcribed in phases 2 and 5.
+  packet): they are now first-class bundles, transcribed by hand from the SRD 5.2.1 text
+  (phase 2 above; the remaining classes are phase 5).
+- **Dropped the seeded `tough` feat and Elf's PHB name pools** — Tough is not in the SRD
+  5.2.1 feat chapter and the 2014 PHB name lists are not SRD content; both were replaced
+  in-license (phase-2 content pass). The seeded Elf's `sizes` was also corrected to
+  `["medium"]` (the SRD prints "Medium (about 5–6 feet tall)" only).
 - Still deferred (not bundled): magic items and other loot content.
 
 ## License

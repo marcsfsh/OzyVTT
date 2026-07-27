@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import {
@@ -6,15 +7,15 @@ import {
 } from "@vtt/rules-5e";
 import {
   ClassReferenceSchema, FeatureRecordSchema, NamePoolReferenceSchema, SpeciesReferenceSchema,
-  loadBackgrounds, loadClasses, loadEquipment, loadFeats, loadNames, loadSkills, loadSpecies,
-  loadSubclasses, namesForSpecies, subclassesForClass
+  loadBackgrounds, loadClasses, loadDamageTypes, loadEquipment, loadFeats, loadNames, loadSkills,
+  loadSpecies, loadSpells, loadSubclasses, namesForSpecies, subclassesForClass
 } from "../src/index.js";
 
 /**
- * These bundles are PHASE-1 SEEDS: a small slice of real SRD content that proves the schemas parse
- * and the loaders work while the wizard, rules math, and UI are built in parallel. The assertions
- * below are therefore about SHAPE and INTEGRITY, not about content coverage - full transcription
- * lands in phases 2 and 5.
+ * Phase-2 state: Fighter, Wizard, and Cleric are complete 20-level transcriptions; all nine SRD
+ * 5.2.1 species, all four backgrounds, and the full feat chapter are authored. The assertions below
+ * cover shape/integrity AND per-class/per-species golden transcription checks (task-packet risk 2:
+ * transcription errors ship as rules bugs, so snapshot the printed numbers here).
  */
 describe("character-builder content records", () => {
   const classes = loadClasses();
@@ -57,18 +58,33 @@ describe("character-builder content records", () => {
   });
 
   it("agrees with the rules engine on hit dice, stat priority, ASI levels, and multiclass prerequisites", () => {
+    // FULL six-ability fixtures, so multi-ability prerequisites (Paladin/Monk/Ranger style) are
+    // actually exercised - a fixture that only raises `statPriority[0]` cannot catch them.
+    const flatEight = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } as const;
     for (const entry of classes) {
       expect(entry.hitDie, entry.id).toBe(hitDieFor(entry.id));
       expect(entry.statPriority, entry.id).toEqual(statPriorityFor(entry.id));
       expect(entry.asiLevels, entry.id).toEqual(asiLevelsFor(entry.id));
-      // Content and code must not disagree about who can multiclass into what.
-      const scores = Object.fromEntries(entry.statPriority.map((ability, index) => [ability, index === 0 ? 13 : 8]));
-      expect(meetsMulticlassPrerequisites(scores, entry.id), entry.id).toBe(true);
+      // Content and code must not disagree about who can multiclass into what: raising exactly the
+      // bundle-declared minimums must satisfy the engine, and a flat-8 sheet must not.
+      const qualified: Record<string, number> = { ...flatEight };
+      for (const minimum of entry.multiclassPrerequisites?.minimums ?? []) qualified[minimum.ability] = minimum.minimum;
+      expect(meetsMulticlassPrerequisites(qualified, entry.id), entry.id).toBe(true);
+      if (entry.multiclassPrerequisites) expect(meetsMulticlassPrerequisites(flatEight, entry.id), `${entry.id} at flat 8s`).toBe(false);
     }
+    // "all"-mode multi-ability prerequisites really require EVERY listed minimum (engine table, so
+    // authoring Paladin/Monk/Ranger later cannot silently regress) ...
+    expect(meetsMulticlassPrerequisites({ ...flatEight, str: 13 }, "paladin")).toBe(false);
+    expect(meetsMulticlassPrerequisites({ ...flatEight, str: 13, cha: 13 }, "paladin")).toBe(true);
+    expect(meetsMulticlassPrerequisites({ ...flatEight, dex: 13 }, "monk")).toBe(false);
+    expect(meetsMulticlassPrerequisites({ ...flatEight, dex: 13, wis: 13 }, "monk")).toBe(true);
+    // ... while "any"-mode accepts either minimum alone (Fighter: Strength 13 OR Dexterity 13).
+    expect(meetsMulticlassPrerequisites({ ...flatEight, dex: 13 }, "fighter")).toBe(true);
     // The ASI levels are also exactly the levels whose table row grants the ASI feature.
-    const fighter = classes.find((entry) => entry.id === "fighter")!;
-    const asiRows = fighter.levelTable.filter((row) => row.features.includes("ability-score-improvement")).map((row) => row.level);
-    expect(asiRows).toEqual(fighter.asiLevels);
+    for (const entry of classes) {
+      const asiRows = entry.levelTable.filter((row) => row.features.includes("ability-score-improvement")).map((row) => row.level);
+      expect(asiRows, entry.id).toEqual(entry.asiLevels);
+    }
   });
 
   it("transcribes the Fighter faithfully (spot check)", () => {
@@ -120,6 +136,91 @@ describe("character-builder content records", () => {
     expect(wizard.levelTable[19].preparedCount).toBe(25);
   });
 
+  it("transcribes the Cleric faithfully (spot check)", () => {
+    const cleric = classes.find((entry) => entry.id === "cleric")!;
+    expect(cleric.hitDie).toBe("d8");
+    expect(cleric.savingThrows).toEqual(["wis", "cha"]);
+    expect(cleric.primaryAbilities).toEqual(["wis"]);
+    expect(cleric.skillChoices).toEqual({ choose: 2, from: ["history", "insight", "medicine", "persuasion", "religion"] });
+    expect(cleric.armorProficiencies).toEqual(["light", "medium", "shields"]);
+    expect(cleric.weaponProficiencies).toEqual(["simple"]);
+    expect(cleric.subclassLevel).toBe(3);
+    expect(cleric.asiLevels).toEqual([4, 8, 12, 16]);
+    expect(cleric.multiclassPrerequisites).toEqual({ mode: "all", minimums: [{ ability: "wis", minimum: 13 }] });
+    // A multiclass Cleric keeps the armor training but gains no weapon proficiencies.
+    expect(cleric.multiclassProficiencies).toEqual({ armor: ["light", "medium", "shields"], weapons: [], tools: [] });
+    expect(cleric.spellcasting).toEqual({ ability: "wis", prepares: "prepared", ritual: true, focus: "holy-symbol", multiclassProgression: "full", spellListId: "cleric" });
+    // The printed slot columns are exactly the shared full-caster table, row for row.
+    for (const row of cleric.levelTable) {
+      expect(row.spellSlots, `cleric level ${row.level}`).toEqual([...FULL_CASTER_SLOTS[row.level - 1]]);
+      expect(row.spellSlots, `cleric level ${row.level}`).toEqual([...spellSlotsForClass("cleric", row.level)]);
+    }
+    // Cantrips 3 -> 4 (level 4) -> 5 (level 10); prepared spells 4 -> 22 with the printed plateaus.
+    expect(cleric.levelTable.map((row) => row.cantripsKnown)).toEqual([3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]);
+    expect(cleric.levelTable.map((row) => row.preparedCount)).toEqual([4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22]);
+    // Channel Divinity rides the table as a class resource: none at 1, 2 uses at level 2, 3 at 6, 4 at 18.
+    const channelAt = (level: number) => cleric.levelTable[level - 1].classResources.find((resource) => resource.id === "channel-divinity")?.amount;
+    expect(channelAt(1)).toBeUndefined();
+    expect(channelAt(2)).toBe(2);
+    expect(channelAt(5)).toBe(2);
+    expect(channelAt(6)).toBe(3);
+    expect(channelAt(17)).toBe(3);
+    expect(channelAt(18)).toBe(4);
+    expect(channelAt(20)).toBe(4);
+    // ... and the feature's own uses scale identically, owning the shared "channel-divinity" pool.
+    const channel = cleric.features.find((feature) => feature.id === "channel-divinity")!;
+    expect(channel.uses).toMatchObject({
+      per: "long-rest", pool: "channel-divinity",
+      scaling: { type: "by-level", table: [{ level: 2, limit: 2 }, { level: 6, limit: 3 }, { level: 18, limit: 4 }] }
+    });
+    expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "turn-undead"]);
+    expect(channel.actions[1].save).toEqual({ ability: "wis", dc: "spellcasting" });
+    // Divine Order is a level-1 CHOICE between the two printed sacred roles.
+    const order = cleric.features.find((feature) => feature.id === "divine-order")!;
+    expect(order.level).toBe(1);
+    expect(order.choice).toMatchObject({ kind: "divine-order", choose: 1, from: ["protector", "thaumaturge"] });
+    // Blessed Strikes offers its two printed options; Divine Intervention is 1/Long Rest from level 10.
+    expect(cleric.features.find((feature) => feature.id === "blessed-strikes")!.choice).toMatchObject({ from: ["divine-strike", "potent-spellcasting"] });
+    expect(cleric.features.find((feature) => feature.id === "divine-intervention")!.uses).toEqual({ limit: 1, per: "long-rest" });
+    // Feature rows match the printed table (levels 6 and 17 are subclass-feature rows, so empty here).
+    const featuresAt = (level: number) => cleric.levelTable[level - 1].features;
+    expect(featuresAt(1)).toEqual(["spellcasting", "divine-order"]);
+    expect(featuresAt(2)).toEqual(["channel-divinity"]);
+    expect(featuresAt(5)).toEqual(["sear-undead"]);
+    expect(featuresAt(6)).toEqual([]);
+    expect(featuresAt(7)).toEqual(["blessed-strikes"]);
+    expect(featuresAt(14)).toEqual(["improved-blessed-strikes"]);
+    expect(featuresAt(17)).toEqual([]);
+    expect(featuresAt(19)).toEqual(["epic-boon"]);
+    expect(featuresAt(20)).toEqual(["greater-divine-intervention"]);
+    // Starting equipment resolves against the catalog and keeps the printed 110 GP fallback.
+    expect(cleric.startingEquipment.map((option) => option.id)).toEqual(["cleric-a", "cleric-b"]);
+    expect(cleric.startingEquipment[0].items.map((item) => item.id)).toEqual(["chain-shirt", "shield", "mace", "holy-symbol-amulet", "priests-pack"]);
+    expect(cleric.startingEquipment[0].goldPieces).toBe(7);
+    expect(cleric.startingEquipment[1]).toMatchObject({ items: [], goldPieces: 110 });
+  });
+
+  it("transcribes the Life Domain faithfully (spot check)", () => {
+    const life = subclasses.find((entry) => entry.id === "life-domain")!;
+    expect(life.classId).toBe("cleric");
+    expect(life.subclassLevel).toBe(3);
+    expect(life.features.map((feature) => [feature.id, feature.level])).toEqual([
+      ["life-domain-spells", 3], ["life-domain-spells-5", 5], ["life-domain-spells-7", 7], ["life-domain-spells-9", 9],
+      ["disciple-of-life", 3], ["preserve-life", 3], ["blessed-healer", 6], ["supreme-healing", 17]
+    ]);
+    // Domain spells are always-prepared grants, staged at the printed Cleric levels.
+    const grantsAt = (id: string) => life.features.find((feature) => feature.id === id)!.grants!.spells.map((spell) => spell.id);
+    expect(grantsAt("life-domain-spells")).toEqual(["aid", "bless", "cure-wounds", "lesser-restoration"]);
+    expect(grantsAt("life-domain-spells-5")).toEqual(["mass-healing-word", "revivify"]);
+    expect(grantsAt("life-domain-spells-7")).toEqual(["aura-of-life", "death-ward"]);
+    expect(grantsAt("life-domain-spells-9")).toEqual(["greater-restoration", "mass-cure-wounds"]);
+    for (const feature of life.features) for (const spell of feature.grants?.spells ?? []) {
+      expect(spell.alwaysPrepared, `${feature.id}/${spell.id}`).toBe(true);
+    }
+    // Preserve Life spends from the same Channel Divinity pool the class feature owns.
+    expect(life.features.find((feature) => feature.id === "preserve-life")!.uses).toEqual({ limit: 1, per: "long-rest", pool: "channel-divinity" });
+  });
+
   it("links every subclass to a class that exists and gates it at a real level", () => {
     const classIds = new Set(classes.map((entry) => entry.id));
     for (const subclass of subclasses) {
@@ -130,6 +231,7 @@ describe("character-builder content records", () => {
     }
     expect(subclassesForClass("fighter").map((subclass) => subclass.id)).toEqual(["champion"]);
     expect(subclassesForClass("wizard").map((subclass) => subclass.id)).toEqual(["evoker"]);
+    expect(subclassesForClass("cleric").map((subclass) => subclass.id)).toEqual(["life-domain"]);
     expect(subclassesForClass("barbarian")).toEqual([]);
   });
 
@@ -159,6 +261,77 @@ describe("character-builder content records", () => {
     expect(homebrew.darkvisionFeet).toBeNull();
   });
 
+  it("carries all nine SRD 5.2.1 species with the printed size, speed, and darkvision", () => {
+    const expected: Record<string, { sizes: string[]; speed: number; darkvision: number | null }> = {
+      dragonborn: { sizes: ["medium"], speed: 30, darkvision: 60 },
+      dwarf: { sizes: ["medium"], speed: 30, darkvision: 120 },
+      elf: { sizes: ["medium"], speed: 30, darkvision: 60 },
+      gnome: { sizes: ["small"], speed: 30, darkvision: 60 },
+      goliath: { sizes: ["medium"], speed: 35, darkvision: null },
+      halfling: { sizes: ["small"], speed: 30, darkvision: null },
+      human: { sizes: ["small", "medium"], speed: 30, darkvision: null },
+      orc: { sizes: ["medium"], speed: 30, darkvision: 120 },
+      tiefling: { sizes: ["small", "medium"], speed: 30, darkvision: 60 }
+    };
+    expect(species.map((entry) => entry.id).sort()).toEqual(Object.keys(expected).sort());
+    for (const entry of species) {
+      const want = expected[entry.id];
+      expect(entry.sizes, entry.id).toEqual(want.sizes);
+      expect(entry.speedFeet, entry.id).toBe(want.speed);
+      expect(entry.darkvisionFeet, entry.id).toBe(want.darkvision);
+      // A species-level darkvision range is always backed by a structured trait modifier (and a
+      // species without darkvision must not smuggle one in).
+      const modifierFeet = entry.traits.flatMap((trait) => trait.modifiers.flatMap((modifier) => modifier.type === "darkvision" ? [modifier.feet] : []));
+      expect(modifierFeet, entry.id).toEqual(want.darkvision === null ? [] : [want.darkvision]);
+    }
+  });
+
+  it("transcribes the new species' trait riders faithfully (spot checks)", () => {
+    const byId = (id: string) => species.find((entry) => entry.id === id)!;
+    // Dwarf: poison resistance, the +1 HP/level rider, and PB-scaling Stonecunning.
+    const dwarf = byId("dwarf");
+    expect(dwarf.traits.find((trait) => trait.id === "dwarf-resilience")!.grants!.damageResistances).toEqual(["poison"]);
+    expect(dwarf.traits.find((trait) => trait.id === "dwarf-toughness")!.modifiers).toEqual([{ type: "hit-points-per-level", amount: 1 }]);
+    expect(dwarf.traits.find((trait) => trait.id === "dwarf-stonecunning")!.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
+    // Dragonborn: ten ancestries, each granting the printed damage resistance as data.
+    const dragonborn = byId("dragonborn");
+    const resistances = Object.fromEntries(dragonborn.lineages.map((lineage) => [lineage.id, lineage.traits[0].grants!.damageResistances[0]]));
+    expect(resistances).toEqual({
+      "black-dragon": "acid", "blue-dragon": "lightning", "brass-dragon": "fire", "bronze-dragon": "lightning",
+      "copper-dragon": "acid", "gold-dragon": "fire", "green-dragon": "poison", "red-dragon": "fire",
+      "silver-dragon": "cold", "white-dragon": "cold"
+    });
+    expect(dragonborn.traits.find((trait) => trait.id === "dragonborn-breath-weapon")!.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
+    expect(dragonborn.traits.find((trait) => trait.id === "dragonborn-draconic-flight")!.level).toBe(5);
+    // Goliath: six ancestry boons behind one PB-per-Long-Rest choice; Large Form gates at level 5.
+    const goliath = byId("goliath");
+    const ancestry = goliath.traits.find((trait) => trait.id === "goliath-giant-ancestry")!;
+    expect(ancestry.choice).toMatchObject({ kind: "giant-ancestry", choose: 1 });
+    expect(ancestry.choice!.from).toEqual(["clouds-jaunt", "fires-burn", "frosts-chill", "hills-tumble", "stones-endurance", "storms-thunder"]);
+    expect(ancestry.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
+    expect(goliath.traits.find((trait) => trait.id === "goliath-large-form")!.level).toBe(5);
+    // Orc: Adrenaline Rush refreshes on a SHORT rest; Relentless Endurance is 1/Long Rest.
+    const orc = byId("orc");
+    expect(orc.traits.find((trait) => trait.id === "orc-adrenaline-rush")!.uses).toMatchObject({ per: "short-rest", scaling: { type: "proficiency-bonus" } });
+    expect(orc.traits.find((trait) => trait.id === "orc-relentless-endurance")!.uses).toEqual({ limit: 1, per: "long-rest" });
+    // Tiefling: three legacies, each granting a resistance + cantrip at 1 and spells at levels 3 and 5.
+    const tiefling = byId("tiefling");
+    expect(tiefling.lineages.map((lineage) => lineage.id)).toEqual(["abyssal", "chthonic", "infernal"]);
+    for (const lineage of tiefling.lineages) {
+      expect(lineage.traits.map((trait) => trait.level), lineage.id).toEqual([undefined, 3, 5]);
+      expect(lineage.traits[0].grants!.damageResistances, lineage.id).toHaveLength(1);
+      expect(lineage.traits[0].grants!.spells[0].level, lineage.id).toBe(0);
+    }
+    expect(tiefling.lineages.find((lineage) => lineage.id === "infernal")!.traits[0].grants!.spells[0].id).toBe("fire-bolt");
+    expect(tiefling.traits.find((trait) => trait.id === "tiefling-otherworldly-presence")!.grants!.spells).toEqual([{ id: "thaumaturgy", level: 0, alwaysPrepared: true }]);
+    // Gnome: two lineages; the Forest Gnome casts Speak with Animals PB times per Long Rest.
+    const gnome = byId("gnome");
+    expect(gnome.lineages.map((lineage) => lineage.id)).toEqual(["forest-gnome", "rock-gnome"]);
+    expect(gnome.lineages[0].traits.find((trait) => trait.id === "forest-gnome-spell")!.uses).toMatchObject({ per: "long-rest", scaling: { type: "proficiency-bonus" } });
+    // Halfling: the four printed prose traits, in print order.
+    expect(byId("halfling").traits.map((trait) => trait.id)).toEqual(["halfling-brave", "halfling-nimbleness", "halfling-luck", "halfling-naturally-stealthy"]);
+  });
+
   it("gives every background ability options, an origin feat that exists, and equipment", () => {
     const featIds = new Set(feats.map((feat) => feat.id));
     for (const background of backgrounds) {
@@ -171,6 +344,22 @@ describe("character-builder content records", () => {
     expect(soldier.skillProficiencies).toEqual(["athletics", "intimidation"]);
     expect(soldier.originFeatId).toBe("savage-attacker");
     expect(soldier.startingEquipment.at(-1)).toMatchObject({ items: [], goldPieces: 50 });
+    // The soldier's gaming set points at REAL catalog ids (the seeded `dice-set` was a dangling id).
+    expect(soldier.startingEquipment[0].items.map((item) => item.id)).toContain("gaming-set-dice");
+    expect(soldier.toolChoices?.from).toEqual(["gaming-set-dice", "gaming-set-playing-cards"]);
+    // Acolyte and Criminal complete the SRD 5.2.1 set of four.
+    expect(backgrounds.map((background) => background.id).sort()).toEqual(["acolyte", "criminal", "sage", "soldier"]);
+    const acolyte = backgrounds.find((background) => background.id === "acolyte")!;
+    expect(acolyte.abilityOptions!.from).toEqual(["int", "wis", "cha"]);
+    expect(acolyte.originFeatId).toBe("magic-initiate-cleric");
+    expect(acolyte.skillProficiencies).toEqual(["insight", "religion"]);
+    expect(acolyte.toolProficiencies).toEqual(["calligraphers-supplies"]);
+    const criminal = backgrounds.find((background) => background.id === "criminal")!;
+    expect(criminal.abilityOptions!.from).toEqual(["dex", "con", "int"]);
+    expect(criminal.originFeatId).toBe("alert");
+    expect(criminal.skillProficiencies).toEqual(["sleight-of-hand", "stealth"]);
+    expect(criminal.toolProficiencies).toEqual(["thieves-tools"]);
+    expect(criminal.startingEquipment[0].items.find((item) => item.id === "dagger")?.quantity).toBe(2);
   });
 
   it("makes a feat literally a FeatureRecord plus catalog metadata", () => {
@@ -178,21 +367,105 @@ describe("character-builder content records", () => {
       expect(FeatureRecordSchema.safeParse(feat.feature).success, feat.id).toBe(true);
       expect(feat.category, feat.id).toMatch(/^[a-z0-9-]+$/);
     }
-    const tough = feats.find((feat) => feat.id === "tough")!;
-    expect(tough.feature.modifiers).toEqual([{ type: "hit-points-per-level", amount: 2 }]);
     const savage = feats.find((feat) => feat.id === "savage-attacker")!;
     expect(savage.feature.uses).toMatchObject({ limit: 1, per: "turn" });
+    // The ASI feat encodes "+2 to one score or +1 to two" as two repeatable +1 picks.
+    const asi = feats.find((feat) => feat.id === "ability-score-improvement")!;
+    expect(asi.category).toBe("general");
+    expect(asi.prerequisite?.level).toBe(4);
+    expect(asi.repeatable).toBe(true);
+    expect(asi.feature.choice).toMatchObject({ kind: "ability-score", choose: 2, repeatable: true });
+    expect(asi.feature.choice?.from).toEqual(["str", "dex", "con", "int", "wis", "cha"]);
+  });
+
+  it("carries the complete SRD 5.2.1 feat chapter, so every `<category>-feats` slug resolves non-empty", () => {
+    const byCategory = (category: string) => feats.filter((feat) => feat.category === category).map((feat) => feat.id);
+    expect(byCategory("origin")).toEqual(["alert", "magic-initiate-cleric", "magic-initiate-druid", "magic-initiate-wizard", "savage-attacker", "skilled"]);
+    expect(byCategory("general")).toEqual(["ability-score-improvement", "grappler"]);
+    expect(byCategory("fighting-style")).toEqual(["archery", "defense", "great-weapon-fighting", "two-weapon-fighting"]);
+    expect(byCategory("epic-boon")).toEqual([
+      "boon-of-combat-prowess", "boon-of-dimensional-travel", "boon-of-fate", "boon-of-irresistible-offense",
+      "boon-of-spell-recall", "boon-of-the-night-spirit", "boon-of-truesight"
+    ]);
+    // SRD 5.2.1's feat chapter has NO Tough feat (PHB-2024-only); it must stay out of the srd source.
+    expect(feats.some((feat) => feat.id === "tough")).toBe(false);
+    // Fighting-style feats gate on the Fighting Style feature; every Epic Boon gates on level 19.
+    for (const id of byCategory("fighting-style")) {
+      expect(feats.find((feat) => feat.id === id)!.prerequisite?.requires, id).toEqual(["fighting-style"]);
+    }
+    for (const id of byCategory("epic-boon")) {
+      expect(feats.find((feat) => feat.id === id)!.prerequisite?.level, id).toBe(19);
+    }
+    expect(feats.find((feat) => feat.id === "boon-of-spell-recall")!.prerequisite?.requires).toEqual(["spellcasting"]);
+    // Boons restricted to specific scores say so as data; Grappler's "Str or Dex 13+" stays prose (the
+    // feat-prerequisite shape has no any/all mode - see the schema-gap notes in the task report).
+    expect(feats.find((feat) => feat.id === "boon-of-irresistible-offense")!.feature.choice?.from).toEqual(["str", "dex"]);
+    expect(feats.find((feat) => feat.id === "boon-of-spell-recall")!.feature.choice?.from).toEqual(["int", "wis", "cha"]);
+    expect(feats.find((feat) => feat.id === "grappler")!.prerequisite?.text).toContain("Strength or Dexterity 13+");
+  });
+
+  it("resolves every authored `fromCatalog` slug through the documented slug families", () => {
+    const spells = loadSpells();
+    const authored: Array<{ owner: string; slug: string }> = [];
+    const collect = (owner: string, features: readonly { id: string; choice?: { fromCatalog?: string } }[]) => {
+      for (const feature of features) {
+        if (feature.choice?.fromCatalog) authored.push({ owner: `${owner}/${feature.id}`, slug: feature.choice.fromCatalog });
+      }
+    };
+    for (const entry of classes) collect(entry.id, entry.features);
+    for (const entry of subclasses) collect(entry.id, entry.features);
+    for (const entry of species) {
+      collect(entry.id, entry.traits);
+      for (const lineage of entry.lineages) collect(`${entry.id}/${lineage.id}`, lineage.traits);
+    }
+    for (const entry of backgrounds) collect(entry.id, entry.features);
+    collect("feats", feats.map((feat) => feat.feature));
+    expect(authored.length).toBeGreaterThanOrEqual(15);
+    const skillCount = loadSkills().length;
+    const weaponCount = loadEquipment().filter((item) => item.category === "weapon").length;
+    for (const { owner, slug } of authored) {
+      // Mirrors the resolver's slug grammar (packages/domain/src/catalog-choice.ts): every authored
+      // slug must land in a family AND resolve to a non-empty option list, or a wizard step dead-ends.
+      if (slug === "skills") { expect(skillCount, owner).toBeGreaterThan(0); continue; }
+      if (slug === "weapons") { expect(weaponCount, owner).toBeGreaterThan(0); continue; }
+      if (slug.endsWith("-spells")) {
+        const listId = slug.slice(0, -"-spells".length);
+        expect(spells.some((spell) => spell.classes.includes(listId)), `${owner} -> ${slug}`).toBe(true);
+        continue;
+      }
+      if (slug.endsWith("-subclasses")) {
+        const classId = slug.slice(0, -"-subclasses".length);
+        expect(subclassesForClass(classId).length, `${owner} -> ${slug}`).toBeGreaterThan(0);
+        continue;
+      }
+      if (slug.endsWith("-feats")) {
+        const category = slug.slice(0, -"-feats".length);
+        expect(feats.some((feat) => feat.category === category), `${owner} -> ${slug}`).toBe(true);
+        continue;
+      }
+      if (slug.endsWith("-lineages")) {
+        const speciesId = slug.slice(0, -"-lineages".length);
+        expect(species.find((entry) => entry.id === speciesId)?.lineages.length ?? 0, `${owner} -> ${slug}`).toBeGreaterThan(0);
+        continue;
+      }
+      expect.fail(`${owner}: fromCatalog "${slug}" matches no documented slug family`);
+    }
   });
 
   it("carries per-species name pools for the random generator", () => {
-    expect(names.map((pool) => pool.speciesId).sort()).toEqual(["elf", "human"]);
+    expect(names.map((pool) => pool.speciesId).sort()).toEqual(
+      ["dragonborn", "dwarf", "elf", "gnome", "goliath", "halfling", "human", "orc", "tiefling"]
+    );
     const speciesIds = new Set(species.map((entry) => entry.id));
     for (const pool of names) {
       expect(speciesIds, pool.speciesId).toContain(pool.speciesId);
       for (const list of pool.pools) expect(list.names.length, `${pool.speciesId}/${list.id}`).toBeGreaterThanOrEqual(10);
     }
+    // EVERY authored species has a pool; a species outside the SRD 5.2.1 roster does not.
+    for (const entry of species) expect(namesForSpecies(entry.id), entry.id).toBeDefined();
     expect(namesForSpecies("elf")!.pools.map((list) => list.id)).toEqual(["elf-given", "elf-family", "elf-child"]);
-    expect(namesForSpecies("dragonborn")).toBeUndefined();
+    expect(namesForSpecies("dwarf")!.pools.map((list) => list.label)).toEqual(["Masculine", "Feminine", "Clan"]);
+    expect(namesForSpecies("aasimar")).toBeUndefined();
   });
 
   it("keeps every authored dice formula parseable by the authoritative grammar", () => {
@@ -221,13 +494,64 @@ describe("character-builder content records", () => {
     const equipmentIds = new Set(loadEquipment().map((item) => item.id));
     for (const entry of classes) {
       for (const skillId of entry.skillChoices.from) expect(skillIds, `${entry.id} skill ${skillId}`).toContain(skillId);
+      for (const toolId of entry.toolProficiencies) expect(equipmentIds, `${entry.id} tool ${toolId}`).toContain(toolId);
       for (const option of entry.startingEquipment) for (const item of option.items) {
         expect(equipmentIds, `${entry.id} equipment ${item.id}`).toContain(item.id);
       }
     }
-    for (const background of backgrounds) for (const skillId of background.skillProficiencies) {
-      expect(skillIds, `${background.id} skill ${skillId}`).toContain(skillId);
+    // SYMMETRIC on purpose: backgrounds get the same equipment/tool integrity classes get - the
+    // seeded soldier's dangling `dice-set` id slipped through exactly this gap.
+    for (const background of backgrounds) {
+      for (const skillId of background.skillProficiencies) expect(skillIds, `${background.id} skill ${skillId}`).toContain(skillId);
+      for (const toolId of background.toolProficiencies) expect(equipmentIds, `${background.id} tool ${toolId}`).toContain(toolId);
+      for (const toolId of background.toolChoices?.from ?? []) expect(equipmentIds, `${background.id} tool choice ${toolId}`).toContain(toolId);
+      for (const option of background.startingEquipment) for (const item of option.items) {
+        expect(equipmentIds, `${background.id} equipment ${item.id}`).toContain(item.id);
+      }
     }
+  });
+
+  it("cross-references every spell and damage-type grant against the spell and damage-type catalogs", () => {
+    const spellById = new Map(loadSpells().map((spell) => [spell.id, spell]));
+    const damageTypeIds = new Set(loadDamageTypes().map((type) => type.id));
+    const everyFeature = [
+      ...classes.flatMap((entry) => entry.features.map((feature) => ({ owner: entry.id, feature }))),
+      ...subclasses.flatMap((entry) => entry.features.map((feature) => ({ owner: entry.id, feature }))),
+      ...species.flatMap((entry) => [...entry.traits, ...entry.lineages.flatMap((lineage) => lineage.traits)].map((feature) => ({ owner: entry.id, feature }))),
+      ...backgrounds.flatMap((entry) => entry.features.map((feature) => ({ owner: entry.id, feature }))),
+      ...feats.map((feat) => ({ owner: feat.id, feature: feat.feature }))
+    ];
+    let spellGrants = 0;
+    for (const { owner, feature } of everyFeature) {
+      for (const grant of feature.grants?.spells ?? []) {
+        spellGrants += 1;
+        const spell = spellById.get(grant.id);
+        expect(spell, `${owner}/${feature.id} grants unknown spell "${grant.id}"`).toBeDefined();
+        // The authored spell level must agree with the catalog (a wrong level would mis-slot the grant).
+        if (grant.level !== undefined) expect(grant.level, `${owner}/${feature.id} ${grant.id} level`).toBe(spell!.level);
+      }
+      for (const resistance of feature.grants?.damageResistances ?? []) {
+        expect(damageTypeIds, `${owner}/${feature.id} resistance ${resistance}`).toContain(resistance);
+      }
+      for (const immunity of feature.grants?.damageImmunities ?? []) {
+        expect(damageTypeIds, `${owner}/${feature.id} immunity ${immunity}`).toContain(immunity);
+      }
+    }
+    // Coverage floor: the domain-spell tiers, the elf/gnome/tiefling lineages, and the racial cantrips.
+    expect(spellGrants).toBeGreaterThanOrEqual(20);
+  });
+
+  it("carries the SRD ability column on every skill (raw bundle - a bundle rebuild must preserve it)", () => {
+    const require = createRequire(import.meta.url);
+    const raw = require("../bundles/skills.v1.json") as Array<{ id: string; ability?: string }>;
+    expect(raw).toHaveLength(18);
+    const byId = Object.fromEntries(raw.map((skill) => [skill.id, skill.ability]));
+    expect(byId).toEqual({
+      "acrobatics": "dex", "animal-handling": "wis", "arcana": "int", "athletics": "str", "deception": "cha",
+      "history": "int", "insight": "wis", "intimidation": "cha", "investigation": "int", "medicine": "wis",
+      "nature": "int", "perception": "wis", "performance": "cha", "persuasion": "cha", "religion": "int",
+      "sleight-of-hand": "dex", "stealth": "dex", "survival": "wis"
+    });
   });
 });
 
