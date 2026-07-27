@@ -492,9 +492,21 @@ export type ContentSourceKind = "srd" | "homebrew";
  * homebrew authors the same record. The structured riders (granted actions, effects, modifiers,
  * limited uses) stay on the server-side record - the server, never the wizard, applies them.
  */
-export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
+/**
+ * One inline option of a feature's pick, as the wizard needs to render and follow it. Carries the
+ * authored NAME (an id alone forces the client to titleize, turning `clouds-jaunt` into "Clouds
+ * Jaunt") and any SECOND-ORDER pick the option itself owes: Cleric Divine Order's "thaumaturge"
+ * grants an extra cantrip, so choosing it opens another choice. Without that nested `choice` on the
+ * wire the wizard offers Divine Order, reports the step complete, and the server refuses the build.
+ * Riders (actions, grants, modifiers, uses) deliberately stay server-side - the server applies them.
+ */
+export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string; choice: ContentFeatureChoiceSummary | null }>;
+export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
   /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
-  maxSpellLevel: number | null }> | null }>;
+  maxSpellLevel: number | null;
+  /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
+  options: readonly ContentFeatureOptionSummary[] }>;
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null }>;
 /**
  * ONE row of a class's printed 20-level table - the display data the wizard renders when a player
  * previews "what do I get at level 7?": slot columns, cantrips/spells known, the prepared-spell

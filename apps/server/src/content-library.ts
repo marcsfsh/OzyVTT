@@ -159,15 +159,31 @@ const equipmentSummaries: readonly ContentEquipmentSummary[] = loadEquipment().m
 //
 // NOTE: the bundles currently carry a partial SRD slice (task packet phase 1.1 seed content) - full
 // transcription is phases 2 and 5. A short catalog here is missing CONTENT, never a missing endpoint.
+/**
+ * A feature's pick as the wizard needs it. Inline `options` carry their authored name (an id alone
+ * makes the client titleize - `clouds-jaunt` renders as "Clouds Jaunt") and any SECOND-ORDER pick the
+ * option owes: choosing Cleric Divine Order's "thaumaturge" grants an extra cantrip, and without that
+ * nested choice on the wire the wizard reports the step complete and the server refuses the build.
+ * Riders (actions/grants/modifiers/uses) stay server-side - only what the player must SEE travels.
+ */
+const choiceSummaryOf = (choice: FeatureRecord["choice"]): ContentFeatureSummary["choice"] => choice
+  ? {
+      kind: choice.kind, choose: choice.choose, from: choice.from ?? [], fromCatalog: choice.fromCatalog ?? null, maxSpellLevel: choice.maxSpellLevel ?? null,
+      options: (choice.options ?? []).map((option) => ({
+        id: option.id, name: option.name, description: option.description,
+        // One level of nesting only, matching the schema's own bound: a nested choice cannot itself carry options.
+        choice: option.choice ? { kind: option.choice.kind, choose: option.choice.choose, from: option.choice.from ?? [], fromCatalog: option.choice.fromCatalog ?? null, maxSpellLevel: option.choice.maxSpellLevel ?? null, options: [] } : null
+      }))
+    }
+  : null;
+
 const featureSummaryOf = (feature: FeatureRecord): ContentFeatureSummary => ({
   id: feature.id,
   name: feature.name,
   level: feature.level ?? null,
   description: feature.description,
   tags: feature.tags,
-  choice: feature.choice
-    ? { kind: feature.choice.kind, choose: feature.choice.choose, from: feature.choice.from ?? [], fromCatalog: feature.choice.fromCatalog ?? null, maxSpellLevel: feature.choice.maxSpellLevel ?? null }
-    : null
+  choice: choiceSummaryOf(feature.choice)
 });
 // The whole bundle, not just its label: a label can be shown but never turned into inventory, so the
 // wizard's "take option A" had nothing to add. Items and the "or take N gp" alternative both travel.
