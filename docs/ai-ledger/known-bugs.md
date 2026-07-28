@@ -264,6 +264,16 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
   actually wraps.
 
+- **[codex/viewer] The campaign's current in-world date reaches players, and always has.** M7's Campaign
+  dashboard shows a "Now: …" chip to players as well as the GM. That is **not** a new exposure:
+  `GET /api/v1/codex/calendar` (`codex-http.ts:522`) returns `store.getCalendar()` **unprojected to any
+  authenticated role**, and it predates M7 — the dashboard only surfaces what the server already sent.
+  It is also consistent with the `inWorldLabel` every revealed journal entry already carries. Recorded
+  because there is a real product question underneath: **if a GM is meant to be able to run the campaign
+  clock ahead of the party while prepping, `currentDate` needs a server-side gate**, and no such gate
+  exists today. Raised by the M7 implementer rather than decided unilaterally. Not a leak of GM-only
+  content as the system is currently specified; revisit if prep-ahead becomes a supported workflow.
+
 ## Gotchas that look like bugs (but aren't)
 
 - **[build] Stale `tsbuildinfo` can mask type errors** — web `check`/`build` are incremental

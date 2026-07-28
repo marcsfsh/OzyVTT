@@ -239,6 +239,15 @@ export function dateToInstant(calendar: CodexCalendar, date: CodexInWorldDate): 
 }
 export function calendarYearOf(calendar: CodexCalendar, instant: number): number { const perYear = calendarDaysPerYear(calendar) || 1; return Math.floor(instant / perYear); }
 export function formatWorldYear(calendar: CodexCalendar, year: number): string { return `${year}${calendar.yearName ? ` ${calendar.yearName}` : ""}`; }
+/**
+ * A raw in-world date rendered as "Month Day, Year Era". It lived inside `JournalView` until CI-7 gave
+ * the Campaign dashboard the same readout — two copies of a date format is exactly how the journal's
+ * "Now" chip and the dashboard's would drift apart.
+ */
+export function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
+  const month = calendar.months[Math.max(0, Math.min(date.month, calendar.months.length - 1))];
+  return `${month?.name ?? ""} ${date.day}, ${formatWorldYear(calendar, date.year)}`;
+}
 export function instantToDate(calendar: CodexCalendar, instant: number): CodexInWorldDate {
   const perYear = calendarDaysPerYear(calendar) || 1;
   const year = Math.floor(instant / perYear);

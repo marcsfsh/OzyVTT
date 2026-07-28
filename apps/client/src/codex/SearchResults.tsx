@@ -52,7 +52,7 @@ export function useCodexSearch(
 /**
  * R2: **kind reads by icon + label, never colour alone.** Every row carries a text kind label, so the
  * accent below is only a scanning aid — remove all colour and the list still reads correctly. Pages get
- * their entity type's own glyph and colour (the same `EntityIcon` the notebook and World cards use);
+ * their entity type's own glyph and colour (the same `EntityIcon` the notebook and Campaign dashboard cards use);
  * the other three get a fixed glyph from the existing registry, because the narrow hit deliberately does
  * not carry a marker's own `iconId`/`iconColor`.
  */

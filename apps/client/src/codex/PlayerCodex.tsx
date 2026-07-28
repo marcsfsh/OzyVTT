@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
-import { WorldHome } from "./WorldHome";
+import { CampaignHome, type CampaignEntry } from "./CampaignHome";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { EntityIcon } from "./icons";
 import { ENTITY_DEFS, entityDef, relationshipLabel, type EntityType } from "./entities";
 import "./codex.css";
 
-type PlayerView = "world" | "lore" | "atlas" | "journal" | "graph";
+/** CI-7: `world` is `campaign` on the player's mode bar too — one vocabulary across both audiences. */
+type PlayerView = "campaign" | "lore" | "atlas" | "journal" | "graph";
 
 /**
  * The player-facing Codex: a read-only window onto the worldbuilding the GM has revealed. Lore browses
@@ -25,7 +26,7 @@ function whenLabel(entry: PlayerCodexJournalEntry): string {
 }
 
 export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () => void }>) {
-  const [view, setView] = useState<PlayerView>("world");
+  const [view, setView] = useState<PlayerView>("campaign");
   const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
   const [rels, setRels] = useState<CodexRelationshipEdge[]>([]);
   const [filter, setFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
@@ -41,11 +42,19 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // CI-7: the campaign's current date for the dashboard. `/codex/calendar` is a role-aware read that the
+  // server already answers for a player token — the same calendar behind the `inWorldLabel` every player
+  // entry already carries. It is fetched, not derived, so this surface still shows only what it was sent.
+  const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [nextPages, nextMaps, nextTimeline, nextRels] = await Promise.all([playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token), playerCodexApi.listRelationships(token)]);
-      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels);
+      const [nextPages, nextMaps, nextTimeline, nextRels, nextCalendar] = await Promise.all([
+        playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token), playerCodexApi.listRelationships(token),
+        // A missing calendar costs the dashboard one chip; it must not cost the player the whole codex.
+        calendarApi.get(token).catch(() => null)
+      ]);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setCalendar(nextCalendar);
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
@@ -101,17 +110,38 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
   const currentRootId = breadcrumb[0]?.id ?? null;
 
+  /**
+   * CI-7 dashboard feed. Every value here is a field of a record the SERVER chose to send this player —
+   * `timeline` is already `projectPlayerJournalEntry`'d and `maps` is already the revealed-only list, so
+   * nothing is filtered again on the way in. A second gate here could only ever disagree with the one
+   * that counts, and `revealedToPlayers` is deliberately absent: a player's map row has no such field to
+   * read, so the dashboard cannot accidentally render GM knowledge it was never handed.
+   */
+  const campaignEntries = useMemo<readonly CampaignEntry[]>(
+    // Newest first by `createdAt` — the same notion of "recent" the GM dashboard uses, and the only one
+    // a player entry can express (the timeline arrives in in-world chronological order, which is a
+    // different question). The revealed set itself is the server's; this only reorders it.
+    () => [...timeline]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((entry) => ({ id: entry.id, summary: entry.text, when: whenLabel(entry), kind: entry.kind })),
+    [timeline]
+  );
+  const campaignToday = useMemo(() => (calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null), [calendar]);
+
   return (
     <div className="codex-root codex-player">
       <div className="codex-modebar">
         <Tabs ariaLabel="Codex" activeId={view} onChange={(id) => setView(id as PlayerView)}
-          tabs={[{ id: "world", label: "World" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
+          tabs={[{ id: "campaign", label: "Campaign" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
       </div>
 
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
 
-      {view === "world" && (
-        <WorldHome pages={pages} loading={loading} showReveal={false} onOpenPage={openPage}
+      {view === "campaign" && (
+        <CampaignHome pages={pages} entries={campaignEntries} maps={maps} today={campaignToday} loading={loading} showReveal={false} onOpenPage={openPage}
+          /* R1: a player's jumps prepare their destination too — the entry is marked, the map is open. */
+          onOpenEntry={(entryId) => { setFocusedEntryId(entryId); setView("journal"); }}
+          onOpenMap={(mapId) => { setSelectedMarkerId(null); setCurrentMapId(mapId); setView("atlas"); }}
           onPickType={(type) => { setFilter({ type, tag: null }); setView("lore"); }}
           onPickTag={(tag) => { setFilter({ type: null, tag }); setView("lore"); }} />
       )}

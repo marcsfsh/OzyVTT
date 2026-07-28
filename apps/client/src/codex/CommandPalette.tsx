@@ -12,7 +12,9 @@ import { SearchResultRow, searchHitKey, useCodexSearch } from "./SearchResults";
  * reachable from Cmd-K, not just a page. It used to hold its own copy of the notebook and filter titles
  * client-side — a second search mechanism that could only ever agree with the real one by coincidence.
  */
-type GotoTarget = "world" | "pages" | "atlas" | "journal" | "graph";
+/** CI-7: `world` became `campaign` here as well as on the mode bar — a palette that still said "World"
+    would be the one place the suite's vocabulary split. */
+type GotoTarget = "campaign" | "pages" | "atlas" | "journal" | "graph";
 type Action =
   | { kind: "hit"; hit: CodexSearchHit }
   | { kind: "create"; label: string; title: string }
@@ -28,7 +30,7 @@ type CommandPaletteProps = Readonly<{
 }>;
 
 const GOTO: ReadonlyArray<{ label: string; target: GotoTarget }> = [
-  { label: "Go to World", target: "world" },
+  { label: "Go to Campaign", target: "campaign" },
   { label: "Go to Pages", target: "pages" },
   { label: "Go to Atlas", target: "atlas" },
   { label: "Go to Journal", target: "journal" },

@@ -9,6 +9,9 @@ const listRelationships = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
+const timeline = vi.fn();
+const listMaps = vi.fn();
+const getCalendar = vi.fn();
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
@@ -20,7 +23,13 @@ vi.mock("./api", async (importOriginal) => {
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
-    }
+    },
+    // CI-7: the Campaign dashboard's own three feeds. They resolve EMPTY in every test below on
+    // purpose — an empty journal and an empty atlas are what make `pages` the deciding feed for the
+    // empty state under test, exactly as they were before the dashboard had any other data.
+    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a) },
+    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a) },
+    calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) }
   };
 });
 
@@ -52,15 +61,18 @@ describe("Codex loading states (CF-2)", () => {
     listFolders.mockResolvedValue([]);
     search.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
+    timeline.mockResolvedValue([]);
+    listMaps.mockResolvedValue([]);
+    getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
   });
 
-  it("World does not claim the campaign is empty while pages are still loading", async () => {
+  it("Campaign does not claim the campaign is empty while pages are still loading", async () => {
     const pages = deferred<unknown[]>();
     listPages.mockReturnValue(pages.promise);
     const user = userEvent.setup();
     renderWorkspace();
 
-    await user.click(screen.getByRole("tab", { name: "World" }));
+    await user.click(screen.getByRole("tab", { name: "Campaign" }));
     // The fetch is still open: the invitation to create a first page must not be on screen.
     expect(screen.queryByText(/No entries yet/i)).not.toBeInTheDocument();
 
@@ -92,7 +104,7 @@ describe("Codex loading states (CF-2)", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "World" }));
+    await user.click(screen.getByRole("tab", { name: "Campaign" }));
     expect(await screen.findByText(/No entries yet/i)).toBeInTheDocument();
   });
 });

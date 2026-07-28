@@ -28,7 +28,7 @@ function withKeys(type: EntityType, present: Readonly<Record<string, FieldPresen
     return { key, secret, label: meta?.label ?? key, kind: meta?.kind, placeholder: meta?.placeholder };
   });
 }
-/** One source of truth per entity type: its label, glyph id (see icons.tsx CODEX_ICONS), accent color, and structured fields — used by the tree, World cards, graph, badges, and editor alike. */
+/** One source of truth per entity type: its label, glyph id (see icons.tsx CODEX_ICONS), accent color, and structured fields — used by the tree, Campaign dashboard cards, graph, badges, and editor alike. */
 export type EntityDef = Readonly<{ type: EntityType; label: string; icon: string; color: string; fields: readonly FieldDef[] }>;
 
 export const ENTITY_DEFS: Readonly<Record<EntityType, EntityDef>> = {

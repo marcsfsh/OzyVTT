@@ -9,6 +9,11 @@ const listRelationships = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
+// CI-7 gave the Campaign mode three feeds of its own; they are stubbed here so entering the mode does
+// not reach a real `fetch`, but this file is still about navigation, not about what the dashboard says.
+const timeline = vi.fn();
+const listMaps = vi.fn();
+const getCalendar = vi.fn();
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
@@ -20,7 +25,10 @@ vi.mock("./api", async (importOriginal) => {
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
-    }
+    },
+    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a) },
+    atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a) },
+    calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) }
   };
 });
 
@@ -33,7 +41,7 @@ import type { CodexPage, CodexPageSummary } from "./api";
  *
  * The assessment's third root cause is that the suite is "a shell but not a system" — a star into Pages
  * with no return edges. M7 will add those edges, so these tests pin the shell's *current* contract:
- * which mode is active, that a World type card sets the filter AND lands on Pages, and that a filter is
+ * which mode is active, that a Campaign type card sets the filter AND lands on Pages, and that a filter is
  * cleared rather than left stale. Without this, M7's navigation work has nothing to regress against.
  */
 const summary = (id: string, title: string, entityType: CodexPageSummary["entityType"], tags: string[] = []): CodexPageSummary => ({
@@ -52,6 +60,9 @@ describe("Codex shell — cross-mode navigation", () => {
     listRelationships.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     search.mockResolvedValue([]);
+    timeline.mockResolvedValue([]);
+    listMaps.mockResolvedValue([]);
+    getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
     getPage.mockImplementation(async (_t: string, id: string) => ({
       page: { ...PAGES.find((p) => p.id === id)!, playerBody: "", gmBody: "", gmFields: {} } as CodexPage,
       backlinks: [], relationships: []
@@ -68,17 +79,17 @@ describe("Codex shell — cross-mode navigation", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "World" }));
-    expect(screen.getByRole("tab", { name: "World" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("tab", { name: "Campaign" }));
+    expect(screen.getByRole("tab", { name: "Campaign" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("World → Pages prepares its destination: picking a type filters the notebook AND lands on Pages", async () => {
+  it("Campaign → Pages prepares its destination: picking a type filters the notebook AND lands on Pages", async () => {
     // This handoff is the one the design calls the best transition in the suite; M7 makes every other
     // jump match it, so its current behaviour is worth pinning.
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "World" }));
+    await user.click(screen.getByRole("tab", { name: "Campaign" }));
     await user.click(await screen.findByText(/character/i));
     expect(screen.getByRole("tab", { name: "Pages" })).toHaveAttribute("aria-selected", "true");
     // The filter chip is visible and names the type, and the non-matching page is filtered out.
@@ -91,7 +102,7 @@ describe("Codex shell — cross-mode navigation", () => {
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("tab", { name: "World" }));
+    await user.click(screen.getByRole("tab", { name: "Campaign" }));
     await user.click(await screen.findByText(/character/i));
     await user.click(await screen.findByRole("button", { name: /clear filter/i }));
     expect(await screen.findByText("Barovia")).toBeInTheDocument();

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
+import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
-import { JournalView } from "./JournalView";
+import { JournalView, journalWhenLabel } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { EntityIcon } from "./icons";
-import { WorldHome } from "./WorldHome";
+import { CampaignHome, type CampaignEntry } from "./CampaignHome";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
 import { useConfirm, usePrompt } from "../components/feedback";
@@ -36,7 +36,10 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 type WorkspaceActor = Readonly<{ id: string; name: string }>;
 export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {}, onOpenReplay }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; actors?: readonly WorkspaceActor[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
-  const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal" | "graph">("pages");
+  // CI-7: `world` is `campaign`. The mode is not persisted anywhere (no localStorage key, no URL), so
+  // the rename needs no migration — but it IS the union the mode bar, the palette's goto targets and
+  // every `setMode` call share, which is why renaming it here forces the rest to follow.
+  const [mode, setMode] = useState<"campaign" | "pages" | "atlas" | "journal" | "graph">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
   // "What do players actually see?" — mounts the REAL player Codex against a short-lived PLAYER token
   // minted by the server, so the preview walks the same projection a player does. Never the GM token:
@@ -77,6 +80,49 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
 
   useEffect(() => { void refreshList(); }, [refreshList]);
 
+  /**
+   * CI-7: the dashboard's own feed — the journal, the atlas and the calendar, which the notebook rail
+   * never needed. Deliberately NOT folded into `refreshList`: that runs on mount and on every
+   * `codex:changed`, and the workspace lands on Pages, so three extra round-trips would be paid by
+   * every GM on the suite's most-loaded surface to render a mode they may not open. This fetches when
+   * Campaign is actually on screen, and refreshes with the rest while it stays there.
+   */
+  const [campaign, setCampaign] = useState<{ entries: readonly CodexJournalEntry[]; maps: readonly CodexMap[]; calendar: CodexCalendar | null }>({ entries: [], maps: [], calendar: null });
+  const [campaignLoading, setCampaignLoading] = useState(true);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
+  const loadCampaign = useCallback(async () => {
+    try {
+      const [entries, maps, calendar] = await Promise.all([journalApi.timeline(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken)]);
+      setCampaign({ entries, maps, calendar }); setCampaignError(null);
+    } catch (loadError) { setCampaignError(loadError instanceof Error ? loadError.message : "Could not load the campaign dashboard."); }
+    finally { setCampaignLoading(false); }
+  }, [gmToken]);
+  useEffect(() => {
+    if (mode !== "campaign") return;
+    void loadCampaign();
+    const onChanged = () => { void loadCampaign(); };
+    socket.on("codex:changed", onChanged);
+    return () => { socket.off("codex:changed", onChanged); };
+  }, [mode, loadCampaign]);
+
+  /**
+   * Newest first, and flattened to the one shape the dashboard renders.
+   *
+   * `createdAt`, deliberately, and not the two nearer-looking alternatives. `sortKey` is an insertion
+   * counter (`MAX(sort_key) + 1`), so it reads as chronology and is not; the timeline's own order is
+   * in-world chronology (`calendar_instant`, then session), which answers "when did this happen in the
+   * story" rather than "what has been written lately" — and it is the only one of the three the PLAYER
+   * projection cannot express, since a player entry carries `createdAt` and nothing else to sort on.
+   * One notion of "recent", available to both audiences.
+   *
+   * `playerText || gmText` because a GM-only entry has no player line and would otherwise render as a
+   * blank row on the GM's own dashboard.
+   */
+  const campaignEntries = useMemo<readonly CampaignEntry[]>(() => [...campaign.entries]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((entry) => ({ id: entry.id, summary: entry.playerText.trim() || (entry.gmText ?? "").trim(), when: journalWhenLabel(entry), kind: entry.kind })), [campaign.entries]);
+  const campaignToday = useMemo(() => (campaign.calendar?.currentDate ? formatWorldDate(campaign.calendar, campaign.calendar.currentDate) : null), [campaign.calendar]);
+
   // CI-1 / R8: the rail's search is the SUITE's search — pages, journal entries, maps and markers in one
   // list. It overlays the tree while a query is active and re-runs when the notebook changes.
   const runSearch = useCallback((q: string) => codexApi.search(gmToken, q), [gmToken]);
@@ -93,9 +139,10 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     switch (hit.kind) {
       case "page": setPageFilter({ type: null, tag: null }); setMode("pages"); setSelectedId(hit.id); break;
       case "map": setAtlasTarget({ mapId: hit.id, markerId: null }); setMode("atlas"); break;
-      // A player-visible pin always names its map; if the server ever hands back a marker without one,
-      // land on the Atlas rather than silently swallowing the click.
-      case "marker": setAtlasTarget(hit.mapId ? { mapId: hit.mapId, markerId: hit.id } : null); setMode("atlas"); break;
+      // A hit normally names the pin's map. If the server ever hands one back without it, the target
+      // still travels: since CI-6 the Atlas resolves a map-less pin itself rather than the click being
+      // silently swallowed (which is what `setAtlasTarget(null)` used to do here).
+      case "marker": setAtlasTarget({ mapId: hit.mapId, markerId: hit.id }); setMode("atlas"); break;
       case "journal": setJournalTarget(hit.id); setMode("journal"); break;
     }
   }, []);
@@ -268,7 +315,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     <div className="codex-root">
       <div className="codex-modebar">
         <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => setMode(id as typeof mode)}
-          tabs={[{ id: "world", label: "World" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
+          tabs={[{ id: "campaign", label: "Campaign" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
           <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>
@@ -278,10 +325,16 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         </div>
       </div>
       {/* CF-2: one error surface for the whole workspace. It previously lived inside the Pages rail, so a
-          failed load was invisible in World, Atlas, Journal and Graph. */}
+          failed load was invisible in Campaign, Atlas, Journal and Graph. */}
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
-      {mode === "world"
-        ? <WorldHome pages={pages} loading={loading} onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
+      {mode === "campaign"
+        ? <CampaignHome pages={pages} entries={campaignEntries} maps={campaign.maps} today={campaignToday}
+            loading={loading || campaignLoading} error={campaignError}
+            onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
+            /* R1: both new jumps prepare their destination — the entry is marked on the timeline, the
+               map is the one that opens — reusing the very latches search already lands through. */
+            onOpenEntry={(entryId) => { setJournalTarget(entryId); setMode("journal"); }}
+            onOpenMap={(mapId) => { setAtlasTarget({ mapId, markerId: null }); setMode("atlas"); }}
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
             onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
         : mode === "atlas"
@@ -289,6 +342,8 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             openTarget={atlasTarget} onOpenedTarget={() => setAtlasTarget(null)} />
         : mode === "journal"
         ? <JournalView gmToken={gmToken} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }}
+            /* CI-6: the entry knows its pin but not the pin's map — the Atlas resolves that half. */
+            onOpenMarker={(markerId) => { setAtlasTarget({ mapId: null, markerId }); setMode("atlas"); }}
             openEntryId={journalTarget} onOpenedEntry={() => setJournalTarget(null)} />
         : mode === "graph"
         ? <RelationshipGraph loading={loading} nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />

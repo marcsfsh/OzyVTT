@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Panel, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
+import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldDate, formatWorldYear, journalApi, type CodexCalendar, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { EntityPicker } from "./EntityPicker";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
-
-/** A raw in-world date rendered as "Month Day, Year Era" (client-side; the server stores the same shape). */
-function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
-  const month = calendar.months[Math.max(0, Math.min(date.month, calendar.months.length - 1))];
-  return `${month?.name ?? ""} ${date.day}, ${formatWorldYear(calendar, date.year)}`;
-}
 
 /**
  * The campaign journal + chronicle: GM-written two-layer entries placed on the world's own calendar.
@@ -23,14 +17,26 @@ type Draft = { playerText: string; gmText: string; sessionNumber: string; dateYe
 const EMPTY: Draft = { playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [] };
 const DRAFT_KEY = "codex-journal-draft";
 
-function whenLabel(entry: CodexJournalEntry): string {
+/**
+ * How an entry says *when* it happened, in the journal's own order of preference. Exported because the
+ * Campaign dashboard (CI-7) lists the same entries: two independent answers to "when was this" is how
+ * a dashboard ends up disagreeing with the timeline it links into.
+ */
+export function journalWhenLabel(entry: CodexJournalEntry): string {
   if (entry.inWorldLabel) return entry.inWorldLabel;
   if (entry.sessionNumber !== null) return `Session ${entry.sessionNumber}`;
   if (entry.realDate) return entry.realDate;
   return new Date(entry.createdAt).toLocaleDateString();
 }
 
-export function JournalView({ gmToken, onOpenPage, onOpenReplay, openEntryId = null, onOpenedEntry = () => {} }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenReplay?: (archiveId: number) => void; openEntryId?: string | null; onOpenedEntry?: () => void }>) {
+/**
+ * CI-6 (return edge): an entry knows where it happened (`attachMarkerId`, set by the combat bridge when
+ * a battle is logged at a pin) and which encounter produced it (`sourceEncounterId`). Both jumps are
+ * owned by surfaces above this one — the Atlas for the pin, the replay panel for the fight — so the
+ * journal hands the id up rather than reaching sideways into either. `onOpenReplay` is the SAME prop
+ * `PageTimeline` already takes, threaded from the same place, so there is one replay path and not two.
+ */
+export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {} }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenMarker?: (markerId: string) => void; onOpenReplay?: (archiveId: number) => void; openEntryId?: string | null; onOpenedEntry?: () => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -205,8 +211,8 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay, openEntryId = n
                 className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}${entry.id === focusedEntryId ? " is-focused" : ""}`}>
                 <header className="codex-entry-head">
                   <div className="codex-entry-meta">
-                    <Badge tone={entry.kind === "combat" ? "caution" : "neutral"}>{entry.kind === "combat" ? "Battle" : whenLabel(entry)}</Badge>
-                    {entry.kind === "combat" && <span className="codex-entry-when">{whenLabel(entry)}</span>}
+                    <Badge tone={entry.kind === "combat" ? "caution" : "neutral"}>{entry.kind === "combat" ? "Battle" : journalWhenLabel(entry)}</Badge>
+                    {entry.kind === "combat" && <span className="codex-entry-when">{journalWhenLabel(entry)}</span>}
                     {entry.sessionNumber !== null && <span className="codex-entry-when">Session {entry.sessionNumber}</span>}
                   </div>
                   <RevealSwitch revealed={entry.revealedToPlayers} onChange={(revealed) => reveal(entry, revealed)} ariaLabel="Show this entry to players" />
@@ -221,8 +227,14 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay, openEntryId = n
                     {entry.tags.map((tag) => <li key={tag}><Badge>{tag}</Badge></li>)}
                   </ul>
                 )}
+                {/* CI-6: the entry's two return edges sit beside the page edge it already had, so an
+                    entry reads as "here is what happened, here is where, here is the fight itself".
+                    §4: `Button size="sm"` is a `@vtt/ui` primitive and carries the 44px floor itself
+                    (route 2, `.nh-btn--sm`) — no new control and no new floor to argue about. */}
                 <footer className="codex-entry-foot">
                   {entry.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(entry.attachPageId!)}>Open page</Button>}
+                  {entry.attachMarkerId && onOpenMarker &&
+                    <Button variant="ghost" size="sm" onClick={() => onOpenMarker(entry.attachMarkerId!)}>Open marker</Button>}
                   {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
                     <Button variant="ghost" size="sm" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</Button>}
                   <Button variant="ghost" size="sm" onClick={() => edit(entry)}>Edit</Button>

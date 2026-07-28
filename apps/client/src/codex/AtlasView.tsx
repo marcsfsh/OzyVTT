@@ -23,8 +23,12 @@ const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
  * CI-1 / R1 ("every cross-mode jump prepares its destination"): an incoming request to *land somewhere*
  * in the atlas. A marker hit carries both halves because opening a pin means opening its map FIRST and
  * then selecting the pin — `mapId` alone lands on the wrong pin, `markerId` alone lands on the wrong map.
+ *
+ * CI-6 widened `mapId` to null: a journal entry stores only `attachMarkerId`, so the entry→marker edge
+ * knows the pin but not the map it sits on. Rather than teach every caller to go looking, the atlas
+ * resolves that itself below — this view is the only thing in the client that already knows the map list.
  */
-export type AtlasTarget = Readonly<{ mapId: string; markerId: string | null }>;
+export type AtlasTarget = Readonly<{ mapId: string | null; markerId: string | null }>;
 
 export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene, onOpenReplay, openTarget = null, onOpenedTarget = () => {} }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void; openTarget?: AtlasTarget | null; onOpenedTarget?: () => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -79,18 +83,40 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
   // and no `onOpenedTarget` would yank the view back every time the atlas refreshes. Clearing the latch
   // when the target goes away is the one deviation — it lets the SAME pin be re-opened from a later search.
   const handledTargetRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => {
     if (!openTarget) { handledTargetRef.current = null; return; }
     if (loading) return; // wait for the map list either way: a failed load settles too, and must not hang the jump
-    const key = `${openTarget.mapId}:${openTarget.markerId ?? ""}`;
+    const key = `${openTarget.mapId ?? ""}:${openTarget.markerId ?? ""}`;
     if (handledTargetRef.current === key) return;
     handledTargetRef.current = key;
-    if (maps.some((map) => map.id === openTarget.mapId)) {
-      setCurrentMapId(openTarget.mapId);
-      setSelectedMarkerId(openTarget.markerId);
-    } // No such map (deleted since the search) => the GM simply lands on the atlas they were already on.
-    onOpenedTarget();
-  }, [openTarget, loading, maps, onOpenedTarget]);
+    if (openTarget.mapId !== null) {
+      if (maps.some((map) => map.id === openTarget.mapId)) {
+        setCurrentMapId(openTarget.mapId);
+        setSelectedMarkerId(openTarget.markerId);
+      } // No such map (deleted since the search) => the GM simply lands on the atlas they were already on.
+      onOpenedTarget();
+      return;
+    }
+    // CI-6: a pin without its map. There is no marker-by-id read on the codex surface — markers are
+    // only listed per map — so the map is found by asking each one. Bounded by the size of the atlas,
+    // paid only when this edge is actually used, and never on the Atlas's own load path.
+    if (!openTarget.markerId) { onOpenedTarget(); return; }
+    const markerId = openTarget.markerId;
+    void (async () => {
+      const found = await findMarkerMap(gmToken, maps, markerId);
+      // Cancelled by UNMOUNT only, deliberately — not by this effect re-running. A `codex:changed` ping
+      // mid-lookup gives `maps` a new identity, and a per-effect `live` flag would abandon the lookup
+      // there while the latch above stops it ever being retried: the jump would just quietly do nothing.
+      if (!mountedRef.current) return;
+      if (found) { setError(null); setCurrentMapId(found); setSelectedMarkerId(markerId); }
+      // R4: the jump failed for a reason the GM can act on — say so rather than dropping them on
+      // whatever map happened to be open and letting them wonder which pin they were promised.
+      else setError("That pin is no longer on any map in the atlas.");
+      onOpenedTarget();
+    })();
+  }, [openTarget, loading, maps, onOpenedTarget, gmToken]);
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;
@@ -301,3 +327,17 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
 }
 
 function assetsEmpty(assets: readonly MapAsset[]) { return assets.length === 0; }
+
+/**
+ * CI-6: which map is this pin on? Asked in parallel across the atlas because the codex exposes markers
+ * only per map (`GET /maps/:id/markers`) — there is no marker-by-id route to ask instead. A failed map
+ * contributes no markers rather than failing the whole lookup, so one unreadable map cannot break a
+ * jump to a pin that lives on another.
+ */
+async function findMarkerMap(token: string, maps: readonly CodexMap[], markerId: string): Promise<string | null> {
+  const perMap = await Promise.all(maps.map(async (map) => {
+    const markers = await atlasApi.listMarkers(token, map.id).catch(() => [] as CodexMarker[]);
+    return markers.some((marker) => marker.id === markerId) ? map.id : null;
+  }));
+  return perMap.find((mapId) => mapId !== null) ?? null;
+}
