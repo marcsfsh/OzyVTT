@@ -9,9 +9,11 @@ import { cleanup } from "@testing-library/react";
  * component can *render* under test; they are deliberately minimal and do not emulate real behaviour.
  *
  * **What this means for what these tests can prove:** a test passing under a shim is evidence about this
- * app's logic, not about the browser. Anything that depends on real layout or pointer geometry —
- * `MapSurface` panning, `RelationshipGraph` hit-testing, the 44px touch floor — cannot be honestly
- * verified here and stays a real-browser check. See `docs/ai-context/testing.md`.
+ * app's logic, not about the browser. Not verifiable here, and therefore still real-browser checks:
+ * layout and pointer geometry (`MapSurface` panning, `RelationshipGraph` hit-testing, the 44px touch
+ * floor — `getScreenCTM` is deliberately NOT shimmed, since faking a matrix would invent geometry);
+ * Modal focus-trap / Escape / click-outside (the shim below is `show()` semantics, not `showModal()`);
+ * and anything CSS-dependent, since no stylesheet is loaded. See `docs/ai-context/testing.md`.
  */
 
 // Native <dialog>: the app's Modal calls showModal()/close(). jsdom implements neither.

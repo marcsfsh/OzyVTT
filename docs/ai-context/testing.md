@@ -8,7 +8,7 @@
 | Command | What it does |
 | --- | --- |
 | `npm run check` | **Typecheck only** — fans `tsc` across every workspace with a `check` script. Fastest full-repo signal. Web uses `tsc -b` (project references); server/packages use `tsc --noEmit`. |
-| `npm test` | `vitest run` (one-shot) in every workspace with tests: `@vtt/web`, `@vtt/server`, `@vtt/api-contract`, `@vtt/rules-5e`, `@vtt/schemas`, `@vtt/domain`, `@vtt/dndbeyond-pdf`. |
+| `npm test` | `vitest run` (one-shot) in every workspace with tests: `@vtt/web` (14), `@vtt/server` (771), `@vtt/content-srd-5.2.1` (80), `@vtt/rules-5e` (108), `@vtt/api-contract` (36), `@vtt/schemas` (19), `@vtt/dndbeyond-pdf` (12), `@vtt/domain` (11). |
 | `npm run build` | `tsc -b && vite build` for the client; `tsc` for the server. |
 | `npm run dev` | Client (`vite --host 0.0.0.0`, `:5173`) + server (`tsx watch`, `:3001`) concurrently. |
 | `npm start` | Build, then run the single LAN service. |
@@ -40,13 +40,22 @@ documents the same local-equivalent sequence.
   are focused unit tests. No `vitest.config.*` — Vitest defaults.
 - **`@vtt/web` now HAS a test script** (added 2026-07-28, Codex overhaul M3): Vitest + **jsdom** +
   Testing Library, configured in `apps/client/vitest.config.ts` with shims in `apps/client/test/setup.ts`.
-  **What it does and does not prove:** jsdom omits several APIs this app uses — native `<dialog>`
-  `showModal`/`close`, `setPointerCapture`, `scrollIntoView`, `scrollTo`, `ResizeObserver`, `matchMedia`,
-  `SVGSVGElement.getScreenCTM`. `setup.ts` shims them so components can render, but a test passing under
-  a shim is evidence about *this app's logic*, not about a browser. **Anything depending on real layout
-  or pointer geometry — `MapSurface` panning, `RelationshipGraph` hit-testing, the 44px touch floor —
-  cannot be verified here and still needs a real browser pass.** UI work therefore still requires running
-  the app.
+  **What it does and does not prove.** jsdom omits several APIs this app uses. `setup.ts` shims **six**
+  so components can render: native `<dialog>` `showModal`/`close`, `setPointerCapture`,
+  `scrollIntoView`, `scrollTo`, `ResizeObserver`, `matchMedia`. **`SVGSVGElement.getScreenCTM` is
+  deliberately NOT shimmed** — faking a coordinate matrix would invent geometry rather than test it.
+
+  A test passing under a shim is evidence about *this app's logic*, never about a browser. Concretely,
+  these cannot be verified here and still need a real browser pass:
+  - **Layout and pointer geometry** — `MapSurface` panning/zoom, `RelationshipGraph` hit-testing, and
+    the 44px touch floor (`getScreenCTM` is absent; jsdom reports zero-size boxes anyway).
+  - **Modal behaviour beyond "it rendered"** — the `showModal` shim only sets `.open`, i.e. `show()`
+    semantics. The browser's focus trap, Escape-to-close and click-outside are **not** represented, so a
+    Modal could be broken in those respects while tests pass.
+  - **Anything CSS-dependent** — no stylesheet is loaded, so visibility, breakpoints and theming are
+    invisible to these tests.
+
+  UI work therefore still requires running the app.
 - **No ESLint/Prettier.** "check" is TypeScript-only; don't assume a linter will catch style.
 - Web `check`/`build` are incremental (`tsc -b`); a stale `tsbuildinfo` can mask errors — a
   clean `npm run build` resolves confusing type results.

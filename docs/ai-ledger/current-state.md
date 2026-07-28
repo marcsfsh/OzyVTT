@@ -627,10 +627,28 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
   - **CD-8 completed:** migrations **v8** (legacy single `page_id`/`scene_id` → one-element arrays, incl.
     null → `[]` not `[null]`) and **v9** (page folder paths → folder records, dedup, ignoring null/empty)
     now have row-level tests against simulated legacy databases. Only v7 had them before.
-  - **Verified.** Full CI-order parity — `npm test` → `check` → `build`, **all exit 0**. Client **14**,
-    server **771** (+2), every other workspace unchanged (A-10 holds). Confirmed the production bundle
-    does not include test code. **Not verified locally: Node 24.** This container runs Node 22; CI uses 24,
-    so the Node-24 run is unproven until CI executes.
+  - **Verified.** Full CI-order parity — `npm test` → `check` → `build`, **all exit 0**. Accurate
+    per-workspace counts: web **14**, server **771**, content-srd **80**, rules-5e **108**,
+    api-contract **36**, schemas **19**, dndbeyond-pdf **12**, domain **11**. Only web (new) and server
+    (+2) changed, so **A-10 holds**. Production bundle confirmed free of test code. **Not verified
+    locally: Node 24** — this container runs Node 22, so the Node-24 run is unproven until CI executes.
+  - **Independent review → follow-ups fixed.** Verdict **accepted with follow-ups**, and it earned it by
+    **mutation-testing the tests** in a detached worktree: nine mutations (dropping `expectedRev`,
+    collapsing the 409 branch, killing the debounce, neutralising the page filter, removing the
+    `setMode("pages")` handoff, breaking `splitEntityFields`, two migration-SQL breaks) all **failed the
+    suite**; the two survivors are genuine redundancy, not weak tests. It also proved **zero unmocked
+    network calls**. Fixed from its findings:
+    - **`@vtt/web` ran `vitest` without declaring it** — it resolved only by hoisting from another
+      workspace. Now pinned as a devDep like every other test workspace.
+    - **Three documentation inaccuracies of mine**, all corrected: `testing.md` claimed `setup.ts` shims
+      `SVGSVGElement.getScreenCTM` (**it does not, deliberately** — faking a coordinate matrix would
+      invent geometry rather than test it); it still said "No `vitest.config.*`"; and its workspace list
+      omitted `@vtt/content-srd-5.2.1` (80 tests) — the same slip meant earlier reports attributed those
+      80 tests to `api-contract`, which actually has 36.
+    - **Two real limits were missing from the recorded list:** the `showModal` shim is `show()` semantics,
+      so Modal focus-trap / Escape / click-outside are **unrepresentable** here; and no stylesheet loads,
+      so anything CSS-dependent is invisible to these tests. Both now stated in `testing.md` and
+      `setup.ts`.
 - **Codex overhaul M2 — the combat bridge becomes findable (2026-07-28).** Delivers **CP-8**, **CP-9
   (location half)** and **CD-8**. The bridge was the assessment's sharpest evidence for "write-only":
   every auto-logged battle was hardcoded undated (`calendarInstant`/`inWorldDate` null) so it sank below
