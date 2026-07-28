@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Badge, Button } from "@vtt/ui";
+import { Badge, Button, Skeleton } from "@vtt/ui";
 import { EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
 
@@ -12,13 +12,15 @@ type WorldEntity = Readonly<{ id: string; title: string; entityType: EntityType;
  * the page list (the entity store), so it's always current. Shared by the GM and the player codex; the
  * player passes showReveal=false (everything they can see is, by definition, revealed).
  */
-export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, onCreate, showReveal = true }: Readonly<{
+export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, onCreate, showReveal = true, loading = false }: Readonly<{
   pages: readonly WorldEntity[];
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
   onCreate?: () => void;
   showReveal?: boolean;
+  /** CF-2: true while the first fetch is in flight, so the "No entries yet" invitation cannot lie. */
+  loading?: boolean;
 }>) {
   const byType = useMemo(() => {
     const counts = {} as Record<EntityType, number>;
@@ -33,6 +35,8 @@ export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, onCreate, 
   const recent = useMemo(() => [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 10), [pages]);
   const revealed = useMemo(() => pages.filter((page) => page.revealedToPlayers).length, [pages]);
 
+  // CF-2: settle the fetch before claiming emptiness — for either audience.
+  if (loading && pages.length === 0) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
   if (pages.length === 0) {
     return showReveal
       ? <div className="codex-main-empty"><h3>No entries yet</h3><p>Create characters, locations, factions and more. They'll be organized here by type and tag.</p>{onCreate && <Button variant="primary" onClick={onCreate}>New page</Button>}</div>

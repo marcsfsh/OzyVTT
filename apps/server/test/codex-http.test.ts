@@ -152,6 +152,49 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((await body(stale)).error.code).toBe("conflict");
   });
 
+  /**
+   * CD-2. A page's structured fields used to survive a type switch: PATCH a character (with `race`,
+   * `goals`, …) to `location` and the character keys stayed in `fields_json`. The editor renders only
+   * the NEW type's fields, so the GM could neither see nor delete them — while a revealed page still
+   * shipped them to players. The store now prunes to the effective type, on a bare type-only PATCH too.
+   */
+  it("prunes entity fields to the new type on an entityType-only PATCH, so nothing is stranded in the player payload", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/pages", GM, {
+      title: "Strahd", entityType: "character",
+      fields: { race: "Vampire", age: "400", status: "undead" },
+      gmFields: { goals: "rule Barovia" }
+    }));
+    const pageId = created.data.page.id as string;
+    await post(base, `/api/v1/codex/pages/${pageId}/reveal`, GM, { revealed: true });
+
+    // Sanity: the character's own keys are present before the switch.
+    const before = await body(await get(base, `/api/v1/codex/pages/${pageId}`, GM));
+    expect(before.data.page.fields).toEqual({ race: "Vampire", age: "400", status: "undead" });
+
+    // The switch carries NO fields — only the type. This is the case that used to strand them.
+    const switched = await patch(base, `/api/v1/codex/pages/${pageId}`, GM, { entityType: "location" });
+    expect(switched.status).toBe(200);
+
+    const gmAfter = await body(await get(base, `/api/v1/codex/pages/${pageId}`, GM));
+    expect(gmAfter.data.page.entityType).toBe("location");
+    expect(gmAfter.data.page.fields).toEqual({});          // no character key survives...
+    expect(gmAfter.data.page.gmFields).toEqual({});         // ...on either side of the secrecy line
+
+    // The player payload is the point: a revealed page must not still be carrying the old type's values.
+    const playerAfter = await body(await get(base, `/api/v1/codex/pages/${pageId}`, PLAYER));
+    expect(playerAfter.data.page.fields).toEqual({});
+    expect(JSON.stringify(playerAfter)).not.toContain("Vampire");
+    expect(JSON.stringify(playerAfter)).not.toContain("undead");
+
+    // Recoverable, which is what makes pruning safe: the pre-switch revision restores type AND values.
+    const revisions = (await body(await get(base, `/api/v1/codex/pages/${pageId}/revisions`, GM))).data.revisions as Json[];
+    const preSwitch = revisions.find((revision) => (revision as { rev: number }).rev === 1)!;
+    const restored = await body(await post(base, `/api/v1/codex/pages/${pageId}/revisions/${(preSwitch as { id: number }).id}/restore`, GM, {}));
+    expect(restored.data.page.entityType).toBe("character");
+    expect(restored.data.page.fields).toEqual({ race: "Vampire", age: "400", status: "undead" });
+  });
+
   it("never leaks a hidden parent map's id to a player (revealed child, secret parent)", async () => {
     const { base } = await fixture();
     const asset = randomUUID();

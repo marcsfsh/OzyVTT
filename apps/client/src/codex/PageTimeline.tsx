@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Input } from "@vtt/ui";
+import { Alert, Badge, Button, Input } from "@vtt/ui";
 import { socket } from "../socket";
 import { journalApi, type CodexJournalEntry } from "./api";
 import { GmOnlyTag } from "./SecretMarkers";
@@ -50,7 +50,7 @@ export function PageTimeline({ gmToken, pageId, onOpenReplay }: Readonly<{ gmTok
         <Input value={note} placeholder="Add a journal note…" aria-label="Add a journal note to this page" onChange={(event) => setNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void add(); }} />
         <Button variant="secondary" size="sm" disabled={busy || !note.trim()} onClick={add}>Add</Button>
       </div>
-      {error && <p className="codex-rail-error" role="alert">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );
 }

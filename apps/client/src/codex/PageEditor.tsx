@@ -292,7 +292,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
         </div>
         <div className="codex-editor-actions">
-          <SaveState status={status} />
+          <SaveState status={status} onRetry={() => void flush()} />
           <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
           <Button variant="ghost" size="sm" onClick={openRevisions}>History</Button>
           <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
@@ -316,7 +316,8 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             <Field label="Tags" htmlFor="codex-tags">
               <TagInput id="codex-tags" ariaLabel="Tags" placeholder="town, npc" values={parseTags(draft.tagsText)}
                 onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tagsText: next.join(", ") }))}
-                suggestions={tagSuggestions}
+                max={24} maxReachedReason="A page may carry at most 24 tags."
+        suggestions={tagSuggestions}
                 /* Uses TagInput's DEFAULT slugify on purpose. The server has always required slugs
                    (`codex-store.ts` tags(): /^[a-z0-9][a-z0-9-]*$/), but the old comma-field only
                    lowercased — so typing "sword coast" produced a tag the server rejected with a generic

@@ -99,13 +99,13 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
 
       {view === "world" && (
-        <WorldHome pages={pages} showReveal={false} onOpenPage={openPage}
+        <WorldHome pages={pages} loading={loading} showReveal={false} onOpenPage={openPage}
           onPickType={(type) => { setFilter({ type, tag: null }); setView("lore"); }}
           onPickTag={(tag) => { setFilter({ type: null, tag }); setView("lore"); }} />
       )}
 
       {view === "graph" && (
-        <RelationshipGraph nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} onOpen={openPage}
+        <RelationshipGraph loading={loading} nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} onOpen={openPage}
           emptyState={<><h3>Nothing connected yet</h3><p>As the GM reveals people and places, the links between them appear here.</p></>} />
       )}
 

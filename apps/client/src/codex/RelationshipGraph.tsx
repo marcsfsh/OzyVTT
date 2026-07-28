@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
-import { Button } from "@vtt/ui";
+import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
 import { type CodexRelationshipEdge } from "./api";
@@ -76,7 +76,9 @@ function computeLayout(nodes: readonly GraphNode[], edges: readonly CodexRelatio
   return pos;
 }
 
-export function RelationshipGraph({ nodes, edges, onOpen, emptyState }: Readonly<{ nodes: readonly GraphNode[]; edges: readonly CodexRelationshipEdge[]; onOpen: (pageId: string) => void; emptyState?: ReactNode }>) {
+export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = false }: Readonly<{ nodes: readonly GraphNode[]; edges: readonly CodexRelationshipEdge[]; onOpen: (pageId: string) => void; emptyState?: ReactNode;
+  /** CF-2: true while the first fetch is in flight — "No entities yet" must not front-run the data. */
+  loading?: boolean }>) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false); // survives pointerup so the click handler can tell a pan from a tap
@@ -160,6 +162,8 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState }: Readonly
     return { k, x: -worldX * k, y: -worldY * k };
   });
 
+  // CF-2: settle the fetch before claiming emptiness — including the caller-supplied empty state.
+  if (loading && nodes.length === 0) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
   if (nodes.length === 0) {
     return emptyState
       ? <div className="codex-main-empty">{emptyState}</div>

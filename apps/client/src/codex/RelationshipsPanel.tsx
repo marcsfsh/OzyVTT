@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Select } from "@vtt/ui";
+import { Alert, Button, Select } from "@vtt/ui";
 import { codexApi, type CodexPageSummary, type CodexRelationship } from "./api";
 import { RELATIONSHIP_TYPES, relationshipLabel } from "./entities";
 import { EntityIcon } from "./icons";
@@ -58,7 +58,7 @@ export function RelationshipsPanel({ gmToken, pageId, relationships, pages, onCh
         <EntityPicker pages={targets} value={target || null} onChange={(id) => setTarget(id ?? "")} ariaLabel="Related entity" placeholder="Search entities…" />
         <Button variant="secondary" size="sm" disabled={busy || !target} onClick={add}>Add</Button>
       </div>
-      {error && <p className="codex-inspector-hint" role="alert">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );
 }

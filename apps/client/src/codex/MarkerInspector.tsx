@@ -1,4 +1,4 @@
-import { Badge, Button, Field, IconButton, Input, Select } from "@vtt/ui";
+import { Alert, Badge, Button, Field, IconButton, Input, Select } from "@vtt/ui";
 import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker, EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
@@ -85,7 +85,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
         </div>
       </div>
 
-      {error && <p className="codex-inspector-hint" role="alert">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       <Field label="Label" htmlFor="marker-label">
         <Input id="marker-label" value={label} placeholder="Unnamed" disabled={busy}

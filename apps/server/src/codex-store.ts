@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import {
+  CODEX_ENTITY_TYPES, CODEX_SECRET_FIELD_KEYS, pruneCodexFields, type CodexEntityType as DomainCodexEntityType
+} from "@vtt/domain";
 
 /**
  * Worldbuilding / campaign-codex persistence: freeform two-layer wiki pages, a nested map tree with
@@ -14,9 +17,13 @@ import { DatabaseSync } from "node:sqlite";
  * GM-only half for players happens in `codex-projections.ts`, the single audited boundary - never here.
  */
 
-/** A page's worldbuilding entity type. `note` is a plain page; the rest carry structured `fields`. */
-export type CodexEntityType = "note" | "character" | "location" | "faction" | "item" | "species" | "religion" | "event";
-export const ENTITY_TYPES: readonly CodexEntityType[] = ["note", "character", "location", "faction", "item", "species", "religion", "event"];
+/**
+ * A page's worldbuilding entity type. `note` is a plain page; the rest carry structured `fields`.
+ * Re-exported from `@vtt/domain` rather than re-declared: the type list, the field keys per type and
+ * the secret-key set are one table now, so the GM UI and this store cannot drift apart.
+ */
+export type CodexEntityType = DomainCodexEntityType;
+export const ENTITY_TYPES: readonly CodexEntityType[] = CODEX_ENTITY_TYPES;
 
 export type CodexPageRow = Readonly<{
   id: string;
@@ -412,7 +419,8 @@ function entityFields(value: Readonly<Record<string, string>> | undefined): Reco
  * hold a secret attribute in the player-facing `fields` map - not from an old page, a restored revision,
  * or a hand-crafted API write. Keep in sync with the schema's `secret: true` fields.
  */
-const SECRET_FIELD_KEYS: ReadonlySet<string> = new Set(["goals"]);
+/** Derived from the shared entity table (`@vtt/domain`) — never hand-maintained here again. */
+const SECRET_FIELD_KEYS: ReadonlySet<string> = CODEX_SECRET_FIELD_KEYS;
 /** Move any secret-keyed values out of player-facing `fields` and into GM-only `gmFields` (viewer-safety net). */
 function sealSecretFields(fields: Record<string, string>, gmFields: Record<string, string>): { fields: Record<string, string>; gmFields: Record<string, string> } {
   const outFields = { ...fields };
@@ -604,9 +612,15 @@ export class CodexStore {
     const database = this.requireDatabase();
     const pageId = this.freshId();
     const stamp = this.stamp();
-    const sealed = sealSecretFields(entityFields(input.fields), entityFields(input.gmFields));
+    const createdType = entityType(input.entityType);
+    // CD-2: fields are pruned to the page's own type on the way in, so a page can never be born
+    // holding values its type has no field for (and therefore no way for the GM to see or remove).
+    const sealed = sealSecretFields(
+      pruneCodexFields(createdType, entityFields(input.fields)),
+      pruneCodexFields(createdType, entityFields(input.gmFields))
+    );
     const row: PageRow = {
-      id: pageId, title: title(input.title), entity_type: entityType(input.entityType), fields_json: JSON.stringify(sealed.fields), gm_fields_json: JSON.stringify(sealed.gmFields),
+      id: pageId, title: title(input.title), entity_type: createdType, fields_json: JSON.stringify(sealed.fields), gm_fields_json: JSON.stringify(sealed.gmFields),
       folder: folder(input.folder), tags_json: JSON.stringify(tags(input.tags)),
       player_body: body(input.playerBody), gm_body: body(input.gmBody), revealed: input.revealedToPlayers ? 1 : 0,
       banner_asset_id: input.bannerAssetId ? id(input.bannerAssetId) : null, rev: 1, created_at: stamp, updated_at: stamp
@@ -627,21 +641,31 @@ export class CodexStore {
     const database = this.requireDatabase();
     const existing = this.pageRow(pageId);
     if (!existing) throw new CodexNotFoundError("That page no longer exists.");
-    if (expectedRev !== undefined && expectedRev !== existing.rev) throw new CodexRevisionConflictError("This page changed since you opened it. Reload to keep editing.");
+    // CD-3 / D-4: the Codex is single-writer and last-writer-wins. The old copy ("Reload to keep
+    // editing") promised a recovery step that does not exist — the next keystroke simply resyncs the
+    // revision and saves. Say what actually happened instead of prescribing a fix.
+    if (expectedRev !== undefined && expectedRev !== existing.rev) throw new CodexRevisionConflictError("This page was changed somewhere else after you opened it.");
+    const nextEntityType = input.entityType === undefined ? (existing.entity_type as CodexEntityType) : entityType(input.entityType);
     // Re-seal whenever either field map is touched (covers restores + raw writes): secret keys never rest in `fields`.
+    //
+    // CD-2: also prune to the *effective* type, and do it on a bare type switch too. A switch used to
+    // keep the old type's values in `fields_json`, where the editor renders only the new type's keys —
+    // so the GM could neither see nor delete them, while a revealed page still shipped them to players.
+    // Pruning is recoverable: every save snapshots the prior state into `codex_page_revisions` (which
+    // is never trimmed), so `restoreRevision` restores the old type together with its values.
     let fieldsJson = existing.fields_json;
     let gmFieldsJson = existing.gm_fields_json;
-    if (input.fields !== undefined || input.gmFields !== undefined) {
+    if (input.fields !== undefined || input.gmFields !== undefined || nextEntityType !== existing.entity_type) {
       const baseFields = input.fields === undefined ? parseFields(existing.fields_json) : entityFields(input.fields);
       const baseGm = input.gmFields === undefined ? parseFields(existing.gm_fields_json) : entityFields(input.gmFields);
-      const sealed = sealSecretFields(baseFields, baseGm);
+      const sealed = sealSecretFields(pruneCodexFields(nextEntityType, baseFields), pruneCodexFields(nextEntityType, baseGm));
       fieldsJson = JSON.stringify(sealed.fields);
       gmFieldsJson = JSON.stringify(sealed.gmFields);
     }
     const next: PageRow = {
       ...existing,
       title: input.title === undefined ? existing.title : title(input.title),
-      entity_type: input.entityType === undefined ? existing.entity_type : entityType(input.entityType),
+      entity_type: nextEntityType,
       fields_json: fieldsJson,
       gm_fields_json: gmFieldsJson,
       folder: input.folder === undefined ? existing.folder : folder(input.folder),

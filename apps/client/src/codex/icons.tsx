@@ -77,7 +77,6 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
   sun: <path fillRule="evenodd" d="M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM11 1h2v3.4h-2zm0 18.6h2V23h-2zM1 11h3.4v2H1zm18.6 0H23v2h-3.4zM4.2 4.2l2.4 2.4L5.2 8 2.8 5.6zm13.2 13.2 2.4 2.4-1.4 1.4-2.4-2.4zM19.8 4.2 21.2 5.6l-2.4 2.4-1.4-1.4zM6.6 17.4 8 18.8l-2.4 2.4-1.4-1.4z" />,
 
   // Utility (editor toolbar + notebook tree - not in the marker picker)
-  link: <path fillRule="evenodd" d="M9 7a5 5 0 0 0 0 10h2v-2H9a3 3 0 0 1 0-6h2V7zm4 0v2h2a3 3 0 0 1 0 6h-2v2h2a5 5 0 0 0 0-10zM8 11h8v2H8z" />,
   image: <path fillRule="evenodd" d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm2 2v7.6l3.6-3.6 3 3 2-2L20 15V6zM8.2 7.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" />,
   "folder-plus": <path fillRule="evenodd" d="M4 5h4l2 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM11 11.5h2v2h2.5v3H13v2h-2v-2H8.5v-3H11z" />,
   trash: <path fillRule="evenodd" d="M10 3h4a1 1 0 0 1 1 1v1h5v2H4V5h5V4a1 1 0 0 1 1-1zM6.5 8h11l-.9 11.6a1.5 1.5 0 0 1-1.5 1.4H8.9a1.5 1.5 0 0 1-1.5-1.4zm3.5 3v7h1.4v-7zm3 0v7h1.4v-7z" />

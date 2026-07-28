@@ -264,7 +264,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           failed load was invisible in World, Atlas, Journal and Graph. */}
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
       {mode === "world"
-        ? <WorldHome pages={pages} onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
+        ? <WorldHome pages={pages} loading={loading} onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
             onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
         : mode === "atlas"
@@ -272,7 +272,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         : mode === "journal"
         ? <JournalView gmToken={gmToken} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "graph"
-        ? <RelationshipGraph nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <RelationshipGraph loading={loading} nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
@@ -337,7 +337,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           <button type="button" className="codex-move-opt is-new" onClick={() => void doMoveToNew()}>+ New folder…</button>
         </div>
       </Modal>
-      {previewError && <p className="codex-rail-error" role="alert">{previewError}</p>}
+      {previewError && <Alert tone="danger">{previewError}</Alert>}
       <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="lg" title="What players see" ariaLabel="Player Codex preview">
         <p className="codex-inspector-hint">This is the real player Codex, read through a player session — anything hidden from players is absent here, not just dimmed.</p>
         {previewToken && <PlayerCodex token={previewToken} />}

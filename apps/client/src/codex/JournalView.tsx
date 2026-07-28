@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Field, Input, Panel, Select, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Field, Input, Panel, Select, Skeleton, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -42,12 +42,16 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
   // this, clicking Edit overwrote the draft AND (via the effect below) deleted its sessionStorage backup.
   const [stashedDraft, setStashedDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CF-2: an empty list is ambiguous until the first fetch settles — without this the journal
+  // asserts "No journal entries yet." over a campaign that simply has not loaded.
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
       const [nextEntries, nextPages, nextCalendar] = await Promise.all([journalApi.timeline(gmToken), codexApi.listPages(gmToken), calendarApi.get(gmToken)]);
       setEntries(nextEntries); setPages(nextPages); setCalendar(nextCalendar); setError(null);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the journal."); }
+    finally { setLoading(false); }
   }, [gmToken]);
 
   useEffect(() => { void load(); }, [load]);
@@ -140,10 +144,11 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
         </div>
       </Panel>
 
-      {error && <p className="codex-rail-error" role="alert">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       <div className="codex-timeline">
-        {entries.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
+        {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
+        {!loading && entries.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
         {groups.map((group) => (
           <section key={group.key} className="codex-timeline-group">
             <div className="codex-timeline-year">{group.label}</div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Field, Input, Modal, Select, Switch } from "@vtt/ui";
+import { Alert, Badge, Button, Field, Input, Modal, Select, Skeleton, Switch } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
@@ -35,6 +35,9 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsName, setSettingsName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // CF-2: "Chart your world" is an invitation to create the FIRST map — showing it mid-fetch tells
+  // a GM with a full atlas that they have nothing.
+  const [loading, setLoading] = useState(true);
 
   const loadMeta = useCallback(async () => {
     try {
@@ -42,6 +45,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
       setMaps(nextMaps); setPages(nextPages); setAssets(nextAssets); setError(null);
       setCurrentMapId((current) => current ?? nextMaps[0]?.id ?? null);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the atlas."); }
+    finally { setLoading(false); }
   }, [gmToken]);
 
   const loadMarkers = useCallback(async (mapId: string) => {
@@ -187,12 +191,13 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
         </nav>
       )}
 
-      {error && <p className="codex-rail-error" role="alert">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       <div className="codex-atlas-body">
         {currentMap
           ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
               onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
+          : loading ? <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={onOpenPage}

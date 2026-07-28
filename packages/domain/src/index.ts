@@ -4,6 +4,13 @@ import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, ty
 /** The `fromCatalog` choice-slug resolver (shared by the wizard UI and server-side character.create validation). */
 export * from "./catalog-choice.js";
 
+/**
+ * The Codex entity field vocabulary. Shared for the same reason as the rider gates below: the GM UI
+ * renders from it and the server prunes + seals from it, and a hand-synced copy on each side is how
+ * a secret field silently stops being sealed.
+ */
+export * from "./codex-entities.js";
+
 export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier, type HealthDisplay, type HealthDisplayAudience, type HealthDisplayStyle } from "@vtt/schemas";
 /**
  * The rider gate vocabulary, for the same reason: the homebrew authoring UI has to offer the fifteen

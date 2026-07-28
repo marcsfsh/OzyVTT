@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, Input, Modal, Select } from "@vtt/ui";
+import { Alert, Button, Field, Input, Modal, Select } from "@vtt/ui";
 import { calendarApi, type CodexCalendar } from "./api";
 
 /** The GM defines the world's calendar: its months (name + length), weekday names, an era suffix, and "today". */
@@ -56,7 +56,7 @@ export function CalendarEditor({ gmToken, calendar, onSaved, onClose }: Readonly
             <Input aria-label="Current day" type="number" inputMode="numeric" placeholder="Day" value={curDay} onChange={(event) => setCurDay(event.target.value)} />
           </div>
         </Field>
-        {error && <p className="codex-rail-error" role="alert">{error}</p>}
+        {error && <Alert tone="danger">{error}</Alert>}
         <div className="codex-cal-foot"><Button variant="primary" size="sm" disabled={busy || months.length === 0} onClick={save}>Save calendar</Button></div>
       </div>
     </Modal>

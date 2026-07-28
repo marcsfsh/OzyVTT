@@ -31,6 +31,9 @@
 
 .codex-list { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
 .codex-list-loading { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-2); }
+/* CF-2: the main-pane counterpart of the rail's loading rows. Sized like `.codex-main-empty` so a mode
+   does not jump when the fetch settles and the skeleton is replaced by the real content or the invitation. */
+.codex-main-loading { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-6) var(--space-4); max-width: 34rem; margin-inline: auto; width: 100%; }
 .codex-list-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-3) var(--space-2); }
 .codex-list-group { display: flex; flex-direction: column; gap: var(--space-1); }
 .codex-list-folder {
