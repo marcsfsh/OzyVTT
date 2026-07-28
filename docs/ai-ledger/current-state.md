@@ -601,6 +601,36 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M3 — the client finally has a test harness (2026-07-28).** Delivers **CF-5** and the
+  rest of **CD-8**. This retires the programme's biggest structural risk: ~3,485 LOC of Codex React had
+  **zero** automated coverage, which is why M1/M1b/M2 shipped on manual verification alone.
+  - **Stack (owner-approved, M3's stated escalation condition).** Vitest + **jsdom** + Testing Library as
+    devDeps on `@vtt/web`; `apps/client/vitest.config.ts` + `apps/client/test/setup.ts`. jsdom was chosen
+    over happy-dom for DOM completeness, because the app's `Modal` uses native `<dialog>`/`showModal()`
+    and the Codex leans on SVG.
+  - **jsdom gaps this app actually hits** — probed directly, not assumed: `showModal`/`close`,
+    `setPointerCapture`, `scrollIntoView`, `scrollTo`, `ResizeObserver`, `matchMedia`,
+    `SVGSVGElement.getScreenCTM`. All shimmed in **test setup only, never product code**. `scrollTo`
+    (used by the scrolling `Tabs` bar) did **not** appear in the upfront probe and surfaced only once real
+    components rendered — the list is empirical, not exhaustive.
+  - **Honest limits, recorded in `testing.md`:** a test passing under a shim is evidence about this app's
+    *logic*, not about a browser. Anything depending on real layout or pointer geometry —
+    `MapSurface` panning, `RelationshipGraph` hit-testing, the 44px touch floor — **cannot** be verified
+    here and still needs a real-browser pass. The harness does not replace running the app.
+  - **Coverage of CF-5's three named areas (14 client tests):** *two-layer secrecy* — `splitEntityFields`,
+    the client half of the three-layer secret-field enforcement, including a sweep asserting every entity
+    type with a secret field keeps it out of the player-facing map; *save/conflict path* —
+    characterization tests pinning autosave, `expectedRev`, the 409 resync and the no-op case, written
+    deliberately **before M4 refactors `PageEditor`** so a behaviour-preserving refactor can be proven so;
+    *cross-mode navigation* — the shell's mode contract and the World→Pages filter handoff, so M7's
+    return-edge work has something to regress against.
+  - **CD-8 completed:** migrations **v8** (legacy single `page_id`/`scene_id` → one-element arrays, incl.
+    null → `[]` not `[null]`) and **v9** (page folder paths → folder records, dedup, ignoring null/empty)
+    now have row-level tests against simulated legacy databases. Only v7 had them before.
+  - **Verified.** Full CI-order parity — `npm test` → `check` → `build`, **all exit 0**. Client **14**,
+    server **771** (+2), every other workspace unchanged (A-10 holds). Confirmed the production bundle
+    does not include test code. **Not verified locally: Node 24.** This container runs Node 22; CI uses 24,
+    so the Node-24 run is unproven until CI executes.
 - **Codex overhaul M2 — the combat bridge becomes findable (2026-07-28).** Delivers **CP-8**, **CP-9
   (location half)** and **CD-8**. The bridge was the assessment's sharpest evidence for "write-only":
   every auto-logged battle was hardcoded undated (`calendarInstant`/`inWorldDate` null) so it sank below

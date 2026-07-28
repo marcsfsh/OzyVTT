@@ -343,6 +343,48 @@ describe("CodexStore entities + relationships", () => {
     expect(store.restoreRevision(page.id, rev.id, "gm").fields.goals).toBeUndefined();
   });
 
+  it("migration v8 backfills a legacy marker's single page/scene id into one-element arrays", () => {
+    // A DB written before markers linked to MANY pages/scenes: single page_id/scene_id columns. The M1
+    // review flagged that v8 had never been run against legacy rows.
+    const database = new DatabaseSync(":memory:");
+    database.exec("CREATE TABLE codex_markers (id TEXT PRIMARY KEY, page_id TEXT, scene_id TEXT)");
+    const insert = database.prepare("INSERT INTO codex_markers (id, page_id, scene_id) VALUES (?, ?, ?)");
+    insert.run("both", "page-1", "scene-1");
+    insert.run("page-only", "page-2", null);
+    insert.run("neither", null, null);
+    const v8 = MIGRATIONS.find((migration) => migration.version === 8);
+    expect(v8).toBeDefined();
+    database.exec(v8!.sql);
+    const rowOf = (id: string) => database.prepare("SELECT page_ids_json, scene_ids_json FROM codex_markers WHERE id = ?").get(id) as { page_ids_json: string; scene_ids_json: string };
+    expect(JSON.parse(rowOf("both").page_ids_json)).toEqual(["page-1"]);
+    expect(JSON.parse(rowOf("both").scene_ids_json)).toEqual(["scene-1"]);
+    expect(JSON.parse(rowOf("page-only").page_ids_json)).toEqual(["page-2"]);
+    // A null must become an empty array, never [null] - the projection filters by membership.
+    expect(JSON.parse(rowOf("page-only").scene_ids_json)).toEqual([]);
+    expect(JSON.parse(rowOf("neither").page_ids_json)).toEqual([]);
+    expect(JSON.parse(rowOf("neither").scene_ids_json)).toEqual([]);
+    database.close();
+  });
+
+  it("migration v9 promotes the folder paths implied by existing pages into folder records", () => {
+    // Before v9 a folder existed only while a page referenced it. The backfill must capture every
+    // distinct real path exactly once, and must not invent a record for null/empty.
+    const database = new DatabaseSync(":memory:");
+    database.exec("CREATE TABLE codex_pages (id TEXT PRIMARY KEY, folder TEXT)");
+    const insert = database.prepare("INSERT INTO codex_pages (id, folder) VALUES (?, ?)");
+    insert.run("a", "NPCs");
+    insert.run("b", "NPCs");            // duplicate path -> one record
+    insert.run("c", "NPCs/Villains");
+    insert.run("d", null);              // no folder -> no record
+    insert.run("e", "");                // empty string -> no record
+    const v9 = MIGRATIONS.find((migration) => migration.version === 9);
+    expect(v9).toBeDefined();
+    database.exec(v9!.sql);
+    const paths = (database.prepare("SELECT path FROM codex_folders ORDER BY path").all() as Array<{ path: string }>).map((row) => row.path);
+    expect(paths).toEqual(["NPCs", "NPCs/Villains"]);
+    database.close();
+  });
+
   it("migration v7 backfills pre-existing secret fields out of the public map (the pillar-1 legacy fix)", () => {
     // Simulate a DB written before the seal existed: `goals` sitting in the public fields_json.
     const database = new DatabaseSync(":memory:");
