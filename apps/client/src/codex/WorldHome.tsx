@@ -68,7 +68,7 @@ export function WorldHome({ pages, onPickType, onPickTag, onOpenPage, onCreate, 
         <section className="codex-world-section">
           <h3 className="codex-world-h">Tags</h3>
           <div className="codex-world-tags">
-            {tags.map(([tag, count]) => <button key={tag} type="button" className="codex-tag-chip" onClick={() => onPickTag(tag)}>{tag}<span className="codex-tag-count">{count}</span></button>)}
+            {tags.map(([tag, count]) => <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>{tag}<span className="codex-tag-count">{count}</span></button>)}
           </div>
         </section>
       )}

@@ -29,13 +29,15 @@ type MarkerInspectorProps = Readonly<{
   onOpenPage: (pageId: string) => void;
   onCreatePage: () => void;
   onRevealPage: (pageId: string) => void;
+  /** CD-6: reveal the map this pin sits on. Optional so a caller without a map-reveal path still compiles. */
+  onRevealMap?: () => void;
   onActivateScene: (sceneId: string) => void;
   /** Jump to the archived fight a combat entry came from. GM-only: archives carry GM narration. */
   onOpenReplay?: (archiveId: number) => void;
   onClose: () => void;
 }>;
 
-export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
+export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onRevealMap, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
   const [busy, setBusy] = useState(false);
@@ -65,6 +67,10 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   };
 
   const subMaps = maps.filter((map) => map.id !== marker.mapId);
+  // CD-6: revealing a pin does nothing if the map it sits on is still secret — players never see the
+  // map, so they never see the pin. Nothing said so, so the GM believed the reveal had taken effect.
+  const markerMap = maps.find((map) => map.id === marker.mapId) ?? null;
+  const shownOnHiddenMap = marker.revealedToPlayers && markerMap !== null && !markerMap.revealedToPlayers;
   const linkedPages = marker.pageIds.map((id) => pages.find((page) => page.id === id)).filter((page): page is CodexPageSummary => Boolean(page));
   const unlinkedPages = pages.filter((page) => !marker.pageIds.includes(page.id));
   const linkedScenes = marker.sceneIds.map((id) => scenes.find((scene) => scene.id === id)).filter((scene): scene is MarkerScene => Boolean(scene));
@@ -108,6 +114,9 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
           <Button variant="ghost" size="sm" onClick={onCreatePage}>＋ New page{marker.label ? ` “${marker.label}”` : ""}</Button>
         </div>
       </Field>
+      {shownOnHiddenMap && (
+        <p className="codex-inspector-hint">This pin is shown, but the map <strong>{markerMap!.name}</strong> is still secret, so players cannot see either{onRevealMap ? <> — <button type="button" className="codex-linklike" onClick={onRevealMap}>show the map too</button>.</> : "."}</p>
+      )}
       {secretLinkedPages.map((page) => (
         <p key={page.id} className="codex-inspector-hint">This pin is shown, but <strong>{page.title}</strong> is still secret — <button type="button" className="codex-linklike" onClick={() => onRevealPage(page.id)}>reveal it too</button>.</p>
       ))}

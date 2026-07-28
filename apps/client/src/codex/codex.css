@@ -69,7 +69,12 @@
 .codex-tree-caret { display: inline-block; width: 0.9em; color: var(--text-muted); }
 .codex-tree-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .codex-tree-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
+/* CF-3 §4 route 1 (grow the paint). The notebook rows are a vertical stack, so route 2 is not
+   available to them — a 44px ::after would overhang into the row above and below. Growing the row
+   also gives the ⋯ move button below a 44px-tall box to sit inside, which is what keeps ITS hit
+   area from reaching the neighbouring rows. */
 .codex-tree-page {
+  min-height: var(--tap-min);
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; text-align: left;
   padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
   background: transparent; color: var(--text); cursor: pointer;
@@ -79,7 +84,10 @@
 .codex-tree-page-row { display: flex; align-items: center; }
 .codex-tree-page-row .codex-tree-page { flex: 1; min-width: 0; }
 .codex-tree-page[draggable="true"], .codex-tree-folder[draggable="true"] { cursor: grab; }
-.codex-tree-page-move { opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-body); border-radius: var(--radius-sm); line-height: 1; }
+/* CF-3 §4 route 2 + gap budget. Paint stays 15px wide, so the 44px ::after overhangs by 14.5px per
+   side; --space-4 (16px) of separation keeps it off the title button beside it. Vertically the row is
+   now 44px (above), so the box lands inside this row and cannot reach the rows above or below. */
+.codex-tree-page-move { margin-inline-start: var(--space-4); opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-body); border-radius: var(--radius-sm); line-height: 1; }
 .codex-tree-page-row:hover .codex-tree-page-move, .codex-tree-page-move:focus-visible { opacity: 1; }
 .codex-tree-page-move:hover { color: var(--cyan); background: var(--surface-2); }
 
@@ -254,12 +262,16 @@
 .codex-world-typeicon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
 .codex-world-typelabel { flex: 1; color: var(--text); }
 .codex-world-typecount { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); }
-.codex-world-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.codex-tag-chip { display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
+.codex-world-tags { display: flex; flex-wrap: wrap; gap: var(--space-3); } /* --space-3: see the chip gap budget below */
+/* CF-3 §4 route 2, using the documented pressable-chip precedent verbatim: 32px paint leaves a 6px
+   overhang per side, which --space-3 (12px) of row gap covers. Going straight to 44px paint would
+   make a wrapping cloud of tag pills far too heavy. */
+.codex-tag-chip { min-height: 32px; display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-dim); cursor: pointer; font-size: var(--fs-sm); }
 .codex-tag-chip:hover { border-color: var(--cyan); color: var(--text); }
 .codex-tag-count { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
 .codex-world-recent { display: flex; flex-direction: column; gap: var(--space-1); }
-.codex-world-recentitem { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
+/* CF-3 §4 route 1. Measured 43.6px — a rounding miss, not a design choice. */
+.codex-world-recentitem { min-height: var(--tap-min); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); cursor: pointer; text-align: left; }
 .codex-world-recentitem:hover { background: var(--surface-2); border-color: var(--line); }
 
 /* Relationship graph */
@@ -267,7 +279,8 @@
 .codex-graph-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .codex-graph-hint { font-size: var(--fs-sm); color: var(--text-muted); }
 .codex-graph-legend { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-left: auto; }
-.codex-graph-legenditem { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+/* CF-3 §4 route 1: these wrap into rows, so growing the paint is harmless and avoids any overhang. */
+.codex-graph-legenditem { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-dim); border: 1px solid transparent; background: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
 .codex-graph-legenditem:hover { border-color: var(--line); color: var(--text); }
 .codex-graph-legenditem.is-off { opacity: 0.4; text-decoration: line-through; }
 .codex-graph-legenditem i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -402,6 +415,20 @@
   .codex-inspector { flex-basis: auto; max-height: none; }
 }
 
+/* CF-4: World, Journal and Graph had no narrow-viewport rules at all — they survived by flex/grid
+   default, not by design, and the two places that actually broke are both in the Graph.
+
+   1. The canvas is `flex: 1 1 auto` inside a container the app shell stretches, so it ignored its own
+      62vh floor: measured **532px tall inside a 360px-tall landscape phone**, 1.5x the viewport, which
+      makes it impossible to see the graph and its toolbar at once. Clamp it to the viewport here.
+   2. `.codex-graph-legend` uses `margin-left: auto` to sit opposite the hint on a wide bar. Once the bar
+      wraps (76px tall at 375px) that auto margin just strands the legend mid-row. Left-align it. */
+@media (max-width: 760px) {
+  .codex-graph { min-height: 0; }
+  .codex-graph-svg { max-height: 68vh; }
+  .codex-graph-legend { margin-left: 0; }
+}
+
 /* ----- Journal ----- */
 .codex-journal { display: flex; flex-direction: column; gap: var(--space-4); max-width: 820px; margin: 0 auto; width: 100%; }
 .codex-composer { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -452,3 +479,8 @@
 .codex-newpage { position: relative; }
 .codex-md-img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-md); margin: var(--space-2) 0; border: 1px solid var(--line); }
 .codex-img-failed { color: var(--text-muted); font-style: italic; }
+
+/* CF-3: the graph node's touch floor. `fill: transparent` (never `none`) is what makes an invisible
+   circle receive pointer events; it is sized in RelationshipGraph.tsx because the radius depends on the
+   live zoom and the neighbour spacing, which CSS cannot see. */
+.codex-graph-nodehit { fill: transparent; }

@@ -601,24 +601,79 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M5 — mobile parity and the remaining confirmed defects (2026-07-28).** Delivers
+  **CF-3, CF-4, CD-2, CD-3, CD-5, CD-6**, plus the M4 follow-ups above.
+  - **A-3 met, and measured rather than inferred.** The spec had downgraded A-3 to a source-level check
+    because `elementFromPoint` measurement "needs a browser runner the repo does not have". The repo
+    still has none — the runner is scratchpad-only and **not committed** — so this is a stronger
+    verification of the same bar, not a new repo capability. Baseline: **13 controls below 44px** across
+    Pages/World/Graph (Atlas and Journal were already clean). After: **88 controls, zero below the floor**
+    at both 375px and 1440px. Routes taken, per design-language §4: `.codex-tree-page`,
+    `.codex-world-recentitem` and `.codex-graph-legenditem` grow their paint (route 1 — mandatory for a
+    stacked list); `.codex-tree-page-move` and `.codex-tag-chip` grow only the area (route 2) with the
+    gap budget respected (`--space-4` beside the tree title; the documented 32px-paint/`--space-3`
+    pressable-chip precedent for tags).
+  - **The graph nodes needed a third route that did not exist.** See decision log §4 — a transparent hit
+    circle sized to 44px on screen, capped at half the nearest-neighbour distance. Two bugs found and
+    fixed while verifying it: the first cut measured against `view.k` alone and ignored the viewBox fit
+    scale (~0.32 on a phone), so a "44px" circle measured 14px; and a ResizeObserver-sampled fit scale
+    can lag layout by a fraction of a pixel, which measured 43.7 against a 44 floor.
+  - **No tap theft, proven functionally.** The geometric heuristic is unreliable (it flags compliant
+    `@vtt/ui` tabs, and reports a false `reach = 0` for anything below the fold — confirmed by
+    re-measuring scrolled into view, where it went 0 → 45). So it was proven by tapping: a tree row opens
+    its page, its ⋯ opens the move picker, and adjacent tag chips each filter by their own tag.
+  - **CF-4.** World, Journal and Graph had **no** narrow-viewport rules at all — they survived by
+    flex/grid default. Two real defects, both in the Graph: the canvas is `flex: 1 1 auto` inside a
+    container the shell stretches, so it ignored its own 62vh floor and measured **532px tall inside a
+    360px landscape viewport** (1.5× the screen); and `.codex-graph-legend`'s `margin-left: auto` stranded
+    the legend mid-row once the bar wrapped. Clamped and left-aligned at ≤760px. A first attempt also
+    lowered the min-height and shrank the *portrait* canvas 508 → 361px — a regression on the common
+    phone shape — so only the clamp was kept.
+  - **CD-2 could not be built as specified**; see decision log §1–2 for the shared-table decision and the
+    viewer-safety duplication it closes. Proven by an HTTP test that was **verified to fail** against the
+    unpruned store.
+  - **CD-5.** The "GM only" cue keyed off empty player text, so the ordinary case — an entry *with*
+    player-facing prose that simply is not revealed — showed no cue at all. Now keyed off
+    `revealedToPlayers`. Verified live: a note added from a page shows the cue immediately.
+  - **CD-6.** A shown pin on a secret map is invisible to players and nothing said so. The inspector now
+    warns and offers to reveal the map. The atlas fixture had no map to click, so this is pinned by five
+    component tests instead — including the three quiet cases, because a warning that fires when nothing
+    is wrong is noise. Three proven to fail with the warning removed.
+  - **Verified.** `check` / `test` / `build` all exit 0. Client tests 14 → 22. All three themes cycled
+    (dark/dusk/light computed colours correct); zero console errors; zero horizontal overflow in all five
+    modes at 375px.
+
 - **Codex overhaul M4 — the Codex stops being a parallel component vocabulary (2026-07-28).** Delivers
   **CF-1, CF-2, CF-6, CD-4, CD-7** — the direct fix for the assessment's root cause 1.
   - **A-2 met.** Codex `@vtt/ui` adoption went **12 → 19** primitives (Homebrew, the comparable surface,
     is 25; the remainder is domain-specific — `ChoiceCard`, `RowEditor`, `Stepper`, `NumberField`…).
-    Every hand-rolled equivalent is **gone**, verified by grep: `.codex-filter-chip` (built twice) →
-    `Chip`; `.codex-template-menu` + `.codex-menu-scrim` → `Menu`/`MenuItem`; the local `SaveStatus`
-    union + `statusLabel` → `SaveState`; the comma-separated tags `<Input>` → `TagInput`; two bespoke
-    loading affordances → `Skeleton`; the local `Notice` → the app-majority `useToast` (6 other surfaces
-    use it, only 2 used `Notice`); raw `<p className="codex-rail-error">` → `Alert`.
+    Swapped: `.codex-filter-chip` (built twice) → `Chip`; `.codex-template-menu` + `.codex-menu-scrim` →
+    `Menu`/`MenuItem`; the local `SaveStatus` union + `statusLabel` → `SaveState`; the comma-separated
+    tags `<Input>` → `TagInput`; two bespoke loading affordances → `Skeleton`; the local `Notice` → the
+    app-majority `useToast` (6 other surfaces use it, only 2 used `Notice`).
+  - **CORRECTION (independent review, same day).** This entry originally claimed "every hand-rolled
+    equivalent is gone, verified by grep", including `<p className="codex-rail-error">` → `Alert`.
+    **That claim was false.** The verifying grep checked five class names and never included
+    `.codex-rail-error` or `.codex-inspector-hint`, so it could not have caught them: **seven** raw
+    `<p role="alert">` paragraphs survived M4 (AtlasView, JournalView, PageTimeline, CalendarEditor,
+    CodexWorkspace's `previewError`, MarkerInspector, RelationshipsPanel). All seven were converted in
+    the M4 follow-up commit. Only the top-level shell error had actually become an `Alert`.
   - **A defect found by real browser verification, not by tests.** The server has **always** required slug
     tags (`codex-store.ts:382`), but the old client field only lowercased — so "sword coast" produced a
     tag the server rejected with a generic save failure. `TagInput`'s **default slugify is the server's
     contract**, so adopting it fixes a real bug. My first attempt overrode `normalize` to "preserve
     behaviour" and would have preserved the defect; the browser pass caught it because it is the only
     check that reaches the server.
-  - **CF-2:** the shared error moved out of the Pages rail to the workspace level as an `Alert`, so a
-    failed load is now visible in **every** mode (it was invisible in World, Atlas, Journal and Graph);
-    both shells gained `Skeleton` loading rows, replacing empty states that lied during the first fetch.
+  - **CF-2 (partly — see the correction below):** the shared error moved out of the Pages rail to the
+    workspace level as an `Alert`, so a failed load is now visible in **every** mode (it was invisible in
+    World, Atlas, Journal and Graph); both shells gained `Skeleton` loading rows.
+  - **CORRECTION (independent review).** The *loading* half reached only the Pages/Lore rail. WorldHome,
+    RelationshipGraph, AtlasView and JournalView each render their empty branch off `length === 0`, which
+    is also the pre-fetch state — so a GM with a full campaign was still told "No entries yet" / "No
+    entities yet" / "Chart your world" for one round-trip. That is precisely the bar M4 set for itself
+    ("every mode shows a loading and an error state"). Closed in the follow-up: Atlas and Journal own
+    their fetches so they own a `loading` flag; World and Graph render from props so they take one.
+    Covered by three tests, two proven to fail with the guards removed.
   - **CF-6:** breakpoints now sit on the documented ladder — three panes are **earned** at
     `min-width: 850px` rather than lost at an off-ladder 900, and the calendar reflow moved 480 → 560.
   - **CD-4:** the Link button was removed (see decision log — reversible; real link support needs a

@@ -38,7 +38,10 @@ export function PageTimeline({ gmToken, pageId, onOpenReplay }: Readonly<{ gmTok
             <li key={entry.id} className="codex-page-timeline-item">
               {entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}
               {(entry.sessionNumber != null || entry.inWorldLabel) && <span className="codex-page-timeline-meta">{[entry.sessionNumber != null ? `S${entry.sessionNumber}` : null, entry.inWorldLabel].filter(Boolean).join(" · ")}</span>}
-              {!entry.playerText.trim() && <GmOnlyTag />}
+              {/* CD-5: secrecy is `revealedToPlayers`, not "has no player text". Keying off empty text
+                  meant the ordinary GM-only entry — one WITH player-facing prose, simply not revealed —
+                  showed no cue at all, which is precisely the case the GM needs flagged. */}
+              {!entry.revealedToPlayers && <GmOnlyTag />}
               <span className="codex-page-timeline-text">{entry.playerText || entry.gmText}</span>
               {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
                 <button type="button" className="codex-linklike" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</button>}

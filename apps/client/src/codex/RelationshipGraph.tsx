@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
@@ -85,6 +85,28 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map()); // live pointers, for two-finger pinch
   const pinch = useRef<{ startDist: number; startK: number } | null>(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
+  /**
+   * The viewBox→screen scale. `preserveAspectRatio="xMidYMid meet"` fits the viewBox inside the
+   * element, so it is the smaller of the two ratios. Tracked in state (not read during render) so a
+   * resize or an orientation change re-sizes the tap targets with it.
+   */
+  const [fitScale, setFitScale] = useState(1);
+  const tapMin = useMemo(() => {
+    if (typeof getComputedStyle !== "function") return 44;
+    return Number(getComputedStyle(document.documentElement).getPropertyValue("--tap-min").trim().replace("px", "")) || 44;
+  }, []);
+  useEffect(() => {
+    const element = svgRef.current;
+    if (!element || typeof ResizeObserver !== "function") return;
+    const measure = () => {
+      const box = element.getBoundingClientRect();
+      if (box.width > 0 && box.height > 0) setFitScale(Math.min(box.width / VB.w, box.height / VB.h));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => { observer.disconnect(); };
+  }, []);
   const [hover, setHover] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<EntityType>>(new Set());
 
@@ -105,6 +127,43 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
   const drawnEdges = allEdges.filter((edge) => visibleIds.has(edge.fromPageId) && visibleIds.has(edge.toPageId));
   const focus = hover && visibleIds.has(hover) ? new Set([hover, ...(adjacency.get(hover) ?? [])]) : null;
   const radiusOf = (id: string) => 11 + Math.min(9, (degree.get(id) ?? 0) * 1.6);
+  /**
+   * CF-3 for an SVG node on a zoomable canvas. Neither design-language §4 route applies here: `::after`
+   * is a CSS box-model construct that does not reach SVG geometry, and a node's on-screen size is a
+   * function of the zoom transform rather than CSS, so no stylesheet can hold it at 44px.
+   *
+   * So the hit area is geometry: a transparent circle sized to 44px ON SCREEN (44/2 ÷ k, since the
+   * parent <g> is scaled by k), capped at half the distance to the nearest other node. The cap is §4's
+   * gap budget applied to a canvas — without it, zooming out far enough would make every node's hit
+   * area overlap its neighbours, and since SVG hit-testing awards the topmost element, the last node
+   * painted would silently swallow its neighbours' taps. Capped, the floor is met wherever it can be
+   * met without stealing, and degrades to the painted radius where it cannot.
+   */
+  const nearestNeighbour = useMemo(() => {
+    const out = new Map<string, number>();
+    const points = [...pos.entries()];
+    for (const [id, a] of points) {
+      let best = Infinity;
+      for (const [otherId, b] of points) {
+        if (otherId === id) continue;
+        best = Math.min(best, Math.hypot(a.x - b.x, a.y - b.y));
+      }
+      out.set(id, best);
+    }
+    return out;
+  }, [pos]);
+  const hitRadiusOf = (id: string) => {
+    // A node's on-screen size is (viewBox fit scale × view.k). Measuring against view.k alone — as the
+    // first cut of this did — silently under-sizes the hit area by the fit scale, which on a phone is
+    // ~0.32: a "44px" circle measured 14px. The floor is defined in screen pixels, so convert properly.
+    const screenScale = fitScale * view.k;
+    // +1px of allowance: `fitScale` is sampled by a ResizeObserver, so it can lag the live layout by a
+    // fraction of a pixel, and that was enough to measure 43.7px against a 44px floor. Aim a pixel over
+    // so rounding can never land under it.
+    const wanted = (tapMin + 1) / 2 / (screenScale || 1);
+    const cap = (nearestNeighbour.get(id) ?? Infinity) / 2;
+    return Math.max(radiusOf(id), Math.min(wanted, cap));
+  };
 
   const toggleType = (type: EntityType) => setHidden((prev) => { const next = new Set(prev); if (next.has(type)) next.delete(type); else next.add(type); return next; });
 
@@ -214,6 +273,8 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
                 onPointerEnter={() => setHover(node.id)} onPointerLeave={() => setHover((current) => (current === node.id ? null : current))} onClick={() => openNode(node.id)}
                 role="button" tabIndex={0} aria-label={`${ENTITY_DEFS[node.entityType].label}: ${node.title}`}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(node.id); } }}>
+                {/* Hit area first so it sits UNDER the paint: same <g>, so the click handler is unchanged. */}
+                <circle className="codex-graph-nodehit" r={hitRadiusOf(node.id)} />
                 <circle r={radius} style={{ fill: entityColor(node.entityType) }} />
                 <g className="codex-graph-nodeicon" transform="translate(-7 -7) scale(0.58)">{iconChildren(entityIconId(node.entityType))}</g>
                 <text className="codex-graph-nodelabel" textAnchor="middle" y={radius + 15}>{node.title}</text>

@@ -24,6 +24,9 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
   causing it. **Deliberately not fixed in M1**, whose scope is giving built capabilities an entry point, not
   redesigning the inspector. Candidate fixes (collapse the picker, or order links above it) are a design
   decision for the Codex overhaul's M5/design pass, not a side-effect of wiring.
+  **Status after M5:** still open. M5's scope was the 44px floor and the narrow-viewport gaps, both of
+  which the inspector now meets; re-ordering or collapsing the icon picker is a layout redesign that was
+  not part of the approved milestone. Carrying forward.
 
 - **[character-builder] Phase-2 gating items found by the requirements QA pass (2026-07-26).** The
   Phase-1 foundation is sound, but three things must land before wizard screens are built:

@@ -148,7 +148,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
             <span className="codex-list-title">{page.title}</span>
             {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
           </button>
-          <button type="button" className="codex-tree-page-move" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}>⋯</button>
+          <button type="button" className="codex-tree-page-move tap-target" aria-label={`Move ${page.title}`} title="Move to folder" onClick={() => handlers.onRequestMove(page.id)}>⋯</button>
         </div>
       ))}
       {folders.map((folder) => <FolderBranch key={folder.path} folder={folder} depth={depth} handlers={handlers} />)}

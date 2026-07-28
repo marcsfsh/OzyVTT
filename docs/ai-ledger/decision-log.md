@@ -7,6 +7,54 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-28 — Codex overhaul M5: the entity field table becomes shared, and the touch floor reaches a canvas
+
+1. **The Codex entity field table moves to `@vtt/domain`; presentation stays on the client.**
+   CD-2 asked for server-side field pruning on an entity-type switch, but the server had no per-entity
+   schema at all — `entities.ts` states outright that it "stores types + fields + relationship slugs
+   opaquely", and `entityFields()` validates only key *shape*. Worse, the server already carried
+   `SECRET_FIELD_KEYS = new Set(["goals"])`, a hand-synced copy of the client's `secret: true` markers,
+   with a comment asking the next author to keep the two in step. **That duplication was a live
+   viewer-safety hazard**: a field marked secret client-side but absent from the server's set is never
+   sealed and ships to players on reveal. So the key list and the secret flags now live once in
+   `@vtt/domain` (`CODEX_ENTITY_FIELD_KEYS`), which both sides read; labels, placeholders, icons and
+   colors stay client-side because only the client needs them. The global (not per-type) secret set is
+   *derived* as the union, which preserves the server's existing behaviour exactly while removing the
+   hand-sync. Alternatives rejected: pruning client-side only (contradicts "enforce server-side" and
+   leaves the duplication), and deferring CD-2 (leaves the viewer-safety hazard open).
+
+2. **Pruning is allowed to delete field values because the revision history makes it recoverable.**
+   The plan's escalation clause was "escalate if CD-2's pruning would delete data a GM could not
+   recover". Checked before implementing: every save snapshots `fields_json`/`gm_fields_json` into
+   `codex_page_revisions`, and **nothing trims that table**, so `restoreRevision` brings back the old
+   type together with its values. The clause does not fire. Pruning runs on create, on a fields write,
+   and on a bare type-only PATCH — the last being the case that used to strand values.
+
+3. **D-4 made explicit: the Codex is single-writer, last-writer-wins.** CD-3's misleading copy was
+   already half-fixed by M4's `SaveState` swap ("Changed elsewhere", no Reload button). The server's
+   409 text still promised "Reload to keep editing", a recovery step that does nothing under D-4, and
+   is now "This page was changed somewhere else after you opened it." `onReload` stays deliberately
+   unwired. `onRetry` *was* wired — an error is a genuine dead end, which is a different question from
+   the concurrency one D-4 settled.
+
+4. **The 44px floor on a zoomable canvas: hit geometry, capped by neighbour distance.** SVG graph nodes
+   can satisfy neither design-language §4 route — `::after` does not reach SVG geometry, and a node's
+   on-screen size is a function of the zoom transform, not CSS. There was **no repo precedent**: every
+   existing 44px precedent is a DOM control. Chosen (owner-approved): a transparent hit `<circle>` sized
+   to 44px on screen, **capped at half the distance to the nearest node**. The cap is §4's gap budget
+   applied to a canvas — uncapped, zooming out would overlap neighbours, and SVG awards the hit to the
+   topmost element, so the last-painted node would silently swallow its neighbours' taps. Where the cap
+   binds, the target degrades to the painted radius rather than stealing.
+
+5. **A-3 is verified by measurement again, not at source level.** The spec had downgraded A-3 to a
+   source-level check with the note that `elementFromPoint` measurement "needs a browser runner the repo
+   does not have". The repo still does not have one — the runner lives in the scratchpad and is not
+   committed — so this is a stronger verification of the same bar, not a new repo capability. Measured
+   88 controls across all five modes at 375px and 1440px: **zero below the floor**. The geometric
+   "tap theft" heuristic proved unreliable (it flags compliant `@vtt/ui` tabs), so no-theft was instead
+   proven functionally: tapping a tree row opens the page, tapping its ⋯ opens the move picker, and
+   adjacent tag chips each filter by their own tag.
+
 ## 2026-07-28 — Magic items: where derived numbers live, and who is allowed to compute them
 
 1. **A derived per-actor block rides a ROLE-GATED REQUEST, never the broadcast projection.**
