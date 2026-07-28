@@ -2,7 +2,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import * as bundle from "@vtt/content-srd-5.2.1";
-import { ActionSchema, ActionUsesSchema, ActorDefinitionSchema, EffectGrantSchema, EffectModifierSchema, EffectOnEndSchema } from "@vtt/schemas";
+import { ActionSchema, ActionUsesSchema, ActorDefinitionSchema, EffectGrantSchema, EffectModifierSchema, EffectOnEndSchema, RiderTriggerSchema } from "@vtt/schemas";
 import * as contract from "../src/index.js";
 
 /**
@@ -132,6 +132,11 @@ const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly
   { component: "HomebrewSpellShape", schema: objectOf(bundle.SpellReferenceSchema).shape.shape },
   { component: "HomebrewEquipmentWeapon", schema: objectOf(bundle.EquipmentReferenceSchema).shape.weapon },
   { component: "HomebrewEquipmentArmor", schema: objectOf(bundle.EquipmentReferenceSchema).shape.armor },
+  // The magic-item vocabulary. Hoisted for the same reason every other rider is: `casts` is an
+  // array of objects and `attunement` is a nullable-shaped one, and the renderer flattens a single
+  // level, so inlining either would render it as a bare `object`.
+  { component: "HomebrewItemSpellCast", schema: bundle.ItemSpellCastSchema },
+  { component: "HomebrewItemAttunement", schema: bundle.ItemAttunementSchema },
   // The actor-side vocabulary a feature or stat block reuses rather than re-inventing.
   { component: "HomebrewStatblockAction", schema: ActionSchema },
   { component: "HomebrewActionUses", schema: ActionUsesSchema },
@@ -151,6 +156,20 @@ const UNION_MIRRORS: ReadonlyArray<{ label: string; node: UnionNode; schema: z.Z
   { label: "FeatureUsesSchema.scaling", node: unionNode("HomebrewFeatureUses", "scaling"), schema: objectOf(bundle.FeatureUsesSchema).shape.scaling },
   { label: "EffectGrantSchema.duration", node: unionNode("HomebrewEffectGrant", "duration"), schema: objectOf(EffectGrantSchema).shape.duration }
 ];
+
+/**
+ * `HomebrewRiderTrigger` is deliberately NOT in `UNION_MIRRORS`, and that is the whole point of it.
+ * Every other union is one branch per Zod option, so a branch COUNT is a faithful check. This one
+ * folds its eleven parameterless moments into a single component carrying an eleven-value `type`
+ * enum - twenty branches covering thirty trigger names - because eleven byte-identical `{ type }`
+ * components would document nothing eleven times. A count assertion here would fail permanently on
+ * the fold while still not noticing the thing that actually breaks callers: a trigger NAME that the
+ * discriminator no longer routes. So the check below is by name, and `unionOfNames` is what it
+ * compares - see "the rider trigger union" test.
+ */
+const TRIGGER_NODE = unionNode("HomebrewRiderTrigger");
+/** Each Zod branch's own `type` literal, in declaration order - the names a caller actually sends. */
+const typeLiterals = (options: readonly z.ZodTypeAny[]) => options.map((option) => (objectOf(option).shape.type._def as { value: string }).value);
 
 const timestamp = "2026-07-27T12:00:00.000Z";
 const issue = { path: ["levelTable", 3, "spellSlots"], message: "A caster row must declare nine slot columns.", recordId: null };
@@ -250,6 +269,35 @@ describe("Zod / OpenAPI parity", () => {
     }
   });
 
+  it("Direction B (cross-package): the rider trigger union routes every trigger name Zod declares, folds included", () => {
+    const mapping = TRIGGER_NODE.discriminator?.mapping ?? {};
+    const options = unionOptions(RiderTriggerSchema);
+    const literals = typeLiterals(options);
+    // THE assertion that matters: thirty names, each routable, in Zod's own declaration order. A
+    // renamed, dropped, or reordered trigger fails here - which a branch count would not, because
+    // the count is 20 by design and would stay 20 while a name changed underneath it.
+    expect(Object.keys(mapping), "every trigger name, in Zod's declaration order").toEqual(literals);
+    // Every mapped component is a documented `oneOf` branch, and no branch exists nothing maps to.
+    expect(branchNames(TRIGGER_NODE), "oneOf is exactly the mapping's distinct targets").toEqual([...new Set(Object.values(mapping).map(refName))]);
+    options.forEach((option, index) => {
+      const component = refName(mapping[literals[index]] as string);
+      const shape = objectOf(option);
+      expect([...(components[component].required ?? [])].sort(), `${component}.required vs RiderTriggerSchema[${index}] "${literals[index]}"`).toEqual(requiredKeys(shape));
+      expect(Object.keys(components[component].properties ?? {}).sort(), `${component}.properties vs RiderTriggerSchema[${index}] "${literals[index]}"`).toEqual(Object.keys(shape.shape).sort());
+    });
+    // A folded branch must accept EXACTLY the names folded into it. One short and the discriminator
+    // routes a body to a component that rejects it; one extra and the document promises a trigger
+    // Zod will not parse. `typeConstOf` cannot see this - a folded branch has an enum, not a const.
+    const folded = new Map<string, string[]>();
+    for (const [value, ref] of Object.entries(mapping)) folded.set(refName(ref), [...(folded.get(refName(ref)) ?? []), value]);
+    for (const [component, values] of folded) {
+      const type = (components[component].properties as Record<string, { const?: string; enum?: string[] }>).type;
+      expect(type.enum ?? [type.const], `${component} accepts exactly the trigger names mapped to it`).toEqual(values);
+    }
+    // The fold itself, stated once so shrinking it back to one-branch-per-name is a deliberate act.
+    expect([literals.length, branchNames(TRIGGER_NODE).length], "thirty trigger names over twenty branches").toEqual([30, 20]);
+  });
+
   it("Direction B: every component's `required` equals its Zod schema's non-optional keys", () => {
     for (const { base, schema, component } of pairs) {
       if (!component) continue;
@@ -306,14 +354,121 @@ describe("Zod / OpenAPI parity", () => {
     }
   });
 
+  /**
+   * Direction A, branch by branch, for the rider vocabulary.
+   *
+   * The bundled-SRD sweep above is broad but shallow here: not one SRD row is a magic item, so
+   * nothing in it exercises a gate, a cast, or an attunement block, and the day the SRD bundle does
+   * gain one is not the day to find out. Each payload is PARSED first, so every `.default()`
+   * materialises - which is the exact mechanism that broke the eight pre-existing modifier
+   * components the moment `when` gained `default([])`: nothing about the authored body changed, but
+   * `additionalProperties: false` started seeing a key that was never declared.
+   *
+   * The fixture maps are keyed by `type` and asserted to cover the union exactly, so a new rider or
+   * trigger cannot land with no payload behind it.
+   */
+  describe("Direction A: the rider vocabulary, one parsed payload per branch", () => {
+    const ajv = new Ajv2020({ strict: false });
+    ajv.addSchema(contract.openApiDocument as unknown as Record<string, unknown>, "openapi");
+    const validator = (component: string) => ajv.compile({ $ref: `openapi#/components/schemas/${component}` });
+
+    /** One payload per trigger. Filters carry the moment they narrow, because a filter alone is refused. */
+    const TRIGGERS: Record<string, object> = {
+      attuned: {}, "while-armored": { weights: ["medium", "heavy"] }, "while-unarmored": {}, "while-shield": { wielding: false },
+      "while-character-is": { classIds: ["cleric", "paladin"] }, "while-proficient-with": { kind: "weapon", ids: ["longsword"] },
+      "while-effect-tag": { tags: ["raging"] }, "while-hp-at-or-below": { percent: 50 }, "while-condition": { conditionIds: ["prone"], present: false },
+      "on-attack-roll": {}, "on-hit": {}, "on-critical-hit": {}, "on-critical-miss": {}, "on-damage-roll": {}, "on-saving-throw": {},
+      "on-ability-check": {}, "on-initiative-roll": {}, "on-death-save": {}, "on-taking-damage": {}, "on-spell-cast": {},
+      "attack-kind-is": { kinds: ["melee", "thrown"] }, "weapon-property-is": { properties: ["finesse"] }, "damage-type-is": { damageTypes: ["fire"] },
+      "ability-is": { abilities: ["dex"] }, "skill-is": { skills: ["sleight-of-hand"] }, "spell-school-is": { schools: ["evocation"] },
+      "spell-level-is": { levels: [0, 3] }, "versus-creature-type": { creatureTypes: ["undead"] }, "versus-size": { sizes: ["large", "huge"] },
+      "versus-condition": { conditionIds: ["prone"] }
+    };
+
+    /** One payload per feature modifier, including the three shared with EffectModifier. */
+    const MODIFIERS: Record<string, object> = {
+      "ability-score": { ability: "str", amount: 2, maximum: 22 }, "hit-points-per-level": { amount: 1 }, speed: { amount: 10 },
+      "armor-class": { amount: 1, whileArmored: true }, initiative: { amount: 2 }, "extra-attack": { count: 1 },
+      "unarmored-defense": { ability: "con", allowShield: true }, darkvision: { feet: 60 },
+      "attack-bonus": { amount: 1 },
+      "extra-damage": { formula: "1d6", damageType: "fire", doubleOnCritical: true, when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee"] }] },
+      "roll-mode": { roll: "concentration", mode: "advantage", scope: "bearer" },
+      "save-bonus": { amount: 1, when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }] },
+      "check-bonus": { amount: 5, when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["sleight-of-hand"] }] },
+      "spell-save-dc": { amount: 1, classId: "wizard" }, "spell-attack-bonus": { amount: 2 }, "spell-slot": { level: 3, amount: 1 },
+      "resource-bonus": { poolId: "channel-divinity", amount: 1 }, "critical-range": { threshold: 19 }, "critical-bonus-dice": { count: 1 },
+      "damage-reduction": { amount: 3, when: [{ type: "on-taking-damage" }, { type: "damage-type-is", damageTypes: ["cold"] }] },
+      sense: { sense: "tremorsense", feet: 30 }
+    };
+
+    it("validates every trigger against the branch its discriminator routes it to", () => {
+      const literals = typeLiterals(unionOptions(RiderTriggerSchema));
+      expect(Object.keys(TRIGGERS).sort(), "a trigger with no payload behind it is an unexercised branch").toEqual([...literals].sort());
+      const compiled = validator("HomebrewRiderTrigger");
+      for (const [type, body] of Object.entries(TRIGGERS)) {
+        const parsed = RiderTriggerSchema.parse({ type, ...body });
+        expect(compiled(parsed), `${type}: ${JSON.stringify(compiled.errors)}`).toBe(true);
+      }
+    });
+
+    it("validates every feature modifier against the branch its discriminator routes it to", () => {
+      const literals = typeLiterals(unionOptions(bundle.FeatureModifierSchema));
+      expect(Object.keys(MODIFIERS).sort(), "a modifier with no payload behind it is an unexercised branch").toEqual([...literals].sort());
+      const compiled = validator("HomebrewFeatureModifier");
+      for (const [type, body] of Object.entries(MODIFIERS)) {
+        const parsed = bundle.FeatureModifierSchema.parse({ type, ...body });
+        expect(compiled(parsed), `${type}: ${JSON.stringify(compiled.errors)}`).toBe(true);
+      }
+      // The three shared branches must ALSO validate as effect modifiers - they are one component
+      // referenced by both unions, so a change made for one silently reaches the other.
+      const asEffect = validator("HomebrewEffectModifier");
+      for (const type of ["attack-bonus", "extra-damage", "roll-mode"]) {
+        const parsed = EffectModifierSchema.parse({ type, ...MODIFIERS[type] });
+        expect(asEffect(parsed), `${type} as an effect modifier: ${JSON.stringify(asEffect.errors)}`).toBe(true);
+      }
+    });
+
+    /** A whole cursed, attuned, spell-casting magic item: the fields no SRD row will ever exercise. */
+    it("validates a fully-loaded magic item against HomebrewEquipmentRecord and the record union", () => {
+      const authored = bundle.EquipmentReferenceSchema.parse({
+        id: "hb-berserker-axe-a1b2c3", name: "Berserker Axe", source: "homebrew",
+        category: "weapon", slot: "weapon", rarity: "rare", costGp: null, weightLb: 4, description: "It hungers.",
+        weapon: { category: "martial", damageDice: "1d8", damageType: "slashing", rangeFeet: null, longRangeFeet: null }, armor: null,
+        isMagic: true, cursed: true, attunement: { required: true, restrictedTo: ["barbarian"] },
+        casts: [{ spellId: "message", atLevel: 0, uses: { limit: 1, per: "long-rest", pool: "axe-charges" }, consumesSpellSlot: false }],
+        grantsFeatIds: ["savage-attacker"],
+        tags: ["cursed"], uses: { limit: 3, per: "long-rest", pool: "axe-charges" }, grants: { damageResistances: ["slashing"] },
+        effects: [{ tags: ["axe-rage"], duration: { type: "encounter" } }],
+        modifiers: [
+          { type: "attack-bonus", amount: 1, scope: "this-item" },
+          { type: "extra-damage", formula: "1d6", damageType: "necrotic", when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee"] }] },
+          { type: "roll-mode", roll: "save", mode: "disadvantage", when: [{ type: "while-hp-at-or-below", percent: 50 }] },
+          { type: "armor-class", amount: 1, when: [{ type: "attuned" }] }
+        ]
+      });
+      // `type` is stamped on the WIRE, never stored - `EquipmentReferenceSchema` is `.strict()` and
+      // would reject its own record with it present. Same stamp the bundled-SRD sweep applies.
+      const body = { ...authored, type: "equipment" };
+      const compiled = validator("HomebrewEquipmentRecord");
+      expect(compiled(body), `HomebrewEquipmentRecord: ${JSON.stringify(compiled.errors)}`).toBe(true);
+      const union = validator("HomebrewRecord");
+      expect(union(body), `via HomebrewRecord: ${JSON.stringify(union.errors)}`).toBe(true);
+      // The refusal is a CARRIER rule, not a vocabulary one: the identical rider on a feat parses.
+      expect(() => bundle.EquipmentReferenceSchema.parse({ ...authored, modifiers: [{ type: "ability-score", ability: "str", amount: 2 }] })).toThrow();
+    });
+  });
+
   it("leaves no Homebrew* component unmirrored, so a new one cannot land unchecked", () => {
     const covered = new Set<string>([
       ...pairs.flatMap((pair) => (pair.component ? [pair.component] : [])),
       ...MIRRORS.map((mirror) => mirror.component),
       ...UNION_MIRRORS.flatMap((union) => branchNames(union.node)),
-      // The three top-level unions: they have no `properties` of their own, so required/properties
+      // The trigger union's branches are mirrored by name rather than by index (the fold), so they
+      // are collected from the document the same way - never listed, or the list would be the hole.
+      ...branchNames(TRIGGER_NODE),
+      // The four top-level unions: they have no `properties` of their own, so required/properties
       // parity is meaningless for them. Their branch SETS are asserted above instead.
-      "HomebrewRecord", "HomebrewFeatureModifier", "HomebrewEffectModifier"
+      "HomebrewRecord", "HomebrewFeatureModifier", "HomebrewEffectModifier", "HomebrewRiderTrigger"
     ]);
     const uncovered = Object.keys(components).filter((name) => name.startsWith("Homebrew") && !covered.has(name));
     expect(uncovered, "every Homebrew* component needs a Zod counterpart or an explicit exemption").toEqual([]);

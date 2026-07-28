@@ -3006,7 +3006,7 @@ Attack rolls against the bearer have disadvantage (Dodge).
 
 ### `HomebrewEffectModifier`
 
-What an active EFFECT contributes to the rules engine. A DIFFERENT and smaller vocabulary than HomebrewFeatureModifier (which is what a feature contributes permanently); the two are deliberately not merged. `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics).
+What an active EFFECT contributes to the rules engine. Still a DIFFERENT and smaller vocabulary than HomebrewFeatureModifier (which is what a feature or an item contributes); the two are deliberately not merged. They do SHARE their last three branches - `attack-bonus`, `extra-damage` and `roll-mode` are one component each, referenced by both unions, because a bonus that meant one thing on an item and another on an effect is exactly the drift a second copy produces. `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics); the six legacy advantage/disadvantage branches stay as they are, with `roll-mode` as the general form that also covers checks, initiative, death saves and concentration.
 
 One of the following, discriminated by `type`:
 
@@ -3018,6 +3018,9 @@ One of the following, discriminated by `type`:
 - `HomebrewEffectIncomingAttackDisadvantage`
 - `HomebrewEffectSaveAdvantage`
 - `HomebrewEffectSaveDisadvantage`
+- `HomebrewRiderAttackBonus`
+- `HomebrewRiderExtraDamage`
+- `HomebrewRiderRollMode`
 
 ### `HomebrewEffectOnEnd`
 
@@ -3061,7 +3064,7 @@ Body armor carries its full base AC (11-18); a shield carries its +2 bonus.
 
 ### `HomebrewEquipmentRecord`
 
-Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, or a homebrew kind nobody has invented yet. NO `summary` and NO `attribution`: `EquipmentReferenceSchema` is the ONE `.strict()` content schema, so an undeclared key THROWS rather than being dropped - documenting either here would publish a field that makes the request fail. Only `weapon`, `armor` and `shield` are mechanically live; a homebrew `category` displays and stacks but derives no AC or attack until an explicit slot field lands.
+Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item, or a homebrew kind nobody has invented yet. NO `summary` and NO `attribution`: `EquipmentReferenceSchema` is the ONE `.strict()` content schema, so an undeclared key THROWS rather than being dropped - documenting either here would publish a field that makes the request fail. `slot` is now the mechanical hook (`category` stays the open display slug), so a homebrew `category: "relic"` with `slot: "armor"` does derive AC. Every rider below lives on the CATALOG record and never on the carried inventory row: an owner is handed their whole inventory verbatim in their projection, so a rider mirrored onto that row would reach the player the instant they picked the item up - which is what makes hiding a cursed item's mechanics structural rather than a deletion someone has to remember.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -3069,12 +3072,25 @@ Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, or a homeb
 | `id` | string (pattern) | yes | The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write - a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas |
 | `name` | string | yes |  |
 | `source` | `srd` \| `homebrew` | no | Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same Default: `"srd"`. |
-| `category` | string (pattern) | yes | Open slug, never a closed enum - "relic", "vehicle", "trinket" need no schema change |
+| `category` | string (pattern) | yes | Open slug, never a closed enum - "relic", "vehicle", "trinket" need no schema change. Display and grouping; `slot` is what the engine switches on |
 | `costGp` | number \| null | yes |  |
 | `weightLb` | number \| null | yes |  |
 | `description` | string \| null | yes |  |
 | `weapon` | HomebrewEquipmentWeapon \| null | no | Populated for weapons only |
 | `armor` | HomebrewEquipmentArmor \| null | no | Populated for armor and shields only |
+| `slot` | `weapon` \| `shield` \| `armor` \| `head` \| `neck` \| `shoulders` \| `hands` \| `ring` \| `belt` \| `feet` \| `held` \| `wondrous` \| `consumable` \| `ammunition` \| `none` | no | WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield) |
+| `rarity` | string (pattern) | no | Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook |
+| `isMagic` | boolean | no | Default: `false`. |
+| `attunement` | HomebrewItemAttunement | no | Attunement requirement and its advisory class/species restriction |
+| `cursed` | boolean | no | A cursed item cannot be voluntarily removed once attuned, and its magic half is withheld from the player until attunement. It MUST require attunement - a curse you can drop by taking the hat off is not a curse, and requiring attunement gives the hiding rule one well-defined boundary: hidden until attuned, fully visible after, because by then the player has learned it and hiding further would only make their own sheet lie to them Default: `false`. |
+| `casts` | HomebrewItemSpellCast[] | no | Spells the item can cast (Amulet of Message, Wand of Fireballs) Default: `[]`. |
+| `grantsFeatIds` | string (pattern)[] | no | Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional - nothing ever grants an item back - so a cycle cannot be drawn rather than merely being checked for Default: `[]`. |
+| `tags` | string (pattern)[] | no | Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity) |
+| `actions` | HomebrewFeatureAction[] | no | Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon) |
+| `effects` | HomebrewEffectGrant[] | no | Effects it can grant, in the same vocabulary the live rules engine already resolves (Rage, Bardic Inspiration) |
+| `uses` | HomebrewFeatureUses | no | Limited uses recovered on a rest |
+| `grants` | HomebrewFeatureGrants | no | Flat proficiency/language/spell grants |
+| `modifiers` | HomebrewFeatureModifier[] | no | Typed numeric riders |
 
 ### `HomebrewEquipmentWeapon`
 
@@ -3212,7 +3228,7 @@ Flat things a feature simply hands the character. All open slugs, so a homebrew 
 
 ### `HomebrewFeatureModifier`
 
-Typed numeric riders a feature contributes. A bounded union, deliberately small and grown additively - anything not modeled stays prose (ADR-0008). Distinct from HomebrewEffectModifier, which is the smaller vocabulary a live EFFECT contributes; do not merge them.
+THE authored rider vocabulary, and the same one a magic ITEM carries - a feat is a HomebrewFeature, a chosen option carries the identical rider block, and HomebrewEquipmentRecord spreads that block too, so "a feat carries the same buffs and debuffs an item does" is true by construction rather than by convention. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this vocabulary with a negative number rather than a second one, and every branch carries the `when`/`scope` gate. Two branches are refused on an ITEM carrier (`hit-points-per-level` and `ability-score`) because both bake into the sheet and cannot be un-granted when the item comes off; both stay available on a feat. HomebrewEffectModifier remains the separate, smaller vocabulary a live EFFECT contributes - the two share exactly three branches and are otherwise not merged.
 
 One of the following, discriminated by `type`:
 
@@ -3224,6 +3240,19 @@ One of the following, discriminated by `type`:
 - `HomebrewModifierExtraAttack`
 - `HomebrewModifierUnarmoredDefense`
 - `HomebrewModifierDarkvision`
+- `HomebrewRiderAttackBonus`
+- `HomebrewRiderExtraDamage`
+- `HomebrewRiderRollMode`
+- `HomebrewModifierSaveBonus`
+- `HomebrewModifierCheckBonus`
+- `HomebrewModifierSpellSaveDc`
+- `HomebrewModifierSpellAttackBonus`
+- `HomebrewModifierSpellSlot`
+- `HomebrewModifierResourceBonus`
+- `HomebrewModifierCriticalRange`
+- `HomebrewModifierCriticalBonusDice`
+- `HomebrewModifierDamageReduction`
+- `HomebrewModifierSense`
 
 ### `HomebrewFeatureOption`
 
@@ -3285,9 +3314,31 @@ Uses a feature gets back on a rest, as DATA rather than a formula language. Eith
 | `per` | `turn` \| `encounter` \| `short-rest` \| `long-rest` | yes |  |
 | `pool` | string (pattern) | no | Shares ONE counter across every feature carrying the same pool id |
 
+### `HomebrewItemAttunement`
+
+Attunement. `restrictedTo` matches class ids or a species id and is ADVISORY - shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event rather than an error to refuse.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `required` | boolean | no | Default: `false`. |
+| `restrictedTo` | string (pattern)[] | no | Class or species ids the item is meant for. Advisory only Default: `[]`. |
+
+### `HomebrewItemSpellCast`
+
+A spell an item can cast. Needs no new machinery: an item cast is one more synthesised action whose limited uses collapse into the same live uses namespace a feature's do, and rests already re-arm it. "Once per day" is `uses: {"limit": 1, "per": "long-rest"}` - there is deliberately no "day" in the `per` vocabulary, because this app already treats a long rest as the day.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `spellId` | string (pattern) | yes |  |
+| `atLevel` | integer (0–9) | no | Cast at this slot level; absent = the spell's own level |
+| `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | no | Which ability powers it; absent = the wielder's own spellcasting ability |
+| `saveDc` | integer (1–40) | no | A flat printed DC ("save DC 15"), overriding any derivation |
+| `uses` | HomebrewFeatureUses | no | Charges. Share one pool across several casts with `uses.pool` |
+| `consumesSpellSlot` | boolean | no | Whether casting it also spends one of the bearer's own spell slots Default: `false`. |
+
 ### `HomebrewModifierAbilityScore`
 
-Raise (or lower) one ability score, optionally past the usual cap.
+Raise (or lower) one ability score, optionally past the usual cap. REFUSED on an item: an ability score cascades into AC, saves, skills, spell DC, hit points and initiative, and every one of those reads the baked `abilityScores`, so layering one score means layering the whole sheet.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -3295,16 +3346,64 @@ Raise (or lower) one ability score, optionally past the usual cap.
 | `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
 | `amount` | integer (-5–5) | yes |  |
 | `maximum` | integer (1–30) | no |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierArmorClass`
 
-A flat AC rider. `whileArmored` is the ONE bounded condition the SRD's printed bonuses need (the Defense fighting style reads "While you're wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant.
+A flat AC rider. `whileArmored` is the ONE bounded condition the SRD's printed bonuses need (the Defense fighting style reads "While you're wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary - the boolean STAYS because shipped bundles author it, and a collector normalises it into that trigger.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `type` | const `"armor-class"` | yes |  |
 | `amount` | integer (-5–5) | yes |  |
 | `whileArmored` | boolean | no | Default: `false`. |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierCheckBonus`
+
+A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is this plus a `skill-is` filter.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"check-bonus"` | yes |  |
+| `amount` | integer (-10–10) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierCriticalBonusDice`
+
+Extra UNTYPED weapon dice on a critical hit (Savage Attacks). A typed crit-only 1d6 fire is `extra-damage` gated with `on-critical-hit` instead.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"critical-bonus-dice"` | yes |  |
+| `count` | integer (1–4) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierCriticalRange`
+
+Score a critical hit on this natural roll or higher (19 for a keen weapon).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"critical-range"` | yes |  |
+| `threshold` | integer (15–20) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierDamageReduction`
+
+Flat reduction of incoming damage. Resistance itself stays `grants.damageResistances`.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-reduction"` | yes |  |
+| `amount` | integer (1–30) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierDarkvision`
 
@@ -3314,6 +3413,8 @@ Grant or extend darkvision.
 | --- | --- | --- | --- |
 | `type` | const `"darkvision"` | yes |  |
 | `feet` | integer (0–240) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierExtraAttack`
 
@@ -3323,15 +3424,19 @@ Additional attacks on the Attack action.
 | --- | --- | --- | --- |
 | `type` | const `"extra-attack"` | yes |  |
 | `count` | integer (1–3) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierHitPointsPerLevel`
 
-Extra hit points at every level (Tough, Dwarven Toughness).
+Extra hit points at every level (Tough, Dwarven Toughness). REFUSED on an item: it changes `hp.maximum`, which live `hp.current` is tracked against, so unequipping could strand current above maximum - there is no correct silent answer.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `type` | const `"hit-points-per-level"` | yes |  |
 | `amount` | integer (-5–5) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierInitiative`
 
@@ -3341,6 +3446,43 @@ Change the initiative bonus.
 | --- | --- | --- | --- |
 | `type` | const `"initiative"` | yes |  |
 | `amount` | integer (-5–10) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierResourceBonus`
+
+One more use of a limited resource. `poolId` is the LIVE uses key (a `uses.pool` or an action id) - the namespace that is actually spent and re-armed - deliberately NOT the class level table's display-only `classResources`, where a rider would parse, store, project, and change nothing.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"resource-bonus"` | yes |  |
+| `poolId` | string (pattern) | yes |  |
+| `amount` | integer (-20–20) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierSaveBonus`
+
+A flat bonus to saving throws. Narrow it with `when: [{"type": "ability-is", "abilities": ["dex"]}]` (a Cloak of Protection is the unnarrowed form).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"save-bonus"` | yes |  |
+| `amount` | integer (-10–10) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierSense`
+
+The missing sibling of `darkvision`: any named sense in feet. Display-level, like `darkvision`, until a senses model exists.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"sense"` | yes |  |
+| `sense` | string (pattern) | yes |  |
+| `feet` | integer (0–240) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierSpeed`
 
@@ -3350,6 +3492,44 @@ Change walking speed in feet.
 | --- | --- | --- | --- |
 | `type` | const `"speed"` | yes |  |
 | `amount` | integer (-30–60) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierSpellAttackBonus`
+
+Change the bearer's spell attack bonus. A Wand of the War Mage is exactly this and nothing else.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-attack-bonus"` | yes |  |
+| `amount` | integer (-5–5) | yes |  |
+| `classId` | string (pattern) | no |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierSpellSaveDc`
+
+Change the bearer's spell save DC. `classId` targets one caster on a multiclass sheet; absent = every caster the bearer has.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-save-dc"` | yes |  |
+| `amount` | integer (-5–5) | yes |  |
+| `classId` | string (pattern) | no |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewModifierSpellSlot`
+
+An extra spell slot of one level, layered over the single-sourced slot maxima so the seed, the long rest and the spend-clamp cannot disagree.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-slot"` | yes |  |
+| `level` | integer (1–9) | yes |  |
+| `amount` | integer (-4–4) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewModifierUnarmoredDefense`
 
@@ -3360,6 +3540,8 @@ AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any ho
 | `type` | const `"unarmored-defense"` | yes |  |
 | `ability` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha` | yes |  |
 | `allowShield` | boolean | no | Default: `false`. |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
 
 ### `HomebrewMonsterRecord`
 
@@ -3449,6 +3631,69 @@ One of the following, discriminated by `type`:
 - `HomebrewEquipmentRecord`
 - `HomebrewMonsterRecord`
 - `HomebrewSpellListRecord`
+
+### `HomebrewRiderAttackBonus`
+
+A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit was the action's printed bonus plus exhaustion and nothing else could reach it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"attack-bonus"` | yes |  |
+| `amount` | integer (-10–10) | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewRiderExtraDamage`
+
+Extra TYPED damage as dice. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer, and an attack's `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults false because 5e does not double dice added after the attack.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"extra-damage"` | yes |  |
+| `formula` | string (pattern) | yes | One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008) |
+| `damageType` | string | yes |  |
+| `doubleOnCritical` | boolean | no | Default: `false`. |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewRiderRollMode`
+
+Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather than two per roll kind. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"roll-mode"` | yes |  |
+| `roll` | `attack` \| `incoming-attack` \| `save` \| `check` \| `initiative` \| `death-save` \| `concentration` | yes |  |
+| `mode` | `advantage` \| `disadvantage` | yes |  |
+| `when` | HomebrewRiderTrigger[] | no | AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow Default: `[]`. |
+| `scope` | `bearer` \| `this-item` | no | What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer" |
+
+### `HomebrewRiderTrigger`
+
+WHEN a rider applies. Thirty named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty branches below cover all thirty names.
+
+One of the following, discriminated by `type`:
+
+- `HomebrewTriggerAttuned`
+- `HomebrewTriggerWhileArmored`
+- `HomebrewTriggerWhileUnarmored`
+- `HomebrewTriggerWhileShield`
+- `HomebrewTriggerWhileCharacterIs`
+- `HomebrewTriggerWhileProficientWith`
+- `HomebrewTriggerWhileEffectTag`
+- `HomebrewTriggerWhileHpAtOrBelow`
+- `HomebrewTriggerWhileCondition`
+- `HomebrewTriggerMoment`
+- `HomebrewTriggerAttackKindIs`
+- `HomebrewTriggerWeaponPropertyIs`
+- `HomebrewTriggerDamageTypeIs`
+- `HomebrewTriggerAbilityIs`
+- `HomebrewTriggerSkillIs`
+- `HomebrewTriggerSpellSchoolIs`
+- `HomebrewTriggerSpellLevelIs`
+- `HomebrewTriggerVersusCreatureType`
+- `HomebrewTriggerVersusSize`
+- `HomebrewTriggerVersusCondition`
 
 ### `HomebrewSpeciesRecord`
 
@@ -3638,6 +3883,187 @@ A subclass. Third-caster subclasses (Eldritch Knight, Arcane Trickster) declare 
 | `spellcasting` | HomebrewSpellcasting | no |  |
 | `levelTable` | HomebrewClassLevelRow[] | no |  |
 | `features` | HomebrewFeature[] | no |  |
+
+### `HomebrewTriggerAbilityIs`
+
+FILTER. Narrows a save or check moment to these abilities - what turns a bare `save-bonus` into "+1 to Dexterity saves".
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"ability-is"` | yes |  |
+| `abilities` | `str` \| `dex` \| `con` \| `int` \| `wis` \| `cha`[] | yes |  |
+
+### `HomebrewTriggerAttackKindIs`
+
+FILTER. Narrows a moment to these attack kinds. `reaction` and `opportunity` require the resolver to ANNOUNCE the trigger; until it does, they never match.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"attack-kind-is"` | yes |  |
+| `kinds` | `melee` \| `ranged` \| `spell` \| `unarmed` \| `thrown` \| `reaction` \| `opportunity`[] | yes |  |
+
+### `HomebrewTriggerAttuned`
+
+STATIC GATE. The bearer is attuned. Redundant (and harmless) when the item's own `attunement.required` is already true.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"attuned"` | yes |  |
+
+### `HomebrewTriggerDamageTypeIs`
+
+FILTER. Narrows to these damage types.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"damage-type-is"` | yes |  |
+| `damageTypes` | string[] | yes |  |
+
+### `HomebrewTriggerMoment`
+
+MOMENT. The named roll or event the rider fires at. All eleven moments are parameterless, so they are ONE component with an eleven-value `type` enum rather than eleven byte-identical components documenting nothing eleven times - the union's discriminator still maps each name individually. A `when` list may carry at most one moment: a rider fires at one moment, not two.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | `on-attack-roll` \| `on-hit` \| `on-critical-hit` \| `on-critical-miss` \| `on-damage-roll` \| `on-saving-throw` \| `on-ability-check` \| `on-initiative-roll` \| `on-death-save` \| `on-taking-damage` \| `on-spell-cast` | yes |  |
+
+### `HomebrewTriggerSkillIs`
+
+FILTER. Narrows a check moment to these skills (Gloves of Thievery: sleight-of-hand).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"skill-is"` | yes |  |
+| `skills` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerSpellLevelIs`
+
+FILTER. Narrows a spell moment to these slot levels (0 is a cantrip).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-level-is"` | yes |  |
+| `levels` | integer (0–9)[] | yes |  |
+
+### `HomebrewTriggerSpellSchoolIs`
+
+FILTER. Narrows a spell moment to these schools.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"spell-school-is"` | yes |  |
+| `schools` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerVersusCondition`
+
+FILTER. Narrows to targets currently under any of these conditions.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"versus-condition"` | yes |  |
+| `conditionIds` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerVersusCreatureType`
+
+FILTER. Narrows to targets of these creature types. Authorable but INERT until an actor definition carries a creature type - it parses and stores, and starts matching the day that field lands.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"versus-creature-type"` | yes |  |
+| `creatureTypes` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerVersusSize`
+
+FILTER. Narrows to targets of these sizes.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"versus-size"` | yes |  |
+| `sizes` | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan`[] | yes |  |
+
+### `HomebrewTriggerWeaponPropertyIs`
+
+FILTER. Narrows to weapons carrying any of these property slugs (finesse, heavy, two-handed).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"weapon-property-is"` | yes |  |
+| `properties` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerWhileArmored`
+
+STATIC GATE. The bearer is wearing armor. Omitting `weights` is exactly what `armor-class.whileArmored: true` has always meant.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-armored"` | yes |  |
+| `weights` | `light` \| `medium` \| `heavy`[] | no |  |
+
+### `HomebrewTriggerWhileCharacterIs`
+
+STATIC GATE. The bearer is one of these classes or species. TWO lists in ONE trigger so "Paladin or Cleric" is a single entry rather than an OR; at least one id must be named.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-character-is"` | yes |  |
+| `classIds` | string (pattern)[] | no | Default: `[]`. |
+| `speciesIds` | string (pattern)[] | no | Default: `[]`. |
+
+### `HomebrewTriggerWhileCondition`
+
+DYNAMIC GATE. The bearer has (or, with `present: false`, lacks) any of these conditions.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-condition"` | yes |  |
+| `conditionIds` | string (pattern)[] | yes |  |
+| `present` | boolean | no | Default: `true`. |
+
+### `HomebrewTriggerWhileEffectTag`
+
+DYNAMIC GATE. The bearer has an active effect carrying any of these tags - the single-tag `requiresEffectTag` precedent, widened to a list.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-effect-tag"` | yes |  |
+| `tags` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerWhileHpAtOrBelow`
+
+DYNAMIC GATE. The bearer is at or below this percentage of maximum hit points (a bloodied threshold).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-hp-at-or-below"` | yes |  |
+| `percent` | integer (1–99) | yes |  |
+
+### `HomebrewTriggerWhileProficientWith`
+
+STATIC GATE. The bearer is proficient with any of the named weapons, armor, tools, or skills.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-proficient-with"` | yes |  |
+| `kind` | `weapon` \| `armor` \| `tool` \| `skill` | yes |  |
+| `ids` | string (pattern)[] | yes |  |
+
+### `HomebrewTriggerWhileShield`
+
+STATIC GATE. The bearer is wielding a shield - or, with `wielding: false`, is NOT, which is how the Dueling-style "only while not holding a shield" is said without a NOT operator.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-shield"` | yes |  |
+| `wielding` | boolean | no | Default: `true`. |
+
+### `HomebrewTriggerWhileUnarmored`
+
+STATIC GATE. The bearer is wearing no armor; `allowShield` decides whether a shield still counts as unarmored (Barbarian yes, Monk no).
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `type` | const `"while-unarmored"` | yes |  |
+| `allowShield` | boolean | no | Default: `false`. |
 
 ### `HomebrewUsesByAbility`
 
