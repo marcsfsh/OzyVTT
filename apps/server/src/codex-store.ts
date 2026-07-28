@@ -456,6 +456,55 @@ const PLAYER_VISIBLE_SQL = `(CASE codex_search_player.kind
     WHERE codex_markers.id = codex_search_player.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
   ELSE 0 END)`;
 
+/**
+ * Search ORDER BY, built for ONE audience table. Both `codex_search_player` and `codex_search_gm` are
+ * ordered through this function, so the two roles cannot rank the same world differently - the GM and
+ * the player who type the same name arrive at the same record.
+ *
+ * Ranking is TWO tiers, in this order:
+ *
+ *  1. EXACT TITLE. A record whose title IS what you typed comes first, unconditionally. The quick
+ *     switcher's whole contract is "type the name, press Enter, arrive", and tier 2 alone makes that
+ *     a probability rather than a guarantee.
+ *
+ *     Measured on this schema, page titled `Strahd` versus one page whose body is the word repeated N
+ *     times, ranked by tier 2 ONLY: at N=40 the titled page wins, at N=80 it LOSES, and the scores on
+ *     either side of that line differ by roughly 1%. So the outcome is not decided by which record the
+ *     GM meant - it is decided by how wordy their prose happened to get. Raising the title weight only
+ *     moves the line; it does not remove it, because bm25 is a relevance heuristic and no weight makes
+ *     a heuristic into a promise. "This record is literally called that" is not a heuristic, so it is
+ *     not left to one. That is the whole justification for the special case, and it is deliberately the
+ *     ONLY one: one extra rule, statable in a sentence, with tier 2 doing the rest of the work.
+ *
+ *     `LOWER()` in SQLite folds ASCII only, so a title with an uppercase NON-ASCII letter ("ÉLARA")
+ *     will not match a typed "élara" here. That fails SAFE: the record simply falls through to tier 2,
+ *     which still weights its title 10x. It is a missing boost, never a missing result.
+ *
+ *  2. WEIGHTED bm25, title over body. `bm25()` takes ONE weight per DECLARED column, in declaration
+ *     order, and `kind`/`record_id` are declared but UNINDEXED - so the arity is FOUR, not two, and
+ *     `title`/`body` are slots 2 and 3. This is worth stating because getting it wrong is SILENT:
+ *     `bm25(t, 10.0, 1.0)` does not error, it weights the two UNINDEXED columns (which can never
+ *     contribute) and leaves title and body at their 1.0 default - i.e. it is exactly the unweighted
+ *     `rank` this replaces. The two leading 0.0s are therefore load-bearing documentation, not padding.
+ *     Extra weights past the fourth are ignored just as silently. Verified empirically, not assumed.
+ *
+ * This only REORDERS; it never filters. A zero-weighted column still returns its rows (scored 0), and
+ * neither tier is in the WHERE clause, so recall is bit-for-bit what it was - a page that only mentions
+ * the term is still found, just below the page named after it.
+ *
+ * WHAT THIS DOES CHANGE, stated rather than hidden: the LIMIT 50 is one cap shared by all four kinds,
+ * and it takes the first 50 in THIS order. So on a query matching more than 50 records, the composition
+ * of that 50 shifts towards title matches. Journal entries feel it most, because they are indexed with
+ * an EMPTY title (an entry has no name) and can therefore only ever place in tier 2 on body score - a
+ * journal entry that used to edge out a barely-relevant page can now fall off the end. That is the
+ * intended trade for a suite-wide search whose first job is navigation, and it only bites past 50 hits;
+ * below the cap nothing is lost, only reordered. If journal recall on huge queries ever matters, the
+ * fix is a per-kind cap, not a weaker title weight.
+ */
+function searchOrderBySql(table: "codex_search_player" | "codex_search_gm"): string {
+  return `(CASE WHEN LOWER(${table}.title) = ? THEN 0 ELSE 1 END), bm25(${table}, 0.0, 0.0, 10.0, 1.0)`;
+}
+
 type PageRow = {
   id: string; title: string; entity_type: string; fields_json: string; gm_fields_json: string; folder: string | null; tags_json: string; player_body: string;
   gm_body: string; revealed: number; banner_asset_id: string | null; rev: number; created_at: string; updated_at: string;
@@ -1083,16 +1132,26 @@ export class CodexStore {
    *
    * Resolving reveal state at READ time (rather than baking it into the index) is what makes a reveal
    * toggle - on a page, entry, marker, or the MAP A MARKER SITS ON - take effect with no reindex.
+   *
+   * ORDERING is `searchOrderBySql` - exact title first, then bm25 with title weighted 10x over body.
+   * It is ORDER BY only: nothing about WHICH records match changed, so the reveal gates above and the
+   * recall of every existing query are untouched.
    */
   searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRef[] {
     const match = ftsQuery(query);
     if (!match) return [];
+    // Tier 1's comparison value. `ftsQuery` already returned non-null, so the query holds at least one
+    // letter or digit and this is never "" - which is what keeps journal entries and unlabelled markers
+    // (both indexed with an EMPTY title) from sweeping into tier 1 on some punctuation-only query.
+    const exactTitle = query.trim().toLowerCase();
     const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
     const kindFilter = kinds && kinds.length > 0 ? ` AND ${table}.kind IN (${kinds.map(() => "?").join(", ")})` : "";
     const visibility = audience === "gm" ? "" : ` AND ${PLAYER_VISIBLE_SQL}`;
-    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${table}.rank LIMIT 50`;
+    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${searchOrderBySql(table)} LIMIT 50`;
     try {
-      return (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? [])) as Array<{ kind: string; record_id: string }>)
+      // Bind order follows the ?s in SQL TEXT order: MATCH, then the kind filter, then tier 1's title
+      // in the ORDER BY. Any new parameterised clause must be inserted at its textual position here.
+      return (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? []), exactTitle) as Array<{ kind: string; record_id: string }>)
         .filter((row): row is { kind: CodexRecordKind; record_id: string } => (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind))
         .map((row) => ({ kind: row.kind, id: row.record_id }));
     } catch { return []; }

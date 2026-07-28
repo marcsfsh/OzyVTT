@@ -82,6 +82,109 @@ describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
   });
 });
 
+describe("CodexStore search ranks the record NAMED for the query first (CI-1)", () => {
+  /**
+   * The quick switcher's entire contract is "type the name, press Enter, arrive". It was broken: the
+   * old `ORDER BY rank` weighted no columns, so `q=Strahd` returned the two QA pages that merely MENTION
+   * Strahd ahead of the page actually CALLED Strahd, and Enter landed on the wrong record.
+   *
+   * These run against `searchAll` directly rather than through HTTP on purpose. The ordering has exactly
+   * one home - the ORDER BY - and this file's own CI-1 lesson is that an end-to-end assertion can pass
+   * because a different layer compensated. Ordering asserted here is ordering proven where it is decided.
+   * `toEqual` on the whole array is deliberate: it pins RECALL (every record still returned) in the same
+   * breath as the order, so a "fix" that won the ranking by dropping the losers cannot pass.
+   */
+  const seedNamedVersusMentions = () => {
+    // Titles that share no word with the query, so only the body can match on the two decoys.
+    const named = store.createPage({ title: "Strahd", playerBody: "A vampire lord.", revealedToPlayers: true });
+    const mentionsA = store.createPage({ title: "QA Keep 645834", playerBody: "Strahd Strahd garrison notes about Strahd and the keep.", revealedToPlayers: true });
+    const mentionsB = store.createPage({ title: "QA Keep 750639", playerBody: "Strahd rides at night. Strahd again.", revealedToPlayers: true });
+    return { named: named.id, mentionsA: mentionsA.id, mentionsB: mentionsB.id };
+  };
+
+  it("puts the page NAMED Strahd first for a GM, keeping the pages that only mention it", () => {
+    const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
+    const hits = store.searchAll("gm", "Strahd");
+    expect(hits[0]).toEqual({ kind: "page", id: named });
+    // Recall is unchanged - the mentions are still found, just below the record named for the query.
+    expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
+  });
+
+  it("ranks identically for a PLAYER, so the two roles never disagree about where Enter lands", () => {
+    // Both audiences have their own FTS table; weighting one and not the other would give the GM and the
+    // player who type the same name different answers.
+    const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
+    const hits = store.searchAll("player", "Strahd");
+    expect(hits[0]).toEqual({ kind: "page", id: named });
+    expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
+  });
+
+  it("keeps the exact-title record first even against a body that repeats the term 120 times", () => {
+    // This is the case the unconditional exact-title tier exists for, and the reason it is worth a rule
+    // of its own rather than a bigger title weight.
+    //
+    // Measured on this schema at title 10x / body 1x, with a page titled `Strahd` against one page whose
+    // body is nothing but the word repeated N times: at N=40 the titled page wins, at N=80 it LOSES, and
+    // the scores either side of that line differ by about 1%. bm25 is not deciding this on meaning - it
+    // is decided by how long the GM's prose happens to be. A quick switcher promises "type the name,
+    // press Enter, arrive", and a promise settled by a 1% margin that moves with the campaign's word
+    // count is not a promise. Tier 1 makes it one.
+    //
+    // 120 is past the flip on both sides of it, so this fails if the tier is ever dropped in favour of
+    // "just raise the weight" - which is exactly what it is here to catch.
+    const named = store.createPage({ title: "Strahd", playerBody: "A vampire lord.", revealedToPlayers: true });
+    const spam = store.createPage({ title: "QA Keep 111", playerBody: Array.from({ length: 120 }, () => "Strahd").join(" "), revealedToPlayers: true });
+    for (const audience of ["gm", "player"] as const) {
+      const hits = store.searchAll(audience, "Strahd");
+      expect(hits[0]).toEqual({ kind: "page", id: named.id });
+      expect(hits).toContainEqual({ kind: "page", id: spam.id });
+    }
+  });
+
+  it("weights a title hit over a body hit even when NEITHER title is exact", () => {
+    // Tier 2 on its own, with tier 1 deliberately unable to fire: no title equals "Ravenloft", so this
+    // fails unless bm25 is genuinely weighting the title column. Without it the assertion cannot tell a
+    // working weight from a silently mis-applied one (`bm25(t, 10.0, 1.0)` weights the two UNINDEXED
+    // columns and leaves title/body at 1.0 - a no-op that does not error).
+    const titled = store.createPage({ title: "Castle Ravenloft", playerBody: "the seat of the land", revealedToPlayers: true });
+    const bodied = store.createPage({ title: "QA Keep 222", playerBody: "We rode to Ravenloft. Ravenloft loomed. Ravenloft again.", revealedToPlayers: true });
+    for (const audience of ["gm", "player"] as const) {
+      const hits = store.searchAll(audience, "Ravenloft");
+      expect(hits[0]).toEqual({ kind: "page", id: titled.id });
+      expect(hits).toContainEqual({ kind: "page", id: bodied.id });
+    }
+  });
+
+  it("ranks across KINDS, not just within one - a map TITLED for the query beats a journal that mentions it", () => {
+    // Suite-wide search shares one 50-result cap across kinds, so ordering has to hold BETWEEN kinds too.
+    // A journal entry is indexed with an EMPTY title and can only ever match on body, so a title weight is
+    // the only thing that can lift the map above a journal that says the word more often.
+    //
+    // The map's title is deliberately NOT exactly "Vallaki": tier 1 cannot fire, so this is tier 2 alone
+    // being measured across kinds. And the journal repeats the word 8 times because at two mentions the
+    // map wins under the OLD bare `rank` too - that fixture asserted a true thing that proved nothing.
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Vallaki Town Square", kind: "regional", revealedToPlayers: true });
+    const entry = store.createEntry({ playerText: Array.from({ length: 8 }, () => "Vallaki").join(" ") });
+    store.setEntryRevealed(entry.id, true);
+    for (const audience of ["gm", "player"] as const) {
+      const hits = store.searchAll(audience, "Vallaki");
+      expect(hits[0]).toEqual({ kind: "map", id: map.id });
+      expect(hits).toContainEqual({ kind: "journal", id: entry.id });
+    }
+  });
+
+  it("still finds a record whose ONLY match is a tag or a body - re-ranking never filters", () => {
+    // The recall guarantee, stated on its own. Re-ranking moved these DOWN; it must not move them OUT,
+    // including behind the exact-title tier when some other record wins that tier outright.
+    const named = store.createPage({ title: "Villain", playerBody: "the archetype", revealedToPlayers: true });
+    const tagged = store.createPage({ title: "Rictavio", tags: ["villain"], revealedToPlayers: true });
+    const bodied = store.createPage({ title: "Rumours", playerBody: "a villain walks abroad", revealedToPlayers: true });
+    const hits = store.searchAll("player", "Villain");
+    expect(hits[0]).toEqual({ kind: "page", id: named.id });
+    expect(hits.map((hit) => hit.id).sort()).toEqual([named.id, tagged.id, bodied.id].sort());
+  });
+});
+
 describe("CodexStore tags on every record type (CI-2)", () => {
   it("stores, updates and clears tags on maps, markers and journal entries", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["gothic", "act-one"] });

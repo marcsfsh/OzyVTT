@@ -261,6 +261,30 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(gmHits).toHaveLength(1);
   });
 
+  it("returns the page NAMED for the query first, so the command palette's Enter lands on it", async () => {
+    // The reviewer's exact reproduction: `q=Strahd` came back ["QA Keep 645834", "QA Keep 750639",
+    // "Strahd"], so typing "Strahd" and pressing Enter opened QA Keep 645834. Ordering is DECIDED in
+    // `searchAll` (and pinned there, at the store level, in codex-store.test.ts); what this adds is that
+    // the router's load → project → filter chain PRESERVES that order rather than quietly reshuffling it.
+    const { base } = await fixture();
+    const make = async (title: string, playerBody: string) => {
+      const created = await body(await post(base, "/api/v1/codex/pages", GM, { title, playerBody }));
+      const id = created.data.page.id as string;
+      await post(base, `/api/v1/codex/pages/${id}/reveal`, GM, { revealed: true });
+      return id;
+    };
+    const named = await make("Strahd", "A vampire lord.");
+    const mentionsA = await make("QA Keep 645834", "Strahd Strahd garrison notes about Strahd and the keep.");
+    const mentionsB = await make("QA Keep 750639", "Strahd rides at night. Strahd again.");
+
+    for (const headers of [GM, PLAYER]) {
+      const hits = (await body(await get(base, `/api/v1/codex/search?q=Strahd`, headers))).data.hits as Json[];
+      expect(hits[0]).toMatchObject({ kind: "page", id: named });
+      // ...and the two that merely mention it are still returned, just lower - recall did not shrink.
+      expect(hits.map((hit) => hit.id).sort()).toEqual([named, mentionsA, mentionsB].sort());
+    }
+  });
+
   it("serves page media to a player only when a revealed page uses it", async () => {
     const { base } = await fixture();
     const upload = await body(await fetch(`${base}/api/v1/codex-assets?filename=a.png`, { method: "POST", headers: { authorization: "Bearer gm-token", "content-type": "image/png" }, body: png(8, 8) }));
