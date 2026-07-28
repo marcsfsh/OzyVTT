@@ -3,8 +3,8 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
-import { CodexNotFoundError, CodexRevisionConflictError, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges } from "./codex-projections.js";
+import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
+import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, type CodexSearchRecord } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -141,6 +141,25 @@ function codexError(response: Response, error: unknown) {
   return malformed(response, error);
 }
 
+/**
+ * Resolve one search hit to the live record plus the CONTEXT its player predicate needs. A marker
+ * carries its map's reveal flag because a pin on a secret map is invisible to players however the pin
+ * itself is flagged (CD-6) - the identical resolution `GET /codex/maps/:id/markers` performs before it
+ * projects a single marker. Returns null for a row whose record has since gone.
+ */
+function loadSearchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRecord | null {
+  switch (ref.kind) {
+    case "page": { const page = store.getPage(ref.id); return page ? { kind: "page", page } : null; }
+    case "journal": { const entry = store.getEntry(ref.id); return entry ? { kind: "journal", entry } : null; }
+    case "map": { const map = store.getMap(ref.id); return map ? { kind: "map", map } : null; }
+    case "marker": {
+      const marker = store.getMarker(ref.id);
+      if (!marker) return null;
+      return { kind: "marker", marker, mapRevealed: store.getMap(marker.mapId)?.revealedToPlayers ?? false };
+    }
+  }
+}
+
 export function createCodexRouter(options: CodexRouterOptions) {
   const router = Router();
   const { store } = options;
@@ -176,17 +195,32 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return envelope(response, 200, { pages });
   });
 
+  /**
+   * CI-1 / R8: ONE search box, ONE result list, all record types - so this stays the single search
+   * route and simply learned to return more kinds, rather than gaining a sibling.
+   *
+   * `hits` is that one list (pages, journal entries, maps, markers), discriminated by `kind`.
+   * `results` is the pre-CI-1 page-only list, kept so a client written before this keeps working, and
+   * droppable once the client reads `hits`. It is the SAME index read through the same per-kind
+   * predicate, just filtered to pages - not a second search mechanism - which is why it is a separate
+   * read rather than a slice of `hits`: slicing would let 50 marker matches crowd pages out of a list
+   * whose whole job is to behave exactly as it did before.
+   */
   router.get(`${CODEX_BASE}/search`, (request, response) => {
     const role = roleOf(request);
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to search the codex.");
     const query = typeof request.query.q === "string" ? request.query.q : "";
-    const hits = store.searchPages(role, query);
-    const results = hits
+    const hits = store.searchAll(role, query)
+      .map((ref) => loadSearchRecord(store, ref))
+      .filter((record) => record !== null)
+      .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record)))
+      .filter((hit) => hit !== null);
+    const results = store.searchPages(role, query)
       .map((hit) => store.getPage(hit.pageId))
       .filter((page) => page !== null)
       .map((page) => (role === "gm" ? projectGmPageSummary(page) : projectPlayerPageSummary(page)))
       .filter((page) => page !== null);
-    return envelope(response, 200, { results });
+    return envelope(response, 200, { results, hits });
   });
 
   router.get(`${CODEX_BASE}/pages/:id`, (request, response) => {

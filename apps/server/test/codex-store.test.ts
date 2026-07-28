@@ -19,6 +19,32 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
+describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
+  it("finds a PAGE by its tag, the same way it finds a tagged map or marker", () => {
+    // The asymmetry this pins: maps/markers/journal indexed their tags but pages did not, so one search
+    // box answered a tag query differently depending on which record happened to carry the tag.
+    const page = store.createPage({ title: "Strahd", tags: ["villain"] });
+    store.setPageRevealed(page.id, true);
+    const gmHits = store.searchAll("gm", "villain");
+    expect(gmHits.some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
+    // ...and a player can find it too, because a revealed page's tags are already player-visible.
+    expect(store.searchAll("player", "villain").some((hit) => hit.kind === "page" && hit.id === page.id)).toBe(true);
+  });
+
+  it("does not surface an UNREVEALED page by its tag to a player", () => {
+    const page = store.createPage({ title: "Secret", tags: ["villain"] });
+    expect(store.searchAll("gm", "villain").some((hit) => hit.id === page.id)).toBe(true);
+    expect(store.searchAll("player", "villain").some((hit) => hit.id === page.id)).toBe(false);
+  });
+
+  it("keeps a page's indexed tags in step when they change", () => {
+    const page = store.createPage({ title: "Rictavio", tags: ["ally"] });
+    store.updatePage(page.id, { tags: ["villain"] }, undefined, "gm");
+    expect(store.searchAll("gm", "ally").some((hit) => hit.id === page.id)).toBe(false);
+    expect(store.searchAll("gm", "villain").some((hit) => hit.id === page.id)).toBe(true);
+  });
+});
+
 describe("CodexStore tags on every record type (CI-2)", () => {
   it("stores, updates and clears tags on maps, markers and journal entries", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["gothic", "act-one"] });
@@ -50,6 +76,90 @@ describe("CodexStore tags on every record type (CI-2)", () => {
     expect(map.tags).toEqual([]);
     expect(store.getMap(map.id)!.tags).toEqual([]);
     expect(MIGRATIONS.some((migration) => migration.version === 10)).toBe(true);
+  });
+});
+
+describe("CodexStore suite-wide search (CI-1)", () => {
+  /**
+   * The plan's K7 risk: v11 replaces the pages-only FTS tables with ONE unified index, on a database
+   * that already has rows. Fresh-database tests can never catch a bad backfill (every table is empty),
+   * so this builds a genuine v10 database out of the shipped migration SQL, fills it, and then opens a
+   * CodexStore on it - which is exactly the upgrade a GM's existing vtt.sqlite performs.
+   */
+  it("migration v11 backfills existing pages, maps, markers and journal entries, keeping the two layers apart", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v10-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+      database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 10)) {
+        database.exec(migration.sql);
+        database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+      }
+      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+      const pageId = crypto.randomUUID(), mapId = crypto.randomUUID(), markerId = crypto.randomUUID(), entryId = crypto.randomUUID();
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Ravenloft', 'location', '{}', '{}', NULL, '[]', 'a gothic castle', 'the crypt of Strahd', 1, NULL, 1, '', '')").run(pageId);
+      // The pages-only index rows exactly as v2..v10 wrote them - what the backfill has to carry forward.
+      database.prepare("INSERT INTO codex_fts_player (page_id, title, body) VALUES (?, 'Ravenloft', 'a gothic castle\n')").run(pageId);
+      database.prepare("INSERT INTO codex_fts_gm (page_id, title, body) VALUES (?, 'Ravenloft', 'a gothic castle\nthe crypt of Strahd\n\n')").run(pageId);
+      database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, 'Barovia', 'regional', NULL, 1, 1, '[\"gloomy\"]', '', '')").run(mapId, crypto.randomUUID());
+      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, tags_json, created_at, updated_at) VALUES (?, ?, 0.5, 0.5, 'pin', '#FF2E9A', 'Svalich Road', 1, '[\"waypoint\"]', '', '')").run(markerId, mapId);
+      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, sort_key, tags_json, created_at, updated_at) VALUES (?, 'The mists parted.', 'Strahd was watching.', 1, 'note', 1, '[\"arrival\"]', '', '')").run(entryId);
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();
+
+      // Every pre-existing record is now findable, by every kind, in the ONE index.
+      expect(upgraded.searchAll("gm", "Ravenloft")).toEqual([{ kind: "page", id: pageId }]);
+      expect(upgraded.searchAll("player", "Barovia")).toEqual([{ kind: "map", id: mapId }]);
+      expect(upgraded.searchAll("player", "Svalich")).toEqual([{ kind: "marker", id: markerId }]);
+      expect(upgraded.searchAll("player", "mists")).toEqual([{ kind: "journal", id: entryId }]);
+      // ...including the tags v10 added to those three kinds.
+      expect(upgraded.searchAll("player", "gloomy")).toEqual([{ kind: "map", id: mapId }]);
+      expect(upgraded.searchAll("player", "waypoint")).toEqual([{ kind: "marker", id: markerId }]);
+      expect(upgraded.searchAll("player", "arrival")).toEqual([{ kind: "journal", id: entryId }]);
+
+      // The backfill kept the layers apart: GM-only text landed in the GM index ONLY.
+      expect(upgraded.searchAll("player", "crypt")).toEqual([]);
+      expect(upgraded.searchAll("gm", "crypt")).toEqual([{ kind: "page", id: pageId }]);
+      expect(upgraded.searchAll("player", "watching")).toEqual([]);
+      expect(upgraded.searchAll("gm", "watching")).toEqual([{ kind: "journal", id: entryId }]);
+
+      // ...and the superseded pages-only tables are gone, so there is one index and one sync path.
+      const reopened = new DatabaseSync(path);
+      const tables = (reopened.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name);
+      reopened.close();
+      expect(tables).not.toContain("codex_fts_player");
+      expect(tables).not.toContain("codex_fts_gm");
+      expect(tables).toContain("codex_search_player");
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the index in step with writes, including markers swept away by a map delete", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Vallaki", kind: "regional", revealedToPlayers: true });
+    const marker = store.createMarker(map.id, { x: 0.1, y: 0.1, iconId: "pin", iconColor: "#FF2E9A", label: "Blinsky toys", revealedToPlayers: true });
+    expect(store.searchAll("player", "Blinsky")).toEqual([{ kind: "marker", id: marker.id }]);
+
+    // Renaming reindexes: the old text stops matching, the new text starts.
+    store.updateMarker(marker.id, { label: "Burgomaster mansion" });
+    expect(store.searchAll("gm", "Blinsky")).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster")).toEqual([{ kind: "marker", id: marker.id }]);
+
+    // A reveal toggle needs no reindex - visibility is resolved against the live row at read time.
+    store.setMarkerRevealed(marker.id, false);
+    expect(store.searchAll("player", "Burgomaster")).toEqual([]);
+    expect(store.searchAll("gm", "Burgomaster")).toEqual([{ kind: "marker", id: marker.id }]);
+
+    // Deleting the MAP cascades its markers away in SQL; their index rows must go with them, or they
+    // would keep matching forever with no live row left to gate them.
+    store.deleteMap(map.id);
+    expect(store.searchAll("gm", "Burgomaster")).toEqual([]);
+    expect(store.searchAll("gm", "Vallaki")).toEqual([]);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -128,6 +128,88 @@ export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry
 export function projectPlayerJournalEntry(row: CodexJournalRow): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
   return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
+}
+
+// ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----
+
+/**
+ * One record a search matched, loaded from the store with whatever CONTEXT its player predicate needs.
+ * A marker carries its map's reveal flag because a pin's visibility is not its own flag alone (CD-6).
+ */
+export type CodexSearchRecord =
+  | Readonly<{ kind: "page"; page: CodexPageRow }>
+  | Readonly<{ kind: "journal"; entry: CodexJournalRow }>
+  | Readonly<{ kind: "map"; map: CodexMapRow }>
+  | Readonly<{ kind: "marker"; marker: CodexMarkerRow; mapRevealed: boolean }>;
+
+/**
+ * One row in the single result list. Uniform on purpose - `kind` tells the client where to navigate,
+ * and every key is present on every kind (null where it does not apply) so nothing branches on key
+ * presence. Deliberately NARROW: it carries only what is needed to render a row and open the record.
+ *
+ * Every field re-checked against the player LIST projection it must not exceed:
+ *   `title`  - page title / map name / marker label, each already in that kind's player projection;
+ *              for a journal entry it is an EXCERPT of the layer-appropriate text, and a player's
+ *              excerpt is taken from `playerText` only - which `projectPlayerJournalEntry` already
+ *              hands that player in full.
+ *   `tags`   - player-visible on all four kinds (pages always were; CI-2 put them on the other three,
+ *              and each player projection emits them).
+ *   `entityType` - `projectPlayerPageSummary` emits it; null for the other kinds.
+ *   `mapId`  - `projectPlayerMarker` emits it, and a player only ever gets a marker hit when that map
+ *              is revealed, so this can never name a secret map; null for the other kinds.
+ * Nothing else is added without re-running this check. No bodies, no reveal flags, no parent links,
+ * no scene/actor ids, no `rev`.
+ */
+export type CodexSearchHit = Readonly<{
+  kind: CodexRecordKind;
+  id: string;
+  title: string;
+  tags: readonly string[];
+  entityType: CodexEntityType | null;
+  mapId: string | null;
+}>;
+
+const EXCERPT_LENGTH = 160;
+/** A journal entry has no title, so the result row shows a bounded one-line excerpt of its text. */
+function excerpt(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length <= EXCERPT_LENGTH ? flat : `${flat.slice(0, EXCERPT_LENGTH - 1)}…`;
+}
+
+export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
+  switch (record.kind) {
+    case "page": return { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null };
+    // The GM may see either layer, so an entry with no player text still shows something useful.
+    case "journal": return { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText || record.entry.gmText || ""), tags: record.entry.tags, entityType: null, mapId: null };
+    case "map": return { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null };
+    case "marker": return { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId };
+  }
+}
+
+/**
+ * null when this record is not player-visible - the audited gate. The predicate per kind is COPIED
+ * from that kind's player LIST endpoint and must never be weaker, or search becomes the leak:
+ *   page    -> `projectPlayerPage(Summary)`: revealed only.
+ *   journal -> `projectPlayerJournalEntry`: revealed only, and the excerpt reads `playerText` ALONE.
+ *   map     -> `projectPlayerMap`: revealed only.
+ *   marker  -> `projectPlayerMarker` PLUS the map gate `GET /codex/maps/:id/markers` applies before
+ *              projecting anything (CD-6): a revealed pin on a secret map is invisible to players.
+ * The store's SQL applies the same predicate so hidden records don't crowd the result cap; this is
+ * the layer that makes it a safety property rather than an optimization.
+ */
+export function projectPlayerSearchHit(record: CodexSearchRecord): CodexSearchHit | null {
+  switch (record.kind) {
+    case "page":
+      return record.page.revealedToPlayers ? { kind: "page", id: record.page.id, title: record.page.title, tags: record.page.tags, entityType: record.page.entityType, mapId: null } : null;
+    case "journal":
+      return record.entry.revealedToPlayers ? { kind: "journal", id: record.entry.id, title: excerpt(record.entry.playerText), tags: record.entry.tags, entityType: null, mapId: null } : null;
+    case "map":
+      return record.map.revealedToPlayers ? { kind: "map", id: record.map.id, title: record.map.name, tags: record.map.tags, entityType: null, mapId: null } : null;
+    case "marker":
+      return record.marker.revealedToPlayers && record.mapRevealed
+        ? { kind: "marker", id: record.marker.id, title: record.marker.label ?? "", tags: record.marker.tags, entityType: null, mapId: record.marker.mapId }
+        : null;
+  }
 }
 
 export function projectGmBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {

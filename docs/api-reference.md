@@ -2264,7 +2264,7 @@ Creates a page.
 
 ### `GET /api/v1/codex/search`
 
-Full-text page search, role-scoped. `q` is the query.
+Suite-wide full-text search across pages, journal entries, maps and markers, role-scoped. `q` is the query. Deliberately ONE search route rather than one per record type: `hits` is a single ranked list discriminated by `kind`. `results` is the superseded page-only list, derived from the same hits and kept for clients written before suite-wide search.
 
 **Auth:** GM session · Player session (own-character limits apply)
 

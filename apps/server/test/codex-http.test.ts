@@ -360,6 +360,22 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(playerEdges[0].type).toBe("rules");
   });
 
+  it("suite-wide search keeps the legacy page-only `results` list exactly as it was", async () => {
+    const { base } = await fixture();
+    // One word ("Ravenloft") on a page AND a map. `results` is the pre-CI-1 contract: pages only.
+    const page = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Ravenloft", playerBody: "a gothic castle" }));
+    await post(base, `/api/v1/codex/pages/${page.data.page.id}/reveal`, GM, { revealed: true });
+    const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: randomUUID(), name: "Ravenloft approach", kind: "regional" }));
+    await post(base, `/api/v1/codex/maps/${map.data.map.id}/reveal`, GM, { revealed: true });
+
+    const found = await body(await get(base, `/api/v1/codex/search?q=Ravenloft`, PLAYER));
+    // Unchanged: page summaries, nothing else, in the shape an existing client already parses.
+    expect((found.data.results as Json[]).map((row) => row.id)).toEqual([page.data.page.id]);
+    expect(found.data.results[0].title).toBe("Ravenloft");
+    // ...while the ONE result list carries both records (R8).
+    expect((found.data.hits as Json[]).map((hit) => hit.kind).sort()).toEqual(["map", "page"]);
+  });
+
   it("round-trips the world calendar (incl. current date), and weekdays appear in dated labels", async () => {
     const { base } = await fixture();
     const cal = { yearName: "AE", months: [{ name: "Rise", days: 10 }, { name: "Fall", days: 10 }], weekdays: ["Sol", "Lun"], currentDate: { year: 3, month: 1, day: 4 } };
@@ -370,5 +386,97 @@ describe("codex HTTP viewer-safety boundary", () => {
     const entry = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Dawn.", inWorldDate: { year: 0, month: 0, day: 1 } }));
     expect(entry.data.entry.inWorldLabel).toBe("Sol, Rise 1, 0 AE"); // weekday now wired into the label
     expect((await put(base, "/api/v1/codex/calendar", PLAYER, cal)).status).toBe(401); // players cannot edit it (GM only)
+  });
+});
+
+/**
+ * CI-1. A player-visible search index IS a player-facing projection, and it is the one that is easy to
+ * get wrong: every OTHER read path starts from a list the GM curated, while search starts from raw
+ * matched text. So the bar is that the player index is gated by exactly the predicate its record's
+ * player LIST endpoint uses - never a weaker one - and these tests assert that at the HTTP boundary,
+ * which is where the role is actually resolved and the projection actually chosen.
+ */
+describe("codex suite-wide search viewer safety (CI-1)", () => {
+  /** One world holding every leak shape at once, so a single query can prove what search must not return. */
+  async function world() {
+    const { base } = await fixture();
+    const asset = randomUUID();
+    const makeMap = async (name: string, revealed: boolean) => {
+      const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: asset, name, kind: "regional" }));
+      if (revealed) await post(base, `/api/v1/codex/maps/${map.data.map.id}/reveal`, GM, { revealed: true });
+      return map.data.map.id as string;
+    };
+    const makeMarker = async (mapId: string, label: string, revealedToPlayers: boolean) =>
+      (await body(await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label, revealedToPlayers }))).data.marker.id as string;
+
+    const openMap = await makeMap("Vallaki", true);
+    const secretMap = await makeMap("Amberhold", false);
+    const shownMarker = await makeMarker(openMap, "Blinsky toys", true);
+    const hiddenMarker = await makeMarker(openMap, "Vistani informant", false);
+    // The CD-6 shape: the pin itself is revealed, but it stands on a map the party has never seen.
+    const pinOnSecretMap = await makeMarker(secretMap, "Wyrmwood cache", true);
+    const entry = await body(await post(base, "/api/v1/codex/journal", GM, {
+      playerText: "The mists parted before us.", gmText: "Strahd was watching from the parapet.", revealedToPlayers: true
+    }));
+    return { base, openMap, secretMap, shownMarker, hiddenMarker, pinOnSecretMap, entryId: entry.data.entry.id as string };
+  }
+
+  const search = async (base: string, term: string, headers: Record<string, string>) =>
+    (await body(await get(base, `/api/v1/codex/search?q=${term}`, headers))).data.hits as Json[];
+
+  it("a player search cannot surface a REVEALED journal entry's GM-only text", async () => {
+    const { base, entryId } = await world();
+    // The entry is revealed, so the player legitimately has it - but "parapet" exists only in gmText.
+    expect(await search(base, "parapet", PLAYER)).toEqual([]);
+    expect(JSON.stringify(await body(await get(base, `/api/v1/codex/search?q=parapet`, PLAYER)))).not.toContain("Strahd");
+    // The player-layer half of the SAME entry is findable, which is what makes the miss meaningful.
+    const byPlayerText = await search(base, "mists", PLAYER);
+    expect(byPlayerText).toHaveLength(1);
+    expect(byPlayerText[0].kind).toBe("journal");
+    expect(byPlayerText[0].id).toBe(entryId);
+    expect(byPlayerText[0].title).toBe("The mists parted before us."); // the excerpt is the PLAYER layer
+    expect(JSON.stringify(byPlayerText)).not.toContain("Strahd");
+  });
+
+  it("a player search cannot surface a hidden marker's label", async () => {
+    const { base, shownMarker } = await world();
+    expect(await search(base, "Vistani", PLAYER)).toEqual([]);
+    // The revealed pin on the same revealed map IS findable - so the miss is the reveal flag, not the index.
+    expect(await search(base, "Blinsky", PLAYER)).toEqual([expect.objectContaining({ kind: "marker", id: shownMarker })]);
+  });
+
+  it("a player search cannot surface a REVEALED marker that sits on a secret map (CD-6)", async () => {
+    const { base, secretMap } = await world();
+    // A pin's own reveal flag is not the whole predicate: `GET /maps/:id/markers` 404s a player on an
+    // unrevealed map before projecting anything, so search must not be the way around that.
+    const hits = await search(base, "Wyrmwood", PLAYER);
+    expect(hits).toEqual([]);
+    expect(JSON.stringify(await body(await get(base, `/api/v1/codex/search?q=Wyrmwood`, PLAYER)))).not.toContain(secretMap);
+  });
+
+  it("a player search cannot surface a hidden map's name", async () => {
+    const { base, openMap } = await world();
+    expect(await search(base, "Amberhold", PLAYER)).toEqual([]);
+    expect(await search(base, "Vallaki", PLAYER)).toEqual([expect.objectContaining({ kind: "map", id: openMap })]);
+  });
+
+  it("a GM search finds every one of those, across all four record kinds", async () => {
+    const { base, secretMap, hiddenMarker, pinOnSecretMap, entryId } = await world();
+    await post(base, "/api/v1/codex/pages", GM, { title: "Ireena", playerBody: "Burgomaster's daughter" }); // unrevealed page
+    expect(await search(base, "parapet", GM)).toEqual([expect.objectContaining({ kind: "journal", id: entryId })]);
+    expect(await search(base, "Vistani", GM)).toEqual([expect.objectContaining({ kind: "marker", id: hiddenMarker })]);
+    expect(await search(base, "Wyrmwood", GM)).toEqual([expect.objectContaining({ kind: "marker", id: pinOnSecretMap })]);
+    expect(await search(base, "Amberhold", GM)).toEqual([expect.objectContaining({ kind: "map", id: secretMap })]);
+    expect((await search(base, "Ireena", GM)).map((hit) => hit.kind)).toEqual(["page"]);
+  });
+
+  it("a player hit carries only navigation fields - no bodies, reveal flags, or secret-map linkage", async () => {
+    const { base, openMap, shownMarker } = await world();
+    // Assert the EXACT key set, not a substring scan: this fails on ANY new field entering the player
+    // search projection, which is the check `viewer-safety.md` asks for on every projection change.
+    const marker = (await search(base, "Blinsky", PLAYER))[0];
+    expect(Object.keys(marker).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(marker.mapId).toBe(openMap);   // a player only ever gets a pin whose map is revealed
+    expect(marker.id).toBe(shownMarker);
   });
 });

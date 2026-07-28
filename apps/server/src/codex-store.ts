@@ -81,6 +81,16 @@ export type CodexBacklinkRow = Readonly<{
   section: string | null;
 }>;
 
+/**
+ * The record kinds the ONE suite-wide search index carries (CI-1 / R8). Adding a kind here is a
+ * viewer-safety change: every new kind needs its own row in `PLAYER_VISIBLE_SQL` below AND its own
+ * branch in `projectPlayerSearchHit`, copied from that kind's player LIST endpoint.
+ */
+export type CodexRecordKind = "page" | "journal" | "map" | "marker";
+export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker"];
+/** One search hit as the store returns it: what kind of record matched, and which one. */
+export type CodexSearchRef = Readonly<{ kind: CodexRecordKind; id: string }>;
+
 export type CodexMapKind = "battlemap" | "regional" | "world";
 export type CodexMapRow = Readonly<{
   id: string;
@@ -366,7 +376,79 @@ export const MIGRATIONS = [{
     ALTER TABLE codex_markers ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
     ALTER TABLE codex_journal ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
   `
+}, {
+  version: 11,
+  // CI-1 / R8 ("one search box, one result list, all record types"). Search stops being a pages-only
+  // idea: ONE unified index per audience carries every record kind, tagged with `kind` beside the id.
+  // Deliberately not four indexes unioned at query time - a second parallel search mechanism is exactly
+  // the root cause this overhaul exists to remove, and it would give journal/marker/map search its own
+  // visibility rules to drift away from the page ones.
+  //
+  // The old pages-only tables are BACKFILLED verbatim (so existing page search is bit-for-bit what it
+  // was) and then DROPPED, so there is one index and one sync path, not two to keep in step. Nothing
+  // outside this file ever read them.
+  //
+  // Two layers, exactly the page precedent: the player table receives ONLY player-layer text; the GM
+  // table receives both. Reveal state is NOT baked in - it is resolved against the live row at read
+  // time (see `searchAll`), so toggling a reveal never needs a reindex.
+  sql: `
+    CREATE VIRTUAL TABLE codex_search_player USING fts5(kind UNINDEXED, record_id UNINDEXED, title, body);
+    CREATE VIRTUAL TABLE codex_search_gm USING fts5(kind UNINDEXED, record_id UNINDEXED, title, body);
+
+    INSERT INTO codex_search_player (kind, record_id, title, body)
+      SELECT 'page', f.page_id, f.title, f.body || char(10) || COALESCE((SELECT group_concat(value, ' ') FROM json_each(p.tags_json)), '')
+      FROM codex_fts_player f JOIN codex_pages p ON p.id = f.page_id;
+    INSERT INTO codex_search_gm (kind, record_id, title, body)
+      SELECT 'page', f.page_id, f.title, f.body || char(10) || COALESCE((SELECT group_concat(value, ' ') FROM json_each(p.tags_json)), '')
+      FROM codex_fts_gm f JOIN codex_pages p ON p.id = f.page_id;
+
+    -- Maps and markers carry no GM-only TEXT (a name/label/tag set is single-layer), so both audiences
+    -- index the same string; what separates them is the read-time reveal predicate, not the content.
+    INSERT INTO codex_search_player (kind, record_id, title, body)
+      SELECT 'map', id, name, CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_maps.tags_json)), '') ELSE '' END FROM codex_maps;
+    INSERT INTO codex_search_gm (kind, record_id, title, body)
+      SELECT 'map', id, name, CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_maps.tags_json)), '') ELSE '' END FROM codex_maps;
+    INSERT INTO codex_search_player (kind, record_id, title, body)
+      SELECT 'marker', id, COALESCE(label, ''), CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_markers.tags_json)), '') ELSE '' END FROM codex_markers;
+    INSERT INTO codex_search_gm (kind, record_id, title, body)
+      SELECT 'marker', id, COALESCE(label, ''), CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_markers.tags_json)), '') ELSE '' END FROM codex_markers;
+
+    -- A journal entry DOES have two layers: gm_text is GM-only and must never enter the player table.
+    INSERT INTO codex_search_player (kind, record_id, title, body)
+      SELECT 'journal', id, '', player_text || ' ' || CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_journal.tags_json)), '') ELSE '' END FROM codex_journal;
+    INSERT INTO codex_search_gm (kind, record_id, title, body)
+      SELECT 'journal', id, '', player_text || ' ' || COALESCE(gm_text, '') || ' ' || CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_journal.tags_json)), '') ELSE '' END FROM codex_journal;
+
+    DROP TABLE codex_fts_player;
+    DROP TABLE codex_fts_gm;
+  `
 }];
+
+/**
+ * The player search index's visibility predicate, one arm per record kind. Each arm is COPIED from
+ * that kind's player LIST endpoint - if search were ever gated more weakly than the list, search would
+ * BE the leak. The arms and where they come from:
+ *
+ *   page    - `revealed = 1`. Same as `projectPlayerPageSummary` / `GET /codex/pages`.
+ *   journal - `revealed = 1`. Same as `projectPlayerJournalEntry` / `GET /codex/journal`. An entry's
+ *             own reveal flag is the WHOLE predicate: attaching an entry to a marker/page is an extra
+ *             GATE on the by-attachment read, never a reveal path, and the unfiltered timeline a player
+ *             gets is exactly "every revealed entry".
+ *   map     - `revealed = 1`. Same as `projectPlayerMap` / `GET /codex/maps`. (A hidden PARENT only
+ *             costs a revealed child its `parentMapId`; a search hit carries no parent link at all.)
+ *   marker  - `revealed = 1` AND ITS MAP'S `revealed = 1`. The marker's own flag is NOT sufficient:
+ *             `GET /codex/maps/:id/markers` 404s a player on an unrevealed map before projecting a
+ *             single pin (CD-6), so a revealed pin on a secret map is invisible and search must agree.
+ *
+ * `ELSE 0` fails closed: an unrecognized kind is never player-visible.
+ */
+const PLAYER_VISIBLE_SQL = `(CASE codex_search_player.kind
+  WHEN 'page' THEN EXISTS (SELECT 1 FROM codex_pages WHERE codex_pages.id = codex_search_player.record_id AND codex_pages.revealed = 1)
+  WHEN 'journal' THEN EXISTS (SELECT 1 FROM codex_journal WHERE codex_journal.id = codex_search_player.record_id AND codex_journal.revealed = 1)
+  WHEN 'map' THEN EXISTS (SELECT 1 FROM codex_maps WHERE codex_maps.id = codex_search_player.record_id AND codex_maps.revealed = 1)
+  WHEN 'marker' THEN EXISTS (SELECT 1 FROM codex_markers JOIN codex_maps ON codex_maps.id = codex_markers.map_id
+    WHERE codex_markers.id = codex_search_player.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
+  ELSE 0 END)`;
 
 type PageRow = {
   id: string; title: string; entity_type: string; fields_json: string; gm_fields_json: string; folder: string | null; tags_json: string; player_body: string;
@@ -655,7 +737,7 @@ export class CodexStore {
       database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(row.id, row.title, row.entity_type, row.fields_json, row.gm_fields_json, row.folder, row.tags_json, row.player_body, row.gm_body, row.revealed, row.banner_asset_id, row.rev, row.created_at, row.updated_at);
       this.rebuildLinks(pageId, row.player_body, row.gm_body);
-      this.rebuildFts(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json);
+      this.indexPage(pageId, row.title, row.player_body, row.gm_body, row.fields_json, row.gm_fields_json, row.tags_json);
       this.registerFolderPath(row.folder, stamp);
       this.snapshotRevision(pageId, row, "codex:create");
       this.bumpRevision();
@@ -706,7 +788,7 @@ export class CodexStore {
       database.prepare("UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, rev = ?, updated_at = ? WHERE id = ?")
         .run(next.title, next.entity_type, next.fields_json, next.gm_fields_json, next.folder, next.tags_json, next.player_body, next.gm_body, next.banner_asset_id, next.rev, next.updated_at, pageId);
       this.rebuildLinks(pageId, next.player_body, next.gm_body);
-      this.rebuildFts(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json);
+      this.indexPage(pageId, next.title, next.player_body, next.gm_body, next.fields_json, next.gm_fields_json, next.tags_json);
       this.registerFolderPath(next.folder, next.updated_at);
       this.snapshotRevision(pageId, next, authorTag);
       this.bumpRevision();
@@ -792,8 +874,7 @@ export class CodexStore {
     const database = this.requireDatabase();
     if (!ID.test(pageId)) return;
     this.transaction(() => {
-      database.prepare("DELETE FROM codex_fts_player WHERE page_id = ?").run(pageId);
-      database.prepare("DELETE FROM codex_fts_gm WHERE page_id = ?").run(pageId);
+      this.unindex("page", pageId);
       // Markers and journal pins that pointed here become label-only rather than dangling.
       // Drop the deleted page from every marker's page_ids array (json_group_array is NULL for an empty set).
       database.prepare("UPDATE codex_markers SET page_ids_json = COALESCE((SELECT json_group_array(value) FROM json_each(codex_markers.page_ids_json) WHERE value != ?), '[]'), updated_at = ? WHERE EXISTS (SELECT 1 FROM json_each(codex_markers.page_ids_json) WHERE value = ?)").run(pageId, this.stamp(), pageId);
@@ -917,18 +998,37 @@ export class CodexStore {
 
   // ----- Search -----
 
-  /** Full-text search over one audience's index. Player queries can only ever hit `player_body` text, and
-   *  are pre-filtered to revealed pages so unrevealed drafts don't crowd the result cap (they'd be
-   *  projected out anyway - this keeps genuinely-visible matches from being truncated behind them). */
-  searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
+  /**
+   * Suite-wide full-text search over ONE audience's index (CI-1 / R8: one search, every record kind).
+   *
+   * Two independent things keep a player out of GM content, and both matter:
+   *  1. CONTENT - the player index only ever received player-layer text (see `indexPage`/`indexEntry`),
+   *     so a GM body/note simply is not in the table a player query runs against.
+   *  2. VISIBILITY - `PLAYER_VISIBLE_SQL` re-checks the live row's reveal state per kind. This mirrors
+   *     the pages-only precedent, where the reveal join existed so unrevealed drafts don't crowd the
+   *     result cap; the audited safety gate is still `projectPlayerSearchHit`, which re-applies the
+   *     same predicate on the way out. Belt and braces, deliberately.
+   *
+   * Resolving reveal state at READ time (rather than baking it into the index) is what makes a reveal
+   * toggle - on a page, entry, marker, or the MAP A MARKER SITS ON - take effect with no reindex.
+   */
+  searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRef[] {
     const match = ftsQuery(query);
     if (!match) return [];
-    const sql = audience === "gm"
-      ? "SELECT page_id FROM codex_fts_gm WHERE codex_fts_gm MATCH ? ORDER BY rank LIMIT 50"
-      : "SELECT codex_fts_player.page_id FROM codex_fts_player JOIN codex_pages p ON p.id = codex_fts_player.page_id WHERE codex_fts_player MATCH ? AND p.revealed = 1 ORDER BY codex_fts_player.rank LIMIT 50";
+    const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
+    const kindFilter = kinds && kinds.length > 0 ? ` AND ${table}.kind IN (${kinds.map(() => "?").join(", ")})` : "";
+    const visibility = audience === "gm" ? "" : ` AND ${PLAYER_VISIBLE_SQL}`;
+    const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ?${kindFilter}${visibility} ORDER BY ${table}.rank LIMIT 50`;
     try {
-      return (this.requireDatabase().prepare(sql).all(match) as Array<{ page_id: string }>).map((row) => ({ pageId: row.page_id }));
+      return (this.requireDatabase().prepare(sql).all(match, ...(kinds ?? [])) as Array<{ kind: string; record_id: string }>)
+        .filter((row): row is { kind: CodexRecordKind; record_id: string } => (CODEX_RECORD_KINDS as readonly string[]).includes(row.kind))
+        .map((row) => ({ kind: row.kind, id: row.record_id }));
     } catch { return []; }
+  }
+
+  /** The pages-only view of the same one index - kept so the page-search contract is provably unchanged. */
+  searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
+    return this.searchAll(audience, query, ["page"]).map((hit) => ({ pageId: hit.id }));
   }
 
   // ----- Maps (the atlas tree) -----
@@ -940,9 +1040,12 @@ export class CodexStore {
     const parent = optionalId(input.parentMapId);
     if (parent && !this.mapRowRaw(parent)) throw new CodexNotFoundError("The parent map no longer exists.");
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_maps").get() as { m: number | null }).m ?? 0) + 1;
+    const name = mapName(input.name);
+    const tagsJson = JSON.stringify(tags(input.tags));
     this.transaction(() => {
       database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(mapId, id(input.assetId), mapName(input.name), mapKind(input.kind), parent, input.revealedToPlayers ? 1 : 0, sortKey, JSON.stringify(tags(input.tags)), stamp, stamp);
+        .run(mapId, id(input.assetId), name, mapKind(input.kind), parent, input.revealedToPlayers ? 1 : 0, sortKey, tagsJson, stamp, stamp);
+      this.indexMap(mapId, name, tagsJson);
       this.bumpRevision();
     });
     return this.getMap(mapId)!;
@@ -957,6 +1060,7 @@ export class CodexStore {
     const tagsJson = input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags));
     this.transaction(() => {
       database.prepare("UPDATE codex_maps SET name = ?, kind = ?, tags_json = ?, updated_at = ? WHERE id = ?").run(name, kind, tagsJson, this.stamp(), mapId);
+      this.indexMap(mapId, name, tagsJson);
       this.bumpRevision();
     });
     return this.getMap(mapId)!;
@@ -1004,6 +1108,10 @@ export class CodexStore {
       database.prepare("UPDATE codex_markers SET sub_map_id = NULL, updated_at = ? WHERE sub_map_id = ?").run(this.stamp(), mapId);
       // Journal pins to this map's own (about-to-cascade) markers are released first, so they don't dangle.
       database.prepare("UPDATE codex_journal SET attach_marker_id = NULL, updated_at = ? WHERE attach_marker_id IN (SELECT id FROM codex_markers WHERE map_id = ?)").run(this.stamp(), mapId);
+      // The markers cascade away in SQL, so their index rows have to be swept explicitly - an orphaned
+      // marker row would keep matching searches forever with no live row left to gate it.
+      for (const row of database.prepare("SELECT id FROM codex_markers WHERE map_id = ?").all(mapId) as Array<{ id: string }>) this.unindex("marker", row.id);
+      this.unindex("map", mapId);
       // Own markers cascade; child maps' parent_map_id is set null by the FK.
       database.prepare("DELETE FROM codex_maps WHERE id = ?").run(mapId);
       this.bumpRevision();
@@ -1026,10 +1134,13 @@ export class CodexStore {
     if (!this.mapRowRaw(mapId)) throw new CodexNotFoundError("That map no longer exists.");
     const markerId = this.freshId();
     const stamp = this.stamp();
+    const label = markerLabel(input.label);
+    const tagsJson = JSON.stringify(tags(input.tags));
     this.transaction(() => {
       database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(markerId, mapId, coord(input.x), coord(input.y), iconId(input.iconId), hexColor(input.iconColor), markerLabel(input.label), input.revealedToPlayers ? 1 : 0,
-          JSON.stringify(idArray(input.pageIds)), optionalId(input.subMapId), JSON.stringify(idArray(input.sceneIds)), optionalId(input.actorId), JSON.stringify(tags(input.tags)), stamp, stamp);
+        .run(markerId, mapId, coord(input.x), coord(input.y), iconId(input.iconId), hexColor(input.iconColor), label, input.revealedToPlayers ? 1 : 0,
+          JSON.stringify(idArray(input.pageIds)), optionalId(input.subMapId), JSON.stringify(idArray(input.sceneIds)), optionalId(input.actorId), tagsJson, stamp, stamp);
+      this.indexMarker(markerId, label, tagsJson);
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -1055,6 +1166,7 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_ids_json = ?, sub_map_id = ?, scene_ids_json = ?, actor_id = ?, tags_json = ?, updated_at = ? WHERE id = ?")
         .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_ids_json, merged.sub_map_id, merged.scene_ids_json, merged.actor_id, merged.tags_json, this.stamp(), markerId);
+      this.indexMarker(markerId, merged.label, merged.tags_json);
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -1087,6 +1199,7 @@ export class CodexStore {
       const database = this.requireDatabase();
       // Journal pins to this marker become label-only rather than dangling.
       database.prepare("UPDATE codex_journal SET attach_marker_id = NULL, updated_at = ? WHERE attach_marker_id = ?").run(this.stamp(), markerId);
+      this.unindex("marker", markerId);
       database.prepare("DELETE FROM codex_markers WHERE id = ?").run(markerId);
       this.bumpRevision();
     });
@@ -1218,6 +1331,7 @@ export class CodexStore {
     this.transaction(() => {
       database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, updated_at = ? WHERE id = ?")
         .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, this.stamp(), entryId);
+      this.indexEntry(entryId, next.player_text, next.gm_text, next.tags_json);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -1236,6 +1350,7 @@ export class CodexStore {
   deleteEntry(entryId: string): void {
     if (!ID.test(entryId)) return;
     this.transaction(() => {
+      this.unindex("journal", entryId);
       this.requireDatabase().prepare("DELETE FROM codex_journal WHERE id = ?").run(entryId);
       this.bumpRevision();
     });
@@ -1267,9 +1382,11 @@ export class CodexStore {
     const stamp = this.stamp();
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
     const date = fields.inWorldDate;
+    const tagsJson = JSON.stringify(tags(fields.tags));
     this.transaction(() => {
       database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, JSON.stringify(tags(fields.tags)), stamp, stamp);
+        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, stamp, stamp);
+      this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -1329,15 +1446,60 @@ export class CodexStore {
     for (const link of links) insert.run(pageId, link.layer, link.targetKind, link.targetRef, link.section);
   }
 
-  private rebuildFts(pageId: string, pageTitle: string, playerBody: string, gmBody: string, fieldsJson: string, gmFieldsJson: string) {
+  // ----- Search index upkeep (the ONE index, both audiences) -----
+  //
+  // Every method that changes a record's indexed TEXT calls its `index*` twin inside the same
+  // transaction; every delete calls `unindex`. Reveal flags are NOT indexed (resolved at read time),
+  // so `set*Revealed` and `moveMarker` deliberately do not reindex.
+
+  /** Replace one record's row in both indexes. `player` must contain player-layer text ONLY. */
+  private indexRecord(kind: CodexRecordKind, recordId: string, player: { title: string; body: string }, gm: { title: string; body: string }) {
     const database = this.requireDatabase();
-    database.prepare("DELETE FROM codex_fts_player WHERE page_id = ?").run(pageId);
-    database.prepare("DELETE FROM codex_fts_gm WHERE page_id = ?").run(pageId);
+    this.unindex(kind, recordId);
+    database.prepare("INSERT INTO codex_search_player (kind, record_id, title, body) VALUES (?, ?, ?, ?)").run(kind, recordId, player.title, player.body);
+    database.prepare("INSERT INTO codex_search_gm (kind, record_id, title, body) VALUES (?, ?, ?, ?)").run(kind, recordId, gm.title, gm.body);
+  }
+
+  private unindex(kind: CodexRecordKind, recordId: string) {
+    const database = this.requireDatabase();
+    database.prepare("DELETE FROM codex_search_player WHERE kind = ? AND record_id = ?").run(kind, recordId);
+    database.prepare("DELETE FROM codex_search_gm WHERE kind = ? AND record_id = ?").run(kind, recordId);
+  }
+
+  private indexPage(pageId: string, pageTitle: string, playerBody: string, gmBody: string, fieldsJson: string, gmFieldsJson: string, tagsJson: string) {
     const fieldText = Object.values(parseFields(fieldsJson)).join(" ");     // public field VALUES (race, ruler, ...)
     const gmFieldText = Object.values(parseFields(gmFieldsJson)).join(" ");  // GM-only field values (secret motives)
-    // Player index carries ONLY player-facing text (body + public fields): a player search can never surface gm content.
-    database.prepare("INSERT INTO codex_fts_player (page_id, title, body) VALUES (?, ?, ?)").run(pageId, pageTitle, `${playerBody}\n${fieldText}`);
-    database.prepare("INSERT INTO codex_fts_gm (page_id, title, body) VALUES (?, ?, ?)").run(pageId, pageTitle, `${playerBody}\n${gmBody}\n${fieldText}\n${gmFieldText}`);
+    // Tags are indexed for pages too. Maps, markers and journal entries all index theirs, so leaving pages
+    // out made ONE search box answer a tag query differently depending on what happened to carry the tag —
+    // which reads as a broken search, not as a boundary. R8 ("one result list, all record types") plus CI-2
+    // ("tags on all record types") only hold together if a tag matches uniformly. This DOES widen existing
+    // page search: a page tagged `villain` now matches "villain". Deliberate; see the decision log.
+    const tagText = parseTags(tagsJson).join(" ");
+    // Player index carries ONLY player-facing text (body + public fields + tags, which are already
+    // player-visible on a revealed page): a player search can never surface gm content.
+    this.indexRecord("page", pageId,
+      { title: pageTitle, body: `${playerBody}\n${fieldText}\n${tagText}` },
+      { title: pageTitle, body: `${playerBody}\n${gmBody}\n${fieldText}\n${gmFieldText}\n${tagText}` });
+  }
+
+  /** A map's name + tags. Single-layer text (no GM-only half), so both audiences index the same string. */
+  private indexMap(mapId: string, name: string, tagsJson: string) {
+    const row = { title: name, body: parseTags(tagsJson).join(" ") };
+    this.indexRecord("map", mapId, row, row);
+  }
+
+  /** A marker's label + tags. Single-layer text; a hidden pin is hidden by the read-time predicate. */
+  private indexMarker(markerId: string, label: string | null, tagsJson: string) {
+    const row = { title: label ?? "", body: parseTags(tagsJson).join(" ") };
+    this.indexRecord("marker", markerId, row, row);
+  }
+
+  /** A journal entry is two-layer like a page: `gmText` goes ONLY into the GM index. */
+  private indexEntry(entryId: string, playerText: string, gmText: string | null, tagsJson: string) {
+    const tagText = parseTags(tagsJson).join(" ");
+    this.indexRecord("journal", entryId,
+      { title: "", body: `${playerText}\n${tagText}` },
+      { title: "", body: `${playerText}\n${gmText ?? ""}\n${tagText}` });
   }
 
   private snapshotRevision(pageId: string, row: PageRow, authorTag: string) {

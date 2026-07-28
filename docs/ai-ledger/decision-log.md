@@ -7,6 +7,43 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-28 — Codex overhaul M6: one search index, and tags that match uniformly
+
+1. **One unified FTS index, and the pages-only tables are dropped.** Migration v11 creates
+   `codex_search_player` / `codex_search_gm` — `fts5(kind UNINDEXED, record_id UNINDEXED, title, body)` —
+   backfills the existing page rows, adds maps, markers and journal entries, then **drops
+   `codex_fts_player` / `codex_fts_gm`**. Keeping the old pair alongside the new one would have meant two
+   sync paths to hold in step on every page edit, which is the parallel-mechanism root cause this whole
+   overhaul exists to remove (assessment root cause 1), and design rule **R8** is explicit: *"One search
+   box, one result list, all record types."* `searchPages` survives as a kind-filtered read of the same
+   index, so page search behaviour is preserved by construction rather than by a second mechanism.
+
+2. **Reveal state is deliberately NOT indexed.** It is resolved against the live row at read time, so
+   toggling a reveal — including on the *map a marker sits on* — needs no reindex and cannot leave the
+   index disagreeing with the record. Index writes happen only where indexed *text* changes.
+
+3. **The player index mirrors each kind's player LIST predicate, and fails closed.** A player-visible
+   index is a player-facing projection (`.claude/rules/viewer-safety.md`), so a weaker predicate here
+   would make search the leak. Pages/journal/maps gate on their own reveal flag; **a marker requires its
+   own flag AND its map's**, which is CD-6's lesson carried into search — a shown pin on a secret map is
+   invisible to players, so it must not be findable either. Applied twice on purpose: in SQL (with
+   `ELSE 0`, so an unknown kind is invisible rather than public) to stop hidden records crowding the
+   result cap, and again in `projectPlayerSearchHit` as the audited gate. A marker hit carries no parent
+   link at all, so the hidden-parent-map rule holds by construction.
+
+4. **Page tags are indexed too — a deliberate widening of existing page search.** Maps, markers and
+   journal entries index their tags, and leaving pages out meant one search box answered a tag query
+   differently depending on which record happened to carry the tag. That reads as a broken search, not as
+   a boundary. **R8 and CI-2 ("tags on all record types") only hold together if a tag matches uniformly.**
+   The cost is real and is accepted: a page tagged `villain` now matches a "villain" search, which it did
+   not before. Reversible by dropping `tagText` from `indexPage`. The v11 backfill carries page tags as
+   well, so an upgraded database indexes pages identically to a freshly written one.
+
+5. **CI-2 shipped as store + edit + search, not as a cross-type filter.** Clicking a tag still filters
+   Pages exactly as before. A tag click that returns every record type needs a cross-type result surface
+   that overlaps M7's navigation work, so it was recorded rather than built. Put to the owner and not
+   answered; the literal reading of CI-2 was taken and is easy to widen later.
+
 ## 2026-07-28 — Codex overhaul M5: the entity field table becomes shared, and the touch floor reaches a canvas
 
 1. **The Codex entity field table moves to `@vtt/domain`; presentation stays on the client.**
