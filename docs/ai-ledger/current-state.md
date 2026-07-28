@@ -601,6 +601,25 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex suite overhaul — Stage One assessment complete (2026-07-28, branch
+  `claude/codex-suite-overhaul-nyeqg0`).** A current-state assessment of the whole Codex suite
+  (World · Pages · Atlas · Journal · Graph) is **`docs/product/codex-suite-assessment.md`** — the
+  single source of truth for this programme; do not restate its contents here. Investigation only:
+  **no product code changed**, baseline recorded green (`check`/`test`/`build` all exit 0, 49 Codex
+  server tests). Three root causes evidenced: the Codex is a **parallel component vocabulary**
+  (12 shared `@vtt/ui` primitives vs 24 in the comparable Homebrew surface, with `SaveState`/`Chip`/
+  `Menu`/`TagInput`/`Skeleton`/`Alert` each hand-rolled); **five capabilities are fully built with
+  zero UI callers** (player search, `journalApi.forMarker`, `atlasApi.updateMap`/`setMapParent`,
+  marker `actorId`) plus a write-only combat-history bridge; and the five areas **share a shell but
+  not a system** (navigation is a star into Pages with no return edges; tags/folders/search are
+  pages-only). Eight confirmed defects are tabled there, the most serious being **journal draft data
+  loss** (`JournalView.tsx:52-58,76-84`). **Two facts that constrain any Codex work:**
+  `apps/client` and `packages/ui` have **no test script**, and there is **no browser-test harness in
+  the repo** — so ~3,485 LOC of Codex React has no automated regression protection, and ledger
+  claims of "browser-verified" are not reproducible. Consequently, **treat this ledger as evidence of
+  intent and history, not of current verified state** — at least one recorded "verified" claim
+  (graph legend touch targets, line 266) is not borne out by the code. Awaiting Stage Two product
+  discovery; 13 open product questions are listed in §8 of the assessment.
 - **Character builder — Phase 1 foundation (2026-07-26, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
   The approved plan (16 discovery decisions + architecture principles) is `docs/task-packets/character-builder.md`:
   a guided wizard for **GM and player**, levels **1-20 with multiclass**, creation + level-up + respec, a
