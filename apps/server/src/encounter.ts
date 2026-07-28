@@ -1,5 +1,9 @@
 import type { ActorDefinition, EncounterStartEntry, GameState, InitiativeEntry } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
+import { aggregateRollMode, collectRiders, type RollModeSource } from "@vtt/rules-5e";
+import { deriveEquipment } from "./equipment-derivation.js";
+import { effectiveActions } from "./effective-actions.js";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
@@ -15,12 +19,12 @@ type StartEncounterInput = Readonly<{
 const EMPTY_TURN = { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 } as const;
 
 /** A fresh fight refreshes per-encounter limited-use pools (Frenzy next fight) and recharge pools (a dragon opens with its breath ready); long-rest pools persist until a rest. */
-function clearPerEncounterUses(state: GameState, combatantIds: ReadonlySet<string>, resolveDefinition: (definitionId: string) => ActorDefinition | undefined) {
+function clearPerEncounterUses(state: GameState, combatantIds: ReadonlySet<string>, resolveDefinition: (definitionId: string) => ActorDefinition | undefined, catalog?: EquipmentCatalog) {
   for (const actor of state.actors) {
     if (!combatantIds.has(actor.id) || !actor.definitionId) continue;
     const definition = resolveDefinition(actor.definitionId);
     if (!definition) continue;
-    for (const action of definition.actions) {
+    for (const action of effectiveActions(definition, actor, catalog)) {
       if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge") continue;
       const key = action.uses.pool ?? action.id;
       if (actor.actionUses[key] !== undefined) {
@@ -33,6 +37,38 @@ function clearPerEncounterUses(state: GameState, combatantIds: ReadonlySet<strin
 
 const validScore = (value: number) => Number.isInteger(value) && value >= -1000 && value <= 1000;
 
+/**
+ * Criterion 5 - "advantage on Initiative while attuned". The initiative roll already supports
+ * advantage/disadvantage (2024 Surprise rolls with disadvantage), so a `roll-mode {roll: "initiative"}`
+ * rider only has to reach the same switch. 5e cancellation applies: any advantage plus any
+ * disadvantage is a normal roll, which is what `aggregateRollMode` already encodes.
+ */
+export function initiativeRollMode(state: GameState, actorId: string, resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined, catalog: EquipmentCatalog | undefined): "advantage" | "disadvantage" | "normal" {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || !catalog) return "normal";
+  const definition = actor.definitionId ? resolveDefinition?.(actor.definitionId) : undefined;
+  const derivation = deriveEquipment(actor, definition, catalog);
+  const advantage: RollModeSource[] = [];
+  const disadvantage: RollModeSource[] = [];
+  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: "on-initiative-roll" })) {
+    if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "initiative") continue;
+    (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: rider.label });
+  }
+  // A rider with NO `when` is standing, and "advantage on Initiative" is the natural way to author it.
+  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null })) {
+    if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "initiative") continue;
+    (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: rider.label });
+  }
+  return aggregateRollMode(advantage, disadvantage).mode;
+}
+
+/** Roll one initiative d20 under an aggregated roll mode. */
+function rollUnderMode(rollD20: () => number, mode: "advantage" | "disadvantage" | "normal"): number {
+  if (mode === "advantage") return Math.max(rollD20(), rollD20());
+  if (mode === "disadvantage") return Math.min(rollD20(), rollD20());
+  return rollD20();
+}
+
 function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
   const names = new Map(state.actors.map((actor) => [actor.id, actor.name]));
   return [...entries].sort((left, right) => right.score - left.score
@@ -41,7 +77,7 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
     || left.actorId.localeCompare(right.actorId));
 }
 
-export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined, now: number = Date.now()) {
+export function startEncounter(state: GameState, input: StartEncounterInput, rollD20: () => number, tokenGeometry: TokenMapGeometry, resolveDefinition?: (definitionId: string) => ActorDefinition | undefined, now: number = Date.now(), catalog?: EquipmentCatalog) {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200) throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
   // When a prepared scene is live, the encounter must run on that scene's map so park/resume stays coherent.
@@ -64,9 +100,13 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
     // 2024 Surprise: a surprised combatant rolls initiative with disadvantage (two d20s, keep lower).
-    const rolled = entry.score === undefined
-      ? (entry.surprised === true ? Math.min(rollD20(), rollD20()) : rollD20()) + tieBreaker
-      : entry.score;
+    // An item's `roll-mode {roll: "initiative"}` rider joins the same aggregation, so a cloak of
+    // advantage and Surprise cancel to a normal roll exactly as 5e says they should.
+    const itemMode = initiativeRollMode(state, actor.id, resolveDefinition, catalog);
+    const mode = entry.surprised === true
+      ? aggregateRollMode(itemMode === "advantage" ? [{ source: "item", label: "Item" }] : [], [{ source: "surprised", label: "Surprised" }]).mode
+      : itemMode;
+    const rolled = entry.score === undefined ? rollUnderMode(rollD20, mode) + tieBreaker : entry.score;
     if (!validScore(rolled)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
     if (input.playersRollInitiative && entry.score === undefined && actor.kind === "player-character" && actor.ownerSessionId !== null) pendingInitiative.push(actor.id);
     return { actorId: actor.id, score: rolled, tieBreaker };
@@ -99,7 +139,7 @@ export function startEncounter(state: GameState, input: StartEncounterInput, rol
     historyCursor: null,
     historyDirty: false
   };
-  if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition);
+  if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its token. GM-only at the command layer. */
@@ -199,6 +239,8 @@ function settleGatherIfComplete(state: GameState) {
 /** Dependencies for start-of-turn recharge rolls; optional so scene bookkeeping paths can advance turns without them. */
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  /** The item catalog, so an item's recharge pool re-arms with the stat block's (see `effectiveActions`). */
+  catalog?: EquipmentCatalog;
   rollDie: (sides: number) => number;
 }>;
 
@@ -213,7 +255,7 @@ function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps,
   const definition = deps.resolveDefinition(actor.definitionId);
   if (!definition) return;
   const rolledPools = new Set<string>();
-  for (const action of definition.actions) {
+  for (const action of effectiveActions(definition, actor, deps.catalog)) {
     if (action.uses?.per !== "recharge" || action.uses.recharge === undefined) continue;
     const key = action.uses.pool ?? action.id;
     if (rolledPools.has(key) || (actor.actionUses[key] ?? 0) === 0) continue;

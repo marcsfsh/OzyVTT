@@ -4,6 +4,7 @@ import {
   type ClassLevelEntry
 } from "@vtt/rules-5e";
 import { endEffectsSustainedBy } from "./effects.js";
+import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ACTORS = 200;
@@ -61,8 +62,21 @@ export function seedHitDice(definition: ActorDefinition): Actor["hitDice"] {
  *
  * Single-sourced: seeding (`instantiate`, the example party), the long rest, and the slot-spend clamp
  * all read this, so they can never disagree about a character's maximum.
+ *
+ * `equipmentSlots` layers an item's granted slots on top (criterion 8: an amulet with one extra
+ * 1st-level slot). Because every reader goes through this one function, the seed, the long-rest
+ * refill and the spend clamp cannot disagree about the bonus slot either - which is exactly why the
+ * rider targets this function rather than writing a number anywhere.
  */
-export function spellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
+export function spellSlotMaxima(definition: ActorDefinition | undefined, equipmentSlots: readonly { level: number; amount: number }[] = []): ReadonlyArray<{ level: number; max: number }> {
+  const base = baseSpellSlotMaxima(definition);
+  if (equipmentSlots.length === 0) return base;
+  const byLevel = new Map(base.map((slot) => [slot.level, slot.max] as const));
+  for (const bonus of equipmentSlots) byLevel.set(bonus.level, Math.max(0, (byLevel.get(bonus.level) ?? 0) + bonus.amount));
+  return [...byLevel].filter(([, max]) => max > 0).map(([level, max]) => ({ level, max })).sort((a, b) => a.level - b.level);
+}
+
+function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
   const spellcasting = definition?.spellcasting;
   if (!spellcasting) return [];
   if (spellcasting.slots.length > 0) return spellcasting.slots;
@@ -86,9 +100,9 @@ export function pactSlotMaximum(definition: ActorDefinition | undefined): { leve
 }
 
 /** Live spell-slot pools for a freshly instantiated actor; null = not a modeled spellcaster. */
-export function seedSpellSlots(definition: ActorDefinition): Actor["spellSlots"] {
+export function seedSpellSlots(definition: ActorDefinition, equipmentSlots: readonly { level: number; amount: number }[] = []): Actor["spellSlots"] {
   if (!definition.spellcasting) return null;
-  return spellSlotMaxima(definition).map((slot) => ({ level: slot.level, remaining: slot.max }));
+  return spellSlotMaxima(definition, equipmentSlots).map((slot) => ({ level: slot.level, remaining: slot.max }));
 }
 
 /** Live Pact Magic pool for a freshly instantiated actor; null = no pact pool. */
@@ -122,10 +136,15 @@ export function armorClassRiderOf(definition: ActorDefinition): number {
   return 0;
 }
 
-function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
+function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string, catalog?: EquipmentCatalog) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), inventory);
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog));
+  // The SECOND of the two reconciliation points (the other is every inventory write). Seeding through
+  // the same derivation is what makes a monster or a PDF import - neither of which ever runs the
+  // character builder - carry its equipment's riders from the moment it reaches the table.
+  const seed = { inventory, effects: [], conditions: [], hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum, temporary: 0 } } as unknown as Actor;
+  const derivation = deriveEquipment(seed, definition, catalog);
   state.actors.push({
     id,
     name: dedupedName(state, definition.name),
@@ -135,8 +154,8 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     // AC derives from equipped armor/shields when the loadout has any (v6 #5); otherwise the stored
     // stat-block AC stands (natural/mage armor, monsters). The sheet's flat rider is added back on
     // top of the derived value, so a builder-made definition and its live actor cannot disagree.
-    armorClass: equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition),
-    initiative: definition.initiativeBonus,
+    armorClass: (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) + derivation.armorClass,
+    initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
     conditions: [],
     effects: [],
@@ -146,7 +165,7 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
     hitDice: seedHitDice(definition),
-    spellSlots: seedSpellSlots(definition),
+    spellSlots: seedSpellSlots(definition, derivation.spellSlots),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
     inventory,
@@ -159,10 +178,10 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
   });
 }
 
-export function addActorFromDefinition(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only") {
+export function addActorFromDefinition(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", catalog?: EquipmentCatalog) {
   if (definition.schemaId !== "vtt.actor-monster") throw new CommandRejectedError("Only monster definitions can be added this way.");
   if (!definition.source.externalId) throw new CommandRejectedError("That bundled definition is missing its content id.");
-  instantiate(state, definition, id, visibility, "monster", definition.source.externalId);
+  instantiate(state, definition, id, visibility, "monster", definition.source.externalId, catalog);
 }
 
 /**
@@ -170,11 +189,11 @@ export function addActorFromDefinition(state: GameState, definition: ActorDefini
  * definition persists with the campaign and a live actor is instantiated from it. Characters
  * become claimable player-characters; the ActorDefinitionSchema already forces them friendly.
  */
-export function importActorDefinition(state: GameState, definition: ActorDefinition, actorId: string, visibility: "public" | "gm-only") {
+export function importActorDefinition(state: GameState, definition: ActorDefinition, actorId: string, visibility: "public" | "gm-only", catalog?: EquipmentCatalog) {
   if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS) throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? "player-character" as const : "monster" as const;
-  instantiate(state, definition, actorId, visibility, kind, definitionId);
+  instantiate(state, definition, actorId, visibility, kind, definitionId, catalog);
   state.definitions = [...state.definitions, { id: definitionId, definition }];
 }
 

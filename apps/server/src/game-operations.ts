@@ -7,6 +7,8 @@ import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
 import { actionAvailability, resolveDefinitionAction } from "./action-resolution.js";
+import { effectiveActions } from "./effective-actions.js";
+import { equipmentCatalogOf } from "./equipment-derivation.js";
 import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "./actor-roster.js";
@@ -155,6 +157,14 @@ export function createGameOperations(context: GameOperationsContext) {
    */
   const audienceOf = (principal: GamePrincipal): ContentAudience => isGmGrade(principal) ? "gm" : "player";
   const catalogFor = (principal: GamePrincipal) => contentLibrary.forAudience(audienceOf(principal));
+  /**
+   * PLAY-TIME item catalog - where magic-item riders live (never on the inventory row, so a cursed
+   * item's mechanics cannot reach the player through their own projection). Deliberately the GM
+   * audience and NOT `catalogFor(principal)`: a player must be able to roll their own GM-authored
+   * cursed sword, and a player-audience view would resolve it to nothing and silently make the item
+   * mundane. What a player may BROWSE stays gated on the catalog read, not on the rules engine.
+   */
+  const equipmentCatalog = () => equipmentCatalogOf(contentLibrary.forAudience("gm"));
 
   /**
    * PLAY-TIME definition lookup, hoisted so the ten transaction-scoped copies of this expression
@@ -308,7 +318,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const { commandId, mapAssetId, entries, rulesMode, playersRollInitiative, expectedRevision } = request;
       const tokenGeometry = await context.tokenGeometryFor(mapAssetId);
       const result = await store.executeTimeline({ id: commandId, type: "encounter.start", expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
-        startEncounter(state, { mapAssetId, entries, rulesMode, playersRollInitiative }, () => context.random(20), tokenGeometry, (definitionId) => resolveDefinitionIn(state, definitionId));
+        startEncounter(state, { mapAssetId, entries, rulesMode, playersRollInitiative }, () => context.random(20), tokenGeometry, (definitionId) => resolveDefinitionIn(state, definitionId), Date.now(), equipmentCatalog());
         // Fresh fight: clear any prior encounter's snapshots and record this start as the baseline
         // the GM can always rewind back to (a distinct label so it reads apart from turn boundaries).
         timeline.truncateAll();
@@ -448,6 +458,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.executeTimeline({ id: request.commandId, type: "initiative.next", expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state, timeline) => {
         outcome = planNextTurn(state, timeline, request.confirmRewrite === true, (advancing) => nextInitiativeTurn(advancing, effectEvents, {
           resolveDefinition: (definitionId) => resolveDefinitionIn(advancing, definitionId),
+          catalog: equipmentCatalog(),
           rollDie: (sides) => context.random(sides)
         }));
       });
@@ -478,6 +489,7 @@ export function createGameOperations(context: GameOperationsContext) {
         if (state.combat.historyCursor !== null) throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
         planNextTurn(state, timeline, false, (advancing) => endTurn(advancing, scope, effectEvents, {
           resolveDefinition: (definitionId) => resolveDefinitionIn(advancing, definitionId),
+          catalog: equipmentCatalog(),
           rollDie: (sides) => context.random(sides)
         }));
       });
@@ -570,6 +582,7 @@ export function createGameOperations(context: GameOperationsContext) {
           },
           override: request.override ?? null,
           resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+          catalog: equipmentCatalog(),
           newPromptId: context.newId,
           now: Date.now,
           commandId
@@ -607,7 +620,7 @@ export function createGameOperations(context: GameOperationsContext) {
       // Like annotation:add, the commandId doubles as the new entity id so a duplicate
       // delivery acks the same actorId instead of minting a fresh unused one.
       const actorId = request.commandId;
-      const result = await store.execute({ id: request.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => addActorFromDefinition(state, definition, actorId, request.visibility));
+      const result = await store.execute({ id: request.commandId, type: "actor.add-from-definition", actorId, expectedRevision: request.expectedRevision, payload: request, principal: principalTag(principal) }, (state) => addActorFromDefinition(state, definition, actorId, request.visibility, equipmentCatalog()));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
@@ -622,7 +635,7 @@ export function createGameOperations(context: GameOperationsContext) {
         throw new GameInputError(`That file is not a valid actor definition (${issue.path.join(".") || "root"}: ${issue.message}).`);
       }
       const actorId = envelope.commandId;
-      const result = await store.execute({ id: envelope.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.expectedRevision, payload: envelope, principal: principalTag(principal) }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.visibility));
+      const result = await store.execute({ id: envelope.commandId, type: "actor.import-definition", actorId, expectedRevision: envelope.expectedRevision, payload: envelope, principal: principalTag(principal) }, (state) => importActorDefinition(state, parsed.data, actorId, envelope.visibility, equipmentCatalog()));
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate, actorId };
     },
@@ -640,7 +653,7 @@ export function createGameOperations(context: GameOperationsContext) {
         // to name a GM-only homebrew class id they were never shown. GM-only today, so the audience
         // is always "gm" - passing it anyway is what keeps phase 3's player path correct by default.
         const definition = buildCharacterDefinition(request, catalogFor(principal), state.builderPolicy);
-        importActorDefinition(state, definition, actorId, "public");
+        importActorDefinition(state, definition, actorId, "public", equipmentCatalog());
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
@@ -854,7 +867,9 @@ export function createGameOperations(context: GameOperationsContext) {
         const definition = attacker.definitionId ? resolveDefinitionIn(state, attacker.definitionId) : undefined;
         // The stat block wins on id collision; the builtin catalog (Dodge, Dash, Unarmed Strike, ...)
         // covers every combatant - including one without a definition.
-        const statBlockAction = definition?.actions.find((candidate) => candidate.id === actionId);
+        // EFFECTIVE actions: an item's derived action id (`item-<itemId>`) is otherwise unresolvable,
+        // and a stat-block action's item-raised numbers would be read at their base values.
+        const statBlockAction = effectiveActions(definition, attacker, equipmentCatalog()).find((candidate) => candidate.id === actionId);
         const action = statBlockAction ?? builtinAction(actionId);
         if (!action) throw new CommandRejectedError("That action is not on the stat block.");
         const isBuiltin = statBlockAction === undefined;
@@ -886,7 +901,7 @@ export function createGameOperations(context: GameOperationsContext) {
           if (!geometry) return null;
           return tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null;
         };
-        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId) });
+        resolution = resolveDefinitionAction(state, action, { actorId, targetIds: resolvedTargetIds, commandId, conditionId: effectiveConditionId, rollMode: rollMode ?? null, override: isPlayer ? null : (override ?? null), builtin: isBuiltin, note: effectiveNote, effectId: request.effectId ?? null, cover: effectiveCover, commit, attackNatural, attackTotal, critical }, { random: (sides) => context.random(sides), newRollId: context.newId, gmSessionId, initiatorRole: initiator.role, initiatorSessionId: sessionIdOf(principal), now: () => new Date().toISOString(), hasCondition: (id) => catalogFor(principal).hasCondition(id), definition, distanceFeet, resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId), catalog: equipmentCatalog() });
         // A player's confirmed hit is settled server-side per the table's player-damage policy - parked as a
         // GM-confirmed proposal (default), or applied directly when the GM opted the table in - so the player
         // never mutates a creature they don't own. GM/integration resolves keep the runner's explicit Apply.
@@ -961,7 +976,8 @@ export function createGameOperations(context: GameOperationsContext) {
           sessionId,
           role: scope.role,
           now: () => new Date().toISOString(),
-          resolveDefinition
+          resolveDefinition,
+          catalog: equipmentCatalog()
         }, legendaryResistance, rollMode);
       });
       const outcome = answered?.outcome;
@@ -993,6 +1009,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "reaction.answer", expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         outcome = answerReaction(state, commandId, reactionId, use, chosenActionId, scope, {
           resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+          catalog: equipmentCatalog(),
           random: (sides) => context.random(sides),
           newRollId: context.newId,
           gmSessionId,
@@ -1047,12 +1064,15 @@ export function createGameOperations(context: GameOperationsContext) {
       const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new CommandRejectedError("That combatant's stat block is unavailable.");
       // Stat-block rows first, then the builtin generic actions (a stat block shadows a builtin id).
-      const builtins = BUILTIN_ACTIONS.filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id));
+      // The actor's EFFECTIVE list, so an item's derived actions appear in the runner and a
+      // pool whose limit an item raised reports the right number remaining.
+      const available = effectiveActions(definition, actor, equipmentCatalog());
+      const builtins = BUILTIN_ACTIONS.filter((candidate) => !available.some((declared) => declared.id === candidate.id));
       return {
         rulesMode: state.combat.rulesMode,
         actions: [
-          ...(definition ? actionAvailability(state, actor, definition.actions, definition) : []),
-          ...actionAvailability(state, actor, builtins, definition, true)
+          ...actionAvailability(state, actor, available, definition, false, available),
+          ...actionAvailability(state, actor, builtins, definition, true, available)
         ]
       };
     },
@@ -1268,7 +1288,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "actor.rest", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        events = applyRest(state, actorId, kind, resolveDefinition);
+        events = applyRest(state, actorId, kind, resolveDefinition, equipmentCatalog());
       });
       if (!result.duplicate) {
         await context.publishGameState(result.state);
@@ -1324,7 +1344,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "character.set-slot", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "resource");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        setSpellSlotRemaining(state, actorId, level, remaining, (definitionId) => resolveDefinitionIn(state, definitionId));
+        setSpellSlotRemaining(state, actorId, level, remaining, (definitionId) => resolveDefinitionIn(state, definitionId), equipmentCatalog());
       });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };
@@ -1348,7 +1368,7 @@ export function createGameOperations(context: GameOperationsContext) {
       const result = await store.execute({ id: commandId, type: "character.set-inventory", actorId, expectedRevision, payload: request, principal: principalTag(principal) }, (state) => {
         const verdict = canInitiateForActor(initiatorOf(principal), state, actorId, "inventory");
         if (!verdict.ok) throw new CommandRejectedError(verdict.message);
-        setInventoryItem(state, actorId, item, (definitionId) => resolveDefinitionIn(state, definitionId));
+        setInventoryItem(state, actorId, item, (definitionId) => resolveDefinitionIn(state, definitionId), { catalog: equipmentCatalog(), role: isGmGrade(principal) ? "gm" : "player" });
       });
       if (!result.duplicate) await context.publishGameState(result.state);
       return { revision: result.state.revision, duplicate: result.duplicate };

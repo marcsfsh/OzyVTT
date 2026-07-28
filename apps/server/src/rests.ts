@@ -3,6 +3,8 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
 import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
+import { effectiveActions } from "./effective-actions.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { healActor, type ActorScope } from "./hit-points.js";
 
@@ -53,14 +55,16 @@ export function spendHitDice(state: GameState, actorId: string, faces: readonly 
   return { healed, events, conModifier };
 }
 
-export function applyRest(state: GameState, actorId: string, kind: "long" | "short", resolveDefinition: (definitionId: string) => ActorDefinition | undefined): EffectNarration[] {
+export function applyRest(state: GameState, actorId: string, kind: "long" | "short", resolveDefinition: (definitionId: string) => ActorDefinition | undefined, catalog?: EquipmentCatalog): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) throw new CommandRejectedError("End the encounter before resting a combatant who is in it.");
   const events: EffectNarration[] = [];
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-    for (const action of definition?.actions ?? []) {
+    // EFFECTIVE actions, not the definition's: a wand's charges live on a DERIVED action, so reading
+    // `definition.actions` here means an item's charges never come back on a short rest.
+    for (const action of effectiveActions(definition, actor, catalog)) {
       if (action.uses?.per !== "short-rest" && action.uses?.per !== "recharge") continue;
       const key = action.uses.pool ?? action.id;
       if (actor.actionUses[key] !== undefined) {
@@ -89,7 +93,10 @@ export function applyRest(state: GameState, actorId: string, kind: "long" | "sho
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers the multiclass sheet whose combined table is derived rather than stored,
     // so a caster seeded from `spellcasting.classes[]` refills instead of staying empty.
-    const maxByLevel = new Map(spellSlotMaxima(longRestDefinition).map((entry) => [entry.level, entry.max] as const));
+    // The item-raised maxima, not the base: an amulet's extra 1st-level slot must come back with the
+    // rest, and every reader goes through `spellSlotMaxima` so seeding, refilling and the spend clamp
+    // cannot disagree about it.
+    const maxByLevel = new Map(spellSlotMaxima(longRestDefinition, deriveEquipment(actor, longRestDefinition, catalog).spellSlots).map((entry) => [entry.level, entry.max] as const));
     actor.spellSlots = actor.spellSlots.map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level) ?? slot.remaining }));
   }
   const pactMaximum = actor.pactSlots ? pactSlotMaximum(longRestDefinition) : null;

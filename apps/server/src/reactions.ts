@@ -6,9 +6,13 @@ import { adjustableActor, applyDamageDetailed, type ActorScope } from "./hit-poi
 import type { EffectNarration } from "./effects.js";
 import { resolveDefinitionAction } from "./action-resolution.js";
 import { builtinAction } from "./builtin-actions.js";
+import { effectiveActions } from "./effective-actions.js";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  /** The item catalog: an item weapon must be findable as the opportunity attack's fallback melee. */
+  catalog?: EquipmentCatalog;
   /** Dice/roll plumbing for leaves-reach answers, which resolve a real melee attack. */
   random: RandomSource;
   newRollId: () => string;
@@ -69,8 +73,12 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     const mover = pending.targetActorId ? state.actors.find((candidate) => candidate.id === pending.targetActorId) : undefined;
     if (!mover) { clearPrompt(false); throw new CommandRejectedError("The mover is no longer in the fight."); }
     const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
-    const declared = actionId ? definition?.actions.find((candidate) => candidate.id === actionId) : undefined;
-    const fallbackMelee = definition?.actions.find((candidate) => candidate.attack !== undefined && candidate.attack.reachFeet !== undefined);
+    // EFFECTIVE actions, not the definition's: a magic weapon's derived attack must be BOTH resolvable
+    // by id and findable as `fallbackMelee`, or the character swings an unarmed strike instead of the
+    // sword they are holding - and any +1 on it is lost with the swing.
+    const available = effectiveActions(definition, reactor, deps.catalog);
+    const declared = actionId ? available.find((candidate) => candidate.id === actionId) : undefined;
+    const fallbackMelee = available.find((candidate) => candidate.attack !== undefined && candidate.attack.reachFeet !== undefined);
     const chosen = declared ?? fallbackMelee ?? builtinAction("unarmed-strike")!;
     const isBuiltin = declared === undefined && fallbackMelee === undefined;
     const commit = attackOptions.commit ?? true;
@@ -80,9 +88,17 @@ export function answerReaction(state: GameState, commandId: string, reactionId: 
     // reaction and applies the damage. No distance function on purpose: the SRD opportunity attack
     // happens right before the target leaves reach, but the engine moves the token first (documented
     // arrival-timing approximation) - range-checking the ARRIVAL position would wrongly block the swing.
-    const resolution = resolveDefinitionAction(state, chosen, { actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin, rollMode: attackOptions.rollMode ?? null, override: null, commit, attackNatural: attackOptions.attackNatural }, {
+    const resolution = resolveDefinitionAction(state, chosen, {
+      actorId: reactor.id, targetIds: [mover.id], commandId, builtin: isBuiltin,
+      rollMode: attackOptions.rollMode ?? null, override: null, commit, attackNatural: attackOptions.attackNatural,
+      // THE transport for criterion 7. This is the ONLY producer of an opportunity attack in the
+      // codebase, and the resolve cannot infer the trigger: the chosen action is an ordinary melee
+      // attack with `activation: "action"`. Without this line a rider gated on
+      // `attack-kind-is {kinds: ["opportunity"]}` never matches and reviews as working.
+      attackKinds: ["reaction", "opportunity"]
+    }, {
       random: deps.random, newRollId: deps.newRollId, gmSessionId: deps.gmSessionId, now: deps.now,
-      definition, resolveDefinition: deps.resolveDefinition
+      definition, resolveDefinition: deps.resolveDefinition, catalog: deps.catalog
     });
     if (!commit) return { ...base, used: false, appliedDamage: 0, resolution, events: [] };
     clearPrompt(true);

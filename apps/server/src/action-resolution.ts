@@ -1,6 +1,8 @@
 import type { ActionResolution, GameState, RollRecord } from "@vtt/domain";
-import { abilityModifier as scoreModifier, aggregateRollMode, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AttackKind, type DiceExpression, type RandomSource, type RiderContext, type RiderMoment, type RollModeSource } from "@vtt/rules-5e";
+import { toRollModes, type ActorDefinition } from "@vtt/schemas";
+import { criticalThreshold, effectiveActions } from "./effective-actions.js";
+import { deriveEquipment, sourceItemOf, weaponPropertiesOf, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { addEffect, endEffect, hasEffectTag } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
@@ -35,6 +37,17 @@ export type ResolveInput = Readonly<{
   attackTotal?: number;
   /** Explicit "this was a natural 20" (critical hit) for the hand-entered-total path. Ignored when a natural is supplied. */
   critical?: boolean;
+  /**
+   * HOW this attack is being made, so a rider gated on `attack-kind-is` can match. Absent means an
+   * ordinary on-turn attack; melee/ranged/thrown are still derived from the action's reach and range.
+   *
+   * This is the transport criterion 7 dies without. Nothing else in the resolve can tell an
+   * opportunity attack from a turn attack: the chosen action is an ordinary melee attack with
+   * `activation: "action"`, and the only indirect signal (`turnActorId !== attacker.id`) also covers
+   * legendary actions, readied releases and GM improvisation. `reactions.ts` is the ONLY producer of
+   * an opportunity attack in the codebase and it announces itself here.
+   */
+  attackKinds?: readonly AttackKind[];
 }>;
 export type ResolveDependencies = Readonly<{
   random: RandomSource;
@@ -52,6 +65,12 @@ export type ResolveDependencies = Readonly<{
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
   /** Resolves ANY combatant's definition (imported over bundled) - needed to offer the TARGET's declared reactions. */
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  /**
+   * The item catalog, where magic-item riders live (never on the inventory row - see
+   * `equipment-derivation.ts`). Absent = every item is mundane, the documented fail-open.
+   * Resolve it for the GM audience: a player must still be able to roll their own cursed item.
+   */
+  catalog?: EquipmentCatalog;
 }>;
 
 /**
@@ -144,21 +163,24 @@ type EconomyPlan = Readonly<{
  * action's own printed number told a Cleric 3 that Preserve Life ("1") had no uses left after a
  * single Divine Spark, even though two Channel Divinity charges were authored. An action with no
  * pool is its own pool and keeps its own limit, unchanged.
+ *
+ * Takes the SIBLING ACTION LIST rather than the definition, because the siblings that matter are the
+ * EFFECTIVE ones: an item that raises a pool's limit does it by riding `uses.limit` on the derived
+ * action, and reading `definition.actions` here would cap a pooled resource at the base number.
  */
-export function useLimitFor(definition: ActorDefinition | undefined, action: DefinitionAction): number {
+export function useLimitFor(siblings: ReadonlyArray<DefinitionAction>, action: DefinitionAction): number {
   const uses = action.uses;
   if (!uses) return 0;
   if (!uses.pool) return uses.limit;
-  return (definition?.actions ?? []).reduce((limit, candidate) => {
+  return siblings.reduce((limit, candidate) => {
     const sibling = candidate.uses;
     return sibling && sibling.pool === uses.pool && sibling.per === uses.per ? Math.max(limit, sibling.limit) : limit;
   }, uses.limit);
 }
 
 /** The multiattack parents (sibling actions) that list `action` as a component. */
-function multiattackParents(definition: ActorDefinition | undefined, action: DefinitionAction): DefinitionAction[] {
-  if (!definition) return [];
-  return definition.actions.filter((candidate) => candidate.multiattack?.some((component) => component.actionId === action.id) ?? false);
+function multiattackParents(siblings: ReadonlyArray<DefinitionAction>, action: DefinitionAction): DefinitionAction[] {
+  return siblings.filter((candidate) => candidate.multiattack?.some((component) => component.actionId === action.id) ?? false);
 }
 
 function componentMap(parent: DefinitionAction): Record<string, number> {
@@ -183,7 +205,7 @@ type EconomyEvaluation = Readonly<{
  * can never drift. Economy/instance gating applies only on the attacker's own turn - off-turn
  * resolves (opportunity attacks, GM improvisation) stay ungated.
  */
-export function evaluateActionEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, targetIds: readonly string[], definition: ActorDefinition | undefined, distanceFeet?: (actorIdA: string, actorIdB: string) => number | null): EconomyEvaluation {
+export function evaluateActionEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, targetIds: readonly string[], definition: ActorDefinition | undefined, distanceFeet?: (actorIdA: string, actorIdB: string) => number | null, siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? []): EconomyEvaluation {
   const violations: RuleViolation[] = [];
   const softViolations: RuleViolation[] = [];
   const notes: string[] = [];
@@ -191,7 +213,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
   const turn = state.combat.turn;
   // An actor whose stat block has a prose-only Multiattack can't be validated fairly: its extra
   // attacks live in text the engine can't see, so action-slot violations degrade to warnings.
-  const proseMultiattack = definition?.actions.some((candidate) => /multiattack/i.test(candidate.name) && !candidate.multiattack) ?? false;
+  const proseMultiattack = siblings.some((candidate) => /multiattack/i.test(candidate.name) && !candidate.multiattack);
 
   // Incapacitation forbids all three activation kinds outright (SRD 2024 "Incapacitated").
   if (action.activation !== "other") {
@@ -210,7 +232,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
   if (action.uses) {
     const key = action.uses.pool ?? action.id;
     // The counter is keyed on the POOL, so the gate must be the pool's size too (see `useLimitFor`).
-    const limit = useLimitFor(definition, action);
+    const limit = useLimitFor(siblings, action);
     const spent = action.uses.per === "turn" ? (turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
     if (spent >= limit) {
       const scopeLabel = action.uses.per === "turn" ? "turn"
@@ -234,7 +256,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
     const active = instance && instance.actorId === attacker.id ? instance : null;
     if (!turn.actionUsed) {
       // Fresh action slot: open a compound instance when the action (or its multiattack parent) declares one.
-      const parents = multiattackParents(definition, action);
+      const parents = multiattackParents(siblings, action);
       let components: Record<string, number> | null = null;
       if (action.multiattack) {
         components = componentMap(action); // resolving the parent itself opens the full plan, no rolls consumed
@@ -254,7 +276,7 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
       instance = components ? { actorId: attacker.id, components } : null;
     } else if (active) {
       const components = { ...active.components };
-      const componentName = (id: string) => id === "attack" ? "attack" : definition?.actions.find((candidate) => candidate.id === id)?.name ?? id;
+      const componentName = (id: string) => id === "attack" ? "attack" : siblings.find((candidate) => candidate.id === id)?.name ?? id;
       const leftovers = () => Object.entries(components).filter(([, count]) => count > 0).map(([id, count]) => `${count}× ${componentName(id)}`);
       if (action.multiattack) {
         // Tapping the Multiattack plan mid-instance is a continue, not a violation - a fresh
@@ -363,19 +385,19 @@ export function evaluateActionEconomy(state: GameState, attacker: LiveActor, act
  * limited uses / open-instance rolls. Target-specific rules (`targetRules`) can't be pre-checked
  * without a target and are deliberately absent here. Never mutates state.
  */
-export function actionAvailability(state: GameState, attacker: LiveActor, actions: ReadonlyArray<DefinitionAction>, definition: ActorDefinition | undefined, builtin = false): ReadonlyArray<{
+export function actionAvailability(state: GameState, attacker: LiveActor, actions: ReadonlyArray<DefinitionAction>, definition: ActorDefinition | undefined, builtin = false, siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? []): ReadonlyArray<{
   id: string; name: string; activation: DefinitionAction["activation"]; available: boolean;
   violations: ReadonlyArray<{ rule: string; message: string }>; usesRemaining: number | null; componentsRemaining: number | null; builtin?: boolean;
 }> {
   return actions.map((action) => {
-    const evaluation = evaluateActionEconomy(state, attacker, action, [], definition);
+    const evaluation = evaluateActionEconomy(state, attacker, action, [], definition, undefined, siblings);
     let usesRemaining: number | null = null;
     if (action.uses) {
       const key = action.uses.pool ?? action.id;
       const spent = action.uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
       // Same pool arithmetic as the gate above, so what the API reports remaining and what resolution
       // allows can never drift (the whole point of sharing `evaluateActionEconomy`).
-      usesRemaining = Math.max(0, useLimitFor(definition, action) - spent);
+      usesRemaining = Math.max(0, useLimitFor(siblings, action) - spent);
     }
     const instance = state.combat.turn.actionInstance;
     let componentsRemaining: number | null = null;
@@ -401,9 +423,9 @@ export function actionAvailability(state: GameState, attacker: LiveActor, action
  * (ADR-0020). Strict rejects the first violation with an override path; assisted converts
  * violations to warnings; freeform skips validation.
  */
-function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[], distanceFeet?: (actorIdA: string, actorIdB: string) => number | null): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
+function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAction, input: ResolveInput, definition: ActorDefinition | undefined, warnings: string[], distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined, siblings: ReadonlyArray<DefinitionAction>): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
   const mode = state.combat.rulesMode;
-  const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition, distanceFeet);
+  const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(state, attacker, action, input.targetIds, definition, distanceFeet, siblings);
   warnings.push(...notes);
 
   let overridden: { rule: string; reason: string } | null = null;
@@ -430,23 +452,87 @@ function planEconomy(state: GameState, attacker: LiveActor, action: DefinitionAc
   return { plan, overridden };
 }
 
+/** Both sides' derived equipment plus the roll-specific filter facts, assembled once per attack. */
+type RiderMomentContext = Readonly<{
+  attacker: EquipmentDerivation;
+  target: EquipmentDerivation;
+  filters: Omit<Partial<RiderContext>, "moment">;
+}>;
+
+/**
+ * How this attack is being made. `melee` / `ranged` / `thrown` are derivable from the action's own
+ * reach and range (and the measured distance, so a thrown weapon used inside its reach stays melee);
+ * `reaction` and `opportunity` are NOT derivable and must be announced by the caller through
+ * `input.attackKinds` - which is exactly what `reactions.ts` does for an opportunity attack.
+ */
+function attackKindsOf(action: DefinitionAction, input: ResolveInput, distance: number | null): AttackKind[] {
+  const kinds = new Set<AttackKind>(input.attackKinds ?? []);
+  const attack = action.attack;
+  if (attack) {
+    const melee = attack.reachFeet !== undefined;
+    const ranged = attack.rangeFeet !== undefined;
+    const usedAsRanged = ranged && (!melee || (distance !== null && distance > attack.reachFeet! + 1e-6));
+    if (usedAsRanged) kinds.add("ranged");
+    else if (melee) kinds.add("melee");
+    if (melee && ranged) kinds.add("thrown");
+  }
+  if (input.builtin && action.id === "unarmed-strike") kinds.add("unarmed");
+  if (action.activation === "reaction") kinds.add("reaction");
+  return [...kinds];
+}
+
 /** Advantage/disadvantage sources the engine can see; the explicit GM rollMode choice wins over all of them. */
-function attackRollSources(state: GameState, attacker: LiveActor, target: LiveActor, action: DefinitionAction, deps: ResolveDependencies): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
+function attackRollSources(state: GameState, attacker: LiveActor, target: LiveActor, action: DefinitionAction, deps: ResolveDependencies, moment: RiderMomentContext): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
   const advantage: RollModeSource[] = [];
   const disadvantage: RollModeSource[] = [];
   const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
   const onOwnTurn = state.combat.turnActorId === attacker.id;
 
-  // Effect modifiers: attack-advantage is turn-scoped by definition (Reckless Attack semantics);
-  // attack-disadvantage is always-on. voidWhileIncapacitated effects (Dodge) lapse per the SRD.
+  // Effect modifiers, normalised through `toRollModes` so this reads ONE claim shape rather than
+  // branching on eight variants. The `onOwnTurn` gate belongs to the LEGACY `attack-advantage`
+  // variant ALONE - it is Reckless Attack semantics, not a general rule - so it is tested on the
+  // variant, not on the normalised claim. The general `roll-mode` variant carries its own `when`.
   const activeEffects = (actor: LiveActor) => actor.effects.filter((effect) => !(effect.voidWhileIncapacitated && isIncapacitated(actor)));
   for (const effect of activeEffects(attacker)) {
-    if (onOwnTurn && effect.modifiers.some((modifier) => modifier.type === "attack-advantage")) advantage.push({ source: effect.id, label: effect.name });
-    if (effect.modifiers.some((modifier) => modifier.type === "attack-disadvantage")) disadvantage.push({ source: effect.id, label: effect.name });
+    for (const modifier of effect.modifiers) {
+      if (modifier.type === "attack-advantage" && !onOwnTurn) continue;
+      for (const claim of toRollModes(modifier)) {
+        if (claim.roll !== "attack") continue;
+        (claim.mode === "advantage" ? advantage : disadvantage).push({ source: effect.id, label: effect.name });
+      }
+    }
   }
   for (const effect of activeEffects(target)) {
-    if (effect.modifiers.some((modifier) => modifier.type === "incoming-attack-advantage")) advantage.push({ source: effect.id, label: `Target: ${effect.name}` });
-    if (effect.modifiers.some((modifier) => modifier.type === "incoming-attack-disadvantage")) disadvantage.push({ source: effect.id, label: `Target: ${effect.name}` });
+    for (const modifier of effect.modifiers) {
+      for (const claim of toRollModes(modifier)) {
+        if (claim.roll !== "incoming-attack") continue;
+        (claim.mode === "advantage" ? advantage : disadvantage).push({ source: effect.id, label: `Target: ${effect.name}` });
+      }
+    }
+  }
+
+  // ITEM (and item-granted feat) riders, at the `on-attack-roll` moment.
+  //
+  // These are pushed OUTSIDE the `onOwnTurn` branch above, and that is load-bearing, not tidiness
+  // waiting to happen. An opportunity attack happens off-turn BY DEFINITION, so a rider routed
+  // through the legacy branch would be silently dropped - the dagger would be authored, displayed,
+  // and inert, and would review as working. `onOwnTurn` is Reckless Attack semantics for the legacy
+  // `attack-advantage` effect variant and belongs to that variant alone. Riders are gated by their
+  // own `when`. DO NOT merge these loops.
+  //
+  // BOTH passes are collected. A rider with NO `when` is STANDING ("this cursed blade always rolls at
+  // disadvantage") and would be invisible to a moment-only collection; `on-attack-roll` plus a filter
+  // is the momentary form. The two are disjoint by construction, so nothing is counted twice.
+  for (const pass of [null, "on-attack-roll"] as const) {
+    for (const rider of collectRiders(moment.attacker.carriers, { ...moment.attacker.context, ...moment.filters, moment: pass })) {
+      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "attack" || rider.modifier.mode === undefined) continue;
+      (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: rider.label });
+    }
+    // The TARGET's own gear (a Cloak of Displacement) claims `incoming-attack` against this attack.
+    for (const rider of collectRiders(moment.target.carriers, { ...moment.target.context, moment: pass })) {
+      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "incoming-attack" || rider.modifier.mode === undefined) continue;
+      (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: `Target: ${rider.label}` });
+    }
   }
 
   if (has(attacker, "prone")) disadvantage.push({ source: "attacker-prone", label: "Attacker is Prone" });
@@ -558,7 +644,14 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   }
 
   const warnings: string[] = [];
-  let { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet);
+  // The attacker's whole equipment contribution, recomputed from (definition, inventory, catalog).
+  // `siblings` is the EFFECTIVE action list - the economy's pool limits and multiattack composition
+  // must see an item's derived actions and its raised `uses.limit`, or a charged item never recharges
+  // and a pooled resource caps at the base number.
+  const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
+  const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
+  const riderItemId = sourceItemOf(action, derivation, attacker.inventory);
+  let { plan, overridden } = planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings);
 
   // GM-adjudicated cover (SRD Cover - no line-of-sight engine, so the GM supplies the call and the
   // server applies the math): total cover can't be targeted directly; half/three-quarters add to AC
@@ -647,16 +740,32 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
   let attack: ActionResolution["attack"] = null;
   let rollMode: ActionResolution["rollMode"];
   let crit = false;
+  let riderFilters: Omit<Partial<RiderContext>, "moment"> = { sourceItemId: riderItemId };
   if (action.attack && targets.length === 1) {
     const target = targets[0];
-    const sources = attackRollSources(state, attacker, target, action, deps);
+    const targetDerivation = deriveEquipment(target, target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, deps.catalog);
+    riderFilters = {
+      attackKinds: attackKindsOf(action, input, deps.distanceFeet?.(attacker.id, target.id) ?? null),
+      weaponProperties: weaponPropertiesOf(riderItemId, attacker.inventory),
+      damageTypes: action.damage.map((part) => part.type),
+      targetSize: target.size ?? "medium",
+      targetConditionIds: target.conditions.map((condition) => condition.id),
+      sourceItemId: riderItemId
+    };
+    const sources = attackRollSources(state, attacker, target, action, deps, { attacker: derivation, target: targetDerivation, filters: riderFilters });
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     const mode = input.rollMode ?? aggregated.mode;
     rollMode = input.rollMode
       ? { mode: input.rollMode, advantage: input.rollMode === "advantage" ? ["GM choice"] : [], disadvantage: input.rollMode === "disadvantage" ? ["GM choice"] : [] }
       : aggregated;
+    // WHICH PASS OWNS WHICH RIDER. A STANDING `attack-bonus` (a +1 sword: no `when` at all) was
+    // already folded into `action.attack.bonus` by `effectiveActions`, so the preview, the confirm
+    // and the availability projection all quote the same number. Only the MOMENTARY ones - gated on
+    // `on-attack-roll` plus a filter - are added here. The two sets are disjoint by construction:
+    // `collectRiders(…, {moment: null})` excludes anything carrying a moment or a filter.
+    const momentaryAttackBonus = sumRiders(collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment: "on-attack-roll" }), "attack-bonus");
     // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1); explained as a warning line so the wire shape stays unchanged.
-    const bonus = action.attack.bonus + exhaustionPenalty(attacker);
+    const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus;
     if (exhaustionLevel(attacker) > 0) warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
     const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
     // A preview (or a hand-rolled/confirmed d20) supplies the natural roll; otherwise roll it. The die is
@@ -695,7 +804,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     const targetAc = target.armorClass !== undefined ? target.armorClass + coverBonus : null;
     // A declared crit (total mode) or a natural 20 (rolled/natural mode) crits; a nat 1 fumbles, but only when
     // a natural die is known (total mode has none, so it can only hit or miss on the total vs AC).
-    crit = declaredCrit || (!manualTotal && naturalRoll === 20);
+    // SRD crits on a natural 20; a `critical-range` rider can widen the threshold (19-20).
+    const critFloor = criticalThreshold(derivation, attacker, action);
+    crit = declaredCrit || (!manualTotal && naturalRoll >= critFloor);
     let outcome = crit ? "crit" as const
       : (!manualTotal && naturalRoll === 1) ? "fumble" as const
       : targetAc === null ? "unknown" as const
@@ -747,6 +858,37 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
             bonusDamage.push({ amount: modifier.amount, type: damage[0]?.type ?? "untyped", source: effect.name });
           }
         }
+      }
+    }
+  }
+  // TYPED RIDER DAMAGE: criterion 1's "extra 1d4 lightning" and criterion 9's "extra 1d6 fire on a
+  // critical hit". Neither existing channel can carry it - `bonusDamage` is flat integers only, and
+  // `attack.criticalBonusDice` is a bare COUNT applied to the first damage part, so it cannot carry a
+  // damage type. Rider dice therefore roll here and land as their own entries in `damage[]`, which
+  // needs no wire-shape change, keeps `damageTotal` correct, and leaves the six existing
+  // `bonusDamage` consumers untouched.
+  //
+  // 5e does not double dice added AFTER the attack, so a rider is NOT crit-doubled unless it opts in
+  // with `doubleOnCritical`. `criticalExpression` doubles the action's own damage terms and is not
+  // reused for these.
+  if (attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown") {
+    const hit = attack !== null && (attack.outcome === "hit" || attack.outcome === "crit");
+    // A rider with NO `when` fires on every damage roll of the action it is scoped to (that is what
+    // "standing" means for a damage rider); `on-hit` and `on-critical-hit` narrow it to those moments.
+    const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
+    if (hit || attack === null) passes.push("on-hit");
+    if (crit) passes.push("on-critical-hit");
+    if (attack !== null && attack.outcome === "fumble") passes.push("on-critical-miss");
+    const already = new Set<unknown>();
+    for (const moment of passes) {
+      for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
+        if (rider.modifier.type !== "extra-damage" || rider.modifier.formula === undefined || already.has(rider.modifier)) continue;
+        already.add(rider.modifier);
+        const expression = parseDiceFormula(rider.modifier.formula);
+        const rolled = resolveDice(crit && rider.modifier.doubleOnCritical === true ? criticalExpression(expression) : expression, deps.random);
+        recordRoll(state, rolled, { ...rollBase, id: deps.newRollId(), purpose: "damage" });
+        damage.push({ formula: rolled.expression.source, type: rider.modifier.damageType ?? damage[0]?.type ?? "untyped", total: rolled.total });
+        warnings.push(`${rider.label}: +${rolled.total} ${rider.modifier.damageType ?? "damage"}.`);
       }
     }
   }
@@ -835,7 +977,9 @@ export function resolveDefinitionAction(state: GameState, action: DefinitionActi
     ].filter((part) => part.amount > 0);
     const proposedTotal = proposedParts.reduce((sum, part) => sum + part.amount, 0);
     const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
-    const declared = targetDefinition?.actions.find((candidate) => candidate.activation === "reaction" && candidate.reaction?.trigger === "hit-by-attack" && candidate.reaction.response === "half-damage");
+    // The TARGET's effective list, not its definition's: a reaction an item grants (a missile-snaring
+    // shield) has to be findable here or it never fires.
+    const declared = effectiveActions(targetDefinition, target, deps.catalog).find((candidate) => candidate.activation === "reaction" && candidate.reaction?.trigger === "hit-by-attack" && candidate.reaction.response === "half-damage");
     const targetIncapacitated = target.conditions.some((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id));
     if (declared && proposedTotal > 0 && target.id !== attacker.id && !targetIncapacitated
       && !state.combat.reactionsUsed.includes(target.id)
