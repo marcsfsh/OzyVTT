@@ -70,14 +70,14 @@ IDs are stable and used for traceability through planning, implementation and QA
 | ID | Requirement | Evidence |
 | --- | --- | --- |
 | CP-1 | Wire player search into the player Codex. | Route is dual-role and viewer-safe; `playerCodexApi.search` has 0 callers |
-| CP-2 | Add GM preview of the player Codex, following the existing `ViewerPreviewPanel` pattern. | `main.tsx:310` gates it on player mode |
+| CP-2 | Add GM preview of the player Codex. **Correction (post-review):** this cannot follow `ViewerPreviewPanel` as a client mount — that panel mints a *separate principal* and iframes `/viewer.html`, and `roleOf()` checks `authorizeGm` first, so a GM token yields GM projections. Requires server work. | `main.tsx:310`; `ViewerPreviewPanel.tsx:24-46`; `codex-http.ts:146-151` |
 | CP-3 | Surface a marker's journal entries in `MarkerInspector` via `journalApi.forMarker`. | 0 callers today |
 | CP-4 | Add UI to rename/retype a map (`atlasApi.updateMap`). | Name/kind frozen at creation, permanently |
 | CP-5 | Add UI to re-parent a map (`atlasApi.setMapParent`). | 0 callers |
 | CP-6 | Allow creating additional **root** maps (map forest). | `AtlasView.tsx:106,123`; model supports it and is tested |
 | CP-7 | Surface the marker→actor link in `MarkerInspector`. | Fully wired, 0 client references |
 | CP-8 | Auto-**date** combat journal entries to the calendar's current in-world date; keep them **GM-only**. | `codex-store.ts:1134` hardcodes nulls |
-| CP-9 | Link a combat journal entry to its archived replay, and surface past battles for a location/session inside the Codex. | `source_encounter_id` stored, read by nothing |
+| CP-9 | Link a combat journal entry to its archived replay, and surface past battles for a location (M2) and for a session (M9 — sessions do not exist earlier). | `source_encounter_id` stored, read by nothing; `codex-store.ts:1134` hardcodes `sessionNumber: null` |
 
 ### 4.2 Foundation — coherence and verification (`CF`)
 
@@ -192,7 +192,7 @@ Countable wherever possible, so "done" is demonstrable rather than asserted.
 | --- | --- |
 | A-1 | **Zero unreachable client API methods** — the `api.ts` call-site sweep returns no method with 0 callers (or the method is deliberately removed). |
 | A-2 | **Design-system adoption**: no hand-rolled equivalent remains where a `@vtt/ui` primitive exists; the Codex primitive count is comparable to Homebrew's. |
-| A-3 | **`.tap-target` / `--tap-min` coverage is complete** across Codex interactive controls; zero controls below 44px. |
+| A-3 | **`.tap-target` / `--tap-min` coverage is complete** across Codex interactive controls — verified at **source level** (every interactive control declares a tap route) plus a manual narrow-viewport pass. *Restated after adversarial review:* `design-language.md` §4's `elementFromPoint` measurement needs a browser runner the repo does not have, so the original "zero controls below 44px, measured" was unverifiable as written. If a browser runner is added later, restore the measured form. |
 | A-4 | `apps/client` has a `test` script, it runs in CI, and it covers two-layer secrecy, the save/conflict path, and cross-mode navigation. |
 | A-5 | From an open page, all four approved return edges are reachable (CI-3…CI-6). |
 | A-6 | Suite-wide search returns journal entries and markers, from both the rail and the palette. |

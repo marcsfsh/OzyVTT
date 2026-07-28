@@ -182,8 +182,29 @@ unreachable by players. CP-9 surfaces replays **GM-only**; the player-facing sid
 carries prose only, never replay data. This must be proven by an HTTP-boundary test, not by
 inspection.
 
-**New surfaces that must project (P2):** session (prep is GM-only, recap is player-facing), quest,
-deadline, downtime, faction standing, party marker.
+**New surfaces that must project (P2):** **dated `event` pages (CT-11)**, session (prep is GM-only,
+recap is player-facing), quest, **deadline (CT-5)**, downtime, faction standing, party marker.
+
+**Why events and deadlines are called out explicitly:** `PlayerCodex.tsx:42` fetches the timeline via
+`playerCodexApi.timeline(token)`. The moment any new record kind resolves onto the chronicle it becomes
+**player-reachable by default**. Events and deadlines are therefore projection surfaces, not display
+changes, and carry the same HTTP-boundary test obligation as any other player-facing read.
+
+### GM preview of the player Codex (CP-2) — how it must actually work
+
+The app's existing `ViewerPreviewPanel` is **not** a component rendering player data. It POSTs
+`/api/v1/viewer/preview-session` to mint a **separate viewer principal**, then loads `/viewer.html` in
+an iframe (`viewer/ViewerPreviewPanel.tsx:24-46`). The Codex has neither a preview-session mint nor a
+separate player document.
+
+This matters because `roleOf()` checks `authorizeGm` **first** (`codex-http.ts:146-151`). Mounting
+`PlayerCodex` with a GM token would return **role `gm`** and therefore **GM projections** — the
+"preview" would show unrevealed pages, hidden maps and GM-only bodies while telling the GM *this is
+what players see*. A false preview on the repo's hardest invariant is worse than no preview.
+
+**Required:** CP-2 needs a genuine player principal — either a Codex preview-session mint mirroring
+the viewer's, or an explicit, audited role downgrade that forces every read through
+`codex-projections.ts`. This is **server work**, not a client mount.
 
 ---
 
