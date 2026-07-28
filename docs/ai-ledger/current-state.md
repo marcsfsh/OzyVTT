@@ -628,7 +628,34 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     exist. Use `tsconfig.app.json`. (`-p apps/server` has `include: ["src"]` and is real.) (2) A reported
     34px tap target on `TagInput`'s wrapped chip ✕ **could not be reproduced** — see `known-bugs.md`;
     logged rather than fixed, because the fix is in a shared primitive and would change Homebrew too.
-  - **Verified.** `check` / `test` / `build` all exit 0; 1083 tests (client 25 → 32, server 775 → 787).
+  - **CI-1, client.** One result surface (`SearchResults.tsx`) rendered identically by the Pages rail, the
+    command palette and the player Codex, so the three cannot drift. The palette's private `listPages`
+    copy and title-substring filter are gone — that was a second search mechanism. Row: glyph · title ·
+    `KIND · #tags`; **kind is a text label, so deleting every colour leaves the list readable** (R2).
+    Marker hits carry `mapId` + `id` and open the map then select the pin, via an `openTarget`/
+    `onOpenedTarget` latch following `ReplayPanel`'s precedent — with one deliberate deviation: the latch
+    clears when the target goes null, so the *same* pin can be opened again from a later search.
+  - **The independent server review found a real coverage hole, and it was right.** Player visibility is
+    gated twice (SQL predicate + projection re-check). That is sound design but it hid a blind spot:
+    **weakening the SQL marker arm alone left all 787 tests passing**, because the projection silently
+    caught it — so the primary layer's correctness for 3 of 4 kinds rested entirely on the secondary one.
+    I reproduced that, then added three store-level tests that call `searchAll` *below* the projection,
+    and confirmed the CD-6 one now fails against the SQL-only break. Lesson: an HTTP-boundary test tells
+    you the pipeline works, never that a given layer does.
+  - Also from that review: the page-tag backfill was the one arm missing the `json_valid()` guard the
+    other three carry — a malformed `tags_json` would have thrown mid-migration and failed server boot
+    for *every* page rather than degrading for one; the journal backfill joined with a space where the
+    live path uses a newline (inert to FTS5, but the migration claims verbatim carry-forward); and the
+    shared `tags()` validator still said "A page may carry at most 24 tags" to map and marker callers.
+  - **The superseded `results` list is deleted.** It existed for exactly one commit so the client could
+    migrate without a flag-day; every caller now reads `hits`. Two lists answering one query is the
+    parallel-mechanism problem this overhaul exists to remove, and the Codex has no external consumer.
+  - **Browser verification (the agent could not run any).** Real end-to-end at **1440px and 375px**: a
+    brand-new journal entry is found through the actual v11 index, its row carries a text kind label,
+    clicking it lands on Journal with the entry focused, a page hit reads `CHARACTER`, result rows
+    measure **71.2px** against the 44px floor, zero overflow, zero console errors. Full tap audit
+    re-run: **0 of 109 controls below 44px** across all five modes.
+  - **Verified.** `check` / `test` / `build` all exit 0; 1109 tests (client 25 → 46, server 775 → 790).
     `docs/api-reference.md` regenerated; the byte-identical contract test passes.
 
 - **Codex overhaul M5 — mobile parity and the remaining confirmed defects (2026-07-28).** Delivers

@@ -255,9 +255,9 @@ describe("codex HTTP viewer-safety boundary", () => {
     const { base } = await fixture();
     await post(base, "/api/v1/codex/pages", GM, { title: "Hidden shrine", playerBody: "", gmBody: "The relic of Vecna rests here.", revealedToPlayers: true });
     // "Vecna" lives only in gmBody → a player full-text search must not surface it.
-    const playerHits = (await body(await get(base, `/api/v1/codex/search?q=Vecna`, PLAYER))).data.results as Json[];
+    const playerHits = ((await body(await get(base, `/api/v1/codex/search?q=Vecna`, PLAYER))).data.hits as Json[]).filter((hit) => hit.kind === "page");
     expect(playerHits).toHaveLength(0);
-    const gmHits = (await body(await get(base, `/api/v1/codex/search?q=Vecna`, GM))).data.results as Json[];
+    const gmHits = ((await body(await get(base, `/api/v1/codex/search?q=Vecna`, GM))).data.hits as Json[]).filter((hit) => hit.kind === "page");
     expect(gmHits).toHaveLength(1);
   });
 
@@ -336,11 +336,11 @@ describe("codex HTTP viewer-safety boundary", () => {
     }));
     await post(base, `/api/v1/codex/pages/${night.data.page.id}/reveal`, GM, { revealed: true });
     const byPublic = await body(await get(base, `/api/v1/codex/search?q=Elfkin`, PLAYER));
-    expect((byPublic.data.results as Json[]).length).toBeGreaterThan(0);   // public field value is searchable
+    expect((byPublic.data.hits as Json[]).length).toBeGreaterThan(0);      // public field value is searchable
     const bySecret = await body(await get(base, `/api/v1/codex/search?q=Xanadar`, PLAYER));
-    expect(bySecret.data.results).toHaveLength(0);                          // secret field value is NOT
+    expect(bySecret.data.hits).toHaveLength(0);                             // secret field value is NOT
     const gmSecret = await body(await get(base, `/api/v1/codex/search?q=Xanadar`, GM));
-    expect((gmSecret.data.results as Json[]).length).toBeGreaterThan(0);    // ...but the GM can find it
+    expect((gmSecret.data.hits as Json[]).length).toBeGreaterThan(0);       // ...but the GM can find it
   });
 
   it("GET /relationships returns the whole-graph edge feed, viewer-safe for players", async () => {
@@ -360,20 +360,21 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(playerEdges[0].type).toBe("rules");
   });
 
-  it("suite-wide search keeps the legacy page-only `results` list exactly as it was", async () => {
+  it("returns ONE list carrying every matching kind, with no superseded second list (R8)", async () => {
     const { base } = await fixture();
-    // One word ("Ravenloft") on a page AND a map. `results` is the pre-CI-1 contract: pages only.
+    // One word ("Ravenloft") on a page AND a map: the point of R8 is that ONE list carries both.
     const page = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Ravenloft", playerBody: "a gothic castle" }));
     await post(base, `/api/v1/codex/pages/${page.data.page.id}/reveal`, GM, { revealed: true });
     const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: randomUUID(), name: "Ravenloft approach", kind: "regional" }));
     await post(base, `/api/v1/codex/maps/${map.data.map.id}/reveal`, GM, { revealed: true });
 
     const found = await body(await get(base, `/api/v1/codex/search?q=Ravenloft`, PLAYER));
-    // Unchanged: page summaries, nothing else, in the shape an existing client already parses.
-    expect((found.data.results as Json[]).map((row) => row.id)).toEqual([page.data.page.id]);
-    expect(found.data.results[0].title).toBe("Ravenloft");
-    // ...while the ONE result list carries both records (R8).
-    expect((found.data.hits as Json[]).map((hit) => hit.kind).sort()).toEqual(["map", "page"]);
+    const hits = found.data.hits as Json[];
+    expect(hits.map((hit) => hit.kind).sort()).toEqual(["map", "page"]);
+    expect(hits.find((hit) => hit.kind === "page")!.id).toBe(page.data.page.id);
+    expect(hits.find((hit) => hit.kind === "map")!.id).toBe(map.data.map.id);
+    // The superseded page-only `results` array is gone, not merely unused.
+    expect(found.data.results).toBeUndefined();
   });
 
   it("round-trips the world calendar (incl. current date), and weekdays appear in dated labels", async () => {

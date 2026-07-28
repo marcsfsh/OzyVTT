@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
@@ -34,9 +35,10 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [maps, setMaps] = useState<PlayerCodexMap[]>([]);
   const [currentMapId, setCurrentMapId] = useState<string | null>(null);
   const [markers, setMarkers] = useState<PlayerCodexMarker[]>([]);
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<PlayerCodexJournalEntry[]>([]);
+  const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [searchHits, setSearchHits] = useState<PlayerCodexPageSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,17 +56,27 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   useEffect(() => { const onChanged = () => { void load().catch(() => undefined); if (currentMapId) void playerCodexApi.listMarkers(token, currentMapId).then(setMarkers).catch(() => undefined); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load, token, currentMapId]);
   useEffect(() => { if (!selectedPageId) { setPage(null); setPageRels([]); return; } let live = true; void playerCodexApi.getPage(token, selectedPageId).then((result) => { if (live) { setPage(result.page); setPageRels(result.relationships); } }).catch(() => { if (live) { setPage(null); setPageRels([]); } }); return () => { live = false; }; }, [token, selectedPageId]);
   useEffect(() => { if (!currentMapId) { setMarkers([]); return; } void playerCodexApi.listMarkers(token, currentMapId).then(setMarkers).catch(() => setMarkers([])); }, [token, currentMapId]);
-  // Search overlays the revealed-page list while a query is active. The server's `/search` route is
-  // role-aware, so a player search only ever indexes player-facing bodies of revealed pages.
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (!trimmed) { setSearchHits(null); return; }
-    let live = true;
-    void playerCodexApi.search(token, trimmed).then((hits) => { if (live) setSearchHits(hits); }).catch(() => { if (live) setSearchHits([]); });
-    return () => { live = false; };
-  }, [query, token, pages]);
+  // CI-1 / R8: one search over everything this player is allowed to see — revealed pages, revealed
+  // entries, revealed maps and revealed pins. The server's `/search` route is role-aware and has already
+  // dropped the rest (`projectPlayerSearchHit`), so this surface must NOT assume page-only and must not
+  // add a filter of its own: a second, client-side gate could only ever disagree with the one that counts.
+  const runSearch = useCallback((q: string) => playerCodexApi.search(token, q), [token]);
+  const searchState = useCodexSearch(query, runSearch, pages);
 
   const openPage = useCallback((pageId: string) => { setSelectedPageId(pageId); setView("lore"); }, []);
+  /** R1: a player's jump prepares its destination too — the pin's map opens first, then the pin is marked. */
+  const openHit = useCallback((hit: CodexSearchHit) => {
+    switch (hit.kind) {
+      case "page": setFilter({ type: null, tag: null }); setSelectedPageId(hit.id); setView("lore"); break;
+      case "map": setSelectedMarkerId(null); setCurrentMapId(hit.id); setView("atlas"); break;
+      case "marker": { if (hit.mapId) setCurrentMapId(hit.mapId); setSelectedMarkerId(hit.id); setView("atlas"); break; }
+      case "journal": setFocusedEntryId(hit.id); setView("journal"); break;
+    }
+  }, []);
+  useEffect(() => {
+    if (!focusedEntryId) return;
+    document.getElementById(`codex-player-entry-${focusedEntryId}`)?.scrollIntoView({ block: "center" });
+  }, [focusedEntryId, timeline]);
   const navigate = useCallback((target: string) => { const match = pages.find((candidate) => candidate.title.toLowerCase() === target.trim().toLowerCase()); if (match) openPage(match.id); }, [pages, openPage]);
   const onMarkerClick = useCallback((markerId: string) => {
     const marker = markers.find((candidate) => candidate.id === markerId);
@@ -118,11 +130,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
             </div>
             <nav className="codex-list" aria-label="Revealed pages">
               {query.trim() ? (
-                searchHits === null
-                  ? <p className="codex-list-empty">Searching…</p>
-                  : searchHits.length === 0
-                    ? <p className="codex-list-empty">Nothing you know matches that.</p>
-                    : searchHits.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)
+                <SearchResultList state={searchState} selectedId={selectedPageId} onOpen={openHit} emptyLabel="Nothing you know matches that." />
               ) : (
                 <>
                   {(filter.type || filter.tag) && <Chip onRemove={() => setFilter({ type: null, tag: null })} removeLabel="Clear filter">{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</Chip>}
@@ -193,7 +201,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
           )}
           <div className="codex-atlas-body">
             {currentMap
-              ? <MapSurface token={token} assetId={currentMap.assetId} markers={markers} placing={false} readOnly selectedMarkerId={null} onBackgroundClick={() => undefined} onMarkerClick={onMarkerClick} onMarkerDragEnd={() => undefined} />
+              ? <MapSurface token={token} assetId={currentMap.assetId} markers={markers} placing={false} readOnly selectedMarkerId={selectedMarkerId} onBackgroundClick={() => undefined} onMarkerClick={onMarkerClick} onMarkerDragEnd={() => undefined} />
               : <div className="codex-main-empty"><h3>No maps yet</h3><p>Maps your GM shares appear here.</p></div>}
           </div>
         </div>
@@ -204,7 +212,8 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
           <div className="codex-timeline">
             {timeline.length === 0 && <p className="codex-list-empty">No entries revealed yet.</p>}
             {timeline.map((entry) => (
-              <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
+              <article key={entry.id} id={`codex-player-entry-${entry.id}`} aria-current={entry.id === focusedEntryId ? "true" : undefined}
+                className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}${entry.id === focusedEntryId ? " is-focused" : ""}`}>
                 <header className="codex-entry-head codex-entry-meta">{entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}<span className="codex-entry-when">{whenLabel(entry)}</span></header>
                 <div className="codex-entry-body"><CodexMarkdown text={entry.text} onNavigate={navigate} token={token} knownTitles={knownTitles} /></div>
               </article>

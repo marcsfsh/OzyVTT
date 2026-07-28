@@ -49,6 +49,32 @@
 .codex-list-item:hover { background: var(--surface-2); border-color: var(--line); }
 .codex-list-item.is-active { background: var(--surface-2); border-color: var(--magenta); }
 .codex-list-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* CI-1 / R2: THE search-result row. One shape for all four record kinds, rendered identically by the
+   Pages rail, the command palette and the player Codex. Kind reads by glyph + a text label; the accent
+   colours below are a scanning aid layered on top of that label, never the signal on their own.
+   §4 route 1 (grow the paint): results are a vertical stack, so route 2's 44px ::after would overhang
+   into the rows above and below and steal their taps — min-height carries the floor instead. The two
+   text lines already push past 44px at the body/2xs sizes; min-height guarantees it for a bare,
+   tag-less, single-line row. */
+.codex-hit {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+}
+.codex-hit:hover { background: var(--surface-2); border-color: var(--line); }
+/* R6: selection owns the edge, hover owns the surface lift. */
+.codex-hit.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-hit-glyph { display: flex; flex: none; align-items: center; }
+.codex-hit-ic { width: 1.2em; height: 1.2em; }
+.codex-hit-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.codex-hit-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codex-hit-meta { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.codex-hit-kind { flex: none; font-family: var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.codex-hit-tag { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; }
 /* Typed-entity glyph (SVG, coloured by its type) rendered inline next to a title, everywhere. */
 .codex-ent-icon { width: 1.05em; height: 1.05em; flex: none; vertical-align: -0.16em; }
 .codex-reader-titleicon { width: 0.82em; height: 0.82em; margin-right: 0.28em; vertical-align: -0.02em; }
@@ -327,10 +353,12 @@
 .codex-palette-input { width: 100%; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font-family: var(--font-body); font-size: var(--fs-body); padding: var(--space-3) var(--space-4); }
 .codex-palette-input:focus { outline: none; border-bottom-color: var(--cyan); }
 .codex-palette-list { list-style: none; margin: 0; padding: var(--space-1); max-height: 46vh; overflow-y: auto; }
-.codex-palette-item { display: block; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-md); cursor: pointer; }
+/* §4 route 1, same reasoning as .codex-hit: the palette list is a vertical stack of commands. */
+.codex-palette-item { min-height: var(--tap-min); display: flex; align-items: center; width: 100%; text-align: left; padding: var(--space-2) var(--space-3); border: none; background: transparent; color: var(--text); border-radius: var(--radius-md); cursor: pointer; }
 .codex-palette-item.is-active { background: var(--surface-3); }
 .codex-palette-item.is-action { color: var(--cyan); }
 .codex-palette-empty { padding: var(--space-3); color: var(--text-muted); }
+.codex-palette-loading { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); }
 
 .codex-atlas { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-atlas-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
@@ -445,6 +473,9 @@
 .codex-timeline { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-entry { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-entry.is-combat { border-left-color: var(--caution); }
+/* CI-1 / R1: the entry a search hit landed on. R6 — selection owns the edge, so this marks the arrival
+   with a border rather than a second background treatment. */
+.codex-entry.is-focused { border-color: var(--magenta); }
 .codex-entry-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .codex-entry-meta { display: flex; align-items: center; gap: var(--space-2); }
 .codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }

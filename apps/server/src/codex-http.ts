@@ -200,11 +200,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
    * route and simply learned to return more kinds, rather than gaining a sibling.
    *
    * `hits` is that one list (pages, journal entries, maps, markers), discriminated by `kind`.
-   * `results` is the pre-CI-1 page-only list, kept so a client written before this keeps working, and
-   * droppable once the client reads `hits`. It is the SAME index read through the same per-kind
-   * predicate, just filtered to pages - not a second search mechanism - which is why it is a separate
-   * read rather than a slice of `hits`: slicing would let 50 marker matches crowd pages out of a list
-   * whose whole job is to behave exactly as it did before.
+   *
+   * A page-only `results` array rode alongside it for exactly one commit, so the client could migrate
+   * without a flag-day. Every caller now reads `hits`, so it is gone: two lists answering one query is
+   * the parallel-mechanism problem this overhaul exists to remove, and the Codex has no external API
+   * consumer to keep it for.
    */
   router.get(`${CODEX_BASE}/search`, (request, response) => {
     const role = roleOf(request);
@@ -215,12 +215,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
       .filter((record) => record !== null)
       .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record)))
       .filter((hit) => hit !== null);
-    const results = store.searchPages(role, query)
-      .map((hit) => store.getPage(hit.pageId))
-      .filter((page) => page !== null)
-      .map((page) => (role === "gm" ? projectGmPageSummary(page) : projectPlayerPageSummary(page)))
-      .filter((page) => page !== null);
-    return envelope(response, 200, { results, hits });
+    return envelope(response, 200, { hits });
   });
 
   router.get(`${CODEX_BASE}/pages/:id`, (request, response) => {

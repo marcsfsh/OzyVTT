@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Modal, Select, Skeleton, Switch, TagInput } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
@@ -19,7 +19,14 @@ type AtlasActor = Readonly<{ id: string; name: string }>;
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
   { value: "world", label: "World" }, { value: "regional", label: "Regional" }, { value: "battlemap", label: "Local / battlemap" }
 ];
-export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene, onOpenReplay }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
+/**
+ * CI-1 / R1 ("every cross-mode jump prepares its destination"): an incoming request to *land somewhere*
+ * in the atlas. A marker hit carries both halves because opening a pin means opening its map FIRST and
+ * then selecting the pin — `mapId` alone lands on the wrong pin, `markerId` alone lands on the wrong map.
+ */
+export type AtlasTarget = Readonly<{ mapId: string; markerId: string | null }>;
+
+export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene, onOpenReplay, openTarget = null, onOpenedTarget = () => {} }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void; openTarget?: AtlasTarget | null; onOpenedTarget?: () => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [maps, setMaps] = useState<CodexMap[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
@@ -64,6 +71,26 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Arriving from a search hit: open the requested map, THEN select the requested marker. The pin lives
+  // in `markers`, which only loads once `currentMapId` changes, so this sets the id and lets the existing
+  // load effect resolve it — `selectedMarker` is derived, so the inspector opens when the pin arrives.
+  // Same handled-latch shape as ReplayPanel's `openArchiveId`: without it a caller that passes a target
+  // and no `onOpenedTarget` would yank the view back every time the atlas refreshes. Clearing the latch
+  // when the target goes away is the one deviation — it lets the SAME pin be re-opened from a later search.
+  const handledTargetRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openTarget) { handledTargetRef.current = null; return; }
+    if (loading) return; // wait for the map list either way: a failed load settles too, and must not hang the jump
+    const key = `${openTarget.mapId}:${openTarget.markerId ?? ""}`;
+    if (handledTargetRef.current === key) return;
+    handledTargetRef.current = key;
+    if (maps.some((map) => map.id === openTarget.mapId)) {
+      setCurrentMapId(openTarget.mapId);
+      setSelectedMarkerId(openTarget.markerId);
+    } // No such map (deleted since the search) => the GM simply lands on the atlas they were already on.
+    onOpenedTarget();
+  }, [openTarget, loading, maps, onOpenedTarget]);
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;

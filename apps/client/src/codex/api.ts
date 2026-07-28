@@ -39,6 +39,32 @@ export type CodexPageRevision = Readonly<{
   authorTag: string;
 }>;
 
+// ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----
+
+/** The four things the codex indexes. Mirrors the server's `CodexRecordKind` (`codex-store.ts`). */
+export type CodexRecordKind = "page" | "journal" | "map" | "marker";
+/**
+ * One row of the single result list, discriminated by `kind`. Mirrors `CodexSearchHit` in
+ * `apps/server/src/codex-projections.ts` EXACTLY, including the deliberate narrowness: it carries only
+ * what a row needs to render and to open its record. Every key is present on every kind (null where it
+ * does not apply), so nothing here branches on key *presence*.
+ *
+ * `title` is the page title / map name / marker label ("" when a pin is unlabelled) / a bounded excerpt
+ * of a journal entry — and a PLAYER's journal excerpt is drawn from `playerText` alone. The server
+ * projects a player's hits through `projectPlayerSearchHit`, so this client never filters visibility
+ * itself: a client-side filter could only ever disagree with the gate that actually matters.
+ */
+export type CodexSearchHit = Readonly<{
+  kind: CodexRecordKind;
+  id: string;
+  title: string;
+  tags: readonly string[];
+  /** Pages only — null on every other kind. */
+  entityType: EntityType | null;
+  /** Markers only — the map that pin lives on, which is what lets a marker hit open the map BEFORE selecting the pin. */
+  mapId: string | null;
+}>;
+
 export type CodexPageInput = Readonly<{
   title?: string;
   entityType?: EntityType;
@@ -73,7 +99,9 @@ async function request<T>(token: string, path: string, init: RequestInit = {}): 
 
 export const codexApi = {
   listPages: (token: string) => request<{ pages: CodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
-  search: (token: string, query: string) => request<{ results: CodexPageSummary[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.results),
+  // CI-1: reads `hits` (all four record kinds), never the legacy page-only `results` the route still
+  // returns for the transition. Two lists off one route is the second parallel path this overhaul removes.
+  search: (token: string, query: string) => request<{ hits: CodexSearchHit[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.hits),
   getPage: (token: string, id: string) => request<{ page: CodexPage; backlinks: CodexBacklink[]; relationships: CodexRelationship[] }>(token, `/pages/${id}`),
   addRelationship: (token: string, pageId: string, toPageId: string, type: string) => request<{ relationship: CodexRelationshipEdge }>(token, `/pages/${pageId}/relationships`, { method: "POST", body: JSON.stringify({ toPageId, type }) }).then((data) => data.relationship),
   removeRelationship: (token: string, relId: string) => request<{ deleted: boolean }>(token, `/relationships/${relId}`, { method: "DELETE" }),
@@ -124,7 +152,9 @@ export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind:
 export const playerCodexApi = {
   listPages: (token: string) => request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
   getPage: (token: string, id: string) => request<{ page: PlayerCodexPage; backlinks: CodexBacklink[]; relationships: CodexRelationship[] }>(token, `/pages/${id}`),
-  search: (token: string, query: string) => request<{ results: PlayerCodexPageSummary[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.results),
+  // Same route, same `hits` key, same row type — the server has already dropped everything this player
+  // may not see (`projectPlayerSearchHit`), so a player result list is narrower, never differently shaped.
+  search: (token: string, query: string) => request<{ hits: CodexSearchHit[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.hits),
   listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
   listMaps: (token: string) => request<{ maps: PlayerCodexMap[] }>(token, "/maps").then((data) => data.maps),
   listMarkers: (token: string, mapId: string) => request<{ markers: PlayerCodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Panel, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
@@ -30,7 +30,7 @@ function whenLabel(entry: CodexJournalEntry): string {
   return new Date(entry.createdAt).toLocaleDateString();
 }
 
-export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
+export function JournalView({ gmToken, onOpenPage, onOpenReplay, openEntryId = null, onOpenedEntry = () => {} }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenReplay?: (archiveId: number) => void; openEntryId?: string | null; onOpenedEntry?: () => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -74,6 +74,25 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
       if (isEmpty) sessionStorage.removeItem(DRAFT_KEY); else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(pending));
     } catch { /* private mode - fine */ }
   }, [draft, editingId, stashedDraft]);
+
+  // CI-1 / R1: arriving from a search hit, the destination is prepared — the entry is marked and scrolled
+  // to, not merely "the Journal mode, somewhere in a year of entries". Same handled-latch shape as the
+  // atlas target and ReplayPanel's `openArchiveId`; the latch clears when the request does, so the same
+  // entry can be reached again from a later search.
+  const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
+  const handledEntryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openEntryId) { handledEntryRef.current = null; return; }
+    if (loading || handledEntryRef.current === openEntryId) return;
+    handledEntryRef.current = openEntryId;
+    setFocusedEntryId(openEntryId);
+    onOpenedEntry();
+  }, [openEntryId, loading, onOpenedEntry]);
+  // Runs on `entries` too: the article only exists once the timeline has rendered it.
+  useEffect(() => {
+    if (!focusedEntryId) return;
+    document.getElementById(`codex-entry-${focusedEntryId}`)?.scrollIntoView({ block: "center" });
+  }, [focusedEntryId, entries]);
 
   const set = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const submit = async () => {
@@ -182,7 +201,8 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
             <div className="codex-timeline-year">{group.label}</div>
             {nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today — {nowLabel}</div>}
             {group.entries.map((entry) => (
-              <article key={entry.id} className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}`}>
+              <article key={entry.id} id={`codex-entry-${entry.id}`} aria-current={entry.id === focusedEntryId ? "true" : undefined}
+                className={`codex-entry${entry.kind === "combat" ? " is-combat" : ""}${entry.id === focusedEntryId ? " is-focused" : ""}`}>
                 <header className="codex-entry-head">
                   <div className="codex-entry-meta">
                     <Badge tone={entry.kind === "combat" ? "caution" : "neutral"}>{entry.kind === "combat" ? "Battle" : whenLabel(entry)}</Badge>

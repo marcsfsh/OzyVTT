@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge } from "./api";
+import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
 import { PageEditor } from "./PageEditor";
-import { AtlasView } from "./AtlasView";
+import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
 import { CommandPalette } from "./CommandPalette";
+import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { EntityIcon } from "./icons";
 import { WorldHome } from "./WorldHome";
@@ -50,7 +51,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[]; relationships: readonly CodexRelationship[] } | null>(null);
   const [query, setQuery] = useState("");
-  const [searchHits, setSearchHits] = useState<CodexPageSummary[] | null>(null);
+  // CI-1: where a cross-mode jump is *going*, held here because the destination mode owns the landing.
+  const [atlasTarget, setAtlasTarget] = useState<AtlasTarget | null>(null);
+  const [journalTarget, setJournalTarget] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
@@ -74,14 +77,28 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
 
   useEffect(() => { void refreshList(); }, [refreshList]);
 
-  // Full-text search overlays the tree while a query is active; re-runs when the notebook changes.
-  useEffect(() => {
-    const q = query.trim();
-    if (!q) { setSearchHits(null); return; }
-    let live = true;
-    void codexApi.search(gmToken, q).then((hits) => { if (live) setSearchHits(hits); }).catch(() => { if (live) setSearchHits([]); });
-    return () => { live = false; };
-  }, [query, gmToken, pages]);
+  // CI-1 / R8: the rail's search is the SUITE's search — pages, journal entries, maps and markers in one
+  // list. It overlays the tree while a query is active and re-runs when the notebook changes.
+  const runSearch = useCallback((q: string) => codexApi.search(gmToken, q), [gmToken]);
+  const searchState = useCodexSearch(query, runSearch, pages);
+
+  /**
+   * R1: every cross-mode jump prepares its destination. A page lands on Pages with the notebook filter
+   * cleared and the page open; a map opens the Atlas on that map; a MARKER opens the Atlas on its map and
+   * then selects the pin (both halves, which is why the hit carries `mapId`); a journal entry lands on
+   * the Journal with that entry marked. The query itself is kept on purpose — it is the list the GM is
+   * working through, not stale state.
+   */
+  const openHit = useCallback((hit: CodexSearchHit) => {
+    switch (hit.kind) {
+      case "page": setPageFilter({ type: null, tag: null }); setMode("pages"); setSelectedId(hit.id); break;
+      case "map": setAtlasTarget({ mapId: hit.id, markerId: null }); setMode("atlas"); break;
+      // A player-visible pin always names its map; if the server ever hands back a marker without one,
+      // land on the Atlas rather than silently swallowing the click.
+      case "marker": setAtlasTarget(hit.mapId ? { mapId: hit.mapId, markerId: hit.id } : null); setMode("atlas"); break;
+      case "journal": setJournalTarget(hit.id); setMode("journal"); break;
+    }
+  }, []);
 
   const toggleFolder = useCallback((path: string) => {
     setCollapsed((prev) => {
@@ -268,9 +285,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
             onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
         : mode === "atlas"
-        ? <AtlasView gmToken={gmToken} scenes={scenes} actors={actors} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <AtlasView gmToken={gmToken} scenes={scenes} actors={actors} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }}
+            openTarget={atlasTarget} onOpenedTarget={() => setAtlasTarget(null)} />
         : mode === "journal"
-        ? <JournalView gmToken={gmToken} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <JournalView gmToken={gmToken} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }}
+            openEntryId={journalTarget} onOpenedEntry={() => setJournalTarget(null)} />
         : mode === "graph"
         ? <RelationshipGraph loading={loading} nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
@@ -307,14 +326,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
                   ))}
             </>
           ) : query.trim()
-            ? (searchHits && searchHits.length > 0
-                ? searchHits.map((page) => (
-                    <button key={page.id} type="button" className={`codex-list-item${page.id === selectedId ? " is-active" : ""}`} onClick={() => setSelectedId(page.id)}>
-                      <span className="codex-list-title">{page.title}</span>
-                      {page.revealedToPlayers && <Badge tone="success">Shown</Badge>}
-                    </button>
-                  ))
-                : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
+            ? <SearchResultList state={searchState} selectedId={selectedId} onOpen={openHit} emptyLabel="Nothing in the codex matches." />
             : loading
                 ? <div className="codex-list-loading">{[0, 1, 2, 3].map((row) => <Skeleton key={row} variant="text" />)}</div>
             : pages.length === 0
@@ -329,7 +341,8 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           : <div className="codex-main-empty"><h3>Select a page</h3><p>Every page has a player-facing side and a GM-only side. Choose one from the list, or create a new page.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}
-      {paletteOpen && <CommandPalette gmToken={gmToken} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }} onCreatePage={createPageTitled} onGoto={(target) => setMode(target)} onClose={() => setPaletteOpen(false)} />}
+      {/* Same `openHit` the rail uses: one search, one result list, one set of destinations (R8 + R1). */}
+      {paletteOpen && <CommandPalette gmToken={gmToken} onOpenHit={openHit} onCreatePage={createPageTitled} onGoto={(target) => setMode(target)} onClose={() => setPaletteOpen(false)} />}
       <Modal open={!!movingPageId} onClose={() => setMovingPageId(null)} title="Move to folder" size="sm" ariaLabel="Move to folder">
         <div className="codex-move-list">
           <button type="button" className="codex-move-opt" onClick={() => void doMove(null)}>Top level</button>

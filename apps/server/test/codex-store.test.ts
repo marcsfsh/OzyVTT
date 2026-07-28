@@ -19,6 +19,43 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
+describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
+  /**
+   * Why these exist. Player visibility is gated TWICE on purpose: `PLAYER_VISIBLE_SQL` in the query, and
+   * `projectPlayerSearchHit` at the HTTP boundary. That is good design, but it creates a blind spot —
+   * an HTTP-boundary test cannot tell you the SQL layer works, only that the pipeline as a whole does.
+   * Proven, not assumed: weakening the SQL marker arm to drop `codex_maps.revealed = 1` left **all 787
+   * tests passing**, because the projection quietly caught it. These call `searchAll` directly, below the
+   * projection, so each kind's primary gate is verified on its own.
+   */
+  it("does not return an unrevealed MAP to a player", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Castle Ravenloft", kind: "regional" });
+    expect(store.searchAll("gm", "Ravenloft").some((hit) => hit.kind === "map" && hit.id === map.id)).toBe(true);
+    expect(store.searchAll("player", "Ravenloft").some((hit) => hit.id === map.id)).toBe(false);
+  });
+
+  it("does not return an unrevealed JOURNAL entry to a player", () => {
+    const entry = store.createEntry({ playerText: "The vistani warned us" });
+    expect(store.searchAll("gm", "vistani").some((hit) => hit.kind === "journal" && hit.id === entry.id)).toBe(true);
+    expect(store.searchAll("player", "vistani").some((hit) => hit.id === entry.id)).toBe(false);
+  });
+
+  it("does not return a REVEALED marker sitting on a SECRET map to a player (CD-6, at the SQL layer)", () => {
+    // The flagship case. The pin is shown; the map is not. Players never receive the map, so they must
+    // not be able to find the pin either — and that must hold in the QUERY, not only in the projection.
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Hidden", kind: "regional" });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Crypt of Strahd" });
+    store.setMarkerRevealed(marker.id, true);                    // pin shown...
+    expect(store.getMap(map.id)!.revealedToPlayers).toBe(false);  // ...map still secret
+    expect(store.searchAll("gm", "Crypt").some((hit) => hit.kind === "marker" && hit.id === marker.id)).toBe(true);
+    expect(store.searchAll("player", "Crypt").some((hit) => hit.id === marker.id)).toBe(false);
+
+    // ...and revealing the map makes it findable, so the miss above is the map gate and not a bad query.
+    store.setMapRevealed(map.id, true);
+    expect(store.searchAll("player", "Crypt").some((hit) => hit.id === marker.id)).toBe(true);
+  });
+});
+
 describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
   it("finds a PAGE by its tag, the same way it finds a tagged map or marker", () => {
     // The asymmetry this pins: maps/markers/journal indexed their tags but pages did not, so one search

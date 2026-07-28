@@ -396,10 +396,10 @@ export const MIGRATIONS = [{
     CREATE VIRTUAL TABLE codex_search_gm USING fts5(kind UNINDEXED, record_id UNINDEXED, title, body);
 
     INSERT INTO codex_search_player (kind, record_id, title, body)
-      SELECT 'page', f.page_id, f.title, f.body || char(10) || COALESCE((SELECT group_concat(value, ' ') FROM json_each(p.tags_json)), '')
+      SELECT 'page', f.page_id, f.title, f.body || char(10) || CASE WHEN json_valid(p.tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(p.tags_json)), '') ELSE '' END
       FROM codex_fts_player f JOIN codex_pages p ON p.id = f.page_id;
     INSERT INTO codex_search_gm (kind, record_id, title, body)
-      SELECT 'page', f.page_id, f.title, f.body || char(10) || COALESCE((SELECT group_concat(value, ' ') FROM json_each(p.tags_json)), '')
+      SELECT 'page', f.page_id, f.title, f.body || char(10) || CASE WHEN json_valid(p.tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(p.tags_json)), '') ELSE '' END
       FROM codex_fts_gm f JOIN codex_pages p ON p.id = f.page_id;
 
     -- Maps and markers carry no GM-only TEXT (a name/label/tag set is single-layer), so both audiences
@@ -415,9 +415,9 @@ export const MIGRATIONS = [{
 
     -- A journal entry DOES have two layers: gm_text is GM-only and must never enter the player table.
     INSERT INTO codex_search_player (kind, record_id, title, body)
-      SELECT 'journal', id, '', player_text || ' ' || CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_journal.tags_json)), '') ELSE '' END FROM codex_journal;
+      SELECT 'journal', id, '', player_text || char(10) || CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_journal.tags_json)), '') ELSE '' END FROM codex_journal;
     INSERT INTO codex_search_gm (kind, record_id, title, body)
-      SELECT 'journal', id, '', player_text || ' ' || COALESCE(gm_text, '') || ' ' || CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_journal.tags_json)), '') ELSE '' END FROM codex_journal;
+      SELECT 'journal', id, '', player_text || char(10) || COALESCE(gm_text, '') || char(10) || CASE WHEN json_valid(tags_json) THEN COALESCE((SELECT group_concat(value, ' ') FROM json_each(codex_journal.tags_json)), '') ELSE '' END FROM codex_journal;
 
     DROP TABLE codex_fts_player;
     DROP TABLE codex_fts_gm;
@@ -493,7 +493,7 @@ function folder(value: string | null | undefined): string | null {
 function tags(value: readonly string[] | undefined): string[] {
   if (!value) return [];
   const cleaned = [...new Set(value.map((tag) => tag.trim().toLowerCase()).filter(Boolean))];
-  if (cleaned.length > MAX_TAGS) throw new Error(`A page may carry at most ${MAX_TAGS} tags.`);
+  if (cleaned.length > MAX_TAGS) throw new Error(`A record may carry at most ${MAX_TAGS} tags.`);
   for (const tag of cleaned) if (tag.length > 40 || !/^[a-z0-9][a-z0-9-]*$/.test(tag)) throw new Error("Tags use lowercase letters, numbers, and hyphens.");
   return cleaned;
 }
