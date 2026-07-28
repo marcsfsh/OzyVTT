@@ -75,8 +75,11 @@ describe("codex HTTP viewer-safety boundary", () => {
     // Assert the EXACT projected key set rather than searching the payload for the id. A substring search
     // for "42" is flaky - the entry's own uuid contains "42" about 15% of the time - and weaker: this
     // fails if any new field is ever added to the player projection, not just this one.
+    // `tags` joined this set in CI-2 — a deliberate, reviewed addition: tags are GM-authored metadata that
+    // has always been player-visible on PAGES, and here it rides the same allow-list, so it is only ever
+    // emitted for an entry the player may already see. Any OTHER new key failing this line is a leak.
     expect(Object.keys(playerTimeline.data.entries[0]).sort())
-      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "text"]);
+      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text"]);
   });
 
 

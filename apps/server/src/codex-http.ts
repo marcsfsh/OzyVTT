@@ -54,9 +54,10 @@ const MapCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   kind: MapKindSchema,
   parentMapId: z.string().uuid().nullable().optional(),
-  revealedToPlayers: z.boolean().optional()
+  revealedToPlayers: z.boolean().optional(),
+  tags: TagsSchema.optional()
 }).strict();
-const MapUpdateSchema = z.object({ name: z.string().trim().min(1).max(120).optional(), kind: MapKindSchema.optional() }).strict();
+const MapUpdateSchema = z.object({ name: z.string().trim().min(1).max(120).optional(), kind: MapKindSchema.optional(), tags: TagsSchema.optional() }).strict();
 const MapParentSchema = z.object({ parentMapId: z.string().uuid().nullable() }).strict();
 
 const Coord = z.number().finite().min(0).max(1_000_000);
@@ -70,15 +71,16 @@ const MarkerLinks = {
 };
 const MarkerCreateSchema = z.object({
   x: Coord, y: Coord, iconId: IconId, iconColor: IconColor,
-  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), ...MarkerLinks
+  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks
 }).strict();
 const MarkerUpdateSchema = z.object({
   x: Coord.optional(), y: Coord.optional(), iconId: IconId.optional(), iconColor: IconColor.optional(),
-  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), ...MarkerLinks
+  label: z.string().max(120).nullable().optional(), revealedToPlayers: z.boolean().optional(), tags: TagsSchema.optional(), ...MarkerLinks
 }).strict();
 const MarkerMoveSchema = z.object({ x: Coord, y: Coord }).strict();
 
 const JournalWriteSchema = z.object({
+  tags: TagsSchema.optional(),
   playerText: z.string().max(20_000).optional(),
   gmText: z.string().max(20_000).nullable().optional(),
   revealedToPlayers: z.boolean().optional(),

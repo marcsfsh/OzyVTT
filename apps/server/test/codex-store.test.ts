@@ -19,6 +19,40 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
+describe("CodexStore tags on every record type (CI-2)", () => {
+  it("stores, updates and clears tags on maps, markers and journal entries", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Barovia", kind: "regional", tags: ["gothic", "act-one"] });
+    expect(map.tags).toEqual(["gothic", "act-one"]);
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", tags: ["dungeon"] });
+    expect(marker.tags).toEqual(["dungeon"]);
+    const entry = store.createEntry({ playerText: "The party arrived.", tags: ["session-1"] });
+    expect(entry.tags).toEqual(["session-1"]);
+
+    // Updating replaces the whole set; an empty array genuinely clears rather than being ignored as absent.
+    expect(store.updateMap(map.id, { tags: ["act-two"] }).tags).toEqual(["act-two"]);
+    expect(store.updateMarker(marker.id, { tags: [] }).tags).toEqual([]);
+    expect(store.updateEntry(entry.id, { tags: ["session-2"] }).tags).toEqual(["session-2"]);
+
+    // Omitting `tags` must LEAVE them alone, not wipe them — the partial-update contract pages already use.
+    expect(store.updateMap(map.id, { name: "Barovia II" }).tags).toEqual(["act-two"]);
+  });
+
+  it("applies the same slug rule and 24-tag cap pages use", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "M", kind: "world" });
+    expect(() => store.updateMap(map.id, { tags: ["Not A Slug"] })).toThrow();
+    expect(() => store.updateMap(map.id, { tags: Array.from({ length: 25 }, (_, i) => `t${i}`) })).toThrow();
+  });
+
+  it("backfills existing rows to an empty tag list rather than null (migration v10)", () => {
+    // Rows written before v10 have no tags_json value of their own; the column default must make them
+    // read as [] so nothing downstream has to cope with a null.
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Legacy", kind: "world" });
+    expect(map.tags).toEqual([]);
+    expect(store.getMap(map.id)!.tags).toEqual([]);
+    expect(MIGRATIONS.some((migration) => migration.version === 10)).toBe(true);
+  });
+});
+
 describe("CodexStore pages", () => {
   it("moveFolder re-paths a folder and its descendants, dissolves to top level, and guards self-moves", () => {
     const a = store.createPage({ title: "A", folder: "NPCs" });

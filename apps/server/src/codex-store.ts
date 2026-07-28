@@ -90,6 +90,8 @@ export type CodexMapRow = Readonly<{
   parentMapId: string | null;
   revealedToPlayers: boolean;
   sortKey: number;
+  /** CI-2: the same tag vocabulary pages carry. */
+  tags: readonly string[];
   createdAt: string;
   updatedAt: string;
 }>;
@@ -103,10 +105,12 @@ export type CodexMarkerRow = Readonly<{
   iconColor: string;
   label: string | null;
   revealedToPlayers: boolean;
+  /** CI-2: the same tag vocabulary pages carry. */
+  tags: readonly string[];
 } & CodexMarkerLinks & { createdAt: string; updatedAt: string }>;
 
-export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean }>;
-export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageIds?: readonly string[]; subMapId?: string | null; sceneIds?: readonly string[]; actorId?: string | null }>;
+export type CodexMapCreateInput = Readonly<{ assetId: string; name: string; kind: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean; tags?: readonly string[] }>;
+export type CodexMarkerCreateInput = Readonly<{ x: number; y: number; iconId: string; iconColor: string; label?: string | null; revealedToPlayers?: boolean; pageIds?: readonly string[]; subMapId?: string | null; sceneIds?: readonly string[]; actorId?: string | null; tags?: readonly string[] }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
 
 /** The world's calendar: ordered months (each with a length), weekday names, and an era suffix. */
@@ -144,10 +148,12 @@ export type CodexJournalRow = Readonly<{
   /** The literal date the GM entered (independent of the calendar config), so instants can be recomputed if the calendar changes. */
   inWorldDate: CodexInWorldDate | null;
   sortKey: number;
+  /** CI-2: the same tag vocabulary pages carry. */
+  tags: readonly string[];
   createdAt: string;
   updatedAt: string;
 }>;
-export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null }>;
+export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
 export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attachMarkerId?: string | null; attachPageId?: string | null; playerText: string; gmText?: string | null; revealedToPlayers?: boolean }>;
 
@@ -349,6 +355,17 @@ export const MIGRATIONS = [{
     INSERT OR IGNORE INTO codex_folders (path, created_at)
       SELECT DISTINCT folder, '' FROM codex_pages WHERE folder IS NOT NULL AND folder != '';
   `
+}, {
+  version: 10,
+  // CI-2: tags stop being a pages-only idea. Maps, markers and journal entries each gain the same
+  // `tags_json` column pages already carry, so one vocabulary describes every record type (and, from
+  // CI-1, one search matches across all of them). Existing rows backfill to an empty array — a NOT NULL
+  // column with a default, so no read path has to cope with NULL.
+  sql: `
+    ALTER TABLE codex_maps ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE codex_markers ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE codex_journal ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+  `
 }];
 
 type PageRow = {
@@ -356,12 +373,21 @@ type PageRow = {
   gm_body: string; revealed: number; banner_asset_id: string | null; rev: number; created_at: string; updated_at: string;
 };
 type RelationshipRowRaw = { id: string; from_page_id: string; to_page_id: string; type: string; created_at: string };
-type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; created_at: string; updated_at: string };
-type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; created_at: string; updated_at: string };
-const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, created_at, updated_at";
-type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; created_at: string; updated_at: string };
-const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, created_at, updated_at";
+type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; parent_map_id: string | null; revealed: number; sort_key: number; tags_json: string; created_at: string; updated_at: string };
+const MAP_COLUMNS = "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at";
+type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; tags_json: string; created_at: string; updated_at: string };
+const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at";
+type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; created_at: string; updated_at: string };
+const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at";
 
+/** Read a stored tag array defensively — a malformed value degrades to no tags rather than throwing. */
+function parseTags(raw: string | null | undefined): readonly string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+  } catch { return []; }
+}
 function id(value: string): string {
   if (!ID.test(value)) throw new Error("Codex id is malformed.");
   return value;
@@ -915,21 +941,22 @@ export class CodexStore {
     if (parent && !this.mapRowRaw(parent)) throw new CodexNotFoundError("The parent map no longer exists.");
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_maps").get() as { m: number | null }).m ?? 0) + 1;
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(mapId, id(input.assetId), mapName(input.name), mapKind(input.kind), parent, input.revealedToPlayers ? 1 : 0, sortKey, stamp, stamp);
+      database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(mapId, id(input.assetId), mapName(input.name), mapKind(input.kind), parent, input.revealedToPlayers ? 1 : 0, sortKey, JSON.stringify(tags(input.tags)), stamp, stamp);
       this.bumpRevision();
     });
     return this.getMap(mapId)!;
   }
 
-  updateMap(mapId: string, input: Readonly<{ name?: string; kind?: CodexMapKind }>): CodexMapRow {
+  updateMap(mapId: string, input: Readonly<{ name?: string; kind?: CodexMapKind; tags?: readonly string[] }>): CodexMapRow {
     const database = this.requireDatabase();
     const existing = this.mapRowRaw(mapId);
     if (!existing) throw new CodexNotFoundError("That map no longer exists.");
     const name = input.name === undefined ? existing.name : mapName(input.name);
     const kind = input.kind === undefined ? existing.kind : mapKind(input.kind);
+    const tagsJson = input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags));
     this.transaction(() => {
-      database.prepare("UPDATE codex_maps SET name = ?, kind = ?, updated_at = ? WHERE id = ?").run(name, kind, this.stamp(), mapId);
+      database.prepare("UPDATE codex_maps SET name = ?, kind = ?, tags_json = ?, updated_at = ? WHERE id = ?").run(name, kind, tagsJson, this.stamp(), mapId);
       this.bumpRevision();
     });
     return this.getMap(mapId)!;
@@ -989,7 +1016,7 @@ export class CodexStore {
   }
 
   listMaps(): CodexMapRow[] {
-    return (this.requireDatabase().prepare("SELECT id, asset_id, name, kind, parent_map_id, revealed, sort_key, created_at, updated_at FROM codex_maps ORDER BY sort_key, name COLLATE NOCASE").all() as MapRowRaw[]).map((row) => this.toMap(row));
+    return (this.requireDatabase().prepare(`SELECT ${MAP_COLUMNS} FROM codex_maps ORDER BY sort_key, name COLLATE NOCASE`).all() as MapRowRaw[]).map((row) => this.toMap(row));
   }
 
   // ----- Markers -----
@@ -1000,9 +1027,9 @@ export class CodexStore {
     const markerId = this.freshId();
     const stamp = this.stamp();
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(markerId, mapId, coord(input.x), coord(input.y), iconId(input.iconId), hexColor(input.iconColor), markerLabel(input.label), input.revealedToPlayers ? 1 : 0,
-          JSON.stringify(idArray(input.pageIds)), optionalId(input.subMapId), JSON.stringify(idArray(input.sceneIds)), optionalId(input.actorId), stamp, stamp);
+          JSON.stringify(idArray(input.pageIds)), optionalId(input.subMapId), JSON.stringify(idArray(input.sceneIds)), optionalId(input.actorId), JSON.stringify(tags(input.tags)), stamp, stamp);
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -1022,11 +1049,12 @@ export class CodexStore {
       page_ids_json: input.pageIds === undefined ? existing.page_ids_json ?? "[]" : JSON.stringify(idArray(input.pageIds)),
       sub_map_id: input.subMapId === undefined ? existing.sub_map_id : optionalId(input.subMapId),
       scene_ids_json: input.sceneIds === undefined ? existing.scene_ids_json ?? "[]" : JSON.stringify(idArray(input.sceneIds)),
-      actor_id: input.actorId === undefined ? existing.actor_id : optionalId(input.actorId)
+      actor_id: input.actorId === undefined ? existing.actor_id : optionalId(input.actorId),
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags))
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_ids_json = ?, sub_map_id = ?, scene_ids_json = ?, actor_id = ?, updated_at = ? WHERE id = ?")
-        .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_ids_json, merged.sub_map_id, merged.scene_ids_json, merged.actor_id, this.stamp(), markerId);
+      database.prepare("UPDATE codex_markers SET x = ?, y = ?, icon_id = ?, icon_color = ?, label = ?, revealed = ?, page_ids_json = ?, sub_map_id = ?, scene_ids_json = ?, actor_id = ?, tags_json = ?, updated_at = ? WHERE id = ?")
+        .run(merged.x, merged.y, merged.icon_id, merged.icon_color, merged.label, merged.revealed, merged.page_ids_json, merged.sub_map_id, merged.scene_ids_json, merged.actor_id, merged.tags_json, this.stamp(), markerId);
       this.bumpRevision();
     });
     return this.getMarker(markerId)!;
@@ -1146,7 +1174,7 @@ export class CodexStore {
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
       sourceEncounterId: null, sessionNumber: sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
-      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags
     });
   }
 
@@ -1184,11 +1212,12 @@ export class CodexStore {
       calendar_instant: dated ? dated.instant : existing.calendar_instant,
       in_world_year: dated ? (dated.date ? dated.date.year : null) : existing.in_world_year,
       in_world_month: dated ? (dated.date ? dated.date.month : null) : existing.in_world_month,
-      in_world_day: dated ? (dated.date ? dated.date.day : null) : existing.in_world_day
+      in_world_day: dated ? (dated.date ? dated.date.day : null) : existing.in_world_day,
+      tags_json: input.tags === undefined ? existing.tags_json : JSON.stringify(tags(input.tags))
     };
     this.transaction(() => {
-      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, updated_at = ? WHERE id = ?")
-        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, this.stamp(), entryId);
+      database.prepare("UPDATE codex_journal SET player_text = ?, gm_text = ?, attach_marker_id = ?, attach_page_id = ?, session_number = ?, real_date = ?, in_world_label = ?, calendar_instant = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, tags_json = ?, updated_at = ? WHERE id = ?")
+        .run(next.player_text, next.gm_text, next.attach_marker_id, next.attach_page_id, next.session_number, next.real_date, next.in_world_label, next.calendar_instant, next.in_world_year, next.in_world_month, next.in_world_day, next.tags_json, this.stamp(), entryId);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -1232,15 +1261,15 @@ export class CodexStore {
     return [];
   }
 
-  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null }>): CodexJournalRow {
+  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[] }>): CodexJournalRow {
     const database = this.requireDatabase();
     const entryId = this.freshId();
     const stamp = this.stamp();
     const sortKey = ((database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
     const date = fields.inWorldDate;
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, stamp, stamp);
+      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, JSON.stringify(tags(fields.tags)), stamp, stamp);
       this.bumpRevision();
     });
     return this.getEntry(entryId)!;
@@ -1253,7 +1282,7 @@ export class CodexStore {
       sourceEncounterId: row.source_encounter_id, sessionNumber: row.session_number, realDate: row.real_date,
       inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant,
       inWorldDate: row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day } : null,
-      sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at
+      sortKey: row.sort_key, tags: parseTags(row.tags_json), createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
   private journalRowRaw(entryId: string): JournalRowRaw | undefined {
@@ -1262,14 +1291,14 @@ export class CodexStore {
   }
 
   private toMap(row: MapRowRaw): CodexMapRow {
-    return { id: row.id, assetId: row.asset_id, name: row.name, kind: mapKind(row.kind), parentMapId: row.parent_map_id, revealedToPlayers: row.revealed === 1, sortKey: row.sort_key, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, assetId: row.asset_id, name: row.name, kind: mapKind(row.kind), parentMapId: row.parent_map_id, revealedToPlayers: row.revealed === 1, sortKey: row.sort_key, tags: parseTags(row.tags_json), createdAt: row.created_at, updatedAt: row.updated_at };
   }
   private toMarker(row: MarkerRowRaw): CodexMarkerRow {
-    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageIds: parseIdArray(row.page_ids_json), subMapId: row.sub_map_id, sceneIds: parseIdArray(row.scene_ids_json), actorId: row.actor_id, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, mapId: row.map_id, x: row.x, y: row.y, iconId: row.icon_id, iconColor: row.icon_color, label: row.label, revealedToPlayers: row.revealed === 1, pageIds: parseIdArray(row.page_ids_json), subMapId: row.sub_map_id, sceneIds: parseIdArray(row.scene_ids_json), actorId: row.actor_id, tags: parseTags(row.tags_json), createdAt: row.created_at, updatedAt: row.updated_at };
   }
   private mapRowRaw(mapId: string): MapRowRaw | undefined {
     if (!ID.test(mapId)) return undefined;
-    return this.requireDatabase().prepare("SELECT id, asset_id, name, kind, parent_map_id, revealed, sort_key, created_at, updated_at FROM codex_maps WHERE id = ?").get(mapId) as MapRowRaw | undefined;
+    return this.requireDatabase().prepare(`SELECT ${MAP_COLUMNS} FROM codex_maps WHERE id = ?`).get(mapId) as MapRowRaw | undefined;
   }
   private markerRowRaw(markerId: string): MarkerRowRaw | undefined {
     if (!ID.test(markerId)) return undefined;

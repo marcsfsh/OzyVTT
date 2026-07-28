@@ -2465,6 +2465,7 @@ Turns an uploaded map asset into an atlas map node.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `assetId` | string (uuid) | yes |  |
 | `name` | string | yes |  |
 | `kind` | `battlemap` \| `regional` \| `world` | yes |  |
@@ -2485,6 +2486,7 @@ Renames/retypes a map.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `name` | string | no |  |
 | `kind` | `battlemap` \| `regional` \| `world` | no |  |
 
@@ -2554,6 +2556,7 @@ Drops a marker on a map.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `x` | number (0–1000000) | yes |  |
 | `y` | number (0–1000000) | yes |  |
 | `iconId` | string (pattern) | yes |  |
@@ -2579,6 +2582,7 @@ Edits a marker's icon/label/links.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `x` | number (0–1000000) | no |  |
 | `y` | number (0–1000000) | no |  |
 | `iconId` | string (pattern) | no |  |
@@ -2655,6 +2659,7 @@ Adds a journal/timeline entry.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `playerText` | string | no |  |
 | `gmText` | string \| null | no |  |
 | `revealedToPlayers` | boolean | no |  |
@@ -2679,6 +2684,7 @@ Edits a journal entry.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `tags` | string[] | no |  |
 | `playerText` | string | no |  |
 | `gmText` | string \| null | no |  |
 | `revealedToPlayers` | boolean | no |  |

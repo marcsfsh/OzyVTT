@@ -76,7 +76,7 @@ export function projectPlayerRelationshipEdges(edges: readonly CodexRelationship
 // ----- Maps -----
 
 export type GmCodexMap = CodexMapRow;
-export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: CodexMapRow["kind"]; parentMapId: string | null }>;
+export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: CodexMapRow["kind"]; parentMapId: string | null; tags: readonly string[] }>;
 
 export function projectGmMap(row: CodexMapRow): GmCodexMap { return row; }
 /**
@@ -87,7 +87,7 @@ export function projectGmMap(row: CodexMapRow): GmCodexMap { return row; }
  */
 export function projectPlayerMap(row: CodexMapRow, context: Readonly<{ parentRevealed: boolean }>): PlayerCodexMap | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, assetId: row.assetId, name: row.name, kind: row.kind, parentMapId: context.parentRevealed ? row.parentMapId : null };
+  return { id: row.id, assetId: row.assetId, name: row.name, kind: row.kind, parentMapId: context.parentRevealed ? row.parentMapId : null, tags: row.tags };
 }
 
 // ----- Markers -----
@@ -96,6 +96,7 @@ export type GmCodexMarker = CodexMarkerRow;
 /** A marker as a player sees it: no scene/actor links (GM-only), and page/sub-map links only when those targets are themselves revealed. */
 export type PlayerCodexMarker = Readonly<{
   id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null;
+  tags: readonly string[];
 }>;
 
 export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker { return row; }
@@ -109,7 +110,7 @@ export function projectGmMarker(row: CodexMarkerRow): GmCodexMarker { return row
 export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ revealedPageIds: ReadonlySet<string>; subMapRevealed: boolean }>): PlayerCodexMarker | null {
   if (!row.revealedToPlayers) return null;
   return {
-    id: row.id, mapId: row.mapId, x: row.x, y: row.y, iconId: row.iconId, iconColor: row.iconColor, label: row.label,
+    id: row.id, mapId: row.mapId, x: row.x, y: row.y, iconId: row.iconId, iconColor: row.iconColor, label: row.label, tags: row.tags,
     pageIds: row.pageIds.filter((pageId) => context.revealedPageIds.has(pageId)),
     subMapId: context.subMapRevealed ? row.subMapId : null
   };
@@ -120,13 +121,13 @@ export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ rev
 export type GmCodexJournalEntry = CodexJournalRow;
 /** A journal entry as a player sees it: player text only, no gmText, no GM-only linkage, only when revealed. */
 export type PlayerCodexJournalEntry = Readonly<{
-  id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; createdAt: string;
+  id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
 }>;
 
 export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry { return row; }
 export function projectPlayerJournalEntry(row: CodexJournalRow): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
-  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, createdAt: row.createdAt };
+  return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
 }
 
 export function projectGmBacklinks(rows: readonly CodexBacklinkRow[]): CodexBacklink[] {
