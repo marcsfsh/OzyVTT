@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Field, IconButton, Input, Modal, SegmentedControl, Select, Textarea } from "@vtt/ui";
+import { Button, Field, IconButton, Input, Modal, SaveState, SegmentedControl, Select, TagInput, Textarea, type SaveStatus } from "@vtt/ui";
 import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type CodexPage, type CodexPageRevision, type CodexPageSummary, type CodexRelationship } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
@@ -11,7 +11,6 @@ import { useConfirm } from "../components/feedback";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 type BodyTab = "player" | "gm";
-type SaveStatus = "idle" | "saving" | "saved" | "conflict" | "error";
 
 type Draft = { title: string; entityType: EntityType; fields: Record<string, string>; folder: string; tagsText: string; playerBody: string; gmBody: string; bannerAssetId: string | null };
 
@@ -42,7 +41,6 @@ function applyFormat(value: string, start: number, end: number, kind: string): {
     case "numbered": return linePrefix("1. ");
     case "quote": return linePrefix("> ");
     case "rule": return { value: `${value.slice(0, start)}\n---\n${value.slice(end)}`, caret: start + 5 };
-    case "link": return { value: `${value.slice(0, start)}[${selected || "text"}](https://)${value.slice(end)}`, caret: start + 1 };
     case "wikilink": return { value: `${value.slice(0, start)}[[${selected || ""}]]${value.slice(end)}`, caret: start + 2 + selected.length };
     default: return { value, caret: end };
   }
@@ -58,7 +56,6 @@ const TOOLBAR: ReadonlyArray<{ kind: string; label: string; glyph?: string; icon
   { kind: "numbered", label: "Numbered list", glyph: "1." },
   { kind: "quote", label: "Quote", glyph: "”" },
   { kind: "rule", label: "Divider", glyph: "―" },
-  { kind: "link", label: "Link", icon: "link" },
   { kind: "wikilink", label: "Wiki-link to another page", glyph: "[[ ]]" }
 ];
 
@@ -281,9 +278,10 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
       textarea.scrollTop = Math.max(0, lineIndex * lineHeight - 48);
     });
   };
+  // Datalist hints from tags already used elsewhere in the notebook; free entry stays open.
+  const tagSuggestions = useMemo(() => [...new Set(pages.flatMap((summary) => summary.tags))].sort(), [pages]);
   const folderCrumbs = draft.folder.split("/").map((segment) => segment.trim()).filter(Boolean);
 
-  const statusLabel = status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "conflict" ? "Changed elsewhere - reload" : status === "error" ? "Save failed" : "";
 
   return (
     <div className="codex-editor">
@@ -294,7 +292,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} />
         </div>
         <div className="codex-editor-actions">
-          <span className={`codex-save-status codex-save-${status}`} role="status">{statusLabel}</span>
+          <SaveState status={status} />
           <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
           <Button variant="ghost" size="sm" onClick={openRevisions}>History</Button>
           <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
@@ -315,7 +313,15 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
               </Select>
             </Field>
             <Field label="Folder" htmlFor="codex-folder" help="Use / to nest, e.g. NPCs/Villains"><Input id="codex-folder" value={draft.folder} placeholder="Unfiled" onChange={(event) => setDraft((prev) => ({ ...prev, folder: event.target.value }))} /></Field>
-            <Field label="Tags" htmlFor="codex-tags" help="Comma-separated"><Input id="codex-tags" value={draft.tagsText} placeholder="town, npc" onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))} /></Field>
+            <Field label="Tags" htmlFor="codex-tags">
+              <TagInput id="codex-tags" ariaLabel="Tags" placeholder="town, npc" values={parseTags(draft.tagsText)}
+                onChange={(next: readonly string[]) => setDraft((prev) => ({ ...prev, tagsText: next.join(", ") }))}
+                suggestions={tagSuggestions}
+                /* Uses TagInput's DEFAULT slugify on purpose. The server has always required slugs
+                   (`codex-store.ts` tags(): /^[a-z0-9][a-z0-9-]*$/), but the old comma-field only
+                   lowercased — so typing "sword coast" produced a tag the server rejected with a generic
+                   save failure. The primitive's default is the server's contract; adopting it fixes that. */ />
+            </Field>
           </div>
 
           {typeDef.fields.some((field) => !field.secret) && (

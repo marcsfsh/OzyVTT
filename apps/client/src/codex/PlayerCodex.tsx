@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Input, Tabs } from "@vtt/ui";
+import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
 import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -38,6 +38,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [query, setQuery] = useState("");
   const [searchHits, setSearchHits] = useState<PlayerCodexPageSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +47,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
+    finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { void load().catch(() => undefined); }, [load]);
@@ -94,7 +96,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
           tabs={[{ id: "world", label: "World" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
       </div>
 
-      {error && <p className="codex-rail-error" role="alert">{error}</p>}
+      {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
 
       {view === "world" && (
         <WorldHome pages={pages} showReveal={false} onOpenPage={openPage}
@@ -123,8 +125,9 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
                     : searchHits.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)
               ) : (
                 <>
-                  {(filter.type || filter.tag) && <div className="codex-filter-chip"><span>{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setFilter({ type: null, tag: null })}>✕</button></div>}
-                  {filteredPages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
+                  {(filter.type || filter.tag) && <Chip onRemove={() => setFilter({ type: null, tag: null })} removeLabel="Clear filter">{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</Chip>}
+                  {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
+                  {!loading && filteredPages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
                   {filteredPages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)}
                 </>
               )}

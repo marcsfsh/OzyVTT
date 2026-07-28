@@ -24,6 +24,7 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
+import { ToastProvider } from "@vtt/ui";
 import { CodexWorkspace } from "./CodexWorkspace";
 import type { CodexPage, CodexPageSummary } from "./api";
 
@@ -41,6 +42,10 @@ const summary = (id: string, title: string, entityType: CodexPageSummary["entity
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
+/** The app mounts inside a ToastProvider (`main.tsx:411`); `CodexWorkspace` uses `useToast`, so a bare
+    render would throw. Rendering it the way the app does is the point of an integration-shaped test. */
+const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm" /></ToastProvider>);
+
 describe("Codex shell — cross-mode navigation", () => {
   beforeEach(() => {
     listPages.mockResolvedValue(PAGES);
@@ -54,14 +59,14 @@ describe("Codex shell — cross-mode navigation", () => {
   });
 
   it("starts on Pages — the GM's first action is actionable", async () => {
-    render(<CodexWorkspace gmToken="gm" />);
+    renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(screen.getByRole("tab", { name: "Pages" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("switches mode when a mode tab is chosen", async () => {
     const user = userEvent.setup();
-    render(<CodexWorkspace gmToken="gm" />);
+    renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("tab", { name: "World" }));
     expect(screen.getByRole("tab", { name: "World" })).toHaveAttribute("aria-selected", "true");
@@ -71,7 +76,7 @@ describe("Codex shell — cross-mode navigation", () => {
     // This handoff is the one the design calls the best transition in the suite; M7 makes every other
     // jump match it, so its current behaviour is worth pinning.
     const user = userEvent.setup();
-    render(<CodexWorkspace gmToken="gm" />);
+    renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("tab", { name: "World" }));
     await user.click(await screen.findByText(/character/i));
@@ -84,7 +89,7 @@ describe("Codex shell — cross-mode navigation", () => {
 
   it("clearing the filter restores the full notebook", async () => {
     const user = userEvent.setup();
-    render(<CodexWorkspace gmToken="gm" />);
+    renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("tab", { name: "World" }));
     await user.click(await screen.findByText(/character/i));

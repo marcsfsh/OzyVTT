@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Input, Modal, Select, Tabs } from "@vtt/ui";
+import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
 import { codexApi, pageLinkKey, type CodexBacklink, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge } from "./api";
 import { PageEditor } from "./PageEditor";
@@ -11,7 +11,7 @@ import { EntityIcon } from "./icons";
 import { WorldHome } from "./WorldHome";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
-import { Notice, type NoticeMessage, useConfirm, usePrompt } from "../components/feedback";
+import { useConfirm, usePrompt } from "../components/feedback";
 import { ENTITY_DEFS, type EntityType } from "./entities";
 import "./codex.css";
 
@@ -55,9 +55,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<NoticeMessage>(null);
+  // CF-2: before this the first fetch showed "No pages yet" — an empty state that lies while loading.
+  const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<NotebookSort>(() => { try { return (localStorage.getItem("codex-notebook-sort") as NotebookSort) || "name-asc"; } catch { return "name-asc"; } });
   const [movingPageId, setMovingPageId] = useState<string | null>(null);
+  const { toast } = useToast();
   const { prompt, dialog: promptDialog } = usePrompt();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -67,6 +69,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       const [nextPages, nextEdges, nextFolders] = await Promise.all([codexApi.listPages(gmToken), codexApi.listRelationships(gmToken), codexApi.listFolders(gmToken).catch(() => [])]);
       setPages(nextPages); setEdges(nextEdges); setFolders(nextFolders); setError(null);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
+    finally { setLoading(false); }
   }, [gmToken]);
 
   useEffect(() => { void refreshList(); }, [refreshList]);
@@ -161,7 +164,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
     }
     await refreshList();
     if (failed.length) { setError(`Imported ${imported} of ${files.length}. Couldn't import: ${failed.join(", ")}.`); }
-    else { setError(null); setNotice({ tone: "success", text: `Imported ${imported} page${imported === 1 ? "" : "s"}.` }); }
+    else { setError(null); toast(`Imported ${imported} page${imported === 1 ? "" : "s"}.`, { tone: "success" }); }
   };
 
   const navigate = useCallback(async (target: string) => {
@@ -257,7 +260,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           <input ref={importInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.target.value = ""; }} />
         </div>
       </div>
-      <Notice notice={notice} />
+      {/* CF-2: one error surface for the whole workspace. It previously lived inside the Pages rail, so a
+          failed load was invisible in World, Atlas, Journal and Graph. */}
+      {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
       {mode === "world"
         ? <WorldHome pages={pages} onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
@@ -272,19 +277,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       <aside className="codex-rail">
         <div className="codex-rail-head">
           <Input value={query} placeholder="Search the notebook…" aria-label="Search the notebook" onChange={(event) => { setQuery(event.target.value); if (event.target.value.trim()) setPageFilter({ type: null, tag: null }); }} />
-          <div className="codex-newpage">
-            <Button variant="primary" size="sm" aria-haspopup="menu" aria-expanded={templateMenu} onClick={() => setTemplateMenu((open) => !open)}>New ▾</Button>
-            {templateMenu && (
-              <>
-                <button type="button" className="codex-menu-scrim" aria-hidden="true" tabIndex={-1} onClick={() => setTemplateMenu(false)} />
-                <div className="codex-template-menu" role="menu">
-                  {TEMPLATES.map((template) => (
-                    <button key={template.key} type="button" role="menuitem" className="codex-template-item" onClick={() => void createFromTemplate(template)}><EntityIcon type={template.type} /> {template.label}</button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          <Menu label="New page from a template" trigger="New" className="codex-newpage">
+            {TEMPLATES.map((template) => (
+              <MenuItem key={template.key} icon={<EntityIcon type={template.type} />} onClick={() => void createFromTemplate(template)}>{template.label}</MenuItem>
+            ))}
+          </Menu>
         </div>
         {!query.trim() && !pageFilter.type && !pageFilter.tag && (
           <div className="codex-rail-tools">
@@ -296,11 +293,10 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             <Button variant="ghost" size="sm" onClick={newFolder}>＋ Folder</Button>
           </div>
         )}
-        {error && <p className="codex-rail-error" role="alert">{error}</p>}
         <nav className="codex-list" aria-label="Campaign notebook">
           {(pageFilter.type || pageFilter.tag) && !query.trim() ? (
             <>
-              <div className="codex-filter-chip"><span>{pageFilter.type ? `${ENTITY_DEFS[pageFilter.type].label}s` : `#${pageFilter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setPageFilter({ type: null, tag: null })}>✕</button></div>
+              <Chip onRemove={() => setPageFilter({ type: null, tag: null })} removeLabel="Clear filter">{pageFilter.type ? `${ENTITY_DEFS[pageFilter.type].label}s` : `#${pageFilter.tag}`}</Chip>
               {filteredPages.length === 0
                 ? <p className="codex-list-empty">Nothing here yet.</p>
                 : filteredPages.map((page) => (
@@ -319,6 +315,8 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
                     </button>
                   ))
                 : <p className="codex-list-empty">{searchHits === null ? "Searching…" : "No notes match."}</p>)
+            : loading
+                ? <div className="codex-list-loading">{[0, 1, 2, 3].map((row) => <Skeleton key={row} variant="text" />)}</div>
             : pages.length === 0
                 ? (!error && <p className="codex-list-empty">No pages yet.</p>)
                 : <NotebookTree node={tree} sort={sort} collapsed={collapsed} selectedId={selectedId} onToggle={toggleFolder} onSelect={setSelectedId} onNewInFolder={createInFolder} onNewSubfolder={newSubfolder} onRenameFolder={renameFolder} onDeleteFolder={deleteFolder} onMovePage={movePage} onMoveFolder={moveFolderTo} onRequestMove={setMovingPageId} />}

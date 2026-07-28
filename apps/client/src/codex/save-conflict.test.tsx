@@ -50,12 +50,19 @@ describe("PageEditor save/conflict path", () => {
     getPage.mockResolvedValue({ page: { ...page, rev: 9 }, backlinks: [], relationships: [] });
   });
 
-  it("autosaves an edit and reports Saved", async () => {
+  it("autosaves an edit, showing the in-flight state then settling", async () => {
+    // NOTE: the shared `SaveState` renders "Saved" for BOTH idle and saved, so asserting that text
+    // proves nothing on its own. Assert the *transition* instead: "Saving…" only ever appears while a
+    // save is genuinely in flight, so seeing it and then seeing it go is real evidence.
+    let release!: (value: unknown) => void;
+    updatePage.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
     const user = userEvent.setup();
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");
     await waitFor(() => expect(updatePage).toHaveBeenCalled(), { timeout: 4000 });
-    await screen.findByText(/saved/i, {}, { timeout: 4000 });
+    expect(await screen.findByText(/saving/i, {}, { timeout: 4000 })).toBeInTheDocument();
+    release({ ...page, rev: 4 });
+    await waitFor(() => expect(screen.queryByText(/saving/i)).not.toBeInTheDocument(), { timeout: 4000 });
   });
 
   it("sends the page's current rev as expectedRev — the optimistic-concurrency check", async () => {
@@ -73,7 +80,10 @@ describe("PageEditor save/conflict path", () => {
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");
     // The GM is told, and the editor re-reads the page to pick up the server's current revision.
-    await screen.findByText(/changed elsewhere/i, {}, { timeout: 4000 });
+    // `findAllByText` because `SaveState` deliberately renders a settled label twice — once visibly and
+    // once in an `nh-sr-only` live region — so a single-match query throws on the accessible duplicate.
+    const shown = await screen.findAllByText(/changed elsewhere/i, {}, { timeout: 4000 });
+    expect(shown.length).toBeGreaterThan(0);
     await waitFor(() => expect(getPage).toHaveBeenCalled(), { timeout: 4000 });
   });
 

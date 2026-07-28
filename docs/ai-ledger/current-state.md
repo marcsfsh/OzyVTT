@@ -601,6 +601,36 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M4 — the Codex stops being a parallel component vocabulary (2026-07-28).** Delivers
+  **CF-1, CF-2, CF-6, CD-4, CD-7** — the direct fix for the assessment's root cause 1.
+  - **A-2 met.** Codex `@vtt/ui` adoption went **12 → 19** primitives (Homebrew, the comparable surface,
+    is 25; the remainder is domain-specific — `ChoiceCard`, `RowEditor`, `Stepper`, `NumberField`…).
+    Every hand-rolled equivalent is **gone**, verified by grep: `.codex-filter-chip` (built twice) →
+    `Chip`; `.codex-template-menu` + `.codex-menu-scrim` → `Menu`/`MenuItem`; the local `SaveStatus`
+    union + `statusLabel` → `SaveState`; the comma-separated tags `<Input>` → `TagInput`; two bespoke
+    loading affordances → `Skeleton`; the local `Notice` → the app-majority `useToast` (6 other surfaces
+    use it, only 2 used `Notice`); raw `<p className="codex-rail-error">` → `Alert`.
+  - **A defect found by real browser verification, not by tests.** The server has **always** required slug
+    tags (`codex-store.ts:382`), but the old client field only lowercased — so "sword coast" produced a
+    tag the server rejected with a generic save failure. `TagInput`'s **default slugify is the server's
+    contract**, so adopting it fixes a real bug. My first attempt overrode `normalize` to "preserve
+    behaviour" and would have preserved the defect; the browser pass caught it because it is the only
+    check that reaches the server.
+  - **CF-2:** the shared error moved out of the Pages rail to the workspace level as an `Alert`, so a
+    failed load is now visible in **every** mode (it was invisible in World, Atlas, Journal and Graph);
+    both shells gained `Skeleton` loading rows, replacing empty states that lied during the first fetch.
+  - **CF-6:** breakpoints now sit on the documented ladder — three panes are **earned** at
+    `min-width: 850px` rather than lost at an off-ladder 900, and the calendar reflow moved 480 → 560.
+  - **CD-4:** the Link button was removed (see decision log — reversible; real link support needs a
+    URL-safety decision).
+  - **Verified.** `test` / `check` / `build` all exit 0; counts unchanged (client 14, server 771, others
+    identical). **The M3 characterization tests did their job** — they failed the moment `SaveState`
+    changed the save-status DOM, and again when `useToast` required a `ToastProvider` the bare test render
+    lacked. Both were corrected as *test* fixes (the save test is now stronger: it asserts the in-flight
+    transition, because `SaveState` renders "Saved" for idle *and* saved). Browser pass at **1440px and
+    390px**, 10/10 including Menu open + **Escape-to-close, which unit tests cannot see**, plus all three
+    **themes cycled** (dark/dusk/light computed colours correct, light properly inverted), zero console
+    errors, no overflow.
 - **Codex overhaul M3 — the client finally has a test harness (2026-07-28).** Delivers **CF-5** and the
   rest of **CD-8**. This retires the programme's biggest structural risk: ~3,485 LOC of Codex React had
   **zero** automated coverage, which is why M1/M1b/M2 shipped on manual verification alone.

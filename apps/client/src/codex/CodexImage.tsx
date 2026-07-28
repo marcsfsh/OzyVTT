@@ -1,3 +1,4 @@
+import { Skeleton } from "@vtt/ui";
 import { useEffect, useState } from "react";
 
 /**
@@ -22,6 +23,6 @@ export function CodexImage({ assetId, token, alt, className }: Readonly<{ assetI
   }, [assetId, token]);
 
   if (failed) return <span className="codex-img-failed">{alt || "image unavailable"}</span>;
-  if (!url) return <span className={`codex-img-loading ${className ?? ""}`.trim()} aria-hidden="true" />;
+  if (!url) return <Skeleton variant="block" className={className} />;
   return <img className={className} src={url} alt={alt ?? ""} loading="lazy" />;
 }

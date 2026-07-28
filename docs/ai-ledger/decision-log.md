@@ -224,6 +224,26 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **Codex tags are slugs, and the client now enforces the same rule the server always did (2026-07-28).**
+  `codex-store.ts` `tags()` has always rejected anything outside `/^[a-z0-9][a-z0-9-]*$/`, but the old
+  comma-separated Tags field only lowercased and trimmed — so typing "sword coast" produced a tag the
+  server refused, surfacing as a generic save failure with no explanation. Adopting `TagInput` with its
+  **default `slugify`** aligns the client with the server contract ("Sword Coast" → `sword-coast`).
+  **This is a deliberate behaviour change, not a preservation:** the previous client behaviour was a
+  defect, and "behaviour-preserving" means preserving *useful* behaviour, not bugs. Found by real
+  browser verification — no unit test caught it, because none of them reach the server.
+- **The Codex editor's "Link" button was removed rather than made to work (2026-07-28, CD-4).** It emitted
+  `[text](https://)`, which `CodexMarkdown` provably cannot render — its supported subset has no
+  markdown-link pattern. The spec offered "render standard links **or** remove the button". Rendering
+  them would add a **new capability** to a deliberately display-only, injection-safe renderer, with a
+  URL-safety surface (`javascript:` and friends) to design; the brief forbids introducing unapproved
+  features. The button was already broken, so removing it loses nothing real. **Reversible:** real link
+  support is a clean follow-up if the owner wants it, and would need an explicit safety decision.
+- **The three-pane editor is earned at `min-width: 850px`, not lost at `max-width: 900px` (2026-07-28,
+  CF-6).** `design-language.md` §3 fixes the ladder at **760 / 650 / 560**, plus `min-width: 850/980`
+  "where a layout earns a third column". The Codex used an off-ladder 900 and 480. The context pane now
+  stacks by default and the three-pane row is a `min-width: 850px` enhancement — which is what the doc
+  prescribes for this exact case — and the calendar reflow moved 480 → the ladder's 560 step.
 - **An auto-logged battle is dated at the campaign's "now" but stays GM-only (2026-07-28, D-5).** The
   combat-history bridge previously hardcoded every entry undated, so each battle sank below every dated
   entry into "Undated" forever — the feature the ledger called the Atlas↔combat *payoff* wrote something

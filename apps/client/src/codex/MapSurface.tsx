@@ -1,3 +1,4 @@
+import { Skeleton } from "@vtt/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
 import { iconChildren } from "./icons";
@@ -132,7 +133,7 @@ export function MapSurface({ token, assetId, markers, placing, selectedMarkerId,
     if (pointers.current.size < 2) gesture.current = { mode: "idle" };
   }, [dragPreview, placing, width, height, onMarkerClick, onMarkerDragEnd, onBackgroundClick]);
 
-  if (image.status === "loading") return <div className="codex-map-status">Loading map…</div>;
+  if (image.status === "loading") return <div className="codex-map-status"><Skeleton variant="block" width="100%" height="100%" /></div>;
   if (image.status === "error") return <div className="codex-map-status codex-map-error">{image.message}</div>;
 
   const glyphSize = Math.min(Math.max(Math.min(width, height) * 0.045, 26), 120);
