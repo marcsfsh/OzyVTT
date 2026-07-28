@@ -7,6 +7,39 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-28 — Magic items: where derived numbers live, and who is allowed to compute them
+
+1. **A derived per-actor block rides a ROLE-GATED REQUEST, never the broadcast projection.**
+   `actor:available-actions` authorizes its caller for one named actor before deriving anything, so
+   the block needs one gate that already exists and is already tested. Putting it on `PlayerView`
+   would need the strip to be right in BOTH `projections.ts` and `PlayerActor`'s `Omit`, on every
+   tick, forever — and a field reaching one list but not the other is the shape every leak in this
+   codebase has had. A test asserts the block's field names never appear in either broadcast; add it
+   to a projection "just for the owner" and that test goes red.
+
+2. **The client does not compute game numbers — not even ones it "obviously" knows.** The sheet
+   recomputed its own checks, saves and skills from `abilityScores` + `proficiencyBonus`. That was
+   fine until items could carry riders, at which point it silently became a rule-2 violation by
+   omission: a +2-saves amulet gave +5 on a GM-forced save and +3 on the player's own chip. The fix
+   is never to teach the client the rule; it is to stop the client computing and send the number.
+
+3. **A rider vocabulary needs a compile-time owner for every variant.** `interpretFeature`'s switch
+   handled 8 of 21 types with no `default`, so 13 riders parsed, stored, published and vanished. The
+   fix that matters is not the 13 wirings — it is `Exclude` + an exhaustive `Record`, so a 22nd
+   variant cannot be added until someone declares who reads it. Same partition rules out
+   double-counting: what the builder bakes is filtered out of carriers at construction.
+
+4. **"Computed correctly" is not "delivered".** `effectiveSkillTier` had a passing test and ZERO
+   production callers for the whole feature's life. A criterion is met when a player can see and
+   roll it, and the only evidence for that is driving the UI. Two defects here were reachable no
+   other way: `rowId` made every authored modifier unpublishable against a `.strict()` schema, and
+   the publish blocker demanded prose from an item whose whole content was `+1 armour class`.
+
+5. **Uncommitted work is work you are choosing to lose.** This container rolled its filesystem back
+   twice in one session, destroying a finished, verified slice both times — the second because an
+   engineer was told to leave the tree for review. Commit at every checkpoint and push; the reflog
+   does not survive, but the remote does.
+
 ## 2026-07-27 — Homebrew: six rules that bind anything authoring content
 
 1. **The audience filter lives at the MERGE POINT, not in projections.** Ten content operations took

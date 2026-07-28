@@ -877,6 +877,34 @@ Every change ships `npm run check` + `npm test` + `npm run build` green, and UI 
 a **live Playwright smoke** (seed a map + calibration + encounter via the API, then drive
 the map inside the full-viewport "Enlarge map" overlay). See `docs/ai-context/testing.md`.
 
+## Magic items (2026-07-28)
+
+Items, feats and features share ONE 21-variant rider vocabulary (`featureRiders`), authored through
+the same `RiderEditor` at `scope: "item" | "feature"`. All fifteen of the GM's authoring criteria
+work end to end: a +1/+1d4-lightning shortsword, wands/orbs/potions/amulets as real slots, a ring
+that moves AC, an amulet that casts a spell on its own pool, initiative advantage, +1 Lay on Hands,
+advantage on opportunity attacks, a bonus spell slot, +1d6 fire on a crit, a raised spell save DC,
+a circlet granting proficiency or expertise, a save bonus, curses as negative riders, feats carrying
+the same vocabulary, and items granting feats.
+
+Two engines, deliberately disjoint: `effectiveActions` folds STANDING riders into the numbers the
+resolver reads; moment riders (`on-critical-hit`, `on-attack-roll`, …) are collected at their moment.
+`collectRiders(…, {moment: null})` excludes anything carrying a moment or filter, so nothing is
+counted twice. A feat reaches the collector as a carrier with no `sourceItemId`; the 8 types the
+builder bakes are excluded there by a compile-time partition.
+
+The sheet's checks, saves and skills are the SERVER's numbers, delivered as a derived block on
+`actor:available-actions` (role-gated request, not the broadcast projection — see decision log).
+Verified by injection at every layer and driven in a browser: a circlet took Borin's Stealth from
+`+1 / not proficient` to `+7 / E "Expertise (Circlet of Shadows)"`, and back on un-attune.
+
+Known gaps, all recorded rather than papered over: `dice:roll` still takes a client-built formula
+string, so the NUMBER is the server's but the transport is not id-based and `roll-mode` riders reach
+no ability check; `spell-attack-bonus` and `damage-reduction` reach a derivation field nothing reads;
+`on-death-save` and `versus-creature-type` parse and stay inert; `actor.initiative` is not reconciled
+on inventory writes, so the derived block computes the live value while direct readers do not; and
+out-of-combat weapon taps still roll a client-computed bonus.
+
 ## Claude Code tooling
 
 This repo carries a Claude Code tooling layer. The **canonical roster** (skills, subagents,
