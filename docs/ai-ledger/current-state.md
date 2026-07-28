@@ -601,6 +601,36 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M6 — one search, tags everywhere (2026-07-28).** Delivers **CI-1, CI-2**.
+  - **CI-2, server.** Migration **v10** gives `codex_maps`, `codex_markers` and `codex_journal` the same
+    `tags_json` column pages carry — `NOT NULL DEFAULT '[]'`, so pre-existing rows backfill to an empty
+    list and no read path handles NULL (K7). All three round-trip tags through create, update and HTTP,
+    reusing the page path's `tags()` validator and `TagsSchema` rather than a second copy, so the 24-tag
+    cap and slug rule cannot drift. Found by the new tests: `createEntry` accepted tags but never
+    forwarded them to `insertEntry`, so journal tags were silently dropped on create.
+  - **CI-2, client.** `TagInput` on the journal composer (which is also the edit surface), the marker
+    inspector, and the atlas Map settings modal — all `max={24}`, none overriding `normalize`, since its
+    default slugify **is** the server contract. Timeline cards gained a read-only tag row; tags were
+    otherwise invisible until you opened Edit. Also fixed: the atlas error `Alert` sat *behind* the modal
+    overlay, so a failed write inside Map settings was silent.
+  - **CI-1, server.** Migration **v11** replaces the pages-only FTS pair with ONE unified index per
+    audience carrying every record kind (decision log §1). Player visibility mirrors each kind's player
+    *list* predicate and fails closed; **a marker needs its own reveal flag AND its map's**, which is
+    CD-6 carried into search. Seven HTTP viewer-safety tests, each proven non-vacuous by the implementer;
+    **I re-verified the CD-6 one independently** — breaking only the map-revealed half fails exactly that
+    one test, so it is not riding on the pin's own flag.
+  - **Page tags are now indexed too** — a deliberate widening of existing page search (decision log §4).
+    Leaving pages out meant one search box answering a tag query differently depending on which record
+    carried the tag. The v11 backfill carries page tags as well, so an upgraded database indexes pages
+    identically to a freshly written one.
+  - **Two agent claims did not survive checking.** (1) `npx tsc --noEmit -p apps/client` is **vacuous** —
+    the root tsconfig is a solution file with `"files": []`; it reports nothing while real type errors
+    exist. Use `tsconfig.app.json`. (`-p apps/server` has `include: ["src"]` and is real.) (2) A reported
+    34px tap target on `TagInput`'s wrapped chip ✕ **could not be reproduced** — see `known-bugs.md`;
+    logged rather than fixed, because the fix is in a shared primitive and would change Homebrew too.
+  - **Verified.** `check` / `test` / `build` all exit 0; 1083 tests (client 25 → 32, server 775 → 787).
+    `docs/api-reference.md` regenerated; the byte-identical contract test passes.
+
 - **Codex overhaul M5 — mobile parity and the remaining confirmed defects (2026-07-28).** Delivers
   **CF-3, CF-4, CD-2, CD-3, CD-5, CD-6**, plus the M4 follow-ups above.
   - **A-3 met, and measured rather than inferred.** The spec had downgraded A-3 to a source-level check
