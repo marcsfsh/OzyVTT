@@ -625,6 +625,25 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     fallback, and the revealed-entry leak guard). `check` + `test` (**769**) + `build` green; browser at
     1440px and 390px: battle dated under "1492 DR" beside the Today marker, "Open replay" opens that
     archive's viewer (asserted on the active tab + scrubber, after a first loose assertion false-passed).
+  - **Independent review → follow-ups fixed (same day).** Verdict **accepted with follow-ups**. It
+    independently confirmed CP-8's undated fallback is load-bearing (`DEFAULT_CALENDAR` omits
+    `currentDate`), that **K3 holds** (the `setCalendar` reflow re-derives from the raw y/m/d using the
+    *same* `calendarInstantOf`/`formatInWorldDate` used at insert, so a calendar edit cannot corrupt or
+    mis-sort a combat entry), that **K2's guard is structural** (the player projection builds a fresh
+    seven-field object with no slot for `sourceEncounterId`), and that skipping the contract change was
+    correct (`api-contract/src/index.ts:1426` already declares the field). Fixed:
+    - **The new K2 test was flaky (~15%)** — it searched the payload for the literal `"42"`, but the
+      entry's own uuid contains "42" about 15% of the time (measured: **15.12%** over 200k uuids). A flaky
+      test in the viewer-safety suite is worse than none. Replaced with a **deterministic and strictly
+      stronger** assertion on the exact projected key set, which now also fails if any new field is ever
+      added to the player journal projection. 25 subsequent runs clean.
+    - **`PageTimeline` rendered the same auto-logged battles with no "Open replay"** while
+      `MarkerInspector` had one — a real CP-9 gap, since the bridge sets `attachPageId` too. Now
+      consistent across all three surfaces.
+    - **A latent unclosable-viewer trap** in `ReplayPanel`: a caller passing `openArchiveId` without
+      `onOpenedArchive` would re-open on every Back. Now latched locally as well as caller-cleared.
+    - **Decision log updated** with the D-5 auto-date/GM-only rationale and the K2 structural-guard rule,
+      which the plan required and the first commit omitted.
   - **Pre-existing defect found, not fixed:** the replay *viewer* overflows ~99px at 390px. Measured both
     paths — the existing "▶ Watch" button produces the identical overflow — so it is not ours. Recorded in
     `known-bugs.md`; `ReplayPanel` is a combat-pillar surface outside this overhaul's scope.

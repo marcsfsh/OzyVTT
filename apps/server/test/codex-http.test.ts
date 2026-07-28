@@ -72,8 +72,11 @@ describe("codex HTTP viewer-safety boundary", () => {
     await post(base, `/api/v1/codex/journal/${entry.id}/reveal`, GM, { revealed: true });
     const playerTimeline = await body(await get(base, "/api/v1/codex/journal", PLAYER));
     expect(playerTimeline.data.entries).toHaveLength(1);
-    expect(playerTimeline.data.entries[0].sourceEncounterId).toBeUndefined();
-    expect(JSON.stringify(playerTimeline)).not.toContain("42");
+    // Assert the EXACT projected key set rather than searching the payload for the id. A substring search
+    // for "42" is flaky - the entry's own uuid contains "42" about 15% of the time - and weaker: this
+    // fails if any new field is ever added to the player projection, not just this one.
+    expect(Object.keys(playerTimeline.data.entries[0]).sort())
+      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "text"]);
   });
 
 

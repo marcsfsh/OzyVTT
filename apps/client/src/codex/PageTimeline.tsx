@@ -9,7 +9,7 @@ import { GmOnlyTag } from "./SecretMarkers";
  * page - including battles the combat-history bridge auto-logs at a location marker that links here -
  * plus a one-line composer to pin a new note. Gives the journal's "pin to page" a place it's read back.
  */
-export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pageId: string }>) {
+export function PageTimeline({ gmToken, pageId, onOpenReplay }: Readonly<{ gmToken: string; pageId: string; onOpenReplay?: (archiveId: number) => void }>) {
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,6 +40,8 @@ export function PageTimeline({ gmToken, pageId }: Readonly<{ gmToken: string; pa
               {(entry.sessionNumber != null || entry.inWorldLabel) && <span className="codex-page-timeline-meta">{[entry.sessionNumber != null ? `S${entry.sessionNumber}` : null, entry.inWorldLabel].filter(Boolean).join(" · ")}</span>}
               {!entry.playerText.trim() && <GmOnlyTag />}
               <span className="codex-page-timeline-text">{entry.playerText || entry.gmText}</span>
+              {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
+                <button type="button" className="codex-linklike" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</button>}
             </li>
           ))}
         </ul>

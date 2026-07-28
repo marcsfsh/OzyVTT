@@ -224,6 +224,21 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **An auto-logged battle is dated at the campaign's "now" but stays GM-only (2026-07-28, D-5).** The
+  combat-history bridge previously hardcoded every entry undated, so each battle sank below every dated
+  entry into "Undated" forever — the feature the ledger called the Atlas↔combat *payoff* wrote something
+  almost nobody could find. `appendCombatEntry` now stamps the calendar's `currentDate`. **It deliberately
+  does NOT auto-reveal:** auto-publishing a fight the moment combat ends would spoil the session with no
+  review step, so the GM reveals when ready — consistent with the codex's secret-by-default posture. With
+  no current date set the previous undated behaviour is preserved exactly rather than inventing a date.
+- **Replays are surfaced in the Codex GM-only, and the archive id never enters the player projection
+  (2026-07-28, constraint K2).** Encounter archives contain GM-only narration and are documented as
+  unreachable by players. A combat journal entry therefore carries `sourceEncounterId` in the **GM**
+  projection only; `projectPlayerJournalEntry` builds a fresh seven-field object with no slot for it, so
+  the guard is **structural rather than a filter that could be forgotten**. Regression-tested at the HTTP
+  boundary on a *revealed* entry — the case where a player can see the battle and still must not reach the
+  replay. **For future codex work:** adding a field to the player journal projection is a viewer-safety
+  change, not a display change.
 - **Map name/kind/parent and Delete map live in one "Map settings" modal (2026-07-28).** M1 had to add
   three map controls (rename, retype, re-parent — CP-4/CP-5) to an atlas bar that already held a reveal
   switch, Add marker, Add sub-map and Delete map. Rather than grow the bar to seven controls (which reads

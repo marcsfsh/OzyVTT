@@ -71,6 +71,8 @@ type PageEditorProps = Readonly<{
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
   onNavigate: (target: string) => void;
+  /** Jump to the archived fight an auto-logged battle came from. GM-only: archives carry GM narration. */
+  onOpenReplay?: (archiveId: number) => void;
   onRelationshipsChanged: () => void;
 }>;
 
@@ -84,7 +86,7 @@ function wikiContext(value: string, caret: number): { start: number; query: stri
   return { start: open, query };
 }
 
-export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onRelationshipsChanged }: PageEditorProps) {
+export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onOpenReplay, onRelationshipsChanged }: PageEditorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
@@ -398,7 +400,7 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
               </div>
             </div>
           )}
-          <PageTimeline gmToken={gmToken} pageId={page.id} />
+          <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} />
         </aside>
       </div>
 
