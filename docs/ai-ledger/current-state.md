@@ -601,6 +601,51 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M7 — return edges, the Campaign dashboard, a Graph that tells the truth (2026-07-28).**
+  Delivers **CI-3…CI-9**. This is the milestone that kills the star topology the assessment named as root
+  cause 3 ("a shell but not a system": every jump led *into* Pages and nothing led back out).
+  - **Three return edges, one mechanism.** From an open page: *In the journal* (CI-3, rows openable),
+    *On the atlas* (CI-4, via the new reverse lookup), *Show in graph* (CI-5) — grouped as one
+    **Connections** section in the editor's context rail rather than three scattered buttons. Every jump
+    reuses the destination-side latch that already existed (`openEntryId`, `openTarget`, and a new
+    `focusPageId` shaped like them). Three edges landing at once is exactly where parallel paths get
+    introduced; none were.
+  - **CI-4 `GET /codex/pages/:id/markers`** — a new *player-reachable* read, which the plan flagged as the
+    milestone's main risk. Both gates are copied, not invented: the router 404s an unrevealed page before
+    any pin is considered, and the projection applies CD-6's map gate before delegating to
+    `projectPlayerMarker`.
+  - **CI-8 `GET /codex/links`** — the whole-graph wiki-link feed. Two clauses, both required:
+    player-layer only, AND both endpoints revealed. Layer alone leaks GM-body links between two revealed
+    pages; both-revealed alone leaks a hidden page's existence through a dangling edge.
+  - **Deliberate single-gate design, and it is the direct answer to M6's lesson.** The store reads stay
+    ungated and the projection is the only gate, so no test can pass because a second layer masked a
+    broken first one. Two store tests assert that ungatedness, so a later "hardening" cannot quietly
+    reintroduce the blind spot.
+  - **CI-7 `World` → `Campaign`.** The rename swept both mode bars, the palette's goto target, the mode
+    unions, 20 CSS selectors, the filename and the `WorldEntity` type. Deliberately *not* renamed, each
+    judged: the atlas map **kind** `"world"` (a map scale and a server contract value), the in-world
+    calendar vocabulary (server field names), the graph's `worldX`/`worldY` SVG coordinates, and prose
+    about the fiction. There is no persisted mode value, so no migration was needed — checked, not assumed.
+    The dashboard covers only data that exists today; **no placeholder panels** were built for quests,
+    deadlines, party position or faction standing, which are Phase 4.
+  - **CI-9 recency.** Reveal-toggle and folder-move no longer move `updated_at`; relationship edits now
+    touch both endpoints. `rev` is deliberately *not* bumped for a relationship edit — that would 409 a GM
+    mid-sentence on a page whose body nobody touched. Conflict detection and history are untouched.
+  - **CI-8 auto-fit.** The frame was computed over connected nodes only, so an orphan sat outside the
+    viewBox with an effective hit area of **zero**. It now frames every node.
+  - **Latent bug found by the non-vacuity discipline, not by a test failing.** One mutation initially
+    failed *nothing*, because the branch it targeted was dead: the both-bodies layer collapse silently
+    depended on the order SQLite happened to return rows in. Fixed with an explicit `ORDER BY layer`.
+  - **A disclosed trade-off I re-measured rather than relayed.** The implementer reported that framing
+    orphans compresses a dense layout enough for M5's tap cap to bind, measuring two nodes at 28.7px. I
+    seeded 5 nodes (3 orphans) and measured at 375px: **all 5 framed, all 44.7px**. Real mechanism,
+    narrower impact; a framed 28.7px node still beats an unreachable one. Both numbers in `known-bugs.md`.
+  - **Verified.** `check` / `test` / `build` all exit 0; **1153 tests** (web 70, server 810). Browser pass
+    at 1440px and 375px: Campaign on both mode bars with no "World" surviving, palette goto renamed, all
+    three return edges landing on the right mode *with the right selection*, wiki-links distinguishable
+    without colour, zero overflow, zero console errors. Tap audit across all five renamed modes:
+    **0 of 112 controls below 44px**.
+
 - **Codex overhaul M6 — one search, tags everywhere (2026-07-28).** Delivers **CI-1, CI-2**.
   - **CI-2, server.** Migration **v10** gives `codex_maps`, `codex_markers` and `codex_journal` the same
     `tags_json` column pages carry — `NOT NULL DEFAULT '[]'`, so pre-existing rows backfill to an empty

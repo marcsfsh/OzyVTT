@@ -7,6 +7,41 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-28 — Codex overhaul M7: return edges, the Campaign rename, and what "recent" means
+
+1. **Every return edge reuses the destination's existing latch; none introduced its own.** CI-3/CI-5/CI-6
+   land through `openEntryId`, `focusPageId` and `openTarget` — the same latches search and the dashboard
+   already use. Three edges arriving in one milestone is precisely where a second navigation mechanism
+   gets introduced, which is the root cause (#1, parallel vocabulary) this programme exists to remove.
+
+2. **CI-4 and CI-8 are single-gated on purpose.** M6 shipped a double gate (SQL predicate + projection
+   re-check) and it hid a blind spot: weakening the SQL marker arm alone left **all 787 tests passing**,
+   because the projection masked it. So the M7 feeds keep the store reads ungated and make the projection
+   the only gate — one layer, fully tested, nothing to mask. Two store tests assert the ungatedness so a
+   later "hardening" cannot silently reintroduce the problem. Both feeds' predicates are *copied* from the
+   corresponding player list endpoint rather than written fresh.
+
+3. **`World` → `Campaign`, and what deliberately kept the old word.** The atlas map **kind** `"world"` is a
+   map *scale* and a server contract value; the in-world calendar vocabulary (`inWorldDate`,
+   `formatWorldDate`) is server field naming; the graph's `worldX`/`worldY` are SVG world-space
+   coordinates; and prose about the fiction ("Chart your world", "worldbuilding") is about the setting,
+   not the mode. Renaming any of those would have split a different vocabulary while healing this one.
+
+4. **The Campaign dashboard shows only records that exist.** CI-7's spec text lists next session, open
+   quests, approaching deadlines, party position and faction standing — but those records are Phase 4
+   (M8–M12) and the M7 plan entry excludes them. Building placeholder panels would have been scope the
+   plan explicitly rules out, and would have made the dashboard look broken rather than incomplete.
+
+5. **CI-9: what counts as "recently updated".** Relationship edits move `updated_at` on **both** endpoints;
+   reveal-toggle and folder-move do not. `rev` is deliberately left alone for relationship edits — `rev` is
+   the conflict token, and bumping it would 409 a GM mid-sentence on a page whose body nobody touched.
+   `deleteFolder` is treated as a folder move because it re-paths pages identically; the spec names only
+   "folder move", so that one is a judgement call rather than a reading.
+
+6. **Wiki-link edges are distinguished without colour** (R2): dashed vs solid, thinner, **no arrowhead**
+   (a mention claims no direction), the label "mentions", a permanent solid-vs-dashed key, and a split
+   count. Lit colour is shared on purpose — delete every colour and the graph still reads.
+
 ## 2026-07-28 — Codex overhaul M6: one search index, and tags that match uniformly
 
 1. **One unified FTS index, and the pages-only tables are dropped.** Migration v11 creates
