@@ -43,6 +43,8 @@ await pw.press("Enter");
 await p.waitForTimeout(2400);
 await p.locator("text=Codex").first().click();
 await p.waitForTimeout(1600);
+// The app sets `html { scroll-behavior: smooth }`; leave it on and every scrolled measurement is stale.
+await p.addStyleTag({ content: "html, * { scroll-behavior: auto !important; }" });
 
 const MEASURE = `(() => {
   const SEL = 'button, summary, a[href], input, select, textarea, [role="button"], [role="tab"], [role="switch"], [tabindex]:not([tabindex="-1"])';
@@ -61,7 +63,7 @@ const MEASURE = `(() => {
     // reachability: walk outward vertically from the centre until elementFromPoint leaves the control
     // Scroll into view first: elementFromPoint reads VIEWPORT coordinates, so a control below the fold
     // returns whatever is painted at that point and reports a false reach=0.
-    el.scrollIntoView({ block: "center" });
+    el.scrollIntoView({ block: "center", behavior: "instant" });
     const r2 = el.getBoundingClientRect();
     const cx = r2.left + r2.width / 2, cy = r2.top + r2.height / 2;
     let reach = 0;
@@ -93,8 +95,13 @@ for (const mode of MODES) {
   const bad = out.filter((c) => c.h < 44 || c.w < 44);
   // §4 gap budget: a control can BE 44px and still lose taps to a later sibling whose ::after overhangs
   // it. `reach` is the vertically reachable span at the centre; under 44 means something is on top.
-  const stolen = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach < 44);
-  report.push(`### ${mode} — ${out.length} controls, ${bad.length} below 44px, ${stolen.length} with taps stolen`);
+  // Real occlusion = the reachable span is materially shorter than the control's own height. Comparing
+  // against a flat 44 was wrong: the ±d walk measures the interior span, so a correct 44px control reads
+  // 43 and every one of them got flagged. `reach === 0` means "never resolved" (e.g. an SVG element, or
+  // one that could not be scrolled into view) — reported separately rather than silently counted as theft.
+  const stolen = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach > 0 && c.reach < c.h - 2);
+  const unresolved = out.filter((c) => c.h >= 44 && c.w >= 44 && c.reach === 0);
+  report.push(`### ${mode} — ${out.length} controls, ${bad.length} below 44px, ${stolen.length} with taps stolen, ${unresolved.length} unresolved`);
   for (const c of bad) report.push(`  SIZE  ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
   for (const c of stolen) report.push(`  STEAL ${c.h}x${c.w} reach=${c.reach}  ${c.tag}.${c.cls}  "${c.label}"`);
   await p.screenshot({ path: `${OUT}/tap-${mode.toLowerCase()}-${width}.png`, fullPage: false });
