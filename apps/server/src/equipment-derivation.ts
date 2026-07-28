@@ -2,7 +2,7 @@ import type { Actor } from "@vtt/domain";
 import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 import {
   abilityModifier, armorWeightOf, collectRiders, effectiveSlot, sumRiders,
-  type ArmorWeight, type RiderCarrier, type RiderContext, type RiderModifier, type ResolvedRider
+  type ArmorWeight, type RiderAbility, type RiderCarrier, type RiderContext, type RiderModifier, type ResolvedRider
 } from "@vtt/rules-5e";
 
 /**
@@ -403,6 +403,45 @@ export function effectiveSkillTier(definition: ActorDefinition | undefined, deri
   const granted = derivation.skills.filter((entry) => entry.id === skillId).map((entry) => entry.proficiency);
   const tiers = [base, ...granted];
   return tiers.includes("expertise") ? "expertise" : tiers.includes("proficient") ? "proficient" : "none";
+}
+
+/**
+ * The ITEM NAMES that raised one skill's tier, for the sheet's "Stealth (Circlet of Shadows)" tooltip.
+ *
+ * Reads `derivation.skills` (which carries `sourceItemId` per grant) and resolves each id through
+ * `derivation.sources` for the catalog's display name, falling back to the raw id when the item
+ * contributed a grant but no summary row. Deduped and order-preserving, so two items granting the
+ * same skill read as a list rather than a repetition. Empty when the tier is entirely the base sheet's.
+ */
+export function skillTierSources(derivation: EquipmentDerivation, skillId: string): readonly string[] {
+  const names: string[] = [];
+  for (const entry of derivation.skills) {
+    if (entry.id !== skillId) continue;
+    const name = derivation.sources.find((source) => source.itemId === entry.sourceItemId)?.itemName ?? entry.sourceItemId;
+    if (!names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/**
+ * The flat item bonus to one ability check - the mirror of `saveRiderBonus`, and `check-bonus`'s
+ * FIRST consumer (its `CARRIER_RIDER_DISPOSITION` entry moves from `"unread"` to `"standing"` with
+ * this function).
+ *
+ * `derivation.checkBonus` is the already-summed STANDING half ("+1 to all ability checks"); only the
+ * momentary riders are added here, and they are disjoint from the standing pass by construction - a
+ * rider naming `on-ability-check` is excluded from the moment-less collection that produced
+ * `checkBonus`. Passing `ability`/`skill` into the context is what lets `ability-is` and `skill-is`
+ * narrow "+5 to Stealth checks" to the one row it names instead of every row on the sheet.
+ */
+export function checkRiderBonus(derivation: EquipmentDerivation, narrow: Readonly<{ ability?: RiderAbility; skill?: string }>): number {
+  const momentary = collectRiders(derivation.carriers, {
+    ...derivation.context,
+    ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
+    ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    moment: "on-ability-check"
+  });
+  return derivation.checkBonus + sumRiders(momentary, "check-bonus");
 }
 
 // ---------------------------------------------------------------------------------------------

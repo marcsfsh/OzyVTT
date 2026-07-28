@@ -213,7 +213,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<Record<CarrierRiderType, "standing" | 
   "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
   "roll-mode": "at-its-moment",      // attacks (action-resolution), saves (saving-throws), initiative (encounter)
   "extra-damage": "at-its-moment",   // action-resolution rolls it as its own typed damage entry
-  "check-bonus": "unread",           // reaches derivation.checkBonus; no ability-check path reads it yet
+  "check-bonus": "standing",         // actor-derived.ts checkRiderBonus, into every check and skill row
   "spell-attack-bonus": "unread",    // reaches derivation.spellAttackBonus; no spell-attack path reads it yet
   "damage-reduction": "unread",      // no incoming-damage path collects riders at all yet
   "sense": "display-only"            // like `darkvision`: the trait prose carries it; no definition field models senses

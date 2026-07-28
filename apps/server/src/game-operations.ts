@@ -7,8 +7,9 @@ import type { IntegrationScope } from "@vtt/api-contract";
 import { addAnnotation, addPing, clearAnnotations, moveAnnotation, removeAnnotation, setAnnotationColor, setAnnotationMovable, setAnnotationVisibility, shapeGeometry, type AnnotationActor } from "./annotations.js";
 import { setCondition } from "./actor-conditions.js";
 import { actionAvailability, resolveDefinitionAction } from "./action-resolution.js";
+import { deriveActorSheet } from "./actor-derived.js";
 import { effectiveActions } from "./effective-actions.js";
-import { equipmentCatalogOf } from "./equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf } from "./equipment-derivation.js";
 import { builtinAction, BUILTIN_ACTIONS, BUILTIN_TARGETING } from "./builtin-actions.js";
 import { parseAreaProse, tokensInTemplate } from "./area-targeting.js";
 import { addActorFromDefinition, importActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "./actor-roster.js";
@@ -1073,7 +1074,12 @@ export function createGameOperations(context: GameOperationsContext) {
         actions: [
           ...actionAvailability(state, actor, available, definition, false, available),
           ...actionAvailability(state, actor, builtins, definition, true, available)
-        ]
+        ],
+        // The sheet's own numbers, computed AFTER the gate above - so they are never derived for an
+        // actor this caller may not see. This is why the block rides a request instead of the
+        // broadcast projection: one authorization already written, instead of two strips that must
+        // both stay right forever (see `actor-derived.ts`).
+        derived: deriveActorSheet(actor, definition, deriveEquipment(actor, definition, equipmentCatalog()), catalogFor(principal).skillSummaries())
       };
     },
 

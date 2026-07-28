@@ -697,7 +697,18 @@ export type ActionAvailability = Readonly<{
   /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
   builtin?: boolean;
 }>;
-export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[] };
+/**
+ * The sheet's own numbers, derived server-side from the actor's LIVE loadout.
+ *
+ * Deliberately not on `PlayerView`: it rides `actor:available-actions`, a request that authorizes
+ * its caller for one named actor, so it is covered by one existing gate rather than by a strip that
+ * has to be right in both `projections.ts` and `PlayerActor` on every tick. See `actor-derived.ts`.
+ */
+export type DerivedAbilityRow = Readonly<{ ability: AbilityId; check: number; checkWithProficiency: number; save: number; saveProficient: boolean; saveFromItems: number }>;
+/** `tier` is the EFFECTIVE tier: the sheet's base raised by any item grant. `sources` names the items that raised it. */
+export type DerivedSkillRow = Readonly<{ id: string; name: string; ability: AbilityId | null; tier: "none" | "proficient" | "expertise"; bonus: number | null; sources: readonly string[] }>;
+export type ActorDerivedSheet = Readonly<{ proficiencyBonus: number; armorClass: number; initiative: number; abilities: readonly DerivedAbilityRow[]; skills: readonly DerivedSkillRow[] }>;
+export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[]; derived?: ActorDerivedSheet };
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
