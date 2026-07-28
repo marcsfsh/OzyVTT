@@ -88,6 +88,8 @@ export const codexApi = {
   deleteFolder: (token: string, path: string) => request<{ deleted: boolean }>(token, "/folders/delete", { method: "POST", body: JSON.stringify({ path }) }),
   listRevisions: (token: string, id: string) => request<{ revisions: CodexPageRevision[] }>(token, `/pages/${id}/revisions`).then((data) => data.revisions),
   restoreRevision: (token: string, id: string, revisionId: number) => request<{ page: CodexPage }>(token, `/pages/${id}/revisions/${revisionId}/restore`, { method: "POST" }).then((data) => data.page),
+  /** Mints a short-lived PLAYER token so the GM can preview the player Codex through the real player projection. */
+  createPreviewSession: (token: string) => request<{ token: string }>(token, "/preview-session", { method: "POST" }).then((data) => data.token),
   exportBundle: (token: string) => request<{ codex: unknown; exportedAt: string }>(token, "/export")
 };
 

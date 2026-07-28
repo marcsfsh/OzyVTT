@@ -10,6 +10,7 @@ import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree
 import { EntityIcon } from "./icons";
 import { WorldHome } from "./WorldHome";
 import { RelationshipGraph } from "./RelationshipGraph";
+import { PlayerCodex } from "./PlayerCodex";
 import { Notice, type NoticeMessage, useConfirm, usePrompt } from "../components/feedback";
 import { ENTITY_DEFS, type EntityType } from "./entities";
 import "./codex.css";
@@ -36,6 +37,11 @@ type WorkspaceActor = Readonly<{ id: string; name: string }>;
 export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; actors?: readonly WorkspaceActor[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
   const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal" | "graph">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // "What do players actually see?" — mounts the REAL player Codex against a short-lived PLAYER token
+  // minted by the server, so the preview walks the same projection a player does. Never the GM token:
+  // the codex router resolves a GM token to role `gm` and would hand back GM projections.
+  const [previewToken, setPreviewToken] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [templateMenu, setTemplateMenu] = useState(false);
   const [pageFilter, setPageFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -126,6 +132,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   const createInFolder = async (folder: string) => {
     try { const page = await codexApi.createPage(gmToken, { title: "Untitled page", folder }); await refreshList(); setMode("pages"); setSelectedId(page.id); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "Could not create the page."); }
+  };
+  const openPlayerPreview = async () => {
+    setPreviewError(null);
+    try { setPreviewToken(await codexApi.createPreviewSession(gmToken)); }
+    catch (previewFailure) { setPreviewError(previewFailure instanceof Error ? previewFailure.message : "Couldn't open the player preview."); }
   };
   const importInputRef = useRef<HTMLInputElement>(null);
   const exportCodex = async () => {
@@ -240,6 +251,7 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           tabs={[{ id: "world", label: "World" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
+          <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
           <Button variant="ghost" size="sm" onClick={exportCodex}>Export</Button>
           <input ref={importInputRef} type="file" accept=".md,.markdown,.txt" multiple hidden onChange={(event) => { void importFiles(event.target.files); event.target.value = ""; }} />
@@ -326,6 +338,11 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           {allFolders.map((path) => <button key={path} type="button" className="codex-move-opt" onClick={() => void doMove(path)}>{path}</button>)}
           <button type="button" className="codex-move-opt is-new" onClick={() => void doMoveToNew()}>+ New folder…</button>
         </div>
+      </Modal>
+      {previewError && <p className="codex-rail-error" role="alert">{previewError}</p>}
+      <Modal open={!!previewToken} onClose={() => setPreviewToken(null)} size="lg" title="What players see" ariaLabel="Player Codex preview">
+        <p className="codex-inspector-hint">This is the real player Codex, read through a player session — anything hidden from players is absent here, not just dimmed.</p>
+        {previewToken && <PlayerCodex token={previewToken} />}
       </Modal>
       {promptDialog}
       {confirmDialog}

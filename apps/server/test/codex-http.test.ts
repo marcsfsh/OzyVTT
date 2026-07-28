@@ -34,8 +34,11 @@ async function fixture() {
   const app = express(); app.use(express.json()); app.use(createCodexRouter({
     store, assets,
     authorizeGm: (token) => token === "gm-token",
-    authorizePlayer: (token) => token === "player-token",
-    notifyChanged: () => {}
+    // The preview token is a REAL player principal, exactly as `auth.issuePreviewPlayerSession()` mints
+    // one in production - so it authorizes as a player and gets the player projection, nothing else.
+    authorizePlayer: (token) => token === "player-token" || token === PREVIEW_TOKEN,
+    notifyChanged: () => {},
+    issuePreviewSession: () => PREVIEW_TOKEN
   }));
   const server = createServer(app); await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); if (!address || typeof address === "string") throw new Error("Codex test server did not bind.");
@@ -43,6 +46,7 @@ async function fixture() {
   return { base: `http://127.0.0.1:${address.port}`, store, assets };
 }
 
+const PREVIEW_TOKEN = "preview-player-token";
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };
 const PLAYER = { authorization: "Bearer player-token", "content-type": "application/json" };
 type Json = Record<string, any>;
@@ -53,6 +57,41 @@ const patch = (base: string, path: string, headers: Record<string, string>, payl
 const put = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PUT", headers, body: JSON.stringify(payload) });
 
 describe("codex HTTP viewer-safety boundary", () => {
+  it("GM preview mints a real player principal and sees byte-identically what a player sees", async () => {
+    const { base } = await fixture();
+    const shown = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Bree", playerBody: "A crossroads town.", gmBody: "A cultist runs the inn." }));
+    const shownId = shown.data.page.id as string;
+    await post(base, `/api/v1/codex/pages/${shownId}/reveal`, GM, { revealed: true });
+    const secret = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", playerBody: "", gmBody: "Meets under the inn." }));
+    const secretId = secret.data.page.id as string;
+
+    // Minting is GM-only.
+    expect((await post(base, "/api/v1/codex/preview-session", PLAYER, {})).status).toBe(401);
+    const minted = await post(base, "/api/v1/codex/preview-session", GM, {});
+    expect(minted.status).toBe(201);
+    const token = (await body(minted)).data.token as string;
+    expect(token).toBeTruthy();
+    const PREVIEW = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+
+    // The whole point: the preview payload must be IDENTICAL to a real player's, not merely similar.
+    expect(await body(await get(base, "/api/v1/codex/pages", PREVIEW)))
+      .toEqual(await body(await get(base, "/api/v1/codex/pages", PLAYER)));
+    expect(await body(await get(base, `/api/v1/codex/pages/${shownId}`, PREVIEW)))
+      .toEqual(await body(await get(base, `/api/v1/codex/pages/${shownId}`, PLAYER)));
+
+    // ...and therefore carries no GM-only content, and cannot reach an unrevealed page.
+    const previewPage = await body(await get(base, `/api/v1/codex/pages/${shownId}`, PREVIEW));
+    expect(previewPage.data.page.gmBody).toBeUndefined();
+    expect(JSON.stringify(previewPage)).not.toContain("cultist");
+    expect((await get(base, `/api/v1/codex/pages/${secretId}`, PREVIEW)).status).toBe(404);
+
+    // Guards the actual regression this milestone exists to prevent: the GM token must NOT be usable as
+    // the preview, because `roleOf` resolves it to `gm` and would return GM projections.
+    const gmPage = await body(await get(base, `/api/v1/codex/pages/${shownId}`, GM));
+    expect(gmPage.data.page.gmBody).toBe("A cultist runs the inn.");
+    expect(gmPage).not.toEqual(previewPage);
+  });
+
   it("hides gmBody and unrevealed pages from players, but shows the GM everything", async () => {
     const { base } = await fixture();
     const created = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Bree", playerBody: "A crossroads town.", gmBody: "A cultist runs the inn." }));

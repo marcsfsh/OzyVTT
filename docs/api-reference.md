@@ -2370,6 +2370,14 @@ Restores a page to a prior revision.
 
 **Responses:** `200` Success - envelope of `CodexPageData` · errors `400` `401` `404`
 
+### `POST /api/v1/codex/preview-session`
+
+Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully. Deliberately a real player principal rather than a role flag on the GM's session - every read then walks the same authorization and projection path a genuine player gets, so the preview can never show what a player could not see.
+
+**Auth:** GM session
+
+**Responses:** `201` Success - envelope of `CodexPreviewSessionData` · errors `401`
+
 ### `GET /api/v1/codex/folders`
 
 Every explicitly-created folder path; lets an empty folder persist.

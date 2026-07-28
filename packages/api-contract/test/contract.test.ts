@@ -234,7 +234,7 @@ describe("public API contracts", () => {
     const forbiddenNames = /secret|hash|password|token/i;
     // The two responses whose entire purpose is issuing a credential: the one-time integration
     // secret, and the player session token (the open LAN-trust join). Everything else stays clean.
-    const issuance = new Set(["IntegrationCredentialIssued.token", "PlayerSessionIssuedData.token"]);
+    const issuance = new Set(["IntegrationCredentialIssued.token", "PlayerSessionIssuedData.token", "CodexPreviewSessionData.token"]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties = "properties" in schema ? Object.keys((schema as { properties: Record<string, unknown> }).properties) : [];
       for (const property of properties) {

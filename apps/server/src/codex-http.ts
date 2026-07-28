@@ -104,6 +104,12 @@ type CodexRouterOptions = Readonly<{
   authorizePlayer: (token: string | undefined) => boolean;
   /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
   notifyChanged: (scope: "pages" | "maps" | "markers" | "journal") => void;
+  /**
+   * Mints a short-lived PLAYER token so the GM can preview the player Codex truthfully. The preview must
+   * be a real player principal - `roleOf` below checks `authorizeGm` FIRST, so reusing the GM's own token
+   * would silently return GM projections while claiming to be the player view.
+   */
+  issuePreviewSession: () => string;
 }>;
 
 const CODEX_ASSET_BASE = "/api/v1/codex-assets";
@@ -245,6 +251,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   // Folder records make empty folders persist (a folder is otherwise only implied by the pages inside it). GM-only.
   router.get(`${CODEX_BASE}/folders`, requireGm, (_request, response) => envelope(response, 200, { folders: store.listFolders() }));
+  // ----- GM preview: mint a real, short-lived player principal (never a role flag on the GM token) -----
+  router.post(`${CODEX_BASE}/preview-session`, requireGm, (_request, response) => {
+    try { return envelope(response, 201, { token: options.issuePreviewSession() }); }
+    catch (error) { return malformed(response, error); }
+  });
+
   router.post(`${CODEX_BASE}/folders`, requireGm, (request, response) => {
     try { const path = store.createFolder(FolderPathSchema.parse(request.body).path); options.notifyChanged("pages"); return envelope(response, 201, { path }); }
     catch (error) { return malformed(response, error); }

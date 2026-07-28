@@ -601,6 +601,30 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M1b — truthful GM preview of the player Codex (2026-07-28).** Delivers **CP-2**,
+  split out of M1 by the Stage Four review. **The defect it exists to prevent:** `roleOf()` checks
+  `authorizeGm` FIRST (`codex-http.ts:146-151`), so mounting `PlayerCodex` with the GM's own token would
+  have returned **GM projections while claiming to be the player view** — positive but false assurance on
+  the repo's hardest invariant. Implemented by mirroring the viewer's proven approach
+  (`viewer-http.ts:149`): the server **mints a real, short-lived PLAYER principal** rather than flagging a
+  role on the GM's session, so every read walks the same authorization and projection path a genuine
+  player gets. `auth.issuePreviewPlayerSession()` (12h TTL, vs the 30-day default) + GM-only
+  `POST /api/v1/codex/preview-session` + a "Preview as player" control in the Codex ops cluster opening
+  the real `PlayerCodex` in a modal. **Minting registers no presence** — `presence.connect` happens on
+  socket join — so no phantom player appears at the table.
+  - **Contract kept in sync** (`.claude/rules/api-contract.md`): `CODEX_PATHS.previewSession` +
+    operation + response schema in `@vtt/api-contract`, `docs/api-reference.md` regenerated,
+    `docs/app-map.md` 155→**156 HTTP paths**. The in-app reference panel groups by `/api/v1/codex` prefix,
+    so no `GROUPS` entry was needed. One named entry added to the contract test's explicit
+    secret-shaped-property allowlist (`CodexPreviewSessionData.token`) — the guard itself is unchanged.
+  - **Verified.** `check` + `test` (**766**, +1) + `build` green. New HTTP-boundary test asserts the
+    preview payload is **byte-identical** (`toEqual`) to a real player session's for both the page list and
+    a single page, carries no `gmBody`, 404s an unrevealed page, and that the **GM token is NOT
+    interchangeable** with it (`gmPage).not.toEqual(previewPage)`) — guarding the exact regression.
+    Live: the minted token decodes to `role: "player"`, returns **zero** hits for GM-only words while the
+    GM token sees the secret page. Browser at 1440px and 390px: modal opens, shows the real player tab set
+    (**Lore**, not Pages), shows the revealed page, leaks neither the GM body nor the unrevealed page, no
+    overflow, no console errors.
 - **Codex overhaul M1 — unreachable capabilities + journal data loss (2026-07-28, branch
   `claude/codex-suite-overhaul-nyeqg0`).** First implementation milestone of the programme specified in
   `docs/product/codex-suite-plan.md`. **Requirements delivered: CP-1, CP-3, CP-4, CP-5, CP-6, CP-7, CD-1.**

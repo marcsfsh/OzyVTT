@@ -63,6 +63,7 @@ export const CODEX_PATHS = {
   pageRevisions: `${API_NAMESPACE}/codex/pages/{id}/revisions`,
   pageRevisionRestore: `${API_NAMESPACE}/codex/pages/{id}/revisions/{revisionId}/restore`,
   search: `${API_NAMESPACE}/codex/search`,
+  previewSession: `${API_NAMESPACE}/codex/preview-session`,
   folders: `${API_NAMESPACE}/codex/folders`,
   foldersMove: `${API_NAMESPACE}/codex/folders/move`,
   foldersDelete: `${API_NAMESPACE}/codex/folders/delete`,
@@ -1177,6 +1178,7 @@ export const openApiDocument = {
     [CODEX_PATHS.pageRelationships]: { post: codexOp("createCodexRelationship", codexGmOnly, "CodexRelationshipResponse", { ok: "201", body: "CodexRelationshipCreateRequest", params: [uuidParam("id")], notFound: true, description: "Adds a typed relationship edge from this page to another." }) },
     [CODEX_PATHS.pageRevisions]: { get: codexOp("listCodexPageRevisions", codexGmOnly, "CodexRevisionListResponse", { bad: false, notFound: true, params: [uuidParam("id")], description: "Autosaved revision history for a page." }) },
     [CODEX_PATHS.pageRevisionRestore]: { post: codexOp("restoreCodexPageRevision", codexGmOnly, "CodexPageResponse", { params: [uuidParam("id"), { name: "revisionId", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], notFound: true, description: "Restores a page to a prior revision." }) },
+    [CODEX_PATHS.previewSession]: { post: codexOp("createCodexPreviewSession", codexGmOnly, "CodexPreviewSessionResponse", { ok: "201", bad: false, description: "Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully. Deliberately a real player principal rather than a role flag on the GM's session - every read then walks the same authorization and projection path a genuine player gets, so the preview can never show what a player could not see." }) },
     [CODEX_PATHS.folders]: {
       get: codexOp("listCodexFolders", codexGmOnly, "CodexFolderListResponse", { bad: false, description: "Every explicitly-created folder path; lets an empty folder persist." }),
       post: codexOp("createCodexFolder", codexGmOnly, "CodexFolderCreatedResponse", { ok: "201", body: "CodexFolderPathRequest", description: "Creates (or keeps) an empty folder." })
@@ -1451,6 +1453,8 @@ export const openApiDocument = {
       CodexPageResponse: envelopeSchema("#/components/schemas/CodexPageData"),
       CodexFolderListData: codexDataObject("folders", { type: "array", items: { type: "string" } }),
       CodexFolderListResponse: envelopeSchema("#/components/schemas/CodexFolderListData"),
+      CodexPreviewSessionData: codexDataObject("token", { type: "string" }),
+      CodexPreviewSessionResponse: envelopeSchema("#/components/schemas/CodexPreviewSessionData"),
       CodexFolderCreatedData: codexDataObject("path", { type: "string" }),
       CodexFolderCreatedResponse: envelopeSchema("#/components/schemas/CodexFolderCreatedData"),
       CodexFolderMovedData: codexDataObject("moved", { type: "integer", minimum: 0 }),

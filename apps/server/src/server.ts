@@ -406,7 +406,8 @@ export function createServer(options: CreateServerOptions) {
     assets: codexAssets,
     authorizeGm,
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
-    notifyChanged: notifyCodexChanged
+    notifyChanged: notifyCodexChanged,
+    issuePreviewSession: () => auth.issuePreviewPlayerSession()
   }));
   // GM-only end to end: `authorizePlayer` is supplied ONLY so an authenticated player gets a 403
   // rather than the 401 an unauthenticated caller gets. There is no player-readable homebrew route.
