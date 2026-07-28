@@ -13,5 +13,6 @@ This directory holds product contracts, checkpoint outcomes, wireframes, browser
 - [Scene-centric IA redesign — design & implementation plan](scene-centric-ia.md)
 - [Character sheets — initiative handoff & roadmap](character-sheet-initiative.md)
 - [Codex worldbuilding suite — current-state assessment](codex-suite-assessment.md)
+- [Codex worldbuilding suite — product specification](codex-suite-spec.md)
 
 Physical-device observations, end-to-end wireframes, and realtime multi-client convergence evidence remain to be added.
