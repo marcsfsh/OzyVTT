@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Field, Input, Modal, Select, Skeleton, Switch, TagInput } from "@vtt/ui";
+import { Alert, Badge, Button, Field, IconEyeOff, Input, Modal, Select, Skeleton, Switch, TagInput } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
@@ -29,6 +29,18 @@ const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
  * resolves that itself below — this view is the only thing in the client that already knows the map list.
  */
 export type AtlasTarget = Readonly<{ mapId: string | null; markerId: string | null }>;
+
+/**
+ * "Players can't see this map yet", on a drill chip. Was a literal 🔒 — design-language §0 forbids an emoji
+ * as a UI glyph and names the failure mode: it renders at a platform-chosen size, in a hue the palette does
+ * not own, and cannot take `currentColor`. `IconEyeOff` is the design system's own GM-only mark (the same
+ * glyph `/styleguide` documents as "GM only"), so this reads identically to the rest of the app's
+ * hidden-from-players vocabulary. `role="img"` + `aria-label` keeps the meaning for a screen reader, which
+ * the emoji's own name ("locked") never carried.
+ */
+function GmOnlyMark() {
+  return <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM-only — players can't see this map yet"><IconEyeOff /></span>;
+}
 
 export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene, onOpenReplay, openTarget = null, onOpenedTarget = () => {} }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void; openTarget?: AtlasTarget | null; onOpenedTarget?: () => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -218,7 +230,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
           {rootMaps.map((root) => (
             <button key={root.id} type="button" className={`codex-descend-chip${root.id === currentRootId ? " is-current" : ""}`} aria-current={root.id === currentRootId ? "true" : undefined} onClick={() => enterMap(root.id)}>
               {root.name}
-              {!root.revealedToPlayers && <span className="codex-descend-lock" title="GM-only — players can't see this map yet" aria-label="GM-only">🔒</span>}
+              {!root.revealedToPlayers && <GmOnlyMark />}
             </button>
           ))}
         </nav>
@@ -247,7 +259,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
           {childMaps.map((child) => (
             <button key={child.id} type="button" className="codex-descend-chip" onClick={() => enterMap(child.id)}>
               <span className="codex-descend-arrow" aria-hidden="true">↳</span>{child.name}
-              {!child.revealedToPlayers && <span className="codex-descend-lock" title="GM-only — players can't see this map yet" aria-label="GM-only">🔒</span>}
+              {!child.revealedToPlayers && <GmOnlyMark />}
             </button>
           ))}
         </nav>

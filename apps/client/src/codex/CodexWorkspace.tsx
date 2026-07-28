@@ -320,8 +320,12 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   return (
     <div className="codex-root">
       <div className="codex-modebar">
-        <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => setMode(id as typeof mode)}
-          tabs={[{ id: "campaign", label: "Campaign" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
+        {/* The wrapper exists only to hang the overflow cue on — five modes do not fit a 375px strip, and
+            the tabs themselves are the primitive's and stay untouched. See `.codex-modetabs` in codex.css. */}
+        <div className="codex-modetabs">
+          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => setMode(id as typeof mode)}
+            tabs={[{ id: "campaign", label: "Campaign" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
+        </div>
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
           <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>

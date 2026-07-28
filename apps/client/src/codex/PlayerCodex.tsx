@@ -139,8 +139,11 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   return (
     <div className="codex-root codex-player">
       <div className="codex-modebar">
-        <Tabs ariaLabel="Codex" activeId={view} onChange={(id) => setView(id as PlayerView)}
-          tabs={[{ id: "campaign", label: "Campaign" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
+        {/* Same five-mode strip as the GM's, so it needs the same overflow cue (see `.codex-modetabs`). */}
+        <div className="codex-modetabs">
+          <Tabs ariaLabel="Codex" activeId={view} onChange={(id) => setView(id as PlayerView)}
+            tabs={[{ id: "campaign", label: "Campaign" }, { id: "lore", label: "Lore" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
+        </div>
       </div>
 
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}

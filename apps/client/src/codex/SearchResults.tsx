@@ -26,6 +26,17 @@ export type SearchState =
   | Readonly<{ status: "ready"; hits: readonly CodexSearchHit[] }>;
 
 /**
+ * How long the box stays quiet after the last keystroke before the request goes out. The suite-wide search
+ * hits four record kinds server-side, and without this every character was its own round trip — a measured
+ * six requests for a six-character query, in all three callers at once. `PageEditor`'s autosave already
+ * establishes the pattern (a `setTimeout` keyed on the changing value, cleared by the effect's own
+ * teardown); it can afford ~800ms because nothing is waiting on it, while a result list a GM is reading as
+ * they type cannot. 250ms is under the ~300ms that reads as instant and still collapses ordinary typing to
+ * one request.
+ */
+const SEARCH_DEBOUNCE_MS = 250;
+
+/**
  * Run the suite-wide search for a query, one state machine shared by all three callers.
  * `search` must be stable (wrap it in `useCallback`); `refreshKey` re-runs the query when the notebook
  * behind it changes, which is how a result list stays current after a `codex:changed` refresh.
@@ -38,13 +49,20 @@ export function useCodexSearch(
   const [state, setState] = useState<SearchState>({ status: "idle" });
   useEffect(() => {
     const trimmed = query.trim();
+    // An empty box resets IMMEDIATELY and fires nothing: there is no request to debounce, and making the
+    // list linger on the previous query's hits for a quarter second would be a small lie about what the
+    // box currently says.
     if (!trimmed) { setState({ status: "idle" }); return; }
     let live = true;
+    // R4: "loading" is set on the keystroke, not when the request leaves. The debounce delays the fetch,
+    // never the honesty — the list must not keep presenting the previous query's hits as this query's.
     setState({ status: "loading" });
-    void search(trimmed)
-      .then((hits) => { if (live) setState({ status: "ready", hits }); })
-      .catch((cause: unknown) => { if (live) setState({ status: "error", message: cause instanceof Error ? cause.message : "The search could not be completed." }); });
-    return () => { live = false; };
+    const timer = setTimeout(() => {
+      void search(trimmed)
+        .then((hits) => { if (live) setState({ status: "ready", hits }); })
+        .catch((cause: unknown) => { if (live) setState({ status: "error", message: cause instanceof Error ? cause.message : "The search could not be completed." }); });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => { live = false; clearTimeout(timer); };
   }, [query, search, refreshKey]);
   return state;
 }

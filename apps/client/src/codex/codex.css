@@ -29,6 +29,13 @@
 .codex-move-opt.is-new { color: var(--cyan); background: none; }
 
 .codex-list { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
+/* `overflow-y: auto` is here so a long notebook scrolls inside a rail stretched by a taller editor — but
+   it also makes this box CLIP, and the box hugs its content, so the folder row's ⋯ menu opened into thin
+   air: measured at 375px, the popover ran from y=505 to y=694 inside a list ending at y=647 and the
+   "Delete folder" item was genuinely unreachable (`elementFromPoint` did not return it). The clip is lifted
+   only while a folder menu is open, so scrolling is unchanged at every other moment. The proper fix is for
+   `Menu`'s popover to escape clipping ancestors, which is the primitive's business, not the Codex's (R9). */
+.codex-list:has(.codex-tree-folder-menu[open]) { overflow: visible; }
 .codex-list-loading { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-2); }
 /* CF-2: the main-pane counterpart of the rail's loading rows. Sized like `.codex-main-empty` so a mode
    does not jump when the fetch settles and the skeleton is replaced by the real content or the invitation. */
@@ -84,7 +91,13 @@
 /* Notebook tree: collapsible nested folders holding the whole campaign's notes. */
 .codex-tree { display: flex; flex-direction: column; gap: 1px; }
 .codex-tree-branch { display: flex; flex-direction: column; gap: 1px; }
+/* §4 route 1 (grow the paint). Measured 33.6px tall at 375px — the row was simply never measured when
+   `.codex-tree-page` below it was fixed. A folder row is one entry in a vertical stack, so §4 forbids
+   route 2 here: a 44px ::after would overhang into the rows above and below and steal their taps. The
+   taller row also gives the ⋯ menu beside it a 44px-tall box to sit inside, which is what keeps ITS hit
+   area off the neighbouring rows. */
 .codex-tree-folder {
+  min-height: var(--tap-min);
   display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left;
   padding: var(--space-1) var(--space-2); border: none; background: transparent; cursor: pointer;
   font-family: var(--font-display); font-size: var(--fs-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
@@ -150,11 +163,14 @@
 .codex-tree-folder-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); }
 .codex-tree-folder-row .codex-tree-folder { flex: 1; min-width: 0; }
 .codex-tree-folder-row.is-drop { background: color-mix(in srgb, var(--cyan) 16%, transparent); border-color: var(--cyan); border-style: dashed; }
-.codex-tree-folder-actions { display: flex; align-items: center; }
-.codex-tree-folder-btn { opacity: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--fs-sm); border-radius: var(--radius-sm); line-height: 1; }
-.codex-tree-folder-row:hover .codex-tree-folder-btn, .codex-tree-folder-btn:focus-visible { opacity: 1; }
-.codex-tree-folder-btn:hover { color: var(--cyan); background: var(--surface-2); }
-.codex-tree-folder-ic { width: 15px; height: 15px; display: block; }
+/* The folder row's ONE action control (see NotebookTree.tsx for why four separate buttons could not meet
+   §4). The floor comes from the primitive: `.nh-menu-trigger--icon` is §4 route 2 on 28px of paint, so its
+   ::after overhangs 8px per side — `--space-2` of separation is exactly the gap budget that keeps it off
+   the folder-name button beside it, and the 44px row above keeps it off the rows. */
+.codex-tree-folder-actions { display: flex; align-items: center; margin-inline-start: var(--space-2); }
+.codex-tree-folder-menu { opacity: 0; }
+.codex-tree-folder-row:hover .codex-tree-folder-menu, .codex-tree-folder-menu:focus-within, .codex-tree-folder-menu[open] { opacity: 1; }
+.codex-tree-folder-ic { width: 1em; height: 1em; display: block; }
 /* Three panes are EARNED at the ladder's 850px step (design-language §3) rather than lost at an
    off-ladder 900px. Below it the context pane stacks under the editor, which is the default above. */
 @media (min-width: 850px) {
@@ -163,7 +179,7 @@
 }
 /* Row actions can't rely on hover on touch, so they stay visible below the three-pane width. */
 @media (max-width: 849px) {
-  .codex-tree-folder-btn, .codex-tree-page-move { opacity: 1; }
+  .codex-tree-folder-menu, .codex-tree-page-move { opacity: 1; }
 }
 
 /* Entity meta (type/folder/tags) and the typed fields share ONE responsive grid so their columns line
@@ -396,6 +412,30 @@
 .codex-modebar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); margin-bottom: var(--space-3); }
 .codex-modebar-ops { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 
+/* The five modes overflow the strip on a phone: measured at 375px the tabs total 392px inside a 325px
+   scrollport, so "Graph" starts at x=348 with the strip ending at 350. `Tabs` already fades its own edge,
+   but a mask can only dim CONTENT — and at rest that boundary lands in the 4px of whitespace between
+   "Journal" (ends 344) and "Graph", so there was nothing for it to bite on and the phone showed four modes
+   with no sign of a fifth. This mark does not depend on where the boundary falls.
+
+   It is keyed off the primitive's OWN state classes rather than a second measurement of its own:
+   `is-scrollable` means the bar overflows, `is-scrolled-end`/`is-scrolled-start` mean that end is already
+   in view. So it appears only when there genuinely is more that way, which is the same rule Tabs.css states
+   for its fade — a permanent arrow would be decoration claiming to be an affordance.
+
+   `flex: 0 1 auto` (not `1 1`) keeps the wide-screen layout exactly as it was: the strip stays shrink-to-fit
+   so its bottom rule still runs under the tabs rather than the whole row. */
+.codex-modetabs { position: relative; flex: 0 1 auto; min-width: 0; }
+.codex-modetabs::before, .codex-modetabs::after {
+  content: ""; position: absolute; top: 50%; width: 7px; height: 7px; pointer-events: none;
+  border-right: 2px solid var(--text-dim); border-bottom: 2px solid var(--text-dim);
+  opacity: 0; transition: opacity var(--dur-base) var(--ease-settle);
+}
+.codex-modetabs::after { right: 2px; transform: translateY(-50%) rotate(-45deg); }
+.codex-modetabs::before { left: 2px; transform: translateY(-50%) rotate(135deg); }
+.codex-modetabs:has(.is-scrollable:not(.is-scrolled-end))::after { opacity: 1; }
+.codex-modetabs:has(.is-scrolled-start)::before { opacity: 1; }
+
 /* Command palette */
 .codex-palette-scrim { position: fixed; inset: 0; background: color-mix(in srgb, var(--void) 70%, transparent); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 60; }
 .codex-palette { width: min(560px, 92vw); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); box-shadow: 0 20px 60px color-mix(in srgb, var(--void) 60%, transparent); overflow: hidden; }
@@ -412,7 +452,11 @@
 .codex-atlas { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-atlas-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .codex-breadcrumb { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; min-width: 0; }
-.codex-crumb { background: none; border: none; color: var(--cyan); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+/* §4 route 1 (grow the paint). Measured 27.5px tall at 375px. Route 2 is not available: the overhang would
+   be (44 − 27.5) / 2 = 8.25px per side and `.codex-breadcrumb` gaps its crumbs by `--space-1` (4px), well
+   under the 16.5px the gap budget demands — and the bar wraps at 375px, so a 44px ::after would also reach
+   the crumb row below it. A breadcrumb bar has the vertical room, so the paint simply grows. */
+.codex-crumb { min-height: var(--tap-min); display: inline-flex; align-items: center; background: none; border: none; color: var(--cyan); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
 .codex-crumb:hover { background: var(--surface-2); }
 .codex-crumb.is-current { color: var(--text); cursor: default; }
 .codex-crumb-sep { color: var(--text-muted); }
@@ -420,12 +464,19 @@
 /* Drill-DOWN chips: the maps nested under the current one (breadcrumb is the way up, these are the way down). */
 .codex-atlas-descend { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: calc(-1 * var(--space-1)); }
 .codex-descend-label { font-family: var(--font-mono); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-.codex-descend-chip { display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); }
+/* §4 route 1 (grow the paint). Measured 29.5px tall at 375px, and it only renders at all once a campaign
+   has two top-level maps or a nested one — which is why six milestones of sparse-database checks never saw
+   it. Route 2 is not available: the overhang would be (44 − 29.5) / 2 = 7.25px per side against this row's
+   `--space-2` (8px) gap, under the 14.5px budget, and the row wraps at 375px so the ::after would reach the
+   chips stacked below it as well. */
+.codex-descend-chip { min-height: var(--tap-min); display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); }
 .codex-descend-chip:hover { background: var(--surface-3); border-color: var(--cyan); }
 /* Selection owns the edge, hover owns the fill (design-language §5) — the atlas you are currently in. */
 .codex-descend-chip.is-current { border-color: var(--magenta); color: var(--text); }
 .codex-descend-arrow { color: var(--cyan); font-weight: 700; }
-.codex-descend-lock { font-size: var(--fs-2xs); opacity: 0.8; }
+/* The "players can't see this map yet" mark. An SVG glyph, never an emoji (design-language §0): 🔒 renders
+   at a platform-chosen size in a hue this palette does not own and cannot take a token colour. */
+.codex-descend-lock { display: inline-flex; align-items: center; color: var(--text-dim); font-size: 1em; }
 
 .codex-atlas-body { display: flex; gap: var(--space-3); align-items: stretch; min-height: 0; }
 .codex-mapsurface { position: relative; flex: 1 1 auto; min-width: 0; min-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--void); touch-action: none; }

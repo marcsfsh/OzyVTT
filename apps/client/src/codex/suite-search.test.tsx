@@ -366,3 +366,93 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     expect(screen.queryByText("Nothing you know matches that.")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * **One typed query is ONE request.** `useCodexSearch` re-ran its effect on every keystroke and fired
+ * immediately, so a six-character query was six round trips against a search that spans pages, journal
+ * entries, maps and markers — measured in the browser as six `/codex/search?q=` requests for "strahd", in
+ * all three callers. The hook now debounces the fetch (`PageEditor`'s autosave is the precedent), and
+ * because the hook is shared, fixing it once fixes the rail, the palette and the player Lore tab together —
+ * which is why all three are pinned here rather than only the one that was measured.
+ *
+ * `delay: null` types the whole string without waiting between keys, which is what makes the assertion
+ * about the number of calls meaningful: with no debounce these tests see one call per character.
+ */
+describe("Suite-wide search — one settled query, one request", () => {
+  const gmMocks = () => {
+    listPages.mockResolvedValue([]);
+    listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
+    listFolders.mockResolvedValue([]);
+    getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
+    listMaps.mockResolvedValue([]);
+    listAssets.mockResolvedValue([]);
+    listMarkers.mockResolvedValue([]);
+    timeline.mockResolvedValue([]);
+    getCalendar.mockResolvedValue(CALENDAR);
+    search.mockResolvedValue(HITS);
+  };
+
+  it("the rail sends ONE request for a six-character query, not one per keystroke", async () => {
+    gmMocks();
+    const user = userEvent.setup({ delay: null });
+    renderWorkspace();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.type(screen.getByLabelText("Search the notebook"), "strahd");
+
+    await waitFor(() => expect(search).toHaveBeenCalledWith("gm", "strahd"));
+    expect(search).toHaveBeenCalledTimes(1);
+    // Named prefixes, so a regression reads as "it searched for 's'" rather than a bare count mismatch.
+    for (const prefix of ["s", "st", "str", "stra", "strah"]) expect(search).not.toHaveBeenCalledWith("gm", prefix);
+  });
+
+  it("the command palette debounces the same way — it is the same hook", async () => {
+    gmMocks();
+    const user = userEvent.setup({ delay: null });
+    renderWorkspace();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(screen.getByLabelText("Command palette"), "strahd");
+
+    await waitFor(() => expect(search).toHaveBeenCalledWith("gm", "strahd"));
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it("the player Lore tab debounces too", async () => {
+    playerListPages.mockResolvedValue([]);
+    playerListMaps.mockResolvedValue([]);
+    playerListMarkers.mockResolvedValue([]);
+    playerTimeline.mockResolvedValue([]);
+    playerListRelationships.mockResolvedValue([]);
+    playerListLinks.mockResolvedValue([]);
+    playerSearch.mockResolvedValue([HIT_MAP]);
+    const user = userEvent.setup({ delay: null });
+    render(<PlayerCodex token="player" />);
+    await waitFor(() => expect(playerListPages).toHaveBeenCalled());
+    await user.click(screen.getByRole("tab", { name: "Lore" }));
+    await user.type(screen.getByLabelText("Search the codex"), "barovia");
+
+    await waitFor(() => expect(playerSearch).toHaveBeenCalledWith("player", "barovia"));
+    expect(playerSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("clearing the box resets the list at once and asks the server nothing", async () => {
+    gmMocks();
+    const user = userEvent.setup({ delay: null });
+    renderWorkspace();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    const box = screen.getByLabelText("Search the notebook");
+    await user.type(box, "strahd");
+    expect(await screen.findByText("Strahd von Zarovich")).toBeInTheDocument();
+
+    search.mockClear();
+    await user.clear(box);
+    // Immediately, not after the debounce: an empty box has no query to send and must not keep showing
+    // the previous one's hits for a quarter second.
+    expect(screen.queryByText("Strahd von Zarovich")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("No pages yet.")).toBeInTheDocument());
+    expect(search).not.toHaveBeenCalled();
+  });
+});

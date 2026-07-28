@@ -601,6 +601,47 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex suite overhaul — Stage Six final QA and Stage Seven remediation (2026-07-28).** Three
+  independent adversarial reviewers over the whole delivered programme, then remediation. M1–M7 complete.
+  - **Viewer safety: no confirmed leak.** The audit independently re-derived every gate and confirmed
+    `projectPlayerSearchHit` re-derives reveal state from a *fresh* store read rather than the FTS row, so
+    each layer is correct alone. It also verified the M6 masking trap was found and closed. Its one flagged
+    item — the world calendar being readable by any authenticated role — is now an explicit decision
+    (decision-log) rather than an implicit one.
+  - **Requirements: all 32 in-scope IDs implemented**, nothing from M8–M12 leaked in (checked at the
+    migration, route and UI layers). It found a real Definition-of-Done miss: **M7 had no `current-state.md`
+    or `decision-log.md` entry**, though its own plan required both — so the two docs CLAUDE.md tells every
+    session to read first said the programme stopped at M6. Both written.
+  - **A-3's evidence was unverifiable by anyone but me**, because the audit ran from a throwaway scratchpad
+    script. It is now `scripts/tap-audit.mjs`, outside `npm test` (it needs a browser and a dev server) with
+    `playwright-core` kept out of the repo's dependencies.
+  - **Committing that tool immediately paid for itself, and then indicted my own earlier numbers.** Against a
+    *populated* database it found **14 controls below the floor where I had measured zero** — notebook
+    folder rows and their four action buttons (M5 fixed page rows; the test DB had no folders), the atlas
+    breadcrumb (no nested maps existed), and graph nodes. The QA pass found 3 more I had missed
+    (`.codex-descend-chip`, which only renders with 2+ maps). **My measurements were never wrong; their
+    coverage was.** That is the argument for committing the tool rather than the number.
+  - **The reviewer then found two bugs in that tool.** It called `scrollIntoView()` inside a *synchronous*
+    evaluate while `scroll-behavior: smooth` is set globally, so scrolled readings were stale; and its steal
+    predicate was arithmetically incapable of being right, since a correct 44px control can only walk to 43.
+    Fixed: Journal's phantom "20 taps stolen" → 2, Pages' 26 → 0. **A-3's actual number was never affected**
+    by either bug — it comes from `max(rect, ::after)` with no scrolling.
+  - **Fixed.** The New menu overflowed a phone by 97px (375 → 472); clamped in the primitive, now 375 → 375
+    and 320 → 320 with desktop byte-identical. Light-theme `--cyan-hi` was failing AA everywhere it is used
+    as text — a **convention inversion** (`-hi` is the lighter twin on dark, must be the deeper twin on
+    light, as `--violet-hi` already does), so the "Shown" reveal badge read 2.48:1; now 5.41:1. Search now
+    ranks the record *named* for the query first (`Strahd` was returning third, and the palette landed on the
+    wrong page). Search debounced 6 requests → 1. Folder actions collapsed from four sub-floor buttons into
+    one `Menu`. Mode bar gained a scroll affordance for its hidden fifth tab. An emoji UI glyph replaced.
+  - **Result: 0 sub-floor controls in Pages, Campaign, Atlas and Journal**, verified independently after
+    remediation. The Graph's 3 remain by design (see `known-bugs.md`).
+  - **Held for the owner, with measurements rather than opinions:** `--text-muted` fails AA on nearly every
+    surface in every theme across 207 usages, and fixing it collapses the three-tier text ramp;
+    `--magenta-hi`/`--danger-hi` share the same inversion the cyan fix corrected. Both are design decisions,
+    not remediation edits.
+  - **Verified.** `check` / `test` / `build` all exit 0; **1169 tests** (web 79, server 817). Corrected audit
+    re-run against a populated database.
+
 - **Codex overhaul M7 — return edges, the Campaign dashboard, a Graph that tells the truth (2026-07-28).**
   Delivers **CI-3…CI-9**. This is the milestone that kills the star topology the assessment named as root
   cause 3 ("a shell but not a system": every jump led *into* Pages and nothing led back out).
