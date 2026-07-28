@@ -1,10 +1,11 @@
 import { Badge, Button, Field, IconButton, Input, Select } from "@vtt/ui";
-import { atlasApi, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
+import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker, EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
-import { RevealSwitch } from "./SecretMarkers";
+import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
-import { useState } from "react";
+import { socket } from "../socket";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * The marker inspector: edit a pin's icon/color/label, wire its links, reveal it, or delete it. A pin can
@@ -13,12 +14,14 @@ import { useState } from "react";
  * the fight staged there. All writes go through the atlas REST surface; the parent refreshes from the result.
  */
 type MarkerScene = Readonly<{ id: string; name: string }>;
+type MarkerActor = Readonly<{ id: string; name: string }>;
 type MarkerInspectorProps = Readonly<{
   gmToken: string;
   marker: CodexMarker;
   pages: readonly CodexPageSummary[];
   maps: readonly CodexMap[];
   scenes: readonly MarkerScene[];
+  actors: readonly MarkerActor[];
   activeSceneId: string | null;
   onUpdated: (marker: CodexMarker) => void;
   onDeleted: (markerId: string) => void;
@@ -30,11 +33,17 @@ type MarkerInspectorProps = Readonly<{
   onClose: () => void;
 }>;
 
-export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onActivateScene, onClose }: MarkerInspectorProps) {
+export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onActivateScene, onClose }: MarkerInspectorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // This pin's campaign history — including the battles the combat bridge auto-logs here. Mirrors
+  // `PageTimeline`'s use of `journalApi.forPage`, which until now had no marker-side counterpart.
+  const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
+  const loadEntries = useCallback(() => { void journalApi.forMarker(gmToken, marker.id).then(setEntries).catch(() => setEntries([])); }, [gmToken, marker.id]);
+  useEffect(() => { loadEntries(); }, [loadEntries]);
+  useEffect(() => { const onChanged = () => loadEntries(); socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [loadEntries]);
 
   const patch = async (input: CodexMarkerInput) => {
     setBusy(true); setError(null);
@@ -132,6 +141,31 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, activeSc
         </Field>
       )}
       {danglingScenes > 0 && <p className="codex-inspector-hint">{danglingScenes} linked scene{danglingScenes === 1 ? "" : "s"} no longer exist — <button type="button" className="codex-linklike" onClick={() => patch({ sceneIds: marker.sceneIds.filter((id) => scenes.some((scene) => scene.id === id)) })}>clear</button>.</p>}
+
+      {actors.length > 0 && (
+        <Field label="Linked actor" htmlFor="marker-actor" help="Who or what holds this place — an NPC, a monster, a creature stationed here.">
+          <Select id="marker-actor" value={marker.actorId ?? ""} disabled={busy} onChange={(event) => patch({ actorId: event.target.value || null })}>
+            <option value="">— none —</option>
+            {actors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
+          </Select>
+        </Field>
+      )}
+
+      <div className="codex-page-timeline">
+        <h4 className="codex-backlinks-title">Journal</h4>
+        {entries.length === 0
+          ? <p className="codex-page-timeline-empty">Nothing logged at this pin yet. Battles fought here are recorded automatically.</p>
+          : <ul className="codex-page-timeline-list">
+              {entries.map((entry) => (
+                <li key={entry.id} className="codex-page-timeline-item">
+                  {entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}
+                  {(entry.sessionNumber != null || entry.inWorldLabel) && <span className="codex-page-timeline-meta">{[entry.sessionNumber != null ? `S${entry.sessionNumber}` : null, entry.inWorldLabel].filter(Boolean).join(" · ")}</span>}
+                  {!entry.revealedToPlayers && <GmOnlyTag />}
+                  <span className="codex-page-timeline-text">{entry.playerText || entry.gmText}</span>
+                </li>
+              ))}
+            </ul>}
+      </div>
 
       <div className="codex-inspector-foot"><Button variant="ghost" size="sm" onClick={remove}>Delete marker</Button></div>
       {confirmDialog}

@@ -38,6 +38,9 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => { try { const saved = sessionStorage.getItem(DRAFT_KEY); return saved ? { ...EMPTY, ...JSON.parse(saved) } : EMPTY; } catch { return EMPTY; } });
   const [editingId, setEditingId] = useState<string | null>(null);
+  // An in-progress NEW entry, set aside while the composer is borrowed to edit an existing one. Without
+  // this, clicking Edit overwrote the draft AND (via the effect below) deleted its sessionStorage backup.
+  const [stashedDraft, setStashedDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -49,13 +52,15 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { const onChanged = () => { void load(); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load]);
-  // Persist an in-progress NEW entry so switching Codex tabs mid-compose doesn't silently drop it.
+  // Persist an in-progress NEW entry so switching Codex tabs mid-compose doesn't silently drop it. While
+  // editing an existing entry the composer holds that entry, so the thing worth keeping is the stash.
   useEffect(() => {
     try {
-      const isEmpty = !draft.playerText.trim() && !draft.gmText.trim();
-      if (editingId || isEmpty) sessionStorage.removeItem(DRAFT_KEY); else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      const pending = stashedDraft ?? (editingId ? null : draft);
+      const isEmpty = !pending || (!pending.playerText.trim() && !pending.gmText.trim());
+      if (isEmpty) sessionStorage.removeItem(DRAFT_KEY); else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(pending));
     } catch { /* private mode - fine */ }
-  }, [draft, editingId]);
+  }, [draft, editingId, stashedDraft]);
 
   const set = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const submit = async () => {
@@ -70,10 +75,13 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
     };
     try {
       if (editingId) await journalApi.update(gmToken, editingId, input); else await journalApi.create(gmToken, input);
-      setDraft(EMPTY); setEditingId(null); await load();
+      // Finishing an edit hands the composer back to whatever new entry was in progress.
+      setDraft(editingId ? (stashedDraft ?? EMPTY) : EMPTY); setStashedDraft(null); setEditingId(null); await load();
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Could not save the entry."); }
   };
   const edit = (entry: CodexJournalEntry) => {
+    // Set aside an unsaved NEW entry before the composer is reused, so Edit can never destroy it.
+    if (!editingId && (draft.playerText.trim() || draft.gmText.trim())) setStashedDraft(draft);
     setEditingId(entry.id);
     const date = entry.inWorldDate; // the raw date the GM typed - correct even if the calendar has since changed
     setDraft({
@@ -82,6 +90,7 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
       attachPageId: entry.attachPageId ?? "", revealed: entry.revealedToPlayers
     });
   };
+  const cancelEdit = () => { setEditingId(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
   const reveal = async (entry: CodexJournalEntry, revealed: boolean) => { await journalApi.reveal(gmToken, entry.id, revealed); await load(); };
   const remove = async (entry: CodexJournalEntry) => { if (await confirm({ title: "Delete entry", body: "Delete this journal entry? This cannot be undone.", confirmLabel: "Delete", danger: true })) { await journalApi.remove(gmToken, entry.id); await load(); } };
 
@@ -109,10 +118,11 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
       <Panel accent="cyan" className="codex-composer">
         <div className="codex-composer-head">
           <strong>{editingId ? "Edit entry" : "New journal entry"}</strong>
+          {editingId && stashedDraft && <span className="codex-entry-when">Your unsaved entry is kept — it returns when you finish here.</span>}
           <div className="codex-composer-head-actions">
             {nowLabel && <span className="codex-now-chip" title="The world's current date — set it in the calendar">Now: {nowLabel}</span>}
             <Button variant="ghost" size="sm" onClick={() => setCalendarOpen(true)}>Calendar</Button>
-            {editingId && <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setDraft(EMPTY); }}>Cancel</Button>}
+            {editingId && <Button variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>}
           </div>
         </div>
         <Field label="Player-facing summary" htmlFor="j-player"><Textarea id="j-player" className="codex-composer-body" value={draft.playerText} placeholder="What the party knows about this…" onChange={(event) => set({ playerText: event.target.value })} /></Field>

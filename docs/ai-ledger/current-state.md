@@ -601,6 +601,40 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M1 — unreachable capabilities + journal data loss (2026-07-28, branch
+  `claude/codex-suite-overhaul-nyeqg0`).** First implementation milestone of the programme specified in
+  `docs/product/codex-suite-plan.md`. **Requirements delivered: CP-1, CP-3, CP-4, CP-5, CP-6, CP-7, CD-1.**
+  - **CD-1 (high — silent data loss) fixed.** Composing a new journal entry and then clicking Edit on an
+    existing one destroyed the draft *and* deleted its sessionStorage backup (the guard `if (editingId ||
+    isEmpty) removeItem(...)` fired the moment `editingId` went truthy). `JournalView` now **stashes** the
+    in-progress new entry, keeps backing it up while the composer is borrowed, tells the GM it is kept, and
+    restores it on Cancel or after the edit is saved.
+  - **CP-1 player search wired.** `playerCodexApi.search` had 0 callers against a route that was already
+    dual-role and viewer-safe; the player Lore rail now has a search box that overlays results.
+  - **CP-3 marker journal readback.** `MarkerInspector` shows the pin's entries via `journalApi.forMarker`
+    (0 callers before) — the marker-side counterpart of `PageTimeline`. Gives the combat-history bridge its
+    first read path. Uses `revealedToPlayers` for the GM-only cue (deliberately **not** repeating CD-5's
+    `!playerText.trim()` mistake, which is still open in `PageTimeline` and scheduled for M5).
+  - **CP-4/CP-5 map rename, retype and re-parent**, via a new **Map settings** modal (`atlasApi.updateMap`
+    and `setMapParent`, both 0 callers before). A map's name and kind were frozen at creation, permanently.
+    The "sits inside" list excludes the map's own descendants so the choice can't propose a cycle.
+  - **CP-6 multiple root maps.** The new-map picker gained a "Nest inside …" switch; turning it off creates a
+    second root. The atlas was practically single-root even though the model supports a forest.
+  - **CP-7 marker → actor link** surfaced as a `Select`, mirroring the existing scene-link pattern. Needed
+    `actors` threaded `main.tsx` → `CodexWorkspace` → `AtlasView` → `MarkerInspector`, exactly as `scenes`
+    already was — so **no new component was required** (the risk the plan flagged did not materialise).
+  - **Verified for real.** `check` + `test` (**765** server tests, baseline unchanged) + `build` all green.
+    Live Chromium pass against the running app at **1440px and 390px**: 14/14 assertions, zero console
+    errors, no horizontal overflow. Rename round-tripped through the API and back into the breadcrumb.
+    **Viewer safety proved at the HTTP boundary three ways** — a player search finds revealed player-facing
+    text ("kindly" → hit), cannot find a GM-only body word on a *revealed* page ("ZZQQXX" → 0 hits, GM gets
+    2), and cannot find an unrevealed page at all ("Strahd" → 0 hits).
+  - **A-1 acceptance criterion met:** the `codex/api.ts` call-site sweep now reports **zero** client API
+    methods with no callers (was five).
+  - **Deviation from the milestone plan (recorded).** The plan's Owns list named 4 files and "server: none".
+    Server: none held. Files were **7** — the four plus `CodexWorkspace.tsx` + `main.tsx` (the `actors` prop
+    chain for CP-7) and `codex.css` (two layout classes). No server, contract or projection changes.
+
 - **Codex suite overhaul — Stage One assessment complete (2026-07-28, branch
   `claude/codex-suite-overhaul-nyeqg0`).** A current-state assessment of the whole Codex suite
   (World · Pages · Atlas · Journal · Graph) is **`docs/product/codex-suite-assessment.md`** — the

@@ -32,7 +32,8 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
 ];
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
-export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
+type WorkspaceActor = Readonly<{ id: string; name: string }>;
+export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; actors?: readonly WorkspaceActor[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
   const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal" | "graph">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [templateMenu, setTemplateMenu] = useState(false);
@@ -250,7 +251,7 @@ export function CodexWorkspace({ gmToken, scenes = [], activeSceneId = null, onA
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
             onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
         : mode === "atlas"
-        ? <AtlasView gmToken={gmToken} scenes={scenes} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <AtlasView gmToken={gmToken} scenes={scenes} actors={actors} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "journal"
         ? <JournalView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "graph"

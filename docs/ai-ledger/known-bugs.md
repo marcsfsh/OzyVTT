@@ -10,6 +10,14 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[ux] The marker inspector is dominated by the icon picker.** Measured live at 1440px: the inspector is
+  a 300px rail whose icon grid occupies roughly the first 500px, so every *functional* control — linked
+  pages, drill-into map, linked scenes, and (new in M1) linked actor at y≈1082 and the journal readback at
+  y≈1188 — sits far below the fold. Pre-existing; M1's two additions lengthen it by ~130px rather than
+  causing it. **Deliberately not fixed in M1**, whose scope is giving built capabilities an entry point, not
+  redesigning the inspector. Candidate fixes (collapse the picker, or order links above it) are a design
+  decision for the Codex overhaul's M5/design pass, not a side-effect of wiring.
+
 - **[character-builder] Phase-2 gating items found by the requirements QA pass (2026-07-26).** The
   Phase-1 foundation is sound, but three things must land before wizard screens are built:
   1. **`fromCatalog` has no resolver.** Ten catalog slugs are authored on feature choices

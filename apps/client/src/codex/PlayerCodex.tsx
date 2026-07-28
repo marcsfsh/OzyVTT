@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Tabs } from "@vtt/ui";
+import { Badge, Input, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
 import { playerCodexApi, type CodexRelationship, type CodexRelationshipEdge, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -35,6 +35,8 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [currentMapId, setCurrentMapId] = useState<string | null>(null);
   const [markers, setMarkers] = useState<PlayerCodexMarker[]>([]);
   const [timeline, setTimeline] = useState<PlayerCodexJournalEntry[]>([]);
+  const [query, setQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<PlayerCodexPageSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -50,6 +52,15 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   useEffect(() => { const onChanged = () => { void load().catch(() => undefined); if (currentMapId) void playerCodexApi.listMarkers(token, currentMapId).then(setMarkers).catch(() => undefined); }; socket.on("codex:changed", onChanged); return () => { socket.off("codex:changed", onChanged); }; }, [load, token, currentMapId]);
   useEffect(() => { if (!selectedPageId) { setPage(null); setPageRels([]); return; } let live = true; void playerCodexApi.getPage(token, selectedPageId).then((result) => { if (live) { setPage(result.page); setPageRels(result.relationships); } }).catch(() => { if (live) { setPage(null); setPageRels([]); } }); return () => { live = false; }; }, [token, selectedPageId]);
   useEffect(() => { if (!currentMapId) { setMarkers([]); return; } void playerCodexApi.listMarkers(token, currentMapId).then(setMarkers).catch(() => setMarkers([])); }, [token, currentMapId]);
+  // Search overlays the revealed-page list while a query is active. The server's `/search` route is
+  // role-aware, so a player search only ever indexes player-facing bodies of revealed pages.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) { setSearchHits(null); return; }
+    let live = true;
+    void playerCodexApi.search(token, trimmed).then((hits) => { if (live) setSearchHits(hits); }).catch(() => { if (live) setSearchHits([]); });
+    return () => { live = false; };
+  }, [query, token, pages]);
 
   const openPage = useCallback((pageId: string) => { setSelectedPageId(pageId); setView("lore"); }, []);
   const navigate = useCallback((target: string) => { const match = pages.find((candidate) => candidate.title.toLowerCase() === target.trim().toLowerCase()); if (match) openPage(match.id); }, [pages, openPage]);
@@ -95,10 +106,24 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
       {view === "lore" && (
         <div className={`codex-workspace${selectedPageId ? " has-selection" : ""}`}>
           <aside className="codex-rail">
+            <div className="codex-rail-head">
+              <Input value={query} placeholder="Search what you know…" aria-label="Search the codex"
+                onChange={(event) => { setQuery(event.target.value); if (event.target.value.trim()) setFilter({ type: null, tag: null }); }} />
+            </div>
             <nav className="codex-list" aria-label="Revealed pages">
-              {(filter.type || filter.tag) && <div className="codex-filter-chip"><span>{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setFilter({ type: null, tag: null })}>✕</button></div>}
-              {filteredPages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
-              {filteredPages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)}
+              {query.trim() ? (
+                searchHits === null
+                  ? <p className="codex-list-empty">Searching…</p>
+                  : searchHits.length === 0
+                    ? <p className="codex-list-empty">Nothing you know matches that.</p>
+                    : searchHits.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)
+              ) : (
+                <>
+                  {(filter.type || filter.tag) && <div className="codex-filter-chip"><span>{filter.type ? `${ENTITY_DEFS[filter.type].label}s` : `#${filter.tag}`}</span><button type="button" aria-label="Clear filter" onClick={() => setFilter({ type: null, tag: null })}>✕</button></div>}
+                  {filteredPages.length === 0 && <p className="codex-list-empty">Nothing revealed yet.</p>}
+                  {filteredPages.map((summary) => <button key={summary.id} type="button" className={`codex-list-item${summary.id === selectedPageId ? " is-active" : ""}`} onClick={() => setSelectedPageId(summary.id)}>{summary.entityType !== "note" && <EntityIcon type={summary.entityType} />}<span className="codex-list-title">{summary.title}</span></button>)}
+                </>
+              )}
             </nav>
           </aside>
           <section className="codex-main">

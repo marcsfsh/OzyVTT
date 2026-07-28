@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Modal } from "@vtt/ui";
+import { Badge, Button, Field, Input, Modal, Select, Switch } from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, type CodexMap, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
+import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
 import { MapSurface } from "./MapSurface";
 import { MarkerInspector } from "./MarkerInspector";
@@ -15,7 +15,11 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
  * Drill-down and breadcrumbs walk the parent chain. All state is server-owned and refreshed on codex:changed.
  */
 type AtlasScene = Readonly<{ id: string; name: string }>;
-export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActivateScene }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void }>) {
+type AtlasActor = Readonly<{ id: string; name: string }>;
+const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
+  { value: "world", label: "World" }, { value: "regional", label: "Regional" }, { value: "battlemap", label: "Local / battlemap" }
+];
+export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [maps, setMaps] = useState<CodexMap[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
@@ -25,6 +29,11 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [picking, setPicking] = useState(false);
+  // A new map nests under the map you're looking at by default; turning this off makes a second ROOT map,
+  // so a world with separate continents/planes isn't stuck in one tree (the data model always allowed a forest).
+  const [nestNew, setNestNew] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsName, setSettingsName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const loadMeta = useCallback(async () => {
@@ -69,9 +78,35 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
 
   const createFromAsset = async (asset: MapAsset) => {
     try {
-      const map = await atlasApi.createMap(gmToken, { assetId: asset.id, name: asset.name, kind: asset.kind, parentMapId: currentMapId });
+      const map = await atlasApi.createMap(gmToken, { assetId: asset.id, name: asset.name, kind: asset.kind, parentMapId: nestNew ? currentMapId : null });
       setPicking(false); await loadMeta(); setCurrentMapId(map.id);
     } catch (createError) { setError(createError instanceof Error ? createError.message : "Could not add the map."); }
+  };
+  // Every map beneath the current one — excluded from the "sits inside" options so a map can't be
+  // re-parented into its own subtree (the server cycle-guards too; this keeps the choice honest).
+  const descendantIds = useMemo(() => {
+    if (!currentMapId) return new Set<string>();
+    const out = new Set<string>();
+    const walk = (parentId: string) => { for (const map of maps) if (map.parentMapId === parentId && !out.has(map.id)) { out.add(map.id); walk(map.id); } };
+    walk(currentMapId);
+    return out;
+  }, [maps, currentMapId]);
+  const renameMap = async () => {
+    if (!currentMap) return;
+    const name = settingsName.trim();
+    if (!name || name === currentMap.name) return;
+    try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { name })); }
+    catch (renameError) { setError(renameError instanceof Error ? renameError.message : "Couldn't rename the map."); }
+  };
+  const retypeMap = async (kind: CodexMapKind) => {
+    if (!currentMap) return;
+    try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { kind })); }
+    catch (retypeError) { setError(retypeError instanceof Error ? retypeError.message : "Couldn't change the map kind."); }
+  };
+  const reparentMap = async (parentMapId: string | null) => {
+    if (!currentMap) return;
+    try { onMapReplace(await atlasApi.setMapParent(gmToken, currentMap.id, parentMapId)); await loadMeta(); }
+    catch (parentError) { setError(parentError instanceof Error ? parentError.message : "Couldn't move the map."); }
   };
   const placeMarker = async (point: { x: number; y: number }) => {
     if (!currentMapId) return;
@@ -120,8 +155,8 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
         <div className="codex-atlas-actions">
           {currentMap && <RevealSwitch revealed={currentMap.revealedToPlayers} onChange={revealMap} ariaLabel="Show this map to players" />}
           {currentMap && <Button variant={placing ? "primary" : "secondary"} size="sm" aria-pressed={placing} onClick={() => setPlacing((value) => !value)}>{placing ? "Placing…" : "Add marker"}</Button>}
-          <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>{currentMap ? "Add sub-map" : "New map"}</Button>
-          {currentMap && <Button variant="ghost" size="sm" onClick={deleteMap}>Delete map</Button>}
+          <Button variant="secondary" size="sm" onClick={() => { setNestNew(true); setPicking(true); }}>{currentMap ? "Add sub-map" : "New map"}</Button>
+          {currentMap && <Button variant="ghost" size="sm" onClick={() => { setSettingsName(currentMap.name); setSettingsOpen(true); }}>Map settings</Button>}
         </div>
       </div>
 
@@ -144,13 +179,20 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
           ? <MapSurface token={gmToken} assetId={currentMap.assetId} markers={markers} placing={placing} selectedMarkerId={selectedMarkerId}
               onBackgroundClick={placeMarker} onMarkerClick={setSelectedMarkerId} onMarkerDragEnd={moveMarker} />
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
-        {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} activeSceneId={activeSceneId}
+        {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={onOpenPage}
           onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onActivateScene={onActivateScene} onClose={() => setSelectedMarkerId(null)} />}
       </div>
 
-      <Modal open={picking} onClose={() => setPicking(false)} title={currentMap ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">
-        {currentMap && <p className="codex-inspector-hint">Pick an uploaded map — it nests inside <strong>{currentMap.name}</strong>, and you can drill into it from here.</p>}
+      <Modal open={picking} onClose={() => setPicking(false)} title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">
+        {currentMap && (
+          <div className="codex-atlas-nestrow">
+            <Switch checked={nestNew} onChange={setNestNew} label={`Nest inside “${currentMap.name}”`} />
+            <p className="codex-inspector-hint">{nestNew
+              ? <>The new map sits inside <strong>{currentMap.name}</strong>, and you can drill into it from here.</>
+              : <>The new map starts its own tree at the top level — for a separate continent, plane, or city.</>}</p>
+          </div>
+        )}
         {assetsEmpty(assets) ? <p className="codex-list-empty">No maps uploaded yet. Upload one under Scenes → Manage maps, then come back.</p> : (
           <div className="codex-asset-grid">
             {assets.map((asset) => (
@@ -159,6 +201,30 @@ export function AtlasView({ gmToken, scenes, activeSceneId, onOpenPage, onActiva
                 <Badge tone="neutral">{asset.kind}</Badge>
               </button>
             ))}
+          </div>
+        )}
+      </Modal>
+      <Modal open={settingsOpen && !!currentMap} onClose={() => setSettingsOpen(false)} title="Map settings" size="sm" ariaLabel="Map settings">
+        {currentMap && (
+          <div className="codex-map-settings">
+            <Field label="Name" htmlFor="map-name">
+              <Input id="map-name" value={settingsName} onChange={(event) => setSettingsName(event.target.value)} onBlur={renameMap}
+                onKeyDown={(event) => { if (event.key === "Enter") void renameMap(); }} />
+            </Field>
+            <Field label="Kind" htmlFor="map-kind" help="How this map sits in the atlas — a world, a region within it, or a local place.">
+              <Select id="map-kind" value={currentMap.kind} onChange={(event) => void retypeMap(event.target.value as CodexMapKind)}>
+                {MAP_KINDS.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}
+              </Select>
+            </Field>
+            <Field label="Sits inside" htmlFor="map-parent" help="Move this map elsewhere in the atlas. Everything under it travels along.">
+              <Select id="map-parent" value={currentMap.parentMapId ?? ""} onChange={(event) => void reparentMap(event.target.value || null)}>
+                <option value="">— top level —</option>
+                {maps.filter((map) => map.id !== currentMap.id && !descendantIds.has(map.id)).map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
+              </Select>
+            </Field>
+            <div className="codex-inspector-foot">
+              <Button variant="ghost" size="sm" onClick={() => { setSettingsOpen(false); void deleteMap(); }}>Delete map</Button>
+            </div>
           </div>
         )}
       </Modal>
