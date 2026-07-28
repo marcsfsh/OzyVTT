@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { resolveSpellcasting, type ActorDefinition, type ContentActionSummary, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
+import { resolveSpellcasting, type ActorDefinition, type ActorDerivedSheet, type ContentActionSummary, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
@@ -399,19 +399,35 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
    * (CLAUDE.md rule 2), so what is previewed and what is rolled are two reads of one function.
    */
   const [serverActions, setServerActions] = useState<readonly ContentActionSummary[]>([]);
-  // Re-asked when the LOADOUT moves, not on every render: equip, unequip, attune and quantity are the
-  // four things that change what the server derives.
-  const inventorySignature = (actor.inventory ?? []).map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`).join(",");
+  /**
+   * THE SHEET'S NUMBERS, from the server. Every chip below reads this instead of recomputing.
+   *
+   * It has to be re-asked on more than the loadout: `deriveEquipment` reads `actor.effects`,
+   * `actor.conditions` and `actor.hp` too (a "while raging" or "while bloodied" rider), so keying
+   * the refetch on inventory alone would serve a stale bonus the moment a condition changed - the
+   * same stale-cache trap `deriveEquipment`'s own comment refuses to fall into.
+   */
+  const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
+  const loadoutSignature = [
+    (actor.inventory ?? []).map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`).join(","),
+    (actor.conditions ?? []).map((condition) => typeof condition === "string" ? condition : condition.id).join(","),
+    (actor.effects ?? []).map((effect) => effect.id).join(","),
+    "kind" in actor.hp ? (actor.hp.kind === "exact" ? String(actor.hp.current) : actor.hp.kind) : String(actor.hp.current)
+  ].join("|");
   useEffect(() => {
-    if (!definitionId) { setServerActions([]); return; }
+    if (!definitionId) { setServerActions([]); setDerived(null); return; }
     let live = true;
-    socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: readonly AvailabilityRow[] }) => {
+    socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: readonly AvailabilityRow[]; derived?: ActorDerivedSheet }) => {
       // A failure is silent on purpose: every caller below already has a working fallback, and an
       // error banner for a lookup the GM did not ask for would be noise.
-      if (live && result.ok && result.actions) setServerActions(result.actions.filter((row) => !row.builtin).map(summaryOfAvailability));
+      if (!live || !result.ok) return;
+      if (result.actions) setServerActions(result.actions.filter((row) => !row.builtin).map(summaryOfAvailability));
+      // Absent only when talking to an older server; the pre-answer fallback covers that.
+      if (result.derived) setDerived(result.derived);
     });
     return () => { live = false; };
-  }, [actor.id, definitionId, inventorySignature]);
+  }, [actor.id, definitionId, loadoutSignature]);
+  const derivedAbility = (ability: (typeof ABILITIES)[number]) => derived?.abilities.find((row) => row.ability === ability) ?? null;
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
@@ -624,8 +640,11 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         <div className="sheet-abilities">
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
-            const mod = modifierOf(score);
-            const withProf = mod + definition.proficiencyBonus;
+            // The server's numbers when it has answered; its own arithmetic only until then. The
+            // difference is item `check-bonus` riders, which the client cannot see (rule 2).
+            const row = derivedAbility(ability);
+            const mod = row?.check ?? modifierOf(score);
+            const withProf = row?.checkWithProficiency ?? (modifierOf(score) + definition.proficiencyBonus);
             return <div key={ability} className="sheet-ability">
               <span>{ability.toUpperCase()}</span>
               <strong>{score}</strong>
@@ -654,13 +673,13 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                 <ul className="sheet-skill-list sheet-skill-edit">{sheetSkills.map((skill) => { const tier = profDraft.skills[skill.id]; return <li key={skill.id}><span>{skill.name}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(skill.id)}>{tier ?? "—"}</button></li>; })}</ul>
               </div>
             : <>
-                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const row = derivedAbility(ability); const isProf = row?.saveProficient ?? proficiencies?.saves.includes(ability) ?? false; const bonus = row?.save ?? saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); const fromItems = row?.saveFromItems ?? 0; return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}${fromItems !== 0 ? ` - includes ${signed(fromItems)} from your equipment` : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
                 <ul className="sheet-skill-list sheet-skill-cols">
-                  {sheetSkills.map((skill) => { const tier = proficiencies?.skills.find((entry) => entry.id === skill.id)?.proficiency; const bonus = skill.ability ? skillBonus(definition.abilityScores[skill.ability], definition.proficiencyBonus, tier ?? "none") : null; return <li key={skill.id}>
+                  {sheetSkills.map((skill) => { const row = derived?.skills.find((entry) => entry.id === skill.id) ?? null; const baseTier = proficiencies?.skills.find((entry) => entry.id === skill.id)?.proficiency; const effective = row?.tier ?? baseTier ?? "none"; const tier = effective === "none" ? undefined : effective; const sources = row?.sources ?? []; const bonus = row ? row.bonus : (skill.ability ? skillBonus(definition.abilityScores[skill.ability], definition.proficiencyBonus, baseTier ?? "none") : null); return <li key={skill.id}>
                     {bonus === null
                       ? <span className="sheet-roll-chip" title={`${skill.name} names no governing ability, so it has no rollable bonus`}>—</span>
                       : <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${skill.name}`} onClick={() => void rollD20(bonus, "check", `${skill.name} check`)}>{signed(bonus)}</button>}
-                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"} aria-label={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
+                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={`${tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}${sources.length > 0 ? ` (${sources.join(", ")})` : ""}`} aria-label={`${tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}${sources.length > 0 ? ` from ${sources.join(", ")}` : ""}`}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
                     <span className="sheet-skill-name">{skill.name} {skill.ability && <em>{skill.ability.toUpperCase()}</em>}</span>
                   </li>; })}
                 </ul>
