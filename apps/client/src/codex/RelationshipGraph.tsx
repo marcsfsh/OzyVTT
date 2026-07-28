@@ -2,16 +2,27 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
-import { type CodexRelationshipEdge } from "./api";
+import { type CodexLinkEdge, type CodexRelationshipEdge } from "./api";
 
 /**
- * The web of the world: entities as nodes (colored + sized by how connected they are), typed
- * relationships as directed, labeled edges. A small deterministic force simulation (Fruchterman-Reingold
- * + gravity) lays it out — the same world always draws the same map — then it's framed to fit. Toggle
- * types in the legend, hover to focus a node's neighborhood, pan/drag + wheel/pinch zoom, click to open.
+ * The web of the world: entities as nodes (colored + sized by how connected they are), and TWO kinds of
+ * edge between them — typed relationships, and the `[[wiki links]]` the bodies already carry. A small
+ * deterministic force simulation (Fruchterman-Reingold + gravity) lays it out — the same world always
+ * draws the same map — then it's framed to fit. Toggle types in the legend, hover to focus a node's
+ * neighborhood, pan/drag + wheel/pinch zoom, click to open.
  * Viewer-safe by construction: the caller passes whichever node/edge set the role may see.
  */
 export type GraphNode = Readonly<{ id: string; title: string; entityType: EntityType }>;
+
+/**
+ * CI-8: the two edge kinds flattened to one shape, so everything downstream — layout, degree, adjacency,
+ * hit-testing, dimming — treats a connection as a connection and only the *paint* branches on kind.
+ * Before this the Graph drew typed relationships alone, and a codex wired together with wiki-links read
+ * as a field of orphans: the picture disagreed with the notebook.
+ */
+type GraphEdge = Readonly<{ key: string; fromPageId: string; toPageId: string; kind: "typed" | "link"; label: string }>;
+/** What a wiki-link edge is called on screen. One word, so the edge label reads without a legend. */
+const LINK_LABEL = "mentions";
 
 const REL_LABEL = new Map(RELATIONSHIP_TYPES.map((entry) => [entry.type, entry.label]));
 const VB = { minX: -520, minY: -390, w: 1040, h: 780 };
@@ -19,7 +30,7 @@ const VB = { minX: -520, minY: -390, w: 1040, h: 780 };
 function hashOf(id: string): number { let hash = 0; for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0; return Math.abs(hash); }
 
 /** Deterministic force-directed layout → id → {x,y}, centered + scaled to frame within the viewBox. */
-function computeLayout(nodes: readonly GraphNode[], edges: readonly CodexRelationshipEdge[]): Map<string, { x: number; y: number }> {
+function computeLayout(nodes: readonly GraphNode[], edges: readonly GraphEdge[]): Map<string, { x: number; y: number }> {
   const count = nodes.length || 1;
   const pos = new Map<string, { x: number; y: number }>();
   nodes.forEach((node, index) => {
@@ -63,12 +74,20 @@ function computeLayout(nodes: readonly GraphNode[], edges: readonly CodexRelatio
     }
     temp = Math.max(temp * 0.96, 4);
   }
-  // Frame on the CONNECTED web (nodes with at least one edge) so the graph opens on the story, not on
-  // orphan nodes flung to the margins. Orphans stay reachable by panning; with no edges at all, frame everything.
-  const linkedIds = new Set<string>();
-  for (const edge of links) { linkedIds.add(edge.fromPageId); linkedIds.add(edge.toPageId); }
-  const framedIds = linkedIds.size > 0 ? ids.filter((id) => linkedIds.has(id)) : ids;
-  const xs = framedIds.map((id) => pos.get(id)!.x), ys = framedIds.map((id) => pos.get(id)!.y);
+  /**
+   * CI-8: frame EVERY node the graph draws.
+   *
+   * This used to fit the bounding box of the connected web alone — nodes with at least one edge — on the
+   * theory that orphans were noise and "stay reachable by panning". They did not: repulsion flings an
+   * unconnected node well outside the connected cluster, and once the fit is computed without it the
+   * scale/centre are wrong for it by construction. Measured on a 3-entity codex with one relationship,
+   * the orphan landed at (-613, -1041) in a 1040×780 viewBox — a page the GM could see in the notebook
+   * and could not see in the picture of it, with nothing on screen saying it was off-frame.
+   *
+   * Fitting the full set costs the connected cluster some scale and is bounded: the fit divides the
+   * padded viewBox by the full span, so no node can leave it.
+   */
+  const xs = ids.map((id) => pos.get(id)!.x), ys = ids.map((id) => pos.get(id)!.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
   const fit = Math.min((VB.w - 150) / (maxX - minX || 1), (VB.h - 170) / (maxY - minY || 1), 1.4);
@@ -76,9 +95,28 @@ function computeLayout(nodes: readonly GraphNode[], edges: readonly CodexRelatio
   return pos;
 }
 
-export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = false }: Readonly<{ nodes: readonly GraphNode[]; edges: readonly CodexRelationshipEdge[]; onOpen: (pageId: string) => void; emptyState?: ReactNode;
+export function RelationshipGraph({ nodes, edges, links = [], onOpen, emptyState, loading = false, focusPageId = null, onFocused = () => {} }: Readonly<{
+  nodes: readonly GraphNode[];
+  edges: readonly CodexRelationshipEdge[];
+  /**
+   * CI-8: the wiki-link edges, from `/codex/links`. Role-scoped by the CALLER, exactly like `edges` —
+   * the GM workspace passes the GM feed and the player Codex passes the player feed, and this component
+   * filters neither. It cannot: it has no token and no notion of who is looking.
+   */
+  links?: readonly CodexLinkEdge[];
+  onOpen: (pageId: string) => void;
+  emptyState?: ReactNode;
   /** CF-2: true while the first fetch is in flight — "No entities yet" must not front-run the data. */
-  loading?: boolean }>) {
+  loading?: boolean;
+  /**
+   * CI-5 / R1: land the graph ON an entity — centred and focused — rather than dropping the GM into the
+   * whole web to hunt for it. Same handled-latch shape as `JournalView`'s `openEntryId` and the atlas's
+   * `openTarget`: the request is consumed once and acknowledged through `onFocused`, so a refresh
+   * cannot yank the view back, and the same node can be reached again from a later jump.
+   */
+  focusPageId?: string | null;
+  onFocused?: () => void;
+}>) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false); // survives pointerup so the click handler can tell a pan from a tap
@@ -123,11 +161,19 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
   }, []);
   useEffect(() => () => { observerRef.current?.disconnect(); observerRef.current = null; }, []);
   const [hover, setHover] = useState<string | null>(null);
+  /** CI-5: the node a jump landed on. Distinct from `hover` because it must survive the pointer leaving. */
+  const [pinned, setPinned] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<EntityType>>(new Set());
 
-  const signature = nodes.map((node) => node.id).join(",") + "|" + edges.map((edge) => `${edge.fromPageId}>${edge.toPageId}`).join(",");
-  const pos = useMemo(() => computeLayout(nodes, edges), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
-  const allEdges = useMemo(() => edges.filter((edge) => pos.has(edge.fromPageId) && pos.has(edge.toPageId) && edge.fromPageId !== edge.toPageId), [edges, pos]);
+  // Both edge kinds, in one list, in a stable order (typed first) so the layout stays deterministic.
+  const graphEdges = useMemo<GraphEdge[]>(() => [
+    ...edges.map((edge) => ({ key: `rel:${edge.id}`, fromPageId: edge.fromPageId, toPageId: edge.toPageId, kind: "typed" as const, label: REL_LABEL.get(edge.type) ?? edge.type })),
+    ...links.map((link) => ({ key: `link:${link.fromPageId}>${link.toPageId}`, fromPageId: link.fromPageId, toPageId: link.toPageId, kind: "link" as const, label: LINK_LABEL }))
+  ], [edges, links]);
+
+  const signature = nodes.map((node) => node.id).join(",") + "|" + graphEdges.map((edge) => `${edge.kind}:${edge.fromPageId}>${edge.toPageId}`).join(",");
+  const pos = useMemo(() => computeLayout(nodes, graphEdges), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
+  const allEdges = useMemo(() => graphEdges.filter((edge) => pos.has(edge.fromPageId) && pos.has(edge.toPageId) && edge.fromPageId !== edge.toPageId), [graphEdges, pos]);
   const degree = useMemo(() => { const map = new Map<string, number>(); for (const edge of allEdges) { map.set(edge.fromPageId, (map.get(edge.fromPageId) ?? 0) + 1); map.set(edge.toPageId, (map.get(edge.toPageId) ?? 0) + 1); } return map; }, [allEdges]);
   const adjacency = useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -140,7 +186,12 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
   const visibleNodes = nodes.filter((node) => !hidden.has(node.entityType));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
   const drawnEdges = allEdges.filter((edge) => visibleIds.has(edge.fromPageId) && visibleIds.has(edge.toPageId));
-  const focus = hover && visibleIds.has(hover) ? new Set([hover, ...(adjacency.get(hover) ?? [])]) : null;
+  const typedCount = drawnEdges.filter((edge) => edge.kind === "typed").length;
+  const linkCount = drawnEdges.length - typedCount;
+  // One focus, two sources: the node a jump pinned (CI-5), overridden while the pointer is on another
+  // node so hovering still explores. Everything downstream reads `focusId` and cannot tell them apart.
+  const focusId = hover ?? pinned;
+  const focus = focusId && visibleIds.has(focusId) ? new Set([focusId, ...(adjacency.get(focusId) ?? [])]) : null;
   const radiusOf = (id: string) => 11 + Math.min(9, (degree.get(id) ?? 0) * 1.6);
   /**
    * CF-3 for an SVG node on a zoomable canvas. Neither design-language §4 route applies here: `::after`
@@ -179,6 +230,28 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
     const cap = (nearestNeighbour.get(id) ?? Infinity) / 2;
     return Math.max(radiusOf(id), Math.min(wanted, cap));
   };
+
+  /**
+   * CI-5 / R1: consume an incoming "focus this entity" request. Preparing the destination means BOTH
+   * halves — the node is pinned (so it and its neighbourhood stay lit while everything else dims) and
+   * the view is centred on it at 1× (so it is on screen, not somewhere in a panned-away corner). The
+   * viewBox is centred on the world origin, so a node at world `p` sits under the middle of the frame
+   * exactly when `view.{x,y} === -p.{x,y}` at k = 1.
+   *
+   * Gated on `loading` and re-run on `pos` so a jump that arrives before the pages do still lands: the
+   * latch is only claimed once the layout actually contains the node.
+   */
+  const handledFocusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusPageId) { handledFocusRef.current = null; return; }
+    if (loading || handledFocusRef.current === focusPageId) return;
+    const point = pos.get(focusPageId);
+    // Nothing to centre on yet. Don't claim the latch — `pos` changing re-runs this.
+    if (!point && nodes.length === 0) return;
+    handledFocusRef.current = focusPageId;
+    if (point) { setPinned(focusPageId); setView({ k: 1, x: -point.x, y: -point.y }); }
+    onFocused();
+  }, [focusPageId, loading, pos, nodes.length, onFocused]);
 
   const toggleType = (type: EntityType) => setHidden((prev) => { const next = new Set(prev); if (next.has(type)) next.delete(type); else next.add(type); return next; });
 
@@ -247,7 +320,25 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
   return (
     <div className="codex-graph">
       <div className="codex-graph-bar">
-        <span className="codex-graph-hint">{visibleNodes.length} entities · {drawnEdges.length} relationship{drawnEdges.length === 1 ? "" : "s"} · drag to pan, scroll to zoom</span>
+        <span className="codex-graph-hint">{visibleNodes.length} entities · {typedCount} relationship{typedCount === 1 ? "" : "s"} · {linkCount} mention{linkCount === 1 ? "" : "s"} · drag to pan, scroll to zoom</span>
+        {/**
+          * R2: the two edge kinds must not read by colour alone, and a per-edge label is not always on
+          * screen (labels appear only when lit, zoomed in, or on a small graph). So the key states the
+          * difference three ways at once — a drawn sample carrying the real dash pattern and weight, and
+          * the word for it. Deliberately not a toggle: it is a key, so it has no hit area to size.
+          */}
+        {drawnEdges.length > 0 && (
+          <div className="codex-graph-edgekey">
+            <span className="codex-graph-edgekey-item">
+              <svg className="codex-graph-edgekey-swatch" viewBox="0 0 26 4" aria-hidden="true"><line className="codex-graph-edgekey-line" x1="1" y1="2" x2="25" y2="2" /></svg>
+              Relationship
+            </span>
+            <span className="codex-graph-edgekey-item">
+              <svg className="codex-graph-edgekey-swatch" viewBox="0 0 26 4" aria-hidden="true"><line className="codex-graph-edgekey-line is-link" x1="1" y1="2" x2="25" y2="2" /></svg>
+              Mention
+            </span>
+          </div>
+        )}
         <div className="codex-graph-legend">
           {usedTypes.map((type) => (
             <button key={type} type="button" className={`codex-graph-legenditem${hidden.has(type) ? " is-off" : ""}`} aria-pressed={!hidden.has(type)} title={hidden.has(type) ? `Show ${ENTITY_DEFS[type].label}` : `Hide ${ENTITY_DEFS[type].label}`} onClick={() => toggleType(type)}>
@@ -258,7 +349,9 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
         <div className="codex-graph-zoom">
           <Button variant="ghost" size="sm" aria-label="Zoom out" onClick={() => zoomBy(0.8)}>−</Button>
           <Button variant="ghost" size="sm" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</Button>
-          <Button variant="ghost" size="sm" onClick={() => setView({ x: 0, y: 0, k: 1 })}>Reset</Button>
+          {/* Reset clears the CI-5 focus too — otherwise a pinned node keeps the rest of the web dimmed
+              with no obvious way back to the whole picture. */}
+          <Button variant="ghost" size="sm" onClick={() => { setView({ x: 0, y: 0, k: 1 }); setPinned(null); }}>Reset</Button>
         </div>
       </div>
       <svg ref={attachSvg} className="codex-graph-svg" viewBox={`${VB.minX} ${VB.minY} ${VB.w} ${VB.h}`} preserveAspectRatio="xMidYMid meet"
@@ -269,13 +362,15 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           {drawnEdges.map((edge) => {
             const a = pos.get(edge.fromPageId)!, b = pos.get(edge.toPageId)!;
-            const lit = hover === edge.fromPageId || hover === edge.toPageId;
+            const lit = focusId === edge.fromPageId || focusId === edge.toPageId;
             const dim = focus ? !lit : false;
             const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
             return (
-              <g key={edge.id} className={`codex-graph-edge${lit ? " is-lit" : ""}${dim ? " is-dim" : ""}`}>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd="url(#codex-graph-arrow)" />
-                {(lit || view.k > 1.4 || drawnEdges.length <= 10) && <text x={midX} y={midY} className="codex-graph-edgelabel">{REL_LABEL.get(edge.type) ?? edge.type}</text>}
+              /* R2: kind reads by SHAPE, not colour — a wiki-link is dashed, lighter, and carries no
+                 arrowhead (it has no direction worth claiming), plus the word "mentions" on its label. */
+              <g key={edge.key} data-edgekind={edge.kind} className={`codex-graph-edge is-${edge.kind}${lit ? " is-lit" : ""}${dim ? " is-dim" : ""}`}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd={edge.kind === "typed" ? "url(#codex-graph-arrow)" : undefined} />
+                {(lit || view.k > 1.4 || drawnEdges.length <= 10) && <text x={midX} y={midY} className="codex-graph-edgelabel">{edge.label}</text>}
               </g>
             );
           })}
@@ -283,10 +378,13 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
             const point = pos.get(node.id)!;
             const radius = radiusOf(node.id);
             const dim = focus ? !focus.has(node.id) : false;
+            const isFocus = pinned === node.id;
             return (
-              <g key={node.id} className={`codex-graph-node${hover === node.id ? " is-hover" : ""}${dim ? " is-dim" : ""}`} transform={`translate(${point.x} ${point.y})`}
+              <g key={node.id} className={`codex-graph-node${hover === node.id ? " is-hover" : ""}${isFocus ? " is-focus" : ""}${dim ? " is-dim" : ""}`} transform={`translate(${point.x} ${point.y})`}
                 onPointerEnter={() => setHover(node.id)} onPointerLeave={() => setHover((current) => (current === node.id ? null : current))} onClick={() => openNode(node.id)}
                 role="button" tabIndex={0} aria-label={`${ENTITY_DEFS[node.entityType].label}: ${node.title}`}
+                /* CI-5: the landing is stated in the accessibility tree too, not only by a ring. */
+                aria-current={isFocus ? "true" : undefined}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(node.id); } }}>
                 {/* Hit area first so it sits UNDER the paint: same <g>, so the click handler is unchanged. */}
                 <circle className="codex-graph-nodehit" r={hitRadiusOf(node.id)} />

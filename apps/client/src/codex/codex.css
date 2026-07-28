@@ -204,15 +204,34 @@
 .codex-md-link-inert { color: var(--text-muted); border-bottom-style: dashed; cursor: default; }
 
 /* Backlinks + revisions */
-.codex-backlinks { border-top: 1px solid var(--line); padding-top: var(--space-3); }
+/* `.codex-backlinks` retired with CI-3/4/5: "Linked from" is a block inside `.codex-connections` now,
+   and the section owns the rule + spacing that used to sit on each panel. */
 .codex-backlinks-title { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 var(--space-2); }
 .codex-backlinks-list { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 /* A page's pinned campaign history (journal entries attached here). */
-.codex-page-timeline { border-top: 1px solid var(--line); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+/* CI-3/CI-4/CI-5: the page's return edges as ONE area — "where else does this entity appear?" — with a
+   sub-heading per place it can appear. One border for the whole group rather than one per block, so it
+   reads as a section instead of four stacked panels. */
+.codex-connections { border-top: 1px solid var(--line); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-4); }
+.codex-connections-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.codex-connections-head .codex-backlinks-title { margin: 0; }
+.codex-connections-block { display: flex; flex-direction: column; gap: var(--space-2); }
+.codex-connections-sub { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0; }
+.codex-connections-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+/* §4 route 1 (grow the paint): a stacked list, where §4 requires it — an invisible `::after` overhang
+   in a vertical list steals the neighbouring row's taps. Matches `.codex-campaign-recentitem`, the same
+   row shape on the dashboard. */
+.codex-connections-item { min-height: var(--tap-min); width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.codex-connections-item:hover { background: var(--surface-2); border-color: var(--line); }
+.codex-connections-item.is-static, .codex-connections-item:disabled { cursor: default; }
+.codex-connections-item.is-static:hover, .codex-connections-item:disabled:hover { background: transparent; border-color: transparent; }
+.codex-connections-aside { align-self: flex-start; padding-inline-start: var(--space-2); font-size: var(--fs-sm); }
+
+.codex-page-timeline { display: flex; flex-direction: column; gap: var(--space-2); }
 .codex-page-timeline-empty { color: var(--text-muted); font-size: var(--fs-sm); margin: 0; }
 .codex-page-timeline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.codex-page-timeline-item { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--fs-sm); }
+.codex-page-timeline-item { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); font-size: var(--fs-sm); }
 .codex-page-timeline-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .codex-page-timeline-text { color: var(--text-dim); min-width: 0; }
 .codex-page-timeline-add { display: flex; gap: var(--space-2); align-items: center; }
@@ -330,12 +349,29 @@
 .codex-graph-edge line { stroke: var(--line-strong); stroke-width: 1.2; opacity: 0.5; transition: opacity var(--dur-hover) var(--ease-settle), stroke var(--dur-hover) var(--ease-settle); }
 .codex-graph-edge.is-lit line { stroke: var(--cyan); opacity: 0.95; stroke-width: 1.8; }
 .codex-graph-edge.is-dim { opacity: 0.15; }
+/* CI-8 / R2: a wiki-link edge, distinguished from a typed relationship by DASH PATTERN and WEIGHT — not
+   by colour, which it deliberately shares with its sibling so a lit neighbourhood reads as one thing.
+   The arrowhead is dropped in the markup (a mention has no direction to claim) and the edge labels
+   itself "mentions", so the difference survives greyscale, colour-blindness, and a stylesheet that fails
+   to load. Placed AFTER `.is-lit` so equal-specificity dash/weight wins, with the lit case restated. */
+.codex-graph-edge.is-link line { stroke-width: 0.9; stroke-dasharray: 6 5; opacity: 0.42; }
+.codex-graph-edge.is-link.is-lit line { stroke: var(--cyan); stroke-width: 1.4; opacity: 0.95; }
 .codex-graph-edgelabel { fill: var(--text-dim); font-size: 9px; font-family: var(--font-mono); pointer-events: none; }
+.codex-graph-edgekey { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.codex-graph-edgekey-item { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; }
+.codex-graph-edgekey-swatch { width: 26px; height: 4px; flex: 0 0 auto; overflow: visible; }
+.codex-graph-edgekey-line { stroke: var(--line-strong); stroke-width: 1.4; }
+.codex-graph-edgekey-line.is-link { stroke-width: 1; stroke-dasharray: 6 5; }
 .codex-graph-node { cursor: pointer; transition: opacity var(--dur-hover) var(--ease-settle); }
 .codex-graph-node:focus { outline: none; }
 .codex-graph-node circle { stroke: var(--void); stroke-width: 2; transition: stroke var(--dur-hover) var(--ease-settle); }
 .codex-graph-node.is-hover circle { stroke: var(--text); stroke-width: 2.5; }
 .codex-graph-node:focus-visible circle { stroke: var(--cyan); stroke-width: 3; }
+/* CI-5: the node a jump landed on, held after the pointer leaves. Selection owns the edge (R6). */
+.codex-graph-node.is-focus circle { stroke: var(--cyan); stroke-width: 3; }
+/* …but never on the invisible 44px hit circle, which would paint that ring at tap radius instead of
+   around the node. Three classes + a type, so it outranks the state rules above. */
+.codex-graph-node.is-focus circle.codex-graph-nodehit { stroke: none; }
 .codex-graph-node.is-dim { opacity: 0.28; }
 .codex-graph-nodeicon { fill: rgba(8, 6, 20, 0.85); pointer-events: none; }
 .codex-graph-nodelabel { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--void); stroke-width: 3px; }

@@ -274,6 +274,24 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   exists today. Raised by the M7 implementer rather than decided unilaterally. Not a leak of GM-only
   content as the system is currently specified; revisit if prep-ahead becomes a supported workflow.
 
+- **[codex/graph] Framing orphans can, in principle, compress a dense graph enough for M5's tap cap to
+  bind — not reproduced.** CI-8 changed the auto-fit to frame every node, including unconnected ones
+  (before, an orphan sat outside the viewBox with an effective hit area of **zero**). The implementer
+  disclosed a trade-off: on a 4-node layout at 375px the tighter fit put two nodes 28.7px apart on
+  screen, so M5's nearest-neighbour cap correctly refused to give both a 44px area, and they measured
+  28.7px. **I could not reproduce it**: seeded to 5 nodes (3 of them orphans) and measured at 375px —
+  all 5 inside the frame, all **44.7px**, none under the floor. So the mechanism is real and is the M5
+  cap behaving as documented, but it needs a specific dense layout, and the change is a clear net
+  improvement (a framed 28.7px node beats an unreachable one). Zoom recovers it fully — the implementer
+  measured 1× → 28.7px, 1.25× → 35.8px, 1.56× → 44.7px for every node. Re-tuning the force simulation
+  would change every existing layout and is out of CI-8's scope.
+
+- **[codex/graph] The node hover/focus ring paints on the invisible 44px hit circle.** `.codex-graph-node.is-hover circle`
+  and `:focus-visible circle` are unscoped, so they stroke *every* circle in the node group — including
+  M5's transparent hit circle, which is far larger than the painted node. Pre-existing (M5 added the hit
+  circle; these rules predate it), spotted during M7. CI-8's new `.is-focus` rule scopes itself off the
+  hit circle correctly, so the pattern to copy is already in the file.
+
 ## Gotchas that look like bugs (but aren't)
 
 - **[build] Stale `tsbuildinfo` can mask type errors** — web `check`/`build` are incremental

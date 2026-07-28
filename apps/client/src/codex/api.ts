@@ -26,6 +26,14 @@ export type CodexBacklink = Readonly<{ sourcePageId: string; sourceTitle: string
 /** A relationship as listed against one page: the OTHER endpoint resolved, plus which way the edge points. */
 export type CodexRelationship = Readonly<{ id: string; type: string; direction: "out" | "in"; otherPageId: string; otherTitle: string; otherType: EntityType; otherRevealed: boolean }>;
 export type CodexRelationshipEdge = Readonly<{ id: string; fromPageId: string; toPageId: string; type: string; createdAt: string }>;
+/**
+ * CI-8: one `[[wiki link]]` edge between two pages — the Graph's SECOND edge kind, beside the typed
+ * relationships above. Mirrors the server's `CodexLinkEdge` (`codex-projections.ts`) exactly, including
+ * its deliberate narrowness: endpoints and nothing else. A wiki-link has no type, no author and no id of
+ * its own — it is a fact derived from a body, not a stored record — so there is nothing else to carry,
+ * and the same pair written twice is the same edge.
+ */
+export type CodexLinkEdge = Readonly<{ fromPageId: string; toPageId: string }>;
 export type CodexPageRevision = Readonly<{
   id: number;
   pageId: string;
@@ -106,6 +114,18 @@ export const codexApi = {
   addRelationship: (token: string, pageId: string, toPageId: string, type: string) => request<{ relationship: CodexRelationshipEdge }>(token, `/pages/${pageId}/relationships`, { method: "POST", body: JSON.stringify({ toPageId, type }) }).then((data) => data.relationship),
   removeRelationship: (token: string, relId: string) => request<{ deleted: boolean }>(token, `/relationships/${relId}`, { method: "DELETE" }),
   listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
+  /**
+   * CI-8: every wiki-link edge in the codex, GM-scoped — the sibling of `listRelationships`, and its
+   * neighbour here for the same reason it is the `/relationships` route's neighbour on the server.
+   */
+  listLinks: (token: string) => request<{ links: CodexLinkEdge[] }>(token, "/links").then((data) => data.links),
+  /**
+   * CI-4: the REVERSE of `atlasApi.listMarkers` — every atlas pin that links THIS page, so an open page
+   * can point back at the map instead of the Atlas being the only way to find out. GM projection (full
+   * `CodexMarker` rows, `mapId` included), which is what lets the jump name both halves of its
+   * destination — the pin's map AND the pin — without the Atlas having to resolve anything.
+   */
+  markersForPage: (token: string, pageId: string) => request<{ markers: CodexMarker[] }>(token, `/pages/${pageId}/markers`).then((data) => data.markers),
   createPage: (token: string, input: CodexPageInput) => request<{ page: CodexPage }>(token, "/pages", { method: "POST", body: JSON.stringify(input) }).then((data) => data.page),
   updatePage: (token: string, id: string, input: CodexPageInput) => request<{ page: CodexPage }>(token, `/pages/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.page),
   revealPage: (token: string, id: string, revealed: boolean) => request<{ page: CodexPage }>(token, `/pages/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.page),
@@ -156,6 +176,13 @@ export const playerCodexApi = {
   // may not see (`projectPlayerSearchHit`), so a player result list is narrower, never differently shaped.
   search: (token: string, query: string) => request<{ hits: CodexSearchHit[] }>(token, `/search?q=${encodeURIComponent(query)}`).then((data) => data.hits),
   listRelationships: (token: string) => request<{ relationships: CodexRelationshipEdge[] }>(token, "/relationships").then((data) => data.relationships),
+  /**
+   * CI-8, the PLAYER's wiki-link feed. Same route as `codexApi.listLinks`; the server has already
+   * dropped every edge with an endpoint this player cannot see AND every edge written in a GM body
+   * (`projectPlayerLinkEdges`). The player Graph must read THIS and never the GM method — a client-side
+   * filter over the GM feed could only ever disagree with the gate that actually counts.
+   */
+  listLinks: (token: string) => request<{ links: CodexLinkEdge[] }>(token, "/links").then((data) => data.links),
   listMaps: (token: string) => request<{ maps: PlayerCodexMap[] }>(token, "/maps").then((data) => data.maps),
   listMarkers: (token: string, mapId: string) => request<{ markers: PlayerCodexMarker[] }>(token, `/maps/${mapId}/markers`).then((data) => data.markers),
   timeline: (token: string) => request<{ entries: PlayerCodexJournalEntry[] }>(token, "/journal").then((data) => data.entries)

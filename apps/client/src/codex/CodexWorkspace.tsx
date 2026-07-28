@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
+import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView, journalWhenLabel } from "./JournalView";
@@ -51,12 +51,18 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [edges, setEdges] = useState<CodexRelationshipEdge[]>([]);
+  // CI-8: the Graph's SECOND edge kind. Loaded beside `edges` on purpose — the typed feed is already
+  // fetched here for a mode the GM may not open, so the wiki-link feed sharing that path (and this
+  // surface's one loading flag and one error Alert, per R4) is one round-trip, not a second pattern.
+  const [links, setLinks] = useState<CodexLinkEdge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: CodexPage; backlinks: readonly CodexBacklink[]; relationships: readonly CodexRelationship[] } | null>(null);
   const [query, setQuery] = useState("");
   // CI-1: where a cross-mode jump is *going*, held here because the destination mode owns the landing.
   const [atlasTarget, setAtlasTarget] = useState<AtlasTarget | null>(null);
   const [journalTarget, setJournalTarget] = useState<string | null>(null);
+  // CI-5: which entity the Graph should land focused on. Same latch shape as the two above.
+  const [graphTarget, setGraphTarget] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
@@ -72,8 +78,8 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   // The rail always holds the FULL notebook (for the folder tree + [[ autocomplete)); search is a separate overlay.
   const refreshList = useCallback(async () => {
     try {
-      const [nextPages, nextEdges, nextFolders] = await Promise.all([codexApi.listPages(gmToken), codexApi.listRelationships(gmToken), codexApi.listFolders(gmToken).catch(() => [])]);
-      setPages(nextPages); setEdges(nextEdges); setFolders(nextFolders); setError(null);
+      const [nextPages, nextEdges, nextFolders, nextLinks] = await Promise.all([codexApi.listPages(gmToken), codexApi.listRelationships(gmToken), codexApi.listFolders(gmToken).catch(() => []), codexApi.listLinks(gmToken)]);
+      setPages(nextPages); setEdges(nextEdges); setFolders(nextFolders); setLinks(nextLinks); setError(null);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load the codex."); }
     finally { setLoading(false); }
   }, [gmToken]);
@@ -346,7 +352,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             onOpenMarker={(markerId) => { setAtlasTarget({ mapId: null, markerId }); setMode("atlas"); }}
             openEntryId={journalTarget} onOpenedEntry={() => setJournalTarget(null)} />
         : mode === "graph"
-        ? <RelationshipGraph loading={loading} nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <RelationshipGraph loading={loading} nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} links={links}
+            onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }}
+            focusPageId={graphTarget} onFocused={() => setGraphTarget(null)} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>
       <aside className="codex-rail">
         <div className="codex-rail-head">
@@ -392,7 +400,15 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       <section className="codex-main">
         {selectedId && <button type="button" className="codex-back" onClick={() => setSelectedId(null)}>‹ All pages</button>}
         {selected
-          ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} pages={pages} backlinks={selected.backlinks} relationships={selected.relationships} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} onOpenReplay={onOpenReplay} onRelationshipsChanged={refreshSelected} />
+          ? <PageEditor key={selected.page.id} gmToken={gmToken} page={selected.page} pages={pages} backlinks={selected.backlinks} relationships={selected.relationships} onChange={onPageChanged} onDeleted={onPageDeleted} onNavigate={navigate} onOpenReplay={onOpenReplay} onRelationshipsChanged={refreshSelected}
+              /* CI-3 / CI-4 / CI-5, R1: the page's three return edges, each landing on a PREPARED
+                 destination — through the very same latches search and the dashboard already jump
+                 through, so there is one way into each mode rather than a second parallel one. A pin
+                 knows its own map (the GM projection carries `mapId`), so both halves travel together
+                 and the Atlas never has to go hunting. */
+              onOpenEntry={(entryId) => { setJournalTarget(entryId); setMode("journal"); }}
+              onOpenMarker={(markerId, mapId) => { setAtlasTarget({ mapId, markerId }); setMode("atlas"); }}
+              onShowInGraph={(pageId) => { setGraphTarget(pageId); setMode("graph"); }} />
           : <div className="codex-main-empty"><h3>Select a page</h3><p>Every page has a player-facing side and a GM-only side. Choose one from the list, or create a new page.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}

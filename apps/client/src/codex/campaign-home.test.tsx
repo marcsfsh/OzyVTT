@@ -10,6 +10,9 @@ vi.mock("./MapSurface", () => ({
 
 const listPages = vi.fn();
 const listRelationships = vi.fn();
+const listLinks = vi.fn();
+const markersForPage = vi.fn();
+const forPage = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
@@ -24,6 +27,7 @@ const playerListMaps = vi.fn();
 const playerListMarkers = vi.fn();
 const playerTimeline = vi.fn();
 const playerListRelationships = vi.fn();
+const playerListLinks = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -33,11 +37,13 @@ vi.mock("./api", async (importOriginal) => {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
       listRelationships: (...a: unknown[]) => listRelationships(...a),
+      listLinks: (...a: unknown[]) => listLinks(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -51,7 +57,8 @@ vi.mock("./api", async (importOriginal) => {
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       timeline: (...a: unknown[]) => playerTimeline(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a)
+      listRelationships: (...a: unknown[]) => playerListRelationships(...a),
+      listLinks: (...a: unknown[]) => playerListLinks(...a)
     }
   };
 });
@@ -97,6 +104,9 @@ const renderWorkspace = () => render(<ToastProvider><CodexWorkspace gmToken="gm"
 const gmDefaults = () => {
   listPages.mockResolvedValue(PAGES);
   listRelationships.mockResolvedValue([]);
+  listLinks.mockResolvedValue([]);
+  markersForPage.mockResolvedValue([]);
+  forPage.mockResolvedValue([]);
   listFolders.mockResolvedValue([]);
   getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
   search.mockResolvedValue([]);
@@ -121,6 +131,7 @@ const playerDefaults = () => {
   // Oldest first, as the server's revealed timeline arrives.
   playerTimeline.mockResolvedValue([PLAYER_OLDER, PLAYER_ENTRY]);
   playerListRelationships.mockResolvedValue([]);
+  playerListLinks.mockResolvedValue([]);
   getCalendar.mockResolvedValue(CALENDAR);
 };
 

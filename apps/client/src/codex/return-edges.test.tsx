@@ -13,6 +13,9 @@ vi.mock("./MapSurface", () => ({
 
 const listPages = vi.fn();
 const listRelationships = vi.fn();
+const listLinks = vi.fn();
+const markersForPage = vi.fn();
+const forPage = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
@@ -31,11 +34,13 @@ vi.mock("./api", async (importOriginal) => {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
       listRelationships: (...a: unknown[]) => listRelationships(...a),
+      listLinks: (...a: unknown[]) => listLinks(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     atlasApi: {
       ...actual.atlasApi,
@@ -99,6 +104,9 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
     search.mockResolvedValue([]);
@@ -157,6 +165,9 @@ describe("Journal entry → its combat replay (CI-6)", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
     search.mockResolvedValue([]);

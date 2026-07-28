@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexJournalEntry, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
@@ -29,6 +29,11 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [view, setView] = useState<PlayerView>("campaign");
   const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
   const [rels, setRels] = useState<CodexRelationshipEdge[]>([]);
+  // CI-8: the player's wiki-link edges. Read from `playerCodexApi`, never `codexApi` — the server has
+  // already dropped every edge touching a page this player cannot see and every edge written in a GM
+  // body, and this surface renders only what its own token was sent. It adds no filter of its own,
+  // because a second gate here could only ever disagree with the one that counts.
+  const [links, setLinks] = useState<CodexLinkEdge[]>([]);
   const [filter, setFilter] = useState<{ type: EntityType | null; tag: string | null }>({ type: null, tag: null });
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [page, setPage] = useState<PlayerCodexPage | null>(null);
@@ -49,12 +54,15 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
 
   const load = useCallback(async () => {
     try {
-      const [nextPages, nextMaps, nextTimeline, nextRels, nextCalendar] = await Promise.all([
+      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar] = await Promise.all([
         playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.timeline(token), playerCodexApi.listRelationships(token),
+        // Uncaught, exactly like the typed-edge feed beside it: the two are the Graph's two halves, and
+        // half a graph drawn silently is worse than the error Alert this surface already shows (R4).
+        playerCodexApi.listLinks(token),
         // A missing calendar costs the dashboard one chip; it must not cost the player the whole codex.
         calendarApi.get(token).catch(() => null)
       ]);
-      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setCalendar(nextCalendar);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar);
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
@@ -147,7 +155,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
       )}
 
       {view === "graph" && (
-        <RelationshipGraph loading={loading} nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} onOpen={openPage}
+        <RelationshipGraph loading={loading} nodes={pages.map((summary) => ({ id: summary.id, title: summary.title, entityType: summary.entityType }))} edges={rels} links={links} onOpen={openPage}
           emptyState={<><h3>Nothing connected yet</h3><p>As the GM reveals people and places, the links between them appear here.</p></>} />
       )}
 

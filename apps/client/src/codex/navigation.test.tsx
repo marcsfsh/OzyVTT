@@ -6,6 +6,9 @@ vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn()
 
 const listPages = vi.fn();
 const listRelationships = vi.fn();
+const listLinks = vi.fn();
+const markersForPage = vi.fn();
+const forPage = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
@@ -22,11 +25,13 @@ vi.mock("./api", async (importOriginal) => {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
       listRelationships: (...a: unknown[]) => listRelationships(...a),
+      listLinks: (...a: unknown[]) => listLinks(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
     },
-    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a) },
     atlasApi: { ...actual.atlasApi, listMaps: (...a: unknown[]) => listMaps(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) }
   };
@@ -58,6 +63,9 @@ describe("Codex shell — cross-mode navigation", () => {
   beforeEach(() => {
     listPages.mockResolvedValue(PAGES);
     listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     search.mockResolvedValue([]);
     timeline.mockResolvedValue([]);

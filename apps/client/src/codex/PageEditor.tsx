@@ -4,6 +4,7 @@ import { codexApi, CodexRequestError, uploadCodexAsset, type CodexBacklink, type
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { PageTimeline } from "./PageTimeline";
+import { PageMarkers } from "./PageMarkers";
 import { RelationshipsPanel } from "./RelationshipsPanel";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { CodexIcon } from "./icons";
@@ -70,6 +71,12 @@ type PageEditorProps = Readonly<{
   onNavigate: (target: string) => void;
   /** Jump to the archived fight an auto-logged battle came from. GM-only: archives carry GM narration. */
   onOpenReplay?: (archiveId: number) => void;
+  /** CI-3: open one of this page's journal entries, on the Journal, with that entry focused. */
+  onOpenEntry?: (entryId: string) => void;
+  /** CI-4: open one of this page's atlas pins — its map first, then the pin (both halves, per R1). */
+  onOpenMarker?: (markerId: string, mapId: string) => void;
+  /** CI-5: open the Graph focused on this entity's own node. */
+  onShowInGraph?: (pageId: string) => void;
   onRelationshipsChanged: () => void;
 }>;
 
@@ -83,7 +90,7 @@ function wikiContext(value: string, caret: number): { start: number; query: stri
   return { start: open, query };
 }
 
-export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onOpenReplay, onRelationshipsChanged }: PageEditorProps) {
+export function PageEditor({ gmToken, page, pages, backlinks, relationships, onChange, onDeleted, onNavigate, onOpenReplay, onOpenEntry, onOpenMarker, onShowInGraph, onRelationshipsChanged }: PageEditorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<Draft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
@@ -399,15 +406,38 @@ export function PageEditor({ gmToken, page, pages, backlinks, relationships, onC
             </div>
           )}
           <RelationshipsPanel gmToken={gmToken} pageId={page.id} relationships={relationships} pages={pages} onChanged={onRelationshipsChanged} onOpen={onNavigate} />
-          {backlinks.length > 0 && (
-            <div className="codex-backlinks">
-              <h4 className="codex-backlinks-title">Linked from</h4>
-              <div className="codex-backlinks-list">
-                {backlinks.map((link) => <button key={link.sourcePageId} type="button" className="codex-md-link" onClick={() => onNavigate(link.sourceTitle)}>{link.sourceTitle}</button>)}
-              </div>
+          {/**
+            * CI-3 / CI-4 / CI-5: the page's return edges, in ONE place.
+            *
+            * The assessment's "star topology" is that every surface points into Pages and nothing points
+            * back out. Three separate buttons scattered down this rail would fix the topology and still
+            * read as three unrelated features; grouped, they read as the answer to a single question a
+            * GM actually asks — *where else does this entity appear?* — with one sub-heading per place
+            * it can appear: other pages, the atlas, the journal, the graph.
+            *
+            * Every row is a jump that prepares its destination (R1); the destinations themselves are
+            * owned by the workspace above, so each edge hands an id up rather than reaching into
+            * another mode. Each block states its own emptiness, so "nothing here" is a fact about the
+            * campaign rather than a gap in the panel.
+            */}
+          <section className="codex-connections" aria-labelledby="codex-connections-h">
+            <div className="codex-connections-head">
+              <h4 className="codex-backlinks-title" id="codex-connections-h">Connections</h4>
+              {/* CI-5. §4: composed from the `@vtt/ui` `Button` primitive, so the 44px floor arrives
+                  with it (route 2, `.nh-btn--sm` + `.tap-target`) — no new floor to argue about. */}
+              {onShowInGraph && <Button variant="ghost" size="sm" onClick={() => onShowInGraph(page.id)}>Show in graph</Button>}
             </div>
-          )}
-          <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} />
+            <div className="codex-connections-block">
+              <h5 className="codex-connections-sub">Linked from</h5>
+              {backlinks.length === 0
+                ? <p className="codex-page-timeline-empty">No other page links here yet.</p>
+                : <div className="codex-backlinks-list">
+                    {backlinks.map((link) => <button key={link.sourcePageId} type="button" className="codex-md-link" onClick={() => onNavigate(link.sourceTitle)}>{link.sourceTitle}</button>)}
+                  </div>}
+            </div>
+            <PageMarkers gmToken={gmToken} pageId={page.id} onOpenMarker={onOpenMarker} />
+            <PageTimeline gmToken={gmToken} pageId={page.id} onOpenReplay={onOpenReplay} onOpenEntry={onOpenEntry} />
+          </section>
         </aside>
       </div>
 

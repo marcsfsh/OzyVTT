@@ -6,11 +6,17 @@ vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn()
 
 const updatePage = vi.fn();
 const getPage = vi.fn();
+// The editor's Connections area (CI-3/CI-4) reads the page's journal entries and its atlas pins on
+// mount. Neither is what this file is about, and an unstubbed read would put its own R4 error Alert on
+// screen beside the save state these tests actually assert on.
+const markersForPage = vi.fn();
+const forPage = vi.fn();
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    codexApi: { ...actual.codexApi, updatePage: (...a: unknown[]) => updatePage(...a), getPage: (...a: unknown[]) => getPage(...a) }
+    codexApi: { ...actual.codexApi, updatePage: (...a: unknown[]) => updatePage(...a), getPage: (...a: unknown[]) => getPage(...a), markersForPage: (...a: unknown[]) => markersForPage(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a) }
   };
 });
 
@@ -48,6 +54,8 @@ describe("PageEditor save/conflict path", () => {
     getPage.mockReset();
     updatePage.mockResolvedValue({ ...page, rev: 4 });
     getPage.mockResolvedValue({ page: { ...page, rev: 9 }, backlinks: [], relationships: [] });
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
   });
 
   it("autosaves an edit, showing the in-flight state then settling", async () => {

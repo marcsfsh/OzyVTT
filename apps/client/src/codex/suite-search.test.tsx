@@ -13,6 +13,9 @@ vi.mock("./MapSurface", () => ({
 
 const listPages = vi.fn();
 const listRelationships = vi.fn();
+const listLinks = vi.fn();
+const markersForPage = vi.fn();
+const forPage = vi.fn();
 const listFolders = vi.fn();
 const getPage = vi.fn();
 const search = vi.fn();
@@ -28,6 +31,7 @@ const playerListMaps = vi.fn();
 const playerListMarkers = vi.fn();
 const playerTimeline = vi.fn();
 const playerListRelationships = vi.fn();
+const playerListLinks = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -37,6 +41,8 @@ vi.mock("./api", async (importOriginal) => {
       ...actual.codexApi,
       listPages: (...a: unknown[]) => listPages(...a),
       listRelationships: (...a: unknown[]) => listRelationships(...a),
+      listLinks: (...a: unknown[]) => listLinks(...a),
+      markersForPage: (...a: unknown[]) => markersForPage(...a),
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a)
@@ -47,7 +53,7 @@ vi.mock("./api", async (importOriginal) => {
       listAssets: (...a: unknown[]) => listAssets(...a),
       listMarkers: (...a: unknown[]) => listMarkers(...a)
     },
-    journalApi: { ...actual.journalApi, timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
+    journalApi: { ...actual.journalApi, forPage: (...a: unknown[]) => forPage(...a), timeline: (...a: unknown[]) => timeline(...a), forMarker: (...a: unknown[]) => forMarker(...a) },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     playerCodexApi: {
       ...actual.playerCodexApi,
@@ -56,7 +62,8 @@ vi.mock("./api", async (importOriginal) => {
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
       timeline: (...a: unknown[]) => playerTimeline(...a),
-      listRelationships: (...a: unknown[]) => playerListRelationships(...a)
+      listRelationships: (...a: unknown[]) => playerListRelationships(...a),
+      listLinks: (...a: unknown[]) => playerListLinks(...a)
     }
   };
 });
@@ -113,6 +120,9 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
     search.mockResolvedValue(HITS);
@@ -169,6 +179,9 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
     search.mockResolvedValue(HITS);
@@ -241,6 +254,9 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
+    listLinks.mockResolvedValue([]);
+    markersForPage.mockResolvedValue([]);
+    forPage.mockResolvedValue([]);
     listFolders.mockResolvedValue([]);
     getPage.mockResolvedValue({ page: null, backlinks: [], relationships: [] });
     search.mockResolvedValue(HITS);
@@ -306,6 +322,7 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     playerListMaps.mockResolvedValue([PLAYER_OTHER, PLAYER_MAP]);
     playerTimeline.mockResolvedValue([]);
     playerListRelationships.mockResolvedValue([]);
+    playerListLinks.mockResolvedValue([]);
     playerListMarkers.mockResolvedValue([PLAYER_MARKER]);
     // The server has ALREADY dropped everything this player may not see; the client renders what arrives.
     playerSearch.mockResolvedValue([HIT_MAP, HIT_MARKER]);
