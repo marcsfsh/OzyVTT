@@ -639,6 +639,24 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     warns and offers to reveal the map. The atlas fixture had no map to click, so this is pinned by five
     component tests instead — including the three quiet cases, because a warning that fires when nothing
     is wrong is noise. Three proven to fail with the warning removed.
+  - **M5 follow-ups from independent review.** The reviewer found that the graph hit-circle fix **did not
+    actually hold**, and it was right. `RelationshipGraph` returns early (Skeleton while loading, empty
+    state with no nodes), so the `<svg>` often does not exist on the render that mounts it — and the
+    `fitScale` observer was attached from a `useEffect(..., [])`, which ran once against a null ref,
+    bailed, and never retried. `fitScale` stayed at its `1` default and every node's "44px" circle came
+    out at the painted radius. **Reproduced at 14.8px** by switching to Graph while the pages fetch was
+    still in flight, then fixed with a ref *callback* (which fires exactly when the element appears) and
+    re-verified at 44.7px under the same race. Lesson worth keeping: my original browser check only ever
+    reached the Graph *after* data had loaded, so it could not have caught this — measuring the happy
+    path is not the same as measuring the floor.
+    Also from that review: `.codex-rail-error` was dead CSS after the `Alert` swap (removed); the
+    `.codex-world-recentitem` comment read as a claim about the current state rather than the
+    pre-fix measurement (reworded); and CD-5 plus `pruneCodexFields`/`CODEX_SECRET_FIELD_KEYS` had no
+    direct tests (added — 10 tests, and the CD-5 pair was proven to fail against the old check).
+  - **Precision note on CD-3.** The corrected server 409 string is real hygiene for any other API
+    consumer, but it does **not** reach the GM: `PageEditor` branches on `error.status === 409` and never
+    reads `error.message`, and `SaveState` renders its own fixed copy. The GM-facing half of CD-3 was
+    already done by M4's `SaveState` swap. Don't cite the server string as a user-facing fix.
   - **Verified.** `check` / `test` / `build` all exit 0. Client tests 14 → 22. All three themes cycled
     (dark/dusk/light computed colours correct); zero console errors; zero horizontal overflow in all five
     modes at 375px.

@@ -239,6 +239,14 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   form no longer offers the field, so the footgun is API-only; the contract keeps accepting it
   for now.
 
+- **[codex/ux] Switching a page's entity type silently drops the old type's field values.** Since M5 the
+  server prunes fields to the effective type (CD-2), and `PageEditor` filters the draft the instant the
+  GM picks a new type — with no confirmation. Switching to `note`, which carries no fields at all, wipes
+  every value. The data **is** recoverable: every save snapshots into `codex_page_revisions`, which is
+  never trimmed, so page History restores the old type together with its values. But a GM who doesn't
+  know to look there will read it as data loss. Raised by the M5 review; a confirmation step is a UX
+  addition beyond CD-2's approved scope, so it is recorded here rather than built.
+
 ## Gotchas that look like bugs (but aren't)
 
 - **[build] Stale `tsbuildinfo` can mask type errors** — web `check`/`build` are incremental

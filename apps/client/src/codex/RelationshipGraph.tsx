@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, RELATIONSHIP_TYPES, type EntityType } from "./entities";
@@ -95,8 +95,22 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
     if (typeof getComputedStyle !== "function") return 44;
     return Number(getComputedStyle(document.documentElement).getPropertyValue("--tap-min").trim().replace("px", "")) || 44;
   }, []);
-  useEffect(() => {
-    const element = svgRef.current;
+  /**
+   * Attached as the <svg>'s ref CALLBACK, not from an effect.
+   *
+   * This component returns early — a Skeleton while loading, an empty state with no nodes — so the
+   * <svg> frequently does not exist on the render that mounts it. A `useEffect(..., [])` therefore ran
+   * once against a null ref, bailed, and (empty deps) never retried: the observer was never attached
+   * for the life of that mount, `fitScale` stayed at its 1 default, and every node's "44px" hit circle
+   * came out at the painted radius. Reproduced at **14.8px** by switching to Graph while the pages
+   * fetch was still in flight. A ref callback fires exactly when the element appears or disappears,
+   * which is the actual condition, so the race cannot recur.
+   */
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const attachSvg = useCallback((element: SVGSVGElement | null) => {
+    svgRef.current = element;
+    observerRef.current?.disconnect();
+    observerRef.current = null;
     if (!element || typeof ResizeObserver !== "function") return;
     const measure = () => {
       const box = element.getBoundingClientRect();
@@ -105,8 +119,9 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
-    return () => { observer.disconnect(); };
+    observerRef.current = observer;
   }, []);
+  useEffect(() => () => { observerRef.current?.disconnect(); observerRef.current = null; }, []);
   const [hover, setHover] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<EntityType>>(new Set());
 
@@ -246,7 +261,7 @@ export function RelationshipGraph({ nodes, edges, onOpen, emptyState, loading = 
           <Button variant="ghost" size="sm" onClick={() => setView({ x: 0, y: 0, k: 1 })}>Reset</Button>
         </div>
       </div>
-      <svg ref={svgRef} className="codex-graph-svg" viewBox={`${VB.minX} ${VB.minY} ${VB.w} ${VB.h}`} preserveAspectRatio="xMidYMid meet"
+      <svg ref={attachSvg} className="codex-graph-svg" viewBox={`${VB.minX} ${VB.minY} ${VB.w} ${VB.h}`} preserveAspectRatio="xMidYMid meet"
         onWheel={onWheel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp} style={{ touchAction: "none" }}>
         <defs>
           <marker id="codex-graph-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path className="codex-graph-arrowhead" d="M0,0 L10,5 L0,10 z" /></marker>
