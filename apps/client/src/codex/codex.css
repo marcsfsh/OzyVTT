@@ -331,6 +331,8 @@
 .codex-descend-label { font-family: var(--font-mono); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
 .codex-descend-chip { display: inline-flex; align-items: center; gap: var(--space-1); background: var(--surface-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: var(--font-display); font-size: var(--fs-sm); padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); }
 .codex-descend-chip:hover { background: var(--surface-3); border-color: var(--cyan); }
+/* Selection owns the edge, hover owns the fill (design-language §5) — the atlas you are currently in. */
+.codex-descend-chip.is-current { border-color: var(--magenta); color: var(--text); }
 .codex-descend-arrow { color: var(--cyan); font-weight: 700; }
 .codex-descend-lock { font-size: var(--fs-2xs); opacity: 0.8; }
 

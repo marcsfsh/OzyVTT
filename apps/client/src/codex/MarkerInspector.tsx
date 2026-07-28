@@ -69,6 +69,9 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
   const availableScenes = scenes.filter((scene) => !marker.sceneIds.includes(scene.id));
   const danglingScenes = marker.sceneIds.filter((id) => !scenes.some((scene) => scene.id === id)).length;
   const secretLinkedPages = linkedPages.filter((page) => marker.revealedToPlayers && !page.revealedToPlayers);
+  // A linked actor that has since been removed from the roster would otherwise render as "— none —"
+  // while the id quietly persists on the marker — same honesty the scene links already get.
+  const danglingActor = marker.actorId !== null && !actors.some((actor) => actor.id === marker.actorId);
 
   return (
     <aside className="codex-inspector" aria-label="Marker">
@@ -148,6 +151,7 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
             <option value="">— none —</option>
             {actors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
           </Select>
+          {danglingActor && <p className="codex-inspector-hint">The linked actor no longer exists — <button type="button" className="codex-linklike" onClick={() => patch({ actorId: null })}>clear it</button>.</p>}
         </Field>
       )}
 

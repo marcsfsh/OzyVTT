@@ -82,6 +82,10 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   // Drill-down: revealed maps nested under the current one (breadcrumb goes up, these go down). `maps` is
   // already the server's revealed-only projection, so only shared child maps ever appear here.
   const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
+  // Mirrors the GM atlas: the breadcrumb only climbs one chain, so several revealed top-level maps need
+  // their own switcher or all but the first are unreachable. Already the revealed-only projection.
+  const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
+  const currentRootId = breadcrumb[0]?.id ?? null;
 
   return (
     <div className="codex-root codex-player">
@@ -162,6 +166,14 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
 
       {view === "atlas" && (
         <div className="codex-atlas">
+          {rootMaps.length > 1 && (
+            <nav className="codex-atlas-descend" aria-label="Top-level maps">
+              <span className="codex-descend-label">Top level</span>
+              {rootMaps.map((root) => (
+                <button key={root.id} type="button" className={`codex-descend-chip${root.id === currentRootId ? " is-current" : ""}`} aria-current={root.id === currentRootId ? "true" : undefined} onClick={() => setCurrentMapId(root.id)}>{root.name}</button>
+              ))}
+            </nav>
+          )}
           <nav className="codex-breadcrumb" aria-label="Map path">
             {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
             {breadcrumb.map((map, index) => <span key={map.id}>{index > 0 && <span className="codex-crumb-sep">›</span>}<button type="button" className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`} onClick={() => setCurrentMapId(map.id)}>{map.name}</button></span>)}

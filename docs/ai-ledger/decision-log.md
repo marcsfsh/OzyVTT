@@ -224,6 +224,20 @@ tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
 - **Public integration API reuses the same command/authorization/projection layer — never a
   parallel path** (RISK-004), and the served `openApiDocument` stays byte-identical to
   `packages/api-contract`. (ADR-0016)
+- **Map name/kind/parent and Delete map live in one "Map settings" modal (2026-07-28).** M1 had to add
+  three map controls (rename, retype, re-parent — CP-4/CP-5) to an atlas bar that already held a reveal
+  switch, Add marker, Add sub-map and Delete map. Rather than grow the bar to seven controls (which reads
+  badly at 390px and fights design-language §5's "one primary action per view"), the three new controls plus
+  the **existing Delete map** moved into a single `Modal`. **Relocating Delete map traces to no requirement**
+  and is recorded here as a deliberate, reversible UX decision, not silent scope: the destructive action is
+  unchanged in behaviour (same `useConfirm` flow), it is simply no longer a bare button in the toolbar.
+- **The atlas is a forest and needs a root switcher, not just a breadcrumb (2026-07-28).** The data model
+  always allowed several root maps, but every navigation affordance was single-tree: the breadcrumb climbs
+  one parent chain and drill chips only descend. Creating a second root (CP-6) therefore produced a map that
+  became unreachable as soon as the Atlas remounted. Durable rule: **any surface that lets a forest be
+  created must also let every root be reached.** Implemented as a "Top level" chip row shown when more than
+  one root exists, mirrored in the player atlas (which reads the revealed-only projection, so it needs no
+  extra viewer-safety handling).
 - **Worldbuilding codex lives OUTSIDE `GameState` (2026-07-24).** The living atlas + two-layer wiki +
   campaign journal persist in a dedicated `CodexStore` (own tables in `data/vtt.sqlite`), fetched on
   demand over a `/api/v1/codex` REST router — NOT in the projected `GameState` blob (which

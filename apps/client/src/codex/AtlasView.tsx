@@ -74,6 +74,10 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
   // Maps nested directly under the current one — the breadcrumb walks UP the parent chain, so these
   // "drill into" chips are the way DOWN (without them a regional child map is unreachable once you leave it).
   const childMaps = useMemo(() => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []), [maps, currentMapId]);
+  // The atlas is a FOREST, not one tree. The breadcrumb only climbs a single chain, so without this row a
+  // second root map becomes unreachable the moment you leave it (the view remounts onto the first root).
+  const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
+  const currentRootId = breadcrumb[0]?.id ?? null;
   const enterMap = useCallback((mapId: string) => { setSelectedMarkerId(null); setCurrentMapId(mapId); }, []);
 
   const createFromAsset = async (asset: MapAsset) => {
@@ -142,6 +146,17 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
 
   return (
     <div className="codex-atlas">
+      {rootMaps.length > 1 && (
+        <nav className="codex-atlas-descend" aria-label="Top-level maps">
+          <span className="codex-descend-label">Top level</span>
+          {rootMaps.map((root) => (
+            <button key={root.id} type="button" className={`codex-descend-chip${root.id === currentRootId ? " is-current" : ""}`} aria-current={root.id === currentRootId ? "true" : undefined} onClick={() => enterMap(root.id)}>
+              {root.name}
+              {!root.revealedToPlayers && <span className="codex-descend-lock" title="GM-only — players can't see this map yet" aria-label="GM-only">🔒</span>}
+            </button>
+          ))}
+        </nav>
+      )}
       <div className="codex-atlas-bar">
         <nav className="codex-breadcrumb" aria-label="Map path">
           {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
@@ -204,7 +219,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
           </div>
         )}
       </Modal>
-      <Modal open={settingsOpen && !!currentMap} onClose={() => setSettingsOpen(false)} title="Map settings" size="sm" ariaLabel="Map settings">
+      <Modal open={settingsOpen && !!currentMap} onClose={() => { void renameMap(); setSettingsOpen(false); }} title="Map settings" size="sm" ariaLabel="Map settings">
         {currentMap && (
           <div className="codex-map-settings">
             <Field label="Name" htmlFor="map-name">

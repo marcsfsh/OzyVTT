@@ -631,6 +631,22 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
     2), and cannot find an unrevealed page at all ("Strahd" → 0 hits).
   - **A-1 acceptance criterion met:** the `codex/api.ts` call-site sweep now reports **zero** client API
     methods with no callers (was five).
+  - **Independent review + follow-up fixes (same day).** A fresh-context reviewer checked M1 against the
+    spec, plan, acceptance criteria and the diff. Verdict: **accepted with follow-ups**; it independently
+    re-confirmed CD-1 across all seven draft-loss paths, re-swept A-1 (48 methods, zero unreachable),
+    and confirmed viewer safety and that no M4/M5 work was pulled forward. It found **one major defect the
+    implementer's own browser pass had missed**: CP-6 created a second root map but nothing could *navigate
+    back to it* — `loadMeta` defaults to `nextMaps[0]`, the breadcrumb only climbs one chain, drill chips
+    only descend, and `CodexWorkspace` unmounts `AtlasView` on every mode change, so a second root vanished
+    after one tab switch (same gap in the player atlas). The original verification asserted the *toggle
+    existed*, not that the map it created was reachable — a shallow check. Fixed by a **"Top level" chip
+    row** (shown when more than one root exists, reusing the drill-chip pattern; current root marked on the
+    edge per design-language §5) in both `AtlasView` and `PlayerCodex`. Also fixed: a dangling `actorId`
+    rendered as "— none —" while the id persisted (now offers to clear it, matching the scene-link
+    behaviour), and a typed map rename was discarded when the settings modal was dismissed with Escape.
+    Re-verified live at 1440px and 390px on a three-root atlas: every root listed, reachable, and **still
+    reachable after leaving and re-entering the Atlas**; drill-down unaffected; no overflow; no console
+    errors. `check` + `test` (765) + `build` green; A-1 still holds.
   - **Deviation from the milestone plan (recorded).** The plan's Owns list named 4 files and "server: none".
     Server: none held. Files were **7** — the four plus `CodexWorkspace.tsx` + `main.tsx` (the `actors` prop
     chain for CP-7) and `codex.css` (two layout classes). No server, contract or projection changes.
