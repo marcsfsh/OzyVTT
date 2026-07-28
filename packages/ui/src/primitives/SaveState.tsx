@@ -25,7 +25,9 @@ export interface SaveStateProps {
        magenta band and reserves violet for GM-only, so no state may be carried by hue
        (design-language §2). Every status below differs by word first, glyph second,
        colour third. Colour uses `--text-dim` / `--caution-hi` / `--danger-hi` and
-       never `--text-muted`, which is 3.61:1 and fails AA.
+       never `--text-muted`, which fails AA on every surface it is likely to sit on —
+       measured 3.53:1 on --surface-1 dark, 3.80:1 dusk, 4.17:1 on --surface-3 light
+       (2026-07-28, Chromium). That token is a known systemic gap, not a local one.
     3. **The two states that need an action get one.** A readout the GM cannot act on
        is exactly the state that most needs reading: conflict offers Reload, error
        offers Retry.

@@ -67,12 +67,29 @@
 .nh-menu-caret { font-size: 0.8em; color: var(--text-dim); transition: transform var(--dur-hover) var(--ease-settle); }
 .nh-menu[open] .nh-menu-caret { transform: rotate(180deg); }
 
+/* ---- Popover ----
+   Viewport clamp (CLAUDE.md rule 5: no horizontal overflow down to a 320px floor).
+   A trigger can sit anywhere — the Codex rail's "New" button lands at x≈280 inside a
+   375px phone — and `left: 0` alone put this box's right edge at 472, widening the
+   document by 97px and shoving a tab off the app's mode strip. Two halves, both here in
+   the primitive so no caller has to remember `align="end"` to stay on screen:
+
+     1. `max-width` caps the box to the viewport minus a gutter, and `min-width` stops
+        insisting on 12rem once the viewport is narrower than that. The min() only bites
+        below a ~216px viewport, so at 320px the popover is still a full 12rem and labels
+        never truncate — shrinking the box was never the fix, moving it is.
+     2. `--nh-menu-shift` is written by Menu.tsx on open (and on resize while open) to
+        slide the box back inside. It rides the `translate` PROPERTY, not `transform`,
+        because `.anim-popover`'s entrance keyframes own `transform`. */
 .nh-menu-popover {
+  --nh-menu-gutter: var(--space-2);
   position: absolute;
   z-index: 40;
   top: calc(100% + var(--space-1));
   left: 0;
-  min-width: 12rem;
+  min-width: min(12rem, calc(100vw - 2 * var(--nh-menu-gutter)));
+  max-width: calc(100vw - 2 * var(--nh-menu-gutter));
+  translate: var(--nh-menu-shift, 0) 0;
   padding: var(--space-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
