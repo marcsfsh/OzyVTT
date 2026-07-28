@@ -77,6 +77,38 @@ export type EquipmentRecordLike = RiderBlockLike & Readonly<{
 }>;
 export type FeatRecordLike = Readonly<{ id: string; name: string; feature: RiderBlockLike }>;
 
+/**
+ * The rider families `buildCharacterDefinition`'s `interpretFeature` FOLDS INTO the ActorDefinition
+ * at build time, and which therefore must NOT be collected again from a feat carrier below.
+ *
+ * This list and `character-build.ts`'s `CARRIER_RIDER_DISPOSITION` are the two halves of ONE
+ * partition of the 21-variant vocabulary, and the partition is what rules out double-counting:
+ *
+ *   - THESE EIGHT describe a permanent change to the SHAPE OF THE SHEET, and baking is the correct
+ *     reading for a feat specifically (`ITEM_REFUSED_MODIFIER_TYPES`' own note: "Both stay fully
+ *     available on a FEATURE or FEAT carrier, where baking is correct: a feat is granted once and
+ *     never un-granted"). `ability-score` is already inside `definition.abilityScores`,
+ *     `hit-points-per-level` inside `hitPoints.maximum`, `speed` inside `speedFeet`, `armor-class`
+ *     inside `armorClass` + the `armorClassBonus` extension, `initiative` inside `initiativeBonus`,
+ *     `extra-attack` inside each action's `attack.count`, `unarmored-defense` inside `armorClass`.
+ *     Collecting any of them here would apply the feat's bonus a SECOND time on every read.
+ *     `darkvision` is in the list because the builder's switch claims it as an explicit display-only
+ *     no-op; leaving it out would split ownership of one variant across both files.
+ *   - EVERYTHING ELSE is inherently roll-time (a `roll-mode`, a trigger-gated `attack-bonus`, a
+ *     crit-only `extra-damage`) or live state (`spell-slot`, `resource-bonus`), which a build-time
+ *     fold structurally cannot express. Those become carriers, read by the SAME `collectRiders` an
+ *     item's riders go through.
+ *
+ * It lives HERE, next to the filter that reads it, rather than in `character-build.ts` where the
+ * baking happens: this module imports no other server module, so `character-build.ts` can import it
+ * without a cycle, while the reverse would drag the whole content library into a leaf.
+ */
+export const BUILDER_BAKED_MODIFIER_TYPES = [
+  "ability-score", "hit-points-per-level", "speed", "armor-class",
+  "initiative", "extra-attack", "unarmored-defense", "darkvision"
+] as const;
+const BUILDER_BAKED: ReadonlySet<string> = new Set(BUILDER_BAKED_MODIFIER_TYPES);
+
 export type EquipmentCatalog = Readonly<{
   equipmentRecord: (id: string) => EquipmentRecordLike | undefined;
   featRecord?: (id: string) => FeatRecordLike | undefined;
@@ -186,6 +218,59 @@ function bearerContext(actor: Actor, definition: ActorDefinition | undefined, ac
   };
 }
 
+/**
+ * THE CHARACTER'S OWN FEATS, as rider carriers - the fix for the asymmetry where a feat granted by an
+ * ITEM got all 21 rider variants (it became a carrier at the `grantsFeatIds` fold below) while the
+ * SAME feat taken in the character builder got only the 8 `interpretFeature` folds, the other 13
+ * falling through a `switch` with no `default` and vanishing without a trace.
+ *
+ * RECOMPUTED PER CALL rather than persisted on the definition, deliberately:
+ *
+ *   - the ids are already on `definition.character.feats` (the builder writes the origin feat and
+ *     every chosen feat there), and the riders already live on the catalog's feat record - so
+ *     persisting them would be a THIRD copy of data that exists twice, free to drift when the GM
+ *     edits a homebrew feat. Recomputing means an edited feat is correct on the next read.
+ *   - storing them would need an additive field on `ActorDefinitionSchema` (@vtt/schemas), whose
+ *     `character.feats` entry is `.strict()`, plus the matching projection review that any new
+ *     definition field needs. Recomputing adds NO state at all, so there is nothing to project and
+ *     nothing to leak - the same argument `deriveEquipment`'s header makes for the whole block.
+ *   - it inherits replace-whole-is-the-un-grant for free. A respec that rewrites `character.feats`
+ *     is correct on the next read with no migration.
+ *
+ * The cost is one catalog map lookup per feat (at most a handful) on every derivation. That is the
+ * same order as the item loop this function sits next to, and the header above already declines to
+ * memoize that for correctness reasons.
+ *
+ * Carriers get NO `sourceItemId`: a feat is worn by the BEARER, not by an item, so `collectRiders`
+ * scopes its riders to the bearer and they apply to every action - which is the whole point.
+ */
+function characterFeatCarriers(definition: ActorDefinition | undefined, catalog: EquipmentCatalog): readonly RiderCarrier[] {
+  const feats = definition?.character?.feats ?? [];
+  if (feats.length === 0 || !catalog.featRecord) return [];
+  const carriers: RiderCarrier[] = [];
+  for (const held of feats) {
+    // Fail open exactly like an item with no catalog record: an imported sheet's unknown feat, or a
+    // homebrew feat the GM has since deleted, contributes prose only rather than throwing.
+    const record = catalog.featRecord(held.id);
+    if (!record) continue;
+    const modifiers = (record.feature.modifiers ?? []).filter(ridesOnTheBearer);
+    if (modifiers.length > 0) carriers.push({ label: record.name, modifiers });
+  }
+  return carriers;
+}
+
+/** Which of a feat's authored riders this carrier may hand to the collector. */
+function ridesOnTheBearer(modifier: RiderModifier): boolean {
+  // Already inside the definition's own numbers - see BUILDER_BAKED_MODIFIER_TYPES.
+  if (BUILDER_BAKED.has(modifier.type)) return false;
+  // `scope: "this-item"` names an item this carrier does not have. `scopeOf` in @vtt/rules-5e
+  // DEGRADES that to `"bearer"` for a carrier with no `sourceItemId`, which would silently turn an
+  // authored "only when swinging this weapon" into "always" - the exact failure mode `passes`'
+  // `default: return false` exists to prevent. So it fails CLOSED here instead. (The right long-term
+  // home for this is a publish-time authoring error on the homebrew validator, not a silent drop.)
+  return modifier.scope !== "this-item";
+}
+
 type ActiveItem = Readonly<{ item: InventoryItem; record: EquipmentRecordLike | undefined }>;
 /** `effectiveSlot` input: the catalog's mechanical slot wins, then the row's marker, then category. */
 const slotView = (entry: ActiveItem) => ({ slot: entry.record?.slot ?? entry.item.magic?.slot, category: entry.item.category });
@@ -220,9 +305,14 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
     equipped.push(entry);
     if (itemIsActive(item, record)) active.push(entry);
   }
-  if (equipped.length === 0) return EMPTY_DERIVATION;
+  // A character's own feats carry riders whether or not they are holding anything, so the
+  // nothing-equipped shortcut has to clear BOTH sources before it can return the empty block.
+  const featCarriers = characterFeatCarriers(definition, catalog);
+  if (equipped.length === 0 && featCarriers.length === 0) return EMPTY_DERIVATION;
+  /** Feats the character already HOLDS - so an item that grants one they have adds nothing twice. */
+  const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
 
-  const carriers: RiderCarrier[] = [];
+  const carriers: RiderCarrier[] = [...featCarriers];
   const featIds: Array<{ id: string; name: string; sourceItemId: string }> = [];
   const actions: ActorAction[] = [];
   const sources: Array<{ itemId: string; itemName: string; summary: string }> = [];
@@ -254,6 +344,9 @@ export function deriveEquipment(actor: Actor, definition: ActorDefinition | unde
       for (const cast of record.casts ?? []) actions.push(castAction(item.id, cast, label));
       // Depth 1: the feat's riders join THIS block, so unequipping removes them in one recomputation.
       for (const featId of record.grantsFeatIds ?? []) {
+        // The bearer already took this feat in the builder, where it is ALREADY a carrier (and its
+        // baked half is already in the definition). Granting it again would double every rider on it.
+        if (heldFeatIds.has(featId)) continue;
         const feat = catalog.featRecord?.(featId);
         if (!feat) continue;
         featIds.push({ id: feat.id, name: feat.name, sourceItemId: item.id });

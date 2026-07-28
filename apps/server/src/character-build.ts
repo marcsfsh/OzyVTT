@@ -10,9 +10,11 @@ import {
   validateAbilityFormula, type Ability, type ClassProgressionTable
 } from "@vtt/rules-5e";
 import type {
-  BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureOption, FeatureRecord, SpeciesReference, SubclassReference
+  BackgroundReference, ClassLevelRow, ClassReference, FeatReference, FeatureModifier, FeatureOption,
+  FeatureRecord, SpeciesReference, SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import type { ContentView } from "./content-library.js";
+import { BUILDER_BAKED_MODIFIER_TYPES } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -171,6 +173,65 @@ type InterpretedFeatures = {
   unarmoredDefense: { ability: Ability; allowShield: boolean } | null;
 };
 
+// ---------------------------------------------------------------------------------------------
+// WHO OWNS WHICH RIDER. The vocabulary is 21 variants (`FeatureModifierSchema`); this fold owns 8
+// and the roll-time collector owns the other 13. Both halves are named, so neither can grow a hole.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Compile-time claim that every literal in `BUILDER_BAKED_MODIFIER_TYPES` is really in the authored
+ * vocabulary. `equipment-derivation.ts` cannot name `FeatureModifier` (it declares its rider views
+ * structurally on purpose), so the check has to happen here - and without it a typo in that list
+ * would leave `CarrierRiderType` below silently over-wide instead of failing.
+ */
+BUILDER_BAKED_MODIFIER_TYPES satisfies readonly FeatureModifier["type"][];
+type CarrierRiderType = Exclude<FeatureModifier["type"], (typeof BUILDER_BAKED_MODIFIER_TYPES)[number]>;
+
+/**
+ * THE OTHER HALF OF THE PARTITION, and the reason it is a `Record` rather than a comment: TypeScript
+ * requires a key for EVERY member of `CarrierRiderType`, so adding a 22nd variant to
+ * `FeatureModifierSchema` without deciding who reads it stops this file compiling.
+ *
+ * These thirteen are NOT folded into the definition, because a build-time number cannot express them:
+ * `roll-mode` is advantage at a moment, `critical-range` is a threshold the attack path reads,
+ * `extra-damage` is dice rolled on a hit, `spell-slot`/`resource-bonus` are live maxima. They reach
+ * the table as RIDER CARRIERS instead - `deriveEquipment` turns the character's `character.feats`
+ * into carriers with no `sourceItemId`, and the same `collectRiders` that serves a magic item serves
+ * them. That is why `interpretFeature` does not grow thirteen new cases.
+ *
+ * The value records where each is actually consumed, so an authored rider that reaches nothing is a
+ * KNOWN gap rather than a surprise. `"unread"` means the vocabulary and the collector carry it but no
+ * consumer applies it YET - the same for an item, so it is a pre-existing engine gap, not a feat one.
+ */
+const CARRIER_RIDER_DISPOSITION: Readonly<Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only">> = {
+  "attack-bonus": "standing",        // effective-actions folds it into attack.bonus; action-resolution adds the on-attack-roll half
+  "save-bonus": "standing",          // saving-throws.ts saveRiderBonus (standing + on-saving-throw)
+  "spell-save-dc": "standing",       // effective-actions folds it into save.dc
+  "spell-slot": "standing",          // spellSlotMaxima, via derivation.spellSlots
+  "resource-bonus": "standing",      // effective-actions usesBonus raises uses.limit
+  "critical-range": "standing",      // effective-actions criticalThreshold
+  "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
+  "roll-mode": "at-its-moment",      // attacks (action-resolution), saves (saving-throws), initiative (encounter)
+  "extra-damage": "at-its-moment",   // action-resolution rolls it as its own typed damage entry
+  "check-bonus": "unread",           // reaches derivation.checkBonus; no ability-check path reads it yet
+  "spell-attack-bonus": "unread",    // reaches derivation.spellAttackBonus; no spell-attack path reads it yet
+  "damage-reduction": "unread",      // no incoming-damage path collects riders at all yet
+  "sense": "display-only"            // like `darkvision`: the trait prose carries it; no definition field models senses
+};
+
+/**
+ * The intentional NO-OP for a rider the roll-time collector owns, named so the `default` case below
+ * reads as a decision instead of a fallthrough.
+ *
+ * THE GUARD IS THE PARAMETER TYPE. In `default:` the modifier is narrowed to exactly the variants no
+ * `case` claimed, so passing it here asserts at COMPILE time that each of them is in the partition
+ * above. The thirteen riders this fix restores were lost precisely because that switch had no
+ * `default` and nothing anywhere named the variants it did not handle.
+ */
+function ownedByTheRollTimeCollector(modifier: { type: CarrierRiderType }): string {
+  return CARRIER_RIDER_DISPOSITION[modifier.type];
+}
+
 /** Resolve a feature's limited uses to a flat count using the character's own numbers. */
 function resolvedUseLimit(uses: NonNullable<FeatureRecord["uses"]>, context: BuildContext): number {
   if (uses.limit !== undefined) return uses.limit;
@@ -274,6 +335,10 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
       case "extra-attack": into.extraAttacks += modifier.count; break;
       case "unarmored-defense": into.unarmoredDefense = { ability: modifier.ability, allowShield: modifier.allowShield }; break;
       case "darkvision": break; // display-only: the trait prose carries the senses; no definition field models them
+      // The other THIRTEEN. Not folded here on purpose - see `CARRIER_RIDER_DISPOSITION`. A feat
+      // reaches them through `deriveEquipment`'s feat carriers and the shared `collectRiders`; a
+      // class/species/background feature does NOT yet (see the note at the head of step 6).
+      default: ownedByTheRollTimeCollector(modifier); break;
     }
   }
 }
@@ -619,6 +684,12 @@ export function buildCharacterDefinition(input: CharacterCreateRequestInput, lib
   }
 
   // ---- 6. Interpret every granted feature (class, subclass, species, background, chosen feats). ----
+  // This fold owns 8 of the 21 rider variants; the other 13 are roll-time and are read from the
+  // character's FEATS as carriers by `deriveEquipment` (see `CARRIER_RIDER_DISPOSITION`). Feats are
+  // reachable there because `character.feats` records their ids; a class feature, subclass feature,
+  // species trait, background feature or chosen inline OPTION is not recorded by id on the
+  // definition at all, so its 13 roll-time riders still stop here. Closing that needs somewhere on
+  // the definition to record which feature records a sheet holds, which is a schema change.
   const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
   const context: BuildContext = { level: input.level, proficiencyBonus, finalScores, spellcastingAbility: casting?.ability ?? null };
   const interpreted: InterpretedFeatures = {
