@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
+import { projectGmLinkEdges, projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -705,5 +705,223 @@ describe("CodexStore media visibility (page images)", () => {
     expect(store.isPageAssetVisibleToPlayers(banner)).toBe(true);   // banner of a revealed page
     expect(store.isPageAssetVisibleToPlayers(inline)).toBe(true);   // inline in the revealed player body
     expect(store.isPageAssetVisibleToPlayers(gmOnly)).toBe(false);  // referenced only in gmBody → stays hidden
+  });
+});
+
+/**
+ * CI-4. `GET /codex/pages/:id/markers` gates a player TWICE: the router refuses an unrevealed page, and
+ * `projectPlayerPageMarker` refuses individual pins. An HTTP test proves the pipeline is safe; it cannot
+ * prove WHICH layer did the work — exactly the blind spot the CI-1 SQL tests above exist for (weakening
+ * one layer there left all 787 tests green because the other quietly caught it). These call the store and
+ * the projection directly, underneath the router, so the pin gate is verified on its own.
+ */
+describe("Codex page→marker reverse lookup — the store and projection layers, on their own (CI-4)", () => {
+  const context = (marker: ReturnType<CodexStore["getMarker"]>, mapRevealed: boolean, revealedPageIds: string[] = []) =>
+    ({ marker: marker!, mapRevealed, revealedPageIds: new Set(revealedPageIds), subMapRevealed: false });
+
+  it("the store's reverse lookup is deliberately UNGATED — one gate, in the projection, or the layers can mask each other", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Amberhold", kind: "regional" }); // secret
+    const page = store.createPage({ title: "The Amber Temple" });                                        // secret
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Vaults", pageIds: [page.id] });
+    // Raw GM-grade rows, hidden pin on a hidden map included. If this ever starts filtering, the HTTP
+    // tests would still pass while the audited projection silently stopped being the thing that decides.
+    expect(store.markersForPage(page.id).map((row) => row.id)).toEqual([marker.id]);
+    expect(store.markersForPage(page.id)[0].revealedToPlayers).toBe(false);
+  });
+
+  it("refuses a REVEALED pin standing on a SECRET map (CD-6), at the projection", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Amberhold", kind: "regional" });
+    const page = store.createPage({ title: "The Amber Temple", revealedToPlayers: true });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Vaults", pageIds: [page.id], revealedToPlayers: true });
+    expect(store.getMarker(marker.id)!.revealedToPlayers).toBe(true);  // the pin is shown...
+    expect(store.getMap(map.id)!.revealedToPlayers).toBe(false);       // ...its map is not
+    expect(projectPlayerPageMarker(context(store.getMarker(marker.id), false, [page.id]))).toBeNull();
+    // Revealing the map lets it through, so the null above is the map gate and not a broken projection.
+    expect(projectPlayerPageMarker(context(store.getMarker(marker.id), true, [page.id]))).not.toBeNull();
+  });
+
+  it("refuses a hidden pin even on a revealed map, at the projection", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Vallaki", kind: "regional", revealedToPlayers: true });
+    const page = store.createPage({ title: "Ireena", revealedToPlayers: true });
+    const marker = store.createMarker(map.id, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Vistani camp", pageIds: [page.id] });
+    expect(projectPlayerPageMarker(context(store.getMarker(marker.id), true, [page.id]))).toBeNull();
+  });
+
+  it("passes a visible pin, and hands back exactly what the forward marker projection hands back", () => {
+    const map = store.createMap({ assetId: crypto.randomUUID(), name: "Vallaki", kind: "regional", revealedToPlayers: true });
+    const shown = store.createPage({ title: "Ireena", revealedToPlayers: true });
+    const secret = store.createPage({ title: "The Heart of Sorrow" });
+    const marker = store.createMarker(map.id, {
+      x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Burgomaster's house",
+      pageIds: [shown.id, secret.id], sceneIds: [crypto.randomUUID()], actorId: crypto.randomUUID(), revealedToPlayers: true
+    });
+    const row = store.getMarker(marker.id)!;
+    const projected = projectPlayerPageMarker(context(row, true, [shown.id]))!;
+    // Reached by page id or by map id, a player must receive the identical pin - it projects THROUGH
+    // `projectPlayerMarker` rather than reimplementing it, so the two reads cannot drift apart.
+    expect(projected).toEqual(projectPlayerMarker(row, { revealedPageIds: new Set([shown.id]), subMapRevealed: false }));
+    expect(projected.pageIds).toEqual([shown.id]);   // the still-secret page link is filtered out
+    expect(projected).not.toHaveProperty("sceneIds");
+    expect(projected).not.toHaveProperty("actorId");
+  });
+});
+
+/**
+ * CI-8. Same reasoning: `GET /codex/links` decides visibility in `projectPlayerLinkEdges`, and the store
+ * feeding it is ungated on purpose. These prove each rule at the projection, not only end to end.
+ */
+describe("Codex whole-graph wiki-link feed — the store and projection layers, on their own (CI-8)", () => {
+  const revealedIds = () => new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+
+  it("the store's link feed is deliberately UNGATED — both layers, every reveal state", () => {
+    const target = store.createPage({ title: "Vallaki" });                                    // secret
+    const source = store.createPage({ title: "Barovia", gmBody: "Answers to [[Vallaki]]." }); // secret, GM-layer link
+    expect(store.listAllLinks()).toEqual([{ fromPageId: source.id, toPageId: target.id, layer: "gm" }]);
+  });
+
+  it("refuses a GM-BODY link even when both endpoints are revealed", () => {
+    const target = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const source = store.createPage({ title: "Barovia", gmBody: "Its burgomaster answers to [[Vallaki]].", revealedToPlayers: true });
+    const edges = store.listAllLinks();
+    expect(projectGmLinkEdges(edges)).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+    expect(projectPlayerLinkEdges(edges, revealedIds())).toEqual([]);
+    // Moving the very same link into the player body lets it through — so the miss is the LAYER rule.
+    store.updatePage(source.id, { gmBody: "", playerBody: "Ruled from [[Vallaki]]." }, undefined, "test");
+    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+  });
+
+  it("refuses a player-body link when EITHER endpoint is unrevealed, so no dangling edge names a secret page", () => {
+    const secret = store.createPage({ title: "The Whispered Name" });
+    const source = store.createPage({ title: "Barovia", playerBody: "Watched by [[The Whispered Name]].", revealedToPlayers: true });
+    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([]);   // hidden TARGET
+    store.setPageRevealed(secret.id, true);
+    store.setPageRevealed(source.id, false);
+    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([]);   // hidden SOURCE
+    store.setPageRevealed(source.id, true);
+    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: secret.id }]);
+  });
+
+  it("resolves targets by title key, and drops self-links and links to titles no page carries", () => {
+    const page = store.createPage({ title: "Barovia", playerBody: "See [[  barovia  ]] and [[A Page Never Written]].", revealedToPlayers: true });
+    expect(store.listAllLinks()).toEqual([]);   // the self-link normalizes to this very page; the other has no node
+    // A link that DOES resolve proves the title-key matching itself works (case/whitespace insensitive).
+    const other = store.createPage({ title: "Castle  Ravenloft", revealedToPlayers: true });
+    store.updatePage(page.id, { playerBody: "Looms over it: [[castle ravenloft]]." }, undefined, "test");
+    expect(store.listAllLinks()).toEqual([{ fromPageId: page.id, toPageId: other.id, layer: "player" }]);
+  });
+
+  it("collapses a target linked from BOTH bodies into ONE player-layer edge", () => {
+    const target = store.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const source = store.createPage({ title: "Barovia", playerBody: "Ruled from [[Vallaki#Rule]].", gmBody: "[[Vallaki]] hides the coffin.", revealedToPlayers: true });
+    // The player body genuinely carries it, so the edge is player-visible - and the graph draws one line.
+    expect(store.listAllLinks()).toEqual([{ fromPageId: source.id, toPageId: target.id, layer: "player" }]);
+    expect(projectPlayerLinkEdges(store.listAllLinks(), revealedIds())).toEqual([{ fromPageId: source.id, toPageId: target.id }]);
+  });
+});
+
+/**
+ * CI-9. "Recently updated" is supposed to answer "what have I been writing?". It answered "what did I
+ * touch last?", so a pre-session reveal sweep or one folder tidy-up refilled the whole list with pages
+ * nobody had edited, while adding a relationship - a real edit to the page's Connections - left it
+ * unchanged. These pin the semantics per write path, with a clock that only moves when the test says so.
+ */
+describe("CodexStore recency semantics — what counts as an update (CI-9)", () => {
+  let recencyDirectory: string;
+  let clock: number;
+  let recency: CodexStore;
+
+  beforeEach(async () => {
+    recencyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-recency-"));
+    clock = Date.parse("2026-07-01T00:00:00.000Z");
+    recency = new CodexStore(join(recencyDirectory, "vtt.sqlite"), () => clock);
+    await recency.initialize();
+  });
+  afterEach(async () => { recency.close(); await rm(recencyDirectory, { recursive: true, force: true }); });
+
+  /** Move the clock, so a write that DOES stamp `updated_at` is visibly distinguishable from one that does not. */
+  const tick = () => { clock += 60_000; };
+  const updatedAt = (pageId: string) => recency.getPage(pageId)!.updatedAt;
+  const rev = (pageId: string) => recency.getPage(pageId)!.rev;
+
+  it("counts a body edit and a tag edit as updates", () => {
+    const page = recency.createPage({ title: "Barovia", playerBody: "A valley." });
+    const born = updatedAt(page.id);
+    tick();
+    recency.updatePage(page.id, { playerBody: "A valley under mist." }, undefined, "test");
+    const afterBody = updatedAt(page.id);
+    expect(afterBody > born).toBe(true);
+    tick();
+    recency.updatePage(page.id, { tags: ["domain"] }, undefined, "test");
+    expect(updatedAt(page.id) > afterBody).toBe(true);
+  });
+
+  it("does NOT count a reveal toggle — but still bumps the codex revision, so clients refetch", () => {
+    const page = recency.createPage({ title: "The Amber Temple", playerBody: "Ice and secrets." });
+    const born = updatedAt(page.id);
+    const revisionBefore = recency.revision;
+    tick();
+    recency.setPageRevealed(page.id, true);
+    expect(updatedAt(page.id)).toBe(born);          // housekeeping: recency untouched
+    expect(rev(page.id)).toBe(page.rev);            // and the editor's conflict token is untouched too
+    expect(recency.revision).toBeGreaterThan(revisionBefore); // ...but the reveal still propagates
+    expect(recency.getPage(page.id)!.revealedToPlayers).toBe(true);
+    tick();
+    recency.setPageRevealed(page.id, false);
+    expect(updatedAt(page.id)).toBe(born);
+  });
+
+  it("does NOT count a folder move — but still bumps `rev`, because an open editor's copy really is stale", () => {
+    const page = recency.createPage({ title: "Ireena", folder: "NPCs" });
+    const born = updatedAt(page.id);
+    const bornRev = rev(page.id);
+    tick();
+    expect(recency.moveFolder("NPCs", "Villagers")).toBe(1);
+    expect(recency.getPage(page.id)!.folder).toBe("Villagers"); // the move really happened...
+    expect(updatedAt(page.id)).toBe(born);                      // ...without touching recency
+    expect(rev(page.id)).toBe(bornRev + 1);                     // conflict detection is a separate concern
+  });
+
+  it("does NOT count a folder DELETE dropping pages to the top level — it is a folder move by another name", () => {
+    const page = recency.createPage({ title: "Ireena", folder: "NPCs/Villagers" });
+    const born = updatedAt(page.id);
+    const bornRev = rev(page.id);
+    tick();
+    recency.deleteFolder("NPCs");
+    expect(recency.getPage(page.id)!.folder).toBeNull();
+    expect(updatedAt(page.id)).toBe(born);
+    expect(rev(page.id)).toBe(bornRev + 1);
+  });
+
+  it("DOES count adding a relationship, on BOTH endpoints, without forcing either editor into a conflict", () => {
+    const strahd = recency.createPage({ title: "Strahd", entityType: "character" });
+    const barovia = recency.createPage({ title: "Barovia", entityType: "location" });
+    const bornStrahd = updatedAt(strahd.id);
+    const bornBarovia = updatedAt(barovia.id);
+    tick();
+    const edge = recency.createRelationship(strahd.id, barovia.id, "rules");
+    expect(updatedAt(strahd.id) > bornStrahd).toBe(true);
+    expect(updatedAt(barovia.id) > bornBarovia).toBe(true);   // the OTHER end gained a connection too
+    expect(rev(strahd.id)).toBe(strahd.rev);                  // `rev` is the conflict token, not recency
+    expect(rev(barovia.id)).toBe(barovia.rev);
+
+    // An idempotent re-add changes nothing, so it is not an edit.
+    const settled = updatedAt(strahd.id);
+    tick();
+    expect(recency.createRelationship(strahd.id, barovia.id, "rules").id).toBe(edge.id);
+    expect(updatedAt(strahd.id)).toBe(settled);
+  });
+
+  it("DOES count removing a relationship, on both endpoints", () => {
+    const strahd = recency.createPage({ title: "Strahd", entityType: "character" });
+    const barovia = recency.createPage({ title: "Barovia", entityType: "location" });
+    const edge = recency.createRelationship(strahd.id, barovia.id, "rules");
+    const afterCreate = updatedAt(strahd.id);
+    expect(updatedAt(barovia.id)).toBe(afterCreate);
+    tick();
+    recency.deleteRelationship(edge.id);
+    expect(recency.listRelationshipsFor(strahd.id)).toEqual([]);
+    expect(updatedAt(strahd.id) > afterCreate).toBe(true);
+    expect(updatedAt(barovia.id) > afterCreate).toBe(true);
+    expect(rev(strahd.id)).toBe(strahd.rev);
   });
 });

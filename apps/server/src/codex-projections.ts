@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexEntityType, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -73,6 +73,32 @@ export function projectPlayerRelationshipEdges(edges: readonly CodexRelationship
   return edges.filter((edge) => revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId));
 }
 
+// ----- Wiki-link edges (CI-8: the Graph's second edge kind, beside the typed relationships) -----
+
+/** One `[[wiki link]]` edge as either audience receives it. `layer` is store-side bookkeeping and never ships. */
+export type CodexLinkEdge = Readonly<{ fromPageId: string; toPageId: string }>;
+
+export function projectGmLinkEdges(edges: readonly CodexLinkEdgeRow[]): CodexLinkEdge[] {
+  return edges.map((edge) => ({ fromPageId: edge.fromPageId, toPageId: edge.toPageId }));
+}
+
+/**
+ * The player's wiki-link graph. TWO rules, each copied from the feed that already enforces it rather
+ * than invented here:
+ *   1. BOTH endpoints revealed - `projectPlayerRelationshipEdges`. An edge with one visible end is worse
+ *      than useless: it tells a player a page they cannot see EXISTS, and draws them a line to it.
+ *   2. The `player` layer only - `projectPlayerBacklinks`. A link written in a page's GM body is a GM
+ *      note about a connection, not a connection the players have been shown; the revealed player body
+ *      of the very same page may say nothing of the sort.
+ * Both must hold. Rule 1 alone would leak GM-body links between two revealed pages; rule 2 alone would
+ * leak the existence of unrevealed pages linked from a revealed player body.
+ */
+export function projectPlayerLinkEdges(edges: readonly CodexLinkEdgeRow[], revealedPageIds: ReadonlySet<string>): CodexLinkEdge[] {
+  return edges
+    .filter((edge) => edge.layer === "player" && revealedPageIds.has(edge.fromPageId) && revealedPageIds.has(edge.toPageId))
+    .map((edge) => ({ fromPageId: edge.fromPageId, toPageId: edge.toPageId }));
+}
+
 // ----- Maps -----
 
 export type GmCodexMap = CodexMapRow;
@@ -114,6 +140,33 @@ export function projectPlayerMarker(row: CodexMarkerRow, context: Readonly<{ rev
     pageIds: row.pageIds.filter((pageId) => context.revealedPageIds.has(pageId)),
     subMapId: context.subMapRevealed ? row.subMapId : null
   };
+}
+
+/**
+ * One marker of CI-4's page -> markers reverse lookup, with the CONTEXT its player predicate needs.
+ * `mapRevealed` rides along for the same reason `CodexSearchRecord` carries it: reached by PAGE id, a pin
+ * arrives without its map's gate having been applied, and a pin's visibility is not its own flag alone.
+ */
+export type CodexPageMarkerRecord = Readonly<{
+  marker: CodexMarkerRow;
+  mapRevealed: boolean;
+  revealedPageIds: ReadonlySet<string>;
+  subMapRevealed: boolean;
+}>;
+
+/**
+ * null unless this pin is player-visible - the audited gate for the reverse lookup. The predicate is
+ * COPIED from `GET /codex/maps/:id/markers`, the forward read, and is exactly as strong:
+ *   map    -> that route 404s a player on an unrevealed map BEFORE projecting a single pin (CD-6), so a
+ *             revealed pin on a secret map is invisible there and must be invisible here. Arriving by
+ *             page id rather than map id cannot be the way around it.
+ *   marker -> `projectPlayerMarker`, which also filters the pin's own page/sub-map links to the revealed
+ *             subset and strips scene/actor ids. This projects THROUGH it rather than reimplementing it,
+ *             so the two reads can never drift.
+ */
+export function projectPlayerPageMarker(record: CodexPageMarkerRecord): PlayerCodexMarker | null {
+  if (!record.mapRevealed) return null;
+  return projectPlayerMarker(record.marker, { revealedPageIds: record.revealedPageIds, subMapRevealed: record.subMapRevealed });
 }
 
 // ----- Journal -----

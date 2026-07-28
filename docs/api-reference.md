@@ -2335,7 +2335,7 @@ Shows/hides a page to players.
 
 ### `POST /api/v1/codex/pages/{id}/relationships`
 
-Adds a typed relationship edge from this page to another.
+Adds a typed relationship edge from this page to another. Counts as an edit of BOTH pages, so both move in "recently updated" - but neither page's `rev` changes, so an open editor is not forced into a conflict.
 
 **Auth:** GM session
 
@@ -2349,6 +2349,16 @@ Adds a typed relationship edge from this page to another.
 | `type` | string | yes |  |
 
 **Responses:** `201` Success - envelope of `CodexRelationshipData` · errors `400` `401` `404`
+
+### `GET /api/v1/codex/pages/{id}/markers`
+
+The reverse of `/codex/maps/{id}/markers`: every atlas marker that links THIS page, so an open page can point back at the map. Role-scoped by exactly the forward route's predicate - a player must be able to see the page itself (an unrevealed page 404s), and then receives only revealed pins whose MAP is also revealed, with each pin's links filtered to the revealed subset and scene/actor ids stripped.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Parameters:** `id` (path) - string (uuid)
+
+**Responses:** `200` Success - envelope of `CodexMarkerListData` · errors `401` `404`
 
 ### `GET /api/v1/codex/pages/{id}/revisions`
 
@@ -2439,13 +2449,21 @@ Every relationship edge for the graph, role-scoped (a player sees only edges who
 
 ### `DELETE /api/v1/codex/relationships/{id}`
 
-Removes one relationship edge; idempotent.
+Removes one relationship edge; idempotent. Like adding one, it counts as an edit of both endpoint pages for "recently updated" without changing either page's `rev`.
 
 **Auth:** GM session
 
 **Parameters:** `id` (path) - string (uuid)
 
 **Responses:** `200` Success - envelope of `CodexDeletedData` · errors `401`
+
+### `GET /api/v1/codex/links`
+
+Every `[[wiki link]]` edge between two pages - the Graph's second edge kind, beside the typed relationships. Role-scoped by both rules the existing feeds enforce: a player sees an edge only when BOTH endpoints are revealed pages (never a dangling edge to a page they cannot see) AND only when it was written in a page's PLAYER-facing body, never its GM body. Links to a title no page carries, and a page's link to itself, carry no edge.
+
+**Auth:** GM session · Player session (own-character limits apply)
+
+**Responses:** `200` Success - envelope of `CodexLinkEdgeListData` · errors `401`
 
 ### `GET /api/v1/codex/maps`
 

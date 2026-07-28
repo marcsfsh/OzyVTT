@@ -60,6 +60,12 @@ export type CodexLinkRow = Readonly<{
 }>;
 export type CodexLinkTargetKind = "page" | "actor" | "monster" | "spell" | "map" | "marker";
 
+/**
+ * CI-8: one `[[wiki link]]` edge between two PAGES, for the whole-graph feed. Carries `layer` because a
+ * player edge may only come from a page's player-facing body - the projection decides, not this row.
+ */
+export type CodexLinkEdgeRow = Readonly<{ fromPageId: string; toPageId: string; layer: "player" | "gm" }>;
+
 export type CodexPageRevisionRow = Readonly<{
   id: number;
   pageId: string;
@@ -796,11 +802,16 @@ export class CodexStore {
     return this.getPage(pageId)!;
   }
 
+  /**
+   * CI-9: showing or hiding a page does NOT move its recency. "Recently updated" answers "what have I
+   * been writing?", and a reveal sweep before a session would otherwise refill the whole list with pages
+   * nobody edited. The coarse revision still bumps, so every client refetches the new reveal state.
+   */
   setPageRevealed(pageId: string, revealed: boolean): CodexPageRow {
     const database = this.requireDatabase();
     if (!this.pageRow(pageId)) throw new CodexNotFoundError("That page no longer exists.");
     this.transaction(() => {
-      database.prepare("UPDATE codex_pages SET revealed = ?, updated_at = ? WHERE id = ?").run(revealed ? 1 : 0, this.stamp(), pageId);
+      database.prepare("UPDATE codex_pages SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, pageId);
       this.bumpRevision();
     });
     return this.getPage(pageId)!;
@@ -810,6 +821,11 @@ export class CodexStore {
    * Rename/move a folder: re-path every page in `fromPath` and its descendants to `toPath` (or to the top
    * level when `toPath` is empty). Reorganization, not a content edit, so it re-paths in place without
    * snapshotting a revision per page. Returns how many pages moved.
+   *
+   * CI-9: and, for the same reason, without moving `updated_at` - filing is not writing, and tidying one
+   * folder used to shove every page in it to the top of "Recently updated". `rev` DOES still bump: that
+   * is the editor's conflict token, not a recency signal, and an open editor's copy really is stale once
+   * its page has been re-pathed. The two are deliberately separated here.
    */
   moveFolder(fromPath: string, toPath: string): number {
     const database = this.requireDatabase();
@@ -823,8 +839,8 @@ export class CodexStore {
     this.transaction(() => {
       const stamp = this.stamp();
       const rows = database.prepare("SELECT id, folder FROM codex_pages WHERE folder = ? OR folder LIKE ?").all(from, `${from}/%`) as { id: string; folder: string }[];
-      const update = database.prepare("UPDATE codex_pages SET folder = ?, rev = rev + 1, updated_at = ? WHERE id = ?");
-      for (const row of rows) { update.run(repath(row.folder), stamp, row.id); moved += 1; } // folder() re-validates depth/length + normalizes "" -> null
+      const update = database.prepare("UPDATE codex_pages SET folder = ?, rev = rev + 1 WHERE id = ?");
+      for (const row of rows) { update.run(repath(row.folder), row.id); moved += 1; } // folder() re-validates depth/length + normalizes "" -> null
       // Carry the folder RECORDS along too, so a renamed/moved empty folder keeps existing at its new path.
       const recs = database.prepare("SELECT path FROM codex_folders WHERE path = ? OR path LIKE ?").all(from, `${from}/%`) as { path: string }[];
       const dropRec = database.prepare("DELETE FROM codex_folders WHERE path = ?");
@@ -857,14 +873,17 @@ export class CodexStore {
     let acc = "";
     for (const segment of path.split("/")) { acc = acc ? `${acc}/${segment}` : segment; insert.run(acc, stamp); }
   }
-  /** Delete a folder (and its subfolders): every page anywhere under it drops to the top level - never deleted. */
+  /**
+   * Delete a folder (and its subfolders): every page anywhere under it drops to the top level - never
+   * deleted. CI-9: that drop is a folder move by another name, so it re-paths on the same terms as
+   * `moveFolder` - `rev` bumps, `updated_at` does not.
+   */
   deleteFolder(path: string): void {
     const database = this.requireDatabase();
     const clean = folder(path);
     if (!clean) return;
     this.transaction(() => {
-      const stamp = this.stamp();
-      database.prepare("UPDATE codex_pages SET folder = NULL, rev = rev + 1, updated_at = ? WHERE folder = ? OR folder LIKE ?").run(stamp, clean, `${clean}/%`);
+      database.prepare("UPDATE codex_pages SET folder = NULL, rev = rev + 1 WHERE folder = ? OR folder LIKE ?").run(clean, `${clean}/%`);
       database.prepare("DELETE FROM codex_folders WHERE path = ? OR path LIKE ?").run(clean, `${clean}/%`);
       this.bumpRevision();
     });
@@ -924,10 +943,13 @@ export class CodexStore {
     const existing = (SYMMETRIC_RELATIONSHIPS.has(relType)
       ? database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE ((from_page_id = ? AND to_page_id = ?) OR (from_page_id = ? AND to_page_id = ?)) AND type = ?").get(from, to, to, from, relType)
       : database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE from_page_id = ? AND to_page_id = ? AND type = ?").get(from, to, relType)) as RelationshipRowRaw | undefined;
+    // An idempotent no-op is not an edit: the early return leaves both pages' recency alone on purpose.
     if (existing) return this.toRel(existing);
     const relId = this.freshId();
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, ?)").run(relId, from, to, relType, this.stamp());
+      const stamp = this.stamp();
+      database.prepare("INSERT INTO codex_relationships (id, from_page_id, to_page_id, type, created_at) VALUES (?, ?, ?, ?, ?)").run(relId, from, to, relType, stamp);
+      this.touchPages([from, to], stamp);
       this.bumpRevision();
     });
     return this.toRel(database.prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships WHERE id = ?").get(relId) as RelationshipRowRaw);
@@ -935,8 +957,12 @@ export class CodexStore {
 
   deleteRelationship(relId: string): void {
     if (!ID.test(relId)) return;
+    const database = this.requireDatabase();
+    // Read the endpoints BEFORE the row goes, so both pages' recency can move with the edit (CI-9).
+    const existing = database.prepare("SELECT from_page_id, to_page_id FROM codex_relationships WHERE id = ?").get(relId) as { from_page_id: string; to_page_id: string } | undefined;
     this.transaction(() => {
-      this.requireDatabase().prepare("DELETE FROM codex_relationships WHERE id = ?").run(relId);
+      database.prepare("DELETE FROM codex_relationships WHERE id = ?").run(relId);
+      if (existing) this.touchPages([existing.from_page_id, existing.to_page_id], this.stamp());
       this.bumpRevision();
     });
   }
@@ -959,6 +985,17 @@ export class CodexStore {
   /** All relationship edges (for the graph). */
   listAllRelationships(): CodexRelationshipRow[] {
     return (this.requireDatabase().prepare("SELECT id, from_page_id, to_page_id, type, created_at FROM codex_relationships").all() as RelationshipRowRaw[]).map((row) => this.toRel(row));
+  }
+
+  /**
+   * CI-9: a relationship edit IS an edit of both pages it connects - the Connections section is part of
+   * the page - so it moves their recency. It deliberately does NOT bump `rev`: `rev` is the editor's
+   * conflict token, and bumping it would 409 a GM mid-sentence on a page whose body nobody touched.
+   * Recency and conflict detection are separate concerns and this is the seam between them.
+   */
+  private touchPages(pageIds: readonly string[], stamp: string) {
+    const update = this.requireDatabase().prepare("UPDATE codex_pages SET updated_at = ? WHERE id = ?");
+    for (const pageId of pageIds) update.run(stamp, pageId);
   }
 
   private toRel(row: RelationshipRowRaw): CodexRelationshipRow {
@@ -994,6 +1031,41 @@ export class CodexStore {
        ORDER BY p.title COLLATE NOCASE`
     ).all(pageLinkKey(page.title), pageId) as Array<{ source_page_id: string; layer: "player" | "gm"; section: string | null; source_title: string; source_revealed: number }>)
       .map((row) => ({ sourcePageId: row.source_page_id, sourceTitle: row.source_title, sourceRevealed: row.source_revealed === 1, layer: row.layer, section: row.section }));
+  }
+
+  /**
+   * CI-8: every `[[wiki link]]` edge BETWEEN TWO PAGES, for the whole-graph feed - the second edge kind
+   * the Graph draws, beside the typed relationships.
+   *
+   * Deliberately RAW and UNGATED, both layers and every reveal state, exactly as `backlinksToPage` hands
+   * both layers to `projectPlayerBacklinks`: `projectPlayerLinkEdges` is the single visibility gate. A
+   * second predicate down here would be a lower layer that an HTTP test cannot distinguish from the
+   * projection (the blind spot the CI-1 SQL tests exist to cover).
+   *
+   * A wiki link stores its target's TITLE key, not an id, so targets resolve through `pageLinkKey` here
+   * rather than in SQL - the same function that wrote the key, so the two cannot drift. A link to a title
+   * no page carries has no node to draw and is dropped; so is a page's link to itself, which
+   * `backlinksToPage` drops too. ONE edge per ordered pair: when a page links the same target from both
+   * of its bodies the edge counts as player-layer, because the player-facing body genuinely carries it.
+   */
+  listAllLinks(): CodexLinkEdgeRow[] {
+    const database = this.requireDatabase();
+    const idByLinkKey = new Map<string, string>();
+    for (const page of database.prepare("SELECT id, title FROM codex_pages").all() as Array<{ id: string; title: string }>) idByLinkKey.set(pageLinkKey(page.title), page.id);
+    const edges = new Map<string, CodexLinkEdgeRow>();
+    // `layer` is in the ORDER BY so the collapse below is DETERMINISTIC rather than a bet on insertion
+    // order: 'gm' sorts before 'player', so a pair present in both bodies always arrives gm-first and is
+    // then upgraded. Without it the merge silently depended on which row SQLite happened to return first.
+    const rows = database.prepare("SELECT source_page_id, layer, target_ref FROM codex_links WHERE target_kind = 'page' ORDER BY source_page_id, target_ref, layer").all() as Array<{ source_page_id: string; layer: "player" | "gm"; target_ref: string }>;
+    for (const row of rows) {
+      const toPageId = idByLinkKey.get(row.target_ref);
+      if (!toPageId || toPageId === row.source_page_id) continue;
+      const key = `${row.source_page_id}|${toPageId}`;
+      const seen = edges.get(key);
+      if (!seen) edges.set(key, { fromPageId: row.source_page_id, toPageId, layer: row.layer });
+      else if (row.layer === "player" && seen.layer !== "player") edges.set(key, { ...seen, layer: "player" });
+    }
+    return [...edges.values()];
   }
 
   // ----- Search -----
@@ -1213,6 +1285,22 @@ export class CodexStore {
   listMarkers(mapId: string): CodexMarkerRow[] {
     if (!ID.test(mapId)) return [];
     return (this.requireDatabase().prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE map_id = ? ORDER BY created_at`).all(mapId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
+  }
+
+  /**
+   * CI-4, the reverse of `listMarkers`: every pin anywhere on the atlas that links THIS page, so a page
+   * can offer "seen on the map" instead of the Atlas being the only way in.
+   *
+   * Deliberately UNGATED, like `listMarkers` - raw GM-grade rows, hidden pins and pins on secret maps
+   * included, because `projectPlayerPageMarker` is the single visibility gate for this feed. Adding a
+   * reveal predicate here would create a lower layer that an HTTP test could not tell apart from the
+   * projection.
+   */
+  markersForPage(pageId: string): CodexMarkerRow[] {
+    if (!ID.test(pageId)) return [];
+    return (this.requireDatabase().prepare(
+      `SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE EXISTS (SELECT 1 FROM json_each(codex_markers.page_ids_json) WHERE value = ?) ORDER BY created_at`
+    ).all(pageId) as MarkerRowRaw[]).map((row) => this.toMarker(row));
   }
 
   /** Whether any revealed codex map uses this image asset - lets players fetch a revealed world map's image. */

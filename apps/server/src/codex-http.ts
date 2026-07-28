@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmJournalEntry, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, type CodexSearchRecord } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectPlayerBacklinks, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, type CodexSearchRecord } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -339,6 +339,25 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return envelope(response, 200, { relationships: projectPlayerRelationshipEdges(all, revealed) });
   });
 
+  /**
+   * CI-8: the whole-graph WIKI-LINK feed - the sibling of the typed-edge route above, and deliberately
+   * its neighbour. The Graph drew only typed relationships, so a codex wired together with `[[links]]`
+   * looked like a field of orphans; it now draws both kinds, visually distinguished.
+   *
+   * A player's edges obey the SAME both-endpoints-revealed rule the typed feed enforces (a dangling edge
+   * would let a player infer a hidden page exists) AND the layer rule `projectPlayerBacklinks` applies -
+   * player-body links only, never the GM body's. `projectPlayerLinkEdges` holds both; the store hands
+   * over raw rows so that projection is the only gate.
+   */
+  router.get(`${CODEX_BASE}/links`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the codex.");
+    const all = store.listAllLinks();
+    if (role === "gm") return envelope(response, 200, { links: projectGmLinkEdges(all) });
+    const revealed = new Set(store.listPages().filter((page) => page.revealedToPlayers).map((page) => page.id));
+    return envelope(response, 200, { links: projectPlayerLinkEdges(all, revealed) });
+  });
+
   // ----- Maps (the atlas tree) -----
 
   router.get(`${CODEX_BASE}/maps`, (request, response) => {
@@ -393,6 +412,40 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const markers = rows
       .map((row) => projectPlayerMarker(row, {
         revealedPageIds: new Set(row.pageIds.filter((pageId) => store.getPage(pageId)?.revealedToPlayers ?? false)),
+        subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
+      }))
+      .filter((marker) => marker !== null);
+    return envelope(response, 200, { markers });
+  });
+
+  /**
+   * CI-4, the REVERSE of the route directly above: which pins on the atlas point at THIS page, so an open
+   * page can offer "seen on the map" instead of the Atlas being the only way to find out.
+   *
+   * This is a NEW player-reachable read, so nothing about its gating is invented - every clause is copied
+   * from a route that already enforces it, and it is deliberately placed beside the forward read so the
+   * two can be compared at a glance:
+   *   - the PAGE gate comes from `GET /codex/journal?pageId=`: a player may only ask about a location
+   *     they can already see, so an unrevealed page 404s before any pin is considered. Without it, a page
+   *     id (however obtained) becomes a probe for "does the party have a pin on this place?".
+   *   - each pin then goes through `projectPlayerPageMarker`, which is `projectPlayerMarker` PLUS the map
+   *     gate the forward route applies before it projects anything (CD-6). A revealed pin on a secret map
+   *     is invisible on the Atlas and is invisible here.
+   * The store's `markersForPage` is deliberately ungated, so this projection is the ONLY gate.
+   */
+  router.get(`${CODEX_BASE}/pages/:id/markers`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the atlas.");
+    const page = store.getPage(pathParam(request, "id"));
+    if (!page) return failure(response, 404, "not_found", "That page was not found.");
+    if (role !== "gm" && !page.revealedToPlayers) return failure(response, 404, "not_found", "That page was not found.");
+    const rows = store.markersForPage(page.id);
+    if (role === "gm") return envelope(response, 200, { markers: rows.map(projectGmMarker) });
+    const markers = rows
+      .map((row) => projectPlayerPageMarker({
+        marker: row,
+        mapRevealed: store.getMap(row.mapId)?.revealedToPlayers ?? false,
+        revealedPageIds: new Set(row.pageIds.filter((linkedId) => store.getPage(linkedId)?.revealedToPlayers ?? false)),
         subMapRevealed: row.subMapId ? (store.getMap(row.subMapId)?.revealedToPlayers ?? false) : false
       }))
       .filter((marker) => marker !== null);

@@ -360,6 +360,142 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(playerEdges[0].type).toBe("rules");
   });
 
+  /**
+   * CI-4. The page -> markers reverse lookup is a NEW player-reachable read, and the one the milestone
+   * flagged as most likely to leak: reached by PAGE id, a pin arrives without its map's gate having been
+   * applied. These assert it is gated by exactly the forward route's predicate, and the negative cases
+   * are also proven one layer down, against `projectPlayerPageMarker` itself, in `codex-store.test.ts`.
+   */
+  it("GET /pages/:id/markers 404s a player on an unrevealed page, and never lets one probe by page id", async () => {
+    const { base } = await fixture();
+    const page = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Amber Temple" }));
+    const pageId = page.data.page.id as string;
+    const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: randomUUID(), name: "Barovia", kind: "regional" }));
+    await post(base, `/api/v1/codex/maps/${map.data.map.id}/reveal`, GM, { revealed: true });
+    await post(base, `/api/v1/codex/maps/${map.data.map.id}/markers`, GM, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Amber vaults", pageIds: [pageId], revealedToPlayers: true });
+
+    // The page is secret, so the question itself must not be answerable - 404, not an empty list, exactly
+    // as `GET /codex/journal?pageId=` refuses a hidden location's mini-timeline.
+    const denied = await get(base, `/api/v1/codex/pages/${pageId}/markers`, PLAYER);
+    expect(denied.status).toBe(404);
+    expect(JSON.stringify(await body(denied))).not.toContain("Amber vaults");
+    // The GM asking the same question gets the pin - so the 404 is the reveal gate, not a broken lookup.
+    expect((await body(await get(base, `/api/v1/codex/pages/${pageId}/markers`, GM))).data.markers).toHaveLength(1);
+
+    // Revealing the page opens it, which is what makes the refusal above meaningful.
+    await post(base, `/api/v1/codex/pages/${pageId}/reveal`, GM, { revealed: true });
+    const allowed = (await body(await get(base, `/api/v1/codex/pages/${pageId}/markers`, PLAYER))).data.markers as Json[];
+    expect(allowed).toHaveLength(1);
+    expect(allowed[0].label).toBe("Amber vaults");
+  });
+
+  it("GET /pages/:id/markers hides a secret map's pin (CD-6) and a hidden pin, and strips scene/actor links", async () => {
+    const { base } = await fixture();
+    const page = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Strahd" }));
+    const pageId = page.data.page.id as string;
+    await post(base, `/api/v1/codex/pages/${pageId}/reveal`, GM, { revealed: true }); // the page itself is open
+
+    const makeMap = async (name: string, revealed: boolean) => {
+      const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: randomUUID(), name, kind: "regional" }));
+      if (revealed) await post(base, `/api/v1/codex/maps/${map.data.map.id}/reveal`, GM, { revealed: true });
+      return map.data.map.id as string;
+    };
+    const openMap = await makeMap("Vallaki", true);
+    const secretMap = await makeMap("Amberhold", false);
+    const secretScene = randomUUID();
+    const secretActor = randomUUID();
+    const otherSecretPage = await body(await post(base, "/api/v1/codex/pages", GM, { title: "The Heart of Sorrow" }));
+
+    // Three pins, all linking the SAME open page - one visible, one hidden, one revealed on a secret map.
+    const shown = await body(await post(base, `/api/v1/codex/maps/${openMap}/markers`, GM, {
+      x: 0.2, y: 0.2, iconId: "castle", iconColor: "#ff2e9a", label: "Castle Ravenloft",
+      pageIds: [pageId, otherSecretPage.data.page.id], sceneIds: [secretScene], actorId: secretActor, revealedToPlayers: true
+    }));
+    await post(base, `/api/v1/codex/maps/${openMap}/markers`, GM, { x: 0.3, y: 0.3, iconId: "pin", iconColor: "#ff2e9a", label: "Vistani camp", pageIds: [pageId], revealedToPlayers: false });
+    await post(base, `/api/v1/codex/maps/${secretMap}/markers`, GM, { x: 0.4, y: 0.4, iconId: "pin", iconColor: "#ff2e9a", label: "Wyrmwood cache", pageIds: [pageId], revealedToPlayers: true });
+
+    // GM sees all three, whole.
+    const gmMarkers = (await body(await get(base, `/api/v1/codex/pages/${pageId}/markers`, GM))).data.markers as Json[];
+    expect(gmMarkers.map((marker) => marker.label).sort()).toEqual(["Castle Ravenloft", "Vistani camp", "Wyrmwood cache"]);
+
+    const playerMarkers = (await body(await get(base, `/api/v1/codex/pages/${pageId}/markers`, PLAYER))).data.markers as Json[];
+    expect(playerMarkers).toHaveLength(1);                       // only the shown pin on the shown map
+    expect(playerMarkers[0].id).toBe(shown.data.marker.id);
+    const payload = JSON.stringify(playerMarkers);
+    expect(payload).not.toContain("Vistani camp");               // hidden pin
+    expect(payload).not.toContain("Wyrmwood cache");             // revealed pin, SECRET map (CD-6)
+    expect(payload).not.toContain(secretMap);                    // ...and not even that map's id
+    expect(payload).not.toContain(secretScene);                  // GM-only linkage never travels
+    expect(payload).not.toContain(secretActor);
+    expect(playerMarkers[0]).not.toHaveProperty("sceneIds");
+    expect(playerMarkers[0]).not.toHaveProperty("actorId");
+    expect(playerMarkers[0]).not.toHaveProperty("revealedToPlayers");
+    expect(playerMarkers[0].pageIds).toEqual([pageId]);           // the pin's OTHER, secret page link is filtered out
+    expect(payload).not.toContain(otherSecretPage.data.page.id as string);
+  });
+
+  /** CI-4's payload must not exceed the forward route's: same projection, so byte-identical for the same pin. */
+  it("GET /pages/:id/markers hands a player exactly what GET /maps/:id/markers hands them for the same pin", async () => {
+    const { base } = await fixture();
+    const page = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Ireena" }));
+    const pageId = page.data.page.id as string;
+    await post(base, `/api/v1/codex/pages/${pageId}/reveal`, GM, { revealed: true });
+    const map = await body(await post(base, "/api/v1/codex/maps", GM, { assetId: randomUUID(), name: "Barovia", kind: "regional" }));
+    const mapId = map.data.map.id as string;
+    await post(base, `/api/v1/codex/maps/${mapId}/reveal`, GM, { revealed: true });
+    await post(base, `/api/v1/codex/maps/${mapId}/markers`, GM, { x: 0.5, y: 0.5, iconId: "pin", iconColor: "#ff2e9a", label: "Burgomaster's house", pageIds: [pageId], sceneIds: [randomUUID()], revealedToPlayers: true });
+
+    const forward = (await body(await get(base, `/api/v1/codex/maps/${mapId}/markers`, PLAYER))).data.markers as Json[];
+    const reverse = (await body(await get(base, `/api/v1/codex/pages/${pageId}/markers`, PLAYER))).data.markers as Json[];
+    expect(reverse).toEqual(forward);
+  });
+
+  /**
+   * CI-8. The whole-graph wiki-link feed. Every negative here is also proven directly against
+   * `projectPlayerLinkEdges` in `codex-store.test.ts` - an HTTP test shows the pipeline works, never
+   * which layer did the work.
+   */
+  it("GET /links returns wiki-link edges, and a player sees neither GM-body links nor edges touching a secret page", async () => {
+    const { base } = await fixture();
+    const make = async (title: string, playerBody: string, gmBody: string, revealed: boolean) => {
+      const page = await body(await post(base, "/api/v1/codex/pages", GM, { title, playerBody, gmBody }));
+      const pageId = page.data.page.id as string;
+      if (revealed) await post(base, `/api/v1/codex/pages/${pageId}/reveal`, GM, { revealed: true });
+      return pageId;
+    };
+    // Barovia -> Vallaki in the PLAYER body (the one edge a player may have);
+    // Barovia -> The Whispered Name in the player body, but that page is SECRET (dangling for a player);
+    // Barovia -> Vallaki again in the GM body of Vallaki, i.e. a GM-only connection between two open pages.
+    const secret = await make("The Whispered Name", "", "", false);
+    const barovia = await make("Barovia", "Ruled from [[Vallaki]], watched by [[The Whispered Name]].", "", true);
+    const vallaki = await make("Vallaki", "A walled town.", "Its burgomaster answers to [[Barovia]].", true);
+
+    const gmLinks = (await body(await get(base, "/api/v1/codex/links", GM))).data.links as Json[];
+    expect(gmLinks).toEqual(expect.arrayContaining([
+      { fromPageId: barovia, toPageId: vallaki },
+      { fromPageId: barovia, toPageId: secret },
+      { fromPageId: vallaki, toPageId: barovia }   // the GM-body link
+    ]));
+    expect(gmLinks).toHaveLength(3);
+
+    const playerLinks = (await body(await get(base, "/api/v1/codex/links", PLAYER))).data.links as Json[];
+    expect(playerLinks).toEqual([{ fromPageId: barovia, toPageId: vallaki }]);
+    // The secret page must not be inferable from a dangling edge, and the GM-body edge must not appear
+    // even though BOTH of its endpoints are revealed - the two rules are independent.
+    expect(JSON.stringify(playerLinks)).not.toContain(secret);
+    expect(playerLinks.some((edge) => edge.fromPageId === vallaki)).toBe(false);
+  });
+
+  it("GET /links drops a self-link and a link to a title no page carries", async () => {
+    const { base } = await fixture();
+    const page = await body(await post(base, "/api/v1/codex/pages", GM, {
+      title: "Barovia", playerBody: "See [[Barovia]] and [[A Page That Was Never Written]].", revealedToPlayers: true
+    }));
+    const links = (await body(await get(base, "/api/v1/codex/links", GM))).data.links as Json[];
+    expect(links).toEqual([]);                                     // no node to draw for either
+    expect(JSON.stringify(links)).not.toContain(page.data.page.id as string);
+  });
+
   it("returns ONE list carrying every matching kind, with no superseded second list (R8)", async () => {
     const { base } = await fixture();
     // One word ("Ravenloft") on a page AND a map: the point of R8 is that ONE list carries both.
