@@ -177,6 +177,36 @@ export function blankDraft(type: HomebrewType): Draft {
 }
 
 /**
+ * The keys the EDITOR mints and the STORE must never see.
+ *
+ * `RowEditor` needs a stable key per row — keying by index is the bug that primitive exists to
+ * prevent — so the rider forms mint a `rowId` when they mint a row. `FeatureModifierSchema` and
+ * `RiderTriggerSchema` are `.strict()` discriminated unions, so that key is not ignored on the way
+ * in: it is a hard parse failure, `Unrecognized key(s) in object: 'rowId'`, on a record whose form
+ * shows nothing wrong. Every authored modifier was unpublishable, on every carrier.
+ *
+ * Stripped HERE, at the one boundary where a draft becomes a request body, rather than avoided by
+ * keying rows on their index. `useAutosave` re-baselines from the draft it just sent (not from the
+ * server's echo), so the draft keeps its ids and the dirty flag stays honest.
+ */
+const EDITOR_KEYS = ["rowId"];
+
+/** Deep copy minus the editor-only keys. Arrays and plain objects only — a draft is JSON. */
+export function forStorage(value: Draft): Draft {
+  const walk = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(walk);
+    if (!node || typeof node !== "object") return node;
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(node as Record<string, unknown>)) {
+      if (EDITOR_KEYS.includes(key)) continue;
+      out[key] = walk(entry);
+    }
+    return out;
+  };
+  return walk(value) as Draft;
+}
+
+/**
  * Fills in the keys a draft is missing without touching anything it already has.
  *
  * Needed because a record can arrive from three places — created blank before this

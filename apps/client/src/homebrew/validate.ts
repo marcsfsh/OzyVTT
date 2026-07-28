@@ -33,6 +33,9 @@
  */
 
 import { getAt } from "./paths";
+// One vocabulary, one place it is spelled: the gating list's kinds come from the form
+// that offers them, so a condition added there is checked here without a second table.
+import { modifierLabel, triggerKindOf } from "./RiderEditor";
 import { isDiceFormula, namesOwnRecord, type Draft, type SchemaContext } from "./schema";
 import { TYPE_WORDS, typeLabel, type HomebrewType } from "./types";
 
@@ -72,6 +75,51 @@ function badFormula(value: unknown): string | null {
     if (found) return found;
   }
   return null;
+}
+
+/**
+ * The two structural rules a rider's gating list has to keep, checked wherever a modifier
+ * lives — an item, a class feature, a species trait, a feat — because the vocabulary is
+ * one vocabulary and both carriers author into it.
+ *
+ *   1. **One moment per rider.** A rider fires at one moment, not two. Two *Only when…*
+ *      lines describe two different riders and the engine would have to pick.
+ *   2. **A filter needs a moment.** An *Only for…* line with no *Only when…* is an
+ *      authoring mistake rather than "always" — it means the GM narrowed a rider that
+ *      never sees a target, so it would quietly never match.
+ *
+ * Blockers rather than inline errors, for the reason this whole file exists: a draft is
+ * allowed to be invalid, and the sentence surfaces once, at the button it blocks. Neither
+ * rule could be a field-level `validate` in any case — both are about a row's SIBLINGS,
+ * and `validate` is handed the row.
+ */
+function badGating(draft: Draft, sectionId: string): BlockedReason | null {
+  let found: BlockedReason | null = null;
+  const walk = (value: unknown): void => {
+    if (found) return;
+    if (Array.isArray(value)) {
+      for (const entry of value) walk(entry);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    const when = record.when;
+    if (Array.isArray(when)) {
+      const kinds = when.map((entry) => triggerKindOf((entry as { type?: unknown })?.type));
+      const name = modifierLabel(record.type);
+      if (kinds.filter((kind) => kind === "moment").length > 1) {
+        found = { text: `Leave “${name}” one “Only when…” line — a modifier fires at one moment, not two.`, sectionId };
+        return;
+      }
+      if (kinds.includes("filter") && !kinds.includes("moment")) {
+        found = { text: `Add an “Only when…” line to “${name}” — an “Only for…” line has nothing to narrow on its own.`, sectionId };
+        return;
+      }
+    }
+    for (const nested of Object.values(record)) walk(nested);
+  };
+  walk(draft);
+  return found;
 }
 
 /** Every `FeatureRecord` on a record, whichever key its type stores them under: a list at
@@ -169,12 +217,39 @@ function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): Blo
  * Second in priority, right behind the name, because it is the second thing the record
  * needs to be worth picking.
  */
-const SHOWN_TO_PLAYERS: Partial<Record<HomebrewType, Readonly<{ path: string; text: string }>>> = {
+/**
+ * A weapon's card is "1d8 slashing" and a shield's is "+2 AC" — both drawn from the typed
+ * block, not from prose. So an item with one of those does NOT have a blank card and must
+ * not be held back for a description it never printed.
+ *
+ * This is the item half of a mistake this file has already made once and documents at
+ * length above: **the client became stricter than the server.** `EquipmentReferenceSchema`
+ * declares `description` `.nullable()`, and every one of the ~50 SRD weapons and ~13
+ * armour pieces carries `description: null` — `loadEquipment` maps them in from the weapon
+ * and armour bundles, which have no prose field at all. So "duplicate Longsword", the
+ * route the create modal itself offers as an equal starting point, landed on a record
+ * whose Publish was disabled before the GM had touched anything, for a requirement the
+ * store does not have. Exactly the shape of the class-duplicate defect, one type over.
+ *
+ * The requirement is kept where it is real: an item with no weapon block, no armour block
+ * and no description IS a blank card, and every piece of SRD gear already has prose.
+ */
+const hasDerivedCard = (draft: Draft): boolean => {
+  const weapon = draft.weapon as Record<string, unknown> | null | undefined;
+  const armor = draft.armor as Record<string, unknown> | null | undefined;
+  return (!!weapon && !blank(weapon.damageDice)) || (!!armor && typeof armor.acBase === "number");
+};
+
+const SHOWN_TO_PLAYERS: Partial<Record<HomebrewType, Readonly<{ path: string; text: string; unless?: (draft: Draft) => boolean }>>> = {
   class: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this class from." },
   species: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this species from." },
   background: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this background from." },
   feat: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this feat from." },
-  equipment: { path: "description", text: "Describe this item — the description is what the inventory shows." }
+  equipment: {
+    path: "description",
+    text: "Describe this item — with no weapon or armour numbers, the description is the whole card the inventory shows.",
+    unless: hasDerivedCard
+  }
 };
 
 export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: SchemaContext): BlockedReason | null {
@@ -183,7 +258,7 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
   if (named) return named;
 
   const shown = SHOWN_TO_PLAYERS[type];
-  const blankCard = shown ? need(draft, shown.path, shown.text, "basics") : null;
+  const blankCard = shown && !shown.unless?.(draft) ? need(draft, shown.path, shown.text, "basics") : null;
   if (blankCard) return blankCard;
 
   const formula = badFormula(draft);
@@ -207,18 +282,26 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
         // Before `brokenCatalog`: a skipped choice still builds a character, an ungranted
         // one cannot be built at all.
         ungrantedChoice(draft),
-        brokenCatalog(draft, ctx, "features")
+        brokenCatalog(draft, ctx, "features"),
+        badGating(draft, "features")
       );
     }
 
     case "subclass":
       return first(
-        need(draft, "classId", "Say which class this subclass belongs to.", "belongs-to"),
+        // NOT "…belongs to", which is the section's own title: the sentence printed
+        // "Say which class this subclass belongs to." and the jump control rendered
+        // "Belongs to ›" immediately beside it, so the last two words were said twice.
+        // Every other type was corrected in the readiness pass; this one was missed. The
+        // sentence says the thing, the section is a control — and the way to keep that
+        // true is never to end an imperative on the words its section is named after.
+        need(draft, "classId", "Choose the class this subclass is for.", "belongs-to"),
         (draft.spellcasting as Record<string, unknown> | null | undefined) && blank(getAt(draft, "spellcasting.spellListId"))
           ? { text: "Choose a spell list. A subclass caster falls back to the class list, which for a homebrew class is empty.", sectionId: "belongs-to" }
           : null,
         formulaBlocker,
-        brokenCatalog(draft, ctx, "features")
+        brokenCatalog(draft, ctx, "features"),
+        badGating(draft, "features")
       );
 
     case "species":
@@ -226,24 +309,29 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
         need(draft, "speedFeet", "Give this species a walking speed.", "body"),
         need(draft, "sizes", "Choose at least one size.", "body"),
         formulaBlocker,
-        brokenCatalog(draft, ctx, "traits")
+        brokenCatalog(draft, ctx, "traits"),
+        badGating(draft, "traits")
       );
 
     case "background":
       return first(
         need(draft, "originFeatId", "Choose the feat this background grants.", "origin"),
         formulaBlocker,
-        brokenCatalog(draft, ctx, "features")
+        brokenCatalog(draft, ctx, "features"),
+        badGating(draft, "features")
       );
 
     case "feat":
       return first(
-        need(draft, "category", "Choose a category. Nothing offers a feat with no category.", "category"),
+        // Same rule, same trap: the section IS titled "Category", so the sentence must
+        // not be "Choose a category." followed by a control reading Category.
+        need(draft, "category", "Say what kind of feat this is. Nothing offers one without it.", "category"),
         // `feature`, singular: a feat IS one `FeatureRecord`. Its NAME is what the wizard
         // prints beside the pick, so an unnamed one is a blank line on the card.
         need(draft, "feature.name", "Say what this feat does.", "feature"),
         formulaBlocker,
-        brokenCatalog(draft, ctx, "feature")
+        brokenCatalog(draft, ctx, "feature"),
+        badGating(draft, "feature")
       );
 
     case "spell":
@@ -270,22 +358,28 @@ export function publishBlockedReason(type: HomebrewType, draft: Draft, ctx: Sche
 
     case "equipment": {
       const weapon = draft.weapon as Record<string, unknown> | null | undefined;
-      const casts = draft.casts as Record<string, unknown> | null | undefined;
+      const casts = Array.isArray(draft.casts) ? (draft.casts as Array<Record<string, unknown>>) : [];
       return first(
-        need(draft, "category", "Choose a category.", "basics"),
+        need(draft, "category", "Give this item a category.", "basics"),
         weapon && !blank(weapon.damageDice) && blank(weapon.damageType)
           ? { text: "Give this item a damage type.", sectionId: "weapon" }
           : null,
         weapon && typeof weapon.damageDice === "string" && weapon.damageDice.trim() !== "" && !isDiceFormula(weapon.damageDice)
           ? { text: `Fix the damage formula “${weapon.damageDice}”.`, sectionId: "weapon" }
           : null,
-        draft.castsSpell === true && blank(casts?.spellId)
-          ? { text: "Choose which spell this item casts.", sectionId: "magic" }
+        casts.some((cast) => blank(cast.spellId))
+          ? { text: "Choose which spell this item casts, or take the empty row off.", sectionId: "magic" }
+          : null,
+        // `cursed` without attunement is a curse you take off by taking the hat off —
+        // and attunement is both what springs it and the boundary the hiding rule needs.
+        draft.cursed === true && getAt(draft, "attunement.required") !== true
+          ? { text: "Make this item require attunement — attuning is what springs a curse and what reveals it.", sectionId: "magic" }
           : null,
         draft.isMagic === true && !!draft.uses && blank(getAt(draft, "uses.limit")) && blank(getAt(draft, "uses.scaling"))
           ? { text: "Say how many charges this item has, or turn charges off.", sectionId: "magic" }
           : null,
-        formulaBlocker
+        formulaBlocker,
+        badGating(draft, "magic")
       );
     }
 

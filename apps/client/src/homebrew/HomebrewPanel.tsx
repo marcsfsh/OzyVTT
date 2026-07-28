@@ -303,6 +303,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
                   records={records}
                   usageCount={usageCount}
                   onChanged={(next) => { setSelected(next); patchRow(next); }}
+                  onSelect={(id) => void select(id)}
                 />
               : hasSelection
                 ? <Skeleton variant="block" height="16rem" />

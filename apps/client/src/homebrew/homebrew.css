@@ -205,6 +205,21 @@
 /* ---- Riders, features, choices ---- */
 .hb-riders { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .hb-riders-when { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* The derived "+1 to hit · 1d8 slashing + 1d4 lightning" line. `--text`, not `--text-dim`:
+   it is the ANSWER, not an aside, and it is the only place the four inputs above it are
+   shown assembled. It wraps rather than scrolling — a phone gets two lines, not a
+   sideways drag, and the page must never scroll horizontally because of it. */
+.hb-riders-readout {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* One jump control per broken record. Wraps, because at 320px two names do not share a
+   line and a row that cannot wrap is a row that widens the document. */
+.hb-broke-list { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--space-2); margin-top: var(--space-2); }
 .hb-feature { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .hb-choice {
   display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;

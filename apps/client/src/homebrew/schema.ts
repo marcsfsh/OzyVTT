@@ -32,7 +32,15 @@ import type { HomebrewType } from "./types";
     and a client-side mirror of it would be a second source of truth to keep in sync. */
 export type Draft = Readonly<Record<string, unknown>>;
 
-export type SelectOption = Readonly<{ value: string; label: string; disabled?: boolean }>;
+/**
+ * `group` is the renderer flag that keeps a long `select` pickable — it renders an
+ * `<optgroup>`, and nothing else changes. It is what lets the rider vocabulary offer
+ * twenty-one modifiers and thirty gating conditions from ordinary selects instead of
+ * from a twelfth `FieldKind` (see the standing rule above). The group LABEL is the
+ * sentence the options finish, so the GM reads "Only while… Attuned" and never has to
+ * learn the word the schema calls it.
+ */
+export type SelectOption = Readonly<{ value: string; label: string; disabled?: boolean; group?: string }>;
 
 /** One entry in a big pickable catalog (spells, equipment). Carries its origin so a
     picker can badge the minority side and facet when both are present. */
@@ -277,7 +285,28 @@ export function basicsSection(
 
 /* ------------------------------------------------------------------- helpers ----- */
 
-export const opt = (value: string, label?: string): SelectOption => ({ value, label: label ?? value });
+export const opt = (value: string, label?: string, group?: string): SelectOption => ({
+  value,
+  label: label ?? value,
+  ...(group ? { group } : {})
+});
+
+/** `opt` bound to one `<optgroup>`, so a long grouped list reads as its groups rather
+    than as the same third argument repeated forty times. */
+export const grouped = (group: string) => (value: string, label?: string): SelectOption => opt(value, label, group);
+
+/** Preserves declaration order of the groups themselves, so the renderer never has to
+    sort and the schema's order IS the order the GM sees. Ungrouped options come first. */
+export function groupOptions(options: readonly SelectOption[]): ReadonlyArray<Readonly<{ group: string | null; options: readonly SelectOption[] }>> {
+  const out: Array<{ group: string | null; options: SelectOption[] }> = [];
+  for (const option of options) {
+    const group = option.group ?? null;
+    const last = out[out.length - 1];
+    if (last && last.group === group) last.options.push(option);
+    else out.push({ group, options: [option] });
+  }
+  return out;
+}
 
 /**
  * Does this `fromCatalog` slug name **the record being edited**?

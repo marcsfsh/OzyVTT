@@ -28,7 +28,7 @@ import {
 } from "@vtt/ui";
 import { CatalogPicker } from "./CatalogPicker";
 import { getAt, setAt } from "./paths";
-import { resolveOptions, resolveSuggestions, type Draft, type FieldDef, type SchemaContext } from "./schema";
+import { groupOptions, resolveOptions, resolveSuggestions, type Draft, type FieldDef, type SchemaContext } from "./schema";
 
 export type CustomRenderer = (args: {
   field: FieldDef;
@@ -169,6 +169,9 @@ export function FieldRenderer(props: FieldRendererProps) {
           />
         );
       }
+      // `<optgroup>` when — and only when — the schema asked for it, so a twenty-one
+      // entry modifier list or a thirty entry gating list reads as its groups. Ungrouped
+      // options render exactly as they always did.
       return wrap(
         <Select
           id={fieldId}
@@ -178,11 +181,23 @@ export function FieldRenderer(props: FieldRendererProps) {
           onChange={(event) => set(event.target.value || null)}
         >
           <option value="">{field.placeholder ?? "Not set"}</option>
-          {options.map((option) => (
-            <option key={option.value} value={option.value} disabled={option.disabled}>
-              {option.label}
-            </option>
-          ))}
+          {groupOptions(options).map((block, index) =>
+            block.group === null ? (
+              block.options.map((option) => (
+                <option key={option.value} value={option.value} disabled={option.disabled}>
+                  {option.label}
+                </option>
+              ))
+            ) : (
+              <optgroup key={`${block.group}-${index}`} label={block.group}>
+                {block.options.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
+            )
+          )}
         </Select>
       );
     }
@@ -268,10 +283,14 @@ export function FieldRenderer(props: FieldRendererProps) {
             ariaLabel={field.label}
             renderRow={(row, index) => (
               <FieldGrid>
-                {rowFields.map((rowField) => (
+                {/* Keyed by POSITION as well as path: one variant's "Extra attacks" and
+                    another's "Extra dice" are both `count` on the same discriminated
+                    union, mutually exclusive through `visibleWhen`. Keying on the path
+                    alone made those a duplicate-key collision. */}
+                {rowFields.map((rowField, fieldIndex) => (
                   <FieldRenderer
                     {...props}
-                    key={rowField.key}
+                    key={`${rowField.key}-${fieldIndex}`}
                     field={rowField}
                     value={(row ?? {}) as Draft}
                     onValue={(nextRow) => {
@@ -300,8 +319,8 @@ export function FieldRenderer(props: FieldRendererProps) {
               field's note. A group blurb introduces its group; it does not follow it. */}
           {help && <p className="nh-field-help">{help}</p>}
           <FieldGrid>
-            {(field.rows ?? []).map((child) => (
-              <FieldRenderer {...props} key={child.key} field={child} idPrefix={`${idPrefix}-${field.key}`} />
+            {(field.rows ?? []).map((child, childIndex) => (
+              <FieldRenderer {...props} key={`${child.key}-${childIndex}`} field={child} idPrefix={`${idPrefix}-${field.key}`} />
             ))}
           </FieldGrid>
         </fieldset>

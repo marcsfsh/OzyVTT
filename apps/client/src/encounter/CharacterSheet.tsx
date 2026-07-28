@@ -25,6 +25,13 @@ registerContentCache(() => sheetCache.clear());
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
+
+/** The required keys of an `ActorAction`, so a derived action can be handed to the targeting session
+    carrying the SERVER's id and nothing invented. Every number on it is display; the resolver reads
+    the id and computes the rest, riders included. */
+const EMPTY_ACTION = {
+  id: "", name: "", activation: "action" as const, description: "", damage: [] as Array<{ formula: string; type: string }>
+};
 const d20 = (bonus: number) => bonus === 0 ? "1d20" : `1d20 ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
@@ -309,16 +316,37 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     beginTargeting(summaryOfOwnAction(action), actor.id);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
-  // The player's OWN stat-block action that an equipped weapon (matched by name) or a spell (matched by its
-  // linked actionId) resolves as - but only when it's actually server-resolvable (has an attack, a save, or
-  // damage). null falls back to the loose quick-roll. Only definition actions carry a server actionId, so an
-  // inventory-only weapon or a utility spell with no combat action stays a plain roll.
+  // The player's OWN action that an equipped weapon (matched by name) or a spell (matched by its linked
+  // actionId) resolves as - but only when it's actually server-resolvable (has an attack, a save, or
+  // damage). null falls back to the loose quick-roll.
+  //
+  // `definition.actions` IS NOT THE WHOLE LIST any more. The server derives an action per equipped
+  // weapon, per charged item and per item-cast spell, keyed `item-<inventory id>`, and folds the
+  // standing riders into its numbers - a +1 sword's to-hit is +1 higher THERE and nowhere else. Looking
+  // only in the definition returned null for exactly those items, and the caller fell back to
+  // `rollD20(wa.toHit)`, which recomputes a to-hit on the CLIENT from base weapon stats with no rider
+  // term. The magic sword then rolled as a mundane one and nothing on screen looked wrong. That is a
+  // server-authority violation by omission (CLAUDE.md rule 2), reached through a fallback that was
+  // correct before items could carry riders.
+  //
+  // So the server's own list is consulted too (`serverActions`, below). Only its ID travels - the whole
+  // resolution, including every rider, happens server-side - so the shape handed to the targeting
+  // session carries the item's printed numbers for the preview line and the SERVER's action id.
   const structuredActionFor = (opts: { actionId?: string; name?: string }): ActorDefinition["actions"][number] | null => {
     if (!definition) return null;
     const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const match = (opts.actionId ? definition.actions.find((candidate) => candidate.id === opts.actionId) : undefined)
       ?? (opts.name ? definition.actions.find((candidate) => norm(candidate.name) === norm(opts.name!)) : undefined);
     return match && (match.attack || match.save || match.damage.length > 0) ? match : null;
+  };
+  /** The id the SERVER would resolve for this weapon, if it derived one. Name-matched, because an
+      inventory row and its derived action share a name and nothing else the client can see. */
+  const serverActionIdFor = (name: string): string | null => {
+    const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const found = serverActions.find((candidate) => norm(candidate.name) === norm(name));
+    // A definition action is already reachable through `structuredActionFor`; this is only for the
+    // derived ones, which no other client path can find.
+    return found && !definition?.actions.some((candidate) => candidate.id === found.id) ? found.id : null;
   };
   // In "inline" mode the picker + result render in the runner mounted in the Actions section; when an attack is
   // tapped from another part of the sheet (an equipped weapon, a spell) bring that runner into view so the
@@ -328,6 +356,32 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   useEffect(() => {
     if (effectiveAttackMode === "inline" && targetingSession?.attackerId === actor.id) runnerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [effectiveAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
+
+  /**
+   * The actor's EFFECTIVE action list, from the server, refreshed whenever the loadout could have
+   * moved. Read-only and already role-scoped (`actor:available-actions` lets the GM ask about anyone
+   * and a player only about their own claimed actor), so it adds no surface.
+   *
+   * Ids and names only - that is all the wire carries. It is enough for the one thing the client must
+   * do, which is hand the right id to the authoritative resolver instead of rolling its own number.
+   * It is NOT enough to render a derived action's chips (no `attack.bonus`, no `damage[]`), which is
+   * why the item-granted actions still do not appear in the player's runner. That needs the derived
+   * block on the wire and is reported rather than half-built here.
+   */
+  const [serverActions, setServerActions] = useState<ReadonlyArray<{ id: string; name: string }>>([]);
+  // Re-asked when the LOADOUT moves, not on every render: equip, unequip, attune and quantity are the
+  // four things that change what the server derives.
+  const inventorySignature = (actor.inventory ?? []).map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`).join(",");
+  useEffect(() => {
+    if (!definitionId) { setServerActions([]); return; }
+    let live = true;
+    socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: ReadonlyArray<{ id: string; name: string }> }) => {
+      // A failure is silent on purpose: every caller below already has a working fallback, and an
+      // error banner for a lookup the GM did not ask for would be noise.
+      if (live && result.ok && result.actions) setServerActions(result.actions.map((entry) => ({ id: entry.id, name: entry.name })));
+    });
+    return () => { live = false; };
+  }, [actor.id, definitionId, inventorySignature]);
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
@@ -423,7 +477,12 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         const abilityMod = modifierOf(definition.abilityScores[weapon.rangeFeet != null ? "dex" : "str"]);
         const toHit = abilityMod + definition.proficiencyBonus;
         const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
-        return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet };
+        // ACTIVE, not merely magical: riders apply while equipped, and while ATTUNED as well when the
+        // item asks for it. An unattuned magic weapon still swings - it just swings mundane - so its
+        // printed numbers are exactly right and must not be second-guessed. Same distinction the
+        // server draws; drawing a different one here is how the two get to disagree.
+        const active = item.magic?.isMagic === true && (item.magic.attunementRequired !== true || item.attuned === true);
+        return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet, active };
       })
     : [];
   // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
@@ -660,13 +719,31 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
               {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
               {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
                 {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
-                {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
-                  <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}</span></p>
-                  <div className="sheet-roll-row">
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => { const structured = structuredAttacks ? structuredActionFor({ name: wa.name }) : null; if (structured) routeAttack(structured); else void rollD20(wa.toHit, "attack", `${wa.name} to hit`); }}>{signed(wa.toHit)} to hit</button>
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>
-                  </div>
-                </div>)}
+                {equippedWeaponActions.map((wa) => {
+                  // The server's own action for this weapon, when it derived one. Its numbers carry
+                  // the item's riders; the two below do not and cannot.
+                  const serverId = serverActionIdFor(wa.name);
+                  // A word, never a silent wrong number: while the item is active, its to-hit and its
+                  // damage are the SERVER's to state, so the chips stop asserting figures they compute
+                  // without a rider term. Deferred only when there is somewhere to defer TO - with no
+                  // server action in hand the printed numbers are still the best answer available, and
+                  // annotating the exception beats blanking the rule.
+                  const defer = wa.active && serverId !== null;
+                  return <div key={wa.id} className="sheet-entry">
+                    <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}{wa.active ? " · Magic" : ""}</span></p>
+                    <div className="sheet-roll-row">
+                      <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => {
+                        const structured = structuredAttacks ? structuredActionFor({ name: wa.name }) : null;
+                        if (structured) { routeAttack(structured); return; }
+                        // Only the ID travels; the roll, every rider and the damage are resolved server-side.
+                        if (serverId) { routeAttack({ ...EMPTY_ACTION, id: serverId, name: wa.name, attack: { bonus: wa.toHit }, damage: [{ formula: wa.damageFormula, type: wa.damageType }] }); return; }
+                        void rollD20(wa.toHit, "attack", `${wa.name} to hit`);
+                      }}>{defer ? "Attack" : `${signed(wa.toHit)} to hit`}</button>
+                      {!defer && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>}
+                    </div>
+                    {defer && <p className="sheet-weapon-meta">Its magic is applied when you attack.</p>}
+                  </div>;
+                })}
                 {!inlineRunner && weaponActions.map(renderAction)}
               </div>}
               {!inlineRunner && hasSpellActions && <div className="sheet-action-group">

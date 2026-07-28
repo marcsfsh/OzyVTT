@@ -24,13 +24,13 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Alert, Badge, Button, IconChevron, Menu, MenuItem, SaveState } from "@vtt/ui";
 import { RevealSwitch } from "../codex/SecretMarkers";
 import { useConfirm } from "../components/feedback";
-import { HomebrewRequestError, homebrewApi, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
+import { HomebrewRequestError, homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { FeatureEditor } from "./FeatureEditor";
 import { LevelTableEditor } from "./LevelTableEditor";
 import { ITEM_RIDERS, RiderEditor } from "./RiderEditor";
 import { SchemaForm, sectionDomId } from "./SchemaForm";
 import { SpellListContents } from "./SpellListContents";
-import { withDefaults } from "./defaults";
+import { forStorage, withDefaults } from "./defaults";
 import { SCHEMAS, fieldAt, sectionTitle } from "./schemas";
 import { useAutosave } from "./useAutosave";
 import { useSchemaContext } from "./useSchemaContext";
@@ -47,13 +47,16 @@ export function RecordDetail({
   record: initial,
   records,
   usageCount,
-  onChanged
+  onChanged,
+  onSelect
 }: Readonly<{
   gmToken: string;
   record: HomebrewRecordDocument;
   records: readonly HomebrewRecordSummary[];
   usageCount: number;
   onChanged: (record: HomebrewRecordDocument) => void;
+  /** Opens another record — the jump control on the removal consequence below. */
+  onSelect?: (id: string) => void;
 }>) {
   const { confirm, dialog } = useConfirm();
   const [doc, setDoc] = useState(initial);
@@ -63,6 +66,8 @@ export function RecordDetail({
   const [draft, setDraft] = useState<Body>(() => withDefaults(initial.type, initial.record));
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** What removing this record just did to OTHER records. See `remove()`. */
+  const [brokeOthers, setBrokeOthers] = useState<readonly HomebrewRecordSummary[]>([]);
   const reasonId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { ctx, spells } = useSchemaContext(initial.id, initial.type, records);
@@ -96,7 +101,9 @@ export function RecordDetail({
     // in above have to be dirty, or they never reach the store.
     baseline: initial.record,
     save: async (body, expectedRev) => {
-      const next = await homebrewApi.update(gmToken, docRef.current.id, body, expectedRev);
+      // `forStorage` drops the row ids the editor mints for `RowEditor`. They are UI identity, and
+      // the rider unions are `.strict()`, so shipping one fails the whole record to parse.
+      const next = await homebrewApi.update(gmToken, docRef.current.id, forStorage(body), expectedRev);
       adopt(next);
       return next.rev;
     },
@@ -216,6 +223,21 @@ export function RecordDetail({
   const setVisible = (visible: boolean) => void runStateChange(() => homebrewApi.setVisibility(gmToken, docRef.current.id, visible, docRef.current.rev));
   const restore = () => runStateChange(() => homebrewApi.restore(gmToken, docRef.current.id));
 
+  /**
+   * **Removing one record can invalidate another, and the demotion that follows used to be
+   * silent.** A published class whose only subclass is removed stays published and becomes
+   * invalid on the spot; the next unrelated write to it hits `stillPublishable`, fails, and
+   * the class quietly drops to Draft — surfacing minutes later, on a record the GM was not
+   * looking at, as a state change nothing on screen explains. The demotion is right. The
+   * silence is the defect.
+   *
+   * So the consequence is reported at the moment it is caused, from the SERVER's own
+   * answer rather than a client guess: every list row carries a freshly computed `valid`,
+   * so re-listing after the delete and diffing against what was published-and-valid a
+   * moment ago names exactly the records this removal broke — for any relation, not just
+   * subclass-to-class, and without the client re-implementing half the validator
+   * (CLAUDE.md rule 2). One extra request, on the rarest path in the feature.
+   */
   const remove = async () => {
     const name = nameOf(draft).trim() || `this ${typeLabel(doc.type)}`;
     // `danger: false` on purpose: nothing is lost, so this is caution, not danger.
@@ -229,9 +251,21 @@ export function RecordDetail({
     if (!confirmed) return;
     setBusy(true);
     setActionError(null);
+    setBrokeOthers([]);
+    const wereFine = new Set(
+      records.filter((row) => row.state === "published" && row.valid && !row.deletedAt && row.id !== docRef.current.id).map((row) => row.id)
+    );
     try {
       await autosave.flush();
       await homebrewApi.remove(gmToken, docRef.current.id);
+      // Best-effort: a failed re-list must not turn a successful removal into an error.
+      // Losing the warning is a smaller harm than claiming the removal did not happen.
+      try {
+        const rows = await listAllHomebrew(gmToken);
+        setBrokeOthers(rows.filter((row) => wereFine.has(row.id) && row.state === "published" && !row.valid && !row.deletedAt));
+      } catch {
+        setBrokeOthers([]);
+      }
       const next = await homebrewApi.get(gmToken, docRef.current.id);
       // `adopt` patches the rail row in place, so the row picks up its Removed state and
       // leaves the default view — and NOTHING ELSE MOVES. Removing one record used to
@@ -329,6 +363,35 @@ export function RecordDetail({
         <Alert tone="info">
           Removed from pickers. Nothing was deleted.{" "}
           <Button variant="secondary" size="sm" className="tap-target" onClick={() => void restore()} disabled={busy}>Restore</Button>
+        </Alert>
+      )}
+
+      {/* The consequence this removal had somewhere else, stated where and when it
+          happened. `warning`, not `error`: nothing failed, and Restore above undoes it.
+          The record is NAMED BY THE CONTROL and not by the sentence, which is the same
+          rule the publish blocker keeps — say the thing once. */}
+      {brokeOthers.length > 0 && (
+        <Alert tone="warning" title={brokeOthers.length === 1 ? "This broke another record" : "This broke other records"}>
+          <p>
+            {brokeOthers.length === 1 ? "It's still published, but it can't be published as it stands" : "They're still published, but they can't be published as they stand"}
+            , so the next edit to {brokeOthers.length === 1 ? "it" : "them"} puts {brokeOthers.length === 1 ? "it" : "them"} back to Draft.
+            Restore this one, or fix {brokeOthers.length === 1 ? "it" : "them"}.
+          </p>
+          <div className="hb-broke-list">
+            {brokeOthers.map((row) => (
+              <Button
+                key={row.id}
+                variant="secondary"
+                size="sm"
+                className="tap-target"
+                disabled={!onSelect}
+                onClick={() => onSelect?.(row.id)}
+              >
+                {row.name || `Untitled ${typeLabel(row.type)}`}
+                <span className="hb-blocked-jump-icon" aria-hidden="true"><IconChevron /></span>
+              </Button>
+            ))}
+          </div>
         </Alert>
       )}
 

@@ -12,7 +12,8 @@
  */
 
 import { newId } from "../lib/ids";
-import { basicsSection, damagePartsField, diceValidate, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
+import { getAt } from "./paths";
+import { basicsSection, damagePartsField, diceValidate, humanise, opt, type Draft, type FieldDef, type HomebrewSchema, type SchemaContext, type SectionDef } from "./schema";
 import type { HomebrewType } from "./types";
 
 const ABILITIES = [
@@ -533,20 +534,53 @@ const SPELL_LIST_SCHEMA: HomebrewSchema = {
 /* ---------------------------------------------------------------- equipment ----- */
 
 /**
- * `EquipmentReferenceSchema` is the ONE `.strict()` content schema, and it is small:
- * id, name, source, category, costGp, weightLb, description, weapon, armor. Nothing else.
+ * `EquipmentReferenceSchema` is the ONE `.strict()` content schema, so every key offered
+ * here has to exist there: strict does not ignore an undeclared field, it rejects the
+ * whole record. `summary` and `attribution` are absent for exactly that reason.
  *
- * **The Magic section the plan specifies is deliberately NOT here yet.** `isMagic`,
- * `requiresAttunement`, item riders and item-cast spells have no fields in that schema,
- * and `.strict()` means the store does not ignore them — it rejects the whole record. The
- * standing rule is that no rider field ships in the form before its consumer exists;
- * here the consumer is a backend vocabulary that has not landed. `RiderEditor` is built
- * and ready (`ITEM_RIDERS`, `scope: "item"`, the `uses` → "Charges" relabel); the day
- * `EquipmentReferenceSchema` grows the vocabulary, this section is a handful of
- * `FieldDef`s and one `custom: "riders"` line, and nothing else changes.
+ * ## The Magic section
  *
- * `summary` and `attribution` are likewise absent, for the same reason.
+ * An item and a feature carry the SAME riders — the server spells that vocabulary once
+ * (`featureRiders`) and so does `RiderEditor`, which both mount. What an item adds on top
+ * is five fields the vocabulary has no home for: where it is worn (`slot`), whether it is
+ * magical at all, whether it needs attunement, what spell it casts, and which feat it
+ * hands over. Everything else — modifiers, charges, actions, effects, grants — is the
+ * shared sub-form with `scope: "item"` and a `labels` relabel, and there is no second
+ * component. See the table at the top of `RiderEditor.tsx`.
+ *
+ * **Nothing below writes a key until the GM turns "This item is magical" on**, which is
+ * what keeps an ordinary longsword saving cleanly whatever state the item vocabulary is
+ * in on the server: turning it off deletes the whole magic half rather than leaving
+ * `isMagic: false` behind for `.strict()` to reject.
  */
+
+/** The mechanical hook, and the one closed enum in the file. `category` stays the OPEN
+    identity slug ("relic", "trinket"); `slot` is what the engine exhaustively switches
+    on, which is what makes an open category safe rather than inert. */
+const SLOTS = [
+  opt("weapon", "A weapon", "Held"),
+  opt("shield", "A shield", "Held"),
+  opt("held", "Held — a wand, orb, rod or staff", "Held"),
+  opt("armor", "Body armour", "Worn"),
+  opt("head", "On the head — a circlet or helm", "Worn"),
+  opt("neck", "Around the neck — an amulet", "Worn"),
+  opt("shoulders", "Over the shoulders — a cloak", "Worn"),
+  opt("hands", "On the hands — gloves", "Worn"),
+  opt("ring", "A ring", "Worn"),
+  opt("belt", "At the belt", "Worn"),
+  opt("feet", "On the feet — boots", "Worn"),
+  opt("wondrous", "Wondrous — attunable, worn nowhere", "Everything else"),
+  opt("consumable", "Used up — a potion or scroll", "Everything else"),
+  opt("ammunition", "Ammunition", "Everything else"),
+  opt("none", "Just carried", "Everything else")
+];
+
+const RARITIES = [opt("common", "Common"), opt("uncommon", "Uncommon"), opt("rare", "Rare"), opt("very-rare", "Very rare"), opt("legendary", "Legendary"), opt("artifact", "Artifact")];
+
+/** Turning magic off must take the whole magic half with it. Left behind, `isMagic: false`
+    plus an orphan rider is a record `.strict()` rejects and a GM cannot see to fix. */
+const MAGIC_KEYS = ["isMagic", "rarity", "attunement", "cursed", "casts", "grantsFeatIds", "modifiers", "grants", "uses", "actions", "effects", "tags"];
+
 const EQUIPMENT_SCHEMA: HomebrewSchema = {
   type: "equipment",
   sections: [
@@ -560,12 +594,118 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           required: true,
           suggestions: (ctx) => ctx.equipmentCategories.map((option) => option.value),
           // An OPEN slug, never a closed enum: homebrew declares "relic" or "trinket"
-          // with no schema change. Only "weapon", "armor" and "shield" drive mechanics —
-          // any other category displays and stacks, and derives nothing.
-          help: "Only weapon, armor and shield drive attacks and armour class. Anything else displays and stacks."
+          // with no schema change. `slot` beside it is what drives the mechanics, so a
+          // category is now free to be nothing but a browse facet.
+          help: "Your own word for it — “relic”, “trinket”. What it DOES is the field beside this one."
+        },
+        {
+          key: "slot",
+          label: "Worn or held as",
+          kind: "select",
+          options: SLOTS,
+          help: "This is what makes it derive armour class or an attack. Leave it unset and the category is used instead."
         },
         { key: "costGp", label: "Cost", kind: "number", min: 0, max: 1000000, unit: "gp", allowDecimal: true },
         { key: "weightLb", label: "Weight", kind: "number", min: 0, max: 1000, unit: "lb", allowDecimal: true }
+      ]
+    },
+    {
+      id: "magic",
+      title: "Magic",
+      fields: [
+        {
+          key: "isMagic",
+          label: "This item is magical",
+          kind: "switch",
+          help: "Everything below is off until this is on.",
+          write: (next, draft) => {
+            if (next === true) return { ...draft, isMagic: true };
+            const cleared: Record<string, unknown> = { ...draft };
+            for (const key of MAGIC_KEYS) delete cleared[key];
+            return cleared;
+          }
+        },
+        { key: "rarity", label: "Rarity", kind: "select", options: RARITIES, visibleWhen: (draft) => draft.isMagic === true },
+        {
+          key: "attunement.required",
+          label: "Requires attunement",
+          kind: "switch",
+          help: "A character can attune to three items at once.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        {
+          key: "attunement.restrictedTo",
+          label: "Only by",
+          kind: "tags",
+          placeholder: "cleric",
+          help: "A class or species. It's shown on the sheet, never enforced — handing a player a restricted item on purpose is a normal table event.",
+          visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+        },
+        {
+          key: "cursed",
+          label: "Cursed",
+          kind: "switch",
+          // Stated where it is decided, not in a manual: this is the whole of what the
+          // flag does, and the attunement precondition is why it is only offered here.
+          help: "Players can't unattune, unequip or drop it — only you can. Its magic stays hidden from them until they attune.",
+          visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+        },
+        {
+          key: "casts",
+          label: "Spells it casts",
+          kind: "rows",
+          wide: true,
+          visibleWhen: (draft) => draft.isMagic === true,
+          addLabel: "Add a spell",
+          emptyText: "It casts nothing.",
+          maxRows: 8,
+          maxRowsReason: "Eight spells is as many as one item carries.",
+          rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
+          newRow: () => ({ rowId: newId(), spellId: "", consumesSpellSlot: false }),
+          rowLabel: (row) => {
+            const cast = row as Record<string, unknown>;
+            const limit = getAt(cast, "uses.limit");
+            const name = typeof cast.spellId === "string" && cast.spellId ? humanise(cast.spellId) : "No spell chosen";
+            return typeof limit === "number" ? `${name} — ${limit} a ${String(getAt(cast, "uses.per") ?? "long-rest").replace(/-/g, " ")}` : name;
+          },
+          rows: [
+            { key: "spellId", label: "Spell", kind: "select", searchable: true, catalog: "spells", placeholder: "Choose a spell" },
+            { key: "atLevel", label: "Cast at level", kind: "stepper", min: 0, max: 9, help: "Leave at the spell's own level for a scroll." },
+            { key: "ability", label: "Uses", kind: "select", options: ABILITIES, help: "Leave empty to use the wielder's own." },
+            { key: "saveDc", label: "Save DC", kind: "number", min: 1, max: 40, help: "The item's own DC, not the character's." },
+            {
+              key: "uses.limit",
+              label: "Times",
+              kind: "number",
+              min: 1,
+              max: 20,
+              // `per` is required on the stored shape, so a count with no recovery is an
+              // unpublishable record. Seeded here, still editable in the field below.
+              write: (next, row) => {
+                const uses = { ...(row.uses as Record<string, unknown> | undefined) };
+                if (next === null || next === undefined) return { ...row, uses: undefined };
+                uses.limit = next;
+                uses.per ??= "long-rest";
+                return { ...row, uses };
+              }
+            },
+            { key: "uses.per", label: "Comes back", kind: "select", options: [opt("encounter", "Every encounter"), opt("short-rest", "On a short rest"), opt("long-rest", "On a long rest")], help: "A long rest is this table's day, so “once per day” is “on a long rest”." },
+            { key: "uses.pool", label: "Shared pool", placeholder: "wand-charges", help: "Spells sharing a pool share one set of charges." },
+            { key: "consumesSpellSlot", label: "Spends the caster's own slot", kind: "switch" }
+          ]
+        },
+        {
+          key: "grantsFeatIds",
+          label: "Feats it grants",
+          kind: "multiselect",
+          wide: true,
+          max: 4,
+          maxRowsReason: "Four feats is as many as one item grants.",
+          options: (ctx) => ctx.feats,
+          help: "The feat's own modifiers come with it, and they come back off when the item does.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        { key: "riders", label: "What it does", kind: "custom", custom: "riders", wide: true, visibleWhen: (draft) => draft.isMagic === true }
       ]
     },
     {
