@@ -413,7 +413,35 @@ export function actionAvailability(state: GameState, attacker: LiveActor, action
       violations: evaluation.violations,
       usesRemaining,
       componentsRemaining,
-      ...(builtin ? { builtin: true } : {})
+      ...(builtin ? { builtin: true } : {}),
+      /**
+       * DISPLAY VALUES, and only display values (ADR-0007 additive-optional, no schemaVersion bump).
+       *
+       * `actions` here is the actor's EFFECTIVE list - `effectiveActions(definition, actor, catalog)`
+       * at every call site - so these numbers already carry the standing riders of whatever the actor
+       * has equipped and attuned. That is the whole point: they exist so a client can RENDER an
+       * item-derived action (an Amulet of Message's cast, a +1 sword's swing) it otherwise could not
+       * see at all, because `definition.actions` does not contain it.
+       *
+       * They are NOT what gets rolled. Resolution takes the `id` and recomputes everything through
+       * the same `effectiveActions` call (CLAUDE.md rule 2), so a preview built from these can never
+       * disagree with the roll - they are two reads of one function, not two computations.
+       */
+      description: action.description,
+      attackBonus: action.attack?.bonus ?? null,
+      reachFeet: action.attack?.reachFeet ?? null,
+      rangeFeet: action.attack?.rangeFeet ?? null,
+      rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
+      attackCount: action.attack?.count ?? null,
+      saveAbility: action.save?.ability ?? null,
+      saveDc: action.save?.dc ?? null,
+      damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
+      usesLimit: action.uses ? useLimitFor(siblings, action) : null,
+      usesPer: action.uses?.per ?? null,
+      usesPool: action.uses?.pool ?? null,
+      requiresEffectTag: action.requiresEffectTag ?? null,
+      multiattack: action.multiattack ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count })) : null,
+      reaction: action.reaction ?? null
     };
   });
 }

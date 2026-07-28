@@ -231,13 +231,33 @@ function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): Blo
  * whose Publish was disabled before the GM had touched anything, for a requirement the
  * store does not have. Exactly the shape of the class-duplicate defect, one type over.
  *
- * The requirement is kept where it is real: an item with no weapon block, no armour block
- * and no description IS a blank card, and every piece of SRD gear already has prose.
+ * The MECHANICS clause below is the same rule reaching one step further, and it was found
+ * by driving the product rather than by reading it: a Ring of Protection whose entire point
+ * is `+1 armour class` was refused until the GM restated that mechanic in English. Its card
+ * is not blank — it says "+1 armour class" — and demanding prose that duplicates a field on
+ * the same screen is exactly the clerical work this editor exists to remove. Worse, the two
+ * can then disagree, and the prose is the half nothing enforces.
+ *
+ * The requirement survives where it is real: an item with no weapon, no armour and no
+ * mechanics IS a blank card, and every piece of SRD gear already has prose.
  */
 const hasDerivedCard = (draft: Draft): boolean => {
   const weapon = draft.weapon as Record<string, unknown> | null | undefined;
   const armor = draft.armor as Record<string, unknown> | null | undefined;
-  return (!!weapon && !blank(weapon.damageDice)) || (!!armor && typeof armor.acBase === "number");
+  if (weapon && !blank(weapon.damageDice)) return true;
+  if (armor && typeof armor.acBase === "number") return true;
+  if (draft.isMagic !== true) return false;
+  const nonEmpty = (value: unknown) => Array.isArray(value) && value.length > 0;
+  const grants = draft.grants as Record<string, unknown> | undefined;
+  return (
+    nonEmpty(draft.modifiers) ||
+    nonEmpty(draft.casts) ||
+    nonEmpty(draft.grantsFeatIds) ||
+    nonEmpty(draft.actions) ||
+    nonEmpty(draft.effects) ||
+    !!draft.uses ||
+    (!!grants && Object.values(grants).some(nonEmpty))
+  );
 };
 
 const SHOWN_TO_PLAYERS: Partial<Record<HomebrewType, Readonly<{ path: string; text: string; unless?: (draft: Draft) => boolean }>>> = {

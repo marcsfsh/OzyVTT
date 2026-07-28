@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { resolveSpellcasting, type ActorDefinition, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
+import { resolveSpellcasting, type ActorDefinition, type ContentActionSummary, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
@@ -32,6 +32,33 @@ const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const EMPTY_ACTION = {
   id: "", name: "", activation: "action" as const, description: "", damage: [] as Array<{ formula: string; type: string }>
 };
+
+/** One row of `actor:available-actions`. The display half is additive-optional on the wire
+    (ADR-0007), so every field is read defensively — an older server simply yields an action
+    with no numbers, which renders as a name and routes correctly anyway. */
+type AvailabilityRow = Readonly<{
+  id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other";
+  available: boolean; usesRemaining: number | null; builtin?: boolean;
+  description?: string; attackBonus?: number | null; reachFeet?: number | null; rangeFeet?: number | null;
+  rangeNormalFeet?: number | null; attackCount?: number | null; saveAbility?: string | null; saveDc?: number | null;
+  damage?: ReadonlyArray<{ formula: string; type: string }>; usesLimit?: number | null;
+  usesPer?: ContentActionSummary["usesPer"]; usesPool?: string | null; requiresEffectTag?: string | null;
+  multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
+  reaction?: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null;
+}>;
+
+/** The wire row in the shape every action surface here already speaks. */
+function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
+  return {
+    id: row.id, name: row.name, activation: row.activation, description: row.description ?? "",
+    attackBonus: row.attackBonus ?? null, reachFeet: row.reachFeet ?? null, rangeFeet: row.rangeFeet ?? null,
+    rangeNormalFeet: row.rangeNormalFeet ?? null, saveAbility: row.saveAbility ?? null, saveDc: row.saveDc ?? null,
+    damage: row.damage ?? [], area: null, attackCount: row.attackCount ?? null,
+    usesLimit: row.usesLimit ?? null, usesPer: row.usesPer ?? null, usesRecharge: null, usesPool: row.usesPool ?? null,
+    requiresEffectTag: row.requiresEffectTag ?? null, multiattack: row.multiattack ?? null,
+    grants: false, reaction: row.reaction ?? null
+  };
+}
 const d20 = (bonus: number) => bonus === 0 ? "1d20" : `1d20 ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
@@ -339,14 +366,14 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
       ?? (opts.name ? definition.actions.find((candidate) => norm(candidate.name) === norm(opts.name!)) : undefined);
     return match && (match.attack || match.save || match.damage.length > 0) ? match : null;
   };
-  /** The id the SERVER would resolve for this weapon, if it derived one. Name-matched, because an
-      inventory row and its derived action share a name and nothing else the client can see. */
-  const serverActionIdFor = (name: string): string | null => {
+  /** The SERVER's own action for this weapon, if it derived one. Name-matched, because an inventory
+      row and its derived action share a name and nothing else the client can see. */
+  const serverActionFor = (name: string): ContentActionSummary | null => {
     const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const found = serverActions.find((candidate) => norm(candidate.name) === norm(name));
     // A definition action is already reachable through `structuredActionFor`; this is only for the
     // derived ones, which no other client path can find.
-    return found && !definition?.actions.some((candidate) => candidate.id === found.id) ? found.id : null;
+    return found && !definition?.actions.some((candidate) => candidate.id === found.id) ? found : null;
   };
   // In "inline" mode the picker + result render in the runner mounted in the Actions section; when an attack is
   // tapped from another part of the sheet (an equipped weapon, a spell) bring that runner into view so the
@@ -362,23 +389,26 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
    * moved. Read-only and already role-scoped (`actor:available-actions` lets the GM ask about anyone
    * and a player only about their own claimed actor), so it adds no surface.
    *
-   * Ids and names only - that is all the wire carries. It is enough for the one thing the client must
-   * do, which is hand the right id to the authoritative resolver instead of rolling its own number.
-   * It is NOT enough to render a derived action's chips (no `attack.bonus`, no `damage[]`), which is
-   * why the item-granted actions still do not appear in the player's runner. That needs the derived
-   * block on the wire and is reported rather than half-built here.
+   * This list is the ONLY place an item-derived action exists: `effectiveActions` synthesises one per
+   * equipped weapon, charged item and item-cast spell, and `definition.actions` - the immutable base -
+   * contains none of them. An Amulet of Message's cast is not a thing the sheet can find any other
+   * way. Its numbers already carry the standing riders of what is equipped and attuned, because the
+   * server read them off that same effective list.
+   *
+   * They are DISPLAY values. Every roll below sends the `id` and lets the server recompute
+   * (CLAUDE.md rule 2), so what is previewed and what is rolled are two reads of one function.
    */
-  const [serverActions, setServerActions] = useState<ReadonlyArray<{ id: string; name: string }>>([]);
+  const [serverActions, setServerActions] = useState<readonly ContentActionSummary[]>([]);
   // Re-asked when the LOADOUT moves, not on every render: equip, unequip, attune and quantity are the
   // four things that change what the server derives.
   const inventorySignature = (actor.inventory ?? []).map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`).join(",");
   useEffect(() => {
     if (!definitionId) { setServerActions([]); return; }
     let live = true;
-    socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: ReadonlyArray<{ id: string; name: string }> }) => {
+    socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: readonly AvailabilityRow[] }) => {
       // A failure is silent on purpose: every caller below already has a working fallback, and an
       // error banner for a lookup the GM did not ask for would be noise.
-      if (live && result.ok && result.actions) setServerActions(result.actions.map((entry) => ({ id: entry.id, name: entry.name })));
+      if (live && result.ok && result.actions) setServerActions(result.actions.filter((row) => !row.builtin).map(summaryOfAvailability));
     });
     return () => { live = false; };
   }, [actor.id, definitionId, inventorySignature]);
@@ -485,6 +515,16 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet, active };
       })
     : [];
+  /** Everything the loadout added that the stat block does not have — a wand's charge, an amulet's
+      cast, a magic weapon's swing. An action a player cannot see is an action they cannot use. */
+  const derivedActions = serverActions.filter((row) => !definition?.actions.some((candidate) => candidate.id === row.id));
+  /** The derived rows that are NOT one of the equipped-weapon entries above — a wand's charge, an
+      amulet's cast, an item-granted Uncanny Dodge. Matched out by name, the same key the weapon rows
+      are matched on, so one action is never drawn twice. */
+  const itemActions = derivedActions.filter((row) => {
+    const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return !equippedWeaponActions.some((wa) => norm(wa.name) === norm(row.name));
+  });
   // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
   // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
   // and carries the catalog's category/weight/description so the sheet can group and describe it.
@@ -695,7 +735,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
-        {(definition.actions.length > 0 || equippedWeaponActions.length > 0) && <section className="sheet-section"><h3>Actions</h3>
+        {(definition.actions.length > 0 || equippedWeaponActions.length > 0 || itemActions.length > 0) && <section className="sheet-section"><h3>Actions</h3>
           {(() => {
             type ActionT = (typeof definition.actions)[number];
             const renderAction = (action: ActionT) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
@@ -716,19 +756,21 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             // actions here; the loose weapon/spell chips below are hidden so an action isn't offered twice.
             const inlineRunner = structuredAttacks && effectiveAttackMode === "inline";
             return <>
-              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
+              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} extraActions={derivedActions} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
               {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
                 {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
                 {equippedWeaponActions.map((wa) => {
-                  // The server's own action for this weapon, when it derived one. Its numbers carry
-                  // the item's riders; the two below do not and cannot.
-                  const serverId = serverActionIdFor(wa.name);
-                  // A word, never a silent wrong number: while the item is active, its to-hit and its
-                  // damage are the SERVER's to state, so the chips stop asserting figures they compute
-                  // without a rider term. Deferred only when there is somewhere to defer TO - with no
-                  // server action in hand the printed numbers are still the best answer available, and
-                  // annotating the exception beats blanking the rule.
-                  const defer = wa.active && serverId !== null;
+                  /* THE SERVER'S numbers, not ours, whenever it has them.
+                     `equippedWeaponActions` recomputes a to-hit on the CLIENT from base weapon stats
+                     and an ability modifier, with no rider term anywhere in it — so a +1 sword read
+                     +5 and rolled +5 while the server resolved +6, and nothing on screen looked
+                     wrong. The derived row carries the folded riders in both `attackBonus` and
+                     `damage[]`, so displaying it fixes the number AND the roll at once. The client
+                     falls back to its own arithmetic only when the server derived nothing (no
+                     definition, an unresolvable id), where the printed stats are all that exists. */
+                  const srv = serverActionFor(wa.name);
+                  const toHit = srv?.attackBonus ?? wa.toHit;
+                  const damage = srv && srv.damage.length > 0 ? srv.damage : [{ formula: wa.damageFormula, type: wa.damageType }];
                   return <div key={wa.id} className="sheet-entry">
                     <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}{wa.active ? " · Magic" : ""}</span></p>
                     <div className="sheet-roll-row">
@@ -736,15 +778,29 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
                         const structured = structuredAttacks ? structuredActionFor({ name: wa.name }) : null;
                         if (structured) { routeAttack(structured); return; }
                         // Only the ID travels; the roll, every rider and the damage are resolved server-side.
-                        if (serverId) { routeAttack({ ...EMPTY_ACTION, id: serverId, name: wa.name, attack: { bonus: wa.toHit }, damage: [{ formula: wa.damageFormula, type: wa.damageType }] }); return; }
-                        void rollD20(wa.toHit, "attack", `${wa.name} to hit`);
-                      }}>{defer ? "Attack" : `${signed(wa.toHit)} to hit`}</button>
-                      {!defer && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>}
+                        if (srv) { routeAttack({ ...EMPTY_ACTION, id: srv.id, name: srv.name, attack: { bonus: toHit }, damage: [...damage] }); return; }
+                        void rollD20(toHit, "attack", `${wa.name} to hit`);
+                      }}>{signed(toHit)} to hit</button>
+                      {damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${wa.name} damage`)}>{part.formula}</button>)}
                     </div>
-                    {defer && <p className="sheet-weapon-meta">Its magic is applied when you attack.</p>}
                   </div>;
                 })}
                 {!inlineRunner && weaponActions.map(renderAction)}
+              </div>}
+              {/* Actions an EQUIPPED ITEM added. They exist nowhere in the stat block, so without
+                  this the amulet a player attuned casts nothing they can reach. The runner owns them
+                  on the player's own turn (`inlineRunner`); this is every other moment. */}
+              {!inlineRunner && itemActions.length > 0 && <div className="sheet-action-group">
+                <h4 className="sheet-action-head">From your items</h4>
+                {itemActions.map((row) => <div key={row.id} className="sheet-entry">
+                  <p><strong>{row.name}.</strong> <RichText text={row.description} />
+                    {row.usesLimit !== null && <span className="sheet-weapon-meta"> · {row.usesLimit} {row.usesLimit === 1 ? "charge" : "charges"}{row.usesPer ? ` per ${row.usesPer.replace(/-/g, " ")}` : ""}</span>}
+                  </p>
+                  {(row.attackBonus !== null || row.damage.length > 0) && <div className="sheet-roll-row">
+                    {row.attackBonus !== null && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => { if (structuredAttacks) routeAttack({ ...EMPTY_ACTION, id: row.id, name: row.name, attack: { bonus: row.attackBonus! }, damage: [...row.damage] }); else void rollD20(row.attackBonus!, "attack", `${row.name} to hit`); }}>{signed(row.attackBonus)} to hit</button>}
+                    {row.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${row.name} damage`)}>{part.formula}</button>)}
+                  </div>}
+                </div>)}
               </div>}
               {!inlineRunner && hasSpellActions && <div className="sheet-action-group">
                 <h4 className="sheet-action-head">Spell actions</h4>

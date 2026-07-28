@@ -330,13 +330,18 @@ function ownActionSummaryParts(action: ContentActionSummary): string[] {
  * never applies damage themselves, so the role boundary stays intact. Reuses the shared targeting store and
  * the GM runner's styles so both surfaces read and behave identically.
  */
-export function PlayerActionRunner({ actorId, definition, revision, rollMode, bonusMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; bonusMode: "auto" | "total"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
+export function PlayerActionRunner({ actorId, definition, extraActions = [], revision, rollMode, bonusMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; /** Actions the SERVER derived from the equipped loadout — a wand's charge, an amulet's cast, a magic weapon's swing. They are absent from `definition.actions` by construction (the definition is the immutable base), so without this the runner cannot offer an item the player has attuned. Their numbers already carry the item's standing riders; resolution still goes by id. */ extraActions?: readonly ContentActionSummary[]; revision: number; rollMode: "auto" | "manual"; bonusMode: "auto" | "total"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
   // A limited use IS a structured effect the server will resolve (`action-resolution.ts`
   // resolveDefinitionAction), so a player's Action Surge / Relentless Endurance belongs in their own
   // console with a Use tap rather than only in the GM's. It needs no target, exactly as there.
-  const actions = useMemo(() => definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0 || action.uses !== undefined).map(summaryOfOwnAction), [definition]);
+  const actions = useMemo(() => [
+    ...definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0 || action.uses !== undefined).map(summaryOfOwnAction),
+    // Item-derived, appended rather than merged: they are keyed `item-<inventory id>` and can never
+    // collide with a stat-block id, and a player reads their own kit after their own stat block.
+    ...extraActions.filter((action) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.usesLimit !== null)
+  ], [definition, extraActions]);
   const isTargetlessOwn = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.usesLimit !== null;
   const session = useTargeting();
   const result = useTargetingResult();
