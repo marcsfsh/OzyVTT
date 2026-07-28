@@ -279,12 +279,18 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   (before, an orphan sat outside the viewBox with an effective hit area of **zero**). The implementer
   disclosed a trade-off: on a 4-node layout at 375px the tighter fit put two nodes 28.7px apart on
   screen, so M5's nearest-neighbour cap correctly refused to give both a 44px area, and they measured
-  28.7px. **I could not reproduce it**: seeded to 5 nodes (3 of them orphans) and measured at 375px —
-  all 5 inside the frame, all **44.7px**, none under the floor. So the mechanism is real and is the M5
-  cap behaving as documented, but it needs a specific dense layout, and the change is a clear net
-  improvement (a framed 28.7px node beats an unreachable one). Zoom recovers it fully — the implementer
-  measured 1× → 28.7px, 1.25× → 35.8px, 1.56× → 44.7px for every node. Re-tuning the force simulation
-  would change every existing layout and is out of CI-8's scope.
+  28.7px. **CORRECTION (Stage Six): it reproduces, and my non-reproduction was a coverage failure.**
+  I first recorded this as *not reproduced* — I had seeded only 5 nodes (3 orphans) and measured all 5 at
+  **44.7px**, inside the frame. The final QA pass, against a populated database, measured **3 of 8 nodes at
+  17.1–17.6px** at 375px, and I confirmed it independently after remediation: Pages and Atlas went to zero
+  sub-floor controls while the Graph's 3 remained. Five nodes simply do not cluster tightly enough to bind
+  the cap. This is the same lesson as the tap audit itself — the measurement was right, its coverage was not.
+  **Still deliberately not fixed**, and the reason is stronger than convenience: the cap is precisely what
+  stops two nodes ~17px apart from being handed overlapping 44px areas, which would trade a small *visible*
+  target for an invisible **wrong-node** tap. Removing it makes the graph worse, not better. The real fixes
+  — more spacing in `computeLayout`'s force simulation, or a zoom-to-fit floor — change every existing
+  layout and belong to their own change. Zoom already recovers it: 1× → 28.7px, 1.56× → 44.7px for every
+  node.
 
 - **[codex/graph] The node hover/focus ring paints on the invisible 44px hit circle.** `.codex-graph-node.is-hover circle`
   and `:focus-visible circle` are unscoped, so they stroke *every* circle in the node group — including
