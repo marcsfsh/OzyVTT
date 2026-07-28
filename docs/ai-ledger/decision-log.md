@@ -7,6 +7,37 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-28 — Stage Six: the world calendar is player-readable by design (accepted, not overlooked)
+
+The final viewer-safety audit found exactly one un-gated GM-authored value in the whole Codex, and asked
+for an explicit decision rather than an implicit one. This is that decision.
+
+**The fact.** `GET /api/v1/codex/calendar` (`codex-http.ts:522`) returns `store.getCalendar()` verbatim to
+any *authenticated* role — including `currentDate`, the "Now" the Campaign dashboard renders. It is the
+only role-shared read in the router that is not branched through a `project*`/reveal check; an exhaustive
+sweep of every `envelope(response, …)` call confirmed that. It predates M7 — the dashboard surfaces it,
+it did not introduce it.
+
+**Accepted as intentional.** CI-7's own text says both GM and players land on the dashboard and see "the
+current in-world date". A reveal gate here would contradict the requirement as written. P2 ("secret by
+default") governs *records* — pages, maps, markers, entries — each of which does have its own
+`revealedToPlayers`. The world clock is not a record; it is the frame those records are dated in, and
+players already receive in-world dates on every revealed journal entry via `inWorldLabel`. Gating the
+clock while shipping the labels would be incoherent.
+
+**The cost, stated plainly rather than buried.** A GM who sets the date forward while prepping — or who
+is simply exploring the calendar editor — telegraphs elapsed in-world time to any player with the Codex
+open, immediately, with no `RevealSwitch` and no warning in the editor. That is a real workflow the
+current design does not support.
+
+**What would change this.** If prep-ahead becomes a wanted workflow, the fix is a `currentDateRevealed`
+flag (or a separate GM-only planning date), not a blanket gate on the calendar — months and weekday names
+must stay readable or every player-facing date label breaks. Recorded in `known-bugs.md` as the trigger.
+
+**Not a leak of GM-only content as the system is specified.** The auditor's own verdict: no GM-only page,
+map, marker, journal entry, relationship, wiki-link, search-index text or replay linkage survived any
+traced path.
+
 ## 2026-07-28 — Codex overhaul M7: return edges, the Campaign rename, and what "recent" means
 
 1. **Every return edge reuses the destination's existing latch; none introduced its own.** CI-3/CI-5/CI-6
