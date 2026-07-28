@@ -1,0 +1,169 @@
+/* WizardShell — full page on a laptop, full-screen sheet on a phone (builder
+   decision 4). Header and footer stick to the edges of the shell so Back/Next stay
+   reachable while the step body scrolls. */
+
+.nh-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 100dvh;
+  padding: 0 0 var(--space-4);
+  background: var(--bg);
+}
+
+.nh-wizard-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  /* Defend against the consuming app's element-selector globals. The client's styles.css carries a
+     bare `header { max-width: 40rem }` (written for its landing hero), which clamped this sticky
+     header to 640px: the step body then scrolled visibly past it in the uncovered gutter. A
+     primitive must not depend on which globals its host happens to define. */
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.nh-wizard-titles { min-width: 0; display: grid; gap: var(--space-1); }
+/* Display face, not the wordmark: a work screen, and the step indicator is already
+   the loud element in this region (§8.1 — one glowing thing per region). */
+.nh-wizard-title {
+  margin: 0;
+  font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display);
+  color: var(--text);
+  letter-spacing: var(--tracking-display);
+}
+.nh-wizard-headops { display: flex; align-items: center; gap: var(--space-2); }
+.nh-wizard-progress { grid-column: 1 / -1; }
+
+.nh-wizard-resume { padding: 0 var(--space-4); }
+
+/* GROW into spare space, never SHRINK below the content. `flex: 1 1 auto` with `min-height: 0`
+   let this item compress inside the shell's `min-height: 100dvh` column, so a step taller than the
+   viewport overflowed its own box: the shell stayed exactly one screen tall, the page had nothing
+   to scroll, and every card below the fold sat unreachable under the sticky footer. Caught by
+   driving the first real consumer (the character builder) in a browser — the styleguide demo's
+   steps are all short enough to never hit it. */
+.nh-wizard-body { flex: 1 0 auto; padding: 0 var(--space-4); }
+.nh-wizard-main { min-width: 0; }
+
+/* Detail / preview pane. */
+.nh-wizard-detail {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+.nh-wizard-detail-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
+.nh-wizard-detail-body { min-width: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* The master-detail pair. Both are `Button variant="ghost"` — the system's quiet text
+   action — so they get their look, hover, and 44px hit area from `.nh-btn`; these rules
+   only place them, and hide each one at the width where it makes no sense. */
+.nh-wizard-detail-open { display: none; margin-bottom: var(--space-3); }
+.nh-wizard-detail-back { display: none; align-self: flex-start; }
+/* The system's disclosure caret, turned a quarter clockwise to point back at the list. A STATIC
+   transform, not a transition: nothing animates, so there is nothing for reduced-motion to suppress. */
+.nh-wizard-detail-back-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-right: var(--space-1);
+  font-size: 1.05em;
+  transform: rotate(90deg);
+}
+
+.nh-wizard-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+/* Back plus an optional second way out (`footerSecondary`), so the group is a row rather than
+   a single slot. With one child it lays out exactly as it did. It WRAPS rather than squeezing:
+   `.nh-btn` is `white-space: nowrap`, so a shrunk button spills its label outside its own border
+   instead of truncating - two actions in half a 375px footer did exactly that. */
+.nh-wizard-foot-back { justify-self: start; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.nh-wizard-foot-next { justify-self: end; }
+/* The gating reason. It keeps its row whether or not it is filled, so the footer
+   never jumps as steps validate; role="status" announces it when it appears. */
+.nh-wizard-blocked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-height: 1.2em;
+  text-align: center;
+  /* "Not finished yet" is CAUTION (violet), not danger: rose-red means damage and
+     destruction (§2). Nothing has gone wrong here — a step is simply incomplete. */
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
+.nh-wizard-blocked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+.nh-wizard-blocked.is-clear { color: transparent; }
+.nh-wizard-blocked.is-clear .nh-wizard-blocked-icon { display: none; }
+
+.nh-wizard-footnote {
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+}
+
+/* ---- Narrow: master-detail. Showing both panes stacked would mean two half-read
+   columns; the Codex workspace already solved this by swapping them. 760 is the
+   documented phone/laptop step — the same one Steps uses to swap its two forms, so
+   the rail and the split now change together instead of 140px apart. ---- */
+@media (max-width: 760px) {
+  .nh-wizard-body--split.has-detail .nh-wizard-main { display: none; }
+  .nh-wizard-body--split:not(.has-detail) .nh-wizard-detail { display: none; }
+  .nh-wizard-detail-open, .nh-wizard-detail-back { display: inline-flex; }
+}
+
+@media (max-width: 560px) {
+  /* At phone width the reason needs its own line, or Back/Next get squeezed to nothing. */
+  .nh-wizard-foot { grid-template-columns: 1fr 1fr; }
+  .nh-wizard-blocked { grid-row: 1; grid-column: 1 / -1; }
+  .nh-wizard-foot-back, .nh-wizard-foot-next { grid-row: 2; }
+  /* Back fills its half of the footer alone, and shares it with a second action when both fit —
+     `flex: 1 1 auto` grows to the cell but never shrinks a label past its own button. When they
+     do not fit, the group's `flex-wrap` stacks them instead of overflowing. */
+  .nh-wizard-foot-back .nh-btn { flex: 1 1 auto; }
+  .nh-wizard-foot-next .nh-btn { width: 100%; }
+  .nh-wizard-foot-back, .nh-wizard-foot-next { justify-self: stretch; }
+}
+
+/* ---- Laptop: a full page inside the app shell, not a floating card ---- */
+@media (min-width: 761px) {
+  .nh-wizard-body--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  /* Stay beside the list. A step body can run well past a screen (a class's feature set, a
+     66-spell picker), and a preview you have scrolled away from previews nothing — the column
+     just becomes empty gutter. It clears the sticky header, and scrolls inside itself rather
+     than growing past the viewport. */
+  .nh-wizard-detail {
+    position: sticky;
+    top: calc(var(--space-16) + var(--space-12));
+    max-height: calc(100dvh - var(--space-16) * 2 - var(--space-12));
+    overflow-y: auto;
+  }
+}

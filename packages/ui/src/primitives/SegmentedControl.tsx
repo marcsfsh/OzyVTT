@@ -34,7 +34,7 @@ export function SegmentedControl({ options, value, onChange, ariaLabel, size = "
         <button
           key={option.value}
           type="button"
-          className="nh-segmented-option interactive"
+          className="nh-segmented-option tap-target interactive"
           aria-pressed={value === option.value}
           aria-label={option.ariaLabel}
           title={option.title}

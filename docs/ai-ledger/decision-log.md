@@ -7,6 +7,208 @@ without a clear new reason, and if you do change one, record it here with the da
 The **canonical architecture record is `docs/adr/`** (19 ADRs). This log captures the
 load-bearing decisions in one place plus operating decisions that don't have an ADR.
 
+## 2026-07-28 — Magic items: where derived numbers live, and who is allowed to compute them
+
+1. **A derived per-actor block rides a ROLE-GATED REQUEST, never the broadcast projection.**
+   `actor:available-actions` authorizes its caller for one named actor before deriving anything, so
+   the block needs one gate that already exists and is already tested. Putting it on `PlayerView`
+   would need the strip to be right in BOTH `projections.ts` and `PlayerActor`'s `Omit`, on every
+   tick, forever — and a field reaching one list but not the other is the shape every leak in this
+   codebase has had. A test asserts the block's field names never appear in either broadcast; add it
+   to a projection "just for the owner" and that test goes red.
+
+2. **The client does not compute game numbers — not even ones it "obviously" knows.** The sheet
+   recomputed its own checks, saves and skills from `abilityScores` + `proficiencyBonus`. That was
+   fine until items could carry riders, at which point it silently became a rule-2 violation by
+   omission: a +2-saves amulet gave +5 on a GM-forced save and +3 on the player's own chip. The fix
+   is never to teach the client the rule; it is to stop the client computing and send the number.
+
+3. **A rider vocabulary needs a compile-time owner for every variant.** `interpretFeature`'s switch
+   handled 8 of 21 types with no `default`, so 13 riders parsed, stored, published and vanished. The
+   fix that matters is not the 13 wirings — it is `Exclude` + an exhaustive `Record`, so a 22nd
+   variant cannot be added until someone declares who reads it. Same partition rules out
+   double-counting: what the builder bakes is filtered out of carriers at construction.
+
+4. **"Computed correctly" is not "delivered".** `effectiveSkillTier` had a passing test and ZERO
+   production callers for the whole feature's life. A criterion is met when a player can see and
+   roll it, and the only evidence for that is driving the UI. Two defects here were reachable no
+   other way: `rowId` made every authored modifier unpublishable against a `.strict()` schema, and
+   the publish blocker demanded prose from an item whose whole content was `+1 armour class`.
+
+5. **Uncommitted work is work you are choosing to lose.** This container rolled its filesystem back
+   twice in one session, destroying a finished, verified slice both times — the second because an
+   engineer was told to leave the tree for review. Commit at every checkpoint and push; the reflog
+   does not survive, but the remote does.
+
+## 2026-07-27 — Homebrew: six rules that bind anything authoring content
+
+1. **The audience filter lives at the MERGE POINT, not in projections.** Ten content operations took
+   a principal and ignored it; nine of eleven content read paths accept player auth. A viewer-safety
+   audit that only reads `projections.ts` will miss this entire class of leak. Corollary: homebrew
+   never enters `GameState`, which is *why* `PlayerView` being a `Pick` allow-list keeps working.
+2. **A capability that knows about drafts must not be reachable from the player path.** The
+   draft-aware authorship index sits on the store and deliberately not on `HomebrewContentSource`.
+   Same instinct as keeping homebrew out of `GameState`: put the dangerous capability where the
+   dangerous path cannot reach it.
+3. **Re-validate AFTER the write, never before.** Validating a proposed body first asks the question
+   against the record's *previous* self — an emptied spell list still resolved through the overlay
+   its old body had stamped, and reported itself valid.
+4. **When a patch would fail the gate, land it and demote — do not refuse.** Drafts may legitimately
+   be invalid and the editor autosaves mid-keystroke, so refusing makes published records
+   uneditable. The record demotes in the same transaction and the response carries the truth; a GM
+   must never be told something is live when it is not, and a `console.warn` is not where that truth
+   belongs.
+5. **Make the invalid state unauthorable, not merely reported.** A choice-bearing feature that no
+   level row grants produces a class whose wizard offers a pick the server will not build — an
+   uncreatable character. The fix is that a new feature arrives *already on the table* in the same
+   edit, and the last level cannot be cleared. Publish still refuses the shape, as a backstop for the
+   paths the editor does not own.
+6. **A required argument beats a safe default when you want an audit.** `forAudience(audience)` and
+   `isMintedHomebrewId(id, type)` both take required arguments so `tsc` names every call site. Known
+   limit: `apps/server`'s tsconfig includes only `src`, so the property stops at the test boundary —
+   a stale test call compiles and fails at runtime instead.
+
+**On process, from the same pass.** Five HIGH defects survived nine commits, four planning documents
+and six research intakes; not one was found by reading. Each came from running the flow — duplicate
+Fighter and press publish (deadlocked both ways), open a feat and watch the network tab (an
+unsolicited PATCH that made it permanently unpublishable). Two of the five lived in the *seam*
+between engineers who had each verified their own slice honestly. **Verify by injection**: break the
+guard, confirm the failure, revert. It repeatedly found guards that did not fire, one that did not
+exist at all, and one test whose obligation set came from the renderer it was testing — so it could
+not fail.
+
+## 2026-07-27 — Phase 5 content: how the character bundles are sourced from now on
+
+The other nine SRD classes landed. Four rules came out of it that bind any future content work.
+
+1. **Character-builder content is generated, not typed.** The open5e fixtures carry no class,
+   subclass, species, background or feat data, so those seven bundles had no machine-checkable
+   source — and that is precisely where the `tough` feat and the elf name pools got in. New content
+   of those kinds comes from a vendored, commit-pinned source through a script that fails closed.
+2. **A vendored transcription is SECONDARY.** A community CC BY transcription is a cross-check and a
+   transcription source, never an authority that silently overrides a reviewed bundle; a
+   disagreement is a reviewed correction decided against the SRD text. It earns that standing by
+   reproducing what was already hand-transcribed — see rule 3. Check the **edition** before the
+   licence: a 2014-SRD transcription would reintroduce the exact violation class this prevents.
+3. **Hand-authored records are the generator's oracle, not its input.** Fighter, Wizard and Cleric
+   carry typed riders prose cannot express, so regenerating them would downgrade the three best
+   records in the bundle. They are copied through untouched and the build re-parses them from the
+   source, failing on any mechanical disagreement. A generator that cannot reproduce what a human
+   already verified has not earned the right to write the rest.
+4. **One owner per field.** `statPriority` is not in the SRD — it is the product's ordering for the
+   random generator, and `@vtt/rules-5e` already owned all twelve. The generator reads it rather
+   than keeping a second copy. Where a value legitimately has two independent derivations (hit die,
+   saves, ASI levels — both in the engine and in the printed table), keep both and let the agreement
+   test enforce it; where it has one owner, read from the owner.
+
+Corollary for tests: **don't pin the incomplete state.** Two tests asserted Barbarian had no
+subclasses and used Barbarian as the example of an un-authored class for the progression fallback.
+Both passed for the wrong reason and would have stopped covering anything the moment content caught
+up. Assert the invariant (every class offers exactly one subclass; the fallback is exercised with a
+deliberately partial list), not the current shortfall.
+
+## 2026-07-27 — Readiness pass: five rules the polish pass settled
+
+A dedicated readiness pass (flow/IA, density/layout, design language/copy) reviewed the wizard as a
+shipping product rather than as a feature. Commits `479cb80`, `5c32df9`, `584be3a`. Five rules came
+out of it that bind future builder work — and, where noted, the whole UI.
+
+1. **Annotate options; never filter them.** A pick the character can't take renders greyed *with its
+   reason* ("Already granted by Soldier"), never removed. Filtering is what produced the bug this
+   fixed — a background silently grants skills, so picking Athletics on the class step burned both
+   picks and the character ended a proficiency short with no message ever shown. The corollary is the
+   **expertise exception**: held skills are accumulated but deliberately **not** disabled there,
+   because the SRD's expertise offer reads "choose one of the following skills in which you have
+   proficiency" — greying them would leave only picks the server refuses and make every Wizard level
+   2+ uncreatable. Reasoning is recorded in the code; don't "fix" the inconsistency.
+2. **Progress means "this is done", not "you walked past this."** Step completeness derives from the
+   same `stepBlockedReason` the footer uses, so a step invalidated by a later choice loses its
+   checkmark the moment it happens. The `i <= furthest` conjunct is load-bearing — without it a step
+   with no offers reads as complete before its prerequisites exist.
+3. **Collapse is derived, never stored.** An answered offer folds to title + count + chips from
+   `picks.length === capacity`. Nothing to invalidate, and un-picking re-expands for free. The chips
+   are display-only spans on purpose: a readout must never become a second place the pick can be made.
+4. **State a constraint once per group, not once per option.** At level 20 the per-card capacity
+   notice was 409 copies of one sentence — a third of step 4's DOM. It now renders once per grid,
+   with `aria-describedby` preserving it for screen readers; genuinely per-option reasons (rule 1)
+   still render per card.
+5. **A primitive defends its own state against app globals.** `apps/client/src/styles.css` has a bare
+   `button:hover:not(:disabled)` at specificity (0,2,1) that beats `.nh-choice.is-selected` at (0,2,0)
+   — independently of anything the primitive does. The fix belongs in the primitive (exclude the state
+   from the aggressive selector, with the numbers in a comment), **not** in the app global, because
+   coupling `styles.css` to a primitive's class name inverts the dependency. Same technique closed a
+   selected card having no keyboard focus ring at all.
+
+Also settled: **one copy template** for "answer this control", replacing five sentence shapes — which
+deletes at source the lowercasing that produced "fighter starting equipment" under a heading reading
+"Fighter". And a status readout that overlays content is `pointer-events: none` and makes room for
+itself; the connection banner took three attempts because an in-flow strip covered all seven rail
+labels and a centred pill clipped the title at 375px.
+
+## 2026-07-27 — Character builder wizard: three UI decisions worth not relitigating
+
+Settled while building the phase-2 wizard screens; each was a fork with a defensible other answer.
+
+1. **The ASI level offers "raise scores" or "take a feat" — and the catalog's own Ability Score
+   Improvement feat is filtered out of that feat list.** The server accepts both routes (the `asi`
+   shorthand with a `payload.increases` split, or the feat resolved from `general-feats`), and they
+   produce identical scores. Offering both would be the same idea expressed twice in one picker. The
+   wizard offers the shorthand and hides the duplicate feat. Level-up and respec should do the same.
+2. **Each step owns the picks its SOURCE asks for**, not the picks that look thematically related.
+   The Sage's Magic Initiate cantrips are chosen on the Background step (the background grants the
+   feat), not on the spell step; the background's +2/+1 is spent on the Ability scores step, where
+   the totals are visible. One rule, no per-offer judgement calls.
+3. **A choose-N grid keeps the chosen edge and check but spends no glow.** §8.1 budgets one glowing
+   element per region, and a "choose 6 spells" region has six answers by definition. Rather than
+   invent a second chosen treatment, the multi-select grid drops the bloom only — cyan edge plus the
+   check still carry the state without colour alone. Implemented in `ChoiceCard.css`, scoped to
+   `.nh-choicegrid-items[role="group"]`.
+
+Also settled: the wizard has **one exit** (Save & close). The draft is parked on every change, so a
+second "leave without saving" button would be a lie *and* — at 375px — overhang the last card in the
+step with its 44px tap area. Discarding lives on the resume banner ("Start fresh"), next to the draft
+it throws away.
+
+## 2026-07-26 — Character builder: features-as-data, so homebrew is additive
+
+The guided builder is being built with a **later homebrew update as a first-class design input** (the owner's
+explicit ask: homebrew should eventually cover classes, subclasses, species, backgrounds, feats, **class
+features**, spells, **all item types**, and monsters). Five rules make that additive rather than a rewrite, and
+they bind all future character-builder work:
+
+1. **Features-as-data.** A class/species/feat feature is a declarative `FeatureRecord` — prose plus optional
+   structured riders drawn from the existing `ActionSchema` / `EffectGrant` / `EffectModifier` vocabulary. **No
+   feature may be implemented as hardcoded client or server behavior.** Homebrew authors the same record type;
+   the wizard and rules engine cannot tell SRD from homebrew apart.
+2. **One merged catalog, one `source: "srd" | "homebrew"` discriminator**, merged once at
+   `apps/server/src/content-library.ts`.
+3. **No new closed enums in content.** Identity ids stay open slugs; ordering and labels come from data, never
+   a hardcoded client list.
+4. **The choice-provenance ledger (`character.choices[]`) is load-bearing** — level-up and respec cannot
+   prefill prior choices without it, and retrofitting provenance onto existing characters is impossible.
+5. **`definitionId` MUST be `import-<actorId>`** — three paths depend on the prefix; a differently-keyed PC is
+   permanently un-editable *and* un-removable.
+
+Also decided: creation submits **one atomic command**, never per-step commands (ten steps would mean ten
+revisions, ten broadcasts, and a half-built character visible in `actors[]`); and edit paths **preserve fields
+they don't know about** — one `carryForwardOmitted()` helper states the rule once ("undefined means not
+supplied"), after a wholesale-replace bug silently wiped the choice ledger and, separately, armor/weapon/tool/
+language training.
+
+Scope approved: levels 1-20, multiclass, creation + level-up + respec. This supersedes the "not a character
+builder" boundary that ADR-0021 had already begun reframing. Full plan and the 16 discovery decisions:
+`docs/task-packets/character-builder.md`.
+
+## 2026-07-26 — D&D Beyond PDF importer extracts client-side (ADR-0018 amended)
+
+The DDB PDF export is a **named AcroForm** (every value is a widget with a field name), so the
+importer extracts **in the browser** with `pdfjs-dist` as a deterministic field-name → schema
+mapping (`packages/dndbeyond-pdf`), not the server-side MarkItDown worker ADR-0018 originally
+proposed. The PDF never leaves the device; the reviewed draft reuses the existing
+`actor:import-definition` command and the server re-validates it (authority unchanged). GM-initiated
+for v1; ambiguity flag-and-degrades (a >4-class multiclass caps to 4 + warns). Verified by 11 golden
+tests over 6 fixtures. Full rationale in ADR-0018's Amendment.
+
 ## Architecture (see `docs/adr/` for full rationale)
 
 - **Authoritative LAN server owns `GameState`.** No game decision runs on the client. (ADR-0001)

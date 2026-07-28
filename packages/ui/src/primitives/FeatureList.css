@@ -1,0 +1,52 @@
+.nh-features { display: grid; gap: var(--space-2); }
+
+/* Expand all / Collapse all are `Button variant="ghost"` — the system's quiet text
+   action. They used to be hand-rolled cyan text with an underline hover, one of three
+   different ways this feature set said "quiet text action". */
+.nh-features-bulk { display: flex; align-items: center; gap: var(--space-1); }
+.nh-features-bulk-sep { color: var(--text-muted); }
+
+.nh-feature {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.nh-feature-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  transition: background var(--dur-hover);
+}
+.nh-feature-summary::-webkit-details-marker { display: none; }
+.nh-feature-summary::marker { content: ""; }
+.nh-feature-summary:hover { background: var(--surface-2); }
+
+.nh-feature-caret { flex: none; display: grid; place-items: center; color: var(--text-muted); font-size: 1rem; transition: transform var(--dur-hover) var(--ease-settle); }
+.nh-feature[open] > .nh-feature-summary .nh-feature-caret { transform: rotate(180deg); }
+.nh-feature-title { flex: 1 1 auto; min-width: 0; font: 700 var(--fs-sm) / 1.35 var(--font-body); }
+.nh-feature-meta { flex: none; color: var(--text-muted); font-size: var(--fs-xs); }
+.nh-feature-badge { flex: none; }
+
+.nh-feature-body {
+  padding: 0 var(--space-3) var(--space-3) calc(var(--space-3) + 1.5rem);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.nh-feature-body > :first-child { margin-top: 0; }
+.nh-feature-body > :last-child { margin-bottom: 0; }
+
+/* Documented breakpoint ladder (760/560/650/850/980) — 560 is the phone step. */
+@media (max-width: 560px) {
+  /* A long feature name plus its level qualifier will not share one line at 375px. */
+  .nh-feature-summary { flex-wrap: wrap; }
+  .nh-feature-title { flex-basis: calc(100% - 2.5rem); }
+  .nh-feature-meta, .nh-feature-badge { margin-left: 1.5rem; }
+  .nh-feature-body { padding-left: var(--space-3); }
+}

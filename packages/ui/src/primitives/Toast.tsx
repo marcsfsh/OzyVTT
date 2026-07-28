@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { cx } from "./util";
+import { IconCheck, IconInfo, IconWarning } from "./icons";
 import "./Toast.css";
 
 export type ToastTone = "success" | "error" | "info";
@@ -23,7 +24,8 @@ export interface ToastApi {
 
 const MUTE_STORAGE_KEY = "vtt.notifications-muted";
 const ToastContext = createContext<ToastApi | null>(null);
-const TONE_ICON: Record<ToastTone, string> = { success: "✓", error: "⚠", info: "•" };
+/* Same system glyphs as Alert — one tone vocabulary, one set of shapes. */
+const TONE_ICON: Record<ToastTone, ComponentType<{ className?: string }>> = { success: IconCheck, error: IconWarning, info: IconInfo };
 
 /** One toast surface for results not visible on screen ("Encounter saved"). Names
     the result, appears briefly, dismisses. Wrap the app once; call useToast(). */
@@ -57,13 +59,16 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
     <ToastContext.Provider value={api}>
       {children}
       <div className="nh-toast-viewport" role="region" aria-label="Notifications">
-        {toasts.map((t) => (
-          <div key={t.id} className={cx("nh-toast", `nh-toast--${t.tone}`, "anim-sheet")} role="status">
-            <span className="nh-toast-icon" aria-hidden="true">{TONE_ICON[t.tone]}</span>
-            <span className="nh-toast-message">{t.message}</span>
-            <button type="button" className="nh-toast-close" aria-label="Dismiss" onClick={() => dismiss(t.id)}>✕</button>
-          </div>
-        ))}
+        {toasts.map((t) => {
+          const ToneIcon = TONE_ICON[t.tone];
+          return (
+            <div key={t.id} className={cx("nh-toast", `nh-toast--${t.tone}`, "anim-sheet")} role="status">
+              <span className="nh-toast-icon" aria-hidden="true"><ToneIcon /></span>
+              <span className="nh-toast-message">{t.message}</span>
+              <button type="button" className="nh-toast-close tap-target interactive" aria-label="Dismiss" onClick={() => dismiss(t.id)}>✕</button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

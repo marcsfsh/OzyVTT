@@ -7,11 +7,203 @@ export const ACTOR_SCHEMA_VERSION = 1;
 const DamageTypeIdSchema = z.string().min(1).max(40);
 const ConditionIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
 const EffectTagSchema = z.string().regex(/^[a-z0-9-]+$/).max(40);
+/** Open identity slug, matching the content catalog's `ContentIdSchema` (no new closed enums for identity). */
+const RiderSlugSchema = z.string().regex(/^[a-z0-9-]+$/).max(80);
+const SizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
+/** A safe dice expression, one die term plus at most one flat modifier - never an evaluable string (ADR-0008). */
+export const DiceFormulaSchema = z.string().regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
+export type AbilityId = z.infer<typeof AbilitySchema>;
+
+// ---------------------------------------------------------------------------------------------
+// Rider gates - the ONE trigger vocabulary an item, a feature, a feat, or an effect all share.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * WHERE an item is worn or held. A CLOSED enum, deliberately, and the one exception to the content
+ * catalog's "no new closed enums" rule - because `slot` is not IDENTITY (that stays the open
+ * `category` slug), it is the MECHANICAL hook the engine exhaustively switches on: what derives AC,
+ * what may be equipped twice, what an attunement gate applies to. A homebrew `category: "relic"`
+ * with `slot: "armor"` derives AC; the open slug alone never could.
+ */
+export const ItemSlotSchema = z.enum([
+  "weapon", "shield", "armor",                                    // the three the engine already knows
+  "head", "neck", "shoulders", "hands", "ring", "belt", "feet",   // worn
+  "held",        // wand, orb, rod, staff, focus
+  "wondrous",    // attunable, no body location
+  "consumable",  // potion, scroll
+  "ammunition",
+  "none"         // pure gear, no equip semantics
+]);
+export type ItemSlot = z.infer<typeof ItemSlotSchema>;
+
+/**
+ * WHEN a rider applies. Thirty named triggers in four KINDS, and the kind is what decides the
+ * evaluation layer so a GM never picks one (see `RIDER_TRIGGER_KINDS`):
+ *
+ *   - `static-gate`  resolvable from the sheet alone   -> a standing number ("AC 17")
+ *   - `dynamic-gate` live actor state                  -> a labelled note, re-checked per roll
+ *   - `moment`       the named roll or event           -> fires at that moment only
+ *   - `filter`       narrows whatever moment it accompanies
+ *
+ * This is DATA, not an expression language. Every member is a `.strict()` object with bounded
+ * parameters; there is no OR, no NOT, no nesting and no arithmetic. ADR-0008 exists to stop this
+ * becoming a parser, and `armor-class.whileArmored` is the same idea in miniature - one named
+ * boolean gate - now enumerated instead of grown one flag at a time.
+ */
+export const RiderTriggerSchema = z.discriminatedUnion("type", [
+  // ---- static gates (6) ----------------------------------------------------------------------
+  /** The bearer is attuned. Redundant (and harmless) when the item's own `attunement.required` is true. */
+  z.object({ type: z.literal("attuned") }).strict(),
+  /** Wearing armor. Omitting `weights` is exactly the pre-existing `whileArmored: true` meaning. */
+  z.object({ type: z.literal("while-armored"), weights: z.array(z.enum(["light", "medium", "heavy"])).min(1).max(3).optional() }).strict(),
+  z.object({ type: z.literal("while-unarmored"), allowShield: z.boolean().default(false) }).strict(),
+  /** `wielding: false` expresses the Dueling-style "only while NOT holding a shield". */
+  z.object({ type: z.literal("while-shield"), wielding: z.boolean().default(true) }).strict(),
+  /** Two lists in ONE trigger so "Paladin or Cleric" is a single entry rather than an OR. */
+  z.object({ type: z.literal("while-character-is"), classIds: z.array(RiderSlugSchema).max(8).default([]), speciesIds: z.array(RiderSlugSchema).max(8).default([]) }).strict(),
+  z.object({ type: z.literal("while-proficient-with"), kind: z.enum(["weapon", "armor", "tool", "skill"]), ids: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  // ---- dynamic gates (3) ---------------------------------------------------------------------
+  /** Any-of against `actor.effects[].tags`; the `ActionSchema.requiresEffectTag` precedent, widened to a list. */
+  z.object({ type: z.literal("while-effect-tag"), tags: z.array(EffectTagSchema).min(1).max(4) }).strict(),
+  z.object({ type: z.literal("while-hp-at-or-below"), percent: z.number().int().min(1).max(99) }).strict(),
+  z.object({ type: z.literal("while-condition"), conditionIds: z.array(ConditionIdSchema).min(1).max(6), present: z.boolean().default(true) }).strict(),
+  // ---- moments (11) --------------------------------------------------------------------------
+  z.object({ type: z.literal("on-attack-roll") }).strict(),
+  z.object({ type: z.literal("on-hit") }).strict(),
+  z.object({ type: z.literal("on-critical-hit") }).strict(),
+  /** The curse mirror of `on-critical-hit`: a natural 1. */
+  z.object({ type: z.literal("on-critical-miss") }).strict(),
+  z.object({ type: z.literal("on-damage-roll") }).strict(),
+  z.object({ type: z.literal("on-saving-throw") }).strict(),
+  z.object({ type: z.literal("on-ability-check") }).strict(),
+  z.object({ type: z.literal("on-initiative-roll") }).strict(),
+  z.object({ type: z.literal("on-death-save") }).strict(),
+  z.object({ type: z.literal("on-taking-damage") }).strict(),
+  z.object({ type: z.literal("on-spell-cast") }).strict(),
+  // ---- filters (10) --------------------------------------------------------------------------
+  /** `reaction` and `opportunity` require the resolver to ANNOUNCE the trigger; until it does they never match. */
+  z.object({ type: z.literal("attack-kind-is"), kinds: z.array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity"])).min(1).max(7) }).strict(),
+  z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("damage-type-is"), damageTypes: z.array(DamageTypeIdSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("ability-is"), abilities: z.array(AbilitySchema).min(1).max(6) }).strict(),
+  z.object({ type: z.literal("skill-is"), skills: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("spell-school-is"), schools: z.array(RiderSlugSchema).min(1).max(8) }).strict(),
+  z.object({ type: z.literal("spell-level-is"), levels: z.array(z.number().int().min(0).max(9)).min(1).max(10) }).strict(),
+  /** Authorable but INERT until `ActorDefinition` carries a creature type - see the vocabulary notes. */
+  z.object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
+  z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
+  z.object({ type: z.literal("versus-condition"), conditionIds: z.array(ConditionIdSchema).min(1).max(6) }).strict()
+]);
+export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
+export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
+
+/**
+ * The static table that decides a rider's evaluation LAYER, so the GM never has to. All-static (or
+ * empty) = a standing number baked by whatever reconciles the carrier; any dynamic gate = a
+ * conditional note re-checked per roll; any moment or filter = momentary, evaluated at that moment.
+ * One table, shared by every consumer, so the layer can never be decided two different ways.
+ */
+export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTriggerKind>> = Object.freeze({
+  attuned: "static-gate", "while-armored": "static-gate", "while-unarmored": "static-gate",
+  "while-shield": "static-gate", "while-character-is": "static-gate", "while-proficient-with": "static-gate",
+  "while-effect-tag": "dynamic-gate", "while-hp-at-or-below": "dynamic-gate", "while-condition": "dynamic-gate",
+  "on-attack-roll": "moment", "on-hit": "moment", "on-critical-hit": "moment", "on-critical-miss": "moment",
+  "on-damage-roll": "moment", "on-saving-throw": "moment", "on-ability-check": "moment",
+  "on-initiative-roll": "moment", "on-death-save": "moment", "on-taking-damage": "moment", "on-spell-cast": "moment",
+  "attack-kind-is": "filter", "weapon-property-is": "filter", "damage-type-is": "filter", "ability-is": "filter",
+  "skill-is": "filter", "spell-school-is": "filter", "spell-level-is": "filter",
+  "versus-creature-type": "filter", "versus-size": "filter", "versus-condition": "filter"
+});
+
+/** Which layer a `when` list belongs to. Pure lookup over `RIDER_TRIGGER_KINDS`; no state, no policy. */
+export function riderLayer(when: readonly RiderTrigger[]): "standing" | "conditional" | "momentary" {
+  const kinds = when.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
+  if (kinds.some((kind) => kind === "moment" || kind === "filter")) return "momentary";
+  if (kinds.some((kind) => kind === "dynamic-gate")) return "conditional";
+  return "standing";
+}
+
+/**
+ * An AND-list of at most four triggers, with at most ONE moment. A rider fires at one moment, not
+ * two, and a filter with no moment is an authoring mistake (a `versus-size` on a rider that never
+ * sees a target), not "always" - so both are rejected with the sentence that explains them.
+ */
+export const RiderWhenSchema = z.array(RiderTriggerSchema).max(4).superRefine((triggers, context) => {
+  const kinds = triggers.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
+  if (kinds.filter((kind) => kind === "moment").length > 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A rider fires at one moment, not two." });
+  }
+  if (kinds.includes("filter") && !kinds.includes("moment")) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "A filter needs a moment to narrow - add the roll or event it applies to." });
+  }
+  const identity = triggers.find((trigger) => trigger.type === "while-character-is" && trigger.classIds.length === 0 && trigger.speciesIds.length === 0);
+  if (identity) context.addIssue({ code: z.ZodIssueCode.custom, message: "`while-character-is` needs at least one class or species." });
+  const duplicate = triggers.find((trigger, index) => triggers.findIndex((other) => other.type === trigger.type) !== index);
+  if (duplicate) context.addIssue({ code: z.ZodIssueCode.custom, message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.` });
+}).default([]);
+
+/**
+ * The two gate fields every rider carries. `scope` has a DERIVED default so a GM never sets it: on
+ * an item with a weapon block the attack/damage/crit family means "with this weapon", everything
+ * else means "the bearer". On a non-item carrier `"this-item"` has nothing to bind to and resolves
+ * to `"bearer"` - it parses, and the authoring UI warns.
+ */
+export const riderGate = {
+  when: RiderWhenSchema,
+  scope: z.enum(["bearer", "this-item"]).optional()
+} as const;
+
+// ---------------------------------------------------------------------------------------------
+// The three riders BOTH vocabularies carry. Declared once here and spread into `EffectModifier`
+// (below) and `FeatureModifier` (@vtt/content-srd-5.2.1), so the two can never drift apart.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit is
+ * `action.attack.bonus + exhaustionPenalty(attacker)` and nothing else could reach it.
+ */
+export const AttackBonusVariantSchema = z.object({
+  type: z.literal("attack-bonus"),
+  amount: z.number().int().min(-10).max(10),
+  ...riderGate
+}).strict();
+
+/**
+ * Extra typed damage as DICE. Neither existing channel can serve this: the effect-side
+ * `damage-bonus` is a flat integer, and `attack.criticalBonusDice` is a bare COUNT applied to the
+ * first damage part, so it cannot carry a damage type. `doubleOnCritical` defaults FALSE because 5e
+ * does not double dice added after the attack.
+ */
+export const ExtraDamageVariantSchema = z.object({
+  type: z.literal("extra-damage"),
+  formula: DiceFormulaSchema,
+  damageType: DamageTypeIdSchema,
+  doubleOnCritical: z.boolean().default(false),
+  ...riderGate
+}).strict();
+
+/**
+ * Advantage or disadvantage on a NAMED roll: one variant with a `mode` field rather than 2 x N
+ * types. It feeds `aggregateRollMode`, which already implements 5e cancellation (any advantage plus
+ * any disadvantage is normal) and labels each source for the roll card, so a curse is just
+ * `mode: "disadvantage"` and needs no separate machinery.
+ */
+export const RollModeVariantSchema = z.object({
+  type: z.literal("roll-mode"),
+  roll: z.enum(["attack", "incoming-attack", "save", "check", "initiative", "death-save", "concentration"]),
+  mode: z.enum(["advantage", "disadvantage"]),
+  ...riderGate
+}).strict();
 
 /**
  * Typed modifiers an active effect contributes to the rules engine (ADR-0020). The vocabulary is
  * deliberately small and grows additively - unmodeled mechanics stay prose per ADR-0008.
  * `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics).
+ *
+ * The last three are the SHARED riders, identical objects to the ones `FeatureModifierSchema`
+ * carries. The six legacy advantage/disadvantage variants stay exactly as they were: `roll-mode` is
+ * the general form, and `toRollModes` below normalises both shapes so no consumer branches on eight.
  */
 export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-20).max(20), appliesTo: z.enum(["melee", "all"]).default("all") }).strict(),
@@ -24,9 +216,33 @@ export const EffectModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("incoming-attack-disadvantage") }).strict(),
   /** The bearer's saving throws have advantage; absent ability = all saves (Dodge grants Dex only). */
   z.object({ type: z.literal("save-advantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
-  z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict()
+  z.object({ type: z.literal("save-disadvantage"), ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional() }).strict(),
+  AttackBonusVariantSchema,
+  ExtraDamageVariantSchema,
+  RollModeVariantSchema
 ]);
 export type EffectModifier = z.infer<typeof EffectModifierSchema>;
+
+/** One normalised advantage/disadvantage claim: which roll, which way. */
+export type NormalisedRollMode = Readonly<{ roll: z.infer<typeof RollModeVariantSchema>["roll"]; mode: "advantage" | "disadvantage"; ability?: AbilityId }>;
+
+/**
+ * ONE normaliser for both shapes, so a consumer never branches on eight variants: the six legacy
+ * advantage/disadvantage members and the general `roll-mode` come back as the same claim. Anything
+ * else (a damage bonus, an attack bonus) normalises to no claims at all.
+ */
+export function toRollModes(modifier: EffectModifier): readonly NormalisedRollMode[] {
+  switch (modifier.type) {
+    case "attack-advantage": return [{ roll: "attack", mode: "advantage" }];
+    case "attack-disadvantage": return [{ roll: "attack", mode: "disadvantage" }];
+    case "incoming-attack-advantage": return [{ roll: "incoming-attack", mode: "advantage" }];
+    case "incoming-attack-disadvantage": return [{ roll: "incoming-attack", mode: "disadvantage" }];
+    case "save-advantage": return [{ roll: "save", mode: "advantage", ...(modifier.ability ? { ability: modifier.ability } : {}) }];
+    case "save-disadvantage": return [{ roll: "save", mode: "disadvantage", ...(modifier.ability ? { ability: modifier.ability } : {}) }];
+    case "roll-mode": return [{ roll: modifier.roll, mode: modifier.mode }];
+    default: return [];
+  }
+}
 
 /** What happens when an effect ends (Frenzy: one level of Exhaustion when the rage ends). */
 export const EffectOnEndSchema = z.object({ type: z.literal("condition"), conditionId: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict();
@@ -93,12 +309,33 @@ export type HealthDisplay = z.infer<typeof HealthDisplaySchema>;
 
 /** SRD skill id slug ("stealth", "arcana"); free-form so homebrew stays expressible. */
 const SkillIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
+/** Armor/weapon/tool/language proficiency slug ("light", "martial", "thieves-tools", "elvish"); open by design. */
+const ProficiencyIdSchema = z.string().regex(/^[a-z0-9-]+$/).max(60);
 /** One carried inventory item. Quantities/equipped/attuned are live state that changes during play (ADR-0007 additive). */
 /** Mechanical stats an inventory item carries when added from the SRD catalog, so equipping it has effect
  * (weapon → a rollable attack action on the sheet; armor/shield → derived Armor Class). Additive-optional;
  * absent for homebrew/pre-existing items, which then have no mechanical effect (display only). */
-export const ItemWeaponSchema = z.object({ category: z.enum(["simple", "martial"]), damageDice: z.string().min(1).max(20), damageType: z.string().min(1).max(40), rangeFeet: z.number().int().positive().nullable(), longRangeFeet: z.number().int().positive().nullable() }).strict();
+export const ItemWeaponSchema = z.object({
+  category: z.enum(["simple", "martial"]), damageDice: z.string().min(1).max(20), damageType: z.string().min(1).max(40),
+  rangeFeet: z.number().int().positive().nullable(), longRangeFeet: z.number().int().positive().nullable(),
+  /** SRD weapon property slugs ("finesse", "versatile", "thrown", "two-handed", "light", "heavy", "reach", "loading", "ammunition"). Open slugs so homebrew properties and 2024 masteries stay expressible; ABSENT = not recorded (behaves exactly as before), an empty array = "this weapon has no properties". Additive-optional. */
+  properties: z.array(z.string().regex(/^[a-z0-9-]+$/).max(40)).max(12).optional()
+}).strict();
 export const ItemArmorSchema = z.object({ acBase: z.number().int().min(2).max(25), addDexModifier: z.boolean(), dexModifierCap: z.number().int().nullable(), stealthDisadvantage: z.boolean(), strengthRequired: z.number().int().nullable() }).strict();
+/**
+ * The NON-SECRET marker for a carried magic item, copied when the item was added. It exists so the
+ * sheet can render the Attune control and the magic styling without a catalog lookup.
+ *
+ * It deliberately carries NO riders, NO casts and NO `cursed` flag. The owner is handed their whole
+ * inventory verbatim in their projection, so anything placed on this row reaches the player the
+ * instant they pick the item up. Mechanics resolve by `item.id` against the content catalog, which
+ * never leaves the server - the same rule feature riders already follow. Additive-optional.
+ */
+export const ItemMagicMarkerSchema = z.object({
+  isMagic: z.boolean().default(false),
+  attunementRequired: z.boolean().default(false),
+  slot: ItemSlotSchema.optional()
+}).strict();
 export const InventoryItemSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/).max(80),
   name: z.string().min(1).max(120),
@@ -110,7 +347,9 @@ export const InventoryItemSchema = z.object({
   /** Equipment category slug when added from the SRD catalog (weapon/armor/tool/...); free-form so homebrew stays expressible. Drives sheet grouping and (with weapon/armor below) mechanical effect. Additive. */
   category: z.string().regex(/^[a-z0-9-]+$/).max(40).optional(),
   weapon: ItemWeaponSchema.optional(),
-  armor: ItemArmorSchema.optional()
+  armor: ItemArmorSchema.optional(),
+  /** Display-only marker so the sheet can offer Attune without the catalog; NEVER the riders. Additive-optional. */
+  magic: ItemMagicMarkerSchema.optional()
 }).strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 /** SRD coin purse; all five currencies, each defaulting to 0. */
@@ -124,6 +363,79 @@ export const CurrencySchema = z.object({
 export type Currency = z.infer<typeof CurrencySchema>;
 /** A live spell-slot pool for one slot level (remaining out of the definition's maximum). */
 export const SpellSlotSchema = z.object({ level: z.number().int().min(1).max(9), remaining: z.number().int().min(0).max(9) }).strict();
+
+/** Faces per hit-die size, so a mixed pool can name its largest die without a second lookup table. */
+const HIT_DIE_FACES: Readonly<Record<string, number>> = Object.freeze({ d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 });
+
+/** ONE size of Hit Point Die a creature carries: a Fighter 3 / Wizard 2 has a 3×d10 entry AND a 2×d6 entry. */
+export const HitDiceEntrySchema = z.object({
+  die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]),
+  maximum: z.number().int().min(1).max(40),
+  remaining: z.number().int().min(0).max(40)
+}).strict();
+export type HitDiceEntry = z.infer<typeof HitDiceEntrySchema>;
+
+/**
+ * Normalise every accepted Hit-Dice input to the pool shape, so the field grows additively without a
+ * schemaVersion bump (ADR-0007). Three inputs are accepted:
+ *   - `{die, maximum, remaining}`             — a save written before multiclass pools existed.
+ *   - `[{die, maximum, remaining}, …]`        — a bare pool array.
+ *   - `{die, maximum, remaining, entries[]}`  — the current shape; the summary is RE-DERIVED here, never
+ *                                               trusted, so a hand-written summary cannot drift.
+ * Malformed input is passed straight through so Zod reports the real error instead of this helper.
+ */
+function normaliseHitDicePool(input: unknown): unknown {
+  if (input === null || input === undefined || typeof input !== "object") return input;
+  // Order matters: `"entries" in []` is TRUE (arrays inherit Array.prototype.entries), so the bare-array
+  // case must be settled before the carrier is inspected, and the carrier check must be own-property.
+  let source: unknown[];
+  if (Array.isArray(input)) source = input;
+  else if (Object.prototype.hasOwnProperty.call(input, "entries")) {
+    const carried = (input as { entries: unknown }).entries;
+    if (!Array.isArray(carried)) return input;
+    source = carried;
+  } else source = [input];
+  if (source.length === 0) return input;
+  const entries: unknown[] = [];
+  let maximum = 0;
+  let remaining = 0;
+  let largestFaces = -1;
+  let die: unknown;
+  for (const candidate of source) {
+    if (candidate === null || typeof candidate !== "object") return input;
+    const { die: entryDie, maximum: entryMaximum, remaining: entryRemaining } = candidate as Record<string, unknown>;
+    if (typeof entryDie !== "string" || typeof entryMaximum !== "number" || typeof entryRemaining !== "number") return input;
+    entries.push({ die: entryDie, maximum: entryMaximum, remaining: entryRemaining });
+    maximum += entryMaximum;
+    remaining += entryRemaining;
+    const faces = HIT_DIE_FACES[entryDie] ?? 0;
+    if (faces > largestFaces) { largestFaces = faces; die = entryDie; }
+  }
+  return { die, maximum, remaining, entries };
+}
+
+/**
+ * A live Hit Point Dice POOL (SRD Hit Point Dice). `entries` is the truth: a multiclass sheet carries
+ * several die sizes at once (Fighter 3 / Wizard 2 = 3d10 + 2d6), which one `{die, maximum}` could not
+ * express — it silently dropped every class after the first.
+ *
+ * `die`/`maximum`/`remaining` are a DERIVED summary kept for the pre-multiclass readers: the TOTAL
+ * number of dice in the pool, labelled with the largest size present. They are recomputed from
+ * `entries` on every parse, so summary and pool cannot drift — never write them by hand, build the
+ * pool with `makeHitDicePool`.
+ */
+export const HitDicePoolSchema = z.preprocess(normaliseHitDicePool, z.object({
+  die: HitDiceEntrySchema.shape.die,
+  maximum: z.number().int().min(1).max(240),
+  remaining: z.number().int().min(0).max(240),
+  entries: z.array(HitDiceEntrySchema).min(1).max(6)
+}).strict().nullable());
+export type HitDicePool = NonNullable<z.infer<typeof HitDicePoolSchema>>;
+
+/** Build a pool (summary included) from per-die entries. An empty pool is `null` — "not modeled". */
+export function makeHitDicePool(entries: readonly HitDiceEntry[]): HitDicePool | null {
+  return entries.length === 0 ? null : HitDicePoolSchema.parse(entries) as HitDicePool;
+}
 
 export const ActorSchema = z.object({
   id: z.string().uuid(),
@@ -157,8 +469,8 @@ export const ActorSchema = z.object({
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary resources seeded from the definition (SRD 2024): per-round legendary actions and Legendary Resistance per day. GM knowledge - stripped from player projections. Additive. */
   legendary: z.object({ actionsPerRound: z.number().int().min(1).max(5).optional(), resistancesPerDay: z.number().int().min(1).max(6).optional() }).strict().optional(),
-  /** Short-rest healing pool (SRD Hit Point Dice), seeded from the definition's hit-point formula; null = not modeled (rests behave as before). Reaches players only on their own claimed character. Additive. */
-  hitDice: z.object({ die: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]), maximum: z.number().int().min(1).max(40), remaining: z.number().int().min(0).max(40) }).strict().nullable().default(null),
+  /** Short-rest healing pool (SRD Hit Point Dice), seeded from the sheet's per-class hit dice (or a monster's hit-point formula); null = not modeled (rests behave as before). A pre-multiclass single-object save normalises into a one-entry pool on load — see HitDicePoolSchema. Reaches players only on their own claimed character. Additive. */
+  hitDice: HitDicePoolSchema.default(null),
   /** Per-token health-display override; absent = inherit the table-wide `combat.healthDisplay`. GM knowledge - resolved and audience-gated in the player/viewer projections. Additive. */
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch-ms timestamp of when this actor last entered a fight (encounter start / add-combatant). Powers the scene-setup "Recent" list; GM-only, stripped from the player projection. Additive. */
@@ -181,10 +493,13 @@ export type Actor = z.infer<typeof ActorSchema>;
 
 /** Immutable reusable content imported from JSON; mutable HP/position/ownership live elsewhere. */
 export const ACTOR_DEFINITION_SCHEMA_VERSION = 1;
-const DiceFormulaSchema = z.string().regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
-const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
+// `DiceFormulaSchema` and `AbilitySchema` are declared at the top of this file: the shared rider
+// variants need them, and a `const` cannot be referenced before its declaration is evaluated.
+/** SRD hit die by class (d4-d12); shared by per-class hit dice and content records. */
+export const HitDieSchema = z.enum(["d4", "d6", "d8", "d10", "d12"]);
+export type HitDie = z.infer<typeof HitDieSchema>;
 /** Definition-side effect grant (Rage, Reckless Attack): resolving the action creates this effect on the actor itself. */
-const EffectGrantSchema = z.object({
+export const EffectGrantSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   tags: z.array(EffectTagSchema).min(1).max(8),
   duration: z.discriminatedUnion("type", [
@@ -206,11 +521,23 @@ const EffectGrantSchema = z.object({
 }).strict();
 
 /**
+ * Limited uses for an action or a content feature: "turn" resets every turn, "encounter" at
+ * encounter start, "long-rest"/"short-rest" via a rest, "recharge" on a start-of-turn d6 >=
+ * `recharge` (and on any rest). `pool` shares one counter across actions carrying the same pool id
+ * (Sneak Attack once per turn regardless of weapon). Exported so content records (class/species
+ * features) reuse the proven shape instead of inventing a parallel one.
+ */
+export const ActionUsesSchema = z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(), recharge: z.number().int().min(2).max(6).optional() }).strict().superRefine((uses, context) => {
+  if (uses.per === "recharge" && uses.recharge === undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "Recharge uses need the d6 threshold (e.g. 5 for \"Recharge 5-6\")." });
+  if (uses.per !== "recharge" && uses.recharge !== undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "The recharge threshold only applies when per is \"recharge\"." });
+});
+
+/**
  * Every mechanics field below is additive-optional on schemaVersion 1 (ADR-0007 additive pattern,
  * ADR-0020 vocabulary): absent fields mean "prose only", and the engine falls back to reference
  * behavior exactly as before. Descriptions stay the display source of truth.
  */
-const ActionSchema = z.object({
+export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1).max(120), activation: z.enum(["action", "bonus-action", "reaction", "other"]), description: z.string().min(1).max(12000),
   attack: z.object({
     bonus: z.number().int(), reachFeet: z.number().int().positive().optional(), rangeFeet: z.number().int().positive().optional(),
@@ -238,16 +565,39 @@ const ActionSchema = z.object({
   grants: EffectGrantSchema.optional(),
   /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
   requiresEffectTag: EffectTagSchema.optional(),
-  /** Limited uses; "turn" resets every turn, "encounter" at encounter start, "long-rest" via a rest, "recharge" on a start-of-turn d6 ≥ `recharge` (and on any rest). `pool` shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon). */
-  uses: z.object({ limit: z.number().int().min(1).max(20), per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]), pool: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(), recharge: z.number().int().min(2).max(6).optional() }).strict().superRefine((uses, context) => {
-    if (uses.per === "recharge" && uses.recharge === undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "Recharge uses need the d6 threshold (e.g. 5 for \"Recharge 5-6\")." });
-    if (uses.per !== "recharge" && uses.recharge !== undefined) context.addIssue({ code: z.ZodIssueCode.custom, path: ["recharge"], message: "The recharge threshold only applies when per is \"recharge\"." });
-  }).optional(),
+  /** Limited uses; see ActionUsesSchema. */
+  uses: ActionUsesSchema.optional(),
   /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
   reaction: z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict().optional(),
   /** SRD Legendary Action: taken on OTHER creatures' turns, spending `cost` from the per-round pool (definition `legendary.actionsPerRound`) that refills when the creature's own turn starts. Pairs with activation "other". */
   legendary: z.object({ cost: z.number().int().min(1).max(5) }).strict().optional()
 });
+
+export type ActorAction = z.infer<typeof ActionSchema>;
+
+/**
+ * ONE recorded build decision - the choice-provenance ledger. Every wizard step that offered the
+ * player a pick writes a row here (ASI-vs-feat, which list a skill came from, the subclass, the
+ * equipment bundle, a chosen spell). Level-up and respec are impossible to prefill without it, and
+ * homebrew content writes exactly the same rows.
+ *
+ * `kind` and `id` are OPEN slugs on purpose (architecture principle 3): "asi", "feat", "skill",
+ * "subclass", "fighting-style", "equipment-pack", "spell", "expertise", "language", "tool", ... A
+ * homebrew feature offering a brand-new kind of choice needs no schema change.
+ */
+export const CharacterChoiceSchema = z.object({
+  /** Character level the decision belongs to (1-20); 1 for species/background/origin choices. */
+  level: z.number().int().min(1).max(20),
+  /** Class the decision belongs to; absent for species/background/origin choices. */
+  classId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional(),
+  /** What kind of decision this was - an open slug, never a closed enum. */
+  kind: z.string().regex(/^[a-z0-9-]+$/).max(60),
+  /** The option that was chosen: a content id, an ability id for an ASI, a skill id, ... */
+  id: z.string().regex(/^[a-z0-9-]+$/).max(80),
+  /** Free-form rider carrying the decision's detail (ASI splits, the feature that offered the pick, the list it came from). */
+  payload: z.record(z.string(), z.unknown()).optional()
+}).strict();
+export type CharacterChoice = z.infer<typeof CharacterChoiceSchema>;
 
 /**
  * Character identity - the builder's choice inputs, stored so a future guided builder fills exactly
@@ -258,11 +608,22 @@ export const CharacterIdentitySchema = z.object({
   classes: z.array(z.object({
     id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60),
     subclass: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
-    level: z.number().int().min(1).max(20)
+    level: z.number().int().min(1).max(20),
+    /** This class's hit die, so a multiclass sheet can pool 3d10 + 2d6. Absent = unknown (the sheet falls back to the definition's hit-point formula). Additive. */
+    hitDie: HitDieSchema.optional()
   }).strict()).max(4).default([]),
   race: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60), subrace: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional() }).strict().optional(),
   background: z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(60) }).strict().optional(),
-  feats: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(80), description: z.string().max(4000).optional() }).strict()).max(40).default([])
+  feats: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(60), name: z.string().min(1).max(80), description: z.string().max(4000).optional() }).strict()).max(40).default([]),
+  /**
+   * The choice-provenance ledger (see CharacterChoiceSchema). ABSENT means "this sheet carries no
+   * provenance" - a PDF import or a pre-wizard character - which respec must be able to tell apart
+   * from "the wizard ran and recorded zero decisions" (an empty array). Read it through
+   * `characterChoices()` when you just want a list. Additive-optional: a stored definition written
+   * before the builder existed parses unchanged AND re-serializes unchanged (ADR-0007: older saved
+   * content is migrated deliberately, never silently reinterpreted).
+   */
+  choices: z.array(CharacterChoiceSchema).max(200).optional()
 }).strict();
 
 /**
@@ -274,26 +635,107 @@ export const ProficienciesSchema = z.object({
   saves: z.array(AbilitySchema).max(6).default([]),
   skills: z.array(z.object({ id: SkillIdSchema, proficiency: z.enum(["proficient", "expertise"]) }).strict()).max(40).default([]),
   saveOverrides: z.record(AbilitySchema, z.number().int().min(-20).max(30)).optional(),
-  skillOverrides: z.record(SkillIdSchema, z.number().int().min(-20).max(30)).optional()
+  skillOverrides: z.record(SkillIdSchema, z.number().int().min(-20).max(30)).optional(),
+  /**
+   * Armor/weapon/tool/language training. Open slugs so homebrew categories stay expressible.
+   * Additive-OPTIONAL, and absent deliberately means "not recorded" rather than "none": an imported
+   * sheet that never listed its armor training must not be read as untrained. `saves`/`skills` above
+   * keep their `.default([])` because every prior writer already emits them.
+   */
+  armor: z.array(ProficiencyIdSchema).max(20).optional(),
+  /** Weapon proficiencies - a group ("simple", "martial") or a single weapon id ("longsword"). Additive. */
+  weapons: z.array(ProficiencyIdSchema).max(60).optional(),
+  /** Tool proficiencies ("thieves-tools", "smiths-tools", "lute"). Additive. */
+  tools: z.array(ProficiencyIdSchema).max(40).optional(),
+  /** Known languages ("common", "elvish", "thieves-cant"). Additive. */
+  languages: z.array(ProficiencyIdSchema).max(30).optional()
 }).strict();
+
+const SpellSlotMaxSchema = z.object({ level: z.number().int().min(1).max(9), max: z.number().int().min(0).max(9) }).strict();
+const PactSlotMaxSchema = z.object({ level: z.number().int().min(1).max(5), max: z.number().int().min(0).max(4) }).strict();
+
+/**
+ * ONE spellcasting class on a multiclass sheet. A Paladin 6 / Wizard 4 casts Paladin spells off CHA
+ * and Wizard spells off INT - inexpressible while `spellcasting` carried a single `ability`.
+ * `slots`/`prepared` are the PER-CLASS breakdown kept for rebuilds and level-up; the character's one
+ * live pool stays the top-level `slots`/`pact` (the combined multiclass table).
+ */
+export const ClassSpellcastingSchema = z.object({
+  classId: z.string().regex(/^[a-z0-9-]+$/).max(60),
+  ability: AbilitySchema,
+  saveDc: z.number().int().min(1).max(40).optional(),
+  attackBonus: z.number().int().min(-5).max(30).optional(),
+  slots: z.array(SpellSlotMaxSchema).max(9).optional(),
+  /** How many spells this class prepares (SRD prepared casters); absent for known casters. */
+  prepared: z.number().int().min(0).max(60).optional()
+}).strict();
+export type ClassSpellcasting = z.infer<typeof ClassSpellcastingSchema>;
 
 /**
  * Spellcasting CAPABILITY (immutable): ability, slot maxima, known/prepared list. Save DC and attack
  * bonus derive (8+PB+mod / PB+mod) unless an override is supplied. Live slots-remaining and today's
  * prepared set live on the Actor. `spells[].actionId` links a spell to the action that resolves it.
+ *
+ * RESOLUTION ORDER for "which ability / DC / attack bonus does this spell use?" - every consumer
+ * MUST follow it, in this order:
+ *   1. `classes[]` entry whose `classId` matches the spell's `classId` -> its ability/saveDc/attackBonus.
+ *   2. the single `classes[]` entry, when there is exactly one (an ordinary single-class caster).
+ *   3. the top-level `ability`/`saveDc`/`attackBonus` -> the pre-multiclass behavior, still the
+ *      source of truth for every sheet written before `classes[]` existed.
+ * A builder that fills `classes[]` MUST also keep the top-level fields populated (mirror the primary
+ * caster) so older consumers keep working; `classes` is purely additive and defaults to empty.
+ * Slot pools are NOT per class: the top-level `slots`/`pact` remain the character's single live pool,
+ * and the superRefine below ENFORCES that - per-class slots without the combined top-level pool is a
+ * parse error, not a caster who silently seeds zero slots.
  */
 const SpellcastingSchema = z.object({
   ability: AbilitySchema,
   saveDc: z.number().int().min(1).max(40).optional(),
   attackBonus: z.number().int().min(-5).max(30).optional(),
-  slots: z.array(z.object({ level: z.number().int().min(1).max(9), max: z.number().int().min(0).max(9) }).strict()).max(9).default([]),
-  pact: z.object({ level: z.number().int().min(1).max(5), max: z.number().int().min(0).max(4) }).strict().optional(),
+  slots: z.array(SpellSlotMaxSchema).max(9).default([]),
+  pact: PactSlotMaxSchema.optional(),
+  /** Per-class spellcasting entries for multiclass sheets. Absent = single caster, read the fields above. Additive-optional. */
+  classes: z.array(ClassSpellcastingSchema).max(4).optional(),
   spells: z.array(z.object({
     id: z.string().max(80), name: z.string().min(1).max(120), level: z.number().int().min(0).max(9),
     prepared: z.boolean().default(true), alwaysPrepared: z.boolean().default(false),
-    actionId: z.string().regex(/^[a-z0-9-]+$/).optional()
+    actionId: z.string().regex(/^[a-z0-9-]+$/).optional(),
+    /** Which class granted this spell, so the resolution order above can pick the right ability. Additive. */
+    classId: z.string().regex(/^[a-z0-9-]+$/).max(60).optional()
   }).strict()).max(400).default([])
-}).strict();
+}).strict().superRefine((spellcasting, context) => {
+  // ENFORCE the contract documented above. A builder that fills per-class `slots` but leaves the
+  // top-level pool empty produces a "modeled caster with zero slots": the live actor seeds
+  // `spellSlots: []` and a long rest restores nothing. Failing loudly at parse time beats shipping a
+  // caster who cannot cast.
+  const perClassSlots = (spellcasting.classes ?? []).some((entry) => (entry.slots ?? []).length > 0);
+  if (perClassSlots && spellcasting.slots.length === 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["slots"], message: "A sheet with per-class spell slots must also carry the combined top-level slots (the character's single live pool)." });
+  }
+});
+export type Spellcasting = z.infer<typeof SpellcastingSchema>;
+
+/**
+ * THE resolution order for "which ability / DC / attack bonus does this class's magic use?", in one
+ * place so no consumer re-implements it (and so multiclass support cannot be half-applied). Returns
+ * undefined only when there is no spellcasting at all.
+ */
+export function resolveSpellcasting(spellcasting: Spellcasting | undefined, classId?: string): { classId?: string; ability: AbilityId; saveDc?: number; attackBonus?: number } | undefined {
+  if (!spellcasting) return undefined;
+  const entries = spellcasting.classes ?? [];
+  const match = classId ? entries.find((entry) => entry.classId === classId) : undefined;
+  // Step 2 (the lone-entry shortcut) may fire ONLY when the caller named no class. Asking for
+  // "fighter" on an Eldritch Knight / Wizard sheet must never be answered with the Wizard's INT and
+  // DC - an unmatched request falls through to step 3, the top-level (primary caster) fields.
+  const chosen = match ?? (classId === undefined && entries.length === 1 ? entries[0] : undefined);
+  if (chosen) return { classId: chosen.classId, ability: chosen.ability, saveDc: chosen.saveDc ?? spellcasting.saveDc, attackBonus: chosen.attackBonus ?? spellcasting.attackBonus };
+  return { ability: spellcasting.ability, saveDc: spellcasting.saveDc, attackBonus: spellcasting.attackBonus };
+}
+
+/** The choice ledger as a list, treating "no ledger recorded" as empty. Use when you only need to read. */
+export function characterChoices(character: z.infer<typeof CharacterIdentitySchema> | undefined): readonly CharacterChoice[] {
+  return character?.choices ?? [];
+}
 
 export const ActorDefinitionSchema = z.object({
   schemaId: z.enum(["vtt.actor-character", "vtt.actor-monster"]), schemaVersion: z.literal(ACTOR_DEFINITION_SCHEMA_VERSION),

@@ -10,7 +10,7 @@
   color: var(--text-muted);
   font: 800 var(--fs-xs) / 1.4 var(--font-body);
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: var(--tracking-eyebrow);
   border-bottom-color: var(--line-strong);
 }
 .nh-table tbody tr { transition: background var(--dur-hover); }
@@ -22,7 +22,7 @@
 /* ---- Stat / definition list (character-sheet vitals, monster meta, key–value data) ---- */
 .nh-statlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: var(--space-2); margin: 0; }
 .nh-statlist > div { padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-3); }
-.nh-statlist dt { color: var(--text-muted); font: 800 var(--fs-xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: .05em; }
+.nh-statlist dt { color: var(--text-muted); font: 800 var(--fs-xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
 .nh-statlist dd { margin: 2px 0 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; font-family: var(--font-mono); }
 
 /* ---- Empty state (no data yet / no results) ---- */
@@ -87,7 +87,10 @@
 .nh-card-status { position: absolute; top: var(--space-2); left: var(--space-2); z-index: 2; }
 /* Tools sit above the actions row (z-index 2) so the ⋯ menu's popover is never painted under the
    Prepare / Go live buttons. The gallery also lifts a card whose menu is open above its siblings. */
-.nh-card-tools { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 4; display: flex; gap: var(--space-1); }
+/* The tools are icon-only squares (see Menu.css `.nh-menu-trigger--icon`), each carrying a
+   44px hit area around a 1.75rem paint. --space-4 is the gap that keeps two neighbouring
+   hit areas from overlapping — anything tighter and the second tool steals the first's taps. */
+.nh-card-tools { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 4; display: flex; align-items: center; gap: var(--space-4); }
 
 .nh-card-body { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); }
 .nh-card-title { margin: 0; color: var(--text); font-size: var(--fs-body); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

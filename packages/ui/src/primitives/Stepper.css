@@ -8,10 +8,17 @@
   background: var(--surface-2);
   overflow: hidden;
 }
+/* −/+ are the ability-allocator's primary touch control, so they carry the 44px
+   floor as real paint rather than an invisible extension (decision 16).
+   `min-width`, not `width`: a flex item's `width` is only its BASIS, and the default
+   `flex-shrink: 1` then shaves it under pressure — measured at the 320px floor, the
+   subclass stepper's buttons came out 41.69px wide, i.e. below the very floor this
+   rule exists to guarantee. `min-width` is the one that cannot be shrunk past. */
 .nh-stepper-btn {
   display: grid;
   place-items: center;
-  width: 2rem;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
   padding: var(--space-2) 0;
   border: 0;
   background: transparent;

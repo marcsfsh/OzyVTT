@@ -21,7 +21,7 @@ export function Switch({ checked, onChange, label, disabled = false, className, 
       role="switch"
       aria-checked={checked}
       disabled={disabled}
-      className={cx("nh-switch", checked && "nh-switch--on", label != null && "nh-switch--labeled", "interactive", className)}
+      className={cx("nh-switch", checked && "nh-switch--on", label != null && "nh-switch--labeled", "tap-target", "interactive", className)}
       onClick={() => onChange(!checked)}
       {...aria}
     >

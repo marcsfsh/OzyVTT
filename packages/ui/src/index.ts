@@ -57,3 +57,33 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } fr
 export { Steps, type StepsProps, type StepItem } from "./primitives/Steps";
 export { Skeleton, type SkeletonProps } from "./primitives/Skeleton";
 export { Kbd, type KbdProps } from "./primitives/Kbd";
+
+/* Authoring primitives (Codex + homebrew editors, and any long typed-entity form) */
+export { FieldGrid, type FieldGridProps } from "./primitives/FieldGrid";
+export { NumberField, type NumberFieldProps } from "./primitives/NumberField";
+export { TagInput, slugify, type TagInputProps } from "./primitives/TagInput";
+export { RowEditor, type RowEditorProps } from "./primitives/RowEditor";
+export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/SaveState";
+
+/* Icons — the design system's own SVG glyphs (no emoji in a primitive). The app's
+   richer fantasy-cartography set lives in apps/client/src/codex/icons.tsx. */
+export {
+  IconCheck, IconChevron, IconSearch, IconShuffle, IconDie, IconPencil, IconWarning, IconInfo,
+  IconPlus, IconTrash, IconDrag, IconCopy, IconEye, IconEyeOff
+} from "./primitives/icons";
+
+/* Guided-flow primitives (character builder, and any other long wizard) */
+export { WizardShell, type WizardShellProps } from "./primitives/WizardShell";
+export { ChoiceCard, type ChoiceCardProps } from "./primitives/ChoiceCard";
+export { ChoiceGrid, type ChoiceGridProps, type ChoiceOption } from "./primitives/ChoiceGrid";
+export {
+  AbilityScoreAllocator,
+  type AbilityScoreAllocatorProps,
+  type AbilityAllocationMode,
+  type AbilityRowData,
+  type AbilityPoolValue
+} from "./primitives/AbilityScoreAllocator";
+export { DiceInputRow, type DiceInputRowProps, type DiceEntryMode } from "./primitives/DiceInputRow";
+export { NameField, type NameFieldProps } from "./primitives/NameField";
+export { FeatureList, type FeatureListProps, type FeatureItem } from "./primitives/FeatureList";
+export { ReviewSummary, type ReviewSummaryProps, type ReviewSection, type ReviewItem } from "./primitives/ReviewSummary";

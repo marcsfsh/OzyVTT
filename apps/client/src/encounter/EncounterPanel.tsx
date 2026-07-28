@@ -5,7 +5,7 @@ import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { ActionRunner } from "./ActionRunner";
-import { beginTargeting, clearTargeting, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
+import { beginTargeting, clearTargeting, resolveActionDirect, resolveTargeting, setTargetingResult, toggleTarget, useTargeting, useTargetingBusy, useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
 import { RollControls, type DieMode } from "./RollControls";
 import { CharacterSheet } from "./CharacterSheet";
@@ -316,6 +316,9 @@ function ownActionSummaryParts(action: ContentActionSummary): string[] {
   if (action.attackCount !== null && action.attackCount > 1) parts.push(`${action.attackCount} attacks`);
   if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
   for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
+  // The charge pool, said the way the GM's runner says it - a limited-use feature has no roll to
+  // print, so this line IS its mechanic.
+  if (action.usesLimit !== null) parts.push(action.usesPer === "recharge" ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}` : `${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer === "short-rest" ? "short rest" : action.usesPer}`);
   return parts;
 }
 
@@ -327,10 +330,19 @@ function ownActionSummaryParts(action: ContentActionSummary): string[] {
  * never applies damage themselves, so the role boundary stays intact. Reuses the shared targeting store and
  * the GM runner's styles so both surfaces read and behave identically.
  */
-export function PlayerActionRunner({ actorId, definition, revision, rollMode, bonusMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; revision: number; rollMode: "auto" | "manual"; bonusMode: "auto" | "total"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
+export function PlayerActionRunner({ actorId, definition, extraActions = [], revision, rollMode, bonusMode, playerDamageMode, targets }: Readonly<{ actorId: string; definition: ActorDefinition; /** Actions the SERVER derived from the equipped loadout — a wand's charge, an amulet's cast, a magic weapon's swing. They are absent from `definition.actions` by construction (the definition is the immutable base), so without this the runner cannot offer an item the player has attuned. Their numbers already carry the item's standing riders; resolution still goes by id. */ extraActions?: readonly ContentActionSummary[]; revision: number; rollMode: "auto" | "manual"; bonusMode: "auto" | "total"; playerDamageMode: "proposal" | "direct"; targets: readonly { actorId: string; name: string }[] }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
-  const actions = useMemo(() => definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0).map(summaryOfOwnAction), [definition]);
+  // A limited use IS a structured effect the server will resolve (`action-resolution.ts`
+  // resolveDefinitionAction), so a player's Action Surge / Relentless Endurance belongs in their own
+  // console with a Use tap rather than only in the GM's. It needs no target, exactly as there.
+  const actions = useMemo(() => [
+    ...definition.actions.filter((action) => action.attack || action.save || action.damage.length > 0 || action.uses !== undefined).map(summaryOfOwnAction),
+    // Item-derived, appended rather than merged: they are keyed `item-<inventory id>` and can never
+    // collide with a stat-block id, and a player reads their own kit after their own stat block.
+    ...extraActions.filter((action) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.usesLimit !== null)
+  ], [definition, extraActions]);
+  const isTargetlessOwn = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.usesLimit !== null;
   const session = useTargeting();
   const result = useTargetingResult();
   const busy = useTargetingBusy();
@@ -365,7 +377,7 @@ export function PlayerActionRunner({ actorId, definition, revision, rollMode, bo
         {actions.map((action) => {
           const parts = ownActionSummaryParts(action);
           return <li key={action.id}>
-            <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => { setTargetingResult(null); beginTargeting(action, actorId); }}>
+            <button type="button" className="action-row" disabled={busy} title={action.description} onClick={() => { setTargetingResult(null); if (isTargetlessOwn(action)) resolveActionDirect(actorId, action.id, revision, onOutcome); else beginTargeting(action, actorId); }}>
               <strong className="action-row-name">{action.name}</strong>
               {parts.length > 0 ? <ul className="action-row-summary">{parts.map((part) => <li key={part}>{part}</li>)}</ul> : <span className="action-row-summary-note">Tap to use</span>}
             </button>

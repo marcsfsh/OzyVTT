@@ -1,0 +1,18 @@
+/* FieldGrid — auto-fitting form columns, no media query.
+
+   `min(var(--nh-fg-min), 100%)` is the whole point: `minmax(220px, 1fr)` would hold a
+   220px floor even inside a 200px container, so the track overflows and the page gains
+   a horizontal scrollbar at 375px. Clamping the minimum to the container's own width
+   lets the last column collapse instead. */
+.nh-fieldgrid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--nh-fg-min, 220px), 100%), 1fr));
+  gap: var(--space-3) var(--space-4);
+  /* Fields have labels above and help below; aligning to start keeps a field with help
+     text from stretching its neighbour's input to match. */
+  align-items: start;
+}
+
+/* Child escape hatch — a textarea, a nested fieldset, or a row editor takes the row. */
+.nh-fieldgrid-wide { grid-column: 1 / -1; }

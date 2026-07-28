@@ -1,14 +1,34 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  AbilityScoreAllocator,
   Alert,
   Avatar,
   Badge,
   Button,
+  ChoiceCard,
+  ChoiceGrid,
   Chip,
+  DiceInputRow,
   Eyebrow,
+  FeatureList,
   Field,
+  FieldGrid,
   IconButton,
+  IconCheck,
+  IconChevron,
+  IconCopy,
+  IconDie,
+  IconDrag,
+  IconEye,
+  IconEyeOff,
+  IconInfo,
+  IconPencil,
+  IconPlus,
+  IconSearch,
+  IconShuffle,
+  IconTrash,
+  IconWarning,
   Input,
   Kbd,
   LinkButton,
@@ -16,21 +36,31 @@ import {
   Meter,
   MenuItem,
   Modal,
+  NameField,
+  NumberField,
   Panel,
   PanelHeader,
+  ReviewSummary,
+  RowEditor,
+  SaveState,
   SegmentedControl,
   Select,
   Skeleton,
   Stepper,
   Steps,
   Switch,
+  TagInput,
   Tabs,
   Textarea,
   ThemeToggle,
   Tooltip,
   ToastProvider,
   useToast,
+  WizardShell,
   Wordmark,
+  type AbilityPoolValue,
+  type ChoiceOption,
+  type SaveStatus,
   type TabItem
 } from "@vtt/ui";
 
@@ -85,8 +115,476 @@ const DEMO_TABS: TabItem[] = [
   { id: "setup", label: "VTT Setup" }
 ];
 
+/* The real GM bar, which is what made the scroll fix necessary: eight labels are about
+   810px of content, so at 375px the last two sit outside a scrollport with a hidden
+   scrollbar. Shrink the window to watch the fade appear and the active tab scroll in. */
+const OVERFLOW_TABS: TabItem[] = [
+  { id: "encounter", label: "Encounter" },
+  { id: "maps", label: "Map Setup" },
+  { id: "scenes", label: "Scenes" },
+  { id: "codex", label: "Codex" },
+  { id: "homebrew", label: "Homebrew" },
+  { id: "viewer", label: "Viewer" },
+  { id: "replay", label: "Replays" },
+  { id: "setup", label: "VTT Setup" }
+];
+
+const ICONS = [
+  { name: "IconCheck", glyph: <IconCheck />, use: "the one chosen mark" },
+  { name: "IconChevron", glyph: <IconChevron />, use: "disclosure; rotate for back" },
+  { name: "IconSearch", glyph: <IconSearch />, use: "filter a catalog" },
+  { name: "IconShuffle", glyph: <IconShuffle />, use: "generate; in flight" },
+  { name: "IconDie", glyph: <IconDie />, use: "roll it for me" },
+  { name: "IconPencil", glyph: <IconPencil />, use: "edit; unsaved" },
+  { name: "IconWarning", glyph: <IconWarning />, use: "blocked / caution" },
+  { name: "IconInfo", glyph: <IconInfo />, use: "low-urgency note" },
+  { name: "IconPlus", glyph: <IconPlus />, use: "add a row / a tag" },
+  { name: "IconTrash", glyph: <IconTrash />, use: "remove (always worded)" },
+  { name: "IconDrag", glyph: <IconDrag />, use: "reorder grip" },
+  { name: "IconCopy", glyph: <IconCopy />, use: "duplicate an existing one" },
+  { name: "IconEye", glyph: <IconEye />, use: "shown to players" },
+  { name: "IconEyeOff", glyph: <IconEyeOff />, use: "GM only" }
+];
+
+const SAVE_STATUSES: SaveStatus[] = ["idle", "dirty", "saving", "saved", "conflict", "error"];
+
+/** All six autosave states side by side — the point of the component is that you can
+    tell them apart with the colour thrown away, so they are shown together. */
+function SaveStateDemo() {
+  const [status, setStatus] = useState<SaveStatus>("dirty");
+  return (
+    <div className="sg-stack">
+      <SegmentedControl
+        ariaLabel="Save status"
+        size="sm"
+        value={status}
+        onChange={(next) => setStatus(next as SaveStatus)}
+        options={SAVE_STATUSES.map((value) => ({ value, label: value }))}
+      />
+      <div className="sg-state-box" style={{ minWidth: 0, justifyItems: "start" }}>
+        <SaveState status={status} onReload={() => setStatus("saved")} onRetry={() => setStatus("saved")} />
+      </div>
+      <div className="sg-savestates">
+        {SAVE_STATUSES.map((value) => (
+          <div key={value} className="sg-savestate-row">
+            <code className="sg-swatch-name">{value}</code>
+            <SaveState status={value} onReload={() => {}} onRetry={() => {}} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Stands in for the app's `newId()`. The whole point of RowEditor's `rowKey` is that
+   this id is minted once, with the row, and never derived from the array position. */
+let demoSeq = 0;
+const newDemoId = () => `demo-${++demoSeq}`;
+
+type DemoAction = { id: string; name: string; description: string };
+type DemoBonus = { id: string; ability: string; amount: number | null };
+
+function RowEditorDemo() {
+  const [actions, setActions] = useState<readonly DemoAction[]>([
+    { id: newDemoId(), name: "Fire Breath", description: "Exhales fire in a 30-foot cone. DEX save 18, 56 (16d6) fire damage." },
+    { id: newDemoId(), name: "Bite", description: "Melee weapon attack, +14 to hit, reach 10 ft. 19 (2d10 + 8) piercing." }
+  ]);
+  const [bonuses, setBonuses] = useState<readonly DemoBonus[]>([]);
+
+  return (
+    <div className="sg-stack">
+      <h3 className="sg-h3">Collapsible rows, capped</h3>
+      <RowEditor
+        ariaLabel="Actions"
+        rows={actions}
+        onChange={setActions}
+        rowKey={(row) => row.id}
+        rowLabel={(row, index) => row.name || `Action ${index + 1}`}
+        collapsible
+        max={3}
+        maxReachedReason="Three actions is the demo's cap — the real schema sets its own."
+        emptyText="No actions yet."
+        addLabel="Add an action"
+        onAdd={() => ({ id: newDemoId(), name: "", description: "" })}
+        renderRow={(row, index) => (
+          <FieldGrid min="14rem">
+            <Field label="Name" htmlFor={`sg-act-name-${row.id}`}>
+              <Input
+                id={`sg-act-name-${row.id}`}
+                value={row.name}
+                placeholder="Fire Breath"
+                onChange={(event) => setActions((prev) => prev.map((r, i) => (i === index ? { ...r, name: event.target.value } : r)))}
+              />
+            </Field>
+            <Field label="Description" htmlFor={`sg-act-desc-${row.id}`} className="nh-fieldgrid-wide">
+              <Textarea
+                id={`sg-act-desc-${row.id}`}
+                value={row.description}
+                placeholder="What happens when it hits."
+                onChange={(event) => setActions((prev) => prev.map((r, i) => (i === index ? { ...r, description: event.target.value } : r)))}
+              />
+            </Field>
+          </FieldGrid>
+        )}
+      />
+
+      <h3 className="sg-h3">Flat rows, and the empty state</h3>
+      <RowEditor
+        ariaLabel="Ability bonuses"
+        rows={bonuses}
+        onChange={setBonuses}
+        rowKey={(row) => row.id}
+        rowLabel={(row, index) => (row.ability ? `${row.ability.toUpperCase()} ${(row.amount ?? 0) >= 0 ? "+" : ""}${row.amount ?? 0}` : `Bonus ${index + 1}`)}
+        emptyText="No ability bonuses yet."
+        addLabel="Add a bonus"
+        onAdd={() => ({ id: newDemoId(), ability: "str", amount: 1 })}
+        renderRow={(row, index) => (
+          <FieldGrid min="10rem">
+            <Field label="Ability" htmlFor={`sg-bonus-ab-${row.id}`}>
+              <Select
+                id={`sg-bonus-ab-${row.id}`}
+                value={row.ability}
+                onChange={(event) => setBonuses((prev) => prev.map((r, i) => (i === index ? { ...r, ability: event.target.value } : r)))}
+              >
+                {ABILITIES.map((ability) => <option key={ability.id} value={ability.id}>{ability.label}</option>)}
+              </Select>
+            </Field>
+            <Field label="Amount" htmlFor={`sg-bonus-amt-${row.id}`}>
+              <NumberField
+                id={`sg-bonus-amt-${row.id}`}
+                value={row.amount}
+                min={-2}
+                max={3}
+                allowNegative
+                onChange={(next) => setBonuses((prev) => prev.map((r, i) => (i === index ? { ...r, amount: next } : r)))}
+              />
+            </Field>
+          </FieldGrid>
+        )}
+      />
+    </div>
+  );
+}
+
+function NumberFieldDemo() {
+  const [gold, setGold] = useState<number | null>(1250);
+  const [weight, setWeight] = useState<number | null>(1.5);
+  const [attack, setAttack] = useState<number | null>(-1);
+  const [hp, setHp] = useState<number | null>(null);
+  return (
+    <FieldGrid>
+      <Field label="Cost" htmlFor="sg-num-gp" help="Clamps to 0–1,000,000 when you leave the field, not while you type.">
+        <NumberField id="sg-num-gp" value={gold} onChange={setGold} min={0} max={1000000} unit="gp" placeholder="0" />
+      </Field>
+      <Field label="Weight" htmlFor="sg-num-lb" help="allowDecimal switches the phone keypad to one with a decimal point.">
+        <NumberField id="sg-num-lb" value={weight} onChange={setWeight} min={0} allowDecimal unit="lb" placeholder="0" />
+      </Field>
+      <Field label="Attack bonus" htmlFor="sg-num-atk" help="allowNegative — a −1 cursed blade is a real item.">
+        <NumberField id="sg-num-atk" value={attack} onChange={setAttack} min={-5} max={5} allowNegative />
+      </Field>
+      <Field label="Hit points" htmlFor="sg-num-hp" error="Give this creature hit points.">
+        <NumberField id="sg-num-hp" value={hp} onChange={setHp} min={1} max={1000} invalid placeholder="256" />
+      </Field>
+    </FieldGrid>
+  );
+}
+
+const TOOL_SUGGESTIONS = ["thieves-tools", "smiths-tools", "herbalism-kit", "navigators-tools", "brewers-supplies"];
+
+function TagInputDemo() {
+  const [tools, setTools] = useState<readonly string[]>(["thieves-tools"]);
+  const [resistances, setResistances] = useState<readonly string[]>(["fire", "cold", "poison"]);
+  return (
+    <FieldGrid>
+      <Field label="Tool proficiencies" htmlFor="sg-tags-tools" help="Suggestions hint; they never close the set.">
+        <TagInput
+          id="sg-tags-tools"
+          ariaLabel="Tool proficiencies"
+          values={tools}
+          onChange={setTools}
+          suggestions={TOOL_SUGGESTIONS}
+          placeholder="thieves-tools"
+        />
+      </Field>
+      <Field label="Damage resistances" htmlFor="sg-tags-res" help="Typed entries slugify: “Cold Iron” becomes cold-iron.">
+        <TagInput
+          id="sg-tags-res"
+          ariaLabel="Damage resistances"
+          values={resistances}
+          onChange={setResistances}
+          max={3}
+          maxReachedReason="Three is this demo's cap. Remove one to add another."
+          placeholder="fire"
+        />
+      </Field>
+    </FieldGrid>
+  );
+}
+
+/* ---- Character-builder demo data (presentation only — the real content comes from
+   the SRD bundles and the real math from @vtt/rules-5e). ---- */
+
+const WIZARD_STEPS = [
+  { label: "Species" }, { label: "Class" }, { label: "Background" },
+  { label: "Ability scores" }, { label: "Skills" }, { label: "Equipment" }, { label: "Review" }
+];
+
+const SPECIES: ChoiceOption[] = [
+  { value: "human", title: "Human", facet: "srd", keywords: "versatile", meta: "+1 to all · 30 ft", description: "Ambitious and adaptable, humans turn up in every corner of the world.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "elf", title: "Elf", facet: "srd", keywords: "fey darkvision", meta: "+2 DEX · 30 ft", description: "Graceful, long-lived, and at home in twilight — darkvision and keen senses.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "dwarf", title: "Dwarf", facet: "srd", keywords: "stout hardy", meta: "+2 CON · 25 ft", description: "Stone-hardy and stubborn, with darkvision and a resistance to poison.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "halfling", title: "Halfling", facet: "srd", keywords: "lucky small", meta: "+2 DEX · 25 ft", description: "Small, lucky, and very hard to frighten.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "dragonborn", title: "Dragonborn", facet: "srd", keywords: "breath weapon", meta: "+2 STR · 30 ft", description: "Draconic ancestry grants a breath weapon and matching damage resistance.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "gnome", title: "Gnome", facet: "srd", keywords: "cunning tinker", meta: "+2 INT · 25 ft", description: "Inventive and irrepressible, with advantage on mental saves against magic.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "half-elf", title: "Half-Elf", facet: "srd", keywords: "charisma versatile", meta: "+2 CHA · 30 ft", description: "At home everywhere and nowhere; two extra skills of your choosing.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "half-orc", title: "Half-Orc", facet: "srd", keywords: "relentless endurance", meta: "+2 STR · 30 ft", description: "Relentless endurance keeps you standing at 1 hit point once per rest.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "tiefling", title: "Tiefling", facet: "srd", keywords: "infernal fire", meta: "+2 CHA · 30 ft", description: "Infernal heritage: fire resistance and a little innate magic.", badge: <Badge tone="info">SRD</Badge> },
+  { value: "ashborn", title: "Ashborn", facet: "homebrew", keywords: "volcanic", meta: "+2 CON · 30 ft", description: "Born of the cinder wastes; the campaign's own lineage.", badge: <Badge tone="primary">Homebrew</Badge> },
+  { value: "tidewalker", title: "Tidewalker", facet: "homebrew", keywords: "aquatic swim", meta: "+2 WIS · 30 ft", description: "Amphibious wanderers of the drowned coast, with a swim speed.", badge: <Badge tone="primary">Homebrew</Badge> },
+  { value: "voidkin", title: "Voidkin", facet: "homebrew", keywords: "starlight", meta: "+2 INT · 30 ft", description: "Touched by the space between stars. Needs the GM's blessing.", badge: <Badge tone="primary">Homebrew</Badge>, disabled: true, disabledReason: "The GM has not unlocked this lineage." }
+];
+
+const ABILITIES = [
+  { id: "str", label: "Strength", abbr: "STR" },
+  { id: "dex", label: "Dexterity", abbr: "DEX" },
+  { id: "con", label: "Constitution", abbr: "CON" },
+  { id: "int", label: "Intelligence", abbr: "INT" },
+  { id: "wis", label: "Wisdom", abbr: "WIS" },
+  { id: "cha", label: "Charisma", abbr: "CHA" }
+];
+const SPECIES_BONUS: Record<string, number> = { dex: 2, con: 1 };
+const POINT_COST: Record<number, number> = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
+const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
+/* Demo-only: the shipping wizard takes these from @vtt/rules-5e. */
+const modifierOf = (score: number) => Math.floor((score - 10) / 2);
+
+const CLASS_FEATURES = [
+  { id: "second-wind", title: "Second Wind", meta: "Level 1", badge: <Badge tone="info">SRD</Badge>, body: <p>Once per short or long rest, use a bonus action to regain 1d10 + your fighter level in hit points.</p>, defaultOpen: true },
+  { id: "action-surge", title: "Action Surge", meta: "Level 2", badge: <Badge tone="info">SRD</Badge>, body: <p>On your turn, take one additional action. Once per short or long rest.</p> },
+  { id: "martial-archetype", title: "Martial Archetype", meta: "Level 3", badge: <Badge tone="info">SRD</Badge>, body: <p>Choose the archetype that shapes the rest of your fighter career. Its features arrive at levels 3, 7, 10, 15, and 18.</p> },
+  { id: "asi-4", title: "Ability Score Improvement", meta: "Level 4", badge: <Badge tone="info">SRD</Badge>, body: <p>Raise one ability by 2, or two abilities by 1 each — or take a feat instead. No ability goes above 20 this way.</p> },
+  { id: "extra-attack", title: "Extra Attack", meta: "Level 5", badge: <Badge tone="info">SRD</Badge>, body: <p>Attack twice whenever you take the Attack action on your turn.</p> },
+  { id: "cinder-mark", title: "Cinder Mark", meta: "Level 3", badge: <Badge tone="primary">Homebrew</Badge>, body: <p>Brand a creature you hit. Your next attack against it before the end of your next turn deals an extra 1d6 fire damage.</p> }
+];
+
+/** The wizard frame driving a real step: species picking, live validation gating,
+    a preview pane, and the persistent attribution footnote. */
+function WizardDemo() {
+  const [step, setStep] = useState(0);
+  const [species, setSpecies] = useState<string | null>(null);
+  const [facet, setFacet] = useState("all");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const chosen = SPECIES.find((option) => option.value === species) ?? null;
+
+  return (
+    <div className="sg-wizard-frame">
+      <WizardShell
+        title="Create a character"
+        eyebrow="Character builder"
+        steps={WIZARD_STEPS}
+        current={step}
+        onStepSelect={setStep}
+        onSaveAndClose={() => undefined}
+        onBack={step > 0 ? () => setStep((s) => s - 1) : undefined}
+        onNext={step < WIZARD_STEPS.length - 1 ? () => setStep((s) => s + 1) : undefined}
+        blockedReason={step === 0 && !species ? "Choose a species to continue." : undefined}
+        resume={<Alert tone="info" title="Draft found">You started this character on another device. <Button variant="ghost" size="sm">Resume draft</Button></Alert>}
+        detail={chosen
+          ? <>
+              <p>{chosen.description}</p>
+              <p className="tabular sg-muted">{chosen.meta}</p>
+            </>
+          : <p>Pick a species to preview its traits here.</p>}
+        detailTitle={chosen ? chosen.title : "Preview"}
+        detailOpen={detailOpen}
+        onOpenDetail={() => setDetailOpen(true)}
+        detailOpenLabel="Show preview"
+        onCloseDetail={() => setDetailOpen(false)}
+        detailBackLabel="Back to the list"
+        footnote="Species, class, and background text from the SRD 5.2.1, CC BY 4.0."
+      >
+        <div className="sg-wizard-step">
+          <ChoiceGrid
+            ariaLabel="Species"
+            options={SPECIES}
+            value={species}
+            onChange={(value) => { setSpecies(value); }}
+            searchPlaceholder="Search species…"
+            facetValue={facet}
+            onFacetChange={setFacet}
+            facetLabel="Source"
+            facets={[{ value: "all", label: "All" }, { value: "srd", label: "SRD" }, { value: "homebrew", label: "Homebrew" }]}
+          />
+        </div>
+      </WizardShell>
+    </div>
+  );
+}
+
+/** All four ability-generation methods behind one component. */
+function AllocatorDemo() {
+  const [method, setMethod] = useState("standard");
+  const [assigned, setAssigned] = useState<Record<string, string | null>>({});
+  const [scores, setScores] = useState<Record<string, number>>(() => Object.fromEntries(ABILITIES.map((a) => [a.id, 8])));
+  const [rolls, setRolls] = useState<number[]>([]);
+  const [diceMode, setDiceMode] = useState<"auto" | "manual">("auto");
+
+  const spend = method === "point-buy";
+  const values = method === "roll" ? rolls : method === "custom" ? [17, 15, 13, 12, 10, 8] : STANDARD_ARRAY;
+
+  const pool: AbilityPoolValue[] = useMemo(
+    () => values.map((value, index) => {
+      const id = `${method}-${index}`;
+      return { id, value, assignedTo: Object.entries(assigned).find(([, poolId]) => poolId === id)?.[0] ?? null };
+    }),
+    [values, assigned, method]
+  );
+
+  const rows = ABILITIES.map((ability) => {
+    const bonus = SPECIES_BONUS[ability.id];
+    const base = spend ? scores[ability.id] : pool.find((entry) => entry.assignedTo === ability.id)?.value ?? null;
+    const total = base == null ? null : base + (bonus ?? 0);
+    return { ...ability, score: base, bonus, total, modifier: total == null ? null : modifierOf(total), min: 8, max: 15 };
+  });
+
+  const spent = ABILITIES.reduce((sum, ability) => sum + (POINT_COST[scores[ability.id]] ?? 0), 0);
+
+  const switchMethod = (next: string) => { setMethod(next); setAssigned({}); setRolls([]); };
+  const assign = (abilityId: string, poolId: string | null) => setAssigned((prev) => {
+    const next = { ...prev };
+    if (poolId) for (const key of Object.keys(next)) if (next[key] === poolId) next[key] = null;
+    next[abilityId] = poolId;
+    return next;
+  });
+
+  return (
+    <AbilityScoreAllocator
+      mode={spend ? "spend" : "assign"}
+      method={method}
+      onMethodChange={switchMethod}
+      methods={[
+        { value: "standard", label: "Standard array" },
+        { value: "point-buy", label: "Point buy" },
+        { value: "roll", label: "Roll 4d6" },
+        { value: "custom", label: "GM formula" }
+      ]}
+      methodHint={
+        method === "standard" ? "Assign 15, 14, 13, 12, 10, 8 to the six abilities."
+        : method === "point-buy" ? "Spend 27 points. 8 is free; 15 costs 9."
+        : method === "roll" ? "Roll 4d6 and drop the lowest, six times, then assign the results."
+        : "This table's formula: 2d6 + 6, rolled six times."
+      }
+      rows={rows}
+      pool={spend ? undefined : pool}
+      onAssign={assign}
+      onScoreChange={(abilityId, next) => setScores((prev) => ({ ...prev, [abilityId]: next }))}
+      budget={spend ? { spent, total: 27 } : undefined}
+      toolbar={method === "roll"
+        ? <DiceInputRow
+            label="Roll six scores"
+            notation="4d6 drop lowest"
+            mode={diceMode}
+            onModeChange={setDiceMode}
+            min={3}
+            max={18}
+            onRoll={() => setRolls(Array.from({ length: 6 }, () => 8 + Math.floor(Math.random() * 8)))}
+            onManual={(total) => setRolls((prev) => (prev.length >= 6 ? prev : [...prev, total]))}
+            onReroll={rolls.length > 0 ? () => { setRolls([]); setAssigned({}); } : undefined}
+            result={rolls.length > 0 ? rolls.join(" · ") : undefined}
+            hint={diceMode === "manual" ? "Type each of your six totals, one at a time." : "The server owns the dice; this button only asks for them."}
+          />
+        : undefined}
+    />
+  );
+}
+
+function NameFieldDemo() {
+  const POOLS = [
+    ["Borin Stoneguard", "Mirena Dawnbright", "Lyra Emberwise", "Kel Tanner"],
+    ["Draven Ash", "Sabine Vale", "Orrin Quickfoot", "Thessaly Grey"],
+    ["Rurik Ironvow", "Nessa Coldbrook", "Halvard Finn", "Ilsa Wren"]
+  ];
+  const [batch, setBatch] = useState(0);
+  const [name, setName] = useState("");
+  return (
+    <div className="sg-grid2">
+      <NameField
+        value={name}
+        onChange={setName}
+        suggestions={POOLS[batch % POOLS.length]}
+        onShuffle={() => setBatch((b) => b + 1)}
+        help="Per-species name bundles feed these; you can always type your own."
+      />
+    </div>
+  );
+}
+
+function DiceInputDemo() {
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
+  const [hp, setHp] = useState<number | null>(null);
+  return (
+    <DiceInputRow
+      label="Hit points for level 4"
+      notation="1d10 + 2"
+      mode={mode}
+      onModeChange={setMode}
+      min={3}
+      max={12}
+      onRoll={() => setHp(3 + Math.floor(Math.random() * 10))}
+      onManual={setHp}
+      onReroll={hp != null ? () => setHp(null) : undefined}
+      result={hp != null ? `${hp} HP` : undefined}
+      complete={hp != null}
+      hint="Outside combat the wizard offers both paths; inside an encounter, RollControls does."
+    />
+  );
+}
+
+function ChoiceGridDemo() {
+  const [value, setValue] = useState<string | null>("elf");
+  const [facet, setFacet] = useState("all");
+  return (
+    <ChoiceGrid
+      ariaLabel="Species"
+      options={SPECIES}
+      value={value}
+      onChange={setValue}
+      searchPlaceholder="Search species…"
+      facetLabel="Source"
+      facetValue={facet}
+      onFacetChange={setFacet}
+      facets={[{ value: "all", label: "All" }, { value: "srd", label: "SRD" }, { value: "homebrew", label: "Homebrew" }]}
+      emptyAction={<Button variant="secondary" onClick={() => setFacet("all")}>Clear filters</Button>}
+    />
+  );
+}
+
+/** The same grid in choose-N mode — the shape every content offer with `choose > 1`
+    takes (three Weapon Masteries, six prepared spells, two Magic Initiate cantrips). */
+function ChoiceGridMultiDemo() {
+  const [picked, setPicked] = useState<readonly string[]>(["elf"]);
+  const max = 2;
+  return (
+    <>
+      <p className="sg-muted tabular">{picked.length} of {max} chosen</p>
+      <ChoiceGrid
+        ariaLabel="Weapon masteries"
+        selection="multiple"
+        options={SPECIES}
+        value={null}
+        onChange={() => undefined}
+        values={picked}
+        max={max}
+        onToggle={(value, next) => setPicked((prev) => next ? [...prev, value] : prev.filter((entry) => entry !== value))}
+        searchPlaceholder="Search options…"
+      />
+    </>
+  );
+}
+
 export function StyleGuide() {
   const [tab, setTab] = useState("encounter");
+  const [overflowTab, setOverflowTab] = useState("encounter");
   const [vtab, setVtab] = useState("encounter");
   const [modalOpen, setModalOpen] = useState(false);
   const [entranceKey, setEntranceKey] = useState(0);
@@ -96,6 +594,8 @@ export function StyleGuide() {
   const [mod, setMod] = useState(0);
   const [seg, setSeg] = useState("all");
   const [dockSide, setDockSide] = useState("right");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [cardPick, setCardPick] = useState("fighter");
 
   return (
     <ToastProvider>
@@ -148,6 +648,18 @@ export function StyleGuide() {
             </div>
           </Section>
 
+          <Section id="icons" title="Icons" blurb="The system's own SVG glyphs — 24×24, filled with currentColor, sized in em, always aria-hidden so the control around them carries the name. A primitive never renders a glyph as TEXT: Manrope has no ⚠, so it silently falls back to a system face at the wrong size and iOS/Android give it emoji presentation — a yellow triangle, a hue this palette does not own. The set is deliberately small; the app's richer fantasy-cartography glyphs live in the client. There is no IconArrow: the forward → is all-or-none across seven existing call sites, and half-adopting it would mix a drawn arrow with a fallback glyph on the same screen.">
+            <div className="sg-icons">
+              {ICONS.map((icon) => (
+                <div className="sg-icon" key={icon.name}>
+                  <span className="sg-icon-glyph">{icon.glyph}</span>
+                  <code className="sg-swatch-name">{icon.name}</code>
+                  <span className="sg-icon-use">{icon.use}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+
           <Section id="buttons" title="Buttons" blurb="One primary action per view. Variants map to semantic roles; labels are sentence case.">
             <div className="sg-row">
               <Button variant="primary">Roll initiative</Button>
@@ -190,6 +702,35 @@ export function StyleGuide() {
             </div>
           </Section>
 
+          <Section id="fieldgrid" title="Field grid" blurb="The form layout for every authoring surface: as many equal columns as fit, no media query. The load-bearing detail is minmax(min(220px, 100%), 1fr) rather than minmax(220px, 1fr) — the bare version holds a 220px floor even inside a 200px rail, which pushes the document sideways at 375px. Because it is intrinsic rather than breakpoint-driven, the same grid resolves to ONE column in a narrow desktop rail and TWO in a full-width phone column, which is the right answer in both places and takes no thought from the caller. A field that must span the row takes className='nh-fieldgrid-wide' — the escape hatch belongs to the child, so the grid never learns about its children.">
+            <FieldGrid>
+              <Field label="Name" htmlFor="sg-fg-name"><Input id="sg-fg-name" placeholder="Frost Warden" /></Field>
+              <Field label="Hit die" htmlFor="sg-fg-die">
+                <Select id="sg-fg-die" defaultValue="d10"><option>d6</option><option>d8</option><option>d10</option><option>d12</option></Select>
+              </Field>
+              <Field label="Subclass label" htmlFor="sg-fg-sub"><Input id="sg-fg-sub" placeholder="Martial Archetype" /></Field>
+              <Field label="Description" htmlFor="sg-fg-desc" className="nh-fieldgrid-wide" help="nh-fieldgrid-wide spans 1 / -1.">
+                <Textarea id="sg-fg-desc" placeholder="What this class is for." />
+              </Field>
+            </FieldGrid>
+            <h3 className="sg-h3">min=&quot;12rem&quot; — the same grid, tighter columns</h3>
+            <FieldGrid min="12rem">
+              {ABILITIES.map((ability) => (
+                <Field key={ability.id} label={ability.label} htmlFor={`sg-fg-${ability.id}`}>
+                  <NumberField id={`sg-fg-${ability.id}`} value={10} onChange={() => {}} min={1} max={30} />
+                </Field>
+              ))}
+            </FieldGrid>
+          </Section>
+
+          <Section id="numberfield" title="Number field" blurb="A free-typed number — 1250 gp, 133 hit points, a −2 ability bonus. Two decisions, each a bug the other way round. It is type='text' + inputMode, never type='number': that is the repo's established idiom, and the native control gives a spinner nobody uses at 375px, reports an empty value on a stray letter, and changes the number when the wheel rolls over a focused field. And it clamps on BLUR, never mid-typing — clamping per keystroke against min=10 eats the first digit of '12' the moment it is typed, so the field fights the GM. Stepper stays the control for small bounded nudges (an ability score, 'choose 3'); this is for the values where nudging by one twelve hundred times is absurd. The unit is a suffix, never part of the value, and it rides aria-describedby because '1250' and '1250 gp' are different facts.">
+            <NumberFieldDemo />
+          </Section>
+
+          <Section id="taginput" title="Tag input" blurb="An open list of slugs: armour proficiencies, languages, damage resistances, feature tags. Composed from Chip + Input rather than invented, and open rather than a multiselect on purpose — the content schemas keep these fields as free slugs so a homebrew author can name a proficiency the SRD never had. Suggestions are a datalist, which hints without closing the set; a Select here would be a closed-world control over an open-world field. Enter or comma commits, Backspace on an empty input removes the last, and adds and removes are announced politely because a chip appearing above the field you are typing in is otherwise silent. At capacity the field disables and states its reason at full strength — annotate, never hide.">
+            <TagInputDemo />
+          </Section>
+
           <Section id="panels" title="Panels" blurb="Resting surfaces stay dark. An optional 2px hairline labels a panel kind.">
             <div className="sg-grid3">
               <Panel><PanelHeader eyebrow="Notes" title="Plain panel" /><p className="sg-muted">surface-1, 1px line, no glow.</p></Panel>
@@ -198,19 +739,27 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="tabs" title="Tabs" blurb="One tab bar everywhere. Active = text + magenta underline (or left bar) with a faint glow.">
+          <Section id="tabs" title="Tabs" blurb="One tab bar everywhere. Active = text + magenta underline (or left bar) with a faint glow. A horizontal bar that overflows hides its scrollbar, so it has to say so some other way: the edge fades whichever side has content behind it, and only when the bar actually overflows — a permanent fade would claim there is more when there is not. Selecting a tab scrolls it into the scrollport (honouring reduced motion), which is what makes an eighth tab reachable at 375px instead of simply gone. It scrolls the BAR rather than calling scrollIntoView, which walks every scrollable ancestor and would drag the whole page to wherever the tab bar happens to sit. SHRINK THE WINDOW past ~700px to watch the second bar below fade and scroll.">
             <Tabs tabs={DEMO_TABS} activeId={tab} onChange={setTab} ariaLabel="Demo tabs" />
+            <h3 className="sg-h3">Eight tabs — the real GM bar, which overflows at 375px</h3>
+            <Tabs tabs={OVERFLOW_TABS} activeId={overflowTab} onChange={setOverflowTab} ariaLabel="Overflowing demo tabs" />
+            <p className="sg-blurb">Pick “VTT Setup”, then narrow the window: the bar scrolls the active tab back into view and fades the left edge to show what is behind it.</p>
             <div className="sg-vtabs">
               <Tabs tabs={DEMO_TABS.slice(0, 4)} activeId={vtab} onChange={setVtab} orientation="vertical" ariaLabel="Demo vertical tabs" />
             </div>
           </Section>
 
-          <Section id="menus" title="Menus & tooltips" blurb="Native details/summary disclosure; caret rotates on open.">
+          <Section id="menus" title="Menus & tooltips" blurb="Native details/summary disclosure; caret rotates on open. The default trigger is a padded pill that carries the 44px floor as paint; icon puts it in a 1.75rem square instead — for dense tool clusters, where the floor is hit area, not paint — so a ⋯ can sit beside a same-size grip as an even pair.">
             <div className="sg-row">
               <Menu trigger="Options">
                 <MenuItem icon="⚔">Roll mode</MenuItem>
                 <MenuItem icon="🎲">Rules mode</MenuItem>
                 <MenuItem icon="🗑" tone="danger">End encounter</MenuItem>
+              </Menu>
+              <Menu trigger="⋯" icon label="Scene actions" align="end">
+                <MenuItem icon="✎">Rename</MenuItem>
+                <MenuItem icon="⧉">Duplicate</MenuItem>
+                <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
               </Menu>
               <Tooltip content="Reveal the map to the shared screen">
                 <Button variant="secondary">Hover / focus me</Button>
@@ -274,6 +823,10 @@ export function StyleGuide() {
             </div>
           </Section>
 
+          <Section id="savestate" title="Save state" blurb="The autosave readout for a park-as-you-type editor. Three things it fixes about the hand-rolled version it replaces. (1) A REAL RESTING STATE: idle and saved both read 'Saved', because rendering an empty string at rest means the GM cannot tell 'your work is safe' from 'nothing has happened yet' — the one question this readout exists to answer. (2) ICON AND TEXT, never colour alone: this palette is heavy in the red-pink-magenta band and reserves violet for GM-only, so no state may be carried by hue — every status differs by WORD first, glyph second, colour third, and none of them uses --text-muted, which is 3.61:1 and fails AA. (3) THE TWO STATES THAT NEED AN ACTION GET ONE: a readout you cannot act on is exactly the state that most needs reading, so conflict offers Reload and error offers Retry. The label reserves the width of the longest string so the buttons beside it never shuffle, and the polite live region carries only the settled states — announcing 'dirty' would fire on every keystroke.">
+            <SaveStateDemo />
+          </Section>
+
           <Section id="table" title="Data table" blurb="One table style for content lists, credentials, and import previews. Numeric columns are mono + right-aligned; rows lift on hover.">
             <div className="sg-table-wrap">
               <table className="nh-table">
@@ -316,7 +869,7 @@ export function StyleGuide() {
                 <div className="nh-card-body"><h3 className="nh-card-title">Bridge Ambush</h3><span className="nh-card-meta">4 combatants</span></div>
                 <span className="nh-card-status"><Badge tone="primary" solid>LIVE</Badge></span>
                 <div className="nh-card-tools">
-                  <Menu trigger="⋯">
+                  <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
                   </Menu>
@@ -328,7 +881,7 @@ export function StyleGuide() {
                 <div className="nh-card-body"><h3 className="nh-card-title">Boss Chamber</h3><span className="nh-card-meta">6 combatants</span></div>
                 <span className="nh-card-status"><Badge>Staging</Badge></span>
                 <div className="nh-card-tools">
-                  <Menu trigger="⋯">
+                  <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
                     <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
@@ -340,7 +893,7 @@ export function StyleGuide() {
                 <div className="nh-card-thumb"><span className="nh-card-thumb-empty" aria-hidden="true">🗺️</span></div>
                 <div className="nh-card-body"><h3 className="nh-card-title">Escape Tunnels</h3><span className="nh-card-meta">2 combatants</span></div>
                 <div className="nh-card-tools">
-                  <Menu trigger="⋯">
+                  <Menu trigger="⋯" icon label="Scene actions" align="end">
                     <MenuItem icon="✎">Rename</MenuItem>
                     <MenuItem icon="⧉">Duplicate</MenuItem>
                     <MenuItem icon="🗑" tone="danger">Remove</MenuItem>
@@ -390,11 +943,130 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Done steps check off; the current step glows.">
+          <Section id="steps" title="Steps" blurb="Progress indicator for multi-step flows — character builder, map calibration, content-import wizards. Two forms, one component, swapped by media query: the full horizontal rail above 760px (done steps check off, the current step glows, it scrolls rather than wraps) and a 'Step 3 of 7' + progress bar below it, so a seven-step flow never blobs into rows at 375px. Pass onStepSelect to let a completed step be revisited. Position alone can only say 'before' and 'after', so a flow that knows whether a visited step is actually FINISHED declares state='done' | 'incomplete' per step — the third rail below. Each of the four states differs in three ways at once, never by hue alone: done is a solid cyan ring with a check, incomplete a dashed caution-violet ring with the system's one caution mark (rose is reserved for damage and destruction — an unanswered step is not an error), current a filled magenta disc, and upcoming a quiet grey ring with its number. Steps that declare a state also say 'done' / 'not finished' to a screen reader, because the marks themselves are decorative.">
             <Steps
               current={1}
               steps={[{ label: "Upload map" }, { label: "Calibrate grid" }, { label: "Verify scale" }, { label: "Save" }]}
             />
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <Steps current={3} ariaLabel="Character builder progress" onStepSelect={() => {}} steps={WIZARD_STEPS} />
+            </div>
+            {/* All four states at once — the only place they can be compared side by side. */}
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <Steps
+                current={3}
+                ariaLabel="Declared step states"
+                onStepSelect={() => {}}
+                maxSelectable={5}
+                steps={[
+                  { label: "Species", state: "done" },
+                  { label: "Background", state: "incomplete" },
+                  { label: "Class & level", state: "done" },
+                  { label: "Class features" },
+                  { label: "Ability scores", state: "incomplete" },
+                  { label: "Equipment" },
+                  { label: "Name & review" }
+                ]}
+              />
+            </div>
+          </Section>
+
+          <Section id="wizard" title="Wizard shell" blurb="The multi-step frame behind the character builder: a full page on a laptop, a full-screen sheet on a phone — deliberately not a modal. Header and footer stick, so Back/Next stay put while the step body scrolls. Next is gated per step: when the step is incomplete the button disables AND the reason is shown and announced (a silent disabled button is a dead end). It also carries the resume-draft slot, Save & close, an optional preview pane, and the persistent CC BY footnote. The preview is the flow's ONE detail pane: a column on a laptop, and below 760px a master-detail swap with both halves — the way in (onOpenDetail) and the way back (onCloseDetail) — owned by the shell, so no consumer re-invents a 'Show preview' button. Shrink the window past 760px to watch it swap.">
+            <WizardDemo />
+            <p className="sg-muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--fs-sm)" }}>
+              Demoed inside a bounded scroll frame so the whole page stays readable; in the app it owns the viewport.
+            </p>
+          </Section>
+
+          <Section id="choicecard" title="Choice card" blurb="The selectable content card behind every pick-one step (species, class, background, feat). Radio semantics — role=radio + aria-checked — because these grids are single-select. There is exactly ONE chosen treatment in the system: a cyan edge with the selection glow plus a check. Slots: icon, description, mono meta line, and the provenance Badge. BADGE THE EXCEPTION, NOT THE RULE: the tones are fixed (info = SRD, primary = Homebrew — reuse those, don't invent a third), but a badge every card carries distinguishes nothing and takes ~46px out of the title row at 375px, so the badge goes on what is unusual. Here that is the homebrew class; in the builder, where every shipped option is SRD, only homebrew is badged at all. Badge both sides only when both are genuinely present and the grid can be filtered by them — see the faceted grid below.">
+            <div className="sg-grid3" role="radiogroup" aria-label="Class">
+              <ChoiceCard
+                selected={cardPick === "fighter"} onSelect={() => setCardPick("fighter")}
+                title="Fighter" meta="d10 hit die · STR or DEX"
+                icon={<IconDie />}
+                description="A master of martial combat, skilled with every weapon and all armor."
+              />
+              <ChoiceCard
+                selected={cardPick === "wizard"} onSelect={() => setCardPick("wizard")}
+                title="Wizard" meta="d6 hit die · INT"
+                description="A scholarly magic-user capable of manipulating the structures of reality."
+              />
+              <ChoiceCard
+                selected={cardPick === "warden"} onSelect={() => setCardPick("warden")}
+                title="Ember Warden" meta="d10 hit die · CON" badge={<Badge tone="primary">Homebrew</Badge>}
+                description="This table's own class: a sworn guardian who burns their own vitality for power."
+              />
+              <ChoiceCard
+                selected={false} onSelect={() => {}} disabled
+                title="Artificer" meta="d8 hit die · INT"
+                description="Not in the SRD bundle yet."
+                disabledReason="Not available at level 1 in this campaign."
+              />
+            </div>
+          </Section>
+
+          <Section id="choicegrid" title="Choice grid (faceted picker)" blurb="Search + facets + a ChoiceCard grid. The search is debounced (160ms) so a long catalog doesn't refilter per keystroke; no results is a real .nh-empty state; and the grid is a keyboard radiogroup — arrows move and select, Home/End jump, and a roving tabindex means Tab enters and leaves the grid once instead of stepping through twelve cards. It carries no detail pane of its own: a phone can only show the cards or the detail, never both, and WizardShell already owns that master-detail swap — pass the selected option's text to the shell instead.">
+            <ChoiceGridDemo />
+          </Section>
+
+          <Section id="choicegrid-multi" title="Choice grid (choose N)" blurb="selection='multiple' turns the same grid into the choose-N list every content offer needs — three Weapon Masteries, six prepared spells, two Magic Initiate cantrips. Same cards, same single chosen treatment; only the semantics change (role=checkbox, and arrows move focus without ticking every card they pass). Pass max and the grid locks the UNCHOSEN cards at capacity with a reason, while the chosen ones stay tappable so a pick can always be swapped — capacity handled once here rather than re-derived by each step. The chosen cards keep their cyan edge and check but spend no glow: a choose-6 region has six answers, and §8.1 budgets one glowing element per region — six blooming cards is the wallpaper that rule exists to prevent.">
+            <ChoiceGridMultiDemo />
+          </Section>
+
+          <Section id="allocator" title="Ability score allocator" blurb="All four generation methods behind one component: standard array, point buy, 4d6-drop-lowest, and a GM custom formula. Two interactions cover them — assign values from a pool, or spend against a budget. Assignment is a per-ability select rather than drag-and-drop: dragging is the obvious mouse gesture and a dead end on a phone, and shipping both would be two ways to say one thing. Base, bonus, total, and modifier all render in the mono tabular face. Pure presentation: every number and callback comes from @vtt/rules-5e.">
+            <AllocatorDemo />
+          </Section>
+
+          <Section id="diceinput" title="Dice input row" blurb="The manual-vs-auto roll control for everything OUTSIDE combat — ability generation, starting HP, starting gold. It speaks the same two-mode vocabulary as the encounter's RollControls ('roll it for me' or type what your physical dice showed) so rolling feels the same everywhere, but it shares no combat state. Pass complete once the row has collected every result it needs: the roll and Apply actions lock while Roll again stays live, so a finished set never leaves a button that silently does nothing.">
+            <DiceInputDemo />
+          </Section>
+
+          <Section id="namefield" title="Name field" blurb="Text input + a shuffle button + a row of clickable suggestions from the per-species name bundles. The suggestions are plain buttons, not a dropdown: a name list you have to open is a name list nobody uses.">
+            <NameFieldDemo />
+          </Section>
+
+          <Section id="features" title="Feature list" blurb="In-flow disclosure for long class/species feature lists (Menu is a popover — wrong shape for twenty features you read alongside the step). Built on native details/summary, so keyboard and screen-reader behaviour come from the platform. Collapsed rows are one tappable line, which is what makes a twenty-feature class readable at 375px.">
+            <FeatureList items={CLASS_FEATURES} allowExpandAll ariaLabel="Fighter features" />
+          </Section>
+
+          <Section id="roweditor" title="Row editor" blurb="Repeating rows behind every 'rows' field — monster actions, starting-equipment options, ability bonuses, damage parts. rowKey IS A STABLE ID, NEVER THE INDEX: keying by index means removing row 2 of 5 hands row 3's DOM to row 2, so the focused input, the open disclosure and any uncommitted keystrokes silently belong to a different record. The caller mints that id with newId() when it mints the row, which is also why onAdd returns the row rather than the primitive inventing data. ONE ⋯ MENU PER ROW, NOT FOUR ICON BUTTONS: move up, move down and remove would each need a 44px hit area in a dense list; collapsed into one menu they cost one target, they match .nh-card-tools, and there is no gap budget to get wrong. The drag grip on the left is a pointer-only enhancement on top — every reorder it offers is also in the menu, so nothing is mouse-only, and it sets touch-action: none so dragging on a phone does not scroll the page out from under the row. Reorders and removals announce politely, with row-scoped names throughout: five bare 'Remove's in a list tell a screen reader nothing. Collapse is UI-local and derived, never stored — a newly added row opens because you just asked for it. At the cap the Add button disables with its reason at full strength beside it.">
+            <RowEditorDemo />
+          </Section>
+
+          <Section id="review" title="Review summary" blurb="The final 'here's your character' step: every choice grouped by the step that made it, each group with its own way back. It extends .nh-statlist rather than inventing a second key/value grid, and anything still missing is called out in words beside its Edit link.">
+            <ReviewSummary
+              sections={[
+                { id: "identity", title: "Identity", onEdit: () => {}, items: [
+                  { label: "Name", value: "Borin Stoneguard" },
+                  { label: "Species", value: "Dwarf" },
+                  { label: "Class", value: "Fighter 4" },
+                  { label: "Background", value: "Soldier" }
+                ] },
+                { id: "abilities", title: "Ability scores", onEdit: () => {}, items: [
+                  { label: "STR", value: "16 (+3)", numeric: true },
+                  { label: "DEX", value: "12 (+1)", numeric: true },
+                  { label: "CON", value: "17 (+3)", numeric: true },
+                  { label: "INT", value: "10 (±0)", numeric: true },
+                  { label: "WIS", value: "13 (+1)", numeric: true },
+                  { label: "CHA", value: "8 (−1)", numeric: true }
+                ] },
+                { id: "vitals", title: "Vitals", onEdit: () => {}, items: [
+                  { label: "HP", value: "38", numeric: true },
+                  { label: "AC", value: "18", numeric: true },
+                  { label: "Speed", value: "25 ft", numeric: true },
+                  { label: "Prof", value: "+2", numeric: true }
+                ], note: "Armor class comes from your equipped armor, so it can change when you swap gear." },
+                { id: "equipment", title: "Equipment", onEdit: () => {}, editLabel: "Edit",
+                  incomplete: "Pick one of the two starting packs.",
+                  items: [
+                    { label: "Weapon", value: "Warhammer" },
+                    { label: "Armor", value: "Chain mail" },
+                    { label: "Pack", value: "Not chosen" }
+                  ] }
+              ]}
+            >
+              <p className="sg-muted" style={{ fontSize: "var(--fs-sm)" }}>SRD 5.2.1 content, CC BY 4.0.</p>
+            </ReviewSummary>
           </Section>
 
           <Section id="skeleton" title="Skeleton loaders" blurb="Quiet shimmer placeholders shaped like the content they stand in for (neutralized under reduced-motion). Use while a fetch resolves.">
@@ -418,11 +1090,28 @@ export function StyleGuide() {
             </div>
           </Section>
 
-          <Section id="overlays" title="Modals & toasts" blurb="Native dialog with scrim blur, focus return, and scroll lock. Toasts name the result.">
+          <Section id="overlays" title="Modals, sheets & toasts" blurb="Native dialog with scrim blur, focus return, and scroll lock. Toasts name the result. size='full' is the full-screen sheet: a roomy centred surface on a laptop, edge-to-edge over the whole viewport at ≤760px (with the footer clearing the home indicator) — reach for it instead of overriding max-height on a modal, which is what features kept doing.">
             <div className="sg-row">
               <Button variant="primary" onClick={() => setModalOpen(true)}>Open modal</Button>
+              <Button variant="secondary" onClick={() => setSheetOpen(true)}>Open full-screen sheet</Button>
               <ToastDemo />
             </div>
+            <Modal
+              open={sheetOpen}
+              onClose={() => setSheetOpen(false)}
+              size="full"
+              title="Browse the bestiary"
+              accent="cyan"
+              footer={<>
+                <Button variant="ghost" onClick={() => setSheetOpen(false)}>Cancel</Button>
+                <Button variant="primary" onClick={() => setSheetOpen(false)}>Add selected</Button>
+              </>}
+            >
+              <p className="sg-muted">Long, browse-heavy surfaces (content browsers, sheets, the builder's sub-pickers) want the whole phone screen. Shrink the window below 760px to watch this go edge-to-edge.</p>
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <FeatureList items={CLASS_FEATURES} />
+              </div>
+            </Modal>
             <Modal
               open={modalOpen}
               onClose={() => setModalOpen(false)}

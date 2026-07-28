@@ -112,8 +112,21 @@ const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boolean }>
   { title: "Encounter archives (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
   { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
-  { title: "Codex (worldbuilding wiki, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") }
+  { title: "Codex (worldbuilding wiki, atlas, journal & calendar)", match: (path) => path.startsWith("/api/v1/codex") },
+  { title: "Homebrew authoring (GM-only)", match: (path) => path.startsWith("/api/v1/homebrew") }
 ];
+
+/**
+ * Anything the groups above do not claim. This panel used to render ONLY matched groups, so a new
+ * path group was invisible here the moment it shipped - already served, already in the OpenAPI
+ * document, already in `docs/api-reference.md`, and silently absent from the one surface a GM
+ * actually opens. It had happened twice (codex, then homebrew) before this existed, and the count
+ * line above made it worse by including paths the list did not show.
+ *
+ * A missing `GROUPS` entry now degrades to "listed under Other" instead of "gone", so the failure
+ * mode is a wrong heading rather than a missing surface.
+ */
+const ungrouped = (paths: readonly string[]) => paths.filter((path) => !GROUPS.some((group) => group.match(path)));
 
 const refName = (ref: string) => ref.replace("#/components/schemas/", "");
 const resolveRef = (ref: string, components: Components): Schema | undefined => components[refName(ref)];
@@ -383,6 +396,18 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
             </div>
           </section>;
         })}
+        {(() => {
+          const rest = ungrouped(Object.keys(document.paths));
+          if (rest.length === 0) return null;
+          return <section className="api-reference-group">
+            <h3>Other</h3>
+            <div className="api-endpoint-list">
+              {rest.flatMap((path) => METHOD_ORDER.filter((method) => document.paths[path][method]).map((method) => (
+                <EndpointDetails key={`${method} ${path}`} method={method} path={path} operation={document.paths[path][method]!} components={components} origin={origin} language={language} />
+              )))}
+            </div>
+          </section>;
+        })()}
         {state.commands.length > 0 && <section className="api-reference-group">
           <h3>Command catalog (typed routes + the <code>POST /game/commands</code> tunnel)</h3>
           <table className="api-command-table">

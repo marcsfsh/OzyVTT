@@ -126,6 +126,10 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
   const publicActorIds = new Set(state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id));
   return {
     revision: state.revision,
+    // The GM's builder policy travels verbatim (GM-set, player-read - decision 10): it holds no
+    // secrets, and a player's wizard must know which ability methods to offer. Copied, never a
+    // live reference into GameState.
+    builderPolicy: { allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods], customFormula: state.builderPolicy.customFormula },
     combat: projectPlayerCombat(state, playerSessionId, now),
     actors: state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((source) => {
       // Explicit strips: notes/ownerSessionId/hp (existing) plus effects (rebuilt masked below),
@@ -151,7 +155,9 @@ export function projectPlayerView(state: GameState, playerSessionId: string | un
         presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
         ...(ownDefinition ? { definition: ownDefinition } : {}),
         ...(mine ? { actionUses: { ...actionUses } } : {}),
-        ...(mine && hitDice ? { hitDice: { ...hitDice } } : {}),
+        // The pool's `entries` array is copied too - a player projection must never hand out a live
+        // reference into GameState (same deep-copy rule as spellSlots/inventory below).
+        ...(mine && hitDice ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } } : {}),
         // Sheet resources reach ONLY the owning player - never another player, never the viewer (which
         // projects separately). Same owner-gate as actionUses/hitDice above; viewer safety by construction.
         ...(mine ? { spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })), pactSlots: pactSlots === null ? null : { ...pactSlots }, preparedSpellIds: [...preparedSpellIds], inventory: inventory.map((item) => ({ ...item })), currency: { ...currency } } : {}),

@@ -1,0 +1,29 @@
+/* NumberField — an .nh-input with a unit riding inside the well.
+
+   The 44px touch floor comes from `.nh-input`'s own min-height (route 1, grow the
+   paint), so nothing here adds a `.tap-target` and there is no gap budget to spend. */
+
+.nh-numberfield {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  /* The grid track, not the input, owns the width — a NumberField in a FieldGrid cell
+     should fill its column the way a bare Input does. */
+  width: 100%;
+}
+
+/* The unit is a static label, not a control, so it must never eat a tap meant for the
+   field. `pointer-events: none` sends the click through to the input behind it. */
+.nh-numberfield-unit {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-body);
+}
+
+/* Reserve room for the suffix so a five-digit value never slides under it. 3.25rem
+   clears "lb"/"gp"/"ft" plus the well's own right padding. */
+.nh-numberfield--unit .nh-numberfield-input { padding-right: 3.25rem; }

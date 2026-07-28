@@ -10,6 +10,189 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[character-builder] Phase-2 gating items found by the requirements QA pass (2026-07-26).** The
+  Phase-1 foundation is sound, but three things must land before wizard screens are built:
+  1. **`fromCatalog` has no resolver.** Ten catalog slugs are authored on feature choices
+     (`fighting-style-feats`, `wizard-spells`, `elf-lineages`, …) with no code or documented convention
+     mapping any of them to a query — and the spell-list link is severed on the wire in both directions
+     (`ContentSpellSummary` drops `SpellReference.classes`; `ContentClassSummary` drops
+     `spellcasting.spellListId`). The first Fighter step and the whole Wizard spell step have no data
+     path. Must be resolved **server-side** or the implementer will hand-roll a client-side rules
+     decision (violates CLAUDE rule 2).
+  2. **Decision 10 (GM picks the allowed ability methods + a custom formula) is modelled nowhere.**
+     All four methods' math exists in `packages/rules-5e/src/ability-scores.ts`, but no `GameState`
+     field, command, or contract carries the setting. `AbilityScoreAllocator`'s `methods` prop cites
+     the decision and is unsupplied.
+  3. **Class/species/background wire shapes drop wizard-critical fields** — armor/weapon/tool
+     proficiencies, `multiclassPrerequisites`, species `abilityBonuses`, background skill/tool/language
+     choices. `ProficienciesSchema` just gained armor/weapons/tools/languages with nothing able to fill
+     them.
+- **[character-builder] No `ClassReference` → `ClassProgressionTable` adapter.** Every rules function
+  accepts an overridable table, but nothing constructs one from bundle data, so a homebrew class falls
+  through to SRD defaults **silently**: `d8` hit die, sheet-order stat priority, `casterProgression:
+  "none"` (⇒ zero spell slots), ASI at 4/8/12/16, and multiclass prerequisites that always pass. Wrong
+  answers, not errors. Highest-value missing piece for homebrew.
+- **[character-builder] No feature-rider interpreter.** `FeatureRecord.actions/effects/modifiers/
+  grants/uses` are read by nothing but the summary projection, which strips them. `content-library.ts`,
+  `packages/domain`, and the published OpenAPI `ContentFeature` description all assert "the server
+  applies them when it builds the character" — that code does not exist. Largest unscoped Phase-2 item.
+- **[character-builder] ~~`resolveSpellcasting` has zero production consumers~~ — FIXED 2026-07-27
+  (phase-2 wizard branch).** `CharacterSheet.tsx` now resolves caster numbers through
+  `resolveSpellcasting`, one row per casting class (labelled "<Class> caster"), so a multiclass sheet
+  can no longer show one DC for two spell lists. Verified in a browser: an Evoker Wizard 3 renders
+  "Wizard caster INT / Save DC 13 / Spell atk +5".
+- **[character-builder] No server-side builder roll command.** `DiceInputRow` covers manual-entry and
+  auto-roll client-side, but nothing server-side accepts a typed builder result the way
+  `initiative.roll-self` accepts `natural`. Without it the client owns the roll (violates server
+  authority).
+- **[character-builder] Homebrew discriminator covers 6 of 9 promised content types.** Spells,
+  equipment/weapons/armor, and monsters carry no `source` field, and `EquipmentReferenceSchema.category`
+  is a **closed 10-value enum** — a direct conflict with "all item types". (The `SKILL_ABILITY`
+  hardcode is **fixed** as of 2026-07-27: `content:skills` carries an `ability` column and
+  `CharacterSheet.tsx` drives both the skill list and each governing ability from the catalog, so a
+  homebrew skill is now a bundle row and nothing else.)
+- **[character-builder] Content/test gaps.** `soldier-a` starting equipment references `dice-set` but the
+  catalog id is `gaming-set-dice` — invisible because the cross-reference test checks *class* equipment
+  ids and *background skill* ids but not background equipment ids. And
+  `character-content.test.ts:65-66` sets only `statPriority[0]` to 13, so Paladin/Monk/Ranger
+  (multi-ability prerequisites) will fail the moment they are authored.
+- **[ui] A bare `header { max-width: 40rem }` in `apps/client/src/styles.css` clamps every
+  `<header>` in the app**, including four `@vtt/ui` primitives (`WizardShell`, `ReviewSummary`,
+  `Modal`, `Panel`). It was written for the landing hero. Found 2026-07-27 when it silently clamped
+  the character builder's sticky header to 640px, letting the step body scroll visibly through the
+  uncovered gutter. `WizardShell` and `ReviewSummary` now defend themselves with `max-width: none`;
+  **`Modal` and `Panel` heads are still clamped**. The real fix is to scope the app global (e.g.
+  `main > header`), which would also unclamp `.codex-entry-head` / `.acting-console-head` — a visual
+  change wide enough to want its own pass.
+- **[content] `skills.v1.json` prints "Sleight Of Hand"** (capital "Of"); the SRD prints "Sleight of
+  Hand". Harmless but now visible, because the sheet renders the catalog's `name` verbatim instead of
+  title-casing the id. One-row data fix.
+- **[character-builder] No GM-facing editor for `builder.set-policy`.** The command and the
+  `PlayerView.builderPolicy` projection both exist and the wizard honours the policy (it offers only
+  the permitted ability methods, and "custom" only when a formula is configured), but nothing in the
+  UI lets the GM *set* it — so the table is stuck on the default (all four methods, no custom
+  formula). Small VTT-Setup panel; decision 10 is not fully delivered until it lands.
+
+- **[a11y] `--text-muted` fails AA at small sizes** (3.61:1 dark) — affects `.nh-choice-meta`,
+  `.nh-statlist dt` and dozens of app labels. Pre-existing, not introduced by the builder work;
+  deliberately not retuned mid-flight. Needs its own pass.
+
+### Homebrew system — open items (2026-07-27)
+
+- **[homebrew] Validity is point-in-time.** The publish gate checks a record against the world as it
+  stands at that moment. Nothing re-checks **dependents** when the world changes underneath them, so
+  deleting or editing a dependency can leave a dependent record published-and-invalid (`restore`
+  included). The merge drops an unparseable record with a `console.warn`, so the failure is quiet.
+- **[homebrew] `reminted.reason` has no honest value for "not our shape"** — the contract enum is
+  frozen, so a pack id that is re-minted for shape reasons reports a collision that did not happen.
+  Needs a `packages/api-contract` enum addition.
+- **[docs] The reference generator's obligation set seeds from REQUEST bodies only**, so ~84 response
+  components document nowhere — 11 homebrew (`HomebrewRecordDocument`, `HomebrewRecordSummary`,
+  `HomebrewValidity`, `HomebrewValidationIssue`, `HomebrewUsage`, the six `*Data`) and ~73 mostly
+  Codex. Proven by injecting a response-side ghost component: all 32 api-contract tests pass and it
+  renders nowhere. The request side IS genuinely covered — the same injection on a request-reachable
+  path fails the test. Pre-existing seeding choice, not a regression; a one-line change with a large
+  doc diff.
+- **[ui] `--caution-hi` IS `--violet-hi` in all three themes**, and in light `--caution` is literally
+  `--violet` (`#7A3FD0`). The "violet is reserved for GM-only" rule is violated by the caution token
+  itself. Harmless today only because the team held the every-state-is-a-word rule, so colour
+  carries no signal rather than the wrong one. Worth resolving before anything relies on hue.
+- **[homebrew] Packs have no UI** — export and import are 2 of the 13 operations, HTTP-only,
+  deliberately deferred.
+- **[homebrew] Magic-item riders are not authorable yet.** `EquipmentReferenceSchema` is `.strict()`
+  and carries no magic vocabulary, so `isMagic`/`riders`/`casts` would be **rejected**, not ignored.
+  `RiderEditor` ships built and ready (`ITEM_RIDERS`, `uses` relabelled "Charges"); the section is a
+  handful of `FieldDef`s the day the schema grows. **This is the largest remaining piece of the
+  approved scope** — the product decision was full item riders in v1.
+- **[homebrew] A caster subclass still needs its class published first** (the third-caster check
+  reads the class's level table). Not a deadlock — the class side now waits for nothing — but an
+  ordering a GM can hit.
+
+### Found by the 2026-07-27 phase-5 content pass
+
+- **[character-builder] ~~Repeated class choices were under-offered, making level-8+ characters
+  uncreatable~~ — FIXED 2026-07-27.** The wire carried no repeat count, so the client inferred one
+  from `asiLevels` and **only for `asi-or-feat`**; every other repeated choice was offered once while
+  the server's capacity is `choose x grants`. The build was then rejected at Create with "needs 4
+  pick(s); got 1". `ContentFeatureSummary.grantedAtLevels` now carries the level table's own answer,
+  resolved server-side, and the client uses it for every kind. Two defects compounded it, both mine
+  from the phase-5 generator: it stamped a concrete `feature.level` on repeated features (which sent
+  the client down the single-grant branch), and it omitted `repeatable: true` on the ASI choice that
+  the hand-authored Fighter has always carried — taking an ASI at both level 4 and level 8 repeats
+  one option id, which `character-build.ts:478` rejects unless the choice allows it. Level 8 went
+  from **3/12 to 12/12** classes creatable. Note the pre-existing half: no SRD class had a repeated
+  NON-ASI choice until Rogue expertise (1, 6) and Sorcerer metamagic (2, 10, 17) were added, so the
+  gap had never been exercised. **This matters for homebrew:** a homebrew class may repeat any
+  choice at all, so `grantedAtLevels` is load-bearing for that work, not just this fix.
+
+- **[content] ~~Champion's feature levels disagreed with the source~~ — FIXED 2026-07-27.** The
+  hand-authored record carried 2024 feature **text** at 2014 feature **levels**: Remarkable Athlete
+  at 7 and Additional Fighting Style at 10 are the old progression, and **Heroic Warrior (level 10)
+  was missing entirely**. Resolved against the SRD in favour of the source — corroborated by the
+  Fighter class table, which grants subclass features at 3/7/10/15/18. Champion is now Improved
+  Critical (3), Remarkable Athlete (3), Additional Fighting Style (7), Heroic Warrior (10), Superior
+  Critical (15), Survivor (18). Same family of error as the `tough` feat, in reverse: wrong-edition
+  content in an SRD 5.2.1 repo. **The cross-check now covers subclass feature ids and levels** and
+  fails the build on drift, and a test pins Champion's six levels for CI (the build script is
+  manual). Life Domain's `life-domain-spells-5/-7/-9` are allowlisted in `STAGED_FEATURES`: the
+  source prints one entry whose body is a table of Cleric 3/5/7/9 grants, and splitting it into four
+  staged features is better modelling than the source, not drift.
+- **[testing] The nine generated classes have prose-only features.** Only the choice-bearing ones
+  (46 of 185) carry structured riders; the rest are description text, which ADR-0008 permits but
+  means a Barbarian's Rage grants nothing mechanically — the resource counts are in `classResources`
+  but nothing interprets them. The three hand-authored classes are richer than the nine new ones.
+  Expected for a first pass; worth knowing before anyone assumes parity.
+- **[content] `weaponProficiencies` gained two qualified slugs** — `martial-light` (Monk) and
+  `martial-finesse-or-light` (Rogue), because the SRD grants those classes a *slice* of Martial
+  rather than all of it. Flattening them to `martial` would have handed a Rogue a greatsword.
+  Nothing consumes the qualifier yet, so equipment filtering by proficiency is not enforced.
+
+### Deferred by the 2026-07-27 readiness pass (found, scoped, not fixed)
+
+The polish pass was bounded to small/medium lift; these were found by it and left, each for a stated
+reason. They are **findings, not unknowns** — don't re-discover them.
+
+- **[character-builder] `patch(...)` spreads a stale `draft`** across 5 call sites. Latent, not
+  currently reproducible in the wizard's own flows, but the shape is the classic one (a second patch
+  in the same tick loses the first). Fixing it properly is a state-model change, not a polish edit.
+- **[ui] `h1, h2, h3 { font-weight: 400 }`** in `apps/client/src/styles.css` reaches 32 app-side
+  sites, including the Bungee wordmark, which the browser then renders faux-bold. App-wide typography;
+  out of scope for a builder pass.
+- **[ui] The `→` glyph has no font coverage** — no loaded Manrope subset declares U+2192, so every
+  arrow falls back. The fix is an `IconArrow` primitive plus 7 call sites, and it is all-or-none
+  (mixing a drawn arrow with a fallback glyph is worse than either).
+- **[a11y] `.nh-step--done` check glyph is 1.97:1 against its own fill in the light theme.**
+  Recomputed independently from the tokens 2026-07-27 — the figure is exact, but two refinements
+  matter. The glyph is an `aria-hidden` SVG with the state also in an `nh-sr-only` label, so the
+  applicable rule is **1.4.11 (3:1)**, not 1.4.3; and the marker's **border** (`--cyan` on `--bg`)
+  measures a **passing 3.85:1**. So the done state stays distinguishable — what fails is the glyph
+  inside it. A real 1.4.11 failure, lower severity than "state invisible". Dark theme is 9.07:1.
+  (While measuring: `.nh-step--incomplete` light = 3.91:1, passes. Pre-existing near-miss not from
+  this pass — the *upcoming* marker's number is real text at 4.47:1, marginally under 4.5:1.)
+- **[character-builder] Skill/tool/language uniqueness is enforced client-side only.** `479cb80`
+  makes held proficiencies arrive greyed with their provenance ("Already granted by Soldier"), which
+  stops the silent double-spend in the UI — but the **server's duplicate guard is still per-offer**,
+  so a hand-built API payload can still burn two picks on one skill. Server-side global uniqueness is
+  the real fix.
+- **[rules-5e] Third-caster multiclass rounding** is unverified against the SRD's rounding rule for
+  Eldritch Knight / Arcane Trickster style progressions.
+- **[character-builder] Step 4's *arrival* state is still heavy at high level.** Measured per class
+  2026-07-27 (the earlier "~306 cards" figure was wrong — it is class-dependent): **Fighter L20 = 10
+  offers / 62 cards**; **Wizard L20 = 12 offers / 467 cards**. The worst case is 467, materially
+  worse than filed. The composition is the real story — "Wizard prepared spells" is choose 25 of 203,
+  and because collapse is (correctly) derived from `picks.length === capacity`, that one grid stays
+  fully expanded until the 25th spell is picked, so a Wizard 20 sits above 200 cards for the whole
+  step. `5c32df9` fixed the *answered* state (24,222px → 1,933px at L20) and that fix is real; the
+  arrival state is untouched. Cutting it means progressive disclosure — a design change, not a
+  density fix.
+- **[testing] `apps/client` and `packages/ui` have no test script and zero test files.** The 767
+  passing tests cover neither — every readiness commit changed only those two workspaces, so `tsc`
+  was the only automated net under the whole pass. This matters most for
+  `apps/client/src/builder/build-payload.ts`, which is **pure and dependency-light**: `computeOffers`,
+  `prunePicks`, `stepBlockedReason` and `withExpertiseReach` are all functions of `(draft, catalogs)`
+  and were exercised headlessly in a few dozen lines with no React and no socket. Highest-value
+  testing gap in the repo right now.
+
 - **[ux] ~~Maps/scenes/encounter IA redesign~~ — RESOLVED 2026-07-22 (scene-centric IA, this PR).**
   The upload → browse → prepare → start experience was rethought scene-first: a new **Scenes** hub tab
   is the prep home (a gallery of scene cards — thumbnail, LIVE/staging badge, go-live, private staging,

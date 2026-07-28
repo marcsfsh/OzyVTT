@@ -5,6 +5,8 @@
  * so the formula lives in exactly one place instead of being re-implemented per call site.
  */
 
+import { effectiveSlot } from "./riders.js";
+
 export type Ability = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
 /** How proficient a creature is in a save or skill (SRD: none / proficient / Expertise). */
@@ -57,7 +59,7 @@ export function spellAttackBonus(spellcastingAbilityScore: number, proficiencyBo
 /** The armor/shield fields an item carries (from the SRD catalog) that drive Armor Class. */
 export type ItemArmorStats = Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null }>;
 /** Minimal shape of an equipped inventory item this math needs (kept structural so callers can pass their own item type). */
-export type EquippedItem = Readonly<{ equipped?: boolean; category?: string; armor?: ItemArmorStats | undefined }>;
+export type EquippedItem = Readonly<{ equipped?: boolean; category?: string; slot?: string; armor?: ItemArmorStats | undefined }>;
 
 /**
  * SRD Armor Class from equipped armor + shields. Returns null when the character has no equipped armor OR
@@ -65,13 +67,18 @@ export type EquippedItem = Readonly<{ equipped?: boolean; category?: string; arm
  * stat-block AC). When armor IS equipped: acBase + Dex (capped for medium, none for heavy - the SRD rule
  * is encoded directly by the item's addDexModifier / dexModifierCap). A shield adds its own acBase (+2);
  * an unarmored character with only a shield is 10 + Dex + shield.
+ *
+ * The armor/shield hook is `effectiveSlot` (the explicit `slot` field, falling back to the three
+ * engine-known `category` literals), so a homebrew category with an explicit slot derives AC too.
+ * ONE shield counts - the best equipped one. Body armor was already de-duped by the builder; shields
+ * never were, so three equipped shields used to read +6.
  */
 export function armorClassFromEquipment(dexModifier: number, items: readonly EquippedItem[]): number | null {
-  const equippedArmor = items.find((item) => item.equipped && item.armor && item.category === "armor");
-  const shields = items.filter((item) => item.equipped && item.armor && item.category === "shield");
-  if (!equippedArmor && shields.length === 0) return null;
+  const worn = items.filter((item) => item.equipped && item.armor);
+  const equippedArmor = worn.find((item) => effectiveSlot(item) === "armor");
+  const shieldBonus = worn.reduce((best, item) => effectiveSlot(item) === "shield" ? Math.max(best, item.armor!.acBase) : best, 0);
+  if (!equippedArmor && shieldBonus === 0) return null;
   const dexAllowed = (armor: ItemArmorStats) => (armor.addDexModifier ? Math.min(dexModifier, armor.dexModifierCap ?? Number.POSITIVE_INFINITY) : 0);
   const base = equippedArmor ? equippedArmor.armor!.acBase + dexAllowed(equippedArmor.armor!) : 10 + dexModifier;
-  const shieldBonus = shields.reduce((sum, shield) => sum + shield.armor!.acBase, 0);
   return base + shieldBonus;
 }

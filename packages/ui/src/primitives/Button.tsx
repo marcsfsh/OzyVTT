@@ -34,7 +34,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm", block && "nh-btn--block", "interactive", lift && "lift", className)}
+      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm tap-target", block && "nh-btn--block", "interactive", lift && "lift", className)}
       {...rest}
     >
       {children}
@@ -56,7 +56,7 @@ export interface LinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement>
 export function LinkButton({ variant = "secondary", size = "md", block = false, lift = false, arrow = false, className, children, ...rest }: LinkButtonProps) {
   return (
     <a
-      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm", block && "nh-btn--block", "interactive", lift && "lift", className)}
+      className={cx("nh-btn", `nh-btn--${variant}`, size === "sm" && "nh-btn--sm tap-target", block && "nh-btn--block", "interactive", lift && "lift", className)}
       {...rest}
     >
       {children}
@@ -80,7 +80,7 @@ export function IconButton({ label, size = "md", className, type = "button", chi
       type={type}
       aria-label={label}
       title={rest.title ?? label}
-      className={cx("nh-iconbtn", size === "sm" && "nh-iconbtn--sm", "interactive", className)}
+      className={cx("nh-iconbtn", size === "sm" && "nh-iconbtn--sm", "tap-target", "interactive", className)}
       {...rest}
     >
       {children as ReactNode}

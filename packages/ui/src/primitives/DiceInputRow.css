@@ -1,0 +1,36 @@
+.nh-diceinput {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.nh-diceinput-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.nh-diceinput-label { color: var(--text); font: 600 var(--fs-sm) / 1.3 var(--font-body); }
+.nh-diceinput-notation { color: var(--text-muted); font-size: var(--fs-xs); }
+.nh-diceinput-mode { margin-left: auto; }
+
+.nh-diceinput-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.nh-diceinput-field { max-width: 10rem; }
+.nh-diceinput-die { display: inline-grid; place-items: center; font-size: 1.1em; }
+.nh-diceinput-result {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.nh-diceinput-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.nh-diceinput-error { margin: 0; display: flex; align-items: center; gap: var(--space-1); color: var(--danger-hi); font-size: var(--fs-sm); }
+
+@media (max-width: 560px) {
+  .nh-diceinput-mode { margin-left: 0; width: 100%; }
+  .nh-diceinput-mode .nh-segmented-option { flex: 1 1 0; }
+  .nh-diceinput-field { max-width: none; flex: 1 1 8rem; }
+}

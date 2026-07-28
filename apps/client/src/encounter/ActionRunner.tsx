@@ -8,13 +8,24 @@ import { beginTargeting, clearBlockedPrompt, clearTargeting, resolveActionDirect
 import { useRollPreference } from "../dice/roll-preference";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 
-/** Per-definition cache: stat blocks are immutable content, one lookup per session is plenty. */
+/** Per-definition cache: one lookup per stat block per session.
+    NOT immutable any more — a GM can publish a homebrew creature edit mid-session, so the
+    cache is dropped on `homebrew:changed` (`content/invalidate.ts`) and the next resolve
+    refetches. Actions and typed defences are late-bound at every use, which is exactly
+    why a stale entry here would show the wrong attack on a creature already on the table. */
 const actionCache = new Map<string, readonly ContentActionSummary[]>();
+registerContentCache(() => actionCache.clear());
 
-const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null || action.builtin === true;
-/** Rage/Reckless (grants), a Multiattack plan, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
-const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.builtin === true);
+/* A LIMITED USE is itself the mechanic (`action-resolution.ts` resolveDefinitionAction: "limited uses
+   are themselves a structured effect"). Action Surge, Indomitable, Arcane Recovery, Relentless
+   Endurance and the tiefling legacy tiers have nothing to roll - they have a counter - so without
+   this they listed as static reference rows the table could read but never spend. Both predicates
+   mirror the server's, or the sheet and the resolver disagree about what is usable. */
+const isResolvable = (action: ContentActionSummary) => action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0 || action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true;
+/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
+const isTargetless = (action: ContentActionSummary) => action.attackBonus === null && action.saveAbility === null && action.damage.length === 0 && action.targeting !== "single" && (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const tagLabel = (tag: string) => tag.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 /** The action's mechanics as discrete lines - each renders as its own bullet beneath the name. */

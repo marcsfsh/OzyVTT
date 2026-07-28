@@ -8,6 +8,125 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## What works today
 
+- **Character builder — the wizard screens (2026-07-27, branch
+  `claude/dndbeyond-sheet-importer-0k6u2e`). A character can now be created through the UI for the
+  first time.** A seven-step guided flow (Species · Background · Class & level · Class features ·
+  Ability scores · Equipment · Name & review) launched from **"Create a character"** beside the
+  roster's import buttons (GM only, phase 2). It is a **full page**, not a modal: `WizardShell` takes
+  the viewport on a laptop and becomes a full-screen sheet on a phone (decision 4).
+  - **Offers come from the content, not from code.** `apps/client/src/builder/build-payload.ts`
+    rebuilds the same offer set `character-build.ts` validates against, resolving every `fromCatalog`
+    slug through the shared `resolveCatalogChoice` — so the wizard and the server cannot disagree
+    about what was offerable. Each offer renders with its pick count and gates Next until exactly
+    filled, always with a reason ("Choose 3 for Weapon Mastery — 1 of 3 so far").
+  - **Server authority holds.** The client sends CHOICES; the server assembles the sheet. Auto-rolls
+    (ability scores, per-level HP) go through the existing `dice.roll`, so the numbers are
+    server-thrown and land in roll history; manual entry carries the player's own physical dice into
+    the payload. Nothing on the review screen is a computed game outcome — it shows the inputs, and a
+    400 surfaces the server's own message inline.
+  - **Ability scores** honour `builderPolicy.allowedAbilityMethods` (custom shown only with a
+    configured formula) and wire `AbilityScoreAllocator` to the real `@vtt/rules-5e` math.
+  - **Draft persistence is client-side for now** (`builder/draft.ts` → localStorage, keyed per
+    session), surfaced through the shell's existing resume affordance. The stored record is the same
+    shape a Phase-3 `GameState.characterDrafts[]` row would hold, so the swap is a change of
+    transport, not of model.
+  - **Ten catalogs** are read once per session through `apps/client/src/content/catalogs.ts` (module
+    cache + in-flight dedupe + listener set; a failed or empty ack is never cached), and the
+    persistent CC BY footer renders the catalogs' own `attribution` lines.
+  - **Verified by driving it:** a Fighter 5 (human soldier, Champion) and a Wizard 3 (high-elf sage,
+    Evoker) created end-to-end in Chromium at 1440px and again at 375px with touch — HP 52/AC 16 and
+    HP 20/AC 12/DC 13/slots 4+2 on their sheets, matching `character-build.test.ts` exactly; zero
+    horizontal overflow on all seven steps at 375px; 0 controls under the 44px floor.
+  - **A readiness pass then reviewed it as a shipping product** (`479cb80`, `5c32df9`, `584be3a` —
+    flow/IA, density/layout, design language + copy). What changed materially:
+    - **One correctness bug, not a polish item:** a background silently grants skills, so re-picking
+      one on the class step burned both picks and left the character permanently a proficiency short
+      with no message. Held proficiencies now arrive greyed with their provenance. (The server guard
+      is still per-offer — see `known-bugs.md`.)
+    - **Step 4 is readable at high level.** Answered offers fold to title + count + chips; the
+      capacity notice is stated once per grid instead of once per card. Level 5: 9,545px / 2,007
+      elements → **782px / 92**. Level 20: 24,222px → **1,933px**. Every other step already sat
+      between 1.0 and 2.1 screens at every level.
+    - **The step rail tells the truth** — completeness derives from the same blocked-reason function
+      the footer uses, so an answer invalidated five steps later loses its tick immediately instead
+      of surfacing at review.
+    - **The wizard stopped writing answers nobody gave** — "Raise ability scores" used to default all
+      three improvements to +2 Strength (wrong for a Wizard, illegal at 20).
+    - **A selected card had no keyboard focus ring at all**, and hover took the cyan edge *away* from
+      the chosen card, so "the pointer is here" and "this is my answer" rendered identically. Both
+      closed in the primitive (see decision-log rule 5).
+    - Memoising the builder catalogs **exposed a latent bug** rather than fixing a slow one: the
+      pruning effect's deps were incomplete and only worked because `catalogs` rebuilt every render.
+      With the accident removed, picking Evoker stopped producing the Evocation Savant offer. Fixed
+      by depending on `draft.picks`.
+    - **A tenth reviewer certified the pass and found one defect the other nine missed** — a Wizard
+      2+ could answer all seven steps and be **rejected at Create**. The expertise step (Wizard's
+      Scholar, choose 1 of 6) offered all six enabled while the server accepts only the skills the
+      character is actually proficient in, so a player picking without outside knowledge had roughly
+      **4-in-6** odds of dead-ending at the last step. The flow chain's override was right — greying
+      *held* skills would have made every Wizard 2+ uncreatable — it just stopped one step short. The
+      fix is the **inverse** grey, in `withExpertiseReach`: options the character is *not* proficient
+      in are greyed with a reason. It runs as a second pass because the server's test is a **union**
+      over sources (`character-build.ts:643`), not an accumulation in step order — greying from the
+      running total would have blocked a skill the player picks *later*. A safety valve never greys
+      every option, so a build the client can't fully see falls back to today's behaviour rather than
+      becoming uncreatable. Verified by A/B round-trip through the real server assembly: expertise in
+      `investigation` is now blocked at step 4 ("not one of your proficiencies — pick a different
+      skill") instead of at Create; `arcana` still builds and is accepted.
+    - **Verification at the end of the pass:** `npm run check` clean, 767 tests, build green;
+      Chromium walkthroughs at 1280×900 and 375×720/780 across Fighter L1/L3/L20, Wizard L5 and
+      Cleric L5, in dark, dusk and light, each creating a character end to end — zero horizontal
+      overflow on all seven steps in every run.
+
+- **Homebrew content system (2026-07-27, branch `claude/dndbeyond-sheet-importer-0k6u2e`).** A GM
+  can author, publish and play **nine content types** — class, subclass, species, background, feat,
+  spell, equipment, monster, spell-list. 11 commits, ~15k lines.
+  - **Storage is Codex-shaped, never `GameState`.** `homebrew-store.ts` owns its tables, migrations,
+    revisions and `expectedRev`; `homebrew-http.ts` carries all 13 operations, GM-gated, **HTTP-only
+    with a content-free `homebrew:changed` ping** and no socket handlers. That is not a preference:
+    `GameCommandDescriptor.run` must return a revision from `store.execute` on `GameState`, and
+    homebrew rows are not in it. Keeping out of `GameState` is also what leaves `projections.ts`
+    untouched — `PlayerView` is a `Pick` allow-list.
+  - **The audience filter is at the merge point**, not in projections. `ContentLibrary.forAudience()`
+    takes a **required** argument so the compiler enumerates every call site. Draft reaches nobody;
+    published + `visibleToPlayers` reaches both; published without it is GM-only.
+  - **`monsterForInstance()` is deliberately status- and delete-blind** — monster actions and typed
+    defences are late-bound per use, so a status-aware lookup would disarm live tokens mid-fight.
+    That carve-out is what makes soft-delete safe.
+  - **Editing is honest.** A patch that would fail the publish gate lands and **demotes the record in
+    the same transaction** — refusing was wrong, because drafts may be invalid and the editor
+    autosaves. Re-validation runs *after* the write, because validating first asks the question
+    against the record's previous self.
+  - **The editor is one schema renderer plus nine field schemas**, not nine forms — and it added no
+    new field kind across two scope expansions. The class level table generates ~270 of its ~280
+    cells (PB is arithmetic, features are a projection, nine slot columns derive from one
+    caster-progression pick) with per-row override.
+  - **Verified:** 923 tests; every operation × six credential types with zero getting through;
+    zero horizontal overflow and zero undersized touch targets at 375px **and** the 320px floor in
+    three themes; a homebrew Fighter clone builds a level-5 character matching the SRD exactly
+    (48 HP, +3 PB, AC 17).
+
+- **All twelve SRD classes (2026-07-27, phase 5, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
+  The bundle went from **3 classes to 12** and 3 subclasses to 12 — Barbarian, Bard, Druid, Monk,
+  Paladin, Ranger, Rogue, Sorcerer, Warlock, each with its one SRD subclass. **185 features, 46 of
+  them choice-bearing, 42 authored choice options.**
+  - **The content now has a source.** `sources/dnd-5e-srd-markdown/` vendors a CC BY 4.0 SRD 5.2.1
+    transcription pinned to a commit, and `scripts/build-class-bundle.ts` generates from it. This
+    closes a structural hole: the open5e fixtures ship **no** class/subclass/species/background/feat
+    data at all, so those seven bundles were hand-authored with nothing to check them — which is
+    exactly where both licensing violations landed. Re-run with
+    `npm run build-class-bundle -w @vtt/content-srd-5.2.1`; it is idempotent.
+  - **It adds, never regenerates.** Fighter/Wizard/Cleric carry typed riders the prose cannot
+    express, so they are copied through untouched and used as the build's **oracle**: the generator
+    re-parses them from the source and fails on any disagreement about hit die, saving throws, skill
+    choices, proficiency bonus or spell slots. All three agree — that is what earns the source its
+    (secondary) standing.
+  - `statPriority` is **read from `@vtt/rules-5e`**, not hand-listed — it is not SRD text, the engine
+    already owned all twelve, and the content/engine agreement test caught four drifts on the first run.
+  - **Verified by creating one level-5 character of every class** through the real server assembly:
+    12/12 clean; HP 50/44/38/32 by hit die (d12/d10/d8/d6 at CON 15); full casters 4/3/2, half
+    casters 4/2, Warlock 2 slots at level 3.
+
 - **Worldbuilding codex (2026-07-24, branch `claude/world-maps-geospatial-db-1kiqez`).** A GM
   worldbuilding suite + campaign journal + living atlas, on a new **Codex** GM tab (Pages | Atlas |
   Journal) plus a read-only **player Codex** (Lore | Atlas | Journal, behind a player "Codex" button).
@@ -482,6 +601,60 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Character builder — Phase 1 foundation (2026-07-26, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
+  The approved plan (16 discovery decisions + architecture principles) is `docs/task-packets/character-builder.md`:
+  a guided wizard for **GM and player**, levels **1-20 with multiclass**, creation + level-up + respec, a
+  configurable random generator, full page on desktop / full-screen sheet on mobile, server-held drafts that
+  double as the pending-approval record, GM-gated ability methods, per-species name bundles, CC BY footer, and
+  a 44px touch floor. **Phase 1 builds the foundation only — no wizard screens exist yet and no character can
+  be created through a UI.** What landed:
+  - **Content model** (`packages/content-srd-5.2.1/src/character-content.ts` + six seed bundles): reference
+    schemas for classes / subclasses / species / backgrounds / feats / name pools, all built on ONE shared
+    `FeatureRecord` whose riders reuse the real actor-side shapes (`ActionSchema.omit({attack,save})`,
+    `EffectGrantSchema`) rather than clones. Every record carries `source: "srd" | "homebrew"`; identity ids
+    stay open slugs. `ClassReference` enforces a 20-row level table and feature-id resolution via `superRefine`.
+    Seeds: Fighter + Wizard (full 20-row tables), Champion + Evoker, Human + Elf, Soldier + Sage, 4 feats,
+    2 name pools — **transcription of the remaining 10 classes / 10 subclasses / 7 species / 2 backgrounds /
+    ~16 feats is Phase 2 and 5 work.**
+  - **Schema deltas** (additive-optional, `schemaVersion` unchanged, JSON mirror in lockstep with an Ajv
+    back-compat proof): `character.choices[]` provenance ledger, per-class `hitDie`, per-class
+    `spellcasting.classes[]`, armor/weapon/tool/language proficiencies, weapon `properties`. `Actor.hitDice`
+    became a **normalising pool** — a Zod preprocess accepts the legacy single object, a bare array, or
+    `entries[]`, keeping `die`/`maximum`/`remaining` as a derived summary recomputed on every parse, so
+    existing single-object readers get the correct multiclass total with no client edit.
+  - **Rules math** (`packages/rules-5e`): ability generation (standard array, point-buy costs, `4d6kh3`, GM
+    custom formula), **class stat-priority tables as data**, HP per level incl. `max(roll, average)`, spell
+    slots for single-class and multiclass caster level, ASI levels, multiclass prerequisites.
+  - **UI primitives** (`@vtt/ui`, all demoed in `/styleguide`): `WizardShell`, `ChoiceCard`, `ChoiceGrid`,
+    `AbilityScoreAllocator`, `DiceInputRow`, `NameField`, `FeatureList`, `ReviewSummary`, `Modal size="full"`,
+    plus a documented **44px touch floor**.
+  - **API**: the socket-only debt repaid (`character.submit-import`/`resolve-import` now on both transports)
+    and six content catalogs shipped on both transports from day one, player-readable, each returning CC BY
+    attribution. A new guard test scrapes every `socket.on(...)` in `apps/server/src/*.ts` and requires each
+    event to resolve to a declared scope or a documented HTTP read — closing the structural hole that let the
+    original debt through — plus an Ajv guard validating served content payloads against the OpenAPI document.
+  - **Verified:** `check` clean across all workspaces, **689 tests passing** (server 523, rules-5e 85, content
+    36, api-contract 17, schemas 15, pdf 13), client build green. Three adversarial QA passes (UI/style-guide,
+    core-functionality, requirements-compliance) ran against it; six major correctness bugs and eight major
+    UI/UX findings were fixed, each with a regression test proven to bite by reverting the fix first.
+  - **Not yet built / gating Phase 2:** see `known-bugs.md` — the `fromCatalog` resolver, the GM ability-method
+    setting, the dropped class/species/background wire fields, the bundle→rules adapter, the feature-rider
+    interpreter, and `GameState.characterDrafts[]`.
+- **D&D Beyond PDF importer — Phase 1.5 (2026-07-26, branch `claude/dndbeyond-sheet-importer-0k6u2e`).**
+  A GM imports a D&D Beyond **PDF export** from the roster ("Import from D&D Beyond (PDF)", beside the JSON
+  import). The DDB 2024 sheet is a **named AcroForm**, so extraction is a deterministic field-name → schema
+  mapping in a new **`packages/dndbeyond-pdf`** (`pdfjs-dist`, Apache-2.0): widgets → a draft
+  `actor-character` definition validated against the real `ActorDefinitionSchema`, then a **review modal**
+  (editable name/AC/HP/speed + warnings) whose confirm reuses the existing `actor:import-definition` command
+  (no new server surface; the server still re-validates). Extraction is **client-side/in-browser** — the PDF
+  never leaves the device (amends ADR-0018's server-worker proposal; pdfjs worker bundled locally, no CDN).
+  Recovers identity/classes, abilities, AC/HP/speed/init/PB, save+skill proficiencies (incl. expertise),
+  spellcasting (ability/DC/slots/pact/spells with prepared+level), weapons→actions, and inventory;
+  **flag-and-degrades** on ambiguity (>4-class multiclass caps to 4 + warns; non-caster → no spellcasting).
+  **Verified:** `packages/dndbeyond-pdf` **11 vitest golden tests** over 6 sanitized widget fixtures (all
+  validate against the real schema; source PDFs gitignored), monorepo `check` green, client `build` green
+  (worker emits as a local asset). GM-initiated in v1. **Pending:** a live GM/mobile browser smoke (no e2e
+  harness in-repo). Deferred: player-upload + GM approval, the 2014 layout, OCR, the DDB JSON on-ramp.
 - **Player-driven combat + unified dice input (2026-07-24, branch
   `claude/character-sheet-combat-3uwp2t`).** Finishes the specced-but-lighter "Slice 2" of
   `docs/product/character-sheet-initiative.md`: players now run their own combat rolls, and the
@@ -703,6 +876,34 @@ with sender name).
 Every change ships `npm run check` + `npm test` + `npm run build` green, and UI changes get
 a **live Playwright smoke** (seed a map + calibration + encounter via the API, then drive
 the map inside the full-viewport "Enlarge map" overlay). See `docs/ai-context/testing.md`.
+
+## Magic items (2026-07-28)
+
+Items, feats and features share ONE 21-variant rider vocabulary (`featureRiders`), authored through
+the same `RiderEditor` at `scope: "item" | "feature"`. All fifteen of the GM's authoring criteria
+work end to end: a +1/+1d4-lightning shortsword, wands/orbs/potions/amulets as real slots, a ring
+that moves AC, an amulet that casts a spell on its own pool, initiative advantage, +1 Lay on Hands,
+advantage on opportunity attacks, a bonus spell slot, +1d6 fire on a crit, a raised spell save DC,
+a circlet granting proficiency or expertise, a save bonus, curses as negative riders, feats carrying
+the same vocabulary, and items granting feats.
+
+Two engines, deliberately disjoint: `effectiveActions` folds STANDING riders into the numbers the
+resolver reads; moment riders (`on-critical-hit`, `on-attack-roll`, …) are collected at their moment.
+`collectRiders(…, {moment: null})` excludes anything carrying a moment or filter, so nothing is
+counted twice. A feat reaches the collector as a carrier with no `sourceItemId`; the 8 types the
+builder bakes are excluded there by a compile-time partition.
+
+The sheet's checks, saves and skills are the SERVER's numbers, delivered as a derived block on
+`actor:available-actions` (role-gated request, not the broadcast projection — see decision log).
+Verified by injection at every layer and driven in a browser: a circlet took Borin's Stealth from
+`+1 / not proficient` to `+7 / E "Expertise (Circlet of Shadows)"`, and back on un-attune.
+
+Known gaps, all recorded rather than papered over: `dice:roll` still takes a client-built formula
+string, so the NUMBER is the server's but the transport is not id-based and `roll-mode` riders reach
+no ability check; `spell-attack-bonus` and `damage-reduction` reach a derivation field nothing reads;
+`on-death-save` and `versus-creature-type` parse and stay inert; `actor.initiative` is not reconciled
+on inventory writes, so the derived block computes the live value while direct readers do not; and
+out-of-combat weapon taps still roll a client-computed bonus.
 
 ## Claude Code tooling
 

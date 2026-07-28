@@ -3,6 +3,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  /* 44px touch floor (decision 16): the default button carries it as real paint. */
+  min-height: var(--tap-min);
   padding: var(--space-3) var(--space-5);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -13,7 +15,9 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.nh-btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--fs-sm); }
+/* Small keeps its light visual weight; Button/LinkButton add `.tap-target`, which
+   grows the hit area back to the 44px floor without growing the paint. */
+.nh-btn--sm { min-height: 2rem; padding: var(--space-2) var(--space-3); font-size: var(--fs-sm); }
 .nh-btn--block { display: flex; width: 100%; }
 
 /* Primary — magenta fill, dark ink, glow only on hover (§5.1) */
@@ -37,7 +41,8 @@
 
 .nh-btn:disabled { background: var(--surface-2); color: var(--text-muted); border-color: transparent; cursor: not-allowed; box-shadow: none; }
 
-/* Icon-only square control */
+/* Icon-only square control. Paint stays compact for dense toolbars; `.tap-target`
+   (added by the component) lifts the hit area to the 44px floor. */
 .nh-iconbtn {
   display: inline-grid;
   place-items: center;

@@ -20,6 +20,11 @@ import { createGameOperations, gameCommandRegistry, type GamePrincipal } from ".
 import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexRouter } from "./codex-http.js";
+import { HomebrewStore } from "./homebrew-store.js";
+import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
+import { createHomebrewValidator } from "./homebrew-validate.js";
+import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
+import { findCatalogRecord } from "./homebrew-srd-copy.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
@@ -74,7 +79,11 @@ export function createServer(options: CreateServerOptions) {
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
   const codexStore = new CodexStore(options.databasePath);
   const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), { maxBytes: 10 * 1024 * 1024, maxDimensionPx: 4096, maxPixels: 4096 * 4096 });
-  const contentLibrary = new ContentLibrary();
+  const homebrewStore = new HomebrewStore(options.databasePath);
+  // THE merge point. `publishedFor(audience)` hands `ContentLibrary` only records that are published
+  // and (for a player) player-visible; drafts are in neither slice at all. With no homebrew stored,
+  // both audiences keep sharing the module-level SRD-only catalog - identical cost to before.
+  const contentLibrary = new ContentLibrary(homebrewStore);
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   const gmLoginRateLimiter = new LoginRateLimiter();
@@ -117,6 +126,36 @@ export function createServer(options: CreateServerOptions) {
   function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal") {
     io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
   }
+  /**
+   * Ping every client that the GM's homebrew library changed so it refetches its own merged catalog.
+   * CONTENT-FREE BY DESIGN - a revision counter and nothing else. No `scope`, no `type`: telling
+   * players which kind of thing the GM is working on buys nothing at a home group's scale and is a
+   * small leak of GM intent.
+   *
+   * The emit is widened because `ServerToClientEvents` (`packages/domain`) does not carry
+   * `homebrew:changed` yet; it is owned by another workstream this round. Delete the cast - not the
+   * call - once the member lands.
+   */
+  function notifyHomebrewChanged() {
+    io.emit("homebrew:changed", { revision: homebrewStore.revision });
+  }
+  /**
+   * "What refers to this homebrew record?", scanned over the live campaign.
+   *
+   * Memoised for exactly one turn of the event loop, and that is load-bearing rather than fussy: the
+   * library list asks this once PER ROW, and `GameStore.snapshot` structured-clones the whole
+   * campaign on every read - so an unmemoised lookup clones the campaign fifty times to render one
+   * page. A microtask-scoped cache is built once inside a synchronous request handler and is gone
+   * before the next request runs, so it can never serve a stale answer.
+   */
+  let usageIndex: ReturnType<typeof buildHomebrewUsageIndex> | undefined;
+  const homebrewUsagesFor = (type: Parameters<ReturnType<typeof buildHomebrewUsageIndex>["of"]>[0], id: string) => {
+    if (!usageIndex) {
+      usageIndex = buildHomebrewUsageIndex(store.snapshot);
+      queueMicrotask(() => { usageIndex = undefined; });
+    }
+    return usageIndex.of(type, id);
+  };
   /**
    * Emit a transient battlemap toast. GM sockets always receive it; player sockets only when it isn't
    * GM-only AND every referenced actor is public - so a hidden combatant is never narrated to players.
@@ -227,6 +266,11 @@ export function createServer(options: CreateServerOptions) {
   });
   const commandRegistry = gameCommandRegistry(operations);
 
+  // A homebrew pack can carry up to 500 authored records, which does not fit the global limit below.
+  // body-parser marks a request parsed and every later parser skips it, so a route-scoped limit only
+  // works when it runs FIRST - hence this one line above the global parser rather than inside the
+  // homebrew router.
+  app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
   // Raised from the express default (100kb) so canonical ActorDefinition imports (capped at 256kb
   // by the operation itself) fit through the HTTP surface too.
   app.use(express.json({ limit: "512kb" }));
@@ -364,6 +408,25 @@ export function createServer(options: CreateServerOptions) {
     authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
     notifyChanged: notifyCodexChanged
   }));
+  // GM-only end to end: `authorizePlayer` is supplied ONLY so an authenticated player gets a 403
+  // rather than the 401 an unauthenticated caller gets. There is no player-readable homebrew route.
+  app.use(createHomebrewRouter({
+    store: homebrewStore,
+    authorizeGm,
+    authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+    notifyChanged: notifyHomebrewChanged,
+    // Publish validation and `/duplicate` both read the GM catalog: this router is GM-only end to
+    // end, and a record whose dependencies are published-but-not-player-visible is perfectly valid.
+    validate: createHomebrewValidator({
+      forAudience: (audience) => contentLibrary.forAudience(audience),
+      publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
+      // Drafts included, and only here: the gate asks whether a record EXISTS, which is what lets a
+      // class and its subclass publish in either order instead of neither. No catalog reads this.
+      authoredIndex: () => homebrewStore.authoredIndex()
+    }),
+    usagesOf: homebrewUsagesFor,
+    catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
+  }));
   const gameApiRouter = createGameApiRouter({
     operations,
     registry: commandRegistry,
@@ -487,6 +550,10 @@ export function createServer(options: CreateServerOptions) {
     socket.on("content:monsters", (_payload, acknowledge) => respond(acknowledge, "Only the GM can browse bundled content.", "The bundled content is unavailable.", (principal) => operations.contentMonsters(principal)));
     socket.on("actor:add-from-definition", (payload, acknowledge) => respond(acknowledge, "Only the GM can add combatants.", "The combatant could not be added.", (principal) => operations.actorAddFromDefinition(principal, payload)));
     socket.on("actor:import-definition", (payload, acknowledge) => respond(acknowledge, "Only the GM can import sheets.", "The sheet could not be imported.", (principal) => operations.actorImportDefinition(principal, payload)));
+    socket.on("character:submit-import", (payload, acknowledge) => respond(acknowledge, "Join the table before submitting a sheet.", "The sheet could not be submitted.", (principal) => operations.characterSubmitImport(principal, payload)));
+    socket.on("character:resolve-import", (payload, acknowledge) => respond(acknowledge, "Only the GM can approve imported sheets.", "The import could not be resolved.", (principal) => operations.characterResolveImport(principal, payload)));
+    socket.on("character:create", (payload, acknowledge) => respond(acknowledge, "Only the GM can create characters directly.", "The character could not be created.", (principal) => operations.characterCreate(principal, payload)));
+    socket.on("builder:set-policy", (payload, acknowledge) => respond(acknowledge, "Only the GM can set the character-builder policy.", "The builder policy could not be changed.", (principal) => operations.builderSetPolicy(principal, payload)));
     socket.on("actor:remove", (payload, acknowledge) => respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) => operations.actorRemove(principal, payload)));
     socket.on("actor:set-token-image", (payload, acknowledge) => respond(acknowledge, "Only the GM can set token images.", "The token image could not be set.", (principal) => operations.actorSetTokenImage(principal, payload)));
     socket.on("actor:set-size", (payload, acknowledge) => respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) => operations.actorSetSize(principal, payload)));
@@ -497,8 +564,17 @@ export function createServer(options: CreateServerOptions) {
     socket.on("actor:heal", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The healing could not be applied.", (principal) => operations.actorHeal(principal, payload)));
     socket.on("actor:set-temp-hp", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking hit points.", "The temporary hit points could not be set.", (principal) => operations.actorSetTempHp(principal, payload)));
     socket.on("content:conditions", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentConditions(principal)));
+    socket.on("content:skills", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSkills(principal)));
     socket.on("content:spells", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpells(principal)));
     socket.on("content:equipment", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentEquipment(principal)));
+    // The character-builder catalogs: readable by any joined session (a player builds their own character),
+    // and each mirrored one-for-one by a GET under /api/v1/content - no socket-only capability (ADR-0016).
+    socket.on("content:classes", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentClasses(principal)));
+    socket.on("content:subclasses", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSubclasses(principal)));
+    socket.on("content:species", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentSpecies(principal)));
+    socket.on("content:backgrounds", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentBackgrounds(principal)));
+    socket.on("content:feats", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentFeats(principal)));
+    socket.on("content:names", (_payload, acknowledge) => respond(acknowledge, "Join the table before browsing reference content.", "The reference content is unavailable.", (principal) => operations.contentNames(principal)));
     socket.on("actor:set-condition", (payload, acknowledge) => respond(acknowledge, "Join the table before tracking conditions.", "The condition could not be updated.", (principal) => operations.actorSetCondition(principal, payload)));
     socket.on("content:monster-actions", (payload, acknowledge) => respond(acknowledge, "Only the GM can browse stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterActions(principal, payload)));
     socket.on("content:monster-sheet", (payload, acknowledge) => respond(acknowledge, "Only the GM can read stat blocks.", "The stat block is unavailable.", (principal) => operations.contentMonsterSheet(principal, payload)));
@@ -565,7 +641,7 @@ export function createServer(options: CreateServerOptions) {
   });
 
   async function initialize() {
-    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize(), codexAssets.initialize()]);
+    await Promise.all([auth.initialize(), store.initialize(), combatLog.initialize(), credentials.initialize(), mapAssets.initialize(), mapCatalog.initialize(), tokenAssets.initialize(), tokenCatalog.initialize(), viewerAccess.initialize(), viewerPresentation.initialize(), codexStore.initialize(), codexAssets.initialize(), homebrewStore.initialize()]);
     const persisted = store.snapshot;
     if (persisted.combat.active && persisted.combat.mapAssetId && persisted.combat.initiative.some((entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId))) {
       try {
@@ -580,7 +656,7 @@ export function createServer(options: CreateServerOptions) {
     }
     await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
   }
-  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); combatLog.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); }
+  function close() { presence.dispose(); viewerCoordinator.dispose(); for (const timer of annotationExpiryTimers) clearTimeout(timer); annotationExpiryTimers.clear(); io.close(); store.close(); combatLog.close(); credentials.close(); mapCatalog.close(); tokenCatalog.close(); viewerAccess.close(); viewerPresentation.close(); homebrewStore.close(); }
 
   return { app, httpServer, io, auth, store, credentials, presence, mapAssets, mapCatalog, viewerAccess, viewerPresentation, viewerCoordinator, initialize, close };
 }

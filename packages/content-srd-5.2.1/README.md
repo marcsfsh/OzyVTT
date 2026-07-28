@@ -10,6 +10,17 @@ anything consumes it.
 - `sources/open5e-srd-2024/` — vendored, unmodified [open5e-api](https://github.com/open5e/open5e-api)
   Django fixtures for the `srd-2024` document (CC BY 4.0 — the only document vendored;
   third-party/OGL sources are deliberately excluded).
+- `sources/dnd-5e-srd-markdown/` — vendored, unmodified CC BY 4.0 markdown transcription of SRD
+  5.2.1, pinned to a commit (`PROVENANCE.json`). It exists because the open5e fixtures ship **no**
+  class, subclass, species, background or feat data at all — so the seven character-builder bundles
+  had no machine-checkable source and were hand-authored, which is exactly where both licensing
+  violations landed. **Secondary standing:** a community transcription is a cross-check and a
+  transcription source, never an authority that silently overrides a reviewed bundle. It was
+  accepted only after reproducing the three independently hand-transcribed classes exactly —
+  Fighter, Wizard and Cleric each match on hit die, saving throws, skill choose-count, the full
+  skill list, all 20 progression rows and starting-equipment gold. Only the four files the builder
+  content needs are vendored; spells/monsters/rules already have a validated source and a second
+  copy would create a second truth.
 - `scripts/build-bundle.ts` — the ETL/adapter. Joins Creature + CreatureAction +
   CreatureActionAttack + CreatureTrait and adapts each stat block into a canonical
   `ActorDefinition` (structured attacks/saves/damage; everything unmodeled stays inert in
@@ -35,14 +46,57 @@ anything consumes it.
   - `armor.v1.json` — the armor table (13) with AC-derivation fields; the shield row carries
     its +2 bonus in `acBase`.
   - `skills.v1.json` (18) and `damage-types.v1.json` (13) — short reference descriptions.
+    Skills additionally carry the SRD `ability` column (`acrobatics` → `dex`, …). This used to be
+    hand-added on top of the ETL output, so **every rebuild silently deleted it** and only the
+    ability-column test stood between that and a shipped regression (it caught exactly that during
+    the phase-5 content pass). `build-bundle.ts` now emits the column from a reviewed
+    `SKILL_ABILITY` table and fails closed on an unmapped skill; a rebuild is a no-op diff, and the
+    test now guards a rebuild rather than a hand-edit.
   - `rules.v1.json` — the 56 core-rules glossary entries grouped by ruleset (D20 Tests,
     Combat, Damage and Healing, ...).
   - `attribution.json` — the required CC BY 4.0 attribution (wording verified against the
     SRD's own Legal Information page); any surface that displays this content must show it.
+  - **Character-builder bundles — PHASE-2 state (vertical slice complete):**
+    - `classes.v1.json` — Fighter, Wizard, **Cleric**, each a complete 20-row transcription
+      (Cleric's slot columns are asserted equal to `FULL_CASTER_SLOTS` row-for-row).
+    - `subclasses.v1.json` — Champion, Evoker, **Life Domain** (domain spells as staged
+      always-prepared grants at Cleric levels 3/5/7/9; Preserve Life draws on the shared
+      `channel-divinity` uses pool).
+    - `species.v1.json` — **all nine** SRD 5.2.1 species (Dragonborn, Dwarf, Elf, Gnome,
+      Goliath, Halfling, Human, Orc, Tiefling). Lineage-style choices (Draconic Ancestry,
+      Gnomish Lineage, Fiendish Legacy) are `lineages` behind `<speciesId>-lineages`
+      catalog slugs; typed riders carry darkvision, resistances, HP-per-level, and
+      PB-scaling uses. The SRD grants **no** species languages beyond what character
+      creation hands out, so new species list only `common` (the seeded Elf's `elvish` is a
+      pre-existing liberty).
+    - `backgrounds.v1.json` — all four (Acolyte, Criminal, Sage, Soldier), each with
+      ability-score options, an origin feat, and catalog-resolvable equipment/tools.
+    - `feats.v1.json` — the **complete SRD 5.2.1 feat chapter** (19 records): Origin (Alert,
+      Magic Initiate ×3 per-list variants, Savage Attacker, Skilled), General (Ability Score
+      Improvement, Grappler), Fighting Style (Archery, Defense, Great Weapon Fighting,
+      Two-Weapon Fighting), Epic Boon (Combat Prowess, Dimensional Travel, Fate, Irresistible
+      Offense, Spell Recall, the Night Spirit, Truesight). The formerly seeded **Tough** feat
+      was removed: it is PHB-2024-only, not SRD 5.2.1 content (a test pins this).
+    - `names.v1.json` — hand-written, original name pools for every species (name lists are
+      not SRD text; the seeded Elf pools were replaced for the same reason).
+    Remaining: the other 9 classes and their subclasses (phase 5) — a missing class is a
+    content gap, not a schema gap.
+- `src/character-content.ts` — the character-builder record schemas
+  (`ClassReference`, `SubclassReference`, `SpeciesReference`, `BackgroundReference`,
+  `FeatReference`, `NamePoolReference`) built on ONE shared `FeatureRecord`: prose plus
+  optional structured riders reusing the actor-side `ActionSchema` / `EffectGrantSchema` /
+  `ActionUsesSchema` shapes. Every record carries `source: "srd" | "homebrew"`, identity ids
+  stay open slugs, and no feature needs hardcoded behavior — homebrew authors the same record.
+  A **choice option** (`FeatureChoice.options`) is that same `FeatureRecord` shape, so an
+  option carries its own mechanics — Divine Order's Protector grants Martial weapons and Heavy
+  armor training right where it is printed, rather than being a bare id nothing consumes.
+  `choice.from` remains the canonical id list and is derived from `options` when those are
+  authored, so a consumer that only wants ids never changes.
 - `src/index.ts` — typed, validated loaders (`loadMonsterDefinitions`, `loadConditions`,
   `loadSpells`, `loadWeapons`, `loadWeaponProperties`, `loadArmor`, `loadSkills`,
-  `loadDamageTypes`, `loadRules`, `loadAttribution`). Server-side only: clients receive
-  content via server projections, never by importing this package.
+  `loadDamageTypes`, `loadRules`, `loadAttribution`, plus `loadClasses`, `loadSubclasses`,
+  `loadSpecies`, `loadBackgrounds`, `loadFeats`, `loadNames`). Server-side only: clients
+  receive content via server projections, never by importing this package.
 
 ## Curation record (why the bundle differs from the raw fixtures)
 
@@ -56,8 +110,38 @@ anything consumes it.
   belong, plus a garbage CON-save value; **`mastiff`** and **`swarm-of-rats`** store save
   *modifiers* where the SRD-printed save bonuses belong.
 - **`greater-invisibility`** — upstream ships an empty description; restored from the SRD.
-- Deferred (not bundled): classes, species, feats, backgrounds, magic items — character-build
-  and loot content outside this VTT's "not a character builder" scope.
+- Classes, species, feats, and backgrounds were previously deferred as "outside this VTT's
+  not-a-character-builder scope". That scope changed (ADR-0021 / the character-builder task
+  packet): they are now first-class bundles, transcribed by hand from the SRD 5.2.1 text
+  (phase 2 above; the remaining classes are phase 5).
+- **Dropped the seeded `tough` feat and Elf's PHB name pools** — Tough is not in the SRD
+  5.2.1 feat chapter and the 2014 PHB name lists are not SRD content; both were replaced
+  in-license (phase-2 content pass). The seeded Elf's `sizes` was also corrected to
+  `["medium"]` (the SRD prints "Medium (about 5–6 feet tall)" only).
+- Still deferred (not bundled): magic items and other loot content.
+
+## What deliberately stays prose (ADR-0008)
+
+The rider vocabulary is bounded on purpose. These printed effects have **no** structured
+encoding, so they are authored as description text and adjudicated at the table rather than
+mis-encoded into a rider that means something else:
+
+- **Weapon Mastery** (Fighter level 1). The pick is real and lands in the choice ledger, but
+  the eight mastery properties (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) are combat
+  behaviors with no counterpart in `EffectModifier`/`onHit`, and the SRD's per-weapon mastery
+  column is not in the vendored fixtures. The chosen weapons are provenance and display only.
+- **Potent Spellcasting** (Cleric Blessed Strikes) — "add your Wisdom modifier to Cleric cantrip
+  damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived
+  bonus scoped to cantrips.
+- **Thaumaturge's Arcana/Religion bonus** — an ability-derived bonus to specific skill checks;
+  there is no skill-check modifier in the vocabulary. The extra cantrip *is* modeled.
+- **Stone's Endurance / Divine Spark healing** — damage reduction and "restore Hit Points equal
+  to the roll" have no rider; both actions carry their prose and their use counter.
+- **Frost's Chill's Speed reduction** and **Hill's Tumble's Prone** — `onHit` riders only fire
+  from an attack roll *on the same action*, and these ride an attack made with another action.
+  Encoding them as `onHit` would silently never trigger.
+- **"Necrotic or Radiant, your choice"** (Divine Strike, Divine Spark) — a damage part carries
+  one type; both are recorded as Radiant with the choice stated in the action text.
 
 ## License
 

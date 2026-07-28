@@ -2,6 +2,8 @@ import type { EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { RulesBlockedError } from "./game-store.js";
 import { effectiveSpeedFeet, isIncapacitated } from "./condition-rules.js";
+import { effectiveActions } from "./effective-actions.js";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -18,6 +20,8 @@ export type MovementRulesInput = Readonly<{
   creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
   override: Readonly<{ reason: string }> | null;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  /** The item catalog, so a reach-granting item widens the opportunity-attack trigger. */
+  catalog?: EquipmentCatalog;
   newPromptId: () => string;
   now: () => number;
   commandId: string;
@@ -81,7 +85,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       const enemyPosition = state.combat.tokens.find((token) => token.actorId === enemy.id)?.position ?? null;
       if (!enemyPosition) continue;
       const enemyDefinition = enemy.definitionId ? input.resolveDefinition(enemy.definitionId) : undefined;
-      const reach = Math.max(5, ...(enemyDefinition?.actions.flatMap((candidate) => candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []) ?? []));
+      // The ENEMY's effective actions: a reach-granting item must widen the trigger, or the prompt never appears.
+      const reach = Math.max(5, ...effectiveActions(enemyDefinition, enemy, input.catalog).flatMap((candidate) => candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []));
       const measure = input.creatureDistance ?? ((target: Readonly<{ actorId: string; position: Point }>, point: Point) => input.distance(target.position, point));
       const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, from);
       const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, to);

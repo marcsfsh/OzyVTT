@@ -8,6 +8,11 @@
 }
 .nh-modal--sm { max-width: min(100vw - 2rem, 28rem); }
 .nh-modal--lg { max-width: min(100vw - 2rem, 56rem); }
+/* Full — the documented full-screen sheet. Roomy centred surface on a laptop; on a
+   phone it goes edge-to-edge for the whole viewport, so long content (wizards,
+   sheets, browsers) stops hand-rolling its own max-height overrides. */
+.nh-modal--full { max-width: min(100vw - 2rem, 72rem); }
+.nh-modal--full .nh-modal-surface { max-height: min(94vh, 60rem); }
 .nh-modal::backdrop {
   background: var(--overlay);
   backdrop-filter: blur(6px);
@@ -39,6 +44,14 @@
 .nh-modal--accent-violet::before { background: var(--violet); }
 
 .nh-modal-head {
+  /* `max-width: none` for the same reason as `.nh-wizard-head` and `.nh-review-head`:
+     the client's styles.css carries a bare `header { max-width: 40rem }` (written for
+     its landing hero) which clamps EVERY <header> in the app — including this one, so a
+     `size="lg"`/`"full"` modal's title bar stopped 640px short of its own surface and
+     the bottom rule ended mid-air. A primitive must not depend on which element
+     selectors its host happens to define, and the app must not become coupled to a
+     primitive's class name, so the fix lives here and never in styles.css. */
+  max-width: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -80,4 +93,24 @@
   gap: var(--space-2);
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--line);
+}
+
+/* Full-screen sheet on a phone: the dialog fills the viewport, the surface loses its
+   radius and its max-height cap, and the footer clears the home indicator. */
+@media (max-width: 760px) {
+  .nh-modal--full {
+    max-width: 100vw;
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+  }
+  .nh-modal--full .nh-modal-surface {
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+  .nh-modal--full .nh-modal-body { padding: var(--space-4); }
+  .nh-modal--full .nh-modal-foot { padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
 }

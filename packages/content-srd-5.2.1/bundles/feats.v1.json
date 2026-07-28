@@ -1,0 +1,527 @@
+[
+  {
+    "id": "alert",
+    "name": "Alert",
+    "source": "srd",
+    "category": "origin",
+    "summary": "You are always ready for a fight.",
+    "feature": {
+      "id": "alert",
+      "name": "Alert",
+      "description": "You gain the following benefits. Initiative Proficiency: When you roll Initiative, you can add your Proficiency Bonus to the roll. Initiative Swap: Immediately after you roll Initiative, you can swap your Initiative with the Initiative of one willing ally in the same combat, unless either of you has the Incapacitated condition.",
+      "tags": [
+        "initiative"
+      ]
+    }
+  },
+  {
+    "id": "magic-initiate-cleric",
+    "name": "Magic Initiate (Cleric)",
+    "source": "srd",
+    "category": "origin",
+    "summary": "You dabble in divine magic.",
+    "prerequisite": {
+      "requires": [],
+      "abilityScores": [],
+      "text": "Repeatable, but you must choose a different spell list each time."
+    },
+    "repeatable": true,
+    "feature": {
+      "id": "magic-initiate-cleric",
+      "name": "Magic Initiate (Cleric)",
+      "description": "You learn two cantrips of your choice from the Cleric spell list. You also choose one level 1 spell from that list; you always have it prepared and can cast it once without a spell slot, regaining that use on a Long Rest, and you can also cast it using any spell slots you have. Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (choose when you select this feat). Whenever you gain a new level, you can replace one of the spells you chose for this feat with a different spell of the same level from the Cleric spell list.",
+      "tags": [
+        "spellcasting"
+      ],
+      "choice": {
+        "kind": "cantrip",
+        "choose": 2,
+        "fromCatalog": "cleric-spells",
+        "maxSpellLevel": 0
+      },
+      "uses": {
+        "limit": 1,
+        "per": "long-rest"
+      }
+    }
+  },
+  {
+    "id": "magic-initiate-druid",
+    "name": "Magic Initiate (Druid)",
+    "source": "srd",
+    "category": "origin",
+    "summary": "You dabble in primal magic.",
+    "prerequisite": {
+      "requires": [],
+      "abilityScores": [],
+      "text": "Repeatable, but you must choose a different spell list each time."
+    },
+    "repeatable": true,
+    "feature": {
+      "id": "magic-initiate-druid",
+      "name": "Magic Initiate (Druid)",
+      "description": "You learn two cantrips of your choice from the Druid spell list. You also choose one level 1 spell from that list; you always have it prepared and can cast it once without a spell slot, regaining that use on a Long Rest, and you can also cast it using any spell slots you have. Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (choose when you select this feat). Whenever you gain a new level, you can replace one of the spells you chose for this feat with a different spell of the same level from the Druid spell list.",
+      "tags": [
+        "spellcasting"
+      ],
+      "choice": {
+        "kind": "cantrip",
+        "choose": 2,
+        "fromCatalog": "druid-spells",
+        "maxSpellLevel": 0
+      },
+      "uses": {
+        "limit": 1,
+        "per": "long-rest"
+      }
+    }
+  },
+  {
+    "id": "magic-initiate-wizard",
+    "name": "Magic Initiate (Wizard)",
+    "source": "srd",
+    "category": "origin",
+    "summary": "You dabble in arcane magic.",
+    "prerequisite": {
+      "requires": [],
+      "abilityScores": [],
+      "text": "Repeatable, but you must choose a different spell list each time."
+    },
+    "repeatable": true,
+    "feature": {
+      "id": "magic-initiate-wizard",
+      "name": "Magic Initiate (Wizard)",
+      "description": "You learn two cantrips of your choice from the Wizard spell list. You also choose one level 1 spell from that list; you always have it prepared and can cast it once without a spell slot, regaining that use on a Long Rest. Intelligence is your spellcasting ability for these spells.",
+      "tags": [
+        "spellcasting"
+      ],
+      "choice": {
+        "kind": "cantrip",
+        "choose": 2,
+        "fromCatalog": "wizard-spells",
+        "maxSpellLevel": 0
+      },
+      "uses": {
+        "limit": 1,
+        "per": "long-rest"
+      }
+    }
+  },
+  {
+    "id": "savage-attacker",
+    "name": "Savage Attacker",
+    "source": "srd",
+    "category": "origin",
+    "summary": "Your weapon strikes bite deeper.",
+    "feature": {
+      "id": "savage-attacker",
+      "name": "Savage Attacker",
+      "description": "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice and use either roll against the target.",
+      "uses": {
+        "limit": 1,
+        "per": "turn"
+      }
+    }
+  },
+  {
+    "id": "skilled",
+    "name": "Skilled",
+    "source": "srd",
+    "category": "origin",
+    "summary": "Your training covers three extra skills or tools.",
+    "repeatable": true,
+    "feature": {
+      "id": "skilled",
+      "name": "Skilled",
+      "description": "You gain proficiency in any combination of three skills or tools of your choice. Repeatable: You can take this feat more than once.",
+      "choice": {
+        "kind": "skill-or-tool",
+        "choose": 3,
+        "fromCatalog": "skills"
+      }
+    }
+  },
+  {
+    "id": "ability-score-improvement",
+    "name": "Ability Score Improvement",
+    "source": "srd",
+    "category": "general",
+    "summary": "Increase one ability score by 2, or two ability scores by 1.",
+    "prerequisite": {
+      "level": 4,
+      "requires": [],
+      "abilityScores": []
+    },
+    "repeatable": true,
+    "feature": {
+      "id": "ability-score-improvement",
+      "name": "Ability Score Improvement",
+      "description": "Increase one ability score of your choice by 2, or increase two ability scores of your choice by 1. This feat can't increase an ability score above 20. Repeatable: You can take this feat more than once.",
+      "tags": [
+        "asi"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 2,
+        "from": [
+          "str",
+          "dex",
+          "con",
+          "int",
+          "wis",
+          "cha"
+        ],
+        "repeatable": true
+      }
+    }
+  },
+  {
+    "id": "grappler",
+    "name": "Grappler",
+    "source": "srd",
+    "category": "general",
+    "summary": "You excel at grappling and punishing grappled foes.",
+    "prerequisite": {
+      "level": 4,
+      "requires": [],
+      "abilityScores": [],
+      "text": "Strength or Dexterity 13+."
+    },
+    "feature": {
+      "id": "grappler",
+      "name": "Grappler",
+      "description": "You gain the following benefits. Ability Score Increase: Increase your Strength or Dexterity score by 1, to a maximum of 20. Punch and Grab: When you hit a creature with an Unarmed Strike as part of the Attack action on your turn, you can use both the Damage and the Grapple option. You can use this benefit only once per turn. Attack Advantage: You have Advantage on attack rolls against a creature Grappled by you. Fast Wrestler: You don't have to spend extra movement to move a creature Grappled by you if the creature is your size or smaller.",
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex"
+        ]
+      }
+    }
+  },
+  {
+    "id": "archery",
+    "name": "Archery",
+    "source": "srd",
+    "category": "fighting-style",
+    "summary": "Your ranged attacks strike true.",
+    "prerequisite": {
+      "requires": [
+        "fighting-style"
+      ],
+      "abilityScores": [],
+      "text": "Fighting Style Feature."
+    },
+    "feature": {
+      "id": "archery",
+      "name": "Archery",
+      "description": "You gain a +2 bonus to attack rolls you make with Ranged weapons.",
+      "tags": [
+        "fighting-style"
+      ]
+    }
+  },
+  {
+    "id": "defense",
+    "name": "Defense",
+    "source": "srd",
+    "category": "fighting-style",
+    "summary": "Armor sits better on you than on anyone else.",
+    "prerequisite": {
+      "requires": [
+        "fighting-style"
+      ],
+      "abilityScores": [],
+      "text": "Fighting Style Feature."
+    },
+    "feature": {
+      "id": "defense",
+      "name": "Defense",
+      "description": "While you're wearing Light, Medium, or Heavy armor, you gain a +1 bonus to Armor Class.",
+      "tags": [
+        "fighting-style"
+      ],
+      "modifiers": [
+        {
+          "type": "armor-class",
+          "amount": 1,
+          "whileArmored": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "great-weapon-fighting",
+    "name": "Great Weapon Fighting",
+    "source": "srd",
+    "category": "fighting-style",
+    "summary": "Your two-handed blows never land soft.",
+    "prerequisite": {
+      "requires": [
+        "fighting-style"
+      ],
+      "abilityScores": [],
+      "text": "Fighting Style Feature."
+    },
+    "feature": {
+      "id": "great-weapon-fighting",
+      "name": "Great Weapon Fighting",
+      "description": "When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.",
+      "tags": [
+        "fighting-style"
+      ]
+    }
+  },
+  {
+    "id": "two-weapon-fighting",
+    "name": "Two-Weapon Fighting",
+    "source": "srd",
+    "category": "fighting-style",
+    "summary": "Your off-hand strikes hit with full force.",
+    "prerequisite": {
+      "requires": [
+        "fighting-style"
+      ],
+      "abilityScores": [],
+      "text": "Fighting Style Feature."
+    },
+    "feature": {
+      "id": "two-weapon-fighting",
+      "name": "Two-Weapon Fighting",
+      "description": "When you make an extra attack as a result of using a weapon that has the Light property, you can add your ability modifier to the damage of that attack if you aren't already adding it to the damage.",
+      "tags": [
+        "fighting-style"
+      ]
+    }
+  },
+  {
+    "id": "boon-of-combat-prowess",
+    "name": "Boon of Combat Prowess",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "Your misses become hits when it matters.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [],
+      "abilityScores": []
+    },
+    "feature": {
+      "id": "boon-of-combat-prowess",
+      "name": "Boon of Combat Prowess",
+      "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Peerless Aim: When you miss with an attack roll, you can hit instead. Once you use this benefit, you can't use it again until the start of your next turn.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex",
+          "con",
+          "int",
+          "wis",
+          "cha"
+        ]
+      },
+      "uses": {
+        "limit": 1,
+        "per": "turn"
+      }
+    }
+  },
+  {
+    "id": "boon-of-dimensional-travel",
+    "name": "Boon of Dimensional Travel",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "You blink across the battlefield between blows.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [],
+      "abilityScores": []
+    },
+    "feature": {
+      "id": "boon-of-dimensional-travel",
+      "name": "Boon of Dimensional Travel",
+      "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Blink Steps: Immediately after you take the Attack action or the Magic action, you can teleport up to 30 feet to an unoccupied space you can see.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex",
+          "con",
+          "int",
+          "wis",
+          "cha"
+        ]
+      }
+    }
+  },
+  {
+    "id": "boon-of-fate",
+    "name": "Boon of Fate",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "You bend destiny for yourself and those nearby.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [],
+      "abilityScores": []
+    },
+    "feature": {
+      "id": "boon-of-fate",
+      "name": "Boon of Fate",
+      "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Improve Fate: When you or another creature within 60 feet of you succeeds on or fails a D20 Test, you can roll 2d4 and apply the total rolled as a bonus or penalty to the d20 roll. Once you use this benefit, you can't use it again until you roll Initiative or finish a Short or Long Rest.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex",
+          "con",
+          "int",
+          "wis",
+          "cha"
+        ]
+      },
+      "uses": {
+        "limit": 1,
+        "per": "encounter"
+      }
+    }
+  },
+  {
+    "id": "boon-of-irresistible-offense",
+    "name": "Boon of Irresistible Offense",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "Nothing resists your bludgeoning, piercing, or slashing damage.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [],
+      "abilityScores": []
+    },
+    "feature": {
+      "id": "boon-of-irresistible-offense",
+      "name": "Boon of Irresistible Offense",
+      "description": "You gain the following benefits. Ability Score Increase: Increase your Strength or Dexterity score by 1, to a maximum of 30. Overcome Defenses: The Bludgeoning, Piercing, and Slashing damage you deal always ignores Resistance. Overwhelming Strike: When you roll a 20 on the d20 for an attack roll, you can deal extra damage to the target equal to the ability score increased by this feat. The extra damage's type is the same as the attack's type.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex"
+        ]
+      }
+    }
+  },
+  {
+    "id": "boon-of-spell-recall",
+    "name": "Boon of Spell Recall",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "Your lower-level spell slots sometimes refuse to be spent.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [
+        "spellcasting"
+      ],
+      "abilityScores": [],
+      "text": "Level 19+, Spellcasting Feature."
+    },
+    "feature": {
+      "id": "boon-of-spell-recall",
+      "name": "Boon of Spell Recall",
+      "description": "You gain the following benefits. Ability Score Increase: Increase your Intelligence, Wisdom, or Charisma score by 1, to a maximum of 30. Free Casting: Whenever you cast a spell with a level 1-4 spell slot, roll 1d4. If the number you roll is the same as the slot's level, the slot isn't expended.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "int",
+          "wis",
+          "cha"
+        ]
+      }
+    }
+  },
+  {
+    "id": "boon-of-the-night-spirit",
+    "name": "Boon of the Night Spirit",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "Shadows hide you and blunt all but the brightest harm.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [],
+      "abilityScores": []
+    },
+    "feature": {
+      "id": "boon-of-the-night-spirit",
+      "name": "Boon of the Night Spirit",
+      "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Merge with Shadows: While within Dim Light or Darkness, you can give yourself the Invisible condition as a Bonus Action. The condition ends on you immediately after you take an action, a Bonus Action, or a Reaction. Shadowy Form: While within Dim Light or Darkness, you have Resistance to all damage except Psychic and Radiant.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex",
+          "con",
+          "int",
+          "wis",
+          "cha"
+        ]
+      }
+    }
+  },
+  {
+    "id": "boon-of-truesight",
+    "name": "Boon of Truesight",
+    "source": "srd",
+    "category": "epic-boon",
+    "summary": "Your eyes pierce every veil.",
+    "prerequisite": {
+      "level": 19,
+      "requires": [],
+      "abilityScores": []
+    },
+    "feature": {
+      "id": "boon-of-truesight",
+      "name": "Boon of Truesight",
+      "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Truesight: You have Truesight with a range of 60 feet.",
+      "tags": [
+        "epic-boon"
+      ],
+      "choice": {
+        "kind": "ability-score",
+        "choose": 1,
+        "from": [
+          "str",
+          "dex",
+          "con",
+          "int",
+          "wis",
+          "cha"
+        ]
+      }
+    }
+  }
+]

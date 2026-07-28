@@ -15,6 +15,9 @@ import {
   GameCommandEnvelopeSchema,
   GameMutationAcceptedSchema,
   GameSnapshotSchema,
+  GAME_COMMAND_SCOPES,
+  HOMEBREW_PATHS,
+  HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
   IntegrationCredentialIssuedSchema,
   IntegrationCredentialMetadataSchema,
@@ -87,7 +90,7 @@ describe("public API contracts", () => {
     expect(openApiDocument.info.version).toBe(API_VERSION);
     expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
 
-    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS), ...Object.values(SESSION_PATHS), ...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)];
+    const declaredPaths = [...Object.values(SYSTEM_PATHS), OPENAPI_DOCUMENT_PATH, ...Object.values(INTEGRATION_CREDENTIAL_PATHS), ...Object.values(MAP_ASSET_PATHS), ...Object.values(VIEWER_PATHS), ...Object.values(GAME_PATHS), ...Object.values(CONTENT_PATHS), ...Object.values(ENCOUNTER_ARCHIVE_PATHS), ...Object.values(SESSION_PATHS), ...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS), ...Object.values(HOMEBREW_PATHS)];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(IntegrationScopeSchema.options);
     for (const path of Object.values(SYSTEM_PATHS)) expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(/^#\/components\/schemas\//);
@@ -142,6 +145,36 @@ describe("public API contracts", () => {
     }
   });
 
+  it("documents the homebrew surface as structurally GM-only: never a player session, never an integration scope, never a game command", () => {
+    type Op = { operationId?: string; security?: ReadonlyArray<Record<string, readonly string[]>>; parameters?: ReadonlyArray<{ name: string; in: string; schema?: Record<string, unknown> }> };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
+    const homebrewPaths = Object.values(HOMEBREW_PATHS);
+    const operations = homebrewPaths.flatMap((path) => Object.entries(paths[path]).map(([method, op]) => [`${method} ${path}`, op] as const));
+    // 10 paths, 13 operations - the whole authoring surface, not one endpoint per content type.
+    expect(homebrewPaths).toHaveLength(10);
+    expect(operations).toHaveLength(13);
+    for (const [label, op] of operations) {
+      // Unlike the codex (GM-only writes, GM-or-player reads) there is no player read here AT ALL:
+      // players reach homebrew only through the merged catalogs, after the audience filter.
+      expect(op.security, `${label} must be GM-session-only`).toEqual([{ gmAuth: [] }]);
+      expect(op.security?.some((entry) => "playerAuth" in entry), `${label} must never accept a player session`).toBe(false);
+      expect(op.security?.some((entry) => "bearerAuth" in entry), `${label} must not use integration scopes`).toBe(false);
+    }
+    // No IntegrationScope was added, so `supportedScopes` stays aligned with IntegrationScopeSchema automatically.
+    expect(IntegrationScopeSchema.options).not.toContain("content:read");
+    // Path B held: homebrew rows are not GameState, so nothing here is a game command.
+    expect(Object.keys(GAME_COMMAND_SCOPES).filter((type) => type.startsWith("homebrew."))).toEqual([]);
+    // The id budget is 60, NOT contentSlug's 80: a longer id passes creation and then fails
+    // GameStateSchema.parse on the next boot, bricking campaign load.
+    for (const path of homebrewPaths.filter((path) => path.includes("{id}"))) {
+      const parameter = Object.values(paths[path])[0]?.parameters?.find((parameter) => parameter.name === "id" && parameter.in === "path");
+      expect(parameter?.schema, `${path} id parameter`).toEqual({ type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 });
+    }
+    // One polymorphic collection serves all nine content types via the `type` discriminator.
+    expect(HomebrewContentTypeSchema.options).toHaveLength(9);
+    expect(openApiDocument.components.schemas.HomebrewRecordSummary.properties.type.enum).toEqual(HomebrewContentTypeSchema.options);
+  });
+
   it("scopes every live-game operation to the least-privilege credential scope alongside GM sessions", () => {
     type Operation = { security?: ReadonlyArray<Record<string, readonly string[]>> };
     const paths = openApiDocument.paths as unknown as Record<string, Record<string, Operation>>;
@@ -170,9 +203,18 @@ describe("public API contracts", () => {
     expect(acceptsPlayer(GAME_PATHS.actorDamage, "post")).toBe(true);
     expect(acceptsPlayer(GAME_PATHS.rolls, "post")).toBe(true);
     expect(acceptsPlayer(CONTENT_PATHS.conditions, "get")).toBe(true);
+    // A player submits their own sheet into the queue; only the GM decides on it.
+    expect(acceptsPlayer(GAME_PATHS.characterImports, "post")).toBe(true);
+    expect(acceptsPlayer(GAME_PATHS.characterImportResolve, "post")).toBe(false);
     expect(acceptsPlayer(GAME_PATHS.encounterStart, "post")).toBe(false);
     expect(acceptsPlayer(GAME_PATHS.actorHp, "post")).toBe(false);
     expect(acceptsPlayer(CONTENT_PATHS.monsters, "get")).toBe(false);
+    // Every rules catalog except the bestiary is public reference: a player builds their own
+    // character, so the builder catalogs must never inherit the bestiary's GM-only gating.
+    for (const path of [CONTENT_PATHS.skills, CONTENT_PATHS.spells, CONTENT_PATHS.equipment, CONTENT_PATHS.classes, CONTENT_PATHS.subclasses, CONTENT_PATHS.species, CONTENT_PATHS.backgrounds, CONTENT_PATHS.feats, CONTENT_PATHS.names]) {
+      expect(acceptsPlayer(path, "get"), `${path} must accept a player session`).toBe(true);
+      expect(scopeOf(path, "get"), `${path} scope`).toEqual(["game:read"]);
+    }
     expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(false);
     expect(openApiDocument.components.securitySchemes.playerAuth).toMatchObject({ type: "http", scheme: "bearer" });
   });
@@ -198,6 +240,10 @@ describe("public API contracts", () => {
       for (const property of properties) {
         if (issuance.has(`${name}.${property}`)) continue;
         if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces, not credentials
+        // Same reason, spelled out rather than pattern-matched: an ActorDefinition's `token` is its
+        // battlemap piece (disposition + grid footprint). The name is fixed by ActorDefinitionSchema,
+        // which a homebrew creature body mirrors, so renaming it here would be a documented lie.
+        if (`${name}.${property}` === "HomebrewMonsterRecord.token") continue;
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }

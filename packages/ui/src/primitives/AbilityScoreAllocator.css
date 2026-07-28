@@ -1,0 +1,83 @@
+.nh-abil { display: grid; gap: var(--space-4); }
+
+.nh-abil-method { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.nh-abil-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.nh-abil-toolbar { display: grid; gap: var(--space-3); }
+
+/* Values still to hand out (standard array / rolled results). */
+.nh-abil-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.nh-abil-pool-label { color: var(--text-muted); font: 800 var(--fs-xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
+.nh-abil-pool-values { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.nh-abil-pool-done { color: var(--text-dim); font-size: var(--fs-sm); }
+
+.nh-abil-budget { display: grid; gap: var(--space-2); }
+
+/* ---- The six rows ----
+   Capped, because a table of five short tracks does not get better by being wider: stretched to the
+   full page the eye travelled the best part of a thousand pixels from "STR" to its own total, six
+   times over, across an empty middle. 36rem clears the ~520px the five tracks actually need and
+   sits above 375px's 343px, so the phone's stacked card layout below is untouched. */
+.nh-abil-table { display: grid; gap: var(--space-2); max-width: 36rem; }
+.nh-abil-head,
+.nh-abil-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(9rem, 1fr) 4rem 4rem 4rem;
+  align-items: center;
+  gap: var(--space-3);
+}
+.nh-abil-head {
+  padding: 0 var(--space-3);
+  color: var(--text-muted);
+  font: 800 var(--fs-xs) / 1.4 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.nh-abil-head > span:not(:first-child):not(:nth-child(2)) { text-align: right; }
+
+.nh-abil-row {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.nh-abil-name { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.nh-abil-abbr { color: var(--text); font: 700 var(--fs-body) / 1 var(--font-mono); letter-spacing: var(--tracking-display); }
+.nh-abil-full { color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.nh-abil-cell { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-width: 0; }
+.nh-abil-cell--control { justify-content: flex-start; }
+/* Micro-labels exist for the stacked phone layout; the header row covers desktop. */
+.nh-abil-cell-label { display: none; color: var(--text-muted); font: 800 var(--fs-2xs) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
+.nh-abil-select { max-width: 7rem; }
+
+.nh-abil-num { color: var(--text-dim); font-size: var(--fs-body); font-weight: 700; }
+.nh-abil-num--total { color: var(--text); font-size: var(--fs-h3); }
+.nh-abil-num--mod { color: var(--cyan-hi); }
+:root[data-theme="light"] .nh-abil-num--mod { color: var(--cyan); }
+.nh-abil-note { grid-column: 1 / -1; color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* ---- Phone: each ability becomes a small card with its own labels.
+   650 is the documented "dense table folds" step in the ladder (760/650/560/850/980). ---- */
+@media (max-width: 650px) {
+  .nh-abil-head { display: none; }
+  .nh-abil-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+  .nh-abil-name { grid-column: 1 / -1; }
+  .nh-abil-cell--control { grid-column: 1 / -1; }
+  .nh-abil-cell--control .nh-abil-select { max-width: none; width: 100%; }
+  .nh-abil-cell--control .nh-stepper { width: 100%; justify-content: space-between; }
+  .nh-abil-cell { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; }
+  .nh-abil-cell-label { display: block; }
+}

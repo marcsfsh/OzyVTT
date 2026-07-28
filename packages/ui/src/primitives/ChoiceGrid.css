@@ -1,0 +1,54 @@
+.nh-choicegrid { display: grid; gap: var(--space-4); align-items: start; }
+.nh-choicegrid-picker { display: grid; gap: var(--space-3); min-width: 0; }
+
+.nh-choicegrid-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.nh-choicegrid-search { position: relative; flex: 1 1 14rem; min-width: 0; }
+.nh-choicegrid-search .nh-input { padding-left: calc(var(--space-3) + 1.5rem); }
+.nh-choicegrid-search-icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+  pointer-events: none;
+}
+/* Hide the WebKit search decorations — the magnifier is ours, on the left. */
+.nh-choicegrid-search input[type="search"]::-webkit-search-decoration,
+.nh-choicegrid-search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.nh-choicegrid-count { margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* "You have already chosen 6" is a fact about the GRID, so it is stated once, here, next to the
+   count — not stamped onto every locked card (that put 409 copies of one sentence on the wizard's
+   fourth step at level 20). Same CAUTION violet and same --fs-sm as the per-option reason it
+   replaces: locked reads the same wherever it is said. */
+.nh-choicegrid-locked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
+.nh-choicegrid-locked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+
+/* One column on a phone, filling out to a dozen cards on a laptop. */
+.nh-choicegrid-items {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+/* No detail pane here — WizardShell owns the one master-detail layout (see
+   ChoiceGrid.tsx). This file only lays out search, facets, and the card grid. */
+
+/* auto-FIT, not auto-fill: with `fill` the grid reserves the full five 15rem tracks even when the
+   offer has two options, so the equipment step showed two 240px cards adrift in 1248px of row while
+   the kit inside them was clipped. `fit` collapses the empty tracks and the two cards take the row.
+   A grid of fifteen cards is laid out identically either way. */
+@media (min-width: 561px) {
+  .nh-choicegrid-items { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+}

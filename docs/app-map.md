@@ -7,7 +7,7 @@ file index. For narrative context read `CLAUDE.md`, `docs/ai-ledger/current-stat
 `docs/ai-context/`; the `vtt-orientation` skill routes you here first.
 
 - API version `1` · realtime protocol `1`
-- 6 GameState fields · 72 commands · 132 HTTP paths
+- 8 GameState fields · 76 commands · 155 HTTP paths
 
 ## GameState shape
 
@@ -15,8 +15,10 @@ Top-level fields of the authoritative `GameState` (`packages/domain` `GameStateS
 single JSON blob the server persists and projects per role.
 
 - `actors`
+- `builderPolicy`
 - `combat`
 - `definitions`
+- `pendingImports`
 - `revision`
 - `rolls`
 - `schemaVersion`
@@ -29,7 +31,7 @@ pipeline: domain `ClientToServerEvents` -> `game-commands.ts` schema -> this map
 operation -> `game-operations.ts` handler + registry -> `server.ts` socket line -> `game-http.ts`
 route -> projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `save`, `scene`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `save`, `scene`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -58,15 +60,19 @@ Namespaces: `action`, `actor`, `annotation`, `character`, `damage`, `death-save`
 | `annotation.set-color` | `combat:write` |
 | `annotation.set-movable` | `combat:write` |
 | `annotation.set-visibility` | `combat:write` |
+| `builder.set-policy` | `actor:write` |
 | `character.claim` | `actor:write` |
+| `character.create` | `actor:write` |
 | `character.force-release` | `actor:write` |
 | `character.release` | `actor:write` |
+| `character.resolve-import` | `actor:write` |
 | `character.set-currency` | `actor:write` |
 | `character.set-identity` | `actor:write` |
 | `character.set-inventory` | `actor:write` |
 | `character.set-prepared` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
+| `character.submit-import` | `actor:write` |
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
@@ -138,10 +144,19 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/codex/relationships`
 - `DELETE /api/v1/codex/relationships/{id}`
 - `GET /api/v1/codex/search`
+- `GET /api/v1/content/backgrounds`
+- `GET /api/v1/content/classes`
 - `GET /api/v1/content/conditions`
+- `GET /api/v1/content/equipment`
+- `GET /api/v1/content/feats`
 - `GET /api/v1/content/monsters`
 - `GET /api/v1/content/monsters/{definitionId}`
 - `GET /api/v1/content/monsters/{definitionId}/actions`
+- `GET /api/v1/content/names`
+- `GET /api/v1/content/skills`
+- `GET /api/v1/content/species`
+- `GET /api/v1/content/spells`
+- `GET /api/v1/content/subclasses`
 - `GET /api/v1/encounters`
 - `DELETE GET /api/v1/encounters/{id}`
 - `GET /api/v1/game`
@@ -179,6 +194,10 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/annotations/{id}/visibility`
 - `POST /api/v1/game/annotations/clear`
 - `POST /api/v1/game/annotations/ping`
+- `POST /api/v1/game/builder/policy`
+- `POST /api/v1/game/character-imports`
+- `POST /api/v1/game/character-imports/{importId}/resolve`
+- `POST /api/v1/game/characters`
 - `POST /api/v1/game/claims`
 - `POST /api/v1/game/claims/{actorId}/force-release`
 - `POST /api/v1/game/claims/release`
@@ -224,6 +243,16 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/gm/integration-credentials/{id}/audit`
 - `POST /api/v1/gm/integration-credentials/{id}/revoke`
 - `POST /api/v1/gm/integration-credentials/{id}/rotate`
+- `GET POST /api/v1/homebrew/content`
+- `DELETE GET PATCH /api/v1/homebrew/content/{id}`
+- `POST /api/v1/homebrew/content/{id}/duplicate`
+- `POST /api/v1/homebrew/content/{id}/publish`
+- `POST /api/v1/homebrew/content/{id}/restore`
+- `POST /api/v1/homebrew/content/{id}/unpublish`
+- `GET /api/v1/homebrew/content/{id}/usages`
+- `POST /api/v1/homebrew/content/{id}/visibility`
+- `GET /api/v1/homebrew/packs/export`
+- `POST /api/v1/homebrew/packs/import`
 - `GET POST /api/v1/map-assets`
 - `GET PATCH /api/v1/map-assets/{id}`
 - `POST /api/v1/map-assets/{id}/calibration/wizards`

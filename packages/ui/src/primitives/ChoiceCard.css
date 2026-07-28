@@ -1,0 +1,139 @@
+.nh-choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  /* Room on the right for the chosen check so a long title never runs under it. */
+  padding: var(--space-3) calc(var(--space-4) + 1rem) var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+/* Hover owns the SURFACE; it must not own the EDGE of a card that is already chosen.
+   `:not()` takes its argument's specificity, so `.nh-choice:hover:not(:disabled)` is (0,3,0) and
+   out-specified `.nh-choice.is-selected` at (0,2,0): pointing at your own answer repainted its cyan
+   border grey. Excluded here rather than fixed by out-specifying it on the selected rule - a
+   specificity race is silently lost by whoever edits next. */
+.nh-choice:hover:not(:disabled) { background: var(--surface-2); }
+.nh-choice:hover:not(:disabled):not(.is-selected) { border-color: var(--line-strong); }
+/* And defend the edge against the CONSUMING APP's element-selector globals, the same way
+   `.nh-wizard-head` defends its width. A `.nh-choice` IS a <button>, and the client's styles.css
+   carries a bare `button:hover:not(:disabled) { border-color: color-mix(--cyan 55%, transparent) }`
+   at (0,2,1) — which out-specifies `.nh-choice.is-selected` at (0,2,0) all on its own. Excluding
+   hover above therefore got the chosen edge only as far as 55%-alpha cyan (measured: dark theme
+   rgb(38,135,165) composited, against rgb(45,226,255) at rest). This restates it at (0,3,0), one
+   class clear of any bare-element hover rule a host might define. */
+.nh-choice.is-selected:hover { border-color: var(--cyan); }
+
+.nh-choice-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.nh-choice-icon { flex: none; display: grid; place-items: center; font-size: 1.25rem; color: var(--text-dim); }
+/* WRAPS. A single-line ellipsis is right for a name ("Dragonborn") and wrong for the only other
+   thing a title ever is — the contents of a starting kit — where the clipped tail was the price
+   ("…and 8 GP"), the one number worth comparing against the other option.
+
+   THREE lines, the same ceiling `.nh-choice-desc` below already uses, not a second number: the
+   longest kit in the SRD is 92 characters, which is one line in a 618px card and exactly three in
+   a 293px one. Clamping at two put the price back under the fold on a phone — fixing the laptop by
+   breaking the phone, which is the one trade this project does not make. It is still a ceiling: a
+   pathological title cannot stretch a dense grid's rows. */
+.nh-choice-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--text);
+  font: 700 var(--fs-body) / 1.25 var(--font-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nh-choice-badge { flex: none; }
+
+.nh-choice-desc {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  /* Even card heights in a grid without truncating mid-word. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nh-choice-meta { color: var(--text-muted); font-size: var(--fs-xs); }
+/* "Locked" is CAUTION (violet), not danger: rose-red is damage and destruction (§2).
+   Kept at --fs-sm and full strength — on a disabled card, why it is locked is the most
+   important thing on the card. */
+.nh-choice-locked { display: flex; align-items: center; gap: var(--space-2); color: var(--caution-hi); font-size: var(--fs-sm); }
+.nh-choice-locked-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+
+/* ---- The one chosen treatment: cyan edge + selection glow + a check ---- */
+.nh-choice-check {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--cyan);
+  color: var(--text-on-neon);
+  font-size: 0.85rem;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle);
+}
+/* Cyan edge + glow + the check disc, and NO fill: hover already owns --surface-2, so
+   a filled selected state would make "the pointer is here" and "this is my answer"
+   the same pixel color. Border + glow + check is unambiguous on its own. */
+.nh-choice.is-selected {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+  transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover);
+}
+.nh-choice.is-selected .nh-choice-check { opacity: 1; transform: none; }
+.nh-choice.is-selected .nh-choice-title { color: var(--text); }
+
+/* Choose-N grids keep the chosen EDGE and CHECK — the treatment is unchanged — but spend no glow.
+   §8.1 budgets one glowing element per region, and a "choose 6 spells" region has six answers by
+   definition; six glowing cards is precisely the wallpaper that rule exists to prevent. The cyan
+   edge plus the check still say "chosen" without colour alone, so nothing is lost but the bloom.
+
+   ...EXCEPT while it is focused. At (0,4,0) this selector out-specified BOTH keyboard rings - the
+   local `.nh-choice:focus-visible` (0,2,0) and the global `:where(…)` one (0,1,0), which also sets
+   `outline: none` - so a ticked card in a choose-N grid had no focus indicator at all: tabbing onto
+   your own answer showed nothing. `:not(:focus-visible)` takes this rule out of the way instead of
+   restating the ring at a higher weight; the ring below then wins on source order at equal (0,2,0). */
+.nh-choicegrid-items[role="group"] .nh-choice.is-selected:not(:focus-visible) { box-shadow: none; }
+
+/* Disabled dims PER PROPERTY, never with a group `opacity`: group alpha composites the
+   whole subtree, so a child can't opt back out of it (the old `.nh-choice-locked
+   { opacity: 1 }` was a no-op) and the locked reason fell to 2.08:1 in light theme.
+   Dim the frame, the title, and the icon; leave the reason at full strength. */
+.nh-choice:disabled {
+  cursor: not-allowed;
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 70%, var(--bg));
+}
+.nh-choice:disabled .nh-choice-title { color: var(--text-dim); }
+/* desc/meta keep their resting colors: dimming them further drops --text-muted below
+   AA, and AA is not negotiable (§2). Disabled reads from the frame, the title, and the
+   locked reason. */
+.nh-choice:disabled .nh-choice-icon { color: var(--text-muted); }
+.nh-choice:disabled .nh-choice-badge { opacity: 0.75; }
+
+/* The selection glow above is a class-level box-shadow, so it would out-specify the
+   zero-specificity global :focus-visible ring and leave a focused, already-selected
+   card with no keyboard ring. Restate the ring here so focus always wins. */
+.nh-choice:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nh-choice-check { transition: none; transform: none; }
+}

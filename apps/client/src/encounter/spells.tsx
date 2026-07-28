@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ContentSpellSummary } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 import { RichText } from "./RichText";
 
 /**
@@ -13,8 +14,8 @@ import { RichText } from "./RichText";
 let spellCache: readonly ContentSpellSummary[] | null = null;
 let spellInFlight: Promise<void> | null = null;
 const spellListeners = new Set<(spells: readonly ContentSpellSummary[]) => void>();
-export function requestSpellReference() {
-  if (spellCache) return;
+export function requestSpellReference(force = false) {
+  if (spellCache && !force) return;
   spellInFlight ??= new Promise((resolve) => {
     socket.emit("content:spells", {}, (result) => {
       spellInFlight = null;
@@ -27,10 +28,16 @@ export function requestSpellReference() {
   });
 }
 
+// A homebrew spell can be published mid-session, so this list is not fixed for the
+// session any more. Nothing happens for a cold cache. See `content/invalidate.ts`.
+registerContentCache(() => { if (spellCache) requestSpellReference(true); });
+
 export function useSpellReference(): readonly ContentSpellSummary[] {
   const [spells, setSpells] = useState<readonly ContentSpellSummary[]>(spellCache ?? []);
   useEffect(() => {
-    if (spellCache) { setSpells(spellCache); return; }
+    // Subscribe unconditionally: a consumer mounting with a warm cache still has to hear
+    // about the swap when a publish invalidates it.
+    if (spellCache) setSpells(spellCache);
     spellListeners.add(setSpells);
     requestSpellReference();
     return () => { spellListeners.delete(setSpells); };

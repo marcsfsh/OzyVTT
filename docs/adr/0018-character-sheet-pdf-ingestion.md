@@ -1,6 +1,6 @@
 # ADR-018: Character-sheet PDF ingestion
 
-- Status: Proposed
+- Status: Accepted (amended 2026-07-26 — see Amendment)
 - Date: 2026-07-15
 
 ## Context
@@ -57,3 +57,26 @@ The adapter is additive. Removing or replacing MarkItDown does not invalidate ap
 - Deterministic golden conversions with field provenance and visible ambiguity.
 - Isolation, cleanup, timeout/crash, no-network, and secret/path-redaction tests.
 - Uncoached phone and desktop import/review usability test.
+
+## Amendment (2026-07-26): accepted, with **client-side** extraction
+
+Phase 1.5 ships as `packages/dndbeyond-pdf` + a GM review modal. Two departures from the
+original proposal, both validated by a working extractor over six fixtures (Cleric 5, Bard 20,
+Warlock 20, Fighter 20, Wizard 20, a 6-class multiclass — all validate against `ActorDefinitionSchema`):
+
+- **Extraction runs in the browser, not a server worker.** D&D Beyond's PDF export is a *named
+  AcroForm*: every character value is a widget (`/T` field name + `/V` value), so extraction is a
+  deterministic field-name → schema mapping via `pdfjs-dist` (Apache-2.0; worker bundled locally,
+  no CDN) — no MarkItDown/Python worker, and the PDF never leaves the device (strictly more private
+  than the proposed sandbox). This removes the packaging/isolation burden the original decision
+  carried. The server still re-validates every definition through `ActorDefinitionSchema` and applies
+  the normal import authorization, so server authority is unchanged.
+- **Reuses the existing import path.** The reviewed draft flows through the existing
+  `actor:import-definition` command; no new server surface.
+
+Kept from the proposal: draft → GM review before authorized creation; deterministic,
+golden-fixture-tested extraction; never silently convert ambiguous data (flag-and-degrade, e.g.
+a >4-class multiclass caps to 4 with a warning); and 2024-layout scope (others detected/rejected).
+Deferred: player-initiated upload + a GM approval queue (v1 is GM-initiated), the 2014 sheet layout,
+scanned/OCR, and the D&D Beyond JSON on-ramp (a separate importer, same target). The original
+MarkItDown/worker option remains the fallback if a non-AcroForm export ever appears.

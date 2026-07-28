@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { ActorDefinition, ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { resolveSpellcasting, type ActorDefinition, type ActorDerivedSheet, type ContentActionSummary, type ContentEquipmentSummary, type ContentSpellSummary, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Badge, Button, IconButton, Meter, Modal, SegmentedControl, Stepper } from "@vtt/ui";
 import { abilityModifier as modifierOf, saveBonus, skillBonus, spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
+import { useSkillCatalog } from "../content/catalogs";
 import { ConditionEditor } from "./conditions";
 import { EquipmentPicker } from "./equipment";
 import { SpellCard, useSpellReference } from "./spells";
@@ -13,30 +14,62 @@ import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
+import { registerContentCache } from "../content/invalidate";
 
-/** Definitions are immutable bundled content; one fetch per stat block per session. */
+/** One fetch per stat block per session.
+    NOT immutable any more: homebrew definitions can be republished while the sheet is
+    open, so this is cleared on `homebrew:changed` (`content/invalidate.ts`). A stale
+    entry here is already a known failure mode — see the note at the save path below. */
 const sheetCache = new Map<string, ActorDefinition>();
+registerContentCache(() => sheetCache.clear());
 
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
 const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
+
+/** The required keys of an `ActorAction`, so a derived action can be handed to the targeting session
+    carrying the SERVER's id and nothing invented. Every number on it is display; the resolver reads
+    the id and computes the rest, riders included. */
+const EMPTY_ACTION = {
+  id: "", name: "", activation: "action" as const, description: "", damage: [] as Array<{ formula: string; type: string }>
+};
+
+/** One row of `actor:available-actions`. The display half is additive-optional on the wire
+    (ADR-0007), so every field is read defensively — an older server simply yields an action
+    with no numbers, which renders as a name and routes correctly anyway. */
+type AvailabilityRow = Readonly<{
+  id: string; name: string; activation: "action" | "bonus-action" | "reaction" | "other";
+  available: boolean; usesRemaining: number | null; builtin?: boolean;
+  description?: string; attackBonus?: number | null; reachFeet?: number | null; rangeFeet?: number | null;
+  rangeNormalFeet?: number | null; attackCount?: number | null; saveAbility?: string | null; saveDc?: number | null;
+  damage?: ReadonlyArray<{ formula: string; type: string }>; usesLimit?: number | null;
+  usesPer?: ContentActionSummary["usesPer"]; usesPool?: string | null; requiresEffectTag?: string | null;
+  multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
+  reaction?: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null;
+}>;
+
+/** The wire row in the shape every action surface here already speaks. */
+function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
+  return {
+    id: row.id, name: row.name, activation: row.activation, description: row.description ?? "",
+    attackBonus: row.attackBonus ?? null, reachFeet: row.reachFeet ?? null, rangeFeet: row.rangeFeet ?? null,
+    rangeNormalFeet: row.rangeNormalFeet ?? null, saveAbility: row.saveAbility ?? null, saveDc: row.saveDc ?? null,
+    damage: row.damage ?? [], area: null, attackCount: row.attackCount ?? null,
+    usesLimit: row.usesLimit ?? null, usesPer: row.usesPer ?? null, usesRecharge: null, usesPool: row.usesPool ?? null,
+    requiresEffectTag: row.requiresEffectTag ?? null, multiattack: row.multiattack ?? null,
+    grants: false, reaction: row.reaction ?? null
+  };
+}
 const d20 = (bonus: number) => bonus === 0 ? "1d20" : `1d20 ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 const titleCase = (value: string) => value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 const formatChallenge = (rating: number) => rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
-const titleizeSkill = (id: string) => id.split("-").map(titleCase).join(" ");
 const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "item";
 /** Best-effort per-browser preference storage for the sheet's roll settings (private-mode safe). */
 const readSetting = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeSetting = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable; setting stays in-session */ } };
 const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
-/** SRD governing ability for each of the 18 skills (drives the read-only skill bonus). */
-const SKILL_ABILITY: Record<string, (typeof ABILITIES)[number]> = {
-  acrobatics: "dex", "animal-handling": "wis", arcana: "int", athletics: "str", deception: "cha",
-  history: "int", insight: "wis", intimidation: "cha", investigation: "int", medicine: "wis",
-  nature: "int", perception: "wis", performance: "cha", persuasion: "cha", religion: "int",
-  "sleight-of-hand": "dex", stealth: "dex", survival: "wis"
-};
-const ALL_SKILLS = Object.keys(SKILL_ABILITY).sort();
+/** One skill row on the sheet: which ability governs its check comes from the catalog, never code. */
+type SheetSkill = Readonly<{ id: string; name: string; ability: (typeof ABILITIES)[number] | null }>;
 
 type SrdExtension = Partial<{
   challengeRating: number; type: string; alignment: string; armorDetail: string | null;
@@ -202,7 +235,15 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   const [profDraft, setProfDraft] = useState<{ saves: string[]; skills: Record<string, "proficient" | "expertise"> }>({ saves: [], skills: {} });
-  const [idDraft, setIdDraft] = useState({ className: "", subclass: "", level: 1, race: "", background: "" });
+  // One draft row per class the character HAS (multiclass is decision #2 of the builder packet), not
+  // just the first. `id` is sticky: a row loaded from the sheet keeps its stored class id even when
+  // the name is retyped, so fixing a typo edits that class instead of minting a second one; a row the
+  // user adds here has no id yet and gets one slugified from its name on save. `hitDie` rides along
+  // untouched (nothing on this sheet edits it) so the multiclass Hit-Dice pool survives an identity edit.
+  type ClassDraft = { key: string; id: string | null; name: string; subclass: string; level: number; hitDie?: "d4" | "d6" | "d8" | "d10" | "d12" };
+  const blankClassDraft = (): ClassDraft => ({ key: newId(), id: null, name: "", subclass: "", level: 1 });
+  const [idDraft, setIdDraft] = useState<{ classes: ClassDraft[]; race: string; background: string }>({ classes: [], race: "", background: "" });
+  const editClassDraft = (key: string, patch: Partial<ClassDraft>) => setIdDraft((draft) => ({ ...draft, classes: draft.classes.map((row) => row.key === key ? { ...row, ...patch } : row) }));
   // Roll-entry settings (feedback #8), remembered per browser: "digital" click-to-roll vs "manual" (you
   // type a physical die), and for manual d20s whether the bonus is auto-added or already in your total.
   // The one per-browser dice-input preference, shared with every other roll surface (saves, attacks, the
@@ -243,6 +284,15 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const { prompt, dialog } = usePrompt();
   // SRD spell reference (session-cached): supplies the base/upcast damage the "cast at" control auto-applies.
   const spellRef = useSpellReference();
+  // The skills the sheet lists, and the ability each check uses, come from the CATALOG (session-cached
+  // like the spell reference). This replaces the hardcoded 18-skill SKILL_ABILITY table, which meant a
+  // homebrew skill needed a code edit to be rollable - the named anti-pattern in architecture
+  // principle 3. Ordering is by name from the data; a row whose ability the bundle never set shows no
+  // bonus rather than a wrong one.
+  const skillCatalog = useSkillCatalog();
+  const sheetSkills: readonly SheetSkill[] = [...skillCatalog.items]
+    .map((skill) => ({ id: skill.id, name: skill.name, ability: (ABILITIES as readonly string[]).includes(skill.ability ?? "") ? skill.ability as SheetSkill["ability"] : null }))
+    .sort((left, right) => left.name.localeCompare(right.name));
   const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
   // Tap-to-roll: the server already lets a player roll for their own claimed actor (GM for anyone);
   // the roll lands in the shared dice history like any other roll. Attacks roll to-hit/damage as dice;
@@ -293,16 +343,37 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
     beginTargeting(summaryOfOwnAction(action), actor.id);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
-  // The player's OWN stat-block action that an equipped weapon (matched by name) or a spell (matched by its
-  // linked actionId) resolves as - but only when it's actually server-resolvable (has an attack, a save, or
-  // damage). null falls back to the loose quick-roll. Only definition actions carry a server actionId, so an
-  // inventory-only weapon or a utility spell with no combat action stays a plain roll.
+  // The player's OWN action that an equipped weapon (matched by name) or a spell (matched by its linked
+  // actionId) resolves as - but only when it's actually server-resolvable (has an attack, a save, or
+  // damage). null falls back to the loose quick-roll.
+  //
+  // `definition.actions` IS NOT THE WHOLE LIST any more. The server derives an action per equipped
+  // weapon, per charged item and per item-cast spell, keyed `item-<inventory id>`, and folds the
+  // standing riders into its numbers - a +1 sword's to-hit is +1 higher THERE and nowhere else. Looking
+  // only in the definition returned null for exactly those items, and the caller fell back to
+  // `rollD20(wa.toHit)`, which recomputes a to-hit on the CLIENT from base weapon stats with no rider
+  // term. The magic sword then rolled as a mundane one and nothing on screen looked wrong. That is a
+  // server-authority violation by omission (CLAUDE.md rule 2), reached through a fallback that was
+  // correct before items could carry riders.
+  //
+  // So the server's own list is consulted too (`serverActions`, below). Only its ID travels - the whole
+  // resolution, including every rider, happens server-side - so the shape handed to the targeting
+  // session carries the item's printed numbers for the preview line and the SERVER's action id.
   const structuredActionFor = (opts: { actionId?: string; name?: string }): ActorDefinition["actions"][number] | null => {
     if (!definition) return null;
     const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const match = (opts.actionId ? definition.actions.find((candidate) => candidate.id === opts.actionId) : undefined)
       ?? (opts.name ? definition.actions.find((candidate) => norm(candidate.name) === norm(opts.name!)) : undefined);
     return match && (match.attack || match.save || match.damage.length > 0) ? match : null;
+  };
+  /** The SERVER's own action for this weapon, if it derived one. Name-matched, because an inventory
+      row and its derived action share a name and nothing else the client can see. */
+  const serverActionFor = (name: string): ContentActionSummary | null => {
+    const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const found = serverActions.find((candidate) => norm(candidate.name) === norm(name));
+    // A definition action is already reachable through `structuredActionFor`; this is only for the
+    // derived ones, which no other client path can find.
+    return found && !definition?.actions.some((candidate) => candidate.id === found.id) ? found : null;
   };
   // In "inline" mode the picker + result render in the runner mounted in the Actions section; when an attack is
   // tapped from another part of the sheet (an equipped weapon, a spell) bring that runner into view so the
@@ -312,6 +383,51 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   useEffect(() => {
     if (effectiveAttackMode === "inline" && targetingSession?.attackerId === actor.id) runnerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [effectiveAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
+
+  /**
+   * The actor's EFFECTIVE action list, from the server, refreshed whenever the loadout could have
+   * moved. Read-only and already role-scoped (`actor:available-actions` lets the GM ask about anyone
+   * and a player only about their own claimed actor), so it adds no surface.
+   *
+   * This list is the ONLY place an item-derived action exists: `effectiveActions` synthesises one per
+   * equipped weapon, charged item and item-cast spell, and `definition.actions` - the immutable base -
+   * contains none of them. An Amulet of Message's cast is not a thing the sheet can find any other
+   * way. Its numbers already carry the standing riders of what is equipped and attuned, because the
+   * server read them off that same effective list.
+   *
+   * They are DISPLAY values. Every roll below sends the `id` and lets the server recompute
+   * (CLAUDE.md rule 2), so what is previewed and what is rolled are two reads of one function.
+   */
+  const [serverActions, setServerActions] = useState<readonly ContentActionSummary[]>([]);
+  /**
+   * THE SHEET'S NUMBERS, from the server. Every chip below reads this instead of recomputing.
+   *
+   * It has to be re-asked on more than the loadout: `deriveEquipment` reads `actor.effects`,
+   * `actor.conditions` and `actor.hp` too (a "while raging" or "while bloodied" rider), so keying
+   * the refetch on inventory alone would serve a stale bonus the moment a condition changed - the
+   * same stale-cache trap `deriveEquipment`'s own comment refuses to fall into.
+   */
+  const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
+  const loadoutSignature = [
+    (actor.inventory ?? []).map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`).join(","),
+    (actor.conditions ?? []).map((condition) => typeof condition === "string" ? condition : condition.id).join(","),
+    (actor.effects ?? []).map((effect) => effect.id).join(","),
+    "kind" in actor.hp ? (actor.hp.kind === "exact" ? String(actor.hp.current) : actor.hp.kind) : String(actor.hp.current)
+  ].join("|");
+  useEffect(() => {
+    if (!definitionId) { setServerActions([]); setDerived(null); return; }
+    let live = true;
+    socket.emit("actor:available-actions", { actorId: actor.id }, (result: { ok: boolean; actions?: readonly AvailabilityRow[]; derived?: ActorDerivedSheet }) => {
+      // A failure is silent on purpose: every caller below already has a working fallback, and an
+      // error banner for a lookup the GM did not ask for would be noise.
+      if (!live || !result.ok) return;
+      if (result.actions) setServerActions(result.actions.filter((row) => !row.builtin).map(summaryOfAvailability));
+      // Absent only when talking to an older server; the pre-answer fallback covers that.
+      if (result.derived) setDerived(result.derived);
+    });
+    return () => { live = false; };
+  }, [actor.id, definitionId, loadoutSignature]);
+  const derivedAbility = (ability: (typeof ABILITIES)[number]) => derived?.abilities.find((row) => row.ability === ability) ?? null;
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
@@ -336,8 +452,22 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   const preparedIds = new Set<string>(actor.preparedSpellIds ?? []);
   const liveSlotRemaining = new Map<number, number>((actor.spellSlots ?? []).map((slot) => [slot.level, slot.remaining]));
   const pact = actor.pactSlots ?? null;
-  const spellDc = spellcasting && definition ? (spellcasting.saveDc ?? spellSaveDc(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
-  const spellAtk = spellcasting && definition ? (spellcasting.attackBonus ?? spellAttackBonus(definition.abilityScores[spellcasting.ability], definition.proficiencyBonus)) : null;
+  // Caster numbers go through `resolveSpellcasting` - THE documented resolution order (per-class
+  // entry by classId, then the lone-entry shortcut, then the top-level fields). Reading
+  // `spellcasting.ability` directly, as this did, showed a Paladin/Wizard ONE save DC for both
+  // spell lists. One row per casting class; a single-class or legacy sheet still renders one.
+  const casterEntries = spellcasting?.classes ?? [];
+  const casterRows = (definition && spellcasting
+    ? (casterEntries.length > 0 ? casterEntries.map((entry) => entry.classId) : [undefined])
+    : []
+  ).flatMap((classId) => {
+    const resolved = resolveSpellcasting(spellcasting, classId);
+    if (!resolved) return [];
+    const dc = resolved.saveDc ?? spellSaveDc(definition!.abilityScores[resolved.ability], definition!.proficiencyBonus);
+    const attack = resolved.attackBonus ?? spellAttackBonus(definition!.abilityScores[resolved.ability], definition!.proficiencyBonus);
+    const name = classId ? character?.classes?.find((entry) => entry.id === classId)?.name ?? titleCase(classId) : null;
+    return [{ key: classId ?? "primary", name, ability: resolved.ability, dc, attack }];
+  });
   // "Cast at" support: index the SRD spell data by id, and the character's slot pools by level.
   const spellIndex = new Map(spellRef.map((entry) => [entry.id, entry]));
   const slotMaxByLevel = new Map<number, number>((spellcasting?.slots ?? []).map((slot) => [slot.level, slot.max]));
@@ -393,9 +523,24 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         const abilityMod = modifierOf(definition.abilityScores[weapon.rangeFeet != null ? "dex" : "str"]);
         const toHit = abilityMod + definition.proficiencyBonus;
         const damageFormula = abilityMod === 0 ? weapon.damageDice : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
-        return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet };
+        // ACTIVE, not merely magical: riders apply while equipped, and while ATTUNED as well when the
+        // item asks for it. An unattuned magic weapon still swings - it just swings mundane - so its
+        // printed numbers are exactly right and must not be second-guessed. Same distinction the
+        // server draws; drawing a different one here is how the two get to disagree.
+        const active = item.magic?.isMagic === true && (item.magic.attunementRequired !== true || item.attuned === true);
+        return { id: `equip-${item.id}`, name: item.name, toHit, damageFormula, damageType: weapon.damageType, rangeFeet: weapon.rangeFeet, active };
       })
     : [];
+  /** Everything the loadout added that the stat block does not have — a wand's charge, an amulet's
+      cast, a magic weapon's swing. An action a player cannot see is an action they cannot use. */
+  const derivedActions = serverActions.filter((row) => !definition?.actions.some((candidate) => candidate.id === row.id));
+  /** The derived rows that are NOT one of the equipped-weapon entries above — a wand's charge, an
+      amulet's cast, an item-granted Uncanny Dodge. Matched out by name, the same key the weapon rows
+      are matched on, so one action is never drawn twice. */
+  const itemActions = derivedActions.filter((row) => {
+    const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return !equippedWeaponActions.some((wa) => norm(wa.name) === norm(row.name));
+  });
   // Add-from-catalog: the server upserts by id, so incrementing an existing stack means resending the
   // whole item with quantity+1 (preserving its equipped/attuned state); a new pick starts at quantity 1
   // and carries the catalog's category/weight/description so the sheet can group and describe it.
@@ -431,19 +576,41 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
   };
   const toggleSave = (ability: string) => { const next = { ...profDraft, saves: profDraft.saves.includes(ability) ? profDraft.saves.filter((entry) => entry !== ability) : [...profDraft.saves, ability] }; setProfDraft(next); persistProficiencies(next); };
   const cycleSkill = (id: string) => { const current = profDraft.skills[id]; const tier = current === undefined ? "proficient" : current === "proficient" ? "expertise" : undefined; const skills = { ...profDraft.skills }; if (tier) skills[id] = tier; else delete skills[id]; const next = { ...profDraft, skills }; setProfDraft(next); persistProficiencies(next); };
-  const openIdEditor = () => { const klass = character?.classes[0]; setIdDraft({ className: klass?.name ?? "", subclass: klass?.subclass?.name ?? "", level: klass?.level ?? 1, race: character?.race?.name ?? "", background: character?.background?.name ?? "" }); setEditMode("identity"); };
-  const saveIdentity = () => { const name = idDraft.className.trim(); const classes = name ? [{ id: slugify(name), name, ...(idDraft.subclass.trim() ? { subclass: { id: slugify(idDraft.subclass), name: idDraft.subclass.trim() } } : {}), level: idDraft.level }] : []; const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
-    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as proficiencies).
-    if (definitionId && definition) { const nextDef = { ...definition, character: next }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
+  const openIdEditor = () => {
+    const rows = (character?.classes ?? []).map((klass, index) => ({ key: `${klass.id}-${index}`, id: klass.id, name: klass.name, subclass: klass.subclass?.name ?? "", level: klass.level, hitDie: klass.hitDie }));
+    setIdDraft({ classes: rows.length > 0 ? rows : [blankClassDraft()], race: character?.race?.name ?? "", background: character?.background?.name ?? "" });
+    setEditMode("identity");
+  };
+  const saveIdentity = () => {
+    const classes = idDraft.classes.filter((row) => row.name.trim().length > 0).map((row) => ({
+      id: row.id ?? slugify(row.name), name: row.name.trim(),
+      ...(row.subclass.trim() ? { subclass: { id: slugify(row.subclass), name: row.subclass.trim() } } : {}),
+      level: row.level,
+      ...(row.hitDie ? { hitDie: row.hitDie } : {})
+    // Class id is the key the server merges rows on, so two rows that resolve to the same id (an
+    // added row retyped to match an existing class) must not both ship - the first one wins.
+    })).filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index);
+    const next = { classes, feats: character?.feats ? [...character.feats] : [], ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}), ...(idDraft.background.trim() ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } } : {}) };
+    // Keep the GM's cached definition in step so the edit shows immediately (v6 #6, same staleness as
+    // proficiencies). Spread over the STORED identity, not a bare replacement, so the optimistic copy
+    // mirrors the server's carry-forward merge (the builder's `choices` ledger stays put locally too).
+    if (definitionId && definition) { const nextDef = { ...definition, character: { ...character, ...next } }; sheetCache.set(definitionId, nextDef); setFetched(nextDef); }
     setBusy(true); socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => { ack(result); if (result.ok) setEditMode(null); }); };
 
   // The sheet's own scrolling content (one column of the workspace below). Identity + roll settings now
   // live in the fixed header/rollbar; only the identity EDIT FORM stays inline in the scroll.
   const sheetScroll = (<div className="sheet-scroll">
       {editMode === "identity" && <div className="sheet-editor sheet-id-editor">
-          <label>Class<input type="text" value={idDraft.className} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, className: event.target.value }))} /></label>
-          <label>Subclass<input type="text" value={idDraft.subclass} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, subclass: event.target.value }))} /></label>
-          <label>Level<input type="number" min="1" max="20" value={idDraft.level} onChange={(event) => setIdDraft((draft) => ({ ...draft, level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) }))} /></label>
+          {/* Every class the character has gets its own Class/Subclass/Level trio - a multiclass sheet
+              is edited whole, so saving can never delete the classes this form didn't render. The
+              labels wrap in the existing flex row, so extra classes stay usable on a phone. */}
+          {idDraft.classes.map((row, index) => { const n = idDraft.classes.length > 1 ? ` ${index + 1}` : ""; return <Fragment key={row.key}>
+            <label>Class{n}<input type="text" value={row.name} maxLength={60} onChange={(event) => editClassDraft(row.key, { name: event.target.value })} /></label>
+            <label>Subclass{n}<input type="text" value={row.subclass} maxLength={60} onChange={(event) => editClassDraft(row.key, { subclass: event.target.value })} /></label>
+            <label>Level{n}<input type="number" min="1" max="20" value={row.level} onChange={(event) => editClassDraft(row.key, { level: Math.max(1, Math.min(20, Math.floor(Number(event.target.value) || 1))) })} /></label>
+          </Fragment>; })}
+          {/* The schema allows up to four classes; dropping one is a respec, which the builder owns. */}
+          {idDraft.classes.length < 4 && <Button size="sm" variant="ghost" onClick={() => setIdDraft((draft) => ({ ...draft, classes: [...draft.classes, blankClassDraft()] }))}>Add a class</Button>}
           <label>Race<input type="text" value={idDraft.race} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, race: event.target.value }))} /></label>
           <label>Background<input type="text" value={idDraft.background} maxLength={60} onChange={(event) => setIdDraft((draft) => ({ ...draft, background: event.target.value }))} /></label>
           <Button size="sm" disabled={busy} onClick={saveIdentity}>Save</Button>
@@ -473,8 +640,11 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         <div className="sheet-abilities">
           {ABILITIES.map((ability) => {
             const score = definition.abilityScores[ability];
-            const mod = modifierOf(score);
-            const withProf = mod + definition.proficiencyBonus;
+            // The server's numbers when it has answered; its own arithmetic only until then. The
+            // difference is item `check-bonus` riders, which the client cannot see (rule 2).
+            const row = derivedAbility(ability);
+            const mod = row?.check ?? modifierOf(score);
+            const withProf = row?.checkWithProficiency ?? (modifierOf(score) + definition.proficiencyBonus);
             return <div key={ability} className="sheet-ability">
               <span>{ability.toUpperCase()}</span>
               <strong>{score}</strong>
@@ -500,24 +670,28 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             ? <div className="sheet-editor">
                 <p className="sheet-editor-hint">Changes save as you go. Tap a save to toggle it; tap a skill to cycle proficient → expertise → none. Press <strong>Done</strong> when finished.</p>
                 <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => <button type="button" key={ability} className={`sheet-prepare${profDraft.saves.includes(ability) ? " is-prepared" : ""}`} disabled={busy} onClick={() => toggleSave(ability)}>{ability.toUpperCase()}</button>)}</div>
-                <ul className="sheet-skill-list sheet-skill-edit">{ALL_SKILLS.map((id) => { const tier = profDraft.skills[id]; return <li key={id}><span>{titleizeSkill(id)}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(id)}>{tier ?? "—"}</button></li>; })}</ul>
+                <ul className="sheet-skill-list sheet-skill-edit">{sheetSkills.map((skill) => { const tier = profDraft.skills[skill.id]; return <li key={skill.id}><span>{skill.name}</span><button type="button" className={`sheet-prepare${tier ? " is-prepared" : ""}`} disabled={busy} onClick={() => cycleSkill(skill.id)}>{tier ?? "—"}</button></li>; })}</ul>
               </div>
             : <>
-                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const isProf = proficiencies?.saves.includes(ability) ?? false; const bonus = saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
+                <div className="sheet-roll-row"><span className="sheet-roll-label">Saves</span>{ABILITIES.map((ability) => { const row = derivedAbility(ability); const isProf = row?.saveProficient ?? proficiencies?.saves.includes(ability) ?? false; const bonus = row?.save ?? saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf); const fromItems = row?.saveFromItems ?? 0; return <button type="button" key={ability} className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`} disabled={rolling} title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}${fromItems !== 0 ? ` - includes ${signed(fromItems)} from your equipment` : ""}`} onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}>{ability.toUpperCase()} {signed(bonus)}</button>; })}</div>
                 <ul className="sheet-skill-list sheet-skill-cols">
-                  {ALL_SKILLS.map((id) => { const ability = SKILL_ABILITY[id]; const tier = proficiencies?.skills.find((skill) => skill.id === id)?.proficiency; const bonus = skillBonus(definition.abilityScores[ability], definition.proficiencyBonus, tier ?? "none"); return <li key={id}>
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${titleizeSkill(id)}`} onClick={() => void rollD20(bonus, "check", `${titleizeSkill(id)} check`)}>{signed(bonus)}</button>
-                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"} aria-label={tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
-                    <span className="sheet-skill-name">{titleizeSkill(id)} <em>{ability.toUpperCase()}</em></span>
+                  {sheetSkills.map((skill) => { const row = derived?.skills.find((entry) => entry.id === skill.id) ?? null; const baseTier = proficiencies?.skills.find((entry) => entry.id === skill.id)?.proficiency; const effective = row?.tier ?? baseTier ?? "none"; const tier = effective === "none" ? undefined : effective; const sources = row?.sources ?? []; const bonus = row ? row.bonus : (skill.ability ? skillBonus(definition.abilityScores[skill.ability], definition.proficiencyBonus, baseTier ?? "none") : null); return <li key={skill.id}>
+                    {bonus === null
+                      ? <span className="sheet-roll-chip" title={`${skill.name} names no governing ability, so it has no rollable bonus`}>—</span>
+                      : <button type="button" className="sheet-roll-chip" disabled={rolling} title={`Roll ${skill.name}`} onClick={() => void rollD20(bonus, "check", `${skill.name} check`)}>{signed(bonus)}</button>}
+                    <span className={`sheet-prof-dot${tier === "expertise" ? " expertise" : tier === "proficient" ? " proficient" : ""}`} title={`${tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}${sources.length > 0 ? ` (${sources.join(", ")})` : ""}`} aria-label={`${tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient"}${sources.length > 0 ? ` from ${sources.join(", ")}` : ""}`}>{tier === "expertise" ? "E" : tier === "proficient" ? "P" : ""}</span>
+                    <span className="sheet-skill-name">{skill.name} {skill.ability && <em>{skill.ability.toUpperCase()}</em>}</span>
                   </li>; })}
                 </ul>
               </>}
         </section>}
         {spellcasting && <section className="sheet-section"><h3>Spells</h3>
           <div className="sheet-spellcast-fields">
-            <div className="sheet-spellcast-field"><span>Caster</span><strong>{spellcasting.ability.toUpperCase()}</strong></div>
-            <div className="sheet-spellcast-field"><span>Save DC</span><strong>{spellDc ?? "-"}</strong></div>
-            {spellAtk !== null && <div className="sheet-spellcast-field"><span>Spell atk</span><strong>{signed(spellAtk)}</strong></div>}
+            {casterRows.map((row) => <Fragment key={row.key}>
+              <div className="sheet-spellcast-field"><span>{row.name ? `${row.name} caster` : "Caster"}</span><strong>{row.ability.toUpperCase()}</strong></div>
+              <div className="sheet-spellcast-field"><span>Save DC</span><strong>{row.dc}</strong></div>
+              <div className="sheet-spellcast-field"><span>Spell atk</span><strong>{signed(row.attack)}</strong></div>
+            </Fragment>)}
           </div>
           {(() => {
             type Spell = (typeof spellcasting.spells)[number];
@@ -580,7 +754,7 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
         {extension.traits && extension.traits.length > 0 && <section className="sheet-section"><h3>Traits</h3>
           {extension.traits.map((trait) => <p key={trait.name} className="sheet-entry"><strong>{trait.name}.</strong> <RichText text={trait.description} /></p>)}
         </section>}
-        {(definition.actions.length > 0 || equippedWeaponActions.length > 0) && <section className="sheet-section"><h3>Actions</h3>
+        {(definition.actions.length > 0 || equippedWeaponActions.length > 0 || itemActions.length > 0) && <section className="sheet-section"><h3>Actions</h3>
           {(() => {
             type ActionT = (typeof definition.actions)[number];
             const renderAction = (action: ActionT) => { const atk = action.attack; return <div key={action.id} className="sheet-entry">
@@ -601,17 +775,51 @@ export function CharacterSheet({ actor, role, state, standalone = false, embedde
             // actions here; the loose weapon/spell chips below are hidden so an action isn't offered twice.
             const inlineRunner = structuredAttacks && effectiveAttackMode === "inline";
             return <>
-              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
+              {inlineRunner && liveCombat && <div ref={runnerRef}><PlayerActionRunner actorId={actor.id} definition={definition} extraActions={derivedActions} revision={liveCombat.revision} rollMode={rollMode} bonusMode={bonusMode} playerDamageMode={liveCombat.playerDamageMode} targets={liveCombat.targets} /></div>}
               {(equippedWeaponActions.length > 0 || (!inlineRunner && weaponActions.length > 0)) && <div className="sheet-action-group">
                 {(inlineRunner ? equippedWeaponActions.length > 0 : hasSpellActions) && <h4 className="sheet-action-head">{inlineRunner ? "Equipped weapons" : "Weapon & other"}</h4>}
-                {equippedWeaponActions.map((wa) => <div key={wa.id} className="sheet-entry">
-                  <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}</span></p>
-                  <div className="sheet-roll-row">
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => { const structured = structuredAttacks ? structuredActionFor({ name: wa.name }) : null; if (structured) routeAttack(structured); else void rollD20(wa.toHit, "attack", `${wa.name} to hit`); }}>{signed(wa.toHit)} to hit</button>
-                    <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(wa.damageFormula, "damage", `${wa.name} damage`)}>{wa.damageFormula}</button>
-                  </div>
-                </div>)}
+                {equippedWeaponActions.map((wa) => {
+                  /* THE SERVER'S numbers, not ours, whenever it has them.
+                     `equippedWeaponActions` recomputes a to-hit on the CLIENT from base weapon stats
+                     and an ability modifier, with no rider term anywhere in it — so a +1 sword read
+                     +5 and rolled +5 while the server resolved +6, and nothing on screen looked
+                     wrong. The derived row carries the folded riders in both `attackBonus` and
+                     `damage[]`, so displaying it fixes the number AND the roll at once. The client
+                     falls back to its own arithmetic only when the server derived nothing (no
+                     definition, an unresolvable id), where the printed stats are all that exists. */
+                  const srv = serverActionFor(wa.name);
+                  const toHit = srv?.attackBonus ?? wa.toHit;
+                  const damage = srv && srv.damage.length > 0 ? srv.damage : [{ formula: wa.damageFormula, type: wa.damageType }];
+                  return <div key={wa.id} className="sheet-entry">
+                    <p><strong>{wa.name}.</strong> <span className="sheet-weapon-meta">Equipped weapon · {wa.damageType}{wa.rangeFeet != null ? ` · range ${wa.rangeFeet} ft` : ""}{wa.active ? " · Magic" : ""}</span></p>
+                    <div className="sheet-roll-row">
+                      <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => {
+                        const structured = structuredAttacks ? structuredActionFor({ name: wa.name }) : null;
+                        if (structured) { routeAttack(structured); return; }
+                        // Only the ID travels; the roll, every rider and the damage are resolved server-side.
+                        if (srv) { routeAttack({ ...EMPTY_ACTION, id: srv.id, name: srv.name, attack: { bonus: toHit }, damage: [...damage] }); return; }
+                        void rollD20(toHit, "attack", `${wa.name} to hit`);
+                      }}>{signed(toHit)} to hit</button>
+                      {damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${wa.name} damage`)}>{part.formula}</button>)}
+                    </div>
+                  </div>;
+                })}
                 {!inlineRunner && weaponActions.map(renderAction)}
+              </div>}
+              {/* Actions an EQUIPPED ITEM added. They exist nowhere in the stat block, so without
+                  this the amulet a player attuned casts nothing they can reach. The runner owns them
+                  on the player's own turn (`inlineRunner`); this is every other moment. */}
+              {!inlineRunner && itemActions.length > 0 && <div className="sheet-action-group">
+                <h4 className="sheet-action-head">From your items</h4>
+                {itemActions.map((row) => <div key={row.id} className="sheet-entry">
+                  <p><strong>{row.name}.</strong> <RichText text={row.description} />
+                    {row.usesLimit !== null && <span className="sheet-weapon-meta"> · {row.usesLimit} {row.usesLimit === 1 ? "charge" : "charges"}{row.usesPer ? ` per ${row.usesPer.replace(/-/g, " ")}` : ""}</span>}
+                  </p>
+                  {(row.attackBonus !== null || row.damage.length > 0) && <div className="sheet-roll-row">
+                    {row.attackBonus !== null && <button type="button" className="sheet-roll-chip" disabled={rolling} onClick={() => { if (structuredAttacks) routeAttack({ ...EMPTY_ACTION, id: row.id, name: row.name, attack: { bonus: row.attackBonus! }, damage: [...row.damage] }); else void rollD20(row.attackBonus!, "attack", `${row.name} to hit`); }}>{signed(row.attackBonus)} to hit</button>}
+                    {row.damage.map((part, index) => <button type="button" key={index} className="sheet-roll-chip" disabled={rolling} onClick={() => void rollFlat(part.formula, "damage", `${row.name} damage`)}>{part.formula}</button>)}
+                  </div>}
+                </div>)}
               </div>}
               {!inlineRunner && hasSpellActions && <div className="sheet-action-group">
                 <h4 className="sheet-action-head">Spell actions</h4>

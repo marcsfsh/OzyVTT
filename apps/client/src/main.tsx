@@ -5,6 +5,7 @@ import "@vtt/ui/styles.css";
 import "./styles.css";
 import { ActorRoster, YouArePlaying } from "./actors/ActorRoster";
 import { PartyRosterTab } from "./actors/PartyRosterTab";
+import { CharacterBuilder } from "./builder/CharacterBuilder";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { Notice, useConfirm, type NoticeMessage } from "./components/feedback";
 import { DicePanel } from "./dice/DicePanel";
@@ -15,6 +16,7 @@ import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { CodexWorkspace } from "./codex/CodexWorkspace";
 import { PlayerCodex } from "./codex/PlayerCodex";
+import { HomebrewPanel } from "./homebrew/HomebrewPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { SceneGallery } from "./scenes/SceneGallery";
 import { setPreviewScene, usePreviewScene } from "./scenes/scenePreview";
@@ -35,7 +37,7 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-type GmTab = "scenes" | "table" | "roster" | "codex" | "viewer" | "replay" | "setup";
+type GmTab = "scenes" | "table" | "roster" | "codex" | "homebrew" | "viewer" | "replay" | "setup";
 // v4 #10: reordered to Encounter | Scenes | Character Roster | ... | VTT Setup; Viewer is kept (it drives
 // the shared screen) and placed after Character Roster.
 const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
@@ -43,6 +45,9 @@ const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "scenes", label: "Scenes" },
   { id: "roster", label: "Character Roster" },
   { id: "codex", label: "Codex" },
+  // Immediately after Codex: the two GM authoring surfaces sit adjacent, and Homebrew
+  // is not the eighth-and-furthest label in the tab bar's scroll container.
+  { id: "homebrew", label: "Homebrew" },
   { id: "viewer", label: "Viewer" },
   { id: "replay", label: "Replays" },
   { id: "setup", label: "VTT Setup" }
@@ -61,6 +66,9 @@ function App() {
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [playerCodexOpen, setPlayerCodexOpen] = useState(false);
+  // The character builder is a FULL PAGE (decision 4), so it replaces the app body rather than
+  // floating over it in a modal — the shell's tabs and roster would otherwise scroll behind it.
+  const [builderOpen, setBuilderOpen] = useState(false);
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const previewSceneId = usePreviewScene();
   const [scenePrepOpen, setScenePrepOpen] = useState(false);
@@ -270,15 +278,24 @@ function App() {
       <Button variant="primary" onClick={bootstrapped ? loginGm : bootstrap} disabled={busy || !password}>{busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}{!busy && <span className="nav-arrow" aria-hidden="true">→</span>}</Button>
       <Button variant="ghost" className="link" onClick={() => { setNotice(null); setMode("home"); }}>Back</Button>
     </section>}
-    {mode !== "home" && state && <>
+    {mode === "gm" && gmToken && state && builderOpen && <CharacterBuilder
+      state={state}
+      sessionKey="gm"
+      /* The builder covers the viewport, so the connection banner above is painted over. It gates
+         its own last step on this instead. */
+      connection={connection}
+      onClose={() => setBuilderOpen(false)}
+      onCreated={(name) => setNotice({ tone: "success", text: `${name} joined the roster — ready to claim.` })}
+    />}
+    {mode !== "home" && state && !builderOpen && <>
       {/* The roster is a lobby surface (claiming characters, pre-fight prep). During a live encounter it
           duplicates the combat tracker at several times the size, so it collapses behind one "Character
           Roster" disclosure - the arrow is the only toggle (v5 #6.1) - still one tap away mid-fight. */}
       {/* v5 #7: a player's own character is no longer inside the roster; it rides the always-shown
           YouArePlaying bar below, so the roster can collapse for both roles without hiding their identity. */}
       {state.combat.active
-        ? <details className="roster-collapsed"><summary>Character Roster</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} /></details>
-        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView } : { role: "player" as const, state: state as PlayerView })} />}
+        ? <details className="roster-collapsed"><summary>Character Roster</summary><ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} /></details>
+        : <ActorRoster {...(mode === "gm" ? { role: "gm" as const, state: state as GmView, onCreateCharacter: () => setBuilderOpen(true) } : { role: "player" as const, state: state as PlayerView })} />}
       {mode === "player" && <YouArePlaying state={state as PlayerView} />}
 
       {mode === "gm" && <Tabs
@@ -365,7 +382,9 @@ function App() {
         activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
         onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }} /></div>}
 
-      {mode === "gm" && gmToken && showViewerPreview && <ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
+      {mode === "gm" && gmToken && gmTab === "homebrew" && <div className="anim-view"><HomebrewPanel gmToken={gmToken} /></div>}
+
+      {mode === "gm" && gmToken && showViewerPreview &&<ViewerPreviewPanel gmToken={gmToken} onClose={() => setShowViewerPreview(false)} />}
 
       {mode === "gm" && gmToken && scenePrepOpen && state && <Modal open onClose={() => setScenePrepOpen(false)} size="lg" className="scene-prep-modal" title="Scene prep" ariaLabel="Scene prep">
         <ScenePanel actors={(state as GmView).actors} selectedMap={selectedMap} mapLibrary={mapLibrary} onCreated={(sceneId) => { setScenePrepOpen(false); if (sceneId) setPendingStageSceneId(sceneId); }} onManageMaps={() => { setScenePrepOpen(false); setGmTab("scenes"); setScenesView("maps"); }} />

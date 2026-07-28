@@ -8,6 +8,106 @@ Newest first. Keep each entry to a few lines: what changed, why, and any follow-
 
 ---
 
+## 2026-07-27 — Homebrew content system (`claude/dndbeyond-sheet-importer-0k6u2e`)
+
+Eleven commits, ~15k lines. A GM can author, publish and play nine content types. Built by a staged
+team: 6 research intakes → 3 implementation plans → 3 rounds of 3 implementers → 3 adversarial QA
+passes → remediation. 923 tests.
+
+Sixteen product decisions were settled up front (own SQLite tables Codex-style; GM-only; all nine
+types; full typed riders; structured forms; duplicate AND blank slate; invalid drafts, valid publish;
+auto-namespaced ids; soft-delete; a creation-time visibility toggle; export/import; own GM tab; no
+balance guardrails). The durable engineering rules that came out of it are in `decision-log.md`.
+
+**QA is what made this work.** Five HIGH defects survived nine commits, four planning documents and
+six research intakes — and not one was found by reading. A homebrew class could not be published in
+either order (each rule waited on the other). The editor's default "add a feature" produced an
+uncreatable character. Editing a published record bypassed the publish gate entirely, silently, via
+autosave. A monster's name reached players through an imported pack id. And **no feat had ever been
+publishable** — two independent causes pointing at the same wrong key, in a type that had shipped
+three rounds earlier.
+
+Two of those lived in the seam between engineers who had each verified their own slice honestly,
+which is the argument for adversarial QA as its own stage rather than more careful implementation.
+
+Also worth remembering: a test written in round 2 and praised at the time turned out to be
+self-referential — its obligation set came from the renderer it was testing, so it could not fail.
+A different engineer found it in round 3 while working on something else, and fixing it exposed a
+pre-existing documentation hole unrelated to this project.
+
+Open items, including the largest remaining piece of approved scope (magic-item riders are not yet
+authorable — the equipment schema is `.strict()` and would reject them), are in `known-bugs.md`.
+
+## 2026-07-27 — Phase 5: all twelve SRD classes (`claude/dndbeyond-sheet-importer-0k6u2e`)
+
+The bundle had 3 of 12 classes. It now has 12, with one subclass each. The interesting part was not
+the content but discovering **why** it was missing: the open5e fixtures this package vendors ship no
+class, subclass, species, background or feat data at all, so the seven bundles that drive character
+creation were hand-authored against nothing — which is exactly where both licensing violations
+landed. Backgrounds, incidentally, were never a gap: SRD 5.2.1 licenses exactly four.
+
+Fixed by vendoring a commit-pinned CC BY 4.0 SRD 5.2.1 markdown transcription and generating from it
+(`scripts/build-class-bundle.ts`). Edition was checked before licence — a 2014-SRD transcription
+would have reintroduced the same violation class. The source is **secondary** by construction and
+earned that standing by reproducing the three hand-authored classes exactly; the generator uses them
+as its oracle and fails the build on disagreement rather than regenerating them, because they carry
+typed riders prose cannot express.
+
+Numbers were checked against the SRD, not assumed: Warlock pact slots 1@1 → 2@2 → 2@3 → 3@5 → 4@5,
+full casters 4/3/3/3/3/2/2/1/1, half casters 4/3/3/3/2, Barbarian rages 2–6, Rogue sneak attack
+1d6–10d6, Monk martial arts 1d6–1d12. Rogue's ASI levels came out [4,8,10,12,16] — the extra one at
+10 is Rogue-specific and the parser found it unprompted.
+
+**One real bug the new content exposed:** the assembly read `spellSlots` only, so a Warlock — whose
+slots are all of one level and rise by replacing it — came out with a caster block and no slots. The
+branch was unreachable until a class with pact magic existed. Fixed and pinned by a test.
+
+Two tests were pinning the incomplete state (Barbarian having no subclasses; Barbarian as the
+example of an un-authored class) and now assert the real invariant instead.
+
+`check` clean, **778 tests** (was 767), build green. Verified by creating one level-5 character of
+every class through the real server assembly: 12/12, HP correct per hit die, slots correct per
+caster type. Champion feature-level discrepancy and the prose-only-features caveat are in
+`known-bugs.md`.
+
+## 2026-07-27 — Character-builder readiness pass (`claude/dndbeyond-sheet-importer-0k6u2e`)
+
+A dedicated shipping-readiness review of the seven-step wizard, bounded to small/medium lift (deep
+system reworks explicitly out of scope). Three chains — flow/IA, density/layout, design language +
+copy — each reviewing adversarially, then implementing. Landed as `479cb80`, `5c32df9`, `584be3a`.
+
+Highest-value outcomes: one real **correctness** bug (a background silently grants skills, so
+re-picking one burned both picks and left the character a proficiency short, silently — now greyed
+with provenance); **step 4 made readable at high level** (L5: 9,545px/2,007 elements → 782px/92;
+L20: 24,222px → 1,933px) by folding answered offers to chips and stating the capacity notice once
+per grid rather than 409 times; the **step rail now means "done" rather than "visited"**; the wizard
+**stopped defaulting all three ASI improvements to +2 Strength**; and a selected choice card
+**had no keyboard focus ring at all** (a (0,4,0) glow-suppressor out-specified both the primitive's
+ring and the global `:where()` one, which also sets `outline:none`).
+
+Three times an implementer overrode its own handed plan and was right to — all recorded in the commit
+messages: refusing to disable `expertise` (would have made every Wizard L2+ uncreatable), a 3-line
+rather than 2-line clamp (2 re-cut "and 8 GP"), and a third CSS rule the plan didn't anticipate (the
+app's bare `button:hover` beat the selected state independently). Memoising the catalogs **exposed** a
+latent effect-deps bug rather than fixing a slow one.
+
+A tenth reviewer then certified the pass rather than summarising it, and **found a defect the other
+nine missed**: a Wizard 2+ could complete all seven steps and be rejected at Create, because the
+expertise step offered six skills while the server accepts only the ones the character is proficient
+in (~4-in-6 odds of dead-ending). Fixed with the **inverse** grey in `withExpertiseReach` — a second
+pass, because the server's test is a union over sources rather than a step-order accumulation — plus
+a safety valve that never greys every option. Verified by A/B through the real server assembly.
+
+The same reviewer corrected two figures on the record: step-4 arrival is **class-dependent** (Fighter
+L20 = 62 cards, Wizard L20 = **467**, not the "~306" filed), and the `.nh-step--done` 1.97:1 failure
+is the *glyph*, not the state — the marker's ring measures a passing 3.85:1 and the applicable rule
+is 1.4.11, not 1.4.3.
+
+`check` clean, 767 tests, build green. Deferred items are itemised in `known-bugs.md`; the five rules
+that came out of the pass are in `decision-log.md`. **Top follow-up:** `apps/client` and
+`packages/ui` have no tests at all, so the 767 cover none of the changed code — and `build-payload.ts`
+is pure and trivially testable.
+
 ## 2026-07-24 — Sheet open-consistency + Dice toggle (`claude/character-sheet-discovery-a14i7f`, PR #45)
 
 Three GM-reported follow-ups on how the player sheet opens. (1) The `IconButton` ✕ rode high/off-centre —

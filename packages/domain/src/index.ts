@@ -1,11 +1,39 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type EffectInstance, type EffectModifier } from "@vtt/schemas";
+import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type EffectInstance, type EffectModifier, type HitDie } from "@vtt/schemas";
+
+/** The `fromCatalog` choice-slug resolver (shared by the wizard UI and server-side character.create validation). */
+export * from "./catalog-choice.js";
 
 export { ACTOR_SCHEMA_VERSION, ActorSchema, DeathSavesSchema, EffectInstanceSchema, EffectModifierSchema, HealthDisplaySchema, type Actor, type ActorDefinition, type DeathSaves, type EffectInstance, type EffectModifier, type HealthDisplay, type HealthDisplayAudience, type HealthDisplayStyle } from "@vtt/schemas";
+/**
+ * The rider gate vocabulary, for the same reason: the homebrew authoring UI has to offer the fifteen
+ * item slots and the thirty named triggers, and the client cannot reach `@vtt/schemas`. Anything
+ * missing here gets re-typed as a hardcoded array in a `.tsx` file, and the two lists drift the
+ * first time one of them grows. `RIDER_TRIGGER_KINDS` is what lets the editor group and label them
+ * without a second opinion about which trigger is a moment.
+ */
+export {
+  ItemMagicMarkerSchema, ItemSlotSchema, RIDER_TRIGGER_KINDS, RiderTriggerSchema, RiderWhenSchema, riderLayer, toRollModes,
+  type ItemSlot, type NormalisedRollMode, type RiderTrigger, type RiderTriggerKind
+} from "@vtt/schemas";
+/**
+ * Character-sheet helpers and their types. These MUST travel through `@vtt/domain`: the client has no
+ * `@vtt/schemas` dependency, so anything missing here gets re-implemented ad hoc on the client - which
+ * is exactly how the multiclass spellcasting resolution order drifted. `resolveSpellcasting` is THE
+ * single implementation of that order; never inline a `classes[0]` fallback beside it.
+ */
+export {
+  characterChoices, resolveSpellcasting, makeHitDicePool, HitDiceEntrySchema, HitDicePoolSchema, HitDieSchema,
+  // `AbilityId` is NOT re-exported: domain already declares its own identical alias below.
+  type CharacterChoice, type ClassSpellcasting, type HitDie, type HitDiceEntry, type HitDicePool, type Spellcasting
+} from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z.object({ id: z.string().regex(/^[a-z0-9-]+$/).max(200), definition: ActorDefinitionSchema }).strict();
 export type StoredDefinition = z.infer<typeof StoredDefinitionSchema>;
+/** A player-submitted PDF import awaiting GM approval. GM-only — never in PlayerView or the viewer (ADR-0018). */
+export const PendingImportSchema = z.object({ id: z.string().max(120), name: z.string().min(1).max(120), submittedBy: z.string().max(120), definition: ActorDefinitionSchema }).strict();
+export type PendingImport = z.infer<typeof PendingImportSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
 export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "manual"]);
@@ -365,6 +393,25 @@ export const CombatStateSchema = z.object({
 });
 export type CombatState = z.infer<typeof CombatStateSchema>;
 
+/** An ability-score generation method the character builder can offer (task-packet decision 10). */
+export const BuilderAbilityMethodSchema = z.enum(["standard-array", "point-buy", "roll", "custom"]);
+export type BuilderAbilityMethod = z.infer<typeof BuilderAbilityMethodSchema>;
+/**
+ * The GM's character-builder table policy (task-packet decision 10): which ability-score methods the
+ * wizard offers, plus the GM's custom roll formula. GM-writable via `builder.set-policy`,
+ * player-READABLE (projected verbatim onto PlayerView - it holds no secrets, and a player must see
+ * it to know which methods their wizard shows). Lives top-level rather than on `combat` because
+ * character creation is campaign policy, not fight state - parking it on combat would drag it
+ * through scene park/resume and the SceneCombat shape. All four methods are allowed by default;
+ * "custom" is only actionable while `customFormula` is non-null (validated on write through
+ * `@vtt/rules-5e`'s `validateAbilityFormula` - never stored unvalidated).
+ */
+export const BuilderPolicySchema = z.object({
+  allowedAbilityMethods: z.array(BuilderAbilityMethodSchema).min(1).max(4).default(["standard-array", "point-buy", "roll", "custom"]),
+  customFormula: z.string().min(1).max(160).nullable().default(null)
+}).strict();
+export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;
+
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().nonnegative().default(0),
@@ -372,7 +419,11 @@ export const GameStateSchema = z.object({
   rolls: z.array(RollRecordSchema).default([]),
   combat: CombatStateSchema.default({ active: false, round: 1, turnActorId: null, mapAssetId: null, initiative: [], tokens: [], annotations: [] }),
   /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign, additive per ADR-0007. */
-  definitions: z.array(StoredDefinitionSchema).max(100).default([])
+  definitions: z.array(StoredDefinitionSchema).max(100).default([]),
+  /** Player-submitted PDF imports awaiting GM approval. GM-only: curated out of PlayerView (a Pick) and the viewer. Additive per ADR-0007/0018. */
+  pendingImports: z.array(PendingImportSchema).max(20).default([]),
+  /** Character-builder table policy (decision 10). GM-set, player-read; additive with a full default so older saves parse unchanged. */
+  builderPolicy: BuilderPolicySchema.default({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;
 export type ClientRole = "player" | "gm";
@@ -387,7 +438,7 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp = { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
 export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
-export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool - only on the requesting player's own claimed character. */ hitDice?: Readonly<{ die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number }>; /** Sheet resources (spell slots, prepared spells, inventory, currency) - only on the requesting player's own claimed character. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
+export type PlayerActor = Omit<Actor, "notes" | "ownerSessionId" | "hp" | "effects" | "actionUses" | "conditionImmunities" | "legendary" | "hitDice" | "healthDisplay" | "lastUsedAt" | "spellSlots" | "pactSlots" | "preparedSpellIds" | "inventory" | "currency" | "archived"> & { hp: PlayerHp; effects: PlayerEffect[]; claimStatus: "available" | "mine" | "claimed"; presence: PresenceStatus | null; /** Present only on the requesting player's own claimed character. */ definition?: ActorDefinition; /** Spent limited-use counts - only on the requesting player's own claimed character. */ actionUses?: Record<string, number>; /** Hit Point Dice pool (per-die `entries` plus the derived total summary) - only on the requesting player's own claimed character. */ hitDice?: NonNullable<Actor["hitDice"]>; /** Sheet resources (spell slots, prepared spells, inventory, currency) - only on the requesting player's own claimed character. */ spellSlots?: Actor["spellSlots"]; pactSlots?: Actor["pactSlots"]; preparedSpellIds?: Actor["preparedSpellIds"]; inventory?: Actor["inventory"]; currency?: Actor["currency"]; /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }> };
 export type PlayerInitiativeEntry = Readonly<{ actorId: string; name: string; score: number; active: boolean; health: HealthBand; /** Active condition ids + parallel display labels ("Prone", "Exhaustion 3"): public info, so players and the shared screen render the same dots from one source. */ conditionIds: readonly string[]; conditions: readonly string[] }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
@@ -395,7 +446,7 @@ export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects
 /** A player's own pending reaction prompts only; same masking rules as saves. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
 export type PlayerCombatView = Readonly<{ active: boolean; round: number; turnActorId: string | null; mapAssetId: string | null; hiddenTurn: boolean; initiative: readonly PlayerInitiativeEntry[]; tokens: readonly EncounterToken[]; annotations: readonly PlayerAnnotation[]; turn: { actionUsed: boolean; bonusActionUsed: boolean; actionInstance: { actorId: string; components: Record<string, number> } | null; turnUses: Record<string, number>; movementUsedFeet: number }; rulesMode: "strict" | "assisted" | "freeform"; rollMode: "auto" | "manual"; /** Per-table policy for a player's own hits (see CombatState.playerDamageMode); lets the player runner label the outcome ("handed to the GM" vs "applied"). The pendingDamage proposals themselves stay GM-only. */ playerDamageMode: "proposal" | "direct"; /** Public claimed-PC actorIds still owing an initiative roll - a player checks whether their own id is here to show the "Roll initiative" prompt. */ pendingInitiative: readonly string[]; /** Whether the table waits for all players' initiative rolls before turns begin (see CombatState.playerInitiativeMode). */ playerInitiativeMode: "immediate" | "wait"; underwater: boolean; reactionsUsed: readonly string[]; /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"]; pendingSaves: readonly PlayerPendingSave[]; pendingReactions: readonly PlayerPendingReaction[]; /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean }>;
-export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[] };
+export type PlayerView = Pick<GameState, "revision"> & { combat: PlayerCombatView; actors: PlayerActor[]; rolls: PlayerRollRecord[]; /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */
 export type TurnHistoryEntry = Readonly<{ index: number; kind: "turn" | "return"; label: string; revision: number; at: string }>;
@@ -408,7 +459,9 @@ export type TableEvent = Readonly<{ id: string; kind: "damage" | "heal" | "save"
 /** Which slice of the worldbuilding codex changed; the `codex:changed` ping carries no content, so it is viewer-safe - every recipient refetches only its own projected view over HTTP. */
 export type CodexChangeScope = "pages" | "maps" | "markers" | "journal";
 export type CodexChangedEvent = Readonly<{ scope: CodexChangeScope; codexRevision: number }>;
-export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; "codex:changed": (event: CodexChangedEvent) => void; }
+/** The homebrew library changed. Like `codex:changed` this carries NO content - only a revision, so every recipient refetches its own audience-filtered view over HTTP. A ping that carried the record would hand a player a GM-only draft. */
+export type HomebrewChangedEvent = Readonly<{ revision: number }>;
+export interface ServerToClientEvents { "state:updated": (state: PlayerView | GmView) => void; "system:error": (message: string) => void; "table:event": (event: TableEvent) => void; "log:entry": (entry: CombatLogEntry) => void; "codex:changed": (event: CodexChangedEvent) => void; "homebrew:changed": (event: HomebrewChangedEvent) => void; }
 export type SessionJoinResult = { ok: boolean; role?: ClientRole; sessionId?: string; token?: string; message?: string };
 export type MutationResult = { ok: boolean; revision?: number; duplicate?: boolean; message?: string; needsConfirm?: "rewrite-history" | "discard-changes"; /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
@@ -422,19 +475,143 @@ export type ContentMonsterSummary = Readonly<{ id: string; name: string; challen
 export type ContentMonstersResult = { ok: boolean; message?: string; monsters?: readonly ContentMonsterSummary[]; attribution?: string };
 /** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
 export type ContentConditionSummary = Readonly<{ id: string; name: string; description: string }>;
-export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[] };
+export type ContentConditionsResult = { ok: boolean; message?: string; conditions?: readonly ContentConditionSummary[]; /** The bundle's canonical CC BY 4.0 line (ADR-0015). The server always sends it; a surface that has to hand-write a substitute always writes a weaker one. */ attribution?: string };
 /** SRD spell reference (rules text + the header fields a card shows) for the in-app spell rules window; public information for any joined session. */
 export type ContentSpellSummary = Readonly<{ id: string; name: string; level: number; school: string; castingTime: string; rangeText: string | null; componentsText: string; duration: string; concentration: boolean; ritual: boolean; description: string; higherLevel: string | null;
+  /** Spell-list ids this spell belongs to ("wizard", "cleric", a homebrew list slug) - THE class->spell-list link the wizard's spell step filters on (paired with `ContentClassSummary.spellcasting.spellListId`). */
+  classes: readonly string[];
   /** Base damage/healing roll ("8d6"), or null for a spell that rolls nothing. Drives the sheet's "cast at" auto-roll. */
   damageRoll: string | null;
   /** Damage types for the base roll (empty for healing/none). */
   damageTypes: readonly string[];
   /** Per-slot-level upcast scaling parsed from the SRD (Fireball's 9d6 at 4th, Scorching Ray's 4 rays at 3rd): the sheet auto-applies the entry matching the chosen cast level. */
   castingOptions: ReadonlyArray<{ level: number; damageRoll: string | null; targetCount: number | null }> }>;
-export type ContentSpellsResult = { ok: boolean; message?: string; spells?: readonly ContentSpellSummary[] };
-/** One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only for those categories. */
-export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: "weapon" | "armor" | "shield" | "ammunition" | "adventuring-gear" | "tool" | "equipment-pack" | "consumable" | "focus" | "wondrous"; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
+export type ContentSpellsResult = { ok: boolean; message?: string; spells?: readonly ContentSpellSummary[]; /** The bundle's canonical CC BY 4.0 line (ADR-0015), exactly as for every other catalog read. */ attribution?: string };
+/**
+ * One addable-equipment catalog row (SRD gear/weapons/armor folded into one shape); public SRD
+ * reference the sheet's browse-and-add picker reads. The `weapon`/`armor` blocks are populated only
+ * for those categories.
+ *
+ * `category` is an OPEN SLUG, matching the catalog record and `InventoryItem.category` (which was
+ * always open). Homebrew declares "relic" or "trinket" with no wire change; a surface that groups by
+ * category must derive its groups from the data, because there is no closed list to switch on. Four
+ * values still carry mechanical meaning - "weapon", "armor" and "shield" drive AC and attack
+ * derivation, everything else is inert - so a new slug displays and stacks but derives nothing.
+ */
+export type ContentEquipmentSummary = Readonly<{ id: string; name: string; category: string; costGp: number | null; weightLb: number | null; description: string | null; weapon: Readonly<{ category: "simple" | "martial"; damageDice: string; damageType: string; rangeFeet: number | null; longRangeFeet: number | null }> | null; armor: Readonly<{ acBase: number; addDexModifier: boolean; dexModifierCap: number | null; stealthDisadvantage: boolean; strengthRequired: number | null }> | null }>;
 export type ContentEquipmentResult = { ok: boolean; message?: string; equipment?: readonly ContentEquipmentSummary[]; attribution?: string };
+
+// ---------- Character-builder catalogs ----------
+// One merged catalog per type, read-only, public SRD *rules* reference: a player builds their own
+// character, so unlike the bestiary these are readable by any joined session. Every response carries
+// the CC BY 4.0 `attribution` line the displaying surface must show (ADR-0015).
+
+/** Where a catalog record came from. Bundled SRD and GM homebrew live in ONE catalog, merged server-side, so the wizard can't tell them apart (adapters, never forks). */
+export type ContentSourceKind = "srd" | "homebrew";
+/**
+ * A class/subclass/species/background/feat feature as data - the browse-and-pick projection of the
+ * bundle's shared `FeatureRecord`: prose, the level it lands at, its grouping tags, and whether it
+ * asks the player to choose something. No feature is ever hardcoded client or server behavior;
+ * homebrew authors the same record. The structured riders (granted actions, effects, modifiers,
+ * limited uses) stay on the server-side record - the server, never the wizard, applies them.
+ */
+/**
+ * One inline option of a feature's pick, as the wizard needs to render and follow it. Carries the
+ * authored NAME (an id alone forces the client to titleize, turning `clouds-jaunt` into "Clouds
+ * Jaunt") and any SECOND-ORDER pick the option itself owes: Cleric Divine Order's "thaumaturge"
+ * grants an extra cantrip, so choosing it opens another choice. Without that nested `choice` on the
+ * wire the wizard offers Divine Order, reports the step complete, and the server refuses the build.
+ * Riders (actions, grants, modifiers, uses) deliberately stay server-side - the server applies them.
+ */
+export type ContentFeatureOptionSummary = Readonly<{ id: string; name: string; description: string; choice: ContentFeatureChoiceSummary | null }>;
+export type ContentFeatureChoiceSummary = Readonly<{ kind: string; choose: number; from: readonly string[]; fromCatalog: string | null;
+  /** Ceiling on a spell pick's level (Evocation Savant is level 2 and under; Magic Initiate is cantrips only). Null = no ceiling. WITHOUT this the wizard would offer spells the server then rejects, so it crosses the wire with the rest of the choice. */
+  maxSpellLevel: number | null;
+  /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
+  options: readonly ContentFeatureOptionSummary[] }>;
+export type ContentFeatureSummary = Readonly<{ id: string; name: string; level: number | null; description: string; tags: readonly string[]; /** The pick this feature asks for (open `kind` slug: fighting-style, skill, asi, ...), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null; /**
+ * EVERY level at which the owning class's table grants this feature - the authoritative repeat
+ * count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times, and the server's capacity
+ * is `choose x grants` (`character-build.ts` grantedClassFeatures), so a client that cannot see the
+ * repeats offers too few picks and the build is rejected at Create.
+ *
+ * The client used to infer this, and only for `asi-or-feat`, from `asiLevels`. That covered the SRD
+ * classes that existed at the time and silently under-offered for every other repeated choice - a
+ * Rogue's Expertise (levels 1 and 6) and a Sorcerer's Metamagic (2, 10, 17) are both repeats that
+ * are not ASIs, and a homebrew class may repeat any choice at all. Empty for a feature that is not
+ * granted by a class level table (species traits, feats, subclass features).
+ */
+grantedAtLevels: readonly number[] }>;
+/**
+ * ONE row of a class's printed 20-level table - the display data the wizard renders when a player
+ * previews "what do I get at level 7?": slot columns, cantrips/spells known, the prepared-spell
+ * formula, and the named class resources that grow with level (Second Wind 2 → 4, Rage 3, Sneak
+ * Attack 3d6). `null` means "this class has no such column", never zero.
+ *
+ * DISPLAY ONLY. The structured feature riders (granted actions, effects, modifiers, limited uses)
+ * stay on the server-side bundle record: the server applies them when it builds the character, so the
+ * wizard cannot become a second, divergent rules engine (CLAUDE.md rule 2).
+ */
+export type ContentClassLevelRow = Readonly<{ level: number; proficiencyBonus: number; spellSlots: readonly number[] | null; pactSlots: Readonly<{ level: number; slots: number }> | null; cantripsKnown: number | null; spellsKnown: number | null; preparedFormula: string | null; preparedCount: number | null; classResources: ReadonlyArray<{ id: string; name: string; amount: number | string }> }>;
+/** A named starting-equipment bundle with its RESOLVABLE contents - a label alone can be shown but never turned into inventory. `goldPieces` is the "or take N gp" alternative. */
+export type ContentStartingEquipmentOption = Readonly<{ id: string; label: string; items: ReadonlyArray<{ id: string; name: string; quantity: number }>; goldPieces: number }>;
+/** A "choose N from this list" proficiency grant, exactly as authored (class tool choices, background skill/tool/language choices). */
+export type ContentChoiceList = Readonly<{ choose: number; from: readonly string[] }>;
+/**
+ * A class's (or third-caster subclass's) spellcasting header - what the wizard's caster step renders
+ * and filters by. `spellListId` pairs with `ContentSpellSummary.classes` to restore the class->spell
+ * link on the wire; the prepared-spell FORMULA stays per-level on the level table. Structured feature
+ * riders remain server-side as ever.
+ */
+export type ContentSpellcastingSummary = Readonly<{ ability: string; prepares: "known" | "prepared"; ritual: boolean; focus: string | null; progression: "full" | "half" | "third" | "pact"; spellListId: string | null }>;
+/** One playable class. `hitDie` ("d10") keys the multiclass hit-dice pool, `statPriority` drives the random generator, `spellcasting.progression` is what a multiclass slot table sums, and `levelTable` is the full printed 20-row progression. The flat `spellcastingAbility`/`spellcastingProgression` mirror `spellcasting` for existing readers. */
+export type ContentClassSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; hitDie: string; statPriority: readonly string[]; primaryAbilities: readonly string[]; savingThrows: readonly string[]; skillChoiceCount: number; skillChoices: readonly string[];
+  /** Granted armor/weapon/tool training, as open slugs ("light", "martial", "thieves-tools") - the wizard's proficiency summary renders these verbatim. */
+  armorProficiencies: readonly string[]; weaponProficiencies: readonly string[]; toolProficiencies: readonly string[];
+  /** "Choose N tools" where the class offers one (Monk-style); null otherwise. */
+  toolChoices: ContentChoiceList | null;
+  /** Proficiencies gained when this class is taken as a MULTICLASS (narrower than the level-1 set); null when the record declares none. */
+  multiclassProficiencies: Readonly<{ armor: readonly string[]; weapons: readonly string[]; tools: readonly string[]; skillChoices: ContentChoiceList | null }> | null;
+  /** Ability minimums for multiclassing INTO this class; `mode: "any"` covers "STR 13 or DEX 13". null = none declared (always allowed). The server re-validates - this is display data. */
+  multiclassPrerequisites: Readonly<{ mode: "all" | "any"; minimums: ReadonlyArray<Readonly<{ ability: string; minimum: number }>> }> | null;
+  subclassLevel: number; subclassLabel: string | null; asiLevels: readonly number[]; spellcastingAbility: string | null; spellcastingProgression: "full" | "half" | "third" | "pact" | null;
+  /** The full spellcasting header (null for a non-caster); see ContentSpellcastingSummary. */
+  spellcasting: ContentSpellcastingSummary | null;
+  levelTable: readonly ContentClassLevelRow[]; startingEquipmentOptions: readonly ContentStartingEquipmentOption[]; features: readonly ContentFeatureSummary[] }>;
+export type ContentClassesResult = { ok: boolean; message?: string; classes?: readonly ContentClassSummary[]; attribution?: string };
+/** One subclass, keyed to its parent `classId`. `subclassLevel` is null when it simply inherits the class's own subclass level. */
+export type ContentSubclassSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; classId: string; summary: string | null; description: string | null; subclassLevel: number | null; spellcastingAbility: string | null; spellcastingProgression: "full" | "half" | "third" | "pact" | null;
+  /** Third-caster subclasses (Eldritch Knight, Arcane Trickster) declare their own header, same shape as a class's; null otherwise. */
+  spellcasting: ContentSpellcastingSummary | null;
+  features: readonly ContentFeatureSummary[] }>;
+export type ContentSubclassesResult = { ok: boolean; message?: string; subclasses?: readonly ContentSubclassSummary[]; attribution?: string };
+/** One playable species and its traits-as-data. `sizes` is a list because several 2024 species let the player pick. SRD 5.2.1 puts ability increases on the BACKGROUND, so a species usually grants none. */
+export type ContentSpeciesSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; sizes: readonly string[]; speedFeet: number; darkvisionFeet: number | null; creatureType: string;
+  /** Fixed ability increases, as data. Empty for every SRD 5.2.1 species (they live on the background); populated by 2014-style or homebrew records - the builder applies whatever the record declares. */
+  abilityBonuses: ReadonlyArray<Readonly<{ ability: string; amount: number }>>;
+  /** "Choose N abilities to raise by M" (the 2014 variant-human / half-elf pattern); null when the species has none. */
+  abilityBonusChoice: Readonly<{ choose: number; amount: number; from: readonly string[] }> | null;
+  languages: readonly string[];
+  /** "Choose N languages" where the species offers one; null otherwise. */
+  languageChoices: ContentChoiceList | null;
+  lineages: ReadonlyArray<{ id: string; name: string; description: string | null }>; features: readonly ContentFeatureSummary[] }>;
+export type ContentSpeciesResult = { ok: boolean; message?: string; species?: readonly ContentSpeciesSummary[]; attribution?: string };
+/** One background: the ability-increase options and proficiencies it grants, its origin feat, and its starting-equipment choices (chosen option recorded in the character's `choices[]` ledger). */
+export type ContentBackgroundSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; abilityOptions: Readonly<{ from: readonly string[]; spreads: ReadonlyArray<readonly number[]> }> | null; originFeatId: string | null; skillProficiencies: readonly string[];
+  /** "Choose N skills/tools/languages" where the background offers one; null otherwise. Fixed grants stay in the flat lists beside these. */
+  skillChoices: ContentChoiceList | null;
+  toolProficiencies: readonly string[]; toolChoices: ContentChoiceList | null; languages: readonly string[]; languageChoices: ContentChoiceList | null;
+  startingEquipmentOptions: readonly ContentStartingEquipmentOption[]; features: readonly ContentFeatureSummary[] }>;
+export type ContentBackgroundsResult = { ok: boolean; message?: string; backgrounds?: readonly ContentBackgroundSummary[]; attribution?: string };
+/** One skill: reference text plus the ability its check uses. `ability` is null only while the bundle row predates the ability column (the server fills the SRD mapping for the 18 known skills). */
+export type ContentSkillSummary = Readonly<{ id: string; name: string; description: string; ability: string | null }>;
+export type ContentSkillsResult = { ok: boolean; message?: string; skills?: readonly ContentSkillSummary[]; attribution?: string };
+/** One feat. Prerequisites are reported as data + prose for display; the SERVER decides whether one is met, never the wizard. A feat IS a feature plus catalog metadata - hence the single `feature`. */
+export type ContentFeatSummary = Readonly<{ id: string; name: string; source: ContentSourceKind; summary: string | null; description: string | null; category: string; repeatable: boolean; prerequisiteLevel: number | null; prerequisiteAbilities: ReadonlyArray<{ ability: string; minimum: number }>; prerequisiteRequires: readonly string[]; prerequisiteText: string | null; feature: ContentFeatureSummary }>;
+export type ContentFeatsResult = { ok: boolean; message?: string; feats?: readonly ContentFeatSummary[]; attribution?: string };
+/** Hand-authored name pools for one species, feeding the builder's random generator. Pool `id` is an open slug and pool order comes from the data, so new pools are additive. */
+export type ContentNameBundle = Readonly<{ speciesId: string; source: ContentSourceKind; pools: ReadonlyArray<{ id: string; label: string; names: readonly string[] }> }>;
+export type ContentNamesResult = { ok: boolean; message?: string; names?: readonly ContentNameBundle[]; attribution?: string };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{ shape: "cone" | "line" | "sphere" | "cube" | "emanation"; sizeFeet: number; widthFeet: number | null }>;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
@@ -520,7 +697,18 @@ export type ActionAvailability = Readonly<{
   /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
   builtin?: boolean;
 }>;
-export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[] };
+/**
+ * The sheet's own numbers, derived server-side from the actor's LIVE loadout.
+ *
+ * Deliberately not on `PlayerView`: it rides `actor:available-actions`, a request that authorizes
+ * its caller for one named actor, so it is covered by one existing gate rather than by a strip that
+ * has to be right in both `projections.ts` and `PlayerActor` on every tick. See `actor-derived.ts`.
+ */
+export type DerivedAbilityRow = Readonly<{ ability: AbilityId; check: number; checkWithProficiency: number; save: number; saveProficient: boolean; saveFromItems: number }>;
+/** `tier` is the EFFECTIVE tier: the sheet's base raised by any item grant. `sources` names the items that raised it. */
+export type DerivedSkillRow = Readonly<{ id: string; name: string; ability: AbilityId | null; tier: "none" | "proficient" | "expertise"; bonus: number | null; sources: readonly string[] }>;
+export type ActorDerivedSheet = Readonly<{ proficiencyBonus: number; armorClass: number; initiative: number; abilities: readonly DerivedAbilityRow[]; skills: readonly DerivedSkillRow[] }>;
+export type ActorActionsAvailabilityResult = { ok: boolean; message?: string; rulesMode?: "strict" | "assisted" | "freeform"; actions?: readonly ActionAvailability[]; derived?: ActorDerivedSheet };
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -530,6 +718,12 @@ export interface ClientToServerEvents {
   "actor:add-from-definition": (payload: { commandId: string; definitionId: string; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
   "actor:remove": (payload: { commandId: string; actorId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:import-definition": (payload: { commandId: string; definition: unknown; visibility?: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
+  "character:submit-import": (payload: { commandId: string; definition: unknown; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  "character:resolve-import": (payload: { commandId: string; importId: string; approve: boolean; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
+  /** Create a character from CHOICES (ids + scores + per-level HP entries + the choices[] ledger); the server's feature-rider interpreter assembles the ActorDefinition and lands it through the import path (`actorId` = commandId, definition keyed `import-<actorId>`). GM-only in phase 2. */
+  "character:create": (payload: { commandId: string; name: string; speciesId: string; backgroundId: string; classId: string; level: number; subclassId?: string; abilityMethod: BuilderAbilityMethod; baseScores: Record<AbilityId, number>; backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>; hp: { mode: "average" | "entries"; entries?: readonly number[] }; choices: ReadonlyArray<{ level: number; classId?: string; kind: string; id: string; payload?: Record<string, unknown> }>; expectedRevision?: number }, acknowledgement: (result: ActorAddResult) => void) => void;
+  /** GM sets the character-builder table policy (decision 10): allowed ability methods + the custom roll formula. */
+  "builder:set-policy": (payload: { commandId: string; allowedAbilityMethods: readonly BuilderAbilityMethod[]; customFormula?: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-token-image": (payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-size": (payload: { commandId: string; actorId: string; size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-visibility": (payload: { commandId: string; actorId: string; visibility: "public" | "gm-only"; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
@@ -541,8 +735,15 @@ export interface ClientToServerEvents {
   "actor:set-hp": (payload: { commandId: string; actorId: string; current: number; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "actor:set-condition": (payload: { commandId: string; actorId: string; conditionId: string; active: boolean; level?: number; override?: { reason: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void) => void;
   "content:conditions": (payload: Record<string, never>, acknowledgement: (result: ContentConditionsResult) => void) => void;
+  "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
   "content:spells": (payload: Record<string, never>, acknowledgement: (result: ContentSpellsResult) => void) => void;
   "content:equipment": (payload: Record<string, never>, acknowledgement: (result: ContentEquipmentResult) => void) => void;
+  "content:classes": (payload: Record<string, never>, acknowledgement: (result: ContentClassesResult) => void) => void;
+  "content:subclasses": (payload: Record<string, never>, acknowledgement: (result: ContentSubclassesResult) => void) => void;
+  "content:species": (payload: Record<string, never>, acknowledgement: (result: ContentSpeciesResult) => void) => void;
+  "content:backgrounds": (payload: Record<string, never>, acknowledgement: (result: ContentBackgroundsResult) => void) => void;
+  "content:feats": (payload: Record<string, never>, acknowledgement: (result: ContentFeatsResult) => void) => void;
+  "content:names": (payload: Record<string, never>, acknowledgement: (result: ContentNamesResult) => void) => void;
   "content:monster-actions": (payload: { definitionId: string }, acknowledgement: (result: ContentActionsResult) => void) => void;
   "content:monster-sheet": (payload: { definitionId: string }, acknowledgement: (result: ContentSheetResult) => void) => void;
   "action:resolve": (payload: { commandId: string; actorId: string; actionId: string; targetIds?: readonly string[]; template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }; conditionId?: string; rollMode?: "advantage" | "disadvantage" | "normal"; override?: { reason: string }; effectId?: string; note?: string; cover?: "half" | "three-quarters" | "total"; commit?: boolean; attackNatural?: number; attackTotal?: number; critical?: boolean; expectedRevision?: number }, acknowledgement: (result: ActionResolveResult) => void) => void;
@@ -562,7 +763,9 @@ export interface ClientToServerEvents {
   "character:set-prepared": (payload: { commandId: string; actorId: string; spellId: string; prepared: boolean; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-inventory": (payload: { commandId: string; actorId: string; item: { id: string; name: string; quantity?: number; equipped?: boolean; attuned?: boolean; weightEach?: number; description?: string; category?: string }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-currency": (payload: { commandId: string; actorId: string; currency: { cp?: number; sp?: number; ep?: number; gp?: number; pp?: number }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
-  "character:set-identity": (payload: { commandId: string; actorId: string; character: { classes: ReadonlyArray<{ id: string; name: string; subclass?: { id: string; name: string }; level: number }>; race?: { id: string; name: string; subrace?: { id: string; name: string } }; background?: { id: string; name: string }; feats: ReadonlyArray<{ id: string; name: string; description?: string }> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
+  // `classes[].hitDie` carries the per-class hit die so an identity edit REBUILDS the multiclass
+  // hit-dice pool instead of dropping it (a Fighter 3 / Wizard 2 is 3d10 + 2d6, not 5 of one size).
+  "character:set-identity": (payload: { commandId: string; actorId: string; character: { classes: ReadonlyArray<{ id: string; name: string; subclass?: { id: string; name: string }; level: number; hitDie?: HitDie }>; race?: { id: string; name: string; subrace?: { id: string; name: string } }; background?: { id: string; name: string }; feats: ReadonlyArray<{ id: string; name: string; description?: string }> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "character:set-proficiencies": (payload: { commandId: string; actorId: string; proficiencies: { saves: ReadonlyArray<"str" | "dex" | "con" | "int" | "wis" | "cha">; skills: ReadonlyArray<{ id: string; proficiency: "proficient" | "expertise" }>; saveOverrides?: Record<string, number>; skillOverrides?: Record<string, number> }; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;
   "save:answer": (payload: { commandId: string; saveId: string; method: "roll" | "manual"; total?: number; rollMode?: "advantage" | "disadvantage" | "normal"; commit?: boolean; legendaryResistance?: boolean; expectedRevision?: number }, acknowledgement: (result: SaveAnswerResult) => void) => void;
   "save:dismiss": (payload: { commandId: string; saveId: string; expectedRevision?: number }, acknowledgement: (result: MutationResult) => void) => void;

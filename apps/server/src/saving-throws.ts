@@ -1,11 +1,12 @@
 import type { AbilityId, Actor, GameState, PendingSave, RollRecord } from "@vtt/domain";
-import { abilityModifier as scoreModifier, aggregateRollMode, parseDiceFormula, resolveDice, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
+import { abilityModifier as scoreModifier, aggregateRollMode, collectRiders, parseDiceFormula, resolveDice, sumRiders, type AggregatedRollMode, type RandomSource, type RollModeSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { applyDamageDetailed, adjustableActor, type ActorScope } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import { addEffect, endEffectIfPresent, type EffectNarration } from "./effects.js";
+import { deriveEquipment, EMPTY_DERIVATION, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -14,6 +15,8 @@ export type SaveAnswerDependencies = Readonly<{
   role: "gm" | "player";
   now: () => string;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  /** The item catalog, so an item's save bonus and save advantage reach the roll. */
+  catalog?: EquipmentCatalog;
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean; total: number; dc: number; appliedDamage: number; conditionApplied: boolean; committed: boolean;
@@ -28,7 +31,7 @@ export type SaveOutcome = Readonly<{
  * Restrained imposes disadvantage on Dexterity saves; effect modifiers (Dodge's Dex-save advantage)
  * plug in here as the vocabulary grows. Pure and explainable, mirroring attackRollSources.
  */
-export function saveRollSources(target: Actor, ability: AbilityId): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
+export function saveRollSources(target: Actor, ability: AbilityId, derivation: EquipmentDerivation = EMPTY_DERIVATION): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
   const advantage: RollModeSource[] = [];
   const disadvantage: RollModeSource[] = [];
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -43,7 +46,23 @@ export function saveRollSources(target: Actor, ability: AbilityId): { advantage:
       if (modifier.type === "save-disadvantage" && (modifier.ability === undefined || modifier.ability === ability)) disadvantage.push({ source: effect.id, label: effect.name });
     }
   }
+  // Item riders (criterion 12). A rider with no `when` is standing ("advantage on saving throws");
+  // `on-saving-throw` + `ability-is` narrows it to one ability. Both passes are collected, and they
+  // are disjoint - a rider naming a moment is excluded from the standing pass by construction.
+  for (const moment of [null, "on-saving-throw"] as const) {
+    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ability, moment })) {
+      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "save") continue;
+      (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: rider.label });
+    }
+  }
   return { advantage, disadvantage };
+}
+
+/** The flat item bonus to one saving throw (criterion 12's other half): standing plus this moment's. */
+export function saveRiderBonus(derivation: EquipmentDerivation, ability: AbilityId): number {
+  const momentary = collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" });
+  // `derivation.saveBonus` is the already-summed STANDING half; only the momentary riders are added here.
+  return derivation.saveBonus + sumRiders(momentary, "save-bonus");
 }
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -70,19 +89,48 @@ export function conditionFrom(description: string): string | null {
 }
 
 /**
- * Best-known save modifier for a target. Monsters carry final per-ability save bonuses in the
- * (untyped) open5e extension; anything else falls back to the ability modifier from the definition's
- * scores. Imported PCs don't encode save proficiencies (not in ActorDefinitionSchema), so a proficient
- * PC save is the manual-total path's job - documented limitation, not a bug.
+ * Best-known save modifier for a target, WITHOUT the situational terms (exhaustion, cover, riders).
+ *
+ * Precedence, and each rung exists for a different actor origin:
+ *   1. `saveOverrides[ability]` - a final total the GM typed. An explicit number always wins.
+ *   2. `proficiencies.saves` - a built or edited character sheet. THIS RUNG WAS MISSING: the doc
+ *      comment used to say "Imported PCs don't encode save proficiencies (not in
+ *      ActorDefinitionSchema)", which stopped being true when `ProficienciesSchema` landed. Until
+ *      this was fixed a proficient PC's GM-forced save rolled WITHOUT its proficiency bonus, while
+ *      the sheet's own chip showed it - a silent split-brain in the server's favour of the wrong
+ *      number. Anything reading "the server's save" would have inherited the bug.
+ *   3. The untyped open5e extension - monsters carry final per-ability totals there.
+ *   4. The bare ability modifier.
  */
 export function saveModifierFor(definition: ActorDefinition | undefined, ability: AbilityId): number {
   if (!definition) return 0;
+  const proficiencies = definition.proficiencies;
+  const override = proficiencies?.saveOverrides?.[ability];
+  if (typeof override === "number") return override;
+  // A sheet that records proficiencies is authoritative for itself: an ability absent from `saves`
+  // means "not proficient", NOT "fall through to a monster extension this actor does not have".
+  if (proficiencies) {
+    return scoreModifier(definition.abilityScores[ability]) + (proficiencies.saves.includes(ability) ? definition.proficiencyBonus : 0);
+  }
   const extension = definition.extensions["open5e.srd-2024"];
   if (extension && typeof extension === "object") {
     const fromExtension = (extension as { savingThrows?: Record<string, unknown> }).savingThrows?.[ability];
     if (typeof fromExtension === "number" && Number.isInteger(fromExtension) && fromExtension >= -20 && fromExtension <= 30) return fromExtension;
   }
   return scoreModifier(definition.abilityScores[ability]);
+}
+
+/**
+ * THE save total: the one function the sheet's chip and `answerSave`'s roll both read, so they
+ * cannot drift. Cover is deliberately NOT here - it is per-save (an attacker's line of sight), not a
+ * property of the character, so a chip tapped from the sheet has no cover to know about.
+ */
+export function saveTotalFor(
+  definition: ActorDefinition | undefined, actor: Actor | undefined, ability: AbilityId, derivation: EquipmentDerivation
+): number {
+  return saveModifierFor(definition, ability)
+    + (actor ? exhaustionPenalty(actor) : 0)
+    + saveRiderBonus(derivation, ability);
 }
 
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
@@ -171,9 +219,13 @@ export function answerSave(state: GameState, commandId: string, saveId: string, 
     total = 0;
   } else {
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
-    // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1); cover's saveBonus adds (SRD Cover).
-    const modifier = saveModifierFor(definition, pending.ability) + exhaustionPenalty(target) + pending.saveBonus;
-    const sources = saveRollSources(target, pending.ability);
+    const derivation = deriveEquipment(target, definition, deps.catalog);
+    // Exhaustion applies −2 × level to every D20 Test (SRD 5.2.1); cover's saveBonus adds (SRD Cover);
+    // an item's `save-bonus` rider joins them.
+    // ONE function with the sheet's chip (`saveTotalFor`), plus the per-save cover bonus the chip
+    // cannot know about. If these two ever diverge again, the sheet lies about the roll.
+    const modifier = saveTotalFor(definition, target, pending.ability, derivation) + pending.saveBonus;
+    const sources = saveRollSources(target, pending.ability, derivation);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's adv/disadv button, or a forced "normal") wins over the
     // engine-detected sources, mirroring how attacks let the GM override the aggregation.

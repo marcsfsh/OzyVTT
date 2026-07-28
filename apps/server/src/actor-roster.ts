@@ -1,6 +1,10 @@
-import type { ActorDefinition, GameState } from "@vtt/domain";
-import { abilityModifier, armorClassFromEquipment } from "@vtt/rules-5e";
+import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
+import {
+  abilityModifier, armorClassFromEquipment, hitDicePool, multiclassCasterLevel, multiclassPactSlots, multiclassSpellSlots,
+  type ClassLevelEntry
+} from "@vtt/rules-5e";
 import { endEffectsSustainedBy } from "./effects.js";
+import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ACTORS = 200;
@@ -16,18 +20,131 @@ function dedupedName(state: GameState, base: string): string {
   }
 }
 
-/** SRD Hit Point Dice pool from a definition's hit-point formula ("7d8 + 14" → 7 × d8); no parseable formula = unmodeled (null, the fail-open pattern). */
-export function hitDiceFromDefinition(definition: ActorDefinition): { die: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"; maximum: number; remaining: number } | null {
+/**
+ * SRD Hit Point Dice entry from a definition's hit-point formula ("7d8 + 14" → 7 × d8); no parseable
+ * formula = unmodeled (null, the fail-open pattern). `DiceFormulaSchema` allows only ONE die term, so
+ * this can express a monster or a single-class sheet but never a multiclass pool - see `seedHitDice`.
+ */
+export function hitDiceFromDefinition(definition: ActorDefinition): HitDiceEntry | null {
   const match = definition.hitPoints.formula?.match(/^(\d+)d(4|6|8|10|12|20)\b/i);
   if (!match) return null;
   const count = Math.min(40, Number.parseInt(match[1], 10));
   if (count < 1) return null;
-  return { die: `d${match[2]}` as "d4" | "d6" | "d8" | "d10" | "d12" | "d20", maximum: count, remaining: count };
+  return { die: `d${match[2]}` as HitDiceEntry["die"], maximum: count, remaining: count };
 }
 
-function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string) {
+/** The sheet's class levels in the shape `@vtt/rules-5e` progression math expects. */
+function classLevelsOf(definition: ActorDefinition): ClassLevelEntry[] {
+  return (definition.character?.classes ?? []).map((entry) => ({ classId: entry.id, level: entry.level, ...(entry.hitDie ? { hitDie: entry.hitDie } : {}) }));
+}
+
+/**
+ * THE Hit Point Dice pool a live actor is seeded with. A sheet that records its class levels pools
+ * one entry per die size (Fighter 3 / Wizard 2 = 3d10 + 2d6) - the hit-point FORMULA cannot express
+ * that, so deriving it from `formula` silently dropped every class after the first. Monsters and
+ * legacy/PDF sheets with no class levels keep the formula-derived single entry.
+ */
+export function seedHitDice(definition: ActorDefinition): Actor["hitDice"] {
+  const classLevels = classLevelsOf(definition);
+  if (classLevels.length > 0) {
+    const pool = makeHitDicePool(hitDicePool(classLevels).map((entry) => ({ die: entry.die, maximum: entry.count, remaining: entry.count })));
+    if (pool) return pool;
+  }
+  const single = hitDiceFromDefinition(definition);
+  return single ? makeHitDicePool([single]) : null;
+}
+
+/**
+ * THE spell-slot maxima a character actually has, by slot level. A multiclass builder fills
+ * `spellcasting.classes[]` and the SRD combined slot table belongs at the top level; when the top
+ * level is empty but per-class casters are declared, derive the combined table from the class levels
+ * (SRD Multiclassing) rather than seeding a "modeled caster with zero slots".
+ *
+ * Single-sourced: seeding (`instantiate`, the example party), the long rest, and the slot-spend clamp
+ * all read this, so they can never disagree about a character's maximum.
+ *
+ * `equipmentSlots` layers an item's granted slots on top (criterion 8: an amulet with one extra
+ * 1st-level slot). Because every reader goes through this one function, the seed, the long-rest
+ * refill and the spend clamp cannot disagree about the bonus slot either - which is exactly why the
+ * rider targets this function rather than writing a number anywhere.
+ */
+export function spellSlotMaxima(definition: ActorDefinition | undefined, equipmentSlots: readonly { level: number; amount: number }[] = []): ReadonlyArray<{ level: number; max: number }> {
+  const base = baseSpellSlotMaxima(definition);
+  if (equipmentSlots.length === 0) return base;
+  const byLevel = new Map(base.map((slot) => [slot.level, slot.max] as const));
+  for (const bonus of equipmentSlots) byLevel.set(bonus.level, Math.max(0, (byLevel.get(bonus.level) ?? 0) + bonus.amount));
+  return [...byLevel].filter(([, max]) => max > 0).map(([level, max]) => ({ level, max })).sort((a, b) => a.level - b.level);
+}
+
+function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
+  const spellcasting = definition?.spellcasting;
+  if (!spellcasting) return [];
+  if (spellcasting.slots.length > 0) return spellcasting.slots;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return [];
+  const casterLevels = classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId));
+  return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
+    .map((count, index) => ({ level: index + 1, max: count }))
+    .filter((slot) => slot.max > 0);
+}
+
+/** Warlock Pact Magic maximum, derived from the Warlock levels when the sheet did not state one. */
+export function pactSlotMaximum(definition: ActorDefinition | undefined): { level: number; max: number } | null {
+  const spellcasting = definition?.spellcasting;
+  if (!spellcasting) return null;
+  if (spellcasting.pact) return spellcasting.pact;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return null;
+  const pact = multiclassPactSlots(classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId)));
+  return pact ? { level: pact.level, max: pact.slots } : null;
+}
+
+/** Live spell-slot pools for a freshly instantiated actor; null = not a modeled spellcaster. */
+export function seedSpellSlots(definition: ActorDefinition, equipmentSlots: readonly { level: number; amount: number }[] = []): Actor["spellSlots"] {
+  if (!definition.spellcasting) return null;
+  return spellSlotMaxima(definition, equipmentSlots).map((slot) => ({ level: slot.level, remaining: slot.max }));
+}
+
+/** Live Pact Magic pool for a freshly instantiated actor; null = no pact pool. */
+export function seedPactSlots(definition: ActorDefinition): Actor["pactSlots"] {
+  const pact = pactSlotMaximum(definition);
+  return pact ? { level: pact.level, remaining: pact.max } : null;
+}
+
+/** The spells a sheet starts the day with prepared (defaults the long rest also restores). */
+export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
+  return definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [];
+}
+
+/**
+ * The flat, NON-equipment Armor Class a sheet carries beyond its armor: the Defense fighting style's
+ * "+1 while you wear armor", a ring of protection, a homebrew rider. `ActorDefinition` models only
+ * the AC TOTAL, so any path that RE-DERIVES AC from the live loadout would drop it - which is exactly
+ * how `definition.armorClass` and the live actor's AC diverged the moment a feature granted flat AC
+ * (task-packet risk 3). The builder records it in the open `open5e.srd-2024` extension bag, the same
+ * fail-open channel that already carries an import's skills and saving throws; a definition without
+ * one (every monster, every PDF import) reads 0 and behaves exactly as before.
+ */
+export function armorClassRiderOf(definition: ActorDefinition): number {
+  // Fail-open: `extensions` is schema-defaulted, but a hand-built definition (tests, older callers)
+  // can reach here without it - a missing bag means no rider, never a crash.
+  const extension = definition.extensions?.["open5e.srd-2024"];
+  if (extension && typeof extension === "object") {
+    const value = (extension as { armorClassBonus?: unknown }).armorClassBonus;
+    if (typeof value === "number" && Number.isInteger(value) && value >= -10 && value <= 10) return value;
+  }
+  return 0;
+}
+
+function instantiate(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", kind: "player-character" | "monster", definitionId: string, catalog?: EquipmentCatalog) {
   if (state.actors.length >= MAX_ACTORS) throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
+  const equipmentAc = armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), withResolvedSlots(inventory, catalog));
+  // The SECOND of the two reconciliation points (the other is every inventory write). Seeding through
+  // the same derivation is what makes a monster or a PDF import - neither of which ever runs the
+  // character builder - carry its equipment's riders from the moment it reaches the table.
+  const seed = { inventory, effects: [], conditions: [], hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum, temporary: 0 } } as unknown as Actor;
+  const derivation = deriveEquipment(seed, definition, catalog);
   state.actors.push({
     id,
     name: dedupedName(state, definition.name),
@@ -35,9 +152,10 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     visibility,
     hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum, temporary: 0 },
     // AC derives from equipped armor/shields when the loadout has any (v6 #5); otherwise the stored
-    // stat-block AC stands (natural/mage armor, monsters).
-    armorClass: armorClassFromEquipment(abilityModifier(definition.abilityScores.dex), inventory) ?? definition.armorClass,
-    initiative: definition.initiativeBonus,
+    // stat-block AC stands (natural/mage armor, monsters). The sheet's flat rider is added back on
+    // top of the derived value, so a builder-made definition and its live actor cannot disagree.
+    armorClass: (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) + derivation.armorClass,
+    initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
     conditions: [],
     effects: [],
@@ -46,10 +164,10 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
     conditionImmunities: definition.conditionImmunities ? [...definition.conditionImmunities] : [],
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
-    hitDice: hitDiceFromDefinition(definition),
-    spellSlots: definition.spellcasting ? definition.spellcasting.slots.map((slot) => ({ level: slot.level, remaining: slot.max })) : null,
-    pactSlots: definition.spellcasting?.pact ? { level: definition.spellcasting.pact.level, remaining: definition.spellcasting.pact.max } : null,
-    preparedSpellIds: definition.spellcasting ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id) : [],
+    hitDice: seedHitDice(definition),
+    spellSlots: seedSpellSlots(definition, derivation.spellSlots),
+    pactSlots: seedPactSlots(definition),
+    preparedSpellIds: seedPreparedSpellIds(definition),
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,
@@ -60,10 +178,10 @@ function instantiate(state: GameState, definition: ActorDefinition, id: string, 
   });
 }
 
-export function addActorFromDefinition(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only") {
+export function addActorFromDefinition(state: GameState, definition: ActorDefinition, id: string, visibility: "public" | "gm-only", catalog?: EquipmentCatalog) {
   if (definition.schemaId !== "vtt.actor-monster") throw new CommandRejectedError("Only monster definitions can be added this way.");
   if (!definition.source.externalId) throw new CommandRejectedError("That bundled definition is missing its content id.");
-  instantiate(state, definition, id, visibility, "monster", definition.source.externalId);
+  instantiate(state, definition, id, visibility, "monster", definition.source.externalId, catalog);
 }
 
 /**
@@ -71,12 +189,26 @@ export function addActorFromDefinition(state: GameState, definition: ActorDefini
  * definition persists with the campaign and a live actor is instantiated from it. Characters
  * become claimable player-characters; the ActorDefinitionSchema already forces them friendly.
  */
-export function importActorDefinition(state: GameState, definition: ActorDefinition, actorId: string, visibility: "public" | "gm-only") {
+export function importActorDefinition(state: GameState, definition: ActorDefinition, actorId: string, visibility: "public" | "gm-only", catalog?: EquipmentCatalog) {
   if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS) throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? "player-character" as const : "monster" as const;
-  instantiate(state, definition, actorId, visibility, kind, definitionId);
+  instantiate(state, definition, actorId, visibility, kind, definitionId, catalog);
   state.definitions = [...state.definitions, { id: definitionId, definition }];
+}
+
+/** Queue a player-submitted import for GM approval; the definition is pre-validated by the caller. */
+export function submitPendingImport(state: GameState, definition: ActorDefinition, id: string, submittedBy: string) {
+  if (state.pendingImports.length >= 20) throw new CommandRejectedError("The import queue is full - ask your GM to review the pending sheets first.");
+  state.pendingImports = [...state.pendingImports.filter((entry) => entry.id !== id), { id, name: definition.name, submittedBy, definition }];
+}
+
+/** GM decision on a queued import: approving instantiates a claimable actor; either way it leaves the queue. */
+export function resolvePendingImport(state: GameState, importId: string, approve: boolean, newActorId: string) {
+  const pending = state.pendingImports.find((entry) => entry.id === importId);
+  if (!pending) throw new CommandRejectedError("That pending import is no longer in the queue.");
+  state.pendingImports = state.pendingImports.filter((entry) => entry.id !== importId);
+  if (approve) importActorDefinition(state, pending.definition, newActorId, "public");
 }
 
 export function removeActor(state: GameState, actorId: string) {

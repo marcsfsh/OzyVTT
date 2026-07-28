@@ -4,12 +4,43 @@
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: none;
+  /* 24px, kept in step with SCROLL_PAD in Tabs.tsx and with the mask widths below.
+     Honoured by both the scroll-snap position and the component's own scrollTo, so a
+     tab brought into view lands clear of the fade rather than under it. */
+  scroll-padding-inline: 24px;
+  /* `proximity`, not `mandatory`: a bar that fits partway between two tabs should stay
+     where the finger left it rather than yanking. */
+  scroll-snap-type: x proximity;
 }
 .nh-tabs--horizontal::-webkit-scrollbar { display: none; }
 .nh-tabs--vertical { flex-direction: column; align-items: stretch; }
 
+/* The scrollbar is hidden, so the fade is the ONLY thing telling a phone user that
+   there are more tabs. It is applied by class, never unconditionally: a bar whose tabs
+   all fit shows no fade, because a permanent one would say "there is more" when there
+   is not. The three rules are ordered so the more specific state wins at equal
+   specificity (0,2,0) — at the far end, both `is-scrolled-start` and `is-scrolled-end`
+   are present and the last declaration is the one that applies. */
+.nh-tabs--horizontal.is-scrollable {
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent 100%);
+}
+.nh-tabs--horizontal.is-scrolled-start {
+  mask-image: linear-gradient(to right, transparent 0, #000 1.5rem, #000 calc(100% - 1.5rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 1.5rem, #000 calc(100% - 1.5rem), transparent 100%);
+}
+.nh-tabs--horizontal.is-scrolled-end {
+  mask-image: linear-gradient(to right, transparent 0, #000 1.5rem, #000 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 1.5rem, #000 100%);
+}
+
+/* The active tab already owns ::after (the underline), so the 44px floor
+   (decision 16) is real paint here rather than a `.tap-target` extension. */
 .nh-tab {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
   padding: var(--space-3) var(--space-4);
   border: 0;
   background: transparent;
@@ -22,7 +53,7 @@
 .nh-tab:disabled { color: var(--text-muted); cursor: not-allowed; }
 
 /* Horizontal — 2px magenta underline with a faint steady glow */
-.nh-tabs--horizontal .nh-tab { margin-bottom: -1px; }
+.nh-tabs--horizontal .nh-tab { margin-bottom: -1px; scroll-snap-align: start; }
 .nh-tabs--horizontal .nh-tab--active { color: var(--text); }
 .nh-tabs--horizontal .nh-tab--active::after {
   content: "";

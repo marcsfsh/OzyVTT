@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import character from "../../../packages/test-fixtures/actors/player-character.v1.json";
-import { importActorDefinition, removeActor, storedDefinition } from "../src/actor-roster.js";
+import { importActorDefinition, removeActor, resolvePendingImport, storedDefinition, submitPendingImport } from "../src/actor-roster.js";
 import { claimCharacter } from "../src/character-claims.js";
-import { projectPlayerView } from "../src/projections.js";
+import { projectGmView, projectPlayerView } from "../src/projections.js";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 
 const IDS = {
@@ -60,5 +60,43 @@ describe("canonical sheet import", () => {
     removeActor(game, IDS.imported);
     expect(game.actors).toHaveLength(0);
     expect(game.definitions).toHaveLength(0);
+  });
+});
+
+describe("player-submitted PDF imports (GM approval queue)", () => {
+  it("queues a submission without creating an actor", () => {
+    const game = state();
+    submitPendingImport(game, DEFINITION, "imp-1", IDS.session);
+    expect(game.pendingImports).toHaveLength(1);
+    expect(game.pendingImports[0]).toMatchObject({ id: "imp-1", name: "Mira Thorne", submittedBy: IDS.session });
+    expect(game.actors).toHaveLength(0);
+    expect(GameStateSchema.safeParse(game).success).toBe(true);
+  });
+
+  it("approving instantiates a claimable actor and clears the queue entry", () => {
+    const game = state();
+    submitPendingImport(game, DEFINITION, "imp-1", IDS.session);
+    resolvePendingImport(game, "imp-1", true, IDS.imported);
+    expect(game.pendingImports).toHaveLength(0);
+    expect(game.actors[0]).toMatchObject({ id: IDS.imported, name: "Mira Thorne", kind: "player-character" });
+  });
+
+  it("rejecting drops the submission and creates nothing", () => {
+    const game = state();
+    submitPendingImport(game, DEFINITION, "imp-1", IDS.session);
+    resolvePendingImport(game, "imp-1", false, IDS.imported);
+    expect(game.pendingImports).toHaveLength(0);
+    expect(game.actors).toHaveLength(0);
+  });
+
+  it("keeps the pending queue GM-only — never in the player projection", () => {
+    const game = state();
+    submitPendingImport(game, DEFINITION, "imp-1", IDS.session);
+    const playerView = projectPlayerView(game, IDS.session, () => null);
+    expect("pendingImports" in playerView).toBe(false);
+    // the submitting player has no claimed actor yet, so the queued sheet must not surface anywhere
+    expect(JSON.stringify(playerView)).not.toContain("Mira Thorne");
+    // the GM projection (which spreads state) does carry it (the viewer projects a strict actor subset, never top-level state)
+    expect(projectGmView(game, () => null).pendingImports).toHaveLength(1);
   });
 });

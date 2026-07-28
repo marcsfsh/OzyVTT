@@ -6,6 +6,7 @@ import type {
   TextareaHTMLAttributes
 } from "react";
 import { cx } from "./util";
+import { IconWarning } from "./icons";
 import "./forms.css";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -61,7 +62,7 @@ export function Field({ label, htmlFor, help, error, required, className, childr
       {children}
       {error != null ? (
         <p className="nh-field-error" role="alert">
-          <span aria-hidden="true">⚠</span> {error}
+          <span className="nh-field-error-icon" aria-hidden="true"><IconWarning /></span>{error}
         </p>
       ) : help != null ? (
         <p className="nh-field-help">{help}</p>

@@ -1,3 +1,8 @@
+/* The styleguide entry loads only @vtt/ui/styles.css, not the app's styles.css, so it has
+   to clear the UA body margin itself — otherwise the page sits 8px off and a full-width
+   control can push the document past the viewport at 375px. */
+body { margin: 0; }
+
 .sg { min-height: 100vh; }
 
 .sg-header {
@@ -53,6 +58,30 @@
 .sg-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--space-4); }
 .sg-grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); }
 
+/* Icons — min() on the track floor for the same reason FieldGrid uses it: a bare
+   minmax(11rem, 1fr) holds its floor inside a 343px column and overflows the page. */
+.sg-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr)); gap: var(--space-3); }
+.sg-icon {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  min-width: 0;
+}
+.sg-icon-glyph { grid-row: 1 / 3; display: grid; place-items: center; font-size: 1.4rem; color: var(--cyan-hi); }
+.sg-icon code { min-width: 0; overflow-wrap: anywhere; }
+.sg-icon-use { color: var(--text-dim); font-size: var(--fs-xs); }
+
+/* Save state — all six side by side, so they can be compared with the colour
+   thrown away (which is the component's whole claim). */
+.sg-savestates { display: grid; gap: var(--space-2); }
+.sg-savestate-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.sg-savestate-row > code { min-width: 5rem; }
+
 .sg-vtabs { margin-top: var(--space-4); max-width: 16rem; }
 
 /* States */
@@ -68,6 +97,21 @@
   color: var(--text);
   font-size: var(--fs-sm);
 }
+
+/* Wizard demo — the shell owns the viewport in the app, so the style guide bounds it
+   in a scroll frame to keep this page readable. The sticky header/footer stick to
+   the frame instead of the window, which is exactly what they do in the app. */
+.sg-wizard-frame {
+  height: 36rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+.sg-wizard-frame .nh-wizard { min-height: 100%; }
+.sg-wizard-step { display: grid; gap: var(--space-3); padding-bottom: var(--space-4); }
+/* No hand-rolled "Show preview" button here any more: WizardShell owns both halves of the
+   master-detail swap (onOpenDetail / onCloseDetail) and shows each at the right width. */
 
 /* Textures */
 .sg-textures { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }

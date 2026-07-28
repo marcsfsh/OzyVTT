@@ -1,0 +1,39 @@
+.nh-review { display: grid; gap: var(--space-4); }
+
+.nh-review-section {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+/* Missing something is CAUTION (violet), not danger: rose-red is reserved for damage
+   and destruction (§2). The edge is paired with the words next to the Edit link. */
+.nh-review-section.is-incomplete { border-color: var(--caution); }
+
+/* `max-width: none` for the same reason as `.nh-wizard-head`: a host app's bare `header` rule must
+   not decide how wide a primitive's own header is. */
+.nh-review-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); max-width: none; }
+.nh-review-title { margin: 0; font: 400 var(--fs-h3) / var(--lh-snug) var(--font-display); color: var(--text); }
+/* Edit is `Button variant="ghost" size="sm"` — the system's quiet text action. This
+   rule only aligns the pencil; the button's own look, hover, and 44px hit area come
+   from `.nh-btn`. */
+.nh-review-edit { flex: none; }
+.nh-review-edit-icon { display: grid; place-items: center; font-size: 0.95em; }
+
+.nh-review-incomplete { margin: 0; display: flex; align-items: center; gap: var(--space-2); color: var(--caution-hi); font-size: var(--fs-sm); }
+.nh-review-incomplete-icon { flex: none; display: grid; place-items: center; font-size: 1.05em; }
+
+/* Reuse .nh-statlist's grid; only the value face changes, because a review holds
+   prose ("Wood elf") next to numbers ("17"). */
+.nh-review-stats { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+.nh-review-stats dd.nh-review-text { font-family: var(--font-body); font-weight: 600; line-height: 1.35; }
+.nh-review-stats dd.nh-review-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.nh-review-note { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); line-height: var(--lh-body); }
+
+/* Documented breakpoint ladder (760/560/650/850/980) — 560 is the phone step. */
+@media (max-width: 560px) {
+  .nh-review-stats { grid-template-columns: 1fr 1fr; }
+}

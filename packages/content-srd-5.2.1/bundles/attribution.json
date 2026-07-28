@@ -8,5 +8,14 @@
     "permalink": "https://dnd.wizards.com/resources/systems-reference-document",
     "vendoredFrom": "https://github.com/open5e/open5e-api (data/v2/wizards-of-the-coast/srd-2024, staging branch)",
     "retrieved": "2026-07-17"
-  }
+  },
+  "additionalSources": [
+    {
+      "name": "dnd-5e-srd-markdown",
+      "vendoredFrom": "https://github.com/downfallx/dnd-5e-srd-markdown",
+      "commit": "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4",
+      "retrieved": "2026-07-27",
+      "covers": "classes, subclasses, class spell lists, species, backgrounds, feats"
+    }
+  ]
 }
