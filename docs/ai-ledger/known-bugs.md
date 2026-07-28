@@ -247,6 +247,23 @@ reason. They are **findings, not unknowns** — don't re-discover them.
   know to look there will read it as data loss. Raised by the M5 review; a confirmation step is a UX
   addition beyond CD-2's approved scope, so it is recorded here rather than built.
 
+- **[ui/touch] `TagInput`'s chip ✕ violates §4's gap budget vertically when the chip row wraps — but no
+  tap theft could be demonstrated.** `.nh-taginput-tags` gaps by `--space-2` (8px) and a chip is 24px
+  tall, so wrapped rows sit **32px** apart centre-to-centre while each `.nh-chip-remove` carries a 44px
+  `::after`. Rows therefore overlap by ~12px, which `design-language.md` §4 forbids: it reasons only
+  about *horizontal* neighbours ("consecutive ✕s are a whole chip apart") and never considers the wrap
+  case. Reported by an implementation agent as a measured 34px reach on the last chip of a wrapped row.
+  **I could not reproduce that number**: my probe measured 45px on all seven ✕s across four wrapped rows,
+  and the decisive functional test — a real `touchscreen.tap` 10px *above* a second-row chip's ✕ —
+  removed that chip's own tag, not the row above's. The likely reason there is no theft in practice is
+  that chips are horizontally offset, so the ✕ boxes seldom align vertically. Pre-existing since M4
+  (`PageEditor`); CI-2 widens the exposure to four surfaces. **Deliberately not fixed**: the fix lives in
+  `packages/ui/src/primitives/TagInput.css` and would change chip-cloud density for Homebrew as well as
+  the Codex — a shared-primitive visual change, outside CI-2's approved scope and not justified by an
+  unreproduced measurement. If it is taken up, the fix is `row-gap: var(--space-5)` (20px → exactly 44
+  centre-to-centre; go one step further given the M5 sub-pixel lesson) plus a `/styleguide` case that
+  actually wraps.
+
 ## Gotchas that look like bugs (but aren't)
 
 - **[build] Stale `tsbuildinfo` can mask type errors** — web `check`/`build` are incremental

@@ -450,6 +450,10 @@
 .codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .codex-entry-body { color: var(--text); }
 .codex-entry-gm { border-top: 1px dashed var(--line); padding-top: var(--space-2); color: var(--text-dim); position: relative; display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start; }
+/* CI-2: an entry's stored tags, read-only. Badges, not chips or buttons — nothing here is interactive,
+   so the 44px floor (§4) does not apply; a tag click still belongs to Pages and to a later milestone. */
+.codex-entry-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.codex-entry-tags .nh-badge { font-family: var(--font-mono); }
 .codex-entry-foot { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
 /* ----- Player Codex ----- */

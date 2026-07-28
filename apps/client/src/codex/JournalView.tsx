@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Field, Input, Panel, Select, Skeleton, Textarea } from "@vtt/ui";
+import { Alert, Badge, Button, Field, Input, Panel, Select, Skeleton, TagInput, Textarea } from "@vtt/ui";
 import { socket } from "../socket";
 import { calendarApi, calendarYearOf, codexApi, dateToInstant, formatWorldYear, journalApi, type CodexCalendar, type CodexInWorldDate, type CodexJournalEntry, type CodexPageSummary } from "./api";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -19,8 +19,8 @@ function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): strin
  * A structured in-world date sorts the timeline chronologically and groups it by year; entries can also
  * carry a session #, be pinned to a page, and reveal to players. Logged encounters auto-post here.
  */
-type Draft = { playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean };
-const EMPTY: Draft = { playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false };
+type Draft = { playerText: string; gmText: string; sessionNumber: string; dateYear: string; dateMonth: string; dateDay: string; attachPageId: string; revealed: boolean; tags: readonly string[] };
+const EMPTY: Draft = { playerText: "", gmText: "", sessionNumber: "", dateYear: "", dateMonth: "0", dateDay: "", attachPageId: "", revealed: false, tags: [] };
 const DRAFT_KEY = "codex-journal-draft";
 
 function whenLabel(entry: CodexJournalEntry): string {
@@ -36,7 +36,16 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => { try { const saved = sessionStorage.getItem(DRAFT_KEY); return saved ? { ...EMPTY, ...JSON.parse(saved) } : EMPTY; } catch { return EMPTY; } });
+  // A draft saved before CI-2 has no `tags` key, so EMPTY supplies one; the Array guard also stops a
+  // corrupt value reaching TagInput, which maps over it.
+  const [draft, setDraft] = useState<Draft>(() => {
+    try {
+      const saved = sessionStorage.getItem(DRAFT_KEY);
+      if (!saved) return EMPTY;
+      const parsed = JSON.parse(saved) as Partial<Draft>;
+      return { ...EMPTY, ...parsed, tags: Array.isArray(parsed.tags) ? parsed.tags : [] };
+    } catch { return EMPTY; }
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   // An in-progress NEW entry, set aside while the composer is borrowed to edit an existing one. Without
   // this, clicking Edit overwrote the draft AND (via the effect below) deleted its sessionStorage backup.
@@ -75,7 +84,10 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
       playerText: draft.playerText, gmText: draft.gmText.trim() || null, revealedToPlayers: draft.revealed,
       attachPageId: draft.attachPageId || null,
       sessionNumber: draft.sessionNumber.trim() ? Number(draft.sessionNumber) : null,
-      inWorldDate
+      inWorldDate,
+      // Always sent, never omitted: on an edit, omitting `tags` would leave the old ones in place, so
+      // removing the last tag from an entry has to travel as an explicit empty array.
+      tags: draft.tags
     };
     try {
       if (editingId) await journalApi.update(gmToken, editingId, input); else await journalApi.create(gmToken, input);
@@ -91,12 +103,16 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
     setDraft({
       playerText: entry.playerText, gmText: entry.gmText ?? "", sessionNumber: entry.sessionNumber?.toString() ?? "",
       dateYear: date ? String(date.year) : "", dateMonth: date ? String(date.month) : "0", dateDay: date ? String(date.day) : "",
-      attachPageId: entry.attachPageId ?? "", revealed: entry.revealedToPlayers
+      attachPageId: entry.attachPageId ?? "", revealed: entry.revealedToPlayers, tags: entry.tags
     });
   };
   const cancelEdit = () => { setEditingId(null); setDraft(stashedDraft ?? EMPTY); setStashedDraft(null); };
   const reveal = async (entry: CodexJournalEntry, revealed: boolean) => { await journalApi.reveal(gmToken, entry.id, revealed); await load(); };
   const remove = async (entry: CodexJournalEntry) => { if (await confirm({ title: "Delete entry", body: "Delete this journal entry? This cannot be undone.", confirmLabel: "Delete", danger: true })) { await journalApi.remove(gmToken, entry.id); await load(); } };
+
+  // One vocabulary across the suite: hint with the tags already in use on pages AND on other entries, so
+  // the GM reuses "session-recap" instead of inventing a near-duplicate. Free entry stays open (datalist).
+  const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...entries.flatMap((entry) => entry.tags)])].sort(), [pages, entries]);
 
   // Group the timeline by in-world year (dated years ascending, undated last).
   const groups = useMemo(() => {
@@ -138,6 +154,18 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
           <Field label="Day" htmlFor="j-day"><Input id="j-day" type="number" inputMode="numeric" value={draft.dateDay} placeholder="1" disabled={!draft.dateYear.trim()} onChange={(event) => set({ dateDay: event.target.value })} /></Field>
           <Field label="Pin to page" htmlFor="j-page"><EntityPicker id="j-page" pages={pages} value={draft.attachPageId || null} onChange={(id) => set({ attachPageId: id ?? "" })} ariaLabel="Pin to page" placeholder="— none —" /></Field>
         </div>
+        {/* Its own full-width row rather than a cell in .codex-composer-meta: that row's `flex: 1 1 130px`
+            columns would squeeze a wrapping chip cloud into a 130px gutter on a phone. The composer is
+            also the edit surface, so this one control covers both the new-entry and the edit path. */}
+        <Field label="Tags" htmlFor="j-tags">
+          <TagInput id="j-tags" ariaLabel="Tags" placeholder="session-recap, downtime" values={draft.tags}
+            onChange={(next) => set({ tags: next })}
+            max={24} maxReachedReason="An entry may carry at most 24 tags."
+            suggestions={tagSuggestions}
+            /* DEFAULT slugify on purpose — it IS the server contract (`codex-store.ts` tags():
+               /^[a-z0-9][a-z0-9-]*$/, which throws rather than sanitising). Overriding it here would
+               let "Session Recap" through as a value the PATCH rejects with a generic save failure. */ />
+        </Field>
         <div className="codex-composer-foot">
           <RevealSwitch revealed={draft.revealed} onChange={(revealed) => set({ revealed })} ariaLabel="Show this entry to players" />
           <Button variant="primary" size="sm" disabled={!draft.playerText.trim() && !draft.gmText.trim()} onClick={submit}>{editingId ? "Save entry" : "Add entry"}</Button>
@@ -165,6 +193,14 @@ export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gm
                 </header>
                 {entry.playerText.trim() && <div className="codex-entry-body"><CodexMarkdown text={entry.playerText} token={gmToken} onNavigate={(target) => { const page = pages.find((candidate) => candidate.title.toLowerCase() === target.toLowerCase()); if (page) onOpenPage(page.id); }} /></div>}
                 {entry.gmText && <div className="codex-entry-gm"><GmOnlyTag /><CodexMarkdown text={entry.gmText} token={gmToken} /></div>}
+                {/* Read-only on purpose. An entry's tags are otherwise invisible until you open Edit, but
+                    making them clickable would be the cross-type tag navigation that belongs to a later
+                    milestone — clicking a tag still filters Pages and nothing else. */}
+                {entry.tags.length > 0 && (
+                  <ul className="codex-entry-tags" aria-label="Entry tags">
+                    {entry.tags.map((tag) => <li key={tag}><Badge>{tag}</Badge></li>)}
+                  </ul>
+                )}
                 <footer className="codex-entry-foot">
                   {entry.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(entry.attachPageId!)}>Open page</Button>}
                   {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&

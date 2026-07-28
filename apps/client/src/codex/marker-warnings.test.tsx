@@ -20,11 +20,11 @@ import type { CodexMap, CodexMarker } from "./api";
  */
 const MAP = (revealed: boolean): CodexMap => ({
   id: "m1", assetId: "a1", name: "Barovia", kind: "regional", parentMapId: null,
-  revealedToPlayers: revealed, sortKey: 0, createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
+  revealedToPlayers: revealed, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 const MARKER = (revealed: boolean): CodexMarker => ({
   id: "k1", mapId: "m1", x: 0.5, y: 0.5, iconId: "pin", iconColor: "#FF2E9A", label: "Castle Ravenloft",
-  revealedToPlayers: revealed, pageIds: [], subMapId: null, sceneIds: [], actorId: null,
+  revealedToPlayers: revealed, pageIds: [], subMapId: null, sceneIds: [], actorId: null, tags: [],
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 

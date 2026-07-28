@@ -114,9 +114,12 @@ export async function uploadCodexAsset(token: string, file: File): Promise<{ id:
 
 export type PlayerCodexPageSummary = Readonly<{ id: string; title: string; entityType: EntityType; folder: string | null; tags: readonly string[]; bannerAssetId: string | null; updatedAt: string }>;
 export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ fields: Readonly<Record<string, string>>; body: string }>;
-export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null }>;
-export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null }>;
-export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; createdAt: string }>;
+// CI-2: `tags` is player-visible on all four record types. It rides the same allow-list as every other
+// field in these projections (`codex-projections.ts`), so a tag only ever arrives on a record the player
+// was already permitted to see — a tag is never a side channel onto a secret map, pin, or entry.
+export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null; tags: readonly string[] }>;
+export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null; tags: readonly string[] }>;
+export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
 
 export const playerCodexApi = {
   listPages: (token: string) => request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
@@ -131,19 +134,24 @@ export const playerCodexApi = {
 // ----- Atlas: maps + markers -----
 
 export type CodexMapKind = "battlemap" | "regional" | "world";
+/** CI-2: `tags` carries the SAME vocabulary and the same rules as page tags — at most 24, each a
+    lowercase slug (`/^[a-z0-9][a-z0-9-]*$/`). The server validates with the very same `tags()` helper
+    the page path uses and THROWS on a non-slug rather than sanitising, which is why every tag editor
+    here keeps `TagInput`'s default slugify normalizer instead of overriding it. */
 export type CodexMap = Readonly<{
   id: string; assetId: string; name: string; kind: CodexMapKind; parentMapId: string | null;
-  revealedToPlayers: boolean; sortKey: number; createdAt: string; updatedAt: string;
+  revealedToPlayers: boolean; sortKey: number; tags: readonly string[]; createdAt: string; updatedAt: string;
 }>;
 export type CodexMarker = Readonly<{
   id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null;
   revealedToPlayers: boolean; pageIds: string[]; subMapId: string | null; sceneIds: string[]; actorId: string | null;
-  createdAt: string; updatedAt: string;
+  tags: readonly string[]; createdAt: string; updatedAt: string;
 }>;
-export type CodexMapInput = Readonly<{ assetId?: string; name?: string; kind?: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean }>;
+/** On every write below, omitting `tags` leaves the stored tags alone; sending `[]` genuinely clears them. */
+export type CodexMapInput = Readonly<{ assetId?: string; name?: string; kind?: CodexMapKind; parentMapId?: string | null; revealedToPlayers?: boolean; tags?: readonly string[] }>;
 export type CodexMarkerInput = Readonly<{
   x?: number; y?: number; iconId?: string; iconColor?: string; label?: string | null; revealedToPlayers?: boolean;
-  pageIds?: string[]; subMapId?: string | null; sceneIds?: string[]; actorId?: string | null;
+  pageIds?: string[]; subMapId?: string | null; sceneIds?: string[]; actorId?: string | null; tags?: readonly string[];
 }>;
 
 /** A map asset the GM has uploaded (from the existing map catalog); the raw material for an atlas map node. */
@@ -158,7 +166,9 @@ export const atlasApi = {
   },
   listMaps: (token: string) => request<{ maps: CodexMap[] }>(token, "/maps").then((data) => data.maps),
   createMap: (token: string, input: CodexMapInput & { assetId: string; name: string; kind: CodexMapKind }) => request<{ map: CodexMap }>(token, "/maps", { method: "POST", body: JSON.stringify(input) }).then((data) => data.map),
-  updateMap: (token: string, id: string, input: { name?: string; kind?: CodexMapKind }) => request<{ map: CodexMap }>(token, `/maps/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.map),
+  // Deliberately narrower than CodexMapInput: the server's MapUpdateSchema is strict and accepts only
+  // these three, so widening this would let a caller send a field the PATCH rejects outright.
+  updateMap: (token: string, id: string, input: { name?: string; kind?: CodexMapKind; tags?: readonly string[] }) => request<{ map: CodexMap }>(token, `/maps/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.map),
   setMapParent: (token: string, id: string, parentMapId: string | null) => request<{ map: CodexMap }>(token, `/maps/${id}/parent`, { method: "POST", body: JSON.stringify({ parentMapId }) }).then((data) => data.map),
   revealMap: (token: string, id: string, revealed: boolean) => request<{ map: CodexMap }>(token, `/maps/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.map),
   deleteMap: (token: string, id: string) => request<{ deleted: boolean }>(token, `/maps/${id}`, { method: "DELETE" }),
@@ -177,13 +187,13 @@ export type CodexJournalEntry = Readonly<{
   id: string; playerText: string; gmText: string | null; revealedToPlayers: boolean;
   attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null;
   sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null;
-  sortKey: number; createdAt: string; updatedAt: string;
+  sortKey: number; tags: readonly string[]; createdAt: string; updatedAt: string;
 }>;
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 export type CodexJournalInput = Readonly<{
   playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null;
   attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null;
-  inWorldDate?: CodexInWorldDate | null;
+  inWorldDate?: CodexInWorldDate | null; tags?: readonly string[];
 }>;
 
 // ----- Calendar (the world's own months / weekdays / era) -----

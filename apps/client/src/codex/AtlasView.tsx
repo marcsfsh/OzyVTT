@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Field, Input, Modal, Select, Skeleton, Switch } from "@vtt/ui";
+import { Alert, Badge, Button, Field, Input, Modal, Select, Skeleton, Switch, TagInput } from "@vtt/ui";
 import { socket } from "../socket";
 import { atlasApi, type CodexMap, type CodexMapKind, type CodexMarker, type CodexPageSummary, type MapAsset } from "./api";
 import { codexApi } from "./api";
@@ -67,6 +67,8 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
 
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;
+  // Hint from the tags already in use on pages and on other maps — one vocabulary across the suite.
+  const tagSuggestions = useMemo(() => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(), [pages, maps]);
 
   const breadcrumb = useMemo(() => {
     const chain: CodexMap[] = [];
@@ -110,6 +112,13 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
     if (!currentMap) return;
     try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { kind })); }
     catch (retypeError) { setError(retypeError instanceof Error ? retypeError.message : "Couldn't change the map kind."); }
+  };
+  // Saved per committed tag, matching the kind/parent selects beside it — Map settings has no Save button.
+  // `tags` is always sent as a full list, so clearing the last one travels as [] and genuinely clears it.
+  const retagMap = async (tags: readonly string[]) => {
+    if (!currentMap) return;
+    try { onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { tags })); }
+    catch (tagError) { setError(tagError instanceof Error ? tagError.message : "Couldn't save the tags."); }
   };
   const reparentMap = async (parentMapId: string | null) => {
     if (!currentMap) return;
@@ -227,6 +236,9 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
       <Modal open={settingsOpen && !!currentMap} onClose={() => { void renameMap(); setSettingsOpen(false); }} title="Map settings" size="sm" ariaLabel="Map settings">
         {currentMap && (
           <div className="codex-map-settings">
+            {/* R4: the atlas's error Alert sits behind the overlay, so a failed save in here was silent.
+                Every write in this modal is immediate, which makes a visible failure the only feedback. */}
+            {error && <Alert tone="danger">{error}</Alert>}
             <Field label="Name" htmlFor="map-name">
               <Input id="map-name" value={settingsName} onChange={(event) => setSettingsName(event.target.value)} onBlur={renameMap}
                 onKeyDown={(event) => { if (event.key === "Enter") void renameMap(); }} />
@@ -241,6 +253,14 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
                 <option value="">— top level —</option>
                 {maps.filter((map) => map.id !== currentMap.id && !descendantIds.has(map.id)).map((map) => <option key={map.id} value={map.id}>{map.name}</option>)}
               </Select>
+            </Field>
+            <Field label="Tags" htmlFor="map-tags">
+              <TagInput id="map-tags" ariaLabel="Tags" placeholder="underdark, faerun" values={currentMap.tags}
+                onChange={(next) => void retagMap(next)}
+                max={24} maxReachedReason="A map may carry at most 24 tags."
+                suggestions={tagSuggestions}
+                /* DEFAULT slugify — the server's `tags()` throws on anything that is not
+                   /^[a-z0-9][a-z0-9-]*$/, so the primitive's default IS the contract. */ />
             </Field>
             <div className="codex-inspector-foot">
               <Button variant="ghost" size="sm" onClick={() => { setSettingsOpen(false); void deleteMap(); }}>Delete map</Button>

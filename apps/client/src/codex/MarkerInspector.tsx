@@ -1,11 +1,11 @@
-import { Alert, Badge, Button, Field, IconButton, Input, Select } from "@vtt/ui";
+import { Alert, Badge, Button, Field, IconButton, Input, Select, TagInput } from "@vtt/ui";
 import { atlasApi, journalApi, type CodexJournalEntry, type CodexMap, type CodexMarker, type CodexMarkerInput, type CodexPageSummary } from "./api";
 import { IconPicker, EntityIcon } from "./icons";
 import { EntityPicker } from "./EntityPicker";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
 import { useConfirm } from "../components/feedback";
 import { socket } from "../socket";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * The marker inspector: edit a pin's icon/color/label, wire its links, reveal it, or delete it. A pin can
@@ -66,6 +66,11 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
     catch { setError("Couldn't delete the marker."); }
   };
 
+  // Hint from the tags already in use on pages and on the atlas, so one vocabulary spans the suite.
+  const tagSuggestions = useMemo(
+    () => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(),
+    [pages, maps]
+  );
   const subMaps = maps.filter((map) => map.id !== marker.mapId);
   // CD-6: revealing a pin does nothing if the map it sits on is still secret — players never see the
   // map, so they never see the pin. Nothing said so, so the GM believed the reveal had taken effect.
@@ -96,6 +101,18 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
       <Field label="Label" htmlFor="marker-label">
         <Input id="marker-label" value={label} placeholder="Unnamed" disabled={busy}
           onChange={(event) => setLabel(event.target.value)} onBlur={() => label !== (marker.label ?? "") && patch({ label: label.trim() || null })} />
+      </Field>
+
+      {/* Sits with Label because both describe the pin itself, above the link wiring. Each committed tag
+          saves straight away, like the icon/colour/link controls here — the inspector has no Save button,
+          so a staged tag list would be the one thing in this panel that could be lost by closing it. */}
+      <Field label="Tags" htmlFor="marker-tags">
+        <TagInput id="marker-tags" ariaLabel="Tags" placeholder="dungeon, shop" values={marker.tags}
+          onChange={(next) => patch({ tags: next })}
+          max={24} maxReachedReason="A marker may carry at most 24 tags."
+          suggestions={tagSuggestions}
+          /* DEFAULT slugify — it is the server's own contract (`tags()` throws on a non-slug rather
+             than cleaning it up), so normalising here is what keeps a typed "Old Mill" saveable. */ />
       </Field>
 
       <IconPicker iconId={marker.iconId} color={marker.iconColor} onIcon={(iconId) => patch({ iconId })} onColor={(iconColor) => patch({ iconColor })} />
