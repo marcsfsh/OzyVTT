@@ -16,5 +16,6 @@ This directory holds product contracts, checkpoint outcomes, wireframes, browser
 - [Codex worldbuilding suite — product specification](codex-suite-spec.md)
 - [Codex worldbuilding suite — experience design](codex-suite-design.md)
 - [Codex worldbuilding suite — implementation plan](codex-suite-plan.md)
+- [Codex campaign tracking — deferred programme (M8–M12)](codex-campaign-tracking.md)
 
 Physical-device observations, end-to-end wireframes, and realtime multi-client convergence evidence remain to be added.

@@ -6,7 +6,8 @@ changed.
 Requirements: `codex-suite-spec.md`. Design: `codex-suite-design.md`. Evidence: `codex-suite-assessment.md`.
 
 Milestone order follows owner decision **D-1** (Completion → Foundation → Integration → Campaign
-tracking). **Thirteen** milestones, each independently reviewable and independently verifiable.
+tracking). **Thirteen** milestones. **M1–M7 are the active programme**; M8–M12 are approved,
+specified in `codex-campaign-tracking.md`, and deferred by owner decision U-1.
 
 **Revised after Stage Four adversarial review** — four major findings accepted and fixed: CP-2 split
 into M1b with server work (the original "no server work" claim was wrong); `packages/api-contract`
@@ -189,21 +190,22 @@ Verification · Docs · Escalate if**.
 - **Escalate if.** Indexing GM and player layers separately for three record types proves
   materially more complex than the page precedent.
 
-### M7 · Return edges, World home, Graph
+### M7 · Return edges, the Campaign dashboard, Graph
 
-- **Goal.** Kill the star topology; make World and Graph tell the truth.
+- **Goal.** Kill the star topology; **rename `World` → `Campaign`** and make it a real dashboard; make Graph tell the truth.
 - **Requirements.** CI-3, CI-4, CI-5, CI-6, CI-7, CI-8, CI-9.
 - **Excludes.** Campaign records (Phase 4).
 - **Depends on.** M6.
 - **Owns.** `codex-http.ts` (new page→markers reverse route; whole-graph backlinks feed),
   **`packages/api-contract`** (two new routes), `codex-store.ts`, `codex-projections.ts`,
-  `PageEditor.tsx` (Connections section), `WorldHome.tsx`, `RelationshipGraph.tsx`,
+  `PageEditor.tsx` (Connections section), `WorldHome.tsx` (**renamed to the Campaign dashboard** — file rename plus the mode label in `CodexWorkspace.tsx` and `PlayerCodex.tsx`), `RelationshipGraph.tsx`,
   `CodexWorkspace.tsx`, **`JournalView.tsx` + `AtlasView.tsx`** (CI-6 entry→marker/replay edge).
 - **Reuse.** `projectPlayerMarker` for the reverse lookup — it must project, not bypass.
 - **Risks.** **The reverse marker lookup is a new player-reachable read** — it must go through
   `codex-projections.ts` or it leaks hidden pins. CI-8's backlink edges must respect the
-  both-endpoints-revealed rule the typed-edge feed already enforces. CI-7 gives World data it never
-  had — a new fetch path on the suite's most-loaded surface.
+  both-endpoints-revealed rule the typed-edge feed already enforces. CI-7 gives the dashboard data it never
+  had — a new fetch path on the suite's most-loaded surface. **The rename touches both GM and player
+  mode bars and the command palette's goto targets**; miss one and the vocabulary splits (P4).
 - **Verification.** All four return edges reachable from an open page (A-5). **Viewer-safety audit of
   both new feeds** (A-8). Graph no longer excludes orphans from the frame; wiki-link edges visually
   distinct. World recency excludes housekeeping (CI-9).
@@ -212,92 +214,28 @@ Verification · Docs · Escalate if**.
 
 ---
 
-## Phase 4 — Campaign tracking (the clean cut point — see spec §9)
+## Phase 4 — Campaign tracking (M8–M12) — DEFERRED, fully specified elsewhere
 
-**Everything from M8 onward is separable.** If the owner accepts the spec's §9 recommendation, the
-programme can stop after M7 with a coherent, shipped result. Nothing in M1–M7 depends on M8–M12.
+**Owner decision (U-1): run M1–M7 now. M8–M12 are approved and specified but not yet built.**
 
-### M8 · Chronicle unification
+The full specification — data model with reasoning, five milestones in this document's format, hard
+constraints, the legacy `session_number` transition problem, open questions, and a rejected-alternatives
+register — lives in its own artifact so a future session can implement it without this conversation:
 
-- **Goal.** One timeline. Events become dated records; two lenses.
-- **Requirements.** CT-11, CT-12.
-- **Excludes.** Sessions, quests, deadlines, downtime.
-- **Depends on.** M4 technically (adopted primitives). **M7 is ordering only, not a technical
-  dependency** — corrected after adversarial review flagged it as over-declared.
-- **Owns.** `codex-store.ts` (event dating + migration), `codex-projections.ts`, `JournalView.tsx`,
-  `entities.ts`.
-- **Risks.** K3 — the calendar reflow recomputes every dated record; events joining that set must
-  reflow correctly. The unified row shape (design R2) must not regress entry rendering.
-- **Verification.** An `event` page appears on the timeline in the right year. Lens toggle reorders
-  without data change. Calendar edit reflows events and entries together, non-destructively.
-  **HTTP-boundary test (A-8): a player timeline request returns no unrevealed event and no GM-only
-  event content.** `PlayerCodex.tsx:42` reads the timeline, so any record kind joining the chronicle
-  is player-reachable by default — flagged by adversarial review, originally missing here.
-- **Escalate if.** Two record types on one timeline requires changing the entry sort key contract.
+> **`docs/product/codex-campaign-tracking.md`**
 
-### M9 · Sessions, prep, recap
+**Architecture summary (decided after owner brainstorm; supersedes the earlier draft):**
 
-- **Goal.** The session becomes a record; prep and recap get a home. *Owner-flagged as key.*
-- **Requirements.** CT-1, CT-2, CT-3.
-- **Excludes.** Quests, factions, downtime.
-- **Depends on.** M8. **Requires DQ-1 approved** (Campaign mode).
-- **Owns.** New `codex_sessions` table + migration; routes; projection; new `Campaign` mode
-  components; `PlayerCodex.tsx` (recap surfacing).
-- **Risks.** New mode changes top-level IA. Prep is GM-only and recap is player-facing **on the same
-  record** — the projection must split them, exactly like `fields`/`gmFields`. Existing
-  `sessionNumber` integers on entries must reconcile with real session records (K7).
-- **Verification.** HTTP test: a player session gets recap and **never** prep (A-8). Existing
-  entries' session numbers still group correctly. Mobile pass on the new mode.
-- **Escalate if.** Reconciling legacy `sessionNumber` values needs owner input on ambiguous data.
+- **No sixth mode.** `World` is renamed **`Campaign`** and becomes the dashboard (D-10).
+- **Three new tables**, not five: `codex_sessions`, `codex_quests`, `codex_standing` (D-11).
+- **Four new timeline kinds** on the existing `codex_journal` (`deadline`, `downtime`, `milestone`,
+  `standing`) via its existing `kind` discriminator plus an additive `payload_json`.
+- **Prep and recap are the two layers of one session record** (D-13) — so the recap *is* the player
+  projection, and no new player-facing surface exists.
+- Prep is reachable **two ways**: the session's full view, and a session-console drawer available from
+  any Codex mode (DESIGN DECISION 3).
 
-### M10 · Quests
-
-- **Goal.** Track what is still open.
-- **Requirements.** CT-4. **Depends on.** M9. **Excludes.** Graph representation (DQ-4 default: no).
-- **Owns.** `codex-store.ts` (new `codex_quests` table + migration), `codex-http.ts`,
-  **`packages/api-contract`**, `codex-projections.ts`, `codex/api.ts`, Campaign-mode components;
-  **`@vtt/ui`** + `/styleguide` for the objective checklist.
-- **Risks.** Objectives are ordered mutable state — the first Codex record with a list-of-things
-  shape. The checklist component goes to `@vtt/ui` per design-language §10.2, **not inline** (R9).
-- **Verification.** Two-layer projection test (A-8); objectives persist order; search finds quests
-  (DQ-4); narrow-viewport pass.
-- **Docs.** `api-reference.md`; `current-state.md`; `decision-log.md` (D-6 rationale).
-- **Escalate if.** Objectives need richer state than a checklist (assignees, dates) — that is
-  unapproved scope.
-
-### M11 · Deadlines and downtime
-
-- **Requirements.** CT-5, CT-10. **Depends on.** M8 (the chronicle). **M9 is ordering only** —
-  downtime and deadlines do not technically require session records.
-- **Risks.** **K3 is sharpest here.** Downtime advances the in-world calendar, and `setCalendar`
-  transactionally recomputes every dated record. Downtime that moves the date can therefore reflow
-  the entire chronicle. This needs an explicit transactional design and the heaviest test coverage
-  in Phase 4.
-- **Verification.** Advancing the date via downtime does not corrupt any dated record; deadlines fire
-  when passed; raw dates remain source of truth. **HTTP-boundary test (A-8): deadlines and downtime
-  records are GM-only until explicitly revealed, and never appear in a player timeline request.**
-- **Owns.** `codex-store.ts` (two new tables + migrations), `codex-http.ts`,
-  **`packages/api-contract`**, `codex-projections.ts`, `JournalView.tsx`, Campaign-mode components.
-- **Docs.** `decision-log.md` (date-advancement contract); `current-state.md`.
-- **Escalate if.** Date advancement cannot be made safe without changing the reflow contract.
-
-### M12 · Standing, party marker, progression, reveal audit
-
-- **Goal.** Close out campaign state and give the GM one view of what players can see.
-- **Requirements.** CT-6, CT-7, CT-8, CT-9. **Depends on.** M9, M11.
-- **Owns.** `codex-store.ts` (standing + progression tables, party-marker flag, migrations),
-  `codex-http.ts`, **`packages/api-contract`**, `codex-projections.ts`, `AtlasView.tsx`,
-  `MarkerInspector.tsx`, Campaign-mode components, mode-bar ops cluster (CT-9 entry point).
-- **Reuse.** `Meter` for standing; ordinary marker + flag for the party pin (DQ-3).
-- **Note.** CT-9 (reveal audit) is deliberately last because it must enumerate *every* record type;
-  building it earlier would mean revisiting it after each new type.
-- **Risks.** CT-9 is a **read-only aggregation of reveal state** — it must not become a second source
-  of truth. The party marker is player-visible and must project as an ordinary marker (A-8).
-- **Verification.** Reveal audit lists every revealed record across all areas and can unreveal;
-  standing history lands on the chronicle; HTTP test that the party marker leaks no GM-only fields.
-- **Docs.** `api-reference.md`; `current-state.md`; `known-bugs.md`.
-- **Escalate if.** CT-9 cannot enumerate a record type without a new server aggregation route that
-  duplicates projection logic.
+**M1–M7 remain a complete, coherent deliverable on their own.** Nothing in them depends on M8–M12.
 
 ---
 
@@ -308,7 +246,7 @@ programme can stop after M7 with a coherent, shipped result. Nothing in M1–M7 
 | CP-1, CP-3…CP-7 | M1 | API sweep (A-1) |
 | CP-2 | **M1b** | Preview payload byte-identical to a real player session (A-8) |
 | CP-8, CP-9 (location) | M2 | HTTP viewer-safety test (A-8), timeline placement |
-| CP-9 (session) | M9 | Battles listed for a session record |
+| CP-9 (session) | M9 *(deferred)* | see `codex-campaign-tracking.md` |
 | CF-5 | M3 | CI runs client tests (A-4) |
 | CF-1, CF-2, CF-6 | M4 | Primitive audit (A-2), per-mode states |
 | CF-3, CF-4 | M5 | Tap-target audit (A-3), narrow viewport (A-9) |
@@ -318,11 +256,11 @@ programme can stop after M7 with a coherent, shipped result. Nothing in M1–M7 
 | CD-8 | M2, M3 | New test coverage |
 | CI-1, CI-2 | M6 | A-6, player-search leak test |
 | CI-3…CI-9 | M7 | A-5, viewer-safety audit |
-| CT-11, CT-12 | M8 | Timeline placement, reflow safety, **player-timeline leak test (A-8)** |
-| CT-1, CT-2, CT-3 | M9 | Prep/recap projection split; CP-9 session half |
-| CT-4 | M10 | Two-layer test |
-| CT-5, CT-10 | M11 | Reflow safety, **player-timeline leak test (A-8)** |
-| CT-6…CT-9 | M12 | Audit completeness |
+| CT-11, CT-12 | M8 *(deferred)* | see `codex-campaign-tracking.md` |
+| CT-1, CT-2, CT-3 | M9 *(deferred)* | see `codex-campaign-tracking.md` |
+| CT-4 | M10 *(deferred)* | see `codex-campaign-tracking.md` |
+| CT-5, CT-10 | M11 *(deferred)* | see `codex-campaign-tracking.md` |
+| CT-6…CT-9 | M12 *(deferred)* | see `codex-campaign-tracking.md` |
 
 **All 44 requirement IDs are covered (A-11).** Thirteen milestones after adversarial review split
 M1b out of M1.
@@ -346,11 +284,11 @@ M1b out of M1.
 
 | # | Blocks |
 | --- | --- |
-| **U-1** (spec §9) — full scope, or stop after M7? | Whether M8–M12 are planned in detail |
-| **DQ-1** — Campaign as a sixth mode? | M9 |
-| **DQ-2** — does the player get a Campaign surface? | M9 |
-| U-2 — Graph node/edge scale target (assumed 200) | M7 sizing |
-| U-3 — sessions reachable from the combat pillar? | M9 |
-| **U-5** — does the reveal audit cover only Codex records, or also table-side exposure (tokens, maps on the shared viewer)? Dropped from an earlier draft; restored after review. | M12 |
+| ~~U-1~~ | **RESOLVED** — run M1–M7; M8–M12 specified in `codex-campaign-tracking.md` |
+| ~~DQ-1~~ | **RESOLVED** — no sixth mode; `World` → `Campaign` dashboard (D-10) |
+| ~~DQ-2~~ | **RESOLVED** — the recap is the session's player projection; no new player surface (D-13) |
+| U-2 — Graph node/edge scale target (assumed 200) | M7 sizing only |
+| U-3, U-5, DQ-4 | carried into `codex-campaign-tracking.md` §6 |
 
-M1–M7 can begin without any of these answered.
+**Nothing blocks M1. M1–M7 can run start to finish with only U-2 outstanding, and that affects
+sizing in M7 alone.**

@@ -40,39 +40,62 @@ Three concepts carry the whole suite. Everything else hangs off them.
    events, sessions, deadlines, downtime.
 3. **The campaign** — how play is run. Sessions, prep, quests, faction standing, the party's position.
 
-The suite's current five modes cover (1) well, (2) partially, and (3) not at all. That is the
-structural reason it feels incomplete now that campaign tracking is in scope.
+The suite's five modes cover (1) well and (2) partially, and had no home for (3). The resolution is
+**not** a new mode: (3) is state that belongs to surfaces that already exist — the dashboard (renamed
+from `World` to `Campaign`), the chronicle, and the atlas. See DESIGN DECISION 1.
 
 ---
 
 ## 3. Information architecture
 
-### DESIGN DECISION 1 — add a sixth mode, "Campaign"
+### DESIGN DECISION 1 — no sixth mode. `World` becomes **`Campaign`**, the dashboard.
 
-The approved campaign-tracking requirements (CT-1…CT-8) have no home. The five existing modes are
-all *nouns of the world*; sessions, prep and quests are *the play*. Forcing them into Journal would
-make Journal two things again — the exact problem CT-12 exists to fix.
+*Superseded the original proposal (a sixth "Campaign" tab) after owner brainstorm. Recorded because
+the reasoning matters for future work.*
+
+The five modes stay five. **`World` is renamed `Campaign`** and becomes the dashboard the owner
+approved under CI-7 — entities at a glance *plus* the campaign's live state.
 
 ```
 Codex
-├── World      · what my world is, at a glance          (CI-7)
+├── Campaign   · the dashboard (was "World")   — CI-7 + campaign state
 ├── Pages      · write and organise entities
-├── Atlas      · where things are                        (+ party marker CT-7)
-├── Journal    · the chronicle — one timeline, two lenses (CT-11, CT-12)
-├── Campaign   · how play is run — NEW                   (CT-1…CT-6, CT-8)
-└── Graph      · how the world connects                  (CI-8)
+├── Atlas      · where things are               — + party marker
+├── Journal    · the chronicle, two lenses      — CT-11, CT-12
+└── Graph      · how the world connects         — CI-8
 ```
 
-**Campaign** holds: the current/next session (prep), past sessions, quests, faction standing, and a
-progression log. **Journal** stays the chronicle; a session's *entries* still live there, and the
-Campaign session record links to them.
+**Why no sixth tab.** Campaign material is not a *place*; it is state that belongs to surfaces that
+already exist. A sixth tab would create a second surface that knows about time, competing with the
+Journal timeline we just unified (P3).
 
-**Rejected alternative:** renaming Journal to "Chronicle" and splitting differently. The owner
-approved "Journal is one timeline with two lenses" (CT-12) — renaming it is unapproved scope.
+**Where each thing actually lives:**
 
-**Risk accepted:** six tabs is more than five. Mitigated because the mode bar is already a scrolling
-`Tabs` control and the sixth is a genuinely distinct job. If the owner prefers five, the fallback is
-Campaign as a sub-view of Journal — worse, but viable.
+| Campaign concept | Home |
+| --- | --- |
+| Dashboard summary | `Campaign` mode |
+| Session record (prep + recap) | its own record; reachable from the dashboard **and** Journal's by-session lens |
+| Prep, while working elsewhere | the **session console** drawer (DESIGN DECISION 3) |
+| Quests | own record; listed on the dashboard, opened full-view |
+| Deadlines · downtime · progression · standing changes | **timeline records** in Journal |
+| Faction standing (current value) | the faction entity + dashboard card |
+| Party location | a flagged marker in Atlas |
+| Reveal audit | a global utility (DESIGN DECISION 2) |
+
+**Rejected:** a sixth tab (creates a rival timeline surface); folding campaign material into Journal
+(re-creates the two-things-in-one-surface problem CT-12 exists to fix).
+
+### DESIGN DECISION 3 — prep has two routes, never one
+
+The owner was explicit: prep must be referenceable *while browsing other things*, but the drawer must
+not be the only way in.
+
+1. **Destination** — the session record's full view, reachable from the dashboard's "Next session"
+   card and from Journal's by-session lens. All editing lives here.
+2. **Session console** — a collapsible drawer toggled from the mode bar, showing the current
+   session's prep from **any** Codex mode. Reference surface; its open/closed state persists.
+
+Both read the same record. The console is a view, never a second store.
 
 ### DESIGN DECISION 2 — the reveal audit is a global utility, not a mode
 
@@ -90,7 +113,7 @@ Today every mode routes **into** Pages and nothing routes out (assessment §6.1)
 ```mermaid
 graph LR
   subgraph TODAY["Today — a star, no return edges"]
-    W1[World] --> P1[Pages]
+    W1["World (renamed Campaign)"] --> P1[Pages]
     A1[Atlas] --> P1
     J1[Journal] --> P1
     G1[Graph] --> P1
@@ -107,15 +130,15 @@ graph LR
     A --> P
     J -->|CI-6 its marker + replay| A
     G --> P
-    W[World] --> P
-    W --> A
-    W --> J
-    C[Campaign] --> J
-    C --> P
+    C["Campaign (dashboard)"] --> P
+    C --> A
+    C --> J
+    C -->|next session| S[Session record]
+    S --> J
   end
 ```
 
-**Rule (new, enforceable):** *every cross-mode jump prepares its destination.* The World→Pages
+**Rule (new, enforceable):** *every cross-mode jump prepares its destination.* The dashboard→Pages
 handoff already does this — it sets the filter, clears the query, clears the selection and switches
 mode in one gesture. Every other jump currently just sets mode and id, leaving stale filter state.
 This becomes a consistency rule, not a per-case fix.
@@ -129,46 +152,63 @@ adding chrome.
 
 ## 5. The chronicle — one timeline
 
-CT-11 and CT-12 make Journal the single chronology. Five record kinds resolve onto it:
+CT-11 and CT-12 make Journal the single chronology. These record kinds resolve onto it:
 
 | Kind | Source | Reveal default |
 | --- | --- | --- |
 | Journal entry | GM writes | GM choice |
 | Dated `event` page | CT-11 | follows the page |
 | Combat entry | auto (CP-8) | **GM-only** (D-5) |
-| Deadline | CT-5 | GM-only until fired |
-| Downtime | CT-10 | GM choice |
+| Deadline (`kind='deadline'`) | CT-5 | GM-only until fired |
+| Downtime (`kind='downtime'`) | CT-10 | GM choice |
+| Milestone (`kind='milestone'`) | CT-8 | GM choice |
+| Standing change (`kind='standing'`) | CT-6 | GM choice |
+| Session | CT-1 | recap is the player layer |
 
 **Two lenses (CT-12):** a `SegmentedControl` toggling **By session** / **By in-world date**. Same
 records, two orderings. Session grouping answers "what happened last time"; in-world grouping answers
 "what happened in the world."
 
 **Consistency rule:** every kind renders in the same row shape — icon, title, date, reveal state —
-differing only by icon and accent. A reader must never have to learn five layouts. Kind is carried by
+differing only by icon and accent. A reader must never have to learn a layout per kind. Kind is carried by
 icon **plus** label, never colour alone (design language §5, condition-chip precedent).
 
 ---
 
-## 6. Campaign — the new mode
+## 6. Campaign material — what is a table and what is a timeline record
 
-**Session record (CT-1, CT-2, CT-3).** One record, three faces:
+Owner delegated this decision with one constraint: **future growth must not be hampered.** That
+constraint reversed one of the lead's own proposals (quests), which is recorded here deliberately.
 
-- **Prep** (GM-only) — planned scenes, NPCs to have ready, notes. *The owner named this key.* This is
-  the default view for the next session.
-- **Log** — the journal entries and encounters that occurred, gathered automatically.
-- **Recap** (player-facing, CT-3) — curated prose, surfaced at the top of the player Codex.
+**Governing principle.** Something is a **table** when it has independent identity and lifecycle —
+you create it, name it, browse it, and it outlives any single moment. Something is a **timeline
+record** when it is fundamentally *a thing that happened, or will happen, at a time*.
 
-The three are tabs within the session, not three records. Prep→Log→Recap is the natural lifecycle of
-one session, and modelling it as one record is what lets the recap draw on the log.
+### Three new tables
 
-**Quests (CT-4).** Status (active / completed / failed), ordered tickable objectives, links to
-involved entities via the existing `EntityPicker`. Two-layer like everything else: a quest has a
-player-facing description and GM-only truth.
+| Table | Why it earns one |
+| --- | --- |
+| `codex_sessions` | Number, real date, attendees, **prep (GM layer)**, **recap (player layer)**, status. Prep exists days before the session and is edited over time — independent lifecycle. Prep is *not* a separate table: it is the session's GM layer, exactly like `gmBody` on a page. |
+| `codex_quests` | **Reverses the lead's "quest as a 9th entity type" idea.** Entity `fields` are a flat `Record<string,string>`, so objectives would be JSON stuffed into a string, and quest *status* must be queryable for the dashboard. Quests also plausibly grow — assignees, calendar-linked due dates, sub-quests, rewards. Once storage for a checklist field kind is needed anyway, a table costs little more and leaves headroom. |
+| `codex_standing` | Faction → current value → history. Queryable for the dashboard; leaves room for per-character or multi-axis reputation. |
 
-**Faction standing (CT-6).** Uses the existing `Meter` primitive from `@vtt/ui` — no new component.
-Standing changes are dated records, so they land on the chronicle.
+### Not tables — timeline records
 
-**Progression (CT-8).** Milestone/level events, dated, on the chronicle. No XP arithmetic (D-8).
+`codex_journal` already carries a `kind` discriminator (it distinguishes combat entries today). These
+become new kinds, plus one additive `payload_json` column following the established
+`page_ids_json`/`scene_ids_json` precedent (migration v8):
+
+| Kind | Payload |
+| --- | --- |
+| `deadline` | what, target date, fired flag |
+| `downtime` | who, activity, time cost, outcome |
+| `milestone` | level, reason (CT-8) |
+| `standing` | faction, delta, reason |
+
+Each inherits two-layer bodies, reveal, dating, calendar reflow, pinning and search **for free**.
+
+**Net effect:** three new tables instead of five, no new tab, and prep/recap fall out of the existing
+two-layer pattern instead of needing a new concept.
 
 ---
 
@@ -182,8 +222,9 @@ unreachable by players. CP-9 surfaces replays **GM-only**; the player-facing sid
 carries prose only, never replay data. This must be proven by an HTTP-boundary test, not by
 inspection.
 
-**New surfaces that must project (P2):** **dated `event` pages (CT-11)**, session (prep is GM-only,
-recap is player-facing), quest, **deadline (CT-5)**, downtime, faction standing, party marker.
+**New surfaces that must project (P2):** **dated `event` pages (CT-11)**, **session** (prep is the
+GM layer, recap is the player layer — one record, split by projection), **quest**, and the four new
+timeline kinds (**deadline, downtime, milestone, standing**), plus faction standing and the party marker.
 
 **Why events and deadlines are called out explicitly:** `PlayerCodex.tsx:42` fetches the timeline via
 `playerCodexApi.timeline(token)`. The moment any new record kind resolves onto the chronicle it becomes
@@ -248,7 +289,7 @@ the viewer's, or an explicit, audited role downgrade that forces every read thro
 
 | # | Question | Default if unanswered |
 | --- | --- | --- |
-| DQ-1 | Approve **Campaign as a sixth mode** (DESIGN DECISION 1)? | Proceed as designed |
-| DQ-2 | Does the player see a **Campaign** surface at all (recaps, revealed quests), or only recaps inside their existing tabs? | Recaps surface in the player Codex; no separate player Campaign tab |
+| DQ-1 | ~~Campaign as a sixth mode?~~ **RESOLVED** — no sixth mode; `World` renamed **`Campaign`** and becomes the dashboard. | resolved |
+| DQ-2 | ~~Player Campaign surface?~~ **RESOLVED** — the recap **is** the player projection of the session record. It headlines the player's `Campaign` dashboard, with a "new since you last looked" indicator on the Codex button. **No new player surface.** | resolved |
 | DQ-3 | Should the party marker be **one special marker** or an ordinary marker flagged as the party? | Ordinary marker with a flag — cheaper, reuses everything |
 | DQ-4 | Does a **quest** appear in the Graph and in search alongside entities? (spec U-4) | Yes to search, no to Graph in this programme |

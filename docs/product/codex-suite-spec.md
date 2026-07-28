@@ -115,7 +115,7 @@ IDs are stable and used for traceability through planning, implementation and QA
 | CI-4 | Return edge: page → its markers on the Atlas (**needs a new reverse-lookup route**). |
 | CI-5 | Return edge: page → its node in the Graph, focused on that entity. |
 | CI-6 | Return edge: journal entry → its marker and its combat replay. |
-| CI-7 | **World becomes a world-at-a-glance home** — entities by type plus recent journal activity, atlas presence, and the current in-world date. |
+| CI-7 | **`World` is renamed `Campaign` and becomes the dashboard** — entities by type, recent journal activity, atlas presence, the current in-world date, **plus campaign state** (next session, open quests, approaching deadlines, party position, faction standing). Both GM and players land here. |
 | CI-8 | **Graph draws typed relationships + wiki-links**, visually distinguished; orphans are no longer excluded from the auto-fit frame. Needs a whole-graph backlinks endpoint. |
 | CI-9 | Fix World's "Recently updated" so relationship edits count and housekeeping (reveal-toggle, folder move) does not. |
 
@@ -123,16 +123,16 @@ IDs are stable and used for traceability through planning, implementation and QA
 
 | ID | Requirement |
 | --- | --- |
-| CT-1 | **Sessions are first-class records**: real-world date, number, attendees, recap, with automatic links to the journal entries and encounters that occurred in them. |
-| CT-2 | **Full GM prep surface per session** — planned scenes, NPCs to have ready, notes to hand. *Owner: "GM facing session notes and session prep are a key part."* |
-| CT-3 | **Curated player-facing recap** per session, distinct from the GM log, surfaced at the top of the player Codex. |
+| CT-1 | **Sessions are first-class records** (`codex_sessions`): real-world date, number, attendees, status, with automatic links to the journal entries and encounters that occurred in them. |
+| CT-2 | **Full GM prep surface per session** — planned scenes, NPCs to have ready, notes to hand. Prep is the session record's **GM layer**, not a separate record. Reachable two ways: the session's full view, **and** a session-console drawer available from any Codex mode. *Owner: "GM facing session notes and session prep are a key part."* |
+| CT-3 | **Curated player-facing recap** per session — the session record's **player layer**. Headlines the player's `Campaign` dashboard, with a "new since you last looked" indicator on the Codex button. No separate player surface. |
 | CT-4 | **Quests as first-class records**: status (active/completed/failed), ordered tickable objectives, links to involved entities. |
-| CT-5 | **Calendar-tied deadlines** — a future-dated event that surfaces as it approaches and fires when the campaign date passes it. |
-| CT-6 | **Party standing per faction**, adjustable, with history. |
+| CT-5 | **Calendar-tied deadlines** — a **timeline record** (`kind='deadline'`) that surfaces as it approaches and fires when the campaign date passes it. |
+| CT-6 | **Party standing per faction** (`codex_standing`), adjustable, with history recorded as timeline records (`kind='standing'`). |
 | CT-7 | **Party location marker** on the Atlas that the GM moves as the party travels. |
-| CT-8 | **Milestone / level history** as dated timeline events. No XP arithmetic. |
+| CT-8 | **Milestone / level history** as timeline records (`kind='milestone'`). No XP arithmetic. |
 | CT-9 | **Reveal audit view** — one surface listing everything currently revealed across all five areas, with unreveal from there. |
-| CT-10 | **Full downtime activity tracking** — structured activities with time cost and outcomes, advancing the in-world calendar. |
+| CT-10 | **Full downtime activity tracking** — timeline records (`kind='downtime'`) with structured payload (who, activity, time cost, outcome), advancing the in-world calendar. |
 | CT-11 | **`event` pages become dated timeline records**, appearing on the Journal timeline alongside entries. |
 | CT-12 | **Journal is one timeline with two lenses** — toggle between "by session" and "by in-world date". |
 
@@ -165,6 +165,10 @@ IDs are stable and used for traceability through planning, implementation and QA
 | D-7 | **Party inventory is out of scope.** | Owner declined; character sheets own gear, avoiding two systems disagreeing. |
 | D-8 | Progression is **milestone/level history only**, no XP. | Keeps the character-sheet boundary clean. |
 | D-9 | Deadlines are **calendar-tied only**; no manual segment clocks. | Avoids two similar trackers — the exact "two ways to say one thing" problem this overhaul exists to fix. |
+| D-10 | **No sixth mode.** `World` is renamed **`Campaign`** and absorbs the dashboard role. | Owner brainstorm. Campaign material is state belonging to existing surfaces, not a place. A sixth tab would create a rival timeline surface competing with the Journal unification (P3). |
+| D-11 | **Three new tables** (`codex_sessions`, `codex_quests`, `codex_standing`); deadlines, downtime, milestones and standing-changes are **timeline records** on `codex_journal` via its existing `kind` discriminator plus an additive `payload_json`. | Owner delegated with the constraint *"future growth must not be hampered."* Principle: a table is for independent identity and lifecycle; a timeline record is for *a thing that happens at a time*. |
+| D-12 | **Quests get a table** — reversing the lead's own "quest as a 9th entity type" proposal. | The growth constraint makes the entity route wrong: entity `fields` are a flat `Record<string,string>`, so objectives would be JSON-in-a-string and status would not be queryable for the dashboard. Quests plausibly grow (assignees, due dates, sub-quests, rewards). |
+| D-13 | **Prep and recap are the two layers of one session record**, not separate records. The recap **is** the player projection. | Falls out of the existing two-layer model (`gmBody`/`playerBody`), so no new concept is needed — and it makes DQ-2 answer itself: no new player surface exists. |
 
 ---
 
