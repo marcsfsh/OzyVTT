@@ -34,7 +34,7 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 type WorkspaceActor = Readonly<{ id: string; name: string }>;
-export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {} }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; actors?: readonly WorkspaceActor[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void }>) {
+export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneId = null, onActivateScene = () => {}, onOpenReplay }: Readonly<{ gmToken: string; scenes?: readonly WorkspaceScene[]; actors?: readonly WorkspaceActor[]; activeSceneId?: string | null; onActivateScene?: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
   const [mode, setMode] = useState<"world" | "pages" | "atlas" | "journal" | "graph">("pages");
   const [paletteOpen, setPaletteOpen] = useState(false);
   // "What do players actually see?" — mounts the REAL player Codex against a short-lived PLAYER token
@@ -263,9 +263,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
             onPickType={(type) => { setPageFilter({ type, tag: null }); setQuery(""); setSelectedId(null); setMode("pages"); }}
             onPickTag={(tag) => { setPageFilter({ type: null, tag }); setQuery(""); setSelectedId(null); setMode("pages"); }} />
         : mode === "atlas"
-        ? <AtlasView gmToken={gmToken} scenes={scenes} actors={actors} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <AtlasView gmToken={gmToken} scenes={scenes} actors={actors} activeSceneId={activeSceneId} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "journal"
-        ? <JournalView gmToken={gmToken} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
+        ? <JournalView gmToken={gmToken} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : mode === "graph"
         ? <RelationshipGraph nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }} />
         : <div className={`codex-workspace${selectedId ? " has-selection" : ""}`}>

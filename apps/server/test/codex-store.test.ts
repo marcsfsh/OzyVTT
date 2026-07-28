@@ -78,6 +78,36 @@ describe("CodexStore pages", () => {
     expect(store.listPages()).toHaveLength(1);
   });
 
+  it("dates an auto-logged battle at the campaign's current in-world date", () => {
+    // The combat-history bridge had no test at all, and hardcoded every battle undated - so each one
+    // sank below every dated entry forever. It now takes the calendar's "now".
+    const calendar = store.setCalendar({
+      yearName: "DR", weekdays: ["Sul"],
+      months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }],
+      currentDate: { year: 1492, month: 1, day: 15 }
+    });
+    expect(calendar.currentDate).toEqual({ year: 1492, month: 1, day: 15 });
+
+    const entry = store.appendCombatEntry({ sourceEncounterId: 7, playerText: "A battle was fought here." });
+    expect(entry.kind).toBe("combat");
+    expect(entry.sourceEncounterId).toBe(7);
+    expect(entry.inWorldDate).toEqual({ year: 1492, month: 1, day: 15 });
+    expect(entry.calendarInstant).not.toBeNull();
+    expect(entry.inWorldLabel).toContain("1492");
+    // It must therefore sort WITH the dated entries, not into the undated bucket.
+    const dated = store.listTimeline().filter((row) => row.calendarInstant !== null);
+    expect(dated.map((row) => row.id)).toContain(entry.id);
+  });
+
+  it("leaves an auto-logged battle undated when the world has no current date", () => {
+    // Regression guard: no calendar "now" means there is nothing to date it by, and the previous
+    // undated behaviour must be preserved rather than inventing a date.
+    const entry = store.appendCombatEntry({ sourceEncounterId: 9, playerText: "A battle was fought here." });
+    expect(entry.calendarInstant).toBeNull();
+    expect(entry.inWorldDate).toBeNull();
+    expect(entry.inWorldLabel).toBeNull();
+  });
+
   it("stores nested folder paths, normalizes them, and caps depth", () => {
     const page = store.createPage({ title: "Strahd", folder: " NPCs / Villains " });
     expect(page.folder).toBe("NPCs/Villains"); // segments trimmed

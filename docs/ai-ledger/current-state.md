@@ -601,6 +601,33 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex overhaul M2 — the combat bridge becomes findable (2026-07-28).** Delivers **CP-8**, **CP-9
+  (location half)** and **CD-8**. The bridge was the assessment's sharpest evidence for "write-only":
+  every auto-logged battle was hardcoded undated (`calendarInstant`/`inWorldDate` null) so it sank below
+  every dated entry forever, and nothing ever read the `sourceEncounterId` it stored.
+  - **CP-8:** `appendCombatEntry` now dates the fight at the calendar's **current in-world date**. With no
+    current date set, `resolveDate(null, null)` preserves the old undated behaviour exactly. Entries stay
+    **GM-only** per D-5.
+  - **CP-9 (location half):** a combat entry offers **"Open replay"**, jumping to the Replays tab with that
+    archive already open — in both the Journal timeline and the marker's journal readback built in M1.
+  - **Plan deviations (both make M2 SMALLER than planned).** The plan called for "a new GM-only route
+    joining an entry to its archive summary" plus `packages/api-contract` changes. **Neither was needed:**
+    `projectGmJournalEntry` already returns the whole row including `sourceEncounterId`, and the archive
+    endpoints `ReplayPanel` already consumes serve the replay. So **no new route, no contract change**.
+    Instead `ReplayPanel` took one additive optional prop (`openArchiveId`) — a file outside the plan's
+    Owns list — and `onOpenReplay` threads down the same chain `onActivateScene` already uses.
+  - **Verified live, end to end — the bridge had never been exercised for real.** Started and ended a real
+    encounter through the API: the bridge wrote `kind=combat`, `sourceEncounterId=1`, and
+    **`inWorldLabel="Sul, Alturiak 15, 1492 DR"` with a real sort instant** where before it was null.
+    **K2 proven live:** after *revealing* that entry, the player payload carries only
+    `createdAt/id/inWorldLabel/kind/realDate/sessionNumber/text` — **no `sourceEncounterId`** — so a player
+    who can see the battle still cannot reach the GM-only replay. Backed by 3 new tests (dating, undated
+    fallback, and the revealed-entry leak guard). `check` + `test` (**769**) + `build` green; browser at
+    1440px and 390px: battle dated under "1492 DR" beside the Today marker, "Open replay" opens that
+    archive's viewer (asserted on the active tab + scrubber, after a first loose assertion false-passed).
+  - **Pre-existing defect found, not fixed:** the replay *viewer* overflows ~99px at 390px. Measured both
+    paths — the existing "▶ Watch" button produces the identical overflow — so it is not ours. Recorded in
+    `known-bugs.md`; `ReplayPanel` is a combat-pillar surface outside this overhaul's scope.
 - **Codex overhaul M1b — truthful GM preview of the player Codex (2026-07-28).** Delivers **CP-2**,
   split out of M1 by the Stage Four review. **The defect it exists to prevent:** `roleOf()` checks
   `authorizeGm` FIRST (`codex-http.ts:146-151`), so mounting `PlayerCodex` with the GM's own token would

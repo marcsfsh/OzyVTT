@@ -30,10 +30,12 @@ type MarkerInspectorProps = Readonly<{
   onCreatePage: () => void;
   onRevealPage: (pageId: string) => void;
   onActivateScene: (sceneId: string) => void;
+  /** Jump to the archived fight a combat entry came from. GM-only: archives carry GM narration. */
+  onOpenReplay?: (archiveId: number) => void;
   onClose: () => void;
 }>;
 
-export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onActivateScene, onClose }: MarkerInspectorProps) {
+export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, activeSceneId, onUpdated, onDeleted, onOpenMap, onOpenPage, onCreatePage, onRevealPage, onActivateScene, onOpenReplay, onClose }: MarkerInspectorProps) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [label, setLabel] = useState(marker.label ?? "");
   const [busy, setBusy] = useState(false);
@@ -166,6 +168,8 @@ export function MarkerInspector({ gmToken, marker, pages, maps, scenes, actors, 
                   {(entry.sessionNumber != null || entry.inWorldLabel) && <span className="codex-page-timeline-meta">{[entry.sessionNumber != null ? `S${entry.sessionNumber}` : null, entry.inWorldLabel].filter(Boolean).join(" · ")}</span>}
                   {!entry.revealedToPlayers && <GmOnlyTag />}
                   <span className="codex-page-timeline-text">{entry.playerText || entry.gmText}</span>
+                  {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
+                    <button type="button" className="codex-linklike" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</button>}
                 </li>
               ))}
             </ul>}

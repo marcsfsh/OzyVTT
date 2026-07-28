@@ -172,7 +172,7 @@ function ReplayViewer({ gmToken, summary, onBack }: Readonly<{ gmToken: string; 
   </section>;
 }
 
-export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
+export function ReplayPanel({ gmToken, openArchiveId = null, onOpenedArchive = () => {} }: Readonly<{ gmToken: string; openArchiveId?: number | null; onOpenedArchive?: () => void }>) {
   const [archives, setArchives] = useState<readonly ArchiveSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<ArchiveSummary | null>(null);
@@ -185,6 +185,14 @@ export function ReplayPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       .catch((cause: Error) => { setArchives([]); setError(cause.message); });
   };
   useEffect(refresh, [gmToken]);
+  // Arriving from a Codex combat entry ("Open replay"): jump straight into that archive once the list
+  // has loaded, then clear the request so a later manual Back doesn't re-open it.
+  useEffect(() => {
+    if (openArchiveId === null || !archives) return;
+    const match = archives.find((archive) => archive.id === openArchiveId);
+    if (match) setOpen(match);
+    onOpenedArchive();
+  }, [openArchiveId, archives, onOpenedArchive]);
 
   const exportArchive = async (archive: ArchiveSummary) => {
     setExporting(archive.id); setError(null);

@@ -66,6 +66,8 @@ function App() {
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [gmTab, setGmTab] = useState<GmTab>("table");
   const [playerCodexOpen, setPlayerCodexOpen] = useState(false);
+  // A Codex combat entry can jump to the archived fight it came from (GM-only; archives carry GM narration).
+  const [replayArchiveId, setReplayArchiveId] = useState<number | null>(null);
   // The character builder is a FULL PAGE (decision 4), so it replaces the app body rather than
   // floating over it in a modal — the shell's tabs and roster would otherwise scroll behind it.
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -376,12 +378,13 @@ function App() {
       {mode === "gm" && gmToken && gmTab === "viewer" && <div className="anim-view"><ViewerControls gmToken={gmToken} {...(selectedMap ? { map: { assetId: selectedMap.id, width: selectedMap.width, height: selectedMap.height, altText: selectedMap.name, calibration: selectedMap.calibration, scale: selectedMap.scale, ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {}) } } : {})} /></div>}
 
       {mode === "gm" && gmToken && gmTab === "roster" && <div className="anim-view"><PartyRosterTab state={state as GmView} /></div>}
-      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} /></div>}
+      {mode === "gm" && gmToken && gmTab === "replay" && <div className="anim-view"><ReplayPanel gmToken={gmToken} openArchiveId={replayArchiveId} onOpenedArchive={() => setReplayArchiveId(null)} /></div>}
       {mode === "gm" && gmToken && gmTab === "codex" && <div className="anim-view"><CodexWorkspace gmToken={gmToken}
         scenes={(state as GmView | null)?.combat?.scenes?.map((scene) => ({ id: scene.id, name: scene.name })) ?? []}
         actors={(state as GmView | null)?.actors?.map((actor) => ({ id: actor.id, name: actor.name })) ?? []}
         activeSceneId={(state as GmView | null)?.combat?.activeSceneId ?? null}
-        onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }} /></div>}
+        onActivateScene={(sceneId) => { makeSceneLive(sceneId); setGmTab("table"); }}
+        onOpenReplay={(archiveId) => { setReplayArchiveId(archiveId); setGmTab("replay"); }} /></div>}
 
       {mode === "gm" && gmToken && gmTab === "homebrew" && <div className="anim-view"><HomebrewPanel gmToken={gmToken} /></div>}
 

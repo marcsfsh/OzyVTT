@@ -57,6 +57,26 @@ const patch = (base: string, path: string, headers: Record<string, string>, payl
 const put = (base: string, path: string, headers: Record<string, string>, payload: unknown) => fetch(`${base}${path}`, { method: "PUT", headers, body: JSON.stringify(payload) });
 
 describe("codex HTTP viewer-safety boundary", () => {
+  it("never exposes a combat entry's replay linkage to a player, even when the entry is revealed", async () => {
+    // K2: encounter archives carry GM-only narration and are documented as unreachable by players.
+    // Surfacing replays in the Codex must therefore not hand players the archive id that opens one.
+    const { base, store } = await fixture();
+    const entry = store.appendCombatEntry({ sourceEncounterId: 42, playerText: "A battle was fought here." });
+    expect(entry.sourceEncounterId).toBe(42);
+
+    // GM gets the linkage (that is what drives "Open replay").
+    const gmTimeline = await body(await get(base, "/api/v1/codex/journal", GM));
+    expect(gmTimeline.data.entries[0].sourceEncounterId).toBe(42);
+
+    // Reveal it, so the player CAN see the entry - the linkage still must not travel.
+    await post(base, `/api/v1/codex/journal/${entry.id}/reveal`, GM, { revealed: true });
+    const playerTimeline = await body(await get(base, "/api/v1/codex/journal", PLAYER));
+    expect(playerTimeline.data.entries).toHaveLength(1);
+    expect(playerTimeline.data.entries[0].sourceEncounterId).toBeUndefined();
+    expect(JSON.stringify(playerTimeline)).not.toContain("42");
+  });
+
+
   it("GM preview mints a real player principal and sees byte-identically what a player sees", async () => {
     const { base } = await fixture();
     const shown = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Bree", playerBody: "A crossroads town.", gmBody: "A cultist runs the inn." }));

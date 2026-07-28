@@ -10,6 +10,13 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[mobile] The encounter *replay viewer* overflows horizontally at 390px (~99px).** **Pre-existing, not
+  introduced by the Codex overhaul** — proven by measuring both paths at 390px: opening a replay via the
+  existing "▶ Watch" button on the Replays list (`ReplayPanel.tsx:221`) gives the same 99px as arriving via
+  the new Codex "Open replay" link. The Replays *list* itself is clean (0px), as are all Codex surfaces.
+  `ReplayPanel`/`ReplayViewer` is a combat-pillar surface and outside the Codex overhaul's approved scope,
+  so M2 deliberately did not fix it. Worth noting that M2 makes the screen considerably easier to reach.
+
 - **[ux] The marker inspector is dominated by the icon picker.** Measured live at 1440px: the inspector is
   a 300px rail whose icon grid occupies roughly the first 500px, so every *functional* control — linked
   pages, drill-into map, linked scenes, and (new in M1) linked actor at y≈1082 and the journal readback at

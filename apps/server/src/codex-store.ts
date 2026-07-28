@@ -1126,12 +1126,20 @@ export class CodexStore {
     });
   }
 
-  /** The combat-history bridge: a logged encounter drops a timeline entry, optionally pinned to a location. Best-effort. */
+  /**
+   * The combat-history bridge: a logged encounter drops a timeline entry, optionally pinned to a location.
+   * Best-effort. The fight is dated at the campaign's **current in-world date** so it lands in the right
+   * year on the timeline; previously every auto-logged battle was hardcoded undated and sank below every
+   * dated entry forever. If the GM has not set a current date there is nothing to date it by, and
+   * `resolveDate(null, null)` yields the old undated behaviour unchanged.
+   */
   appendCombatEntry(input: CodexCombatEntryInput): CodexJournalRow {
+    const dated = this.resolveDate(this.getCalendar().currentDate ?? null, null);
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
-      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null
+      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null,
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date
     });
   }
 

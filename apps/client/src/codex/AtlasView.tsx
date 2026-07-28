@@ -19,7 +19,7 @@ type AtlasActor = Readonly<{ id: string; name: string }>;
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
   { value: "world", label: "World" }, { value: "regional", label: "Regional" }, { value: "battlemap", label: "Local / battlemap" }
 ];
-export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void }>) {
+export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenPage, onActivateScene, onOpenReplay }: Readonly<{ gmToken: string; scenes: readonly AtlasScene[]; actors?: readonly AtlasActor[]; activeSceneId: string | null; onOpenPage: (pageId: string) => void; onActivateScene: (sceneId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [maps, setMaps] = useState<CodexMap[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
@@ -196,7 +196,7 @@ export function AtlasView({ gmToken, scenes, actors = [], activeSceneId, onOpenP
           : <div className="codex-main-empty"><h3>Chart your world</h3><p>Turn an uploaded map into an atlas. Drop markers on towns and dungeons, link each to a page or a deeper map, and reveal them as the party explores.</p><Button variant="primary" onClick={() => setPicking(true)}>New map</Button></div>}
         {selectedMarker && <MarkerInspector key={selectedMarker.id} gmToken={gmToken} marker={selectedMarker} pages={pages} maps={maps} scenes={scenes} actors={actors} activeSceneId={activeSceneId}
           onUpdated={onMarkerUpdated} onDeleted={onMarkerDeleted} onOpenMap={enterMap} onOpenPage={onOpenPage}
-          onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onActivateScene={onActivateScene} onClose={() => setSelectedMarkerId(null)} />}
+          onCreatePage={() => createPageForMarker(selectedMarker)} onRevealPage={revealLinkedPage} onActivateScene={onActivateScene} onOpenReplay={onOpenReplay} onClose={() => setSelectedMarkerId(null)} />}
       </div>
 
       <Modal open={picking} onClose={() => setPicking(false)} title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"} size="md" ariaLabel="Choose a map">

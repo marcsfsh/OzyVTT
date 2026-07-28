@@ -30,7 +30,7 @@ function whenLabel(entry: CodexJournalEntry): string {
   return new Date(entry.createdAt).toLocaleDateString();
 }
 
-export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void }>) {
+export function JournalView({ gmToken, onOpenPage, onOpenReplay }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenReplay?: (archiveId: number) => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -162,6 +162,8 @@ export function JournalView({ gmToken, onOpenPage }: Readonly<{ gmToken: string;
                 {entry.gmText && <div className="codex-entry-gm"><GmOnlyTag /><CodexMarkdown text={entry.gmText} token={gmToken} /></div>}
                 <footer className="codex-entry-foot">
                   {entry.attachPageId && <Button variant="ghost" size="sm" onClick={() => onOpenPage(entry.attachPageId!)}>Open page</Button>}
+                  {entry.kind === "combat" && entry.sourceEncounterId !== null && onOpenReplay &&
+                    <Button variant="ghost" size="sm" onClick={() => onOpenReplay(entry.sourceEncounterId!)}>Open replay</Button>}
                   <Button variant="ghost" size="sm" onClick={() => edit(entry)}>Edit</Button>
                   <Button variant="ghost" size="sm" onClick={() => remove(entry)}>Delete</Button>
                 </footer>
