@@ -881,8 +881,6 @@ Server-computed action availability for one combatant: per stat-block action, wh
 
 **Responses:** `200` Per-action availability with explanations - envelope of `ActorAvailableActionsData` · errors `401` `403` `404`
 
-Each row also carries display values - `description`, `attackBonus`, `reachFeet`, `rangeFeet`, `rangeNormalFeet`, `attackCount`, `saveAbility`, `saveDc`, `damage[]`, `usesLimit`, `usesPer`, `usesPool`, `requiresEffectTag`, `multiattack`, `reaction`. They are read off the actor's *effective* action list, so they already include the standing riders of whatever is equipped and attuned, and they are the only way a client can render an action an equipped item derived (a wand's charge, an amulet's cast, a magic weapon's swing) - those are absent from the stat block entirely. They are display values: resolution still takes only the `id` and recomputes through the same function, so a preview built from these cannot disagree with the roll.
-
 ### `POST /api/v1/game/actors/{actorId}/effects`
 
 Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.
