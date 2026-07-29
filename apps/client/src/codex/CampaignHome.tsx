@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Alert, Badge, Button, Skeleton } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
+import { sessionTitle } from "./sessions";
 
 /**
  * CI-7: the Codex's landing surface. Formerly `World`; renamed `Campaign` because it answers
@@ -29,10 +30,23 @@ type CampaignEntity = Readonly<{ id: string; title: string; entityType: EntityTy
 export type CampaignEntry = Readonly<{ id: string; summary: string; when: string; kind: "note" | "combat" }>;
 /** One atlas row. `revealedToPlayers` is GM-only knowledge and is simply absent from a player's maps. */
 export type CampaignMap = Readonly<{ id: string; name: string; revealedToPlayers?: boolean }>;
+/**
+ * M9's "Next session" card, in the shape BOTH projections can supply — which is exactly the player
+ * projection's four keys (`projectPlayerSession`).
+ *
+ * **There is deliberately no `prep` field, not even an optional one.** `prepBody` is the single most
+ * secret thing on a session record and has no player-facing form; a shared type that could carry it
+ * would put the GM's plan one careless `{...session}` away from a component that both audiences render.
+ * The type not having the field is the guarantee — a comment saying "don't pass prep" is not.
+ *
+ * `status` is absent for the same reason at lower stakes: it is GM-only for now, so a player caller
+ * could not fill it in and the card must not read differently for the two audiences.
+ */
+export type CampaignSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string }>;
 
 export function CampaignHome({
-  pages, entries = [], maps = [], today = null,
-  onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onCreate,
+  pages, entries = [], maps = [], today = null, session = null,
+  onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onOpenSession, onCreate,
   showReveal = true, loading = false, error = null
 }: Readonly<{
   pages: readonly CampaignEntity[];
@@ -41,6 +55,13 @@ export function CampaignHome({
   maps?: readonly CampaignMap[];
   /** The world's "now", already formatted against the campaign calendar. Null when no date is set. */
   today?: string | null;
+  /**
+   * M9: which session the card is about — the GM's ACTIVE session, or for a player the nearest revealed
+   * one. Choosing it is the caller's job (`pickNextSession`), because only the caller knows which
+   * pointer its own token was sent; this component just renders what it was handed. Null renders nothing
+   * at all rather than a placeholder, exactly as the dashboard's other sections do.
+   */
+  session?: CampaignSession | null;
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
@@ -48,6 +69,11 @@ export function CampaignHome({
   onOpenEntry: (entryId: string) => void;
   /** R1: opens the Atlas ON this map. */
   onOpenMap: (mapId: string) => void;
+  /**
+   * R1: opens the session log ON this session. Omitted by the player Codex, which has no session log to
+   * open — the card is then the readout it already is for them, with nothing to tap.
+   */
+  onOpenSession?: (sessionId: string) => void;
   onCreate?: () => void;
   showReveal?: boolean;
   /** CF-2: true while the first fetch is in flight, so the "No entries yet" invitation cannot lie. */
@@ -70,8 +96,9 @@ export function CampaignHome({
   const recentEntries = useMemo(() => entries.slice(0, 5), [entries]);
 
   // CF-2: settle the fetches before claiming emptiness — for either audience. A campaign with no pages
-  // but a running journal or a charted atlas is NOT empty, which is why all three feeds gate this.
-  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0;
+  // but a running journal or a charted atlas is NOT empty, which is why all three feeds gate this — and
+  // M9 adds a fourth: a campaign whose GM has prepped a session has plainly started.
+  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session;
   if (loading && nothingYet) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
   if (nothingYet) {
     return (
@@ -99,6 +126,37 @@ export function CampaignHome({
         {/* The same `codex-now-chip` the journal composer uses for the world's "now" — one readout, one look. */}
         {today && <div className="codex-campaign-today"><span className="codex-now-chip" title="The campaign's current date — set it in the journal's calendar">Now: {today}</span></div>}
       </div>
+
+      {/* M9: where this campaign is right now — the session the table is pointed at (GM) or the nearest
+          revealed one (player). It sits above "By type" because it is the most time-sensitive thing on
+          the dashboard; it renders nothing at all when there is no session, rather than a placeholder
+          panel for a record that does not exist. */}
+      {session && (
+        <section className="codex-campaign-section">
+          <h3 className="codex-campaign-h">Next session</h3>
+          <nav className="codex-campaign-recent" aria-label="Next session">
+            {/* R2: the same row chassis the journal and atlas rows above use, which is also where its
+                44px floor comes from — `.codex-campaign-recentitem` is §4 route 1 (grow the paint), so
+                there is no new control and no new floor to argue about here.
+                A player has no session log to open, so `onOpenSession` is absent for them and the row is
+                a plain readout: a button that navigates nowhere is worse than no button. */}
+            {onOpenSession
+              ? <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenSession(session.id)}>
+                  <CodexIcon iconId="hourglass" className="codex-ent-icon codex-campaign-recentglyph" />
+                  <span className="codex-list-title">{sessionTitle(session)}</span>
+                  {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
+                </button>
+              : <div className="codex-campaign-sessionrow">
+                  <CodexIcon iconId="hourglass" className="codex-ent-icon codex-campaign-recentglyph" />
+                  <span className="codex-list-title">{sessionTitle(session)}</span>
+                  {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
+                </div>}
+          </nav>
+          {/* The recap, and never the prep — the shared type has no prep field to render (see
+              `CampaignSession`), so this card reads identically for both audiences by construction. */}
+          {session.recap.trim() && <p className="codex-campaign-sessionrecap">{session.recap}</p>}
+        </section>
+      )}
 
       <section className="codex-campaign-section">
         <h3 className="codex-campaign-h">By type</h3>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit } from "./api";
+import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, sessionApi, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
@@ -11,6 +11,9 @@ import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { EntityIcon } from "./icons";
 import { CampaignHome, type CampaignEntry } from "./CampaignHome";
+import { SessionsView } from "./SessionsView";
+import { SessionConsole } from "./SessionConsole";
+import { pickNextSession } from "./sessions";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
 import { useConfirm, usePrompt } from "../components/feedback";
@@ -33,6 +36,9 @@ const TEMPLATES: ReadonlyArray<{ key: string; label: string; type: EntityType; t
   { key: "species", label: "Species", type: "species", title: "Untitled species", player: "## Description\n\n## Habitat\n", gm: "## Secrets\n" },
   { key: "event", label: "Event", type: "event", title: "Untitled event", player: "## What happened\n", gm: "## The truth\n" }
 ];
+
+/** M9: the console is a workbench preference — a GM who runs with it open expects it open next game. */
+const CONSOLE_KEY = "codex-session-console";
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 type WorkspaceActor = Readonly<{ id: string; name: string }>;
@@ -64,9 +70,24 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   const [journalTarget, setJournalTarget] = useState<string | null>(null);
   // CI-5: which entity the Graph should land focused on. Same latch shape as the two above.
   const [graphTarget, setGraphTarget] = useState<string | null>(null);
+  /**
+   * M9: the session log is a DESTINATION, not a sixth mode — `sessionsOpen` swaps the content region
+   * while the mode bar stays put, so the console toggle never goes out of reach and picking any tab
+   * returns to that mode. `sessionTarget` is the same latch the three above use; `null` means "open the
+   * log with nothing selected", which is what the console's empty state asks for.
+   */
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessionTarget, setSessionTarget] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("codex-notebook-collapsed") ?? "[]") as string[]); } catch { return new Set(); }
   });
+  // Same lazy-initialiser + try/catch discipline as `collapsed` above and `sort` below: private mode
+  // throws on both read and write, and a console that refused to open there would be a worse failure
+  // than one that simply forgets it was open.
+  const [consoleOpen, setConsoleOpen] = useState(() => {
+    try { return localStorage.getItem(CONSOLE_KEY) === "open"; } catch { return false; }
+  });
+  useEffect(() => { try { localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed"); } catch { /* private mode - fine */ } }, [consoleOpen]);
   const [error, setError] = useState<string | null>(null);
   // CF-2: before this the first fetch showed "No pages yet" — an empty state that lies while loading.
   const [loading, setLoading] = useState(true);
@@ -86,6 +107,31 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   }, [gmToken]);
 
   useEffect(() => { void refreshList(); }, [refreshList]);
+
+  /**
+   * M9: **the** session feed. One read, one copy, four consumers — the Campaign card, the journal's
+   * by-session lens, the console drawer and the session log. They are four views of one record set, and
+   * the moment any of them fetched for itself they could disagree about which sessions exist and which
+   * one is active.
+   *
+   * Loaded on mount rather than lazily like `loadCampaign` below, because the console is reachable from
+   * EVERY mode: a feed that only arrived on the Campaign tab would leave the console empty in exactly
+   * the modes it exists to serve. `activeSessionId` rides along with the list because it names a row in
+   * that same list — fetching them apart is how a console ends up pointing at a session the list no
+   * longer contains.
+   */
+  const [sessions, setSessions] = useState<readonly CodexSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const loadSessions = useCallback(async () => {
+    try {
+      const data = await sessionApi.list(gmToken);
+      setSessions(data.sessions); setActiveSessionId(data.activeSessionId); setSessionsError(null);
+    } catch (loadError) { setSessionsError(loadError instanceof Error ? loadError.message : "Could not load the sessions."); }
+    finally { setSessionsLoading(false); }
+  }, [gmToken]);
+  useEffect(() => { void loadSessions(); }, [loadSessions]);
 
   /**
    * CI-7: the dashboard's own feed — the journal, the atlas and the calendar, which the notebook rail
@@ -164,11 +210,13 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
   }, []);
 
   // Live refresh: any codex write pings every client. Refresh the list only - the editor owns the open page.
+  // The session feed rides the same ping: a session write from another device (or from the session log
+  // here) has to reach the console and the journal lens, which read no other source.
   useEffect(() => {
-    const onChanged = () => { void refreshList(); };
+    const onChanged = () => { void refreshList(); void loadSessions(); };
     socket.on("codex:changed", onChanged);
     return () => { socket.off("codex:changed", onChanged); };
-  }, [refreshList]);
+  }, [refreshList, loadSessions]);
 
   // Cmd/Ctrl-K toggles the quick-switcher.
   useEffect(() => {
@@ -324,11 +372,19 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         {/* The wrapper exists only to hang the overflow cue on — five modes do not fit a 375px strip, and
             the tabs themselves are the primitive's and stay untouched. See `.codex-modetabs` in codex.css. */}
         <div className="codex-modetabs">
-          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => setMode(id as typeof mode)}
+          {/* Picking a mode also leaves the session log: the log is a destination laid over the modes,
+              so a tab that changed the mode underneath it without surfacing would look like a dead tab. */}
+          <Tabs ariaLabel="Codex view" activeId={mode} onChange={(id) => { setMode(id as typeof mode); setSessionsOpen(false); }}
             tabs={[{ id: "campaign", label: "Campaign" }, { id: "pages", label: "Pages" }, { id: "atlas", label: "Atlas" }, { id: "journal", label: "Journal" }, { id: "graph", label: "Graph" }]} />
         </div>
         <div className="codex-modebar-ops">
           <Button variant="ghost" size="sm" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Meta+K Control+K">Search</Button>
+          {/* M9. Both are `Button size="sm"` — a `@vtt/ui` primitive that carries the 44px floor itself
+              (§4 route 2, `.nh-btn--sm`), so there is no new control here and no new floor to argue
+              about. They live in the ops row rather than as a sixth tab because the five modes already
+              overflow a 375px strip; this row wraps, which a tab strip does not. */}
+          <Button variant="ghost" size="sm" onClick={() => { setSessionTarget(null); setSessionsOpen(true); }}>Sessions</Button>
+          <Button variant="ghost" size="sm" aria-expanded={consoleOpen} onClick={() => setConsoleOpen((open) => !open)}>Session console</Button>
           <Button variant="ghost" size="sm" onClick={openPlayerPreview}>Preview as player</Button>
           <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
           <Button variant="ghost" size="sm" onClick={exportCodex}>Export</Button>
@@ -338,9 +394,20 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
       {/* CF-2: one error surface for the whole workspace. It previously lived inside the Pages rail, so a
           failed load was invisible in Campaign, Atlas, Journal and Graph. */}
       {error && <Alert tone="danger" title="Couldn't load the codex">{error}</Alert>}
-      {mode === "campaign"
+      {sessionsOpen
+        ? <SessionsView gmToken={gmToken} sessions={sessions} activeSessionId={activeSessionId}
+            loading={sessionsLoading} error={sessionsError} onChanged={loadSessions}
+            openSessionId={sessionTarget} onOpenedSession={() => setSessionTarget(null)}
+            onClose={() => setSessionsOpen(false)} />
+        : mode === "campaign"
         ? <CampaignHome pages={pages} entries={campaignEntries} maps={campaign.maps} today={campaignToday}
             loading={loading || campaignLoading} error={campaignError}
+            /* M9: the GM's card is the session the table is POINTED at — `activeSessionId` is an answer
+               only a GM token receives, so the choice is made here and the presentational dashboard is
+               handed a result. `recapBody` is renamed on the way in to the one shared shape a player
+               projection can also produce; `prepBody` has nowhere to go, which is the point. */
+            session={(() => { const next = pickNextSession(sessions, activeSessionId); return next && { id: next.id, sessionNumber: next.sessionNumber, realDate: next.realDate, recap: next.recapBody }; })()}
+            onOpenSession={(sessionId) => { setSessionTarget(sessionId); setSessionsOpen(true); }}
             onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             /* R1: both new jumps prepare their destination — the entry is marked on the timeline, the
                map is the one that opens — reusing the very latches search already lands through. */
@@ -355,7 +422,10 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
         ? <JournalView gmToken={gmToken} onOpenReplay={onOpenReplay} onOpenPage={(pageId) => { setMode("pages"); setSelectedId(pageId); }}
             /* CI-6: the entry knows its pin but not the pin's map — the Atlas resolves that half. */
             onOpenMarker={(markerId) => { setAtlasTarget({ mapId: null, markerId }); setMode("atlas"); }}
-            openEntryId={journalTarget} onOpenedEntry={() => setJournalTarget(null)} />
+            openEntryId={journalTarget} onOpenedEntry={() => setJournalTarget(null)}
+            /* M9: the workspace's own session feed, so the by-session lens can tell a heading with a
+               real record behind it from a legacy number that has none (there is no backfill). */
+            sessions={sessions} onOpenSession={(sessionId) => { setSessionTarget(sessionId); setSessionsOpen(true); }} />
         : mode === "graph"
         ? <RelationshipGraph loading={loading} nodes={pages.map((page) => ({ id: page.id, title: page.title, entityType: page.entityType }))} edges={edges} links={links}
             onOpen={(pageId) => { setMode("pages"); setSelectedId(pageId); }}
@@ -417,6 +487,13 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
           : <div className="codex-main-empty"><h3>Select a page</h3><p>Every page has a player-facing side and a GM-only side. Choose one from the list, or create a new page.</p><Button variant="primary" onClick={createPage}>New page</Button></div>}
       </section>
         </div>}
+      {/* M9. Always mounted, open or not: `Drawer` is non-modal and stays in the tree (inert, translated
+          off-screen) so the slide plays both ways. It reads the SAME `sessions` feed the log edits and
+          calls no write endpoint of its own — it is a view of one record, not a second copy of it. */}
+      <SessionConsole open={consoleOpen} onClose={() => setConsoleOpen(false)} gmToken={gmToken}
+        session={sessions.find((session) => session.id === activeSessionId) ?? null}
+        loading={sessionsLoading} error={sessionsError}
+        onOpenSession={(sessionId) => { setConsoleOpen(false); setSessionTarget(sessionId); setSessionsOpen(true); }} />
       {/* Same `openHit` the rail uses: one search, one result list, one set of destinations (R8 + R1). */}
       {paletteOpen && <CommandPalette gmToken={gmToken} onOpenHit={openHit} onCreatePage={createPageTitled} onGoto={(target) => setMode(target)} onClose={() => setPaletteOpen(false)} />}
       <Modal open={!!movingPageId} onClose={() => setMovingPageId(null)} title="Move to folder" size="sm" ariaLabel="Move to folder">

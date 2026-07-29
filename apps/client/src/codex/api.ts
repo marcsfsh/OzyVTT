@@ -180,6 +180,13 @@ export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ fields: Readon
 export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null; tags: readonly string[] }>;
 export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null; tags: readonly string[] }>;
 export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
+/**
+ * M9: a session as a PLAYER sees it — the tightest projection the server has (`projectPlayerSession`),
+ * FOUR keys and nothing else. `prepBody` (the GM's plan), `rev`, `status` and `attendees` are absent by
+ * design, and `recapBody` arrives renamed `recap` — the layer prefix only means something where there
+ * are two layers, and here only one is left. An unrevealed session is not in this list at all.
+ */
+export type PlayerCodexSession = Readonly<{ id: string; sessionNumber: number | null; realDate: string | null; recap: string }>;
 
 export const playerCodexApi = {
   listPages: (token: string) => request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
@@ -203,7 +210,13 @@ export const playerCodexApi = {
    * the chronicle, a player Journal that kept reading `/journal` would have been the ONLY surface in the
    * app showing a different set of records than the timeline it claims to be.
    */
-  chronicle: (token: string) => request<{ records: PlayerCodexChronicleRecord[] }>(token, "/timeline").then((data) => data.records)
+  chronicle: (token: string) => request<{ records: PlayerCodexChronicleRecord[] }>(token, "/timeline").then((data) => data.records),
+  /**
+   * M9 / CT-3: the revealed sessions, recap-only. Same route as `sessionApi.list`; the server filters the
+   * unrevealed ones out and always answers a player `activeSessionId: null`, which is why only `sessions`
+   * is unwrapped here — a pointer that is constantly null is not state worth carrying.
+   */
+  sessions: (token: string) => request<{ sessions: PlayerCodexSession[] }>(token, "/sessions").then((data) => data.sessions)
 };
 
 // ----- Atlas: maps + markers -----
@@ -373,4 +386,67 @@ export const journalApi = {
   update: (token: string, id: string, input: CodexJournalInput) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.entry),
   reveal: (token: string, id: string, revealed: boolean) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.entry),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/journal/${id}`, { method: "DELETE" })
+};
+
+// ----- Sessions (M9: prep is the GM half, recap is the player half) -----
+
+export type CodexSessionStatus = "planned" | "played";
+/**
+ * One session, GM view. Mirrors `CodexSessionRow` in `apps/server/src/codex-store.ts` exactly.
+ *
+ * Two bodies, two audiences: `prepBody` is the GM's plan for the evening and never leaves the GM
+ * projection at all; `recapBody` is the player-facing half and reaches the table only once
+ * `revealedToPlayers` is set. `rev` is the same optimistic-concurrency token pages carry — the only
+ * other Codex record with one — so an edit sends it back as `expectedRev` and a stale one is a 409.
+ */
+export type CodexSession = Readonly<{
+  id: string;
+  sessionNumber: number | null;
+  /** The real-world date the group met ("2026-07-26"), free text — the campaign calendar is the IN-WORLD one. */
+  realDate: string | null;
+  attendees: readonly string[];
+  prepBody: string;
+  recapBody: string;
+  revealedToPlayers: boolean;
+  status: CodexSessionStatus;
+  rev: number;
+  createdAt: string;
+  updatedAt: string;
+}>;
+/**
+ * The fields BOTH writes share. Deliberately narrower than `CodexSession` at each end, because the
+ * server's two schemas are `.strict()` and differ (`codex-http.ts`): create takes `revealedToPlayers`
+ * but no `expectedRev`, update takes `expectedRev` but no `revealedToPlayers` — reveal is its own route,
+ * so a PATCH can never publish a recap as a side effect of an edit. Each call site below intersects the
+ * one extra key it may legitimately send, exactly as `atlasApi.createMap` does; a single wide input type
+ * would let a caller send a field the other endpoint rejects outright.
+ */
+export type CodexSessionInput = Readonly<{
+  sessionNumber?: number | null;
+  realDate?: string | null;
+  attendees?: readonly string[];
+  prepBody?: string;
+  recapBody?: string;
+  status?: CodexSessionStatus;
+}>;
+
+export const sessionApi = {
+  /**
+   * The session log plus the pointer at the ACTIVE session. Both travel together because they are one
+   * answer: `activeSessionId` names a row in the very list beside it, and fetching them apart is how a
+   * console ends up pointing at a session the list no longer contains. GM-only value — a player token
+   * is always answered `null` (`codex-http.ts`), which is why `playerCodexApi.sessions` drops it.
+   */
+  list: (token: string) => request<{ sessions: CodexSession[]; activeSessionId: string | null }>(token, "/sessions"),
+  get: (token: string, id: string) => request<{ session: CodexSession }>(token, `/sessions/${id}`).then((data) => data.session),
+  create: (token: string, input: CodexSessionInput & { revealedToPlayers?: boolean }) => request<{ session: CodexSession }>(token, "/sessions", { method: "POST", body: JSON.stringify(input) }).then((data) => data.session),
+  update: (token: string, id: string, input: CodexSessionInput & { expectedRev?: number }) => request<{ session: CodexSession }>(token, `/sessions/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.session),
+  /** The SHARED reveal body (`{ revealed }`) pages, maps, markers and journal entries all use. */
+  reveal: (token: string, id: string, revealed: boolean) => request<{ session: CodexSession }>(token, `/sessions/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.session),
+  /**
+   * Point the table at this session. Returns only the pointer: activating changes nothing ABOUT the
+   * session (no `rev` bump, no `updatedAt` move), so there is no fresher row to echo back.
+   */
+  activate: (token: string, id: string) => request<{ activeSessionId: string | null }>(token, `/sessions/${id}/activate`, { method: "POST" }).then((data) => data.activeSessionId),
+  remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/sessions/${id}`, { method: "DELETE" })
 };

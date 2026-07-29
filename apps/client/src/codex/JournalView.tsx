@@ -8,6 +8,7 @@ import { CodexMarkdown } from "./CodexMarkdown";
 import { CalendarEditor } from "./CalendarEditor";
 import { EntityPicker } from "./EntityPicker";
 import { RevealSwitch, GmOnlyTag } from "./SecretMarkers";
+import { sessionByNumber, type SessionRef } from "./sessions";
 import { useConfirm } from "../components/feedback";
 
 /**
@@ -32,7 +33,22 @@ const LENS_KEY = "codex-chronicle-lens";
  * journal hands the id up rather than reaching sideways into either. `onOpenReplay` is the SAME prop
  * `PageTimeline` already takes, threaded from the same place, so there is one replay path and not two.
  */
-export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {} }: Readonly<{ gmToken: string; onOpenPage: (pageId: string) => void; onOpenMarker?: (markerId: string) => void; onOpenReplay?: (archiveId: number) => void; openEntryId?: string | null; onOpenedEntry?: () => void }>) {
+export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, openEntryId = null, onOpenedEntry = () => {}, sessions = [], onOpenSession }: Readonly<{
+  gmToken: string;
+  onOpenPage: (pageId: string) => void;
+  onOpenMarker?: (markerId: string) => void;
+  onOpenReplay?: (archiveId: number) => void;
+  openEntryId?: string | null;
+  onOpenedEntry?: () => void;
+  /**
+   * M9: the session RECORDS, handed down from the workspace's single feed rather than fetched here.
+   * A second read would be a second answer to "which sessions exist", and the by-session lens would be
+   * the surface where the two disagreed.
+   */
+  sessions?: readonly SessionRef[];
+  /** R1: opens the session log ON that session. Absent = the lens keeps rendering exactly as it did. */
+  onOpenSession?: (sessionId: string) => void;
+}>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [records, setRecords] = useState<CodexChronicleRecord[]>([]);
   const [pages, setPages] = useState<CodexPageSummary[]>([]);
@@ -211,9 +227,28 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
       <div className="codex-timeline">
         {loading && <div className="codex-list-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>}
         {!loading && records.length === 0 && <p className="codex-list-empty">No journal entries yet.</p>}
-        {groups.map((group) => (
+        {groups.map((group) => {
+          /**
+           * M9: a session heading opens the session — but ONLY when a session record actually exists
+           * for that number, and only under the session lens.
+           *
+           * Both halves matter. Under the date lens `group.key` is a calendar YEAR, so resolving it as
+           * a session number would open session 1492. And M9 ships with **no backfill**, so most
+           * numbered groups on an existing campaign have no record behind them: those must keep
+           * rendering exactly as they render today rather than becoming buttons that 404. The heading
+           * is only promoted to a control when there is something real on the other end of it.
+           */
+          const groupSession = lens === "session" && group.key !== "none" && onOpenSession
+            ? sessionByNumber(sessions, Number(group.key))
+            : null;
+          return (
           <section key={group.key} className="codex-timeline-group">
-            <div className="codex-timeline-year">{group.label}</div>
+            {groupSession
+              /* §4 route 1 (grow the paint) — see `.codex-timeline-year.is-openable` in codex.css. */
+              ? <button type="button" className="codex-timeline-year is-openable" onClick={() => onOpenSession!(groupSession.id)}>
+                  {group.label}<span className="codex-timeline-year-open" aria-hidden="true">›</span>
+                </button>
+              : <div className="codex-timeline-year">{group.label}</div>}
             {/* The "Today" marker belongs to the in-world reading; under the session lens a calendar year
                 is not what the groups mean, so placing it there would be an answer to a question nobody asked. */}
             {lens === "date" && nowYear !== null && group.key === String(nowYear) && <div className="codex-timeline-now">Today — {nowLabel}</div>}
@@ -266,7 +301,8 @@ export function JournalView({ gmToken, onOpenPage, onOpenMarker, onOpenReplay, o
               );
             })}
           </section>
-        ))}
+          );
+        })}
       </div>
 
       {calendarOpen && calendar && <CalendarEditor gmToken={gmToken} calendar={calendar} onSaved={setCalendar} onClose={() => setCalendarOpen(false)} />}

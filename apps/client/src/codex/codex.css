@@ -301,6 +301,26 @@
 .codex-timeline-lens .nh-segmented { max-width: 100%; }
 .codex-timeline-group { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-timeline-year { font-family: var(--font-display); font-size: var(--fs-h2); color: var(--cyan); border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-top: var(--space-3); }
+/* M9: under the by-session lens a heading with a real session record behind it opens that session, so
+   it becomes a control and needs the floor. §4 ROUTE 1 (grow the paint): the headings sit in a vertical
+   stack with entry rows immediately above and below, and §4 forbids route 2 there — a 44px `::after`
+   centred on this heading would overhang into the last entry of the previous group and steal its taps.
+   The paint computes to ~34px (--fs-h2 20px x --lh-body 1.5, plus --space-1 of padding-bottom), so the
+   floor adds about ten pixels of height and nothing else changes.
+   `is-openable` also carries a visible affordance (the ›): a heading that silently became clickable is
+   the hidden control the UX rules forbid, and the un-backfilled headings beside it are NOT clickable —
+   the two must not look alike. */
+.codex-timeline-year.is-openable {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  /* Explicit: a <button> carries the UA's own `padding: 1px 6px`, which would inset this heading's
+     text relative to the plain-<div> headings beside it under the same lens. */
+  padding: 0 0 var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.codex-timeline-year.is-openable:hover { color: var(--text); border-bottom-color: var(--cyan); }
+.codex-timeline-year-open { font-size: var(--fs-body); color: var(--text-muted); }
 .codex-now-chip { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); padding: 2px var(--space-2); border-radius: var(--radius-pill); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .codex-timeline-now { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.06em; color: var(--cyan); background: color-mix(in srgb, var(--cyan) 10%, transparent); border-left: 3px solid var(--cyan); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); margin: var(--space-2) 0; }
 .codex-calendar-editor { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -346,12 +366,57 @@
 /* The in-world "now" reads as a stat, so it sits in the stat row rather than above it. It is a chip,
    not a number, so it aligns to the numbers' baseline instead of stretching the row. */
 .codex-campaign-today { display: flex; align-items: flex-end; }
+/* M9: the "Next session" card. The GM's row IS `.codex-campaign-recentitem` (its floor, its hover, its
+   chassis — R2, one row shape on this surface); this is the PLAYER's non-interactive twin, which has no
+   session log to open. No floor applies to it precisely because nothing here is tappable — inventing a
+   44px box around a static row would only steal taps from whatever sits beneath it. */
+.codex-campaign-sessionrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text); }
+/* The recap, clamped: the card answers "where are we", and the whole recap is the Journal's job. */
+.codex-campaign-sessionrecap { margin: 0; padding: 0 var(--space-3); color: var(--text-dim); font-size: var(--fs-sm); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 @media (max-width: 640px) {
   /* At 375px five stats plus the date chip would wrap into a tall stack that pushes every section
      below the fold; tightening the gap keeps the readout to two rows. */
   .codex-campaign-stats { gap: var(--space-3); }
   .codex-campaign-recentwhen { display: none; } /* the when-label is the first thing to lose, not the title */
 }
+
+/* ----- Sessions (M9): the log destination and the console drawer ----- */
+
+/* The log reuses the notebook's two-pane chassis (`.codex-workspace` + `.codex-rail` + `.codex-main`),
+   which is also where its narrow-viewport behaviour comes from: `has-selection` already hides the rail
+   and shows the `‹` back link at <=760px, so a phone gets list-then-detail with no new rules. */
+.codex-sessions-exit { display: flex; margin-bottom: var(--space-2); }
+.codex-sessions-railtitle { font-family: var(--font-display); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); flex: 1 1 auto; }
+/* §4 ROUTE 1 (grow the paint). The log rows are a vertical stack, where §4 requires route 1 outright:
+   any `::after` box taller than the row overhangs into the rows above and below and steals their taps,
+   whatever the exact paint height turns out to be. Same chassis and same reasoning as `.codex-tree-page`
+   in the notebook rail, and there is no gap budget to compute because route 2 is not on the table. */
+.codex-session-row {
+  min-height: var(--tap-min);
+  display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
+  width: 100%; text-align: left; padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--text); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle);
+}
+.codex-session-row:hover { background: var(--surface-2); border-color: var(--line); }
+/* R6: selection owns the edge, hover owns the surface lift — the notebook's rule, unchanged. */
+.codex-session-row.is-active { background: var(--surface-2); border-color: var(--magenta); }
+.codex-session-editor { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Taller than the journal composer's `.codex-composer-body`: prep is written in long sittings, and a
+   4.5rem window over an evening's plan is the kind of scrolling-in-a-slot the composer can afford and
+   this cannot. Still `resize: vertical`, so the GM has the last word. */
+.codex-session-body { min-height: 9rem; resize: vertical; }
+
+/* The console drawer's contents. The panel itself is `@vtt/ui`'s `Drawer` (R9) — nothing here restyles
+   it; these are the Codex-local blocks that sit INSIDE its body. */
+.codex-console { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+.codex-console-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.codex-console-attendees { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* R5: the GM-secret block wears the shared violet marking (`.codex-gm-block`) and nothing else — this
+   panel is the one most likely to be open while a screen is shared, so it must look GM-only at a glance. */
+.codex-console-prep { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; padding: var(--space-3); width: 100%; }
+.codex-console-empty { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; color: var(--text-muted); }
 
 /* Relationship graph */
 .codex-graph { display: flex; flex-direction: column; min-height: 64vh; gap: var(--space-2); }

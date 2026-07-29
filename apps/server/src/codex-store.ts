@@ -198,9 +198,9 @@ export type CodexChronicleRecord =
  * M9: one real-world SESSION at the table. Two-layer exactly as a page is - `prepBody` is the GM's plan
  * and never enters a player projection, `recapBody` is the players' half and ships once `revealed`.
  *
- * `revealed` is named for its COLUMN rather than following the `revealedToPlayers` the other record types
- * carry, because the frozen M9 projection contract is written against `row.revealed`; the meaning is the
- * same gate.
+ * `revealedToPlayers` matches every other codex record type. The SQL column stays `revealed`, exactly as
+ * `codex_pages` does - the column is terse because its table names the subject, the field is explicit
+ * because a row type does not.
  *
  * `sessionNumber` is nullable and UNIQUE-when-present (migration v13): the by-session lens resolves a
  * number to at most one record, and an unnumbered session is still a legitimate record.

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary } from "./api";
+import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexSession } from "./api";
 import { CHRONICLE_KIND_META, chronicleWhenLabel } from "./chronicle";
+import { pickNextSession } from "./sessions";
 import { CodexIcon } from "./icons";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
@@ -58,18 +59,25 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   // server already answers for a player token — the same calendar behind the `inWorldLabel` every player
   // entry already carries. It is fetched, not derived, so this surface still shows only what it was sent.
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
+  /**
+   * M9 / CT-3: the sessions the GM has revealed, recap-only. This is the server's player projection —
+   * four keys, no prep, no status, no attendees — so there is nothing here to filter and nothing to hide.
+   */
+  const [sessions, setSessions] = useState<PlayerCodexSession[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar] = await Promise.all([
+      const [nextPages, nextMaps, nextTimeline, nextRels, nextLinks, nextCalendar, nextSessions] = await Promise.all([
         playerCodexApi.listPages(token), playerCodexApi.listMaps(token), playerCodexApi.chronicle(token), playerCodexApi.listRelationships(token),
         // Uncaught, exactly like the typed-edge feed beside it: the two are the Graph's two halves, and
         // half a graph drawn silently is worse than the error Alert this surface already shows (R4).
         playerCodexApi.listLinks(token),
         // A missing calendar costs the dashboard one chip; it must not cost the player the whole codex.
-        calendarApi.get(token).catch(() => null)
+        calendarApi.get(token).catch(() => null),
+        // Same bargain for the session card: one card is worth less than the rest of the codex.
+        playerCodexApi.sessions(token).catch(() => [])
       ]);
-      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar);
+      setPages(nextPages); setMaps(nextMaps); setTimeline(nextTimeline); setRels(nextRels); setLinks(nextLinks); setCalendar(nextCalendar); setSessions(nextSessions);
       setCurrentMapId((current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null);
       setError(null);
     } catch { setError("Couldn't load the codex - check your connection to the table."); }
@@ -162,6 +170,11 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
 
       {view === "campaign" && (
         <CampaignHome pages={pages} entries={campaignEntries} maps={maps} today={campaignToday} loading={loading} showReveal={false} onOpenPage={openPage}
+          /* M9: the nearest revealed session. A player is never sent `activeSessionId` (the server
+             answers them null — it would name a record that may well be unrevealed), so the rule falls
+             through to the highest-numbered session they can actually see. No `onOpenSession`: there is
+             no player session log to open, and a button that navigates nowhere is worse than no button. */
+          session={pickNextSession(sessions)}
           /* R1: a player's jumps prepare their destination too — the entry is marked, the map is open. */
           onOpenEntry={(entryId) => { setFocusedEntryId(entryId); setView("journal"); }}
           onOpenMap={(mapId) => { setSelectedMarkerId(null); setCurrentMapId(mapId); setView("atlas"); }}

@@ -16,6 +16,7 @@ import { MapManager, type MapSelection } from "./maps/MapManager";
 import { ReplayPanel } from "./replay/ReplayPanel";
 import { CodexWorkspace } from "./codex/CodexWorkspace";
 import { PlayerCodex } from "./codex/PlayerCodex";
+import { useRecapBadge } from "./codex/useRecapBadge";
 import { HomebrewPanel } from "./homebrew/HomebrewPanel";
 import { ScenePanel } from "./scenes/ScenePanel";
 import { SceneGallery } from "./scenes/SceneGallery";
@@ -26,7 +27,7 @@ import { socket } from "./socket";
 import { newId } from "./lib/ids";
 import { ViewerControls } from "./viewer/ViewerControls";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
-import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Button, Input } from "@vtt/ui";
+import { ThemeToggle, Tabs, Wordmark, ToastProvider, useToast, Modal, Badge, Button, Input } from "@vtt/ui";
 import { TableEventToasts } from "./scene/toasts";
 
 const PLAYER_TOKEN_KEY = "vtt.player-token";
@@ -217,6 +218,9 @@ function App() {
   };
 
   const mapToken = mode === "gm" ? gmToken : localStorage.getItem(PLAYER_TOKEN_KEY);
+  // CT-3: "a recap you haven't read". Called unconditionally (hooks rules) with a null token for the GM,
+  // where it does nothing — the badge belongs to the player's Open Codex button and to nothing else.
+  const recapBadge = useRecapBadge(mode === "player" ? mapToken : null);
   // Docking is available whenever a map is loaded (a live scene), not only once combat starts, so the
   // GM can position the tracker during encounter setup too (report #9/#6). Players' projection nulls
   // mapAssetId until combat is active, so this stays GM-side and never affects the viewer.
@@ -308,7 +312,9 @@ function App() {
         onChange={(id) => setGmTab(id as GmTab)}
       />}
 
-      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => setPlayerCodexOpen(true)}>Open Codex</Button></div>}
+      {/* CT-3: the count rides INSIDE the button, so it is part of its accessible name ("Open Codex 2
+          new") rather than a coloured dot a screen reader never reaches. Opening marks them read. */}
+      {mode === "player" && <div className="player-codex-row"><Button variant="secondary" size="sm" onClick={() => { recapBadge.markSeen(); setPlayerCodexOpen(true); }}>Open Codex{recapBadge.unread > 0 && <> <Badge tone="info" solid>{recapBadge.unread} new</Badge></>}</Button></div>}
       {mode === "player" && playerCodexOpen && mapToken && <Modal open onClose={() => setPlayerCodexOpen(false)} size="lg" title="Codex" ariaLabel="Codex"><PlayerCodex token={mapToken} onClose={() => setPlayerCodexOpen(false)} /></Modal>}
 
       {(mode === "player" || gmTab === "table") && <div className={`table-layout anim-view${showDocked ? " docked" : ""}`}>
