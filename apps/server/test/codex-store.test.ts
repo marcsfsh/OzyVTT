@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
-import { projectGmChronicleRecord, projectGmLinkEdges, projectGmMarker, projectGmRelationships, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships } from "../src/codex-projections.js";
+import { projectGmChronicleRecord, projectGmLinkEdges, projectGmMarker, projectGmRelationships, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerSession } from "../src/codex-projections.js";
 
 let directory: string;
 let store: CodexStore;
@@ -1210,5 +1210,305 @@ describe("CodexStore recency semantics — what counts as an update (CI-9)", () 
     expect(updatedAt(strahd.id) > afterCreate).toBe(true);
     expect(updatedAt(barovia.id) > afterCreate).toBe(true);
     expect(rev(strahd.id)).toBe(strahd.rev);
+  });
+});
+
+describe("CodexStore sessions (M9)", () => {
+  let sessionDirectory: string;
+  let clock: number;
+  let sessions: CodexStore;
+
+  beforeEach(async () => {
+    sessionDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-sessions-"));
+    clock = Date.parse("2026-07-26T00:00:00.000Z");
+    sessions = new CodexStore(join(sessionDirectory, "vtt.sqlite"), () => clock);
+    await sessions.initialize();
+  });
+  afterEach(async () => { sessions.close(); await rm(sessionDirectory, { recursive: true, force: true }); });
+
+  /**
+   * An injected clock, exactly as the CI-9 recency describe uses one. Without it the "reveal does not move
+   * recency" assertions are VACUOUS: two writes in the same millisecond produce the same ISO stamp, so a
+   * `toBe(born)` would pass even against a `SET updated_at = ?` that really did fire.
+   */
+  const tick = () => { clock += 60_000; };
+
+  it("creates, reads back, updates with a rev bump, and persists through a restart", async () => {
+    const created = sessions.createSession({
+      sessionNumber: 4, realDate: "2026-07-26", attendees: ["Ozy", "Mara", " Ozy "],
+      prepBody: "Ambush at the bridge.", recapBody: "The party crossed.", status: "planned"
+    });
+    expect(created).toMatchObject({
+      sessionNumber: 4, realDate: "2026-07-26", prepBody: "Ambush at the bridge.",
+      recapBody: "The party crossed.", revealedToPlayers: false, status: "planned", rev: 1
+    });
+    expect(created.attendees).toEqual(["Ozy", "Mara"]);        // trimmed + deduped, NOT slugged
+    expect(created.createdAt).toBe(created.updatedAt);          // born, so the two stamps agree
+
+    tick();
+    const updated = sessions.updateSession(created.id, { recapBody: "The party crossed, one short.", status: "played" }, created.rev, "gm");
+    expect(updated.rev).toBe(2);
+    expect(updated.recapBody).toBe("The party crossed, one short.");
+    expect(updated.status).toBe("played");
+    expect(updated.prepBody).toBe("Ambush at the bridge.");     // an omitted field is UNCHANGED, never cleared
+    expect(updated.updatedAt > created.updatedAt).toBe(true);   // ...and an edit moves recency
+
+    sessions.close();
+    sessions = new CodexStore(join(sessionDirectory, "vtt.sqlite"), () => clock);
+    await sessions.initialize();
+    expect(sessions.getSession(created.id)).toMatchObject({ rev: 2, status: "played", sessionNumber: 4 });
+    expect(sessions.listSessions()).toHaveLength(1);
+  });
+
+  it("rejects a stale expectedRev with a conflict, and accepts an omitted one", () => {
+    const session = sessions.createSession({ sessionNumber: 1, prepBody: "v1" });
+    sessions.updateSession(session.id, { prepBody: "v2" }, session.rev, "gm");
+    expect(() => sessions.updateSession(session.id, { prepBody: "v3" }, 1, "gm")).toThrow(CodexRevisionConflictError);
+    // An omitted expectedRev is the "I know I might be behind" path and must still write.
+    expect(sessions.updateSession(session.id, { prepBody: "v3" }, undefined, "gm").prepBody).toBe("v3");
+  });
+
+  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision (CI-9)", () => {
+    // The recap badge compares a session's `updatedAt` against a lastSeen stamp, so a reveal sweep that
+    // re-stamped every session would light the badge for recaps whose text never changed.
+    const session = sessions.createSession({ sessionNumber: 2, recapBody: "The wolves came at dusk." });
+    const born = session.updatedAt;
+    const revisionBefore = sessions.revision;
+    tick();
+    const revealed = sessions.setSessionRevealed(session.id, true);
+    expect(revealed.revealedToPlayers).toBe(true);                     // the reveal really happened...
+    expect(revealed.updatedAt).toBe(born);                             // ...without moving recency
+    expect(revealed.rev).toBe(session.rev);                            // ...or the editor's conflict token
+    expect(sessions.revision).toBeGreaterThan(revisionBefore);         // ...but clients still refetch
+  });
+
+  it("refuses a duplicate session number, allows any number of UNNUMBERED sessions, and frees a number on delete", () => {
+    sessions.createSession({ sessionNumber: 7 });
+    // The partial UNIQUE index is what makes "open session 7" resolve to one record. A duplicate must be a
+    // clean rejection, not a crash — and the message must be something a GM can act on.
+    expect(() => sessions.createSession({ sessionNumber: 7 })).toThrow(/Session 7 already exists/);
+    // ...on the UPDATE path too, which is the easier one to forget.
+    const other = sessions.createSession({ sessionNumber: 8 });
+    expect(() => sessions.updateSession(other.id, { sessionNumber: 7 }, other.rev, "gm")).toThrow(/Session 7 already exists/);
+    expect(sessions.getSession(other.id)!.sessionNumber).toBe(8);      // the rejected write rolled back whole
+
+    // An unnumbered session is a legitimate state, so many may coexist. This pins the BEHAVIOUR, not the
+    // index's `WHERE` clause — SQLite treats NULLs as distinct in any UNIQUE index, so removing that
+    // predicate changes nothing observable and no test can catch it. What this does catch is a store that
+    // starts inventing a number for an unnumbered session.
+    const drafts = [sessions.createSession({}), sessions.createSession({}), sessions.createSession({})];
+    expect(drafts.every((draft) => draft.sessionNumber === null)).toBe(true);
+    expect(sessions.listSessions()).toHaveLength(5);
+
+    // Deleting the holder frees the number for reuse, so a mistyped session is recoverable.
+    const seven = sessions.listSessions().find((row) => row.sessionNumber === 7)!;
+    sessions.deleteSession(seven.id);
+    expect(sessions.createSession({ sessionNumber: 7 }).sessionNumber).toBe(7);
+  });
+
+  it("orders numbered sessions by number, with the unnumbered ones below them", () => {
+    // The same tier-separator idiom the chronicle uses for undated records: a session with no number yet
+    // is not "session 0", it is outside the numbering, so it sorts below every numbered one.
+    const second = sessions.createSession({ sessionNumber: 2 });
+    const draft = sessions.createSession({});
+    const first = sessions.createSession({ sessionNumber: 1 });
+    expect(sessions.listSessions().map((row) => row.id)).toEqual([first.id, second.id, draft.id]);
+  });
+
+  it("deletes idempotently, ignores a malformed id, and clears the active pointer with the record", () => {
+    const session = sessions.createSession({ sessionNumber: 3 });
+    sessions.setActiveSession(session.id);
+    expect(sessions.activeSessionId).toBe(session.id);
+    sessions.deleteSession(session.id);
+    expect(sessions.getSession(session.id)).toBeNull();
+    // A dangling pointer would have `activeSessionId` name a record that no longer exists — which the
+    // sessions list hands straight to the GM, and which auto-linking would then resolve against.
+    expect(sessions.activeSessionId).toBeNull();
+    expect(() => sessions.deleteSession(session.id)).not.toThrow();    // idempotent
+    expect(() => sessions.deleteSession("not-a-uuid")).not.toThrow();  // malformed id: early return
+  });
+
+  it("sets and clears the active session without touching the session record at all", () => {
+    const session = sessions.createSession({ sessionNumber: 5, prepBody: "The crypt." });
+    const born = sessions.getSession(session.id)!;
+    expect(sessions.activeSessionId).toBeNull();                       // nothing is active on a fresh codex
+
+    tick();
+    expect(sessions.setActiveSession(session.id)).toBe(session.id);
+    expect(sessions.activeSessionId).toBe(session.id);
+    // Activating is a statement about the TABLE, not an edit of the record: no rev (an open console would
+    // 409 on a click nobody typed) and no recency move (the badge would light for unchanged prose).
+    expect(sessions.getSession(session.id)).toEqual(born);
+
+    tick();
+    expect(sessions.setActiveSession(null)).toBeNull();
+    expect(sessions.activeSessionId).toBeNull();
+    expect(sessions.getSession(session.id)).toEqual(born);
+    expect(() => sessions.setActiveSession(crypto.randomUUID())).toThrow(/no longer exists/);
+  });
+
+  it("files new journal entries and auto-logged battles under the ACTIVE session", () => {
+    const session = sessions.createSession({ sessionNumber: 12 });
+    sessions.setActiveSession(session.id);
+
+    // The GM types a note; nobody retypes the session number.
+    expect(sessions.createEntry({ playerText: "We reached Vallaki." }).sessionNumber).toBe(12);
+    // ...and a fight logged mid-session lands in the same group. This was the one record kind that never
+    // could, however diligently the GM numbered everything else.
+    expect(sessions.appendCombatEntry({ sourceEncounterId: 3, playerText: "A brawl." }).sessionNumber).toBe(12);
+
+    // An EXPLICIT value always wins, including an explicit null — that is a caller saying "no session".
+    expect(sessions.createEntry({ playerText: "A retcon.", sessionNumber: 4 }).sessionNumber).toBe(4);
+    expect(sessions.createEntry({ playerText: "Timeless lore.", sessionNumber: null }).sessionNumber).toBeNull();
+  });
+
+  it("degrades to today's exact behaviour when there is no active session — and in every gap", () => {
+    // A numbered session that is NOT active exists throughout. That is load-bearing: without it, "resolve
+    // the ACTIVE session" and "guess at any session lying around" produce the same nulls, and this test
+    // would pass against a lookup that files every entry under whatever session it can find.
+    const bystander = sessions.createSession({ sessionNumber: 9 });
+    expect(sessions.activeSessionId).toBeNull();
+
+    // With nothing active, both call sites must behave precisely as they did before M9: no session.
+    expect(sessions.createEntry({ playerText: "Between sessions." }).sessionNumber).toBeNull();
+    expect(sessions.appendCombatEntry({ sourceEncounterId: 1, playerText: "A brawl." }).sessionNumber).toBeNull();
+
+    // An active session that has NO NUMBER yet is the same gap — there is nothing to file under, and
+    // session 9 sitting right there must not be borrowed.
+    const draft = sessions.createSession({});
+    sessions.setActiveSession(draft.id);
+    expect(sessions.createEntry({ playerText: "Mid-draft." }).sessionNumber).toBeNull();
+    expect(sessions.appendCombatEntry({ sourceEncounterId: 2, playerText: "A brawl." }).sessionNumber).toBeNull();
+
+    // ...and numbering that same session starts the linking, so the nulls above are the gap and not a
+    // broken lookup. It resolves to the ACTIVE session's number, not the bystander's.
+    sessions.updateSession(draft.id, { sessionNumber: 1 }, draft.rev, "gm");
+    expect(sessions.createEntry({ playerText: "Numbered now." }).sessionNumber).toBe(1);
+    expect(bystander.sessionNumber).toBe(9);
+  });
+});
+
+/**
+ * The K7 discipline v11/v12 follow: a fresh-database test can never catch a bad upgrade, because every
+ * table is empty. This builds a genuine v12 database out of the shipped migration SQL, fills it with the
+ * legacy rows that actually matter here (journal entries that already carry a `session_number`), and then
+ * opens a `CodexStore` on it — which is exactly the upgrade a GM's existing vtt.sqlite performs.
+ */
+describe("CodexStore migration v13 — sessions arrive with NO backfill (M9)", () => {
+  it("fabricates no session records for existing numbered entries, and leaves those entries untouched", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v12-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+      database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+      for (const migration of MIGRATIONS.filter((entry) => entry.version <= 12)) {
+        database.exec(migration.sql);
+        database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+      }
+      database.prepare("INSERT INTO codex_meta (id, codex_revision) VALUES (1, 0)").run();
+      const one = crypto.randomUUID(), two = crypto.randomUUID(), loose = crypto.randomUUID();
+      const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, kind, session_number, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, NULL, 1, 'note', ?, ?, '[]', '', '')");
+      insert.run(one, "We arrived in Barovia.", 1, 1);
+      insert.run(two, "The wolves came.", 2, 2);
+      insert.run(loose, "Undated lore.", null, 3);
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();
+
+      // THE point of "no backfill": three legacy entries carrying numbers 1 and 2 produce ZERO session
+      // records. Inventing one per distinct number would fabricate prep, recap and attendance nobody
+      // wrote, and would guess which numbers were ever real sessions.
+      expect(upgraded.listSessions()).toEqual([]);
+      expect(upgraded.activeSessionId).toBeNull();
+
+      // ...and the legacy entries read exactly as they did before the upgrade, so the by-session lens
+      // renders those groups today the way it rendered them yesterday.
+      expect(upgraded.listTimeline().map((entry) => entry.sessionNumber)).toEqual([1, 2, null]);
+      expect(upgraded.getEntry(one)!.playerText).toBe("We arrived in Barovia.");
+
+      // Auto-linking on a REAL upgraded database with real rows: nothing is active, so a new entry is
+      // filed exactly as it was pre-M9 — the legacy numbers do not leak into it.
+      expect(upgraded.createEntry({ playerText: "Written after the upgrade." }).sessionNumber).toBeNull();
+      expect(upgraded.appendCombatEntry({ sourceEncounterId: 9, playerText: "A brawl." }).sessionNumber).toBeNull();
+
+      // Making a session record for a number the legacy entries already use is allowed (the constraint is
+      // over SESSIONS, not entries) and starts the linking from there on, without rewriting history.
+      const third = upgraded.createSession({ sessionNumber: 3 });
+      upgraded.setActiveSession(third.id);
+      expect(upgraded.createEntry({ playerText: "Session three." }).sessionNumber).toBe(3);
+      expect(upgraded.getEntry(one)!.sessionNumber).toBe(1);   // the legacy row is still untouched
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * `sessionStatus()` gates the status in TS, so nothing reachable through the store can write a third
+   * value — which is exactly why the CHECK is worth asserting at the SQL layer instead. A TS-only gate
+   * protects this process, not the file: a repair script or a manual `sqlite3` session would otherwise be
+   * free to write `status = 'cancelled'`, and `toSession` coerces anything unrecognised to "planned", so
+   * the bad row would read back as a plausible one rather than failing loudly. Same discipline as the
+   * two ungatedness tests above — assert the layer, not the pipeline.
+   */
+  it("the status CHECK rejects a value the TS gate would never produce", () => {
+    const database = new DatabaseSync(":memory:");
+    for (const migration of MIGRATIONS) database.exec(migration.sql);
+    const insert = (status: string) => database
+      .prepare("INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', '', '', 0, ?, 1, '', '')")
+      .run(`id-${status}`, status);
+
+    expect(() => insert("cancelled")).toThrow();
+    // Both legal values still insert, so the throw above is the CHECK discriminating rather than the
+    // statement being broken for every input.
+    expect(() => insert("planned")).not.toThrow();
+    expect(() => insert("played")).not.toThrow();
+    database.close();
+  });
+});
+
+/**
+ * The session projection, called POINT-BLANK. `codex-http.test.ts` proves the pipeline; only this proves
+ * the layer. That distinction is not pedantry here — this file's own CI-1 lesson is that a weakened SQL
+ * gate left all 787 tests passing because a projection quietly caught it, and the same blind spot exists
+ * in reverse: an HTTP test cannot tell a working projection from a router that happened to compensate.
+ */
+describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
+  const seed = () => store.createSession({
+    sessionNumber: 6, realDate: "2026-07-26", attendees: ["Ozy", "Mara"],
+    prepBody: "The ambush is at the bridge; Ireena is the real target.",
+    recapBody: "The party crossed the bridge.", status: "planned"
+  });
+
+  it("refuses an UNREVEALED session outright", () => {
+    const session = seed();
+    expect(session.revealedToPlayers).toBe(false);
+    expect(projectPlayerSession(session)).toBeNull();
+    // Revealing it lets it through, so the null above is the reveal gate and not a broken projection.
+    expect(projectPlayerSession(store.setSessionRevealed(session.id, true))).not.toBeNull();
+  });
+
+  it("emits exactly the allow-listed keys of a REVEALED session, and never the prep", () => {
+    const revealed = store.setSessionRevealed(seed().id, true);
+    const projected = projectPlayerSession(revealed)!;
+    // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
+    // ever added to the player projection, not merely if this one leaks. `attendees` and `status` are
+    // deliberately absent (P2, secret by default) as well as `prepBody` and `rev`.
+    expect(Object.keys(projected).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(projected.recap).toBe("The party crossed the bridge.");
+    const payload = JSON.stringify(projected);
+    expect(payload).not.toContain("Ireena is the real target");   // the GM's prep
+    expect(payload).not.toContain("Ozy");                          // attendance
+    expect(payload).not.toContain("planned");                      // scheduling state
+
+    // The GM's own row carries all of it — so the assertions above are the projection working, not a
+    // session that happened to have nothing to leak.
+    const gmRow = projectGmSession(revealed);
+    expect(gmRow.prepBody).toContain("Ireena is the real target");
+    expect(gmRow.attendees).toEqual(["Ozy", "Mara"]);
+    expect(gmRow.status).toBe("planned");
+    expect(gmRow.rev).toBe(1);
   });
 });

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, type CodexSearchRecord } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -99,6 +99,34 @@ const JournalWriteSchema = z.object({
   inWorldLabel: z.string().max(120).nullable().optional(),
   inWorldDate: InWorldDateSchema.optional()
 }).strict();
+/**
+ * M9 sessions. `sessionNumber`'s bounds are the journal's verbatim, on purpose: the two are the SAME
+ * number - a journal entry's `sessionNumber` resolves against a session record - and two copies of the
+ * bound is how one surface silently accepts a value the other rejects (the reason `InWorldDateSchema`
+ * above is shared rather than repeated).
+ */
+const SessionNumberSchema = z.number().int().min(0).max(100_000).nullable();
+const AttendeesSchema = z.array(z.string().trim().min(1).max(40)).max(24);
+const SessionStatusSchema = z.enum(["planned", "played"]);
+const SessionCreateSchema = z.object({
+  sessionNumber: SessionNumberSchema.optional(),
+  realDate: z.string().max(40).nullable().optional(),
+  attendees: AttendeesSchema.optional(),
+  prepBody: z.string().max(100_000).optional(),
+  recapBody: z.string().max(100_000).optional(),
+  revealedToPlayers: z.boolean().optional(),
+  status: SessionStatusSchema.optional()
+}).strict();
+/** No `revealedToPlayers`: reveal is its own route, so a PATCH cannot publish a recap as a side effect of an edit. */
+const SessionUpdateSchema = z.object({
+  sessionNumber: SessionNumberSchema.optional(),
+  realDate: z.string().max(40).nullable().optional(),
+  attendees: AttendeesSchema.optional(),
+  prepBody: z.string().max(100_000).optional(),
+  recapBody: z.string().max(100_000).optional(),
+  status: SessionStatusSchema.optional(),
+  expectedRev: z.number().int().nonnegative().optional()
+}).strict();
 const CalendarSchema = z.object({
   yearName: z.string().max(20),
   months: z.array(z.object({ name: z.string().trim().min(1).max(40), days: z.number().int().min(1).max(400) })).min(1).max(24),
@@ -113,7 +141,7 @@ type CodexRouterOptions = Readonly<{
   authorizeGm: (token: string | undefined) => boolean;
   authorizePlayer: (token: string | undefined) => boolean;
   /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
-  notifyChanged: (scope: "pages" | "maps" | "markers" | "journal") => void;
+  notifyChanged: (scope: "pages" | "maps" | "markers" | "journal" | "sessions") => void;
   /**
    * Mints a short-lived PLAYER token so the GM can preview the player Codex truthfully. The preview must
    * be a real player principal - `roleOf` below checks `authorizeGm` FIRST, so reusing the GM's own token
@@ -546,6 +574,78 @@ export function createCodexRouter(options: CodexRouterOptions) {
     store.deleteEntry(pathParam(request, "id"));
     options.notifyChanged("journal");
     return envelope(response, 200, { deleted: true });
+  });
+
+  /**
+   * M9: SESSIONS - the GM's prep on one side, the players' recap on the other. A new player-reachable
+   * read, so nothing about its gating is invented: the reads branch on `roleOf` and project through
+   * `codex-projections.ts` exactly as the page reads directly above do, and an unrevealed session 404s a
+   * player rather than 403ing, because a status code that distinguishes "secret" from "absent" IS the
+   * leak (the `GET /codex/pages/:id` rule).
+   *
+   * There is deliberately NO `/codex/sessions/:id/entries`. The client already holds the chronicle, whose
+   * records carry `sessionNumber`, so "the entries for session 4" is a filter over data the caller has -
+   * adding a route would add a second player-reachable surface and a second reveal gate to keep in step
+   * with the first. Sessions likewise do NOT join `GET /codex/timeline`: a session has no
+   * `calendarInstant`, and `compareChronicle` sorts every undated record below every dated one, so they
+   * would clump beneath the very entries they contain.
+   */
+  router.get(`${CODEX_BASE}/sessions`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the session log.");
+    const rows = store.listSessions();
+    if (role === "gm") return envelope(response, 200, { sessions: rows.map(projectGmSession), activeSessionId: store.activeSessionId });
+    // A player gets `activeSessionId: null`, never the real id: it names a record that may well be
+    // unrevealed, and a player has no use for it. The KEY stays present so one response shape serves both
+    // roles - a key that appears only for the GM is a tell in itself.
+    return envelope(response, 200, { sessions: rows.map(projectPlayerSession).filter((session) => session !== null), activeSessionId: null });
+  });
+
+  router.post(`${CODEX_BASE}/sessions`, requireGm, (request, response) => {
+    try { const session = store.createSession(SessionCreateSchema.parse(request.body)); options.notifyChanged("sessions"); return envelope(response, 201, { session: projectGmSession(session) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  router.get(`${CODEX_BASE}/sessions/:id`, (request, response) => {
+    const role = roleOf(request);
+    if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the session log.");
+    const session = store.getSession(pathParam(request, "id"));
+    if (!session) return failure(response, 404, "not_found", "That session was not found.");
+    if (role === "gm") return envelope(response, 200, { session: projectGmSession(session) });
+    const projected = projectPlayerSession(session);
+    // The SAME 404 an absent session gets, deliberately - never 403.
+    if (!projected) return failure(response, 404, "not_found", "That session was not found.");
+    return envelope(response, 200, { session: projected });
+  });
+
+  router.patch(`${CODEX_BASE}/sessions/:id`, requireGm, (request, response) => {
+    try {
+      const { expectedRev, ...fields } = SessionUpdateSchema.parse(request.body);
+      const session = store.updateSession(pathParam(request, "id"), fields, expectedRev, "gm");
+      options.notifyChanged("sessions");
+      return envelope(response, 200, { session: projectGmSession(session) });
+    } catch (error) { return codexError(response, error); }
+  });
+
+  router.delete(`${CODEX_BASE}/sessions/:id`, requireGm, (request, response) => {
+    store.deleteSession(pathParam(request, "id"));
+    options.notifyChanged("sessions");
+    return envelope(response, 200, { deleted: true });
+  });
+
+  router.post(`${CODEX_BASE}/sessions/:id/reveal`, requireGm, (request, response) => {
+    try { const session = store.setSessionRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed); options.notifyChanged("sessions"); return envelope(response, 200, { session: projectGmSession(session) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * Point the table at this session. Returns only the pointer, not the record: activating changes nothing
+   * ABOUT the session (see `setActiveSession` - no `rev`, no `updated_at`), so echoing the row back would
+   * imply an edit that did not happen.
+   */
+  router.post(`${CODEX_BASE}/sessions/:id/activate`, requireGm, (request, response) => {
+    try { const activeSessionId = store.setActiveSession(pathParam(request, "id")); options.notifyChanged("sessions"); return envelope(response, 200, { activeSessionId }); }
+    catch (error) { return codexError(response, error); }
   });
 
   // ----- Calendar (the world's own months / weekdays / era) -----

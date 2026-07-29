@@ -123,7 +123,7 @@ export function createServer(options: CreateServerOptions) {
     }
   }
   /** Ping every client that the worldbuilding codex changed so it refetches its own projected view. Content-free (scope + revision only), so it carries nothing GM-only - the projection boundary lives in the HTTP reads. */
-  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal") {
+  function notifyCodexChanged(scope: "pages" | "maps" | "markers" | "journal" | "sessions") {
     io.emit("codex:changed", { scope, codexRevision: codexStore.revision });
   }
   /**

@@ -194,6 +194,54 @@ export type CodexChronicleRecord =
   | Readonly<{ kind: "entry"; entry: CodexJournalRow }>
   | Readonly<{ kind: "event"; page: CodexPageRow }>;
 
+/**
+ * M9: one real-world SESSION at the table. Two-layer exactly as a page is - `prepBody` is the GM's plan
+ * and never enters a player projection, `recapBody` is the players' half and ships once `revealed`.
+ *
+ * `revealed` is named for its COLUMN rather than following the `revealedToPlayers` the other record types
+ * carry, because the frozen M9 projection contract is written against `row.revealed`; the meaning is the
+ * same gate.
+ *
+ * `sessionNumber` is nullable and UNIQUE-when-present (migration v13): the by-session lens resolves a
+ * number to at most one record, and an unnumbered session is still a legitimate record.
+ */
+export type CodexSessionStatus = "planned" | "played";
+export type CodexSessionRow = Readonly<{
+  id: string;
+  sessionNumber: number | null;
+  /** The real-world date the group met ("2026-07-26"), free text - the calendar is the IN-WORLD one. */
+  realDate: string | null;
+  attendees: readonly string[];
+  /** GM-only. The single most important secret on this record: never projected to a player. */
+  prepBody: string;
+  /** The player-facing half, gated by `revealedToPlayers` - the recap the table reads before the next session. */
+  recapBody: string;
+  revealedToPlayers: boolean;
+  status: CodexSessionStatus;
+  rev: number;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+export type CodexSessionCreateInput = Readonly<{
+  sessionNumber?: number | null;
+  realDate?: string | null;
+  attendees?: readonly string[];
+  prepBody?: string;
+  recapBody?: string;
+  revealedToPlayers?: boolean;
+  status?: CodexSessionStatus;
+}>;
+/** No `revealedToPlayers`: reveal has its own endpoint and its own recency rule, exactly as `CodexPageUpdateInput` omits it. */
+export type CodexSessionUpdateInput = Readonly<{
+  sessionNumber?: number | null;
+  realDate?: string | null;
+  attendees?: readonly string[];
+  prepBody?: string;
+  recapBody?: string;
+  status?: CodexSessionStatus;
+}>;
+
 export type CodexPageCreateInput = Readonly<{
   title: string;
   entityType?: CodexEntityType;
@@ -471,6 +519,62 @@ export const MIGRATIONS = [{
     ALTER TABLE codex_pages ADD COLUMN calendar_instant INTEGER;
     CREATE INDEX codex_pages_instant ON codex_pages (calendar_instant);
   `
+}, {
+  version: 13,
+  // M9: a real-world SESSION becomes a record of its own - the GM's prep on one side, the players' recap
+  // on the other - so "what are we doing on Sunday" and "what happened last time" stop being loose notes
+  // scattered through the journal. Two-layer exactly as a page is: `prep_body` is the GM half and never
+  // leaves `projectGmSession`; `recap_body` is the player half, gated by `revealed`.
+  //
+  // NO BACKFILL, deliberately (the K7 discipline v12 followed): a legacy journal entry already carries a
+  // `session_number`, but inventing a session RECORD per distinct number would fabricate prep, recap and
+  // attendance nobody wrote, and would guess at which numbers were real sessions. Existing numbered
+  // entries therefore keep rendering exactly as they do today, grouped by a number with no record behind
+  // it; a session record only exists once the GM makes one.
+  //
+  // The UNIQUE index is what makes the by-session lens's resolution TOTAL: a number maps to at most one
+  // record, so "open session 4" is never ambiguous. An unnumbered session is still a legitimate state (a
+  // one-shot, or a session drafted before the GM decides where it lands), and many may coexist.
+  //
+  // The `WHERE session_number IS NOT NULL` predicate is INTENT, not enforcement, and it is worth saying
+  // so rather than implying otherwise: SQLite already treats NULLs as distinct in any UNIQUE index, so
+  // repeated NULLs are permitted with or without it - verified by mutation, since a test cannot tell the
+  // two apart. It is here because it states which rows the rule is about, and because it keeps the index
+  // off every unnumbered row.
+  //
+  // `active_session_id` lives on `codex_meta` (`id INTEGER PRIMARY KEY CHECK (id = 1)`) so "exactly one
+  // active session" is STRUCTURAL: there is one meta row, therefore one pointer, and no code path can
+  // produce two. A `is_active` flag on `codex_sessions` would make it a convention that every write has
+  // to remember to uphold. No FK to `codex_sessions(id)`: `deleteSession` clears the pointer itself, and
+  // an FK would be a second, silent owner of that rule.
+  //
+  // `status` carries a CHECK the way every comparable v1 enum does (`codex_journal.kind`,
+  // `codex_maps.kind`, `codex_links.layer`/`target_kind`). `sessionStatus()` already gates it in TS, but a
+  // TS-only gate protects this process, not the file: anything that ever writes this database outside the
+  // store - a repair script, a manual sqlite3 session - would be free to invent a third status that
+  // `toSession` then silently coerces to "planned". The constraint is what makes the column honest.
+  //
+  // Ordering note: on a FRESH database this runs BEFORE `initialize()` seeds `codex_meta`, so nothing
+  // here may assume a row exists. The ALTER alters the table, not a row, and the seed names its columns
+  // (`INSERT INTO codex_meta (id, codex_revision)`), so the new column simply defaults to NULL - verified
+  // against the running schema, not assumed.
+  sql: `
+    CREATE TABLE codex_sessions (
+      id TEXT PRIMARY KEY,
+      session_number INTEGER,
+      real_date TEXT,
+      attendees_json TEXT NOT NULL,
+      prep_body TEXT NOT NULL,
+      recap_body TEXT NOT NULL,
+      revealed INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('planned', 'played')),
+      rev INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+    CREATE UNIQUE INDEX codex_sessions_number ON codex_sessions (session_number) WHERE session_number IS NOT NULL;
+    ALTER TABLE codex_meta ADD COLUMN active_session_id TEXT;
+  `
 }];
 
 /**
@@ -573,6 +677,9 @@ type MapRowRaw = { id: string; asset_id: string; name: string; kind: string; par
 const MAP_COLUMNS = "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at";
 type MarkerRowRaw = { id: string; map_id: string; x: number; y: number; icon_id: string; icon_color: string; label: string | null; revealed: number; page_ids_json: string | null; sub_map_id: string | null; scene_ids_json: string | null; actor_id: string | null; tags_json: string; created_at: string; updated_at: string };
 const MARKER_COLUMNS = "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, created_at, updated_at";
+type SessionRowRaw = { id: string; session_number: number | null; real_date: string | null; attendees_json: string; prep_body: string; recap_body: string; revealed: number; status: string; rev: number; created_at: string; updated_at: string };
+/** One column list per session read, the same discipline PAGE_COLUMNS / JOURNAL_COLUMNS follow. */
+const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, rev, created_at, updated_at";
 type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; created_at: string; updated_at: string };
 const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at";
 
@@ -793,6 +900,30 @@ function sessionNo(value: number | null | undefined): number | null {
   if (value === null || value === undefined) return null;
   if (!Number.isInteger(value) || value < 0 || value > 100_000) throw new Error("A session number must be a non-negative integer.");
   return value;
+}
+const MAX_ATTENDEES = 24;
+/**
+ * Who was at the table: short free-text names, deduped and bounded. Deliberately NOT `tags()` - an
+ * attendee is a person's name ("Ozy"), not a slug, so lowercasing and rejecting spaces would be wrong.
+ * The per-name bound is `shortLabel`, which already trims, rejects control characters and caps length,
+ * so this adds only the dedupe and the count cap.
+ */
+function attendees(value: readonly string[] | undefined): string[] {
+  if (!value) return [];
+  const out: string[] = [];
+  for (const raw of value) {
+    const name = shortLabel(raw, 40, "attendee name");
+    if (name && !out.includes(name)) out.push(name);
+  }
+  if (out.length > MAX_ATTENDEES) throw new Error(`A session may list at most ${MAX_ATTENDEES} attendees.`);
+  return out;
+}
+const SESSION_STATUSES = new Set<CodexSessionStatus>(["planned", "played"]);
+/** The status enum lives in TS, not a SQL CHECK - this is the one gate, so it is the one to keep correct. */
+function sessionStatus(value: string | undefined): CodexSessionStatus {
+  if (value === undefined) return "planned";
+  if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
+  return value as CodexSessionStatus;
 }
 
 /** A page title reduced to a stable link target: lowercased, trimmed, whitespace collapsed. */
@@ -1565,12 +1696,19 @@ export class CodexStore {
 
   // ----- Journal / timeline -----
 
+  /**
+   * M9 auto-linking: an entry written with NO `sessionNumber` is filed under the ACTIVE session, so the
+   * GM gets the by-session grouping for free instead of retyping the number on every note. An explicitly
+   * supplied value always wins - including an explicit `null`, which is how a caller says "this belongs
+   * to no session" and is why the test is `=== undefined` rather than a falsy check. With no active
+   * session `activeSessionNumber()` is null, which is today's behaviour exactly.
+   */
   createEntry(input: CodexJournalCreateInput): CodexJournalRow {
     const dated = this.resolveDate(input.inWorldDate, input.inWorldLabel);
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
-      sourceEncounterId: null, sessionNumber: sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
+      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags
     });
   }
@@ -1581,13 +1719,18 @@ export class CodexStore {
    * year on the timeline; previously every auto-logged battle was hardcoded undated and sank below every
    * dated entry forever. If the GM has not set a current date there is nothing to date it by, and
    * `resolveDate(null, null)` yields the old undated behaviour unchanged.
+   *
+   * M9 does for the SESSION number what the line above does for the in-world date: a fight logged during
+   * a live session is filed under that session, resolved the same way and from the same "what is now?"
+   * state. A hardcoded `null` here is what made auto-logged battles the one record kind that never
+   * appeared in the by-session lens, however diligently the GM numbered everything else.
    */
   appendCombatEntry(input: CodexCombatEntryInput): CodexJournalRow {
     const dated = this.resolveDate(this.getCalendar().currentDate ?? null, null);
     return this.insertEntry({
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
-      sourceEncounterId: input.sourceEncounterId, sessionNumber: null, realDate: null,
+      sourceEncounterId: input.sourceEncounterId, sessionNumber: this.activeSessionNumber(), realDate: null,
       inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date
     });
   }
@@ -1736,6 +1879,202 @@ export class CodexStore {
   private markerRowRaw(markerId: string): MarkerRowRaw | undefined {
     if (!ID.test(markerId)) return undefined;
     return this.requireDatabase().prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE id = ?`).get(markerId) as MarkerRowRaw | undefined;
+  }
+
+  // ----- Sessions (M9: the GM's prep on one side, the players' recap on the other) -----
+  //
+  // Modelled on `codex_pages` throughout, because a session is the only OTHER record with an editor
+  // behind it: `rev` is the editor's conflict token (stale `expectedRev` -> 409), create stamps
+  // `created_at === updated_at`, and every write runs inside `this.transaction` with a `bumpRevision()`
+  // so clients refetch. Where sessions differ from pages they differ deliberately, and each difference
+  // is commented at the method that makes it.
+
+  createSession(input: CodexSessionCreateInput): CodexSessionRow {
+    const database = this.requireDatabase();
+    const sessionId = this.freshId();
+    const stamp = this.stamp();
+    const row: SessionRowRaw = {
+      id: sessionId,
+      session_number: sessionNo(input.sessionNumber),
+      real_date: shortLabel(input.realDate, 40, "date"),
+      attendees_json: JSON.stringify(attendees(input.attendees)),
+      prep_body: body(input.prepBody),
+      recap_body: body(input.recapBody),
+      revealed: input.revealedToPlayers ? 1 : 0,
+      status: sessionStatus(input.status),
+      rev: 1, created_at: stamp, updated_at: stamp
+    };
+    this.guardSessionNumber(row.session_number, () => {
+      this.transaction(() => {
+        database.prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(row.id, row.session_number, row.real_date, row.attendees_json, row.prep_body, row.recap_body, row.revealed, row.status, row.rev, row.created_at, row.updated_at);
+        this.bumpRevision();
+      });
+    });
+    return this.getSession(sessionId)!;
+  }
+
+  /**
+   * Omitted-field-means-unchanged, the page/journal update contract verbatim: the session console PATCHes
+   * a whole draft on every autosave, and a rule of "absent means clear" would wipe the recap the first
+   * time prep was edited from a surface that does not carry it.
+   *
+   * `authorTag` is accepted for signature symmetry with `updatePage` and is deliberately unused: sessions
+   * keep no revision history (there is no `codex_session_revisions` table), so there is nothing to attribute.
+   */
+  updateSession(sessionId: string, input: CodexSessionUpdateInput, expectedRev: number | undefined, authorTag: string): CodexSessionRow {
+    void authorTag;
+    const database = this.requireDatabase();
+    const existing = this.sessionRowRaw(sessionId);
+    if (!existing) throw new CodexNotFoundError("That session no longer exists.");
+    if (expectedRev !== undefined && expectedRev !== existing.rev) throw new CodexRevisionConflictError("This session was changed somewhere else after you opened it.");
+    const next: SessionRowRaw = {
+      ...existing,
+      session_number: input.sessionNumber === undefined ? existing.session_number : sessionNo(input.sessionNumber),
+      real_date: input.realDate === undefined ? existing.real_date : shortLabel(input.realDate, 40, "date"),
+      attendees_json: input.attendees === undefined ? existing.attendees_json : JSON.stringify(attendees(input.attendees)),
+      prep_body: input.prepBody === undefined ? existing.prep_body : body(input.prepBody),
+      recap_body: input.recapBody === undefined ? existing.recap_body : body(input.recapBody),
+      status: input.status === undefined ? existing.status : sessionStatus(input.status),
+      // `rev` and `updated_at` move TOGETHER on an edit: the conflict token and the recency stamp both
+      // describe "this record was written", and splitting them is what CI-9's exceptions below are for.
+      rev: existing.rev + 1,
+      updated_at: this.stamp()
+    };
+    this.guardSessionNumber(next.session_number, () => {
+      this.transaction(() => {
+        database.prepare("UPDATE codex_sessions SET session_number = ?, real_date = ?, attendees_json = ?, prep_body = ?, recap_body = ?, status = ?, rev = ?, updated_at = ? WHERE id = ?")
+          .run(next.session_number, next.real_date, next.attendees_json, next.prep_body, next.recap_body, next.status, next.rev, next.updated_at, sessionId);
+        this.bumpRevision();
+      });
+    });
+    return this.getSession(sessionId)!;
+  }
+
+  /**
+   * CI-9, exactly `setPageRevealed`: publishing a recap is not an EDIT of it, so this moves neither `rev`
+   * (an open console would 409 on a reveal nobody typed) nor `updated_at`. `updated_at` matters more here
+   * than anywhere else - it is what the player recap badge compares against - and a reveal sweep that
+   * re-stamped every session would light the badge for recaps whose text never changed.
+   */
+  setSessionRevealed(sessionId: string, revealed: boolean): CodexSessionRow {
+    const database = this.requireDatabase();
+    if (!this.sessionRowRaw(sessionId)) throw new CodexNotFoundError("That session no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_sessions SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, sessionId);
+      this.bumpRevision();
+    });
+    return this.getSession(sessionId)!;
+  }
+
+  /** Idempotent, and an early return on a malformed id - every other codex delete behaves this way. */
+  deleteSession(sessionId: string): void {
+    const database = this.requireDatabase();
+    if (!ID.test(sessionId)) return;
+    this.transaction(() => {
+      database.prepare("DELETE FROM codex_sessions WHERE id = ?").run(sessionId);
+      // Clearing the pointer is PART of the delete, not a separate tidy-up: there is no FK doing it (see
+      // migration v13), and a dangling `active_session_id` would have `activeSessionId` name a record that
+      // no longer exists - which the sessions list hands straight to the GM.
+      database.prepare("UPDATE codex_meta SET active_session_id = NULL WHERE active_session_id = ?").run(sessionId);
+      this.bumpRevision();
+    });
+  }
+
+  getSession(sessionId: string): CodexSessionRow | null {
+    const row = this.sessionRowRaw(sessionId);
+    return row ? this.toSession(row) : null;
+  }
+
+  /**
+   * Numbered sessions first in number order, then the unnumbered ones oldest-first. The leading
+   * `(session_number IS NULL)` is the same tier-separator idiom `listTimeline`'s ORDER BY and
+   * `compareChronicle` use for undated records, so the codex has ONE way of saying "these sort below
+   * those" rather than a new one per table.
+   */
+  listSessions(): CodexSessionRow[] {
+    return (this.requireDatabase()
+      .prepare(`SELECT ${SESSION_COLUMNS} FROM codex_sessions ORDER BY (session_number IS NULL), session_number, created_at`)
+      .all() as SessionRowRaw[]).map((row) => this.toSession(row));
+  }
+
+  /** The session the table is currently playing, or null. One meta row, therefore one pointer (v13). */
+  get activeSessionId(): string | null {
+    return (this.requireDatabase().prepare("SELECT active_session_id FROM codex_meta WHERE id = 1").get() as { active_session_id: string | null } | undefined)?.active_session_id ?? null;
+  }
+
+  /**
+   * Point the table at a session (or clear it with `null`). Writes `codex_meta` ONLY, and that is the
+   * whole design: activating is a statement about the TABLE, not an edit of the record, so it must not
+   * move the session's `rev` (409ing an open console) or its `updated_at` (lighting the recap badge on a
+   * session nobody wrote). Same seam CI-9 draws between recency and conflict detection everywhere else.
+   */
+  setActiveSession(sessionId: string | null): string | null {
+    const database = this.requireDatabase();
+    const next = sessionId === null ? null : id(sessionId);
+    if (next !== null && !this.sessionRowRaw(next)) throw new CodexNotFoundError("That session no longer exists.");
+    this.transaction(() => {
+      database.prepare("UPDATE codex_meta SET active_session_id = ? WHERE id = 1").run(next);
+      this.bumpRevision();
+    });
+    return next;
+  }
+
+  /**
+   * The active session's NUMBER, or null - the one resolution both auto-linking call sites share, so a
+   * hand-written note and an auto-logged battle can never disagree about which session "now" is.
+   *
+   * Degrades to null in every gap: nothing active, or an active session the GM has not numbered yet. Both
+   * are exactly the pre-M9 behaviour at those call sites, so auto-linking can only ever ADD a number where
+   * there would have been none - it never borrows some other session's. (The `?? null` on a pointer whose
+   * record has gone is belt and braces: `deleteSession` clears the pointer with the row, so that state is
+   * unreachable and consequently untested - it is here so a torn database cannot make this throw.)
+   */
+  private activeSessionNumber(): number | null {
+    const active = this.activeSessionId;
+    return active === null ? null : (this.getSession(active)?.sessionNumber ?? null);
+  }
+
+  /**
+   * Run a session write that could collide on `session_number`, translating the partial-unique-index
+   * violation into copy the GM can act on. The INDEX is the enforcement, not a pre-check `SELECT`: a
+   * read-then-write would be a second answer to the same question and a race against itself, and the
+   * whole reason v13 has the constraint is that the by-session lens needs the resolution to be total.
+   *
+   * Matching on the message is the only handle `node:sqlite` offers (`err.code` is the generic
+   * `ERR_SQLITE_ERROR` for every constraint), and it is safe HERE specifically: the only unique
+   * constraints on `codex_sessions` are the primary key - which is a freshly minted uuid - and this
+   * index. Anything else rethrows untouched.
+   */
+  private guardSessionNumber(sessionNumber: number | null, work: () => void): void {
+    try { work(); }
+    catch (error) {
+      if (sessionNumber !== null && error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+        throw new Error(`Session ${sessionNumber} already exists. Give this one a different number.`);
+      }
+      throw error;
+    }
+  }
+
+  private toSession(row: SessionRowRaw): CodexSessionRow {
+    return {
+      id: row.id, sessionNumber: row.session_number, realDate: row.real_date,
+      // `parseTags` is the codex's defensive "read a stored JSON string array" reader (a malformed value
+      // degrades to empty rather than throwing); attendees are stored the same way, so it is reused rather
+      // than copied. It does NOT slug - that happens on the way in, and attendees deliberately skip it.
+      attendees: parseTags(row.attendees_json),
+      prepBody: row.prep_body, recapBody: row.recap_body,
+      revealedToPlayers: row.revealed === 1,
+      // Anything unrecognised reads as `planned`, the harmless half of the enum - the same fail-safe
+      // `toEntry` applies to a journal row's `kind`.
+      status: row.status === "played" ? "played" : "planned",
+      rev: row.rev, createdAt: row.created_at, updatedAt: row.updated_at
+    };
+  }
+
+  private sessionRowRaw(sessionId: string): SessionRowRaw | undefined {
+    if (!ID.test(sessionId)) return undefined;
+    return this.requireDatabase().prepare(`SELECT ${SESSION_COLUMNS} FROM codex_sessions WHERE id = ?`).get(sessionId) as SessionRowRaw | undefined;
   }
 
   // ----- internals -----

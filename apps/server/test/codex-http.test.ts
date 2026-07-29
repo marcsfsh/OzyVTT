@@ -742,3 +742,143 @@ describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
     expect(response.status).toBe(401);
   });
 });
+
+/**
+ * M9 sessions at the HTTP boundary (A-8). A session is a NEW player-reachable read, and the record whose
+ * two layers are furthest apart in consequence: `prepBody` is the GM's plan for the evening, `recapBody`
+ * is what the table reads afterwards. These are the pipeline tests; the layer that actually decides is
+ * exercised point-blank in `codex-store.test.ts` ("Codex session — the projection layer, on its own"),
+ * because an HTTP test can only ever say the pipeline as a whole behaved, never which layer made it.
+ */
+describe("codex sessions HTTP boundary (M9, A-8)", () => {
+  const PREP = "The ambush is at the bridge; Ireena is the real target.";
+  const RECAP = "The party crossed the bridge.";
+
+  it("gives a player the recap and NEVER the prep, and 404s an unrevealed session", async () => {
+    const { base } = await fixture();
+    const shown = await body(await post(base, "/api/v1/codex/sessions", GM, {
+      sessionNumber: 6, realDate: "2026-07-26", attendees: ["Ozy", "Mara"], prepBody: PREP, recapBody: RECAP
+    }));
+    const shownId = shown.data.session.id as string;
+    const secret = await body(await post(base, "/api/v1/codex/sessions", GM, {
+      sessionNumber: 7, prepBody: "Strahd attends the ball in person.", recapBody: "The ball ended badly."
+    }));
+    const secretId = secret.data.session.id as string;
+
+    // The GM sees BOTH layers of both sessions - so the player assertions below are the gate working,
+    // not an empty payload or a session with nothing to leak.
+    const gmList = await body(await get(base, "/api/v1/codex/sessions", GM));
+    expect((gmList.data.sessions as Json[]).map((row) => row.sessionNumber)).toEqual([6, 7]);
+    expect(JSON.stringify(gmList)).toContain(PREP);
+    expect(JSON.stringify(gmList)).toContain(RECAP);
+
+    // Unrevealed: the player list is empty and the direct read is a 404, never a 403 - a status code that
+    // distinguishes "secret" from "absent" is itself the leak.
+    expect((await body(await get(base, "/api/v1/codex/sessions", PLAYER))).data.sessions).toHaveLength(0);
+    expect((await get(base, `/api/v1/codex/sessions/${shownId}`, PLAYER)).status).toBe(404);
+
+    await post(base, `/api/v1/codex/sessions/${shownId}/reveal`, GM, { revealed: true });
+    const playerList = await body(await get(base, "/api/v1/codex/sessions", PLAYER));
+    const rows = playerList.data.sessions as Json[];
+    expect(rows).toHaveLength(1);                                   // the still-secret session 7 is absent
+    // The EXACT projected key set, as the journal and chronicle tests above assert for their records:
+    // this fails if any new field ever enters the player session projection, not only if this one leaks.
+    expect(Object.keys(rows[0]).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(rows[0].recap).toBe(RECAP);
+
+    const payload = JSON.stringify(playerList);
+    expect(payload).not.toContain(PREP);                            // the revealed session's own prep
+    expect(payload).not.toContain("Strahd attends the ball");       // the unrevealed session's prep...
+    expect(payload).not.toContain("The ball ended badly.");         // ...and even its recap
+    expect(payload).not.toContain(secretId);                        // ...and its id
+    expect(payload).not.toContain("Ozy");                           // attendance is GM-only for now
+
+    // The single read is gated identically, and carries the same key set.
+    const single = await body(await get(base, `/api/v1/codex/sessions/${shownId}`, PLAYER));
+    expect(Object.keys(single.data.session).sort()).toEqual(["id", "realDate", "recap", "sessionNumber"]);
+    expect(JSON.stringify(single)).not.toContain(PREP);
+    expect((await get(base, `/api/v1/codex/sessions/${secretId}`, PLAYER)).status).toBe(404);
+    expect((await get(base, `/api/v1/codex/sessions/${secretId}`, GM)).status).toBe(200);
+  });
+
+  it("returns the active session id to the GM and never to a player", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1, recapBody: "We began." }));
+    const sessionId = created.data.session.id as string;
+    await post(base, `/api/v1/codex/sessions/${sessionId}/reveal`, GM, { revealed: true });
+
+    expect((await body(await get(base, "/api/v1/codex/sessions", GM))).data.activeSessionId).toBeNull();
+    const activated = await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, GM, {});
+    expect(activated.status).toBe(200);
+    expect((await body(activated)).data.activeSessionId).toBe(sessionId);
+    expect((await body(await get(base, "/api/v1/codex/sessions", GM))).data.activeSessionId).toBe(sessionId);
+
+    // The player's copy of the SAME revealed session names no active id. The key stays present so one
+    // response shape serves both roles - a key that appears only for the GM is a tell in itself.
+    const playerList = await body(await get(base, "/api/v1/codex/sessions", PLAYER));
+    expect(playerList.data.sessions).toHaveLength(1);
+    expect(playerList.data).toHaveProperty("activeSessionId");
+    expect(playerList.data.activeSessionId).toBeNull();
+  });
+
+  it("refuses player writes and unauthenticated reads with the right envelopes", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 }));
+    const sessionId = created.data.session.id as string;
+    for (const response of [
+      await post(base, "/api/v1/codex/sessions", PLAYER, { sessionNumber: 2 }),
+      await patch(base, `/api/v1/codex/sessions/${sessionId}`, PLAYER, { prepBody: "mine now" }),
+      await post(base, `/api/v1/codex/sessions/${sessionId}/reveal`, PLAYER, { revealed: true }),
+      await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, PLAYER, {}),
+      await fetch(`${base}/api/v1/codex/sessions/${sessionId}`, { method: "DELETE", headers: PLAYER })
+    ]) expect(response.status).toBe(401);
+    const noauth = await get(base, "/api/v1/codex/sessions", { "content-type": "application/json" });
+    expect(noauth.status).toBe(401);
+    expect((await body(noauth)).ok).toBe(false);
+    // ...and the record is exactly as the GM left it.
+    expect((await body(await get(base, `/api/v1/codex/sessions/${sessionId}`, GM))).data.session.rev).toBe(1);
+  });
+
+  it("maps a stale expectedRev to 409 and a duplicate session number to 400", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 }));
+    const sessionId = created.data.session.id as string;
+    const stale = await patch(base, `/api/v1/codex/sessions/${sessionId}`, GM, { prepBody: "later", expectedRev: 0 });
+    expect(stale.status).toBe(409);
+    expect((await body(stale)).error.code).toBe("conflict");
+
+    // A duplicate number is a clean validation failure, not a 500 - the constraint must never crash out.
+    const duplicate = await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 });
+    expect(duplicate.status).toBe(400);
+    const failed = await body(duplicate);
+    expect(failed.error.code).toBe("validation_failed");
+    expect(failed.error.message).toMatch(/Session 1 already exists/);
+  });
+
+  it("deletes idempotently and stops serving the session", async () => {
+    const { base } = await fixture();
+    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1, recapBody: "We began." }));
+    const sessionId = created.data.session.id as string;
+    const first = await fetch(`${base}/api/v1/codex/sessions/${sessionId}`, { method: "DELETE", headers: GM });
+    expect(first.status).toBe(200);
+    expect((await body(first)).data.deleted).toBe(true);
+    expect((await fetch(`${base}/api/v1/codex/sessions/${sessionId}`, { method: "DELETE", headers: GM })).status).toBe(200);
+    expect((await get(base, `/api/v1/codex/sessions/${sessionId}`, GM)).status).toBe(404);
+    expect((await body(await get(base, "/api/v1/codex/sessions", GM))).data.sessions).toHaveLength(0);
+  });
+
+  it("files journal entries written during the active session under its number, end to end", async () => {
+    const { base } = await fixture();
+    // Nothing active: an entry is filed exactly as it was pre-M9.
+    const before = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "Between sessions." }));
+    expect(before.data.entry.sessionNumber).toBeNull();
+
+    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 12 }));
+    await post(base, `/api/v1/codex/sessions/${created.data.session.id}/activate`, GM, {});
+    const during = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "We reached Vallaki." }));
+    expect(during.data.entry.sessionNumber).toBe(12);
+    // An explicit value still wins over the active session.
+    const pinned = await body(await post(base, "/api/v1/codex/journal", GM, { playerText: "A retcon.", sessionNumber: 4 }));
+    expect(pinned.data.entry.sessionNumber).toBe(4);
+  });
+});

@@ -1,4 +1,4 @@
-import type { CodexBacklinkRow, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -181,6 +181,43 @@ export function projectGmJournalEntry(row: CodexJournalRow): GmCodexJournalEntry
 export function projectPlayerJournalEntry(row: CodexJournalRow): PlayerCodexJournalEntry | null {
   if (!row.revealedToPlayers) return null;
   return { id: row.id, text: row.playerText, kind: row.kind, sessionNumber: row.sessionNumber, realDate: row.realDate, inWorldLabel: row.inWorldLabel, tags: row.tags, createdAt: row.createdAt };
+}
+
+// ----- Sessions (M9: prep is the GM half, recap is the player half) -----
+
+export type GmCodexSession = CodexSessionRow;
+/**
+ * A session as a PLAYER sees it. Deliberately the tightest projection in this file - four keys - and each
+ * omission is a decision, not an oversight:
+ *
+ *   `prepBody`  - the GM's plan for the evening. The single most secret thing on the record; it is why
+ *                 the record is two-layer at all. It has no player-facing form and never gains one.
+ *   `rev`       - the editor's conflict token, absent from every other player projection here.
+ *   `attendees` - GM-only FOR NOW (P2, secret by default). It is real-world personal data about who came,
+ *                 and nothing in the player Codex needs it yet.
+ *   `status`    - GM-only FOR NOW, same rule: "planned vs played" is the GM's own scheduling state.
+ *
+ * Widening either of the last two later is a one-line, reversible change; leaking them is not, which is
+ * the whole reason they start out.
+ *
+ * `recapBody` is renamed `recap` on the way out, matching `playerBody`->`body` and `playerText`->`text`:
+ * the layer prefix only means something when there are two layers, and here there is only one left.
+ */
+export type PlayerCodexSession = Readonly<{
+  id: string;
+  sessionNumber: number | null;
+  realDate: string | null;
+  recap: string;
+}>;
+
+export function projectGmSession(row: CodexSessionRow): GmCodexSession { return row; }
+
+/** null when unrevealed; otherwise the player layer. prepBody, rev, status and attendees never enter it. */
+export function projectPlayerSession(row: CodexSessionRow): PlayerCodexSession | null {
+  if (!row.revealedToPlayers) return null;
+  // Explicit allow-list, never a spread-and-delete: a field added to `CodexSessionRow` must be added HERE
+  // to reach a player, so the default for anything new is secret.
+  return { id: row.id, sessionNumber: row.sessionNumber, realDate: row.realDate, recap: row.recapBody };
 }
 
 /**
