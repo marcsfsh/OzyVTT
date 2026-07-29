@@ -1,4 +1,5 @@
-import type { CodexBacklinkRow, CodexChronicleRecord, CodexEntityType, CodexInWorldDate, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow } from "./codex-store.js";
+import { deadlineFired } from "./codex-store.js";
+import type { CodexBacklinkRow, CodexCalendar, CodexCalendarMonth, CodexChronicleRecord, CodexDowntimePayload, CodexEntityType, CodexInWorldDate, CodexJournalKind, CodexJournalRow, CodexLinkEdgeRow, CodexMapRow, CodexMarkerRow, CodexPageRow, CodexPageSummaryRow, CodexQuestObjective, CodexQuestRow, CodexQuestStatus, CodexRecordKind, CodexRelationshipRow, CodexRelationshipView, CodexSessionRow } from "./codex-store.js";
 
 /**
  * The codex viewer-safety boundary. Two-layer pages carry a player-facing body AND a GM-secret body;
@@ -176,6 +177,11 @@ export type GmCodexJournalEntry = CodexJournalRow;
  * A journal entry as a player sees it: player text only, no gmText, no GM-only linkage, only when revealed.
  * `sessionNumber` additionally passes through the session gate below - it is the one field here whose
  * visibility is not the entry's own flag alone.
+ *
+ * M11 widened `kind` (a revealed deadline says it is a deadline - O-2 puts no kind filter anywhere) but
+ * deliberately added neither `payload` nor `fired`. This is the mini-timeline row on a page or a marker, and
+ * a downtime's `who`/`activity` and a deadline's fired state are read on the CHRONICLE, which has them. A
+ * player-facing field the player Codex does not read is a field with no reason to have been widened.
  */
 export type PlayerCodexJournalEntry = Readonly<{
   id: string; text: string; kind: CodexJournalRow["kind"]; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string;
@@ -326,8 +332,97 @@ function excerpt(text: string): string {
  * What a chronicle row IS, for the reader. R2: one row shape for every record; the kind reads by icon +
  * label, never by colour alone. `combat` is split out from `entry` because it already renders with its own
  * badge and replay edge today and must keep doing so - it is the same store row, discriminated for display.
+ *
+ * M11 adds `deadline` and `downtime` (CT-5 / CT-10) for the same reason `combat` is here: they are the same
+ * journal row, discriminated so a reader can tell "a thing that will happen" from "a thing that happened".
+ * Widening this type is DELIBERATELY breaking - `CHRONICLE_KIND_META` on the client is a
+ * `Record<CodexChronicleKind, ...>`, so the compiler, not a reviewer, is what notices a new kind has no
+ * icon and no word (F-5: nothing else about a new journal kind produces a single compile error).
  */
-export type CodexChronicleKind = "entry" | "combat" | "event";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime";
+
+/**
+ * A journal row's STORE kind mapped to its CHRONICLE kind - a real total function over `CodexJournalKind`,
+ * never `kind === "combat" ? "combat" : "entry"`.
+ *
+ * That collapse was one of the two sites F-5 identified: it silently rendered any unknown kind as an
+ * ordinary note, so a `deadline` row would have looked exactly like a stray entry and no test or type
+ * would have said otherwise. An exhaustive `switch` with no `default` makes the NEXT kind (M12's
+ * `milestone` / `standing`) a compile error here instead.
+ *
+ * Only `note` is renamed on the way out: "entry" is what an unclassified journal row has always been
+ * called on the chronicle, and renaming it now would churn every reader for nothing.
+ */
+function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
+  switch (kind) {
+    case "note": return "entry";
+    case "combat": return "combat";
+    case "deadline": return "deadline";
+    case "downtime": return "downtime";
+  }
+}
+
+/**
+ * CT-5's `fired` is DERIVED and stored nowhere (D11-C), and the comparison that derives it is the store's
+ * `deadlineFired` - imported, never re-implemented. Both chronicle projections below call that one function,
+ * because two copies of a `<=` is how a dashboard ends up disagreeing with the timeline it links into.
+ *
+ * What this file owns is the part that is a viewer-safety decision rather than an arithmetic one: WHOSE
+ * clock each audience is measured against. The GM row uses the GM's own clock; the player row uses the
+ * PUBLISHED date (O-1 / D11-G). Measuring a player's row against the GM clock would leak the prep clock one
+ * bit at a time - the party would learn that a date they have not been shown has already gone by - which is
+ * exactly what O-1 exists to keep private. That is why the two contexts below name their instant differently
+ * and are not assignable to one another.
+ */
+
+/**
+ * CT-10's downtime payload, in the two shapes the two audiences get. Allow-listed by explicit literal per
+ * audience (D11-E), never a spread of the stored payload: `applied` is GM WORKFLOW state - "have I confirmed
+ * the clock move?" - and is a fact about the GM's prep, not about the party's week off, so it stops here.
+ *
+ * A record that is not downtime carries no payload at all; `null` rather than an omitted key, so no reader
+ * branches on key presence (the rule every other chronicle field follows).
+ */
+export type GmCodexDowntime = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
+export type PlayerCodexDowntime = Readonly<{ who: string; activity: string; days: number }>;
+
+function projectGmDowntime(payload: CodexDowntimePayload | null): GmCodexDowntime | null {
+  if (payload === null) return null;
+  return { who: payload.who, activity: payload.activity, days: payload.days, applied: payload.applied };
+}
+function projectPlayerDowntime(payload: CodexDowntimePayload | null): PlayerCodexDowntime | null {
+  if (payload === null) return null;
+  // Explicit allow-list, never a spread-and-delete: a field added to `CodexDowntimePayload` must be added
+  // HERE to reach a player, so the default for anything new is secret.
+  return { who: payload.who, activity: payload.activity, days: payload.days };
+}
+
+/**
+ * What the CALLER resolves for a GM chronicle read. Both fields are things only the store can answer, and
+ * the `projectPlayerMarker` / `projectPlayerQuest` division of labour applies unchanged: the caller ANSWERS
+ * the question, the projection decides who may see the answer.
+ *
+ * Optional, and each absent value is the QUIETEST one (`fired: false`, no proposed date). A caller that
+ * forgets loses a feature; it can never leak one. That is the only default an audited file may have, and it
+ * is also what lets the M9/M10 call sites - which have no clock to supply - keep compiling untouched.
+ */
+export type GmChronicleContext = Readonly<{
+  /** The GM's own clock as a sort instant. `deadlineFired` measures the GM's `fired` against THIS. */
+  campaignInstant?: number | null;
+  /** For an unapplied downtime, the date `applyDowntime` would move the clock to. GM workflow; never a player's. */
+  proposedDate?: CodexInWorldDate | null;
+}>;
+
+/**
+ * What the caller resolves for a PLAYER chronicle read: the session context this file already needed, plus
+ * the PUBLISHED clock.
+ *
+ * The field is called `publishedInstant`, not `campaignInstant`, on purpose. It is the one structural defence
+ * available here against the leak D11-G exists to prevent: `GmChronicleContext` and this type are not
+ * assignable to one another by accident, so handing the player projection the GM's clock has to be typed out
+ * deliberately rather than reached by a copy-paste of the GM branch.
+ */
+export type PlayerChronicleContext = PlayerSessionNumberContext & Readonly<{ publishedInstant?: number | null }>;
 
 /**
  * One chronicle row as the GM sees it. Flat and uniform on purpose: every key is present on every kind
@@ -360,6 +455,12 @@ export type GmCodexChronicleRecord = Readonly<{
   attachPageId: string | null;
   attachMarkerId: string | null;
   sourceEncounterId: number | null;
+  /** CT-5, derived (D11-C): has the GM's clock reached this deadline's own date? `false` for every other kind. */
+  fired: boolean;
+  /** CT-10: the downtime activity, `applied` included - this is the GM's row. `null` for every other kind. */
+  payload: GmCodexDowntime | null;
+  /** CT-10 / O-3: where the clock WOULD land if the GM confirms. `null` once applied, and for every other kind. */
+  proposedDate: CodexInWorldDate | null;
   createdAt: string;
   updatedAt: string;
 }>;
@@ -380,8 +481,15 @@ export type GmCodexChronicleRecord = Readonly<{
  *                    `sessionNumber` therefore inherits that projection's session gate too, rather than
  *                    restating it: an unrevealed session's number never reaches this row either.
  *
+ *   `fired`        - M11 (CT-5). A revealed deadline the campaign has already reached has to READ as passed,
+ *                    or the party's copy of the timeline says something different from the GM's. Derived
+ *                    against the PUBLISHED date, never the GM's clock (D11-G) - see `deadlineFired`.
+ *   `payload`      - M11 (CT-10), and only ever `who`/`activity`/`days`. `applied` is GM workflow state and
+ *                    is dropped by `projectPlayerDowntime` (D11-E), like `rev` on every other record here.
+ *
  * Absent by construction: `gmText`, `calendarInstant`, `inWorldDate`, `revealedToPlayers`, `attachPageId`,
- * `attachMarkerId`, `sourceEncounterId` (K2 - the replay id never reaches a player), `updatedAt`, `rev`.
+ * `attachMarkerId`, `sourceEncounterId` (K2 - the replay id never reaches a player), `updatedAt`, `rev`,
+ * `proposedDate` (M11 - the clock move the GM has not confirmed, and may never confirm, is prep).
  */
 export type PlayerCodexChronicleRecord = Readonly<{
   kind: CodexChronicleKind;
@@ -392,18 +500,24 @@ export type PlayerCodexChronicleRecord = Readonly<{
   realDate: string | null;
   inWorldLabel: string | null;
   tags: readonly string[];
+  fired: boolean;
+  payload: PlayerCodexDowntime | null;
   createdAt: string;
 }>;
 
-export function projectGmChronicleRecord(record: CodexChronicleRecord): GmCodexChronicleRecord {
+export function projectGmChronicleRecord(record: CodexChronicleRecord, context: GmChronicleContext = {}): GmCodexChronicleRecord {
   if (record.kind === "entry") {
     const entry = record.entry;
     return {
-      kind: entry.kind === "combat" ? "combat" : "entry", id: entry.id, title: null,
+      kind: chronicleKindOf(entry.kind), id: entry.id, title: null,
       text: entry.playerText, gmText: entry.gmText, revealedToPlayers: entry.revealedToPlayers,
       sessionNumber: entry.sessionNumber, realDate: entry.realDate, inWorldLabel: entry.inWorldLabel,
       calendarInstant: entry.calendarInstant, inWorldDate: entry.inWorldDate, tags: entry.tags,
       attachPageId: entry.attachPageId, attachMarkerId: entry.attachMarkerId, sourceEncounterId: entry.sourceEncounterId,
+      // `fired` is asked of every entry, not only a deadline: `deadlineFired` answers `false` for a
+      // non-deadline and for an undated row, so no reader here has to know which kinds can fire.
+      fired: deadlineFired(entry, context.campaignInstant ?? null),
+      payload: projectGmDowntime(entry.payload), proposedDate: context.proposedDate ?? null,
       createdAt: entry.createdAt, updatedAt: entry.updatedAt
     };
   }
@@ -415,6 +529,9 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord): GmCodexC
     sessionNumber: null, realDate: null, inWorldLabel: page.inWorldLabel,
     calendarInstant: page.calendarInstant, inWorldDate: page.inWorldDate, tags: page.tags,
     attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+    // An `event` PAGE is not a deadline and carries no payload: a page has no `kind` in the journal's
+    // vocabulary and no `payload_json` column, so these are structurally, not conditionally, absent.
+    fired: false, payload: null, proposedDate: null,
     createdAt: page.createdAt, updatedAt: page.updatedAt
   };
 }
@@ -435,14 +552,20 @@ export function projectGmChronicleRecord(record: CodexChronicleRecord): GmCodexC
  * either underlying projection tightens - which is exactly what the session gate is, one milestone later.
  * `context` exists only for that delegation; an `event` row carries no session number to gate.
  */
-export function projectPlayerChronicleRecord(record: CodexChronicleRecord, context: PlayerSessionNumberContext): PlayerCodexChronicleRecord | null {
+export function projectPlayerChronicleRecord(record: CodexChronicleRecord, context: PlayerChronicleContext): PlayerCodexChronicleRecord | null {
   if (record.kind === "entry") {
     const projected = projectPlayerJournalEntry(record.entry, context);
     if (!projected) return null;
+    // O-2: NO kind filter here or anywhere. A deadline and a downtime are gated by the ordinary reveal flag
+    // - the one `projectPlayerJournalEntry` just applied - and by nothing else, so a revealed deadline is
+    // exactly as visible as a revealed note. `payload` still rides through the per-kind allow-list.
     return {
-      kind: projected.kind === "combat" ? "combat" : "entry", id: projected.id, title: null, text: projected.text,
+      kind: chronicleKindOf(projected.kind), id: projected.id, title: null, text: projected.text,
       sessionNumber: projected.sessionNumber, realDate: projected.realDate, inWorldLabel: projected.inWorldLabel,
-      tags: projected.tags, createdAt: projected.createdAt
+      tags: projected.tags,
+      fired: deadlineFired(record.entry, context.publishedInstant ?? null),
+      payload: projectPlayerDowntime(record.entry.payload),
+      createdAt: projected.createdAt
     };
   }
   const projected = projectPlayerPage(record.page);
@@ -450,8 +573,62 @@ export function projectPlayerChronicleRecord(record: CodexChronicleRecord, conte
   return {
     kind: "event", id: projected.id, title: projected.title, text: excerpt(projected.body),
     sessionNumber: null, realDate: null, inWorldLabel: record.page.inWorldLabel,
-    tags: projected.tags, createdAt: record.page.createdAt
+    tags: projected.tags, fired: false, payload: null, createdAt: record.page.createdAt
   };
+}
+
+// ----- Calendar (M11 / O-1: the GM's prep clock and the players' published clock are two values) -----
+
+/**
+ * The world calendar as the GM sees it: their own clock in `currentDate`, plus what the party is currently
+ * being shown.
+ *
+ * This is the only projection in this file whose GM half is not a straight passthrough of the store row, and
+ * that is because the row is not the whole answer: `publishedDate` lives in `codex_meta` columns beside
+ * `calendar_json` rather than inside it (D11-G - `PUT /codex/calendar` replaces that whole blob from client
+ * input, so a player-facing value inside it would be one careless PUT from being clobbered).
+ */
+export type GmCodexCalendar = Readonly<{
+  yearName: string;
+  months: readonly CodexCalendarMonth[];
+  weekdays: readonly string[];
+  /** The GM's clock - the campaign's authoritative "now". Never reaches a player by any path. */
+  currentDate: CodexInWorldDate | null;
+  /** What players currently see as "now". Equal to `currentDate` until the GM runs ahead while prepping. */
+  publishedDate: CodexInWorldDate | null;
+}>;
+
+/**
+ * The world calendar as a PLAYER sees it - today's shape exactly, with one field re-sourced.
+ *
+ * `currentDate` KEEPS ITS NAME and its meaning ("where the campaign is now, as far as this reader is
+ * concerned"); only where it comes from changes (D11-G), which is why the player's "Now:" chip needs no
+ * client change at all.
+ *
+ * There is no reveal flag to gate on: a calendar is not a record, it has no `revealedToPlayers` column, and
+ * its months/weekdays/era have always been player-visible - the world's own months are not a secret. The
+ * gate this projection applies instead is on the SOURCE of the one field that is: `publishedDate` is read
+ * and `calendar.currentDate` is not read AT ALL. That is the whole invariant, and it is why this is an
+ * explicit key-by-key literal rather than a spread with `currentDate` overwritten: a spread would put the
+ * GM clock into the object first and rely on a later key to remove it, which is precisely the shape K1
+ * forbids (and it would carry any future GM-only calendar field straight out with it).
+ *
+ * `publishedDate` is deliberately NOT echoed back to a player: for a player `currentDate` already IS the
+ * published date, so a second key could only duplicate it or lie about it.
+ */
+export type PlayerCodexCalendar = Readonly<{
+  yearName: string;
+  months: readonly CodexCalendarMonth[];
+  weekdays: readonly string[];
+  currentDate: CodexInWorldDate | null;
+}>;
+
+export function projectGmCalendar(calendar: CodexCalendar, publishedDate: CodexInWorldDate | null): GmCodexCalendar {
+  return { yearName: calendar.yearName, months: calendar.months, weekdays: calendar.weekdays, currentDate: calendar.currentDate ?? null, publishedDate };
+}
+
+export function projectPlayerCalendar(calendar: CodexCalendar, publishedDate: CodexInWorldDate | null): PlayerCodexCalendar {
+  return { yearName: calendar.yearName, months: calendar.months, weekdays: calendar.weekdays, currentDate: publishedDate };
 }
 
 // ----- Suite-wide search (CI-1 / R8: one index, one result list, every record kind) -----

@@ -68,7 +68,7 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "The party reached Barovia.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: null, sourceEncounterId: null,
+  attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: ["dark-gift"], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -77,7 +77,7 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The party reached Barovia.", gmText: null, revealedToPlayers: false,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: ["dark-gift"], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  tags: ["dark-gift"], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 

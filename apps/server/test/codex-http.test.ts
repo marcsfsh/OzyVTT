@@ -681,8 +681,16 @@ describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
     expect(payload).not.toContain("The Sundering");                       // even the secret event's TITLE
     // The EXACT projected key set, as the journal timeline test above asserts for an entry: this fails if
     // any new field ever enters the player chronicle projection, not only if this one leaks.
+    //
+    // M11 widened it by exactly two, each a reviewed addition rather than a passenger:
+    //   `fired`   - CT-5. A revealed deadline the campaign has already passed has to READ as passed, or the
+    //               party's timeline says something different from the GM's. Derived against the PUBLISHED
+    //               date, never the GM's clock - which is what the prep-clock test below pins.
+    //   `payload` - CT-10, and only ever `who`/`activity`/`days`. `applied` is GM workflow state and is
+    //               allow-listed away, which the projection test asserts at its own layer.
+    // `proposedDate` deliberately did NOT join them: a clock move the GM has not confirmed is prep.
     expect(Object.keys(playerRows[0]).sort())
-      .toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text", "title"]);
+      .toEqual(["createdAt", "fired", "id", "inWorldLabel", "kind", "payload", "realDate", "sessionNumber", "tags", "text", "title"]);
   });
 
   it("interleaves a dated event with journal entries in one in-world order, for both roles", async () => {
@@ -1110,6 +1118,173 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
  * about mounting. Reading Express's route table is exact instead: it is the set of routes that were
  * really registered, so a documented-but-unmounted path cannot hide in it.
  */
+/**
+ * M11 (CT-5 / CT-10), at the HTTP boundary. These assert on the SERIALIZED RESPONSE BODY rather than on a
+ * projection's return value, deliberately: the M6 lesson is that a gate at one layer can be masked by a gate
+ * at another, so the end-to-end read has to be checked where the bytes actually leave the process. The
+ * projection half lives in `codex-projections.test.ts` and the store half in `codex-store.test.ts`.
+ */
+describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)", () => {
+  const calendar = async (base: string, headers: Record<string, string>) =>
+    (await body(await get(base, "/api/v1/codex/calendar", headers))).data.calendar as Json;
+  const chronicleRaw = async (base: string, headers: Record<string, string>) =>
+    (await body(await get(base, "/api/v1/codex/timeline", headers))).data.records as Json[];
+  const WORLD = { yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["First", "Second"] };
+
+  /**
+   * T-11, first half. The GM runs their clock to Alturiak 20 having published only Hammer 10 - two DIFFERENT
+   * dates on purpose, because with them equal a route that returned the GM's clock would pass anyway.
+   */
+  it("gives a player the PUBLISHED date while the GM's clock is ahead of it", async () => {
+    const { base } = await fixture();
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    await post(base, "/api/v1/codex/calendar/publish", GM, {});
+    // ...and now the GM runs ahead while prepping. Publishing is a separate act and this is not it.
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 20 } });
+
+    const gmCalendar = await calendar(base, GM);
+    expect(gmCalendar.currentDate).toEqual({ year: 1492, month: 1, day: 20 });
+    expect(gmCalendar.publishedDate).toEqual({ year: 1492, month: 0, day: 10 });
+
+    const playerCalendar = await calendar(base, PLAYER);
+    expect(playerCalendar.currentDate).toEqual({ year: 1492, month: 0, day: 10 });
+    // On the serialized body: the GM's clock parts (month 1, day 20) are nowhere in what the player received,
+    // under any key, and neither is the `publishedDate` key that would duplicate their own `currentDate`.
+    expect(Object.keys(playerCalendar).sort()).toEqual(["currentDate", "months", "weekdays", "yearName"]);
+    expect(JSON.stringify(playerCalendar.currentDate)).not.toContain("20");
+
+    // Publishing catches the party up, through the one route that does it.
+    await post(base, "/api/v1/codex/calendar/publish", GM, {});
+    expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 1, day: 20 });
+  });
+
+  /** T-11, second half: neither new kind reaches a player's chronicle until the ordinary reveal switch is thrown. */
+  it("never puts an unrevealed deadline or downtime on a player's chronicle, and puts a revealed one there", async () => {
+    const { base } = await fixture();
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    const deadline = (await body(await post(base, "/api/v1/codex/journal/deadline", GM, {
+      playerText: "The duke's tax falls due.", gmText: "He will send the guard.", inWorldDate: { year: 1492, month: 0, day: 20 }
+    }))).data.entry as Json;
+    const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, {
+      playerText: "A quiet week.", gmText: "The cult moves while they rest.", downtime: { who: "Brannor", activity: "Forging a blade", days: 8 }
+    }))).data.entry as Json;
+
+    // The GM sees both, with both layers - so the player assertions are the gate working, not an empty list.
+    const gmPayload = JSON.stringify(await chronicleRaw(base, GM));
+    expect(gmPayload).toContain("He will send the guard.");
+    expect(gmPayload).toContain("Forging a blade");
+
+    const hiddenPayload = JSON.stringify(await chronicleRaw(base, PLAYER));
+    expect(hiddenPayload).not.toContain("The duke's tax falls due.");
+    expect(hiddenPayload).not.toContain("A quiet week.");
+    expect(hiddenPayload).not.toContain("Forging a blade");
+    expect(hiddenPayload).not.toContain("He will send the guard.");
+
+    // O-2: the ORDINARY reveal route publishes them - there is no kind-specific one - and then they are as
+    // visible as any other revealed record, kind and all.
+    for (const id of [deadline.id, downtime.id]) expect((await post(base, `/api/v1/codex/journal/${id}/reveal`, GM, { revealed: true })).status).toBe(200);
+    const shown = await chronicleRaw(base, PLAYER);
+    expect(shown.map((row) => row.kind).sort()).toEqual(["deadline", "downtime"]);
+    const shownPayload = JSON.stringify(shown);
+    expect(shownPayload).toContain("The duke's tax falls due.");
+    expect(shownPayload).toContain("Forging a blade");
+    // ...but still never the GM layer, and never `applied`.
+    expect(shownPayload).not.toContain("He will send the guard.");
+    expect(shownPayload).not.toContain("applied");
+    expect(shownPayload).not.toContain("proposedDate");
+    expect(shown.find((row) => row.kind === "downtime")!.payload).toEqual({ who: "Brannor", activity: "Forging a blade", days: 8 });
+  });
+
+  /**
+   * T-11's third strand and the one a store-level test cannot cover: `fired` is a single bit, and computing a
+   * player's copy from the GM's clock would use it to announce that a date the party has never been shown has
+   * already gone by. The deadline is Hammer 20; published is Hammer 10; the GM's clock is Alturiak 20.
+   */
+  it("computes a player's `fired` from the published clock, not the GM's, end to end", async () => {
+    const { base } = await fixture();
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    await post(base, "/api/v1/codex/calendar/publish", GM, {});
+    const deadline = (await body(await post(base, "/api/v1/codex/journal/deadline", GM, {
+      playerText: "The duke's tax falls due.", revealedToPlayers: true, inWorldDate: { year: 1492, month: 0, day: 20 }
+    }))).data.entry as Json;
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 20 } });
+
+    const gmRow = (await chronicleRaw(base, GM)).find((row) => row.id === deadline.id)!;
+    const playerRow = (await chronicleRaw(base, PLAYER)).find((row) => row.id === deadline.id)!;
+    expect(gmRow.fired).toBe(true);       // the GM's clock is past it
+    expect(playerRow.fired).toBe(false);  // the party's is not, and their row must say so
+
+    await post(base, "/api/v1/codex/calendar/publish", GM, {});
+    expect((await chronicleRaw(base, PLAYER)).find((row) => row.id === deadline.id)!.fired).toBe(true);
+  });
+
+  /** T-12: confirming a clock move is a GM act. A player cannot reach it, and neither can an anonymous caller. */
+  it("refuses apply-downtime, deadline/downtime creation and publish to a player and to an anonymous caller", async () => {
+    const { base } = await fixture();
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    const downtime = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data.entry as Json;
+
+    for (const headers of [PLAYER, { "content-type": "application/json" }]) {
+      for (const path of ["/api/v1/codex/journal/deadline", "/api/v1/codex/journal/downtime", "/api/v1/codex/calendar/publish", `/api/v1/codex/journal/${downtime.id}/apply-downtime`]) {
+        const response = await post(base, path, headers, { downtime: { who: "x", activity: "y", days: 1 }, inWorldDate: { year: 1492, month: 0, day: 1 } });
+        expect(response.status, `${path}`).toBe(401);
+        expect((await body(response)).error.code).toBe("unauthenticated");
+      }
+    }
+    // ...and none of those refusals moved anything.
+    expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });
+  });
+
+  /**
+   * O-3 end to end: create proposes, confirm applies, and confirming twice is refused. The clock is checked
+   * after every step, because "did not move" is the assertion that matters on two of the three.
+   */
+  it("proposes a date on create, moves the clock only on confirm, and refuses a second confirm", async () => {
+    const { base } = await fixture();
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    const created = (await body(await post(base, "/api/v1/codex/journal/downtime", GM, { playerText: "A quiet week.", downtime: { who: "Brannor", activity: "Forging", days: 8 } }))).data as Json;
+    expect(created.proposedDate).toEqual({ year: 1492, month: 0, day: 18 });
+    expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 10 });   // nothing moved
+
+    const applied = await post(base, `/api/v1/codex/journal/${created.entry.id}/apply-downtime`, GM, {});
+    expect(applied.status).toBe(200);
+    expect((await body(applied)).data.calendar.currentDate).toEqual({ year: 1492, month: 0, day: 18 });
+    expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });
+    // Applying moved the GM's clock and NOT the party's - only publish does that (D11-H).
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+
+    const again = await post(base, `/api/v1/codex/journal/${created.entry.id}/apply-downtime`, GM, {});
+    expect([400, 409]).toContain(again.status);
+    expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 0, day: 18 });   // and still nothing moved
+  });
+
+  /**
+   * The write schema is applied on the new routes at all - which is what `.strict()` proves, because an
+   * unknown key is the one rejection ONLY this layer performs (the store ignores input keys it does not read).
+   *
+   * The undated-deadline assertion beside it is deliberately defence in depth rather than a proof of this
+   * layer: `createDeadline` refuses it too, so removing `DeadlineCreateSchema`'s required date leaves this
+   * green. That is the intended arrangement (the router is the early rejection, the store is the enforcer),
+   * and it is stated here so a later reader does not mistake this for a test of the schema alone.
+   */
+  it("parses deadline and downtime bodies through their own schemas, and refuses an undated deadline", async () => {
+    const { base } = await fixture();
+    const dated = { year: 1492, month: 0, day: 20 };
+    for (const [path, payload] of [
+      ["/api/v1/codex/journal/deadline", { playerText: "Someday." }],                                            // no date at all
+      ["/api/v1/codex/journal/deadline", { playerText: "Someday.", inWorldDate: null }],                         // an explicit null is not a date
+      ["/api/v1/codex/journal/deadline", { playerText: "x", inWorldDate: dated, kind: "deadline" }],             // .strict(): the route names the kind, not the body
+      ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: 8 }, applied: true }],     // .strict(): `applied` is never an input (O-3)
+      ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: 8, applied: true } }],     // ...nor inside the payload
+      ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: -1 } }]                    // days is a count, not a rewind
+    ] as const) {
+      const response = await post(base, path, GM, payload);
+      expect(response.status, `${path} ${JSON.stringify(payload)}`).toBe(400);
+      expect((await body(response)).error.code).toBe("validation_failed");
+    }
+  });
+});
+
 describe("Codex routes vs the published contract", () => {
   const mountedRoutes = async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-codex-mount-"));

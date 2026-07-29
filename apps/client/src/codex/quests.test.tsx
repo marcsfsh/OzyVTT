@@ -62,6 +62,9 @@ vi.mock("./api", async (importOriginal) => {
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
+      // M11: the player's own calendar read. It was `calendarApi.get` until O-1 split the two clocks;
+      // it is stubbed with the SAME mock, so what this file asserts about the date is unchanged.
+      calendar: (...a: unknown[]) => getCalendar(...a),
       listPages: (...a: unknown[]) => playerListPages(...a), listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a), chronicle: (...a: unknown[]) => playerChronicle(...a),
       listRelationships: (...a: unknown[]) => playerListRelationships(...a), listLinks: (...a: unknown[]) => playerListLinks(...a),

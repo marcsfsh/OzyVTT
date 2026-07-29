@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CodexRevisionConflictError, CodexStore, MIGRATIONS, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
+import { CodexRevisionConflictError, CodexStore, MIGRATIONS, deadlineFired, parseWikiLinks, pageLinkKey } from "../src/codex-store.js";
 import { projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMarker, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerSearchHit, projectPlayerSession } from "../src/codex-projections.js";
 
 let directory: string;
@@ -1006,7 +1006,12 @@ describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", ()
     const projected = projectPlayerChronicleRecord({ kind: "event", page: store.getPage(page.id)! }, playerSessionNumbers())!;
     // The EXACT key set, not a search of the payload for a secret string: this fails if any new field is
     // ever added to the player projection, not merely if this one leaks.
-    expect(Object.keys(projected).sort()).toEqual(["createdAt", "id", "inWorldLabel", "kind", "realDate", "sessionNumber", "tags", "text", "title"]);
+    //
+    // M11 added exactly two, both required by the contract's §3.3: `fired` (a revealed deadline the party
+    // has already reached must READ as passed) and `payload` (a downtime's who/activity/days, and NEVER
+    // `applied`, which is GM workflow state). This list is the gate on that pair staying a pair - the next
+    // key to appear here has to be argued for, not merely compiled.
+    expect(Object.keys(projected).sort()).toEqual(["createdAt", "fired", "id", "inWorldLabel", "kind", "payload", "realDate", "sessionNumber", "tags", "text", "title"]);
     expect(projected.text).toBe("The sky tore open.");
     expect(JSON.stringify(projected)).not.toContain("Strahd engineered it.");
     expect(JSON.stringify(projected)).not.toContain("conceal the cause");
@@ -2101,5 +2106,482 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
     expect(projectGmChronicleRecord({ kind: "entry", entry: store.getEntry(entry.id)! }).sessionNumber).toBe(4);
     store.setSessionRevealed(session.id, true);
     expect(playerRow().sessionNumber).toBe(4);
+  });
+});
+
+/**
+ * M11 (CT-5 deadlines, CT-10 downtime) — the STORE layer, below any projection.
+ *
+ * The spine of this milestone is a migration that REBUILDS `codex_journal` (v15). `codex_journal.kind` has
+ * carried `CHECK (kind IN ('note', 'combat'))` since v1 and SQLite cannot widen a CHECK in place, so there
+ * was no additive route: the table is recreated, copied, dropped, renamed and re-indexed. That is the most
+ * destructive operation in this file's history, and a fresh-database test can never catch a bad one —
+ * every table is empty. `preserves every pre-existing row` below therefore builds a genuine v14 database
+ * out of the shipped migration SQL and upgrades it, exactly as a GM's existing `vtt.sqlite` will.
+ */
+describe("CodexStore deadlines + downtime (M11)", () => {
+  /** A genuine v1..v14 database on disk, seeded by the caller, ready for a CodexStore to upgrade. */
+  const legacyDatabase = (path: string): DatabaseSync => {
+    const database = new DatabaseSync(path, { enableForeignKeyConstraints: true });
+    database.exec("CREATE TABLE codex_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;");
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 14)) {
+      database.exec(migration.sql);
+      database.prepare("INSERT INTO codex_schema_migrations (version, applied_at) VALUES (?, '')").run(migration.version);
+    }
+    return database;
+  };
+
+  /**
+   * T-1. The CHECK now admits the two new kinds, AND they survive the read path as themselves.
+   *
+   * Both halves matter and they fail differently. Without the migration the INSERT is rejected by the FILE
+   * ("CHECK constraint failed"), which is loud. With the migration but without a real `kind` parse, the
+   * INSERT succeeds and `toEntry`'s old `row.kind === "combat" ? "combat" : "note"` silently reads a
+   * deadline back as an ordinary note — no throw, no compile error anywhere, and a GM's deadline simply
+   * does not exist as one. That second failure is the one this test is really for.
+   */
+  it("stores a deadline and a downtime as THEMSELVES — the widened CHECK, and a kind that is parsed rather than collapsed", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    const deadline = store.createDeadline({ playerText: "The duke's ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+
+    expect(deadline.kind).toBe("deadline");
+    expect(downtime.kind).toBe("downtime");
+    // ...and again through a SECOND read, so this is the stored row talking and not the create call's return.
+    expect(store.getEntry(deadline.id)!.kind).toBe("deadline");
+    expect(store.getEntry(downtime.id)!.kind).toBe("downtime");
+    expect(store.listTimeline().find((entry) => entry.id === deadline.id)!.kind).toBe("deadline");
+
+    // D11-C: a deadline carries NO payload. Its text is the "what", its own date is the "when".
+    expect(deadline.payload).toBeNull();
+    expect(deadline.inWorldDate).toEqual({ year: 1492, month: 2, day: 14 });
+    // D11-D: downtime carries exactly one, and `applied` starts false (O-3).
+    expect(downtime.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    // A note still has none, so `payload` is not quietly universal.
+    expect(store.createEntry({ playerText: "plain" }).payload).toBeNull();
+
+    // O-2: hidden on create, revealed by the ORDINARY switch. No kind-specific reveal path exists.
+    expect(deadline.revealedToPlayers).toBe(false);
+    expect(downtime.revealedToPlayers).toBe(false);
+    expect(store.setEntryRevealed(deadline.id, true).revealedToPlayers).toBe(true);
+
+    // §3.1 says search indexing "should be free" and to VERIFY it rather than assume. It is: `indexEntry`
+    // runs from `insertEntry`, so both kinds are findable on their own text on exactly a note's terms —
+    // and the unrevealed downtime is hidden from the player index by the reveal gate, not by its kind.
+    expect(store.searchAll("gm", "ultimatum").some((hit) => hit.kind === "journal" && hit.id === deadline.id)).toBe(true);
+    expect(store.searchAll("gm", "poison").some((hit) => hit.kind === "journal" && hit.id === downtime.id)).toBe(true);
+    expect(store.searchAll("player", "ultimatum").some((hit) => hit.id === deadline.id)).toBe(true);   // revealed above
+    expect(store.searchAll("player", "poison").some((hit) => hit.id === downtime.id)).toBe(false);     // still hidden
+
+    // The ordinary journal editor must not eat the payload: `updateEntry` names its columns and
+    // `payload_json` is not among them, so an unrelated text edit leaves it intact.
+    expect(store.updateEntry(downtime.id, { playerText: "Vex brews something worse." }).payload)
+      .toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+
+    // A deadline with no structured date is rejected: prose cannot be compared to a clock.
+    expect(() => store.createDeadline({ playerText: "Someday, probably" })).toThrow(/in-world date/);
+    expect(() => store.createDeadline({ playerText: "Soon", inWorldLabel: "next spring" })).toThrow(/in-world date/);
+  });
+
+  /**
+   * T-2. K7, and the whole risk of this milestone in one test. Seeds a v14 database with the four row
+   * shapes that have something to lose — a marker attachment, a page attachment, a dated row, a tagged row
+   * — plus a combat row with an encounter id, then upgrades it and compares EVERY column of EVERY row.
+   *
+   * The assertion is on raw SQL, not on `toEntry`, because a projection that drops a column reads as null
+   * on both sides and the comparison would pass. `SELECT *` here is correct for the same reason it is wrong
+   * in the migration: the test wants whatever columns actually exist, not the ones it remembers.
+   */
+  it("migration v15 preserves every column of every pre-existing journal row (K7)", async () => {
+    const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v14-"));
+    const path = join(legacyDirectory, "vtt.sqlite");
+    let upgraded: CodexStore | undefined;
+    try {
+      const database = legacyDatabase(path);
+      database.prepare("INSERT INTO codex_meta (id, codex_revision, calendar_json) VALUES (1, 3, ?)")
+        .run(JSON.stringify({ yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 30 }], weekdays: ["First"], currentDate: { year: 1492, month: 1, day: 17 } }));
+      const mapId = crypto.randomUUID(), markerId = crypto.randomUUID(), pageId = crypto.randomUUID();
+      database.prepare("INSERT INTO codex_maps (id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, 'Barovia', 'regional', NULL, 1, 1, '[]', '', '')").run(mapId, crypto.randomUUID());
+      database.prepare("INSERT INTO codex_markers (id, map_id, x, y, icon_id, icon_color, label, revealed, tags_json, page_ids_json, scene_ids_json, created_at, updated_at) VALUES (?, ?, 0.5, 0.5, 'pin', '#FF2E9A', 'Svalich Road', 1, '[]', '[]', '[]', '', '')").run(markerId, mapId);
+      database.prepare("INSERT INTO codex_pages (id, title, entity_type, fields_json, gm_fields_json, folder, tags_json, player_body, gm_body, revealed, banner_asset_id, rev, created_at, updated_at) VALUES (?, 'Ravenloft', 'location', '{}', '{}', NULL, '[]', 'a castle', 'the crypt', 0, NULL, 1, '', '')").run(pageId);
+
+      const insert = database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      const pinnedToMarker = crypto.randomUUID(), pinnedToPage = crypto.randomUUID(), dated = crypto.randomUUID(), tagged = crypto.randomUUID(), fight = crypto.randomUUID();
+      insert.run(pinnedToMarker, "The mists parted.", "Strahd watched.", 1, markerId, null, "note", null, 2, "2026-01-04", null, null, null, null, null, 1, '[]', "2026-01-04T00:00:00.000Z", "2026-01-04T00:00:00.000Z");
+      insert.run(pinnedToPage, "We entered the castle.", null, 0, null, pageId, "note", null, null, null, null, null, null, null, null, 2, '[]', "2026-01-05T00:00:00.000Z", "2026-01-05T00:00:00.000Z");
+      insert.run(dated, "The siege begins.", null, 1, null, null, "note", null, 3, null, "First, Alturiak 17, 1492 DR", 537_376, 1492, 1, 17, 3, '[]', "2026-01-06T00:00:00.000Z", "2026-01-06T00:00:00.000Z");
+      insert.run(tagged, "The wolves circled.", "They are Strahd's.", 0, null, null, "note", null, null, null, null, null, null, null, null, 4, '["travel","wolves"]', "2026-01-07T00:00:00.000Z", "2026-01-07T00:00:00.000Z");
+      insert.run(fight, "The battle at the gate.", null, 1, markerId, pageId, "combat", 41, 3, null, null, null, null, null, null, 5, '["combat"]', "2026-01-08T00:00:00.000Z", "2026-01-08T00:00:00.000Z");
+
+      const before = database.prepare("SELECT * FROM codex_journal ORDER BY id").all();
+      const beforeColumns = (database.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      expect(before).toHaveLength(5);
+      database.close();
+
+      upgraded = new CodexStore(path);
+      await upgraded.initialize();                                  // <- v15 runs here
+
+      const reopened = new DatabaseSync(path);
+      const after = reopened.prepare("SELECT * FROM codex_journal ORDER BY id").all() as Array<Record<string, unknown>>;
+      const afterColumns = (reopened.prepare("PRAGMA table_info(codex_journal)").all() as Array<Record<string, unknown>>).map((column) => [column.name, column.type, column.notnull, column.dflt_value]);
+      reopened.close();
+
+      expect(after).toHaveLength(before.length);                    // nothing dropped, nothing duplicated
+      for (const [index, original] of before.entries()) {
+        const { payload_json: payload, ...carried } = after[index];
+        expect(carried).toEqual(original);                          // EVERY pre-existing column, value for value
+        expect(payload).toBeNull();                                 // ...and the new one starts empty
+      }
+      // The rebuilt table IS the old table plus one column, in the same order with the same types,
+      // NOT-NULLs and defaults — including `tags_json`'s DEFAULT '[]', which v10 added and a
+      // reconstructed-from-memory DDL would silently drop.
+      expect(afterColumns.slice(0, -1)).toEqual(beforeColumns);
+      expect(afterColumns.at(-1)).toEqual(["payload_json", "TEXT", 0, null]);
+
+      // The rows are not merely present, they still READ correctly through the store's own path.
+      expect(upgraded.getEntry(fight)!.kind).toBe("combat");
+      expect(upgraded.getEntry(fight)!.sourceEncounterId).toBe(41);
+      expect(upgraded.getEntry(tagged)!.tags).toEqual(["travel", "wolves"]);
+      expect(upgraded.getEntry(pinnedToMarker)!.attachMarkerId).toBe(markerId);
+      expect(upgraded.getEntry(pinnedToPage)!.attachPageId).toBe(pageId);
+      expect(upgraded.getEntry(dated)!.inWorldDate).toEqual({ year: 1492, month: 1, day: 17 });
+      expect(upgraded.listEntriesFor({ markerId }).map((entry) => entry.id).sort()).toEqual([pinnedToMarker, fight].sort());
+
+      // K7 / D11-G: the published date is BACKFILLED from the calendar's `currentDate`, so an existing
+      // codex sees no change on day one — the two clocks start in agreement.
+      expect(upgraded.getPublishedDate()).toEqual({ year: 1492, month: 1, day: 17 });
+      expect(upgraded.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 17 });
+    } finally {
+      upgraded?.close();
+      await rm(legacyDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * T-2b. The backfill's guards, which the happy path above cannot reach. `json_extract` THROWS on
+   * malformed JSON (probed directly against this build) and SQLite's `AND` does NOT short-circuit, so a
+   * single hand-edited `calendar_json` would abort the whole migration and leave the GM's codex unopenable.
+   * Each of these opens a real store, which is the assertion: the migration ran.
+   */
+  it("migration v15 backfills NULL rather than dying when the stored calendar has no usable currentDate", async () => {
+    for (const calendarJson of [null, "not json at all", '{"months":[]}', '{"currentDate":null}', '{"currentDate":{"year":"1492","month":0,"day":1}}']) {
+      const legacyDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v14-odd-"));
+      const path = join(legacyDirectory, "vtt.sqlite");
+      let upgraded: CodexStore | undefined;
+      try {
+        const database = legacyDatabase(path);
+        database.prepare("INSERT INTO codex_meta (id, codex_revision, calendar_json) VALUES (1, 0, ?)").run(calendarJson);
+        database.close();
+        upgraded = new CodexStore(path);
+        await upgraded.initialize();
+        expect(upgraded.getPublishedDate()).toBeNull();
+      } finally {
+        upgraded?.close();
+        await rm(legacyDirectory, { recursive: true, force: true });
+      }
+    }
+    // A FRACTIONAL part truncates rather than killing the migration. `codex_meta` is STRICT, and SQLite
+    // rejects a REAL in an INTEGER column unless it is exactly integral — `1492.0` slides in on its own,
+    // `9.7` does not — so the CAST is what stands between a hand-edited calendar and an unopenable codex.
+    // Truncation (not rounding) is deliberate: `normalizeCalendar` uses `Math.trunc`, so the SQL backfill
+    // and the TypeScript reader agree on what `9.7` means.
+    const floatDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-v14-float-"));
+    const floatPath = join(floatDirectory, "vtt.sqlite");
+    let floats: CodexStore | undefined;
+    try {
+      const database = legacyDatabase(floatPath);
+      database.prepare("INSERT INTO codex_meta (id, codex_revision, calendar_json) VALUES (1, 0, ?)").run('{"currentDate":{"year":1492.0,"month":0.0,"day":9.7}}');
+      database.close();
+      floats = new CodexStore(floatPath);
+      await floats.initialize();
+      expect(floats.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 9 });
+    } finally {
+      floats?.close();
+      await rm(floatDirectory, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * T-3. `DROP TABLE` takes its indexes with it. Forgetting one is SILENT — every query still returns the
+   * right answers, the timeline's ORDER BY just becomes a full scan — so nothing but this catches it.
+   * Asserted on the index DEFINITIONS as well as the names: an index recreated over the wrong columns is
+   * as useless as a missing one and looks identical in a name list.
+   */
+  it("recreates all three codex_journal indexes, over the same columns, after the rebuild", () => {
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    const indexes = new Map((raw.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'codex_journal'").all() as Array<{ name: string; sql: string | null }>).map((row) => [row.name, row.sql]));
+    raw.close();
+    expect(indexes.get("codex_journal_order")).toBe("CREATE INDEX codex_journal_order ON codex_journal (calendar_instant, session_number, created_at)");
+    expect(indexes.get("codex_journal_marker")).toBe("CREATE INDEX codex_journal_marker ON codex_journal (attach_marker_id)");
+    expect(indexes.get("codex_journal_page")).toBe("CREATE INDEX codex_journal_page ON codex_journal (attach_page_id)");
+  });
+
+  /**
+   * T-4. O-3, the owner's decision, stated as three separate properties because passing one proves little:
+   * creating downtime does NOT move the clock, `applyDowntime` DOES, and applying twice is REJECTED and
+   * moves nothing. The third is the one a double-click finds.
+   */
+  it("creating downtime does not move the clock, applying it does, and applying it twice is rejected (O-3)", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+
+    // 1. Creating proposes; it does not decide. The clock has not moved.
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
+    expect(downtime.payload!.applied).toBe(false);
+    // ...and the record is dated where the downtime HAPPENED (the GM's clock), not where it will end.
+    expect(downtime.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });
+    expect(store.proposedDateFor(downtime)).toEqual({ year: 1492, month: 1, day: 10 });
+
+    // 2. The explicit confirmation moves it, and marks the record.
+    const applied = store.applyDowntime(downtime.id);
+    expect(applied.calendar.currentDate).toEqual({ year: 1492, month: 1, day: 10 });
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
+    expect(applied.entry.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+    expect(store.getEntry(downtime.id)!.payload!.applied).toBe(true);   // re-read, so it is the stored row
+    expect(applied.entry.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });  // the record did not re-date itself
+    expect(store.proposedDateFor(applied.entry)).toBeNull();            // nothing left to propose
+
+    // 3. Applying again is a stale page or a double-submit. It throws — a silent no-op would tell the GM
+    //    their click worked — and above all it does not move the clock a second time.
+    expect(() => store.applyDowntime(downtime.id)).toThrow(CodexRevisionConflictError);
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
+
+    // Neighbouring rejections, so "throws" above is the applied guard and not a blanket refusal.
+    const note = store.createEntry({ playerText: "not downtime" });
+    expect(() => store.applyDowntime(note.id)).toThrow(/downtime/);
+    expect(store.proposedDateFor(note)).toBeNull();
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
+
+    // D11-H: none of this published anything. The players' clock is exactly where the migration left it.
+    expect(store.getPublishedDate()).toBeNull();
+  });
+
+  /**
+   * T-5. D11-F / F-2. `applyDowntime` writes the entry AND the calendar, and half of it is worse than
+   * neither: an applied flag with an unmoved clock swallows the days, a moved clock with an unapplied flag
+   * lets the next confirmation move them again.
+   *
+   * The failure is forced in SQLite, not in JavaScript, by a trigger that aborts the calendar write — so
+   * this exercises the real `BEGIN IMMEDIATE` / `ROLLBACK` path rather than a stubbed method. The entry
+   * write happens FIRST in `applyDowntime`, so if the two writes were in separate transactions the entry
+   * would already be committed by the time the calendar write dies. That is exactly the mutation this
+   * catches.
+   */
+  it("applyDowntime is one transaction: a failed calendar write rolls the entry write back too (D11-F)", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+
+    // Fires on the calendar write specifically, so `bumpRevision` (also an UPDATE on codex_meta) is untouched.
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    raw.exec("CREATE TRIGGER codex_test_block_calendar AFTER UPDATE OF calendar_json ON codex_meta BEGIN SELECT RAISE(ABORT, 'no calendar writes'); END;");
+    raw.close();
+
+    expect(() => store.applyDowntime(downtime.id)).toThrow();
+
+    // BOTH sides unchanged. Re-read from the store, not from the value captured above.
+    expect(store.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
+
+    // ...and with the obstruction gone it still works, so the assertions above are the rollback and not a
+    // store that had quietly stopped writing anything at all.
+    const unblock = new DatabaseSync(join(directory, "vtt.sqlite"));
+    unblock.exec("DROP TRIGGER codex_test_block_calendar");
+    unblock.close();
+    expect(store.applyDowntime(downtime.id).calendar.currentDate).toEqual({ year: 1492, month: 1, day: 10 });
+    expect(store.getEntry(downtime.id)!.payload!.applied).toBe(true);
+  });
+
+  /**
+   * T-6. F-3, proven rather than asserted. The spec called K3 "sharpest here" on the grounds that M11 moves
+   * `currentDate` and `setCalendar` reflows every dated record on every call. It is not: `calendarInstantOf`
+   * reads only `months`, and `formatInWorldDate` reads `months`, `yearName` and `weekdays`. NEITHER reads
+   * `currentDate`, so moving the clock rewrites every dated row with byte-identical values — wasted work,
+   * not corruption.
+   *
+   * The reflow risk belongs to calendar-SHAPE edits, which M11 does not perform. This is the test that keeps
+   * that true: wire the clock into either derivation and every dated record in the codex silently re-dates
+   * itself the next time a GM advances the campaign by a day.
+   */
+  it("a currentDate-only calendar write leaves every dated record byte-identical (F-3)", () => {
+    const calendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }, { name: "Alturiak", days: 28 }, { name: "Ches", days: 31 }], weekdays: ["First", "Second", "Third"] };
+    store.setCalendar({ ...calendar, currentDate: { year: 1492, month: 0, day: 1 } });
+    store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1400, month: 0, day: 1 } });
+    store.createEntry({ playerText: "The siege.", inWorldDate: { year: 1492, month: 1, day: 17 } });
+    store.createEntry({ playerText: "The war.", inWorldDate: { year: 1493, month: 2, day: 31 } });
+    store.createEntry({ playerText: "Someday." });                                                  // undated
+    store.createPage({ title: "The Sundering", entityType: "event", inWorldDate: { year: 1450, month: 1, day: 9 } });
+    store.createPage({ title: "The Peace", entityType: "event", inWorldDate: { year: 1500, month: 2, day: 2 } });
+    store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
+
+    const derived = () => {
+      const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+      const rows = ["codex_journal", "codex_pages"].flatMap((table) =>
+        raw.prepare(`SELECT id, calendar_instant, in_world_label, in_world_year, in_world_month, in_world_day FROM ${table} ORDER BY id`).all());
+      raw.close();
+      return rows;
+    };
+    const before = derived();
+    expect(before.filter((row) => (row as { calendar_instant: number | null }).calendar_instant !== null)).toHaveLength(6);
+
+    // The clock moves a long way — a different year, month and day — with the calendar's SHAPE untouched.
+    store.setCalendar({ ...calendar, currentDate: { year: 1600, month: 2, day: 30 } });
+
+    expect(derived()).toEqual(before);                              // every instant and every label, unchanged
+    expect(store.getCalendar().currentDate).toEqual({ year: 1600, month: 2, day: 30 });  // ...and the clock did move
+  });
+
+  /**
+   * T-7. F-4 / F-7. Passing time is `dateForInstant(instant + days)` and nothing else — the month-walking
+   * arithmetic that already round-trips a dated entry, reused rather than reimplemented. The trap it avoids
+   * is `normalizeCalendar`, which clamps `currentDate.day` only to `>= 1` and NOT to the month's length: a
+   * naive `day + days` would store day 40 of a 30-day month, which then computes instants as day 30. That
+   * is the one lossy date in the system, and it is the one this milestone mutates.
+   */
+  it("passing time rolls over the month and the year instead of clamping (F-4, F-7)", () => {
+    const advance = (from: { year: number; month: number; day: number }, days: number) => {
+      store.setCalendar({ ...store.getCalendar(), currentDate: from });
+      const downtime = store.createDowntime({ playerText: "waiting", downtime: { who: "The party", activity: "Waiting", days } });
+      const proposed = store.proposedDateFor(downtime);
+      // The proposal and the applied result must AGREE — the GM confirms a date, so the date they were
+      // shown has to be the date they get.
+      expect(store.applyDowntime(downtime.id).calendar.currentDate).toEqual(proposed);
+      return proposed;
+    };
+    // Default calendar: 12 months x 30 days.
+    expect(advance({ year: 1492, month: 0, day: 25 }, 10)).toEqual({ year: 1492, month: 1, day: 5 });    // month rollover
+    expect(advance({ year: 1492, month: 11, day: 25 }, 10)).toEqual({ year: 1493, month: 0, day: 5 });   // year rollover
+    expect(advance({ year: 1492, month: 0, day: 1 }, 95)).toEqual({ year: 1492, month: 3, day: 6 });     // several months at once
+    expect(advance({ year: 1492, month: 0, day: 1 }, 720)).toEqual({ year: 1494, month: 0, day: 1 });    // two whole years
+    expect(advance({ year: 1492, month: 5, day: 12 }, 0)).toEqual({ year: 1492, month: 5, day: 12 });    // zero days is a legal no-op
+
+    // Uneven months, so this is a real walk and not "every month is 30 days" getting lucky.
+    store.setCalendar({ yearName: "AE", months: [{ name: "Short", days: 5 }, { name: "Long", days: 40 }, { name: "Mid", days: 20 }], weekdays: [] });
+    expect(advance({ year: 3, month: 0, day: 4 }, 3)).toEqual({ year: 3, month: 1, day: 2 });            // 5-day month
+    expect(advance({ year: 3, month: 1, day: 39 }, 5)).toEqual({ year: 3, month: 2, day: 4 });           // 40-day month
+    expect(advance({ year: 3, month: 2, day: 19 }, 3)).toEqual({ year: 4, month: 0, day: 2 });           // 20-day month -> new year
+  });
+
+  /**
+   * T-8. D11-C: `fired` is DERIVED on every read and stored nowhere. K3 makes raw dates the source of truth
+   * and instants derived; a stored `fired` would be a SECOND derived cache that `setCalendar`'s reflow would
+   * have to maintain, and a reflow that missed it would leave a deadline permanently fired on a day that no
+   * longer exists.
+   *
+   * The rewind is the assertion that can only pass if it is genuinely derived: nothing un-sets a stored
+   * flag, so a cached `fired` survives the clock going backwards and the deadline stays fired forever.
+   */
+  it("a deadline's fired state is derived from the clock, in both directions (D11-C)", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    const deadline = store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 2, day: 14 } });
+    const fired = () => store.deadlineStatus(store.getEntry(deadline.id)!).fired;
+
+    expect(fired()).toBe(false);                                                        // the day has not come
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 13 } });
+    expect(fired()).toBe(false);                                                        // ...nor the day before
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 14 } });
+    expect(fired()).toBe(true);                                                         // "passes it" includes the day itself
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1493, month: 0, day: 1 } });
+    expect(fired()).toBe(true);
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    expect(fired()).toBe(false);                                                        // rewound — nothing cached it
+
+    // Nothing about `fired` is written down: `payload_json` stays null for a deadline, in the FILE.
+    const raw = new DatabaseSync(join(directory, "vtt.sqlite"));
+    const stored = raw.prepare("SELECT payload_json FROM codex_journal WHERE id = ?").get(deadline.id) as { payload_json: string | null };
+    raw.close();
+    expect(stored.payload_json).toBeNull();
+
+    // Only a deadline fires, and an undated record never can.
+    const note = store.createEntry({ playerText: "a note", inWorldDate: { year: 1000, month: 0, day: 1 } });
+    expect(store.deadlineStatus(note).fired).toBe(false);
+    expect(deadlineFired({ kind: "deadline", calendarInstant: null }, 999_999)).toBe(false);
+    expect(deadlineFired({ kind: "deadline", calendarInstant: 0 }, null)).toBe(false);   // no clock, nothing to pass
+
+    // D11-G / prohibition 3: the two clocks answer this question separately. With the GM's clock past the
+    // deadline and NOTHING published, the player-facing derivation must still read "not fired" — otherwise
+    // one boolean tells the party the GM has run their private prep clock ahead.
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1493, month: 0, day: 1 } });
+    expect(store.getPublishedDate()).toBeNull();
+    expect(deadlineFired(store.getEntry(deadline.id)!, store.campaignInstant())).toBe(true);
+    expect(deadlineFired(store.getEntry(deadline.id)!, store.publishedInstant())).toBe(false);
+    // ...and publishing is what lets the party in on it.
+    store.publishCampaignDate();
+    expect(store.getPublishedDate()).toEqual({ year: 1493, month: 0, day: 1 });
+    expect(deadlineFired(store.getEntry(deadline.id)!, store.publishedInstant())).toBe(true);
+  });
+
+  /**
+   * O-1's prep clock, on its own. The GM's clock and the players' are two values, and only an explicit
+   * publish copies one to the other (D11-H). Advancing — by hand or via downtime — must never do it.
+   */
+  it("keeps the GM's clock and the published clock apart until the GM publishes (O-1, D11-H)", () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
+    store.publishCampaignDate();
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 1 });
+
+    // The GM runs ahead while prepping. Players stay where they were.
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 6, day: 20 } });
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 6, day: 20 });
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 1 });
+
+    // Downtime does not publish either — it moves the GM's clock only.
+    const downtime = store.createDowntime({ playerText: "prep", downtime: { who: "GM", activity: "Prepping", days: 10 } });
+    store.applyDowntime(downtime.id);
+    expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 6, day: 30 });
+    expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 1 });
+
+    // Only this does.
+    store.publishCampaignDate();
+    expect(store.getPublishedDate()).toEqual(store.getCalendar().currentDate);
+
+    // Publishing with no GM clock CLEARS the published date rather than leaving a stale one behind.
+    store.setCalendar({ ...store.getCalendar(), currentDate: null });
+    store.publishCampaignDate();
+    expect(store.getPublishedDate()).toBeNull();
+  });
+
+  /**
+   * T-14. A GM's backup is their only copy. `publishedDate` lives in three columns on `codex_meta` and
+   * nowhere else, so a bundle without it restores a codex where the two clocks silently agree — the party
+   * jumped forward to wherever the GM's prep had reached.
+   *
+   * There is no `importBundle` in this store (see the report): the round-trip that DOES exist is the one a
+   * GM actually performs — close the service, reopen it on the same file — so it is asserted here as well,
+   * over a store that re-runs every migration on the way in.
+   */
+  it("carries a downtime payload and the published date through export and a reopen (T-14)", async () => {
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 3, day: 8 } });
+    store.publishCampaignDate();
+    store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 9, day: 2 } });   // GM runs ahead
+    const downtime = store.createDowntime({ playerText: "Vex brews poison.", downtime: { who: "Vex", activity: "Brewing poison", days: 30 } });
+    const deadline = store.createDeadline({ playerText: "The ultimatum expires.", inWorldDate: { year: 1492, month: 11, day: 1 } });
+
+    const bundle = store.exportBundle();
+    expect(bundle.publishedDate).toEqual({ year: 1492, month: 3, day: 8 });                        // NOT the GM's clock
+    expect(bundle.journal.find((entry) => entry.id === downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: false });
+    expect(bundle.journal.find((entry) => entry.id === downtime.id)!.kind).toBe("downtime");
+    expect(bundle.journal.find((entry) => entry.id === deadline.id)!.kind).toBe("deadline");
+    expect(bundle.journal.find((entry) => entry.id === deadline.id)!.payload).toBeNull();
+
+    // ...and `applied` rides along, or a restored codex would offer to pass the same 30 days again.
+    store.applyDowntime(downtime.id);
+    expect(store.exportBundle().journal.find((entry) => entry.id === downtime.id)!.payload!.applied).toBe(true);
+
+    // The real round-trip: shut the service down and bring it back up on the same file.
+    const path = join(directory, "vtt.sqlite");
+    store.close();
+    const reopened = new CodexStore(path);
+    await reopened.initialize();
+    try {
+      expect(reopened.getPublishedDate()).toEqual({ year: 1492, month: 3, day: 8 });
+      expect(reopened.getEntry(downtime.id)!.payload).toEqual({ who: "Vex", activity: "Brewing poison", days: 30, applied: true });
+      expect(reopened.getEntry(deadline.id)!.kind).toBe("deadline");
+      expect(reopened.exportBundle().publishedDate).toEqual({ year: 1492, month: 3, day: 8 });
+    } finally {
+      reopened.close();
+    }
+    // `afterEach` closes `store`; a second close is a no-op, so reopening it here keeps that honest.
+    store = new CodexStore(path);
+    await store.initialize();
   });
 });

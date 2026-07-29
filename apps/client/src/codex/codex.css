@@ -383,8 +383,10 @@
 .codex-campaign-questrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text); }
 /* Looks like `.codex-campaign-recentwhen` and is deliberately NOT that class: the media query below
    hides the when-label at 640px ("the first thing to lose"), and on a quest row the progress is the
-   payload, not the metadata. It is ten characters — the title's ellipsis absorbs the cost at 375px. */
-.codex-campaign-questprogress { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
+   payload, not the metadata. It is ten characters — the title's ellipsis absorbs the cost at 375px.
+   M11's deadline card borrows the same rule for the same reason: a deadline's DATE is the payload of
+   that row, not metadata about it — "Approaching" with the date hidden says almost nothing. */
+.codex-campaign-questprogress, .codex-campaign-deadlinewhen { flex: none; font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-dim); white-space: nowrap; }
 /* Indented under its quest so the list reads as belonging to the row above it rather than as a sibling.
    The `Checklist` primitive owns everything else about it, including its own 44px story — which does not
    arise here, because a read-only checklist renders nothing focusable at all. */
@@ -736,6 +738,19 @@
 .codex-composer-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; }
 .codex-composer-meta > * { flex: 1 1 130px; }
 .codex-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+/* M11: the composer's kind switch. Layout only — `SegmentedControl` is the `@vtt/ui` primitive and owns
+   its own 44px story (route 2, 36px paint, 4px overhang). §4's gap budget is met by the composer's own
+   --space-3 (12px) row gap against the head's `Button size="sm"` below it (4px + 6px = 10px needed). */
+.codex-composer-kind { display: flex; }
+/* A sentence the composer says about what it is about to do — the deadline's missing date, and the date
+   logging downtime would PROPOSE. Deliberately prose rather than a warning box: neither is an error. */
+.codex-composer-hint { margin: 0; color: var(--text-dim); font-size: var(--fs-sm); }
+/* O-1, the prep clock. Rendered ONLY while the GM's clock and the players' clock disagree, so there is
+   no "in sync" state to style — the quiet state is no element at all. The Publish control is `Button` at
+   its default size: §4 route 1 (`min-height: var(--tap-min)`, no `::after`), which is what a control
+   sitting directly above the composer's field stack needs. */
+.codex-prepclock { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3); border: 1px solid color-mix(in srgb, var(--caution) 35%, transparent); border-left: 3px solid var(--caution); border-radius: var(--radius-md); background: color-mix(in srgb, var(--caution) 8%, transparent); }
+.codex-prepclock-label { font-size: var(--fs-sm); color: var(--text-dim); }
 
 .codex-timeline { display: flex; flex-direction: column; gap: var(--space-3); }
 .codex-entry { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: var(--radius-md); background: var(--surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
@@ -744,6 +759,12 @@
    everywhere else (tree, graph, badges), so one record has one colour across the suite. R2: the accent is
    never the only signal — every row also carries the kind's glyph and its word ("Event"). */
 .codex-entry.is-event { border-left-color: var(--codex-type-event); }
+/* M11: the two new kinds. A deadline takes the SAME caution accent a battle does, and that is deliberate
+   rather than an oversight — both are threats, and R2 says colour is never what tells the two apart: the
+   warning glyph and the word "Deadline" do that, and they survive with the stylesheet stripped. Downtime
+   takes `--info`, matching the tone its badge carries. */
+.codex-entry.is-deadline { border-left-color: var(--caution); }
+.codex-entry.is-downtime { border-left-color: var(--info); }
 /* CI-1 / R1: the entry a search hit landed on. R6 — selection owns the edge, so this marks the arrival
    with a border rather than a second background treatment. */
 .codex-entry.is-focused { border-color: var(--magenta); }
@@ -756,6 +777,8 @@
 .codex-entry-kindglyph { color: var(--text-dim); }
 .codex-entry.is-combat .codex-entry-kindglyph { color: var(--caution); }
 .codex-entry.is-event .codex-entry-kindglyph { color: var(--codex-type-event); }
+.codex-entry.is-deadline .codex-entry-kindglyph { color: var(--caution); }
+.codex-entry.is-downtime .codex-entry-kindglyph { color: var(--info); }
 .codex-entry-when { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
 /* An event page's name. A journal entry has none, so this element simply does not render for it — the
    row shape is unchanged, the slot is just empty (R2). */
@@ -773,6 +796,18 @@
    is exactly the documented precedent for 32px paint (6px + 6px). Horizontally there is nothing to
    budget for — `width: max(100%, 44px)` means a text button this wide never overhangs sideways. */
 .codex-entry-foot { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+
+/* M11 / CT-10: a downtime row's payload, and O-3's confirmation.
+   The confirmation states its effect in full BEFORE the button — the sentence is the affordance, and the
+   button only agrees with it. §4: `Button` at its DEFAULT size is route 1 (grows its own paint to 44px,
+   no `::after`), which is required here rather than merely tidy — this block sits directly above
+   `.codex-entry-foot`'s route-2 small buttons, and a `::after` overhang stacked against theirs would have
+   the two rows quietly stealing each other's taps. */
+.codex-downtime { display: flex; flex-direction: column; gap: var(--space-2); border-top: 1px dashed var(--line); padding-top: var(--space-2); }
+.codex-downtime-what { margin: 0; color: var(--text); font-size: var(--fs-sm); }
+.codex-downtime-state { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.codex-downtime-apply { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.codex-downtime-proposal { color: var(--text-dim); font-size: var(--fs-sm); }
 
 /* ----- Player Codex ----- */
 .player-codex-row { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }

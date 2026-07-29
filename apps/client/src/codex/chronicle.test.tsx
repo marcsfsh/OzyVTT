@@ -51,13 +51,13 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 const ENTRY: CodexChronicleRecord = {
   kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
   sessionNumber: 3, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", calendarInstant: 1492 * 60, inWorldDate: { year: 1492, month: 0, day: 1 },
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 };
 const EVENT: CodexChronicleRecord = {
   kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", gmText: "Strahd engineered it.", revealedToPlayers: false,
   sessionNumber: null, realDate: null, inWorldLabel: "Hammer 2, 1493 DR", calendarInstant: 1493 * 60 + 1, inWorldDate: { year: 1493, month: 0, day: 2 },
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 };
 

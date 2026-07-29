@@ -22,7 +22,7 @@ import type { CodexJournalEntry } from "./api";
  */
 const entry = (over: Partial<CodexJournalEntry>): CodexJournalEntry => ({
   id: "j1", playerText: "", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null,
+  attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null, payload: null,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });

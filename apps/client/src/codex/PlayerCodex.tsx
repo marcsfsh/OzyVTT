@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Checklist, Chip, Input, Skeleton, Tabs } from "@vtt/ui";
 import { socket } from "../socket";
-import { calendarApi, formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession } from "./api";
-import { CHRONICLE_KIND_META, chronicleWhenLabel } from "./chronicle";
+import { formatWorldDate, playerCodexApi, type CodexCalendar, type CodexLinkEdge, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type PlayerCodexChronicleRecord, type PlayerCodexMap, type PlayerCodexMarker, type PlayerCodexPage, type PlayerCodexPageSummary, type PlayerCodexQuest, type PlayerCodexSession } from "./api";
+import { CHRONICLE_KIND_META, campaignDeadlines, chronicleWhenLabel, deadlineFired, deadlineStateLabel, deadlineStateTone, downtimeSummaryLabel } from "./chronicle";
 import { pickNextSession } from "./sessions";
 import { QUEST_STATUS_LABEL, questProgress, questStatusTone } from "./quests";
 import { CodexIcon } from "./icons";
@@ -10,7 +10,7 @@ import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { CodexImage } from "./CodexImage";
 import { MapSurface } from "./MapSurface";
-import { CampaignHome, type CampaignEntry } from "./CampaignHome";
+import { CampaignHome, type CampaignDeadline, type CampaignEntry } from "./CampaignHome";
 import { RelationshipGraph } from "./RelationshipGraph";
 import { EntityIcon } from "./icons";
 import { ENTITY_DEFS, entityDef, relationshipLabel, type EntityType } from "./entities";
@@ -62,9 +62,17 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // CI-7: the campaign's current date for the dashboard. `/codex/calendar` is a role-aware read that the
-  // server already answers for a player token — the same calendar behind the `inWorldLabel` every player
-  // entry already carries. It is fetched, not derived, so this surface still shows only what it was sent.
+  /**
+   * CI-7: the campaign's current date for the dashboard. `/codex/calendar` is a role-aware read that the
+   * server already answers for a player token — the same calendar behind the `inWorldLabel` every player
+   * entry already carries. It is fetched, not derived, so this surface still shows only what it was sent.
+   *
+   * M11 / O-1: that projection now has real teeth. The GM's clock and the players' clock are two values,
+   * and the player's `currentDate` IS the published one — so the "Now:" chip below keeps reading exactly
+   * as it did while its source moved underneath it. Read through `playerCodexApi`, never `calendarApi`:
+   * the GM method's type carries `publishedDate` beside a `currentDate` that is the GM's own prep clock,
+   * and this surface must not be able to hold that shape at all.
+   */
   const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
   /**
    * M9 / CT-3: the sessions the GM has revealed, recap-only. This is the server's player projection —
@@ -100,7 +108,7 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
         // half a graph drawn silently is worse than the error Alert this surface already shows (R4).
         playerCodexApi.listLinks(token),
         // A missing calendar costs the dashboard one chip; it must not cost the player the whole codex.
-        calendarApi.get(token).catch(() => null),
+        playerCodexApi.calendar(token).catch(() => null),
         // Same bargain for the session card: one card is worth less than the rest of the codex.
         playerCodexApi.sessions(token).catch(() => []),
         // ...and for the quest card, on the same terms.
@@ -192,10 +200,26 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
     // "Recent journal activity" and its rows open the Journal by entry id; an event is a wiki page that
     // already appears in the entity counts above, and giving it a second home here would be the same
     // record in two places on one screen. Widening the dashboard's feed is CI-7's question, not M8's.
+    // M11: `kind` travels across as it arrived. It used to be flattened through
+    // `kind === "combat" ? "combat" : "note"` — the same collapse that made a new record kind cost zero
+    // compile errors on the server and render as the wrong thing; with deadlines and downtime on this
+    // feed it would have drawn both as ordinary notes on the player's own dashboard.
     () => timeline
       .filter((record) => record.kind !== "event")
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((record) => ({ id: record.id, summary: record.text, when: chronicleWhenLabel(record), kind: record.kind === "combat" ? "combat" as const : "note" as const })),
+      .map((record) => ({ id: record.id, summary: record.text, when: chronicleWhenLabel(record), kind: record.kind })),
+    [timeline]
+  );
+  /**
+   * M11 / CT-5 + O-2: the deadlines the party has been TOLD about. Ordered by the shared rule, mapped to
+   * the shared card shape — the same two lines the GM workspace runs, over whatever this token was sent.
+   *
+   * There is no kind filter for visibility anywhere here, and there must not be: an unrevealed deadline
+   * is not in `timeline` at all, because the server's reveal gate already dropped it. A deadline the GM
+   * has revealed is exactly as visible as a note they revealed.
+   */
+  const campaignDeadlineCards = useMemo<readonly CampaignDeadline[]>(
+    () => campaignDeadlines(timeline).map((record) => ({ id: record.id, summary: record.text, when: chronicleWhenLabel(record), fired: record.fired })),
     [timeline]
   );
   const campaignToday = useMemo(() => (calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null), [calendar]);
@@ -324,6 +348,8 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
              it carries `body` and `entityIds` too — and the card renders neither, because `CampaignQuest`
              has no field for them. */
           quests={quests}
+          /* M11: the revealed deadlines, through the same shared rule the GM's workspace applies. */
+          deadlines={campaignDeadlineCards}
           /* R1: the card's rows now land ON the quest, in the player's own reader. Passing this flips the
              card's existing readout rows to its existing button rows (`.codex-campaign-recentitem`,
              already §4 route 1) — the dashboard itself is unchanged and still lists only OPEN quests. */
@@ -435,16 +461,27 @@ export function PlayerCodex({ token }: Readonly<{ token: string; onClose?: () =>
                 note because the two only differed by colour. */}
             {timeline.map((record) => {
               const meta = CHRONICLE_KIND_META[record.kind];
+              // M11: nearly free, as intended — the icon and the word come from the shared kind table, so
+              // a revealed deadline and a revealed downtime read on this timeline the same way they read
+              // on the GM's. The two extra lines are the two extra things the player projection carries:
+              // a deadline's derived `fired`, and a downtime's payload MINUS `applied` (the server's
+              // allow-list never sends it, and `downtimeSummaryLabel` never asks for it).
+              const fired = deadlineFired(record);
               return (
               <article key={`${record.kind}-${record.id}`} id={`codex-player-entry-${record.id}`} aria-current={record.id === focusedEntryId ? "true" : undefined}
-                className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${record.kind === "event" ? " is-event" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>
+                className={`codex-entry${record.kind === "combat" ? " is-combat" : ""}${record.kind === "event" ? " is-event" : ""}${record.kind === "deadline" ? " is-deadline" : ""}${record.kind === "downtime" ? " is-downtime" : ""}${record.id === focusedEntryId ? " is-focused" : ""}`}>
                 <header className="codex-entry-head codex-entry-meta">
                   <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-entry-kindglyph" />
                   <Badge tone={meta.tone}>{meta.label}</Badge>
+                  {record.kind === "deadline" && <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>}
                   <span className="codex-entry-when">{chronicleWhenLabel(record)}</span>
                 </header>
                 {record.title && <h4 className="codex-entry-title">{record.title}</h4>}
                 <div className="codex-entry-body"><CodexMarkdown text={record.text} onNavigate={navigate} token={token} knownTitles={knownTitles} /></div>
+                {/* Who spent the time, on what, for how long. No Confirm and no proposed date: applying a
+                    downtime is a GM action against the GM's own clock, and neither the control nor the
+                    state that drives it exists on this surface. */}
+                {record.kind === "downtime" && record.payload && <p className="codex-downtime-what">{downtimeSummaryLabel(record.payload)}</p>}
               </article>
               );
             })}

@@ -179,7 +179,7 @@ export type PlayerCodexPage = PlayerCodexPageSummary & Readonly<{ fields: Readon
 // was already permitted to see — a tag is never a side channel onto a secret map, pin, or entry.
 export type PlayerCodexMap = Readonly<{ id: string; assetId: string; name: string; kind: "battlemap" | "regional" | "world"; parentMapId: string | null; tags: readonly string[] }>;
 export type PlayerCodexMarker = Readonly<{ id: string; mapId: string; x: number; y: number; iconId: string; iconColor: string; label: string | null; pageIds: string[]; subMapId: string | null; tags: readonly string[] }>;
-export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: "note" | "combat"; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
+export type PlayerCodexJournalEntry = Readonly<{ id: string; text: string; kind: CodexJournalKind; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; tags: readonly string[]; createdAt: string }>;
 /**
  * M9: a session as a PLAYER sees it — the tightest projection the server has (`projectPlayerSession`),
  * FOUR keys and nothing else. `prepBody` (the GM's plan), `rev`, `status` and `attendees` are absent by
@@ -223,7 +223,18 @@ export const playerCodexApi = {
    * may also see. `PlayerCodexQuest` and the rest of the quest surface live in the QUESTS section at the
    * bottom of this file — one home for the whole record, rather than half of it up here.
    */
-  quests: (token: string) => request<{ quests: PlayerCodexQuest[] }>(token, "/quests").then((data) => data.quests)
+  quests: (token: string) => request<{ quests: PlayerCodexQuest[] }>(token, "/quests").then((data) => data.quests),
+  /**
+   * M11 / O-1: the campaign calendar as a PLAYER receives it. Same route as `calendarApi.get`, and the
+   * reason this entry exists at all: since the prep clock, `/codex/calendar` is projected by role, and
+   * the player's `currentDate` is the **published** date — never the GM's clock, which has no field on
+   * this shape to arrive in.
+   *
+   * The player Codex must read THIS and never `calendarApi.get`. That is not a style preference: the GM
+   * method's return type says `publishedDate` is present, and a player surface that typed its calendar
+   * as the GM's would be one careless render away from putting the GM's prep clock on the table.
+   */
+  calendar: (token: string) => request<{ calendar: CodexCalendar }>(token, "/calendar").then((data) => data.calendar)
 };
 
 // ----- Atlas: maps + markers -----
@@ -277,11 +288,34 @@ export const atlasApi = {
 
 // ----- Journal / timeline -----
 
-export type CodexJournalKind = "note" | "combat";
+/**
+ * M11: FOUR kinds now. `deadline` and `downtime` are ordinary journal rows — same table, same two
+ * layers, same reveal flag, same in-world dating — discriminated for display. Mirrors the server's
+ * `CodexJournalKind` (`codex-store.ts`); the DB's CHECK is deliberately wider (it already admits
+ * `milestone`/`standing` for M12), and the DB being more permissive than this union is the safe
+ * direction.
+ */
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime";
+/**
+ * M11 / CT-10: what a downtime record carries beyond its prose. Mirrors the server's
+ * `CodexDowntimePayload` (`codex-store.ts`) exactly.
+ *
+ * `applied` is GM WORKFLOW state — "has the GM confirmed the clock move?" (O-3) — and is the one field
+ * the player projection drops (`CodexDowntimeSummary` below is what a player receives). It is real
+ * stored state, not something derived: the whole point of O-3 is that creating downtime proposes a date
+ * and a separate explicit action applies it.
+ *
+ * There is deliberately no `outcome` field. A downtime's prose already has two layers on this record
+ * (`playerText` / `gmText`); a third prose channel inside a payload would sit outside the reveal split.
+ */
+export type CodexDowntimeSummary = Readonly<{ who: string; activity: string; days: number }>;
+export type CodexDowntimePayload = CodexDowntimeSummary & Readonly<{ applied: boolean }>;
 export type CodexJournalEntry = Readonly<{
   id: string; playerText: string; gmText: string | null; revealedToPlayers: boolean;
   attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null;
   sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null;
+  /** M11: `null` for every kind except `downtime` — the store parses `payload_json` only for that kind. */
+  payload: CodexDowntimePayload | null;
   sortKey: number; tags: readonly string[]; createdAt: string; updatedAt: string;
 }>;
 export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
@@ -290,10 +324,36 @@ export type CodexJournalInput = Readonly<{
   attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null;
   inWorldDate?: CodexInWorldDate | null; tags?: readonly string[];
 }>;
+/**
+ * M11: the downtime triple, sent NESTED beside the ordinary journal input — the server's
+ * `createDowntime(input & { downtime: { who, activity, days } })`. Bounded here as well as on the
+ * server (`who`/`activity` at 120 chars, `days` an integer 0…3650) so the composer cannot hand a GM a
+ * generic save failure for something the field could have prevented.
+ */
+export type CodexDowntimeInput = Readonly<{ who: string; activity: string; days: number }>;
 
 // ----- Calendar (the world's own months / weekdays / era) -----
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
 export type CodexCalendar = Readonly<{ yearName: string; months: readonly CodexCalendarMonth[]; weekdays: readonly string[]; currentDate?: CodexInWorldDate | null }>;
+/**
+ * M11 / O-1 — the PREP CLOCK. The calendar as the **GM** reads it (`projectGmCalendar`).
+ *
+ * There are two clocks now and this type is the only place both are visible at once:
+ *  - `currentDate` (inherited above) is the **GM's own** clock — the authoritative campaign "now", the
+ *    one a logged battle is dated at, the one a deadline fires against, the one downtime advances.
+ *  - `publishedDate` is what the **players** are currently on. A player's read of the very same route
+ *    receives a `CodexCalendar` whose `currentDate` IS this value, which is why the player-facing field
+ *    keeps its name and no player surface needed changing: only its source moved.
+ *
+ * So the GM can run the clock ahead while prepping and the table sees nothing until they publish
+ * (`calendarApi.publish`). `null` means players have no date at all yet.
+ *
+ * Deliberately a SEPARATE type from `CodexCalendar` rather than an optional field on it, because
+ * `CodexCalendar` is also the PUT body (`calendarApi.set`) and the server's `CalendarSchema` is
+ * `.strict()`: a caller that echoed a fetched GM calendar straight back would be sending a key the
+ * route rejects outright. The published date is written by exactly one route, and it is not that one.
+ */
+export type GmCodexCalendar = CodexCalendar & Readonly<{ publishedDate: CodexInWorldDate | null }>;
 export function calendarDaysPerYear(calendar: CodexCalendar): number { return calendar.months.reduce((sum, month) => sum + month.days, 0); }
 /** Absolute day-instant for a date (inverse of instantToDate) - used to place the "now" marker on the timeline. */
 export function dateToInstant(calendar: CodexCalendar, date: CodexInWorldDate): number {
@@ -322,8 +382,20 @@ export function instantToDate(calendar: CodexCalendar, instant: number): CodexIn
   return { year, month, day: remainder + 1 };
 }
 export const calendarApi = {
-  get: (token: string) => request<{ calendar: CodexCalendar }>(token, "/calendar").then((data) => data.calendar),
-  set: (token: string, calendar: CodexCalendar) => request<{ calendar: CodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then((data) => data.calendar)
+  /**
+   * The GM's read. Same route the player reads (`playerCodexApi.calendar`) — the server projects it by
+   * role (M11 / F-6), so this one carries the GM's clock plus `publishedDate` and the player's carries
+   * only the published date, under the name `currentDate`.
+   */
+  get: (token: string) => request<{ calendar: GmCodexCalendar }>(token, "/calendar").then((data) => data.calendar),
+  /** The world's SHAPE plus the GM's clock. Never the published date — see `GmCodexCalendar`. */
+  set: (token: string, calendar: CodexCalendar) => request<{ calendar: CodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then((data) => data.calendar),
+  /**
+   * O-1 / D11-H: copy the GM's clock onto the players' clock. The ONLY thing that publishes it —
+   * advancing the clock, editing the calendar and applying downtime all deliberately leave the table
+   * where it was until the GM says so.
+   */
+  publish: (token: string) => request<{ calendar: GmCodexCalendar }>(token, "/calendar/publish", { method: "POST" }).then((data) => data.calendar)
 };
 
 // ----- The chronicle (CT-11 / CT-12: ONE timeline — journal entries + dated `event` pages) -----
@@ -333,7 +405,7 @@ export const calendarApi = {
  * colour alone). `combat` is split from `entry` because a battle already renders with its own badge and
  * its replay edge; it is the same store row, discriminated for display.
  */
-export type CodexChronicleKind = "entry" | "combat" | "event";
+export type CodexChronicleKind = "entry" | "combat" | "event" | "deadline" | "downtime";
 
 /**
  * One chronicle row, GM view. Mirrors `GmCodexChronicleRecord` in `apps/server/src/codex-projections.ts`
@@ -362,6 +434,18 @@ export type CodexChronicleRecord = Readonly<{
   attachPageId: string | null;
   attachMarkerId: string | null;
   sourceEncounterId: number | null;
+  /**
+   * M11: the downtime payload, full — `applied` included, because whether the GM has confirmed the
+   * clock move is precisely what the GM's row has to show. `null` on every other kind.
+   */
+  payload: CodexDowntimePayload | null;
+  /**
+   * M11 / CT-5: has the campaign clock passed this deadline? **Derived server-side, never stored** —
+   * it is `calendarInstant <= the campaign clock`, so rewinding the clock un-fires a deadline, which is
+   * correct. Meaningful only on a `deadline` row; read it through `deadlineFired` in `chronicle.ts`
+   * rather than directly, so "has this fired" has exactly one answer on this client.
+   */
+  fired: boolean;
   createdAt: string;
   updatedAt: string;
 }>;
@@ -380,6 +464,15 @@ export type PlayerCodexChronicleRecord = Readonly<{
   realDate: string | null;
   inWorldLabel: string | null;
   tags: readonly string[];
+  /**
+   * M11: the downtime payload **without `applied`** (`CodexDowntimeSummary`). Who did what, and for how
+   * long, is campaign fact once the record is revealed; whether the GM has confirmed the clock move is
+   * GM workflow and has no player-facing meaning, so the server's allow-list simply never emits it.
+   * There is no field here to leak it into.
+   */
+  payload: CodexDowntimeSummary | null;
+  /** M11: a revealed deadline the campaign has passed must read as passed. Derived server-side. */
+  fired: boolean;
   createdAt: string;
 }>;
 
@@ -390,6 +483,29 @@ export const journalApi = {
   forPage: (token: string, pageId: string) => request<{ entries: CodexJournalEntry[] }>(token, `/journal?pageId=${pageId}`).then((data) => data.entries),
   forMarker: (token: string, markerId: string) => request<{ entries: CodexJournalEntry[] }>(token, `/journal?markerId=${markerId}`).then((data) => data.entries),
   create: (token: string, input: CodexJournalInput) => request<{ entry: CodexJournalEntry }>(token, "/journal", { method: "POST", body: JSON.stringify(input) }).then((data) => data.entry),
+  /**
+   * M11 / CT-5. A deadline stores NO payload of its own: what will happen is the entry's own text, and
+   * when it will happen is the entry's own in-world date — which is why `inWorldDate` is REQUIRED here
+   * where `create` leaves it optional. A deadline with no date could never fire.
+   */
+  createDeadline: (token: string, input: CodexJournalInput & { inWorldDate: CodexInWorldDate }) =>
+    request<{ entry: CodexJournalEntry }>(token, "/journal/deadline", { method: "POST", body: JSON.stringify(input) }).then((data) => data.entry),
+  /**
+   * M11 / CT-10. Creating downtime NEVER moves the clock (O-3) — it comes back with the date it would
+   * move it to, and `applyDowntime` below is the separate, explicit thing that actually moves it.
+   */
+  createDowntime: (token: string, input: CodexJournalInput & { downtime: CodexDowntimeInput }) =>
+    request<{ entry: CodexJournalEntry; proposedDate: CodexInWorldDate | null }>(token, "/journal/downtime", { method: "POST", body: JSON.stringify(input) }),
+  /**
+   * O-3's confirmation: mark the downtime applied AND advance the campaign clock by its days, in one
+   * server-side transaction. Applying twice is rejected by the store and moves nothing.
+   *
+   * It returns the calendar as well as the entry because one action changed both, but this client
+   * re-reads rather than trusting the echo — the Journal's chronicle, its dated rows and its clock
+   * readout all shift when the clock does.
+   */
+  applyDowntime: (token: string, id: string) =>
+    request<{ entry: CodexJournalEntry; calendar: CodexCalendar }>(token, `/journal/${id}/apply-downtime`, { method: "POST" }),
   update: (token: string, id: string, input: CodexJournalInput) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then((data) => data.entry),
   reveal: (token: string, id: string, revealed: boolean) => request<{ entry: CodexJournalEntry }>(token, `/journal/${id}/reveal`, { method: "POST", body: JSON.stringify({ revealed }) }).then((data) => data.entry),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/journal/${id}`, { method: "DELETE" })

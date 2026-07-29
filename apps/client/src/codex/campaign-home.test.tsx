@@ -54,6 +54,9 @@ vi.mock("./api", async (importOriginal) => {
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
+      // M11: the player's own calendar read. It was `calendarApi.get` until O-1 split the two clocks;
+      // it is stubbed with the SAME mock, so what this file asserts about the date is unchanged.
+      calendar: (...a: unknown[]) => getCalendar(...a),
       listPages: (...a: unknown[]) => playerListPages(...a),
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
@@ -67,7 +70,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { CodexWorkspace } from "./CodexWorkspace";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexCalendar, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexChronicleRecord, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexJournalEntry, CodexMap, CodexPageSummary, PlayerCodexChronicleRecord, PlayerCodexMap, PlayerCodexPageSummary } from "./api";
 
 /**
  * CI-7: **`World` is renamed `Campaign`, and becomes the dashboard.**
@@ -94,9 +97,17 @@ const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", 
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "The party crossed the mists.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: null, sourceEncounterId: null,
+  attachMarkerId: null, attachPageId: null, sourceEncounterId: null, payload: null,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
+});
+
+/** One GM chronicle row — the shape the dashboard's own feed has taken since M11 (see the suite below). */
+const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
+  kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false,
+  sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
+  createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 
 const MAP_OTHER: CodexMap = { id: "m0", assetId: "a0", name: "Castle Ravenloft", kind: "battlemap", parentMapId: null, revealedToPlayers: false, sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" };
@@ -126,10 +137,10 @@ const PLAYER_PAGES: PlayerCodexPageSummary[] = [
 ];
 const PLAYER_MAPS: PlayerCodexMap[] = [{ id: "m1", assetId: "a1", name: "Barovia map", kind: "regional", parentMapId: null, tags: [] }];
 // CT-11: the player Journal reads the CHRONICLE, so a player's rows arrive in the unified record shape.
-const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionNumber: 3, realDate: null, inWorldLabel: null, tags: [], createdAt: "2026-07-20T00:00:00.000Z" };
+const PLAYER_ENTRY: PlayerCodexChronicleRecord = { kind: "entry", id: "j1", title: null, text: "The party crossed the mists.", sessionNumber: 3, realDate: null, inWorldLabel: null, tags: [], payload: null, fired: false, createdAt: "2026-07-20T00:00:00.000Z" };
 const PLAYER_OLDER: PlayerCodexChronicleRecord = { ...PLAYER_ENTRY, id: "j0", text: "They left Daggerford.", sessionNumber: 1, createdAt: "2026-07-01T00:00:00.000Z" };
 /** A revealed dated `event` page on the same chronicle — the record kind CT-11 added to this feed. */
-const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", tags: [], createdAt: "2026-07-10T00:00:00.000Z" };
+const PLAYER_EVENT: PlayerCodexChronicleRecord = { kind: "event", id: "p9", title: "The Sundering", text: "The sky tore open.", sessionNumber: null, realDate: null, inWorldLabel: "Hammer 1, 1492 DR", tags: [], payload: null, fired: false, createdAt: "2026-07-10T00:00:00.000Z" };
 const playerDefaults = () => {
   playerListPages.mockResolvedValue(PLAYER_PAGES);
   playerListMaps.mockResolvedValue(PLAYER_MAPS);
@@ -182,17 +193,18 @@ describe("The mode is called Campaign — everywhere (CI-7)", () => {
 describe("The Campaign dashboard shows what exists today (CI-7)", () => {
   beforeEach(() => {
     gmDefaults();
-    // In the SERVER's order — `listTimeline()` is ascending, so the newer entry arrives last. Anything
-    // the dashboard claims about recency has to be work it did, not an accident of the feed's order.
-    timeline.mockResolvedValue([
-      ENTRY({ id: "j1", playerText: "The party crossed the mists.", createdAt: "2026-07-01T00:00:00.000Z" }),
-      ENTRY({ id: "j2", playerText: "A battle was fought here.", kind: "combat", sourceEncounterId: 7, createdAt: "2026-07-20T00:00:00.000Z" })
-    ]);
-    // The Journal reads the chronicle (CT-11), so the same two records must exist there for the
-    // dashboard's jump to land on one - the dashboard's own feed is still the journal-entry read.
+    /**
+     * In the SERVER's order — the chronicle is ascending, so the newer record arrives last. Anything the
+     * dashboard claims about recency has to be work it did, not an accident of the feed's order.
+     *
+     * M11: this is the dashboard's OWN feed now, not only the Journal's. The GM dashboard used to read
+     * `/journal` while the player's read the chronicle; it reads the chronicle for both audiences since
+     * M11, because whether a deadline has fired is derived by the server and exists on a chronicle
+     * record alone. `timeline` stays stubbed in `gmDefaults` and is deliberately never asserted on here.
+     */
     chronicle.mockResolvedValue([
-      { kind: "entry" as const, id: "j1", title: null, text: "The party crossed the mists.", gmText: null, revealedToPlayers: false, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-01T00:00:00.000Z" },
-      { kind: "combat" as const, id: "j2", title: null, text: "A battle was fought here.", gmText: null, revealedToPlayers: false, sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null, tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: 7, createdAt: "2026-07-20T00:00:00.000Z", updatedAt: "2026-07-20T00:00:00.000Z" }
+      RECORD({ id: "j1", text: "The party crossed the mists.", createdAt: "2026-07-01T00:00:00.000Z" }),
+      RECORD({ kind: "combat", id: "j2", text: "A battle was fought here.", sourceEncounterId: 7, createdAt: "2026-07-20T00:00:00.000Z" })
     ]);
     listMaps.mockResolvedValue([MAP_OTHER, MAP_TARGET]);
   });
@@ -200,7 +212,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
   const openCampaign = async (user: ReturnType<typeof userEvent.setup>) => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("tab", { name: "Campaign" }));
-    await waitFor(() => expect(timeline).toHaveBeenCalled());
+    await waitFor(() => expect(chronicle).toHaveBeenCalled());
   };
 
   it("entities by type, recent journal activity, atlas presence, and the in-world date", async () => {
@@ -254,7 +266,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
   });
 
   it("says a feed failed rather than rendering one section fewer, silently (R4)", async () => {
-    timeline.mockRejectedValue(new Error("The codex request failed (500)."));
+    chronicle.mockRejectedValue(new Error("The codex request failed (500)."));
     const user = userEvent.setup();
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());

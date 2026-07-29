@@ -168,7 +168,29 @@ const DEFAULT_CALENDAR: CodexCalendar = {
   weekdays: ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
 };
 
-export type CodexJournalKind = "note" | "combat";
+/**
+ * M11 (CT-5 / CT-10) widens the journal's kinds from two to four. The DATABASE's CHECK is wider still -
+ * migration v15 admits `milestone` and `standing` as well, because widening a CHECK in SQLite costs a full
+ * table rebuild and M12 needs those two. The DB being more permissive than this union is the existing, safe
+ * direction (a row this file cannot classify reads back as `note` via `journalKind`, never as a throw).
+ */
+export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime";
+/**
+ * CT-10's downtime activity: WHO spent WHICH days doing WHAT, and whether the GM has confirmed the clock
+ * move it proposes (O-3).
+ *
+ * What is deliberately NOT here:
+ *  - `outcome`. It is prose, and this record already has two prose layers with a reveal split between them
+ *    (`playerText` / `gmText`). A third prose channel inside a JSON blob would sit outside that split, which
+ *    is exactly the leak shape K1 forbids.
+ *  - anything a deadline would need. A deadline stores NO payload at all (D11-C): its text IS the "what",
+ *    and its own `inWorldDate` IS the target date. Two dates for one record is what K3 exists to prevent.
+ *
+ * `applied` is real state, not a derived value: "has the GM confirmed?" cannot be computed from anything
+ * else, and it is what makes `applyDowntime` idempotent. It is GM workflow state and must never be
+ * projected to a player (D11-E).
+ */
+export type CodexDowntimePayload = Readonly<{ who: string; activity: string; days: number; applied: boolean }>;
 export type CodexJournalRow = Readonly<{
   id: string;
   playerText: string;
@@ -187,11 +209,15 @@ export type CodexJournalRow = Readonly<{
   sortKey: number;
   /** CI-2: the same tag vocabulary pages carry. */
   tags: readonly string[];
+  /** M11: kind-specific structured data. `null` for every kind except `downtime` (D11-C / D11-D). */
+  payload: CodexDowntimePayload | null;
   createdAt: string;
   updatedAt: string;
 }>;
 export type CodexJournalCreateInput = Readonly<{ playerText?: string; gmText?: string | null; revealedToPlayers?: boolean; attachMarkerId?: string | null; attachPageId?: string | null; sessionNumber?: number | null; realDate?: string | null; inWorldLabel?: string | null; inWorldDate?: CodexInWorldDate | null; tags?: readonly string[] }>;
 export type CodexJournalUpdateInput = CodexJournalCreateInput;
+/** CT-10: what `createDowntime` needs beyond an ordinary entry. `applied` is not an input - it starts false. */
+export type CodexDowntimeCreateInput = CodexJournalCreateInput & Readonly<{ downtime: Readonly<{ who: string; activity: string; days: number }> }>;
 export type CodexCombatEntryInput = Readonly<{ sourceEncounterId: number; attachMarkerId?: string | null; attachPageId?: string | null; playerText: string; gmText?: string | null; revealedToPlayers?: boolean }>;
 
 /**
@@ -690,6 +716,124 @@ export const MIGRATIONS = [{
     ) STRICT;
     CREATE INDEX codex_quests_status ON codex_quests (status);
   `
+}, {
+  version: 15,
+  // M11 (CT-5 deadlines, CT-10 downtime). The only migration in this file that REBUILDS a table, and the
+  // reason is not a preference:
+  //
+  // `codex_journal.kind` has carried `CHECK (kind IN ('note', 'combat'))` since v1 and nothing has
+  // superseded it. SQLite cannot widen a CHECK in place - there is no MODIFY/DROP CONSTRAINT - so a
+  // `deadline` or `downtime` row is REJECTED by the file itself, not merely untyped. Verified by direct
+  // probe against this build before writing a line of this: inserting either kind failed with
+  // "CHECK constraint failed: kind IN ('note', 'combat')", and `ALTER TABLE ... MODIFY` was a syntax error.
+  // The 12-step rebuild is therefore the ONLY way to do it.
+  //
+  // DROPPING the CHECK instead would have been one line, and it is the wrong line. v13 and v14 each state
+  // why at length and it holds here verbatim: a TypeScript gate (`journalKind`) protects this PROCESS, not
+  // this FILE. A repair script or a manual sqlite3 session would be free to write kind = 'quest', which
+  // `journalKind` then coerces to "note" - a bad row reading back as a plausible one instead of failing
+  // loudly. The constraint is what keeps the column honest.
+  //
+  // The CHECK admits SIX kinds while `CodexJournalKind` admits four (D11-B). `milestone` and `standing` are
+  // M12's (spec §2.2); they are here because the cost of this migration is the REBUILD, and paying it twice
+  // four weeks apart for one word each would be silly. The DB being more permissive than the TS union is
+  // the direction that already exists and the safe one - the narrow gate is the one that runs on every read.
+  //
+  // Rebuild discipline, each point load-bearing:
+  //  - The new table is the CURRENT table, byte-for-byte, in the SAME physical column order (v1's columns,
+  //    then v6's three, then v10's `tags_json` with its DEFAULT) - copied from the live `sqlite_master` DDL,
+  //    NOT reconstructed from the TypeScript row type. `payload_json` is appended LAST so no existing column
+  //    moves. STRICT is kept, as v1 declared it.
+  //  - The INSERT names its columns on BOTH sides. `SELECT *` would silently reorder or mis-map the day
+  //    someone adds a column between writing this and running it.
+  //  - All three indexes are recreated verbatim (`codex_journal_order`, `codex_journal_marker`,
+  //    `codex_journal_page` - enumerated from v1 and confirmed against `sqlite_master`; there are no others
+  //    and no triggers or views on this table). DROP TABLE takes its indexes with it, so forgetting one
+  //    would silently turn the timeline's ORDER BY into a full scan.
+  //  - Foreign keys ARE enforced here (`initialize()` opens with `enableForeignKeyConstraints: true`), so
+  //    this was checked rather than assumed: nothing REFERENCES `codex_journal` and `codex_journal`
+  //    references nothing, so the drop/rename has no FK work to do. If that ever changes, this migration
+  //    must be revisited - a rename with FKs on rewrites child clauses, and a drop enforces them.
+  //
+  // `payload_json` is TEXT holding JSON, the shape v8's `page_ids_json` and v14's `objectives_json` already
+  // established. Nullable with no default because it is null for every kind except `downtime` - unlike
+  // `tags_json`, "no payload" is the normal state, not a legacy gap to backfill.
+  //
+  // The published date (O-1 / D11-G) is three INTEGER columns on `codex_meta`, not a field inside
+  // `calendar_json`: `setCalendar` REPLACES that whole blob from GM client input, so a player-facing value
+  // living inside it would be clobbered by an unrelated calendar edit. Raw parts rather than an instant
+  // because K3 makes the raw date the source of truth - an instant would go stale under a calendar reshape.
+  //
+  // It is BACKFILLED from the calendar's `currentDate` (K7) so on day one players see exactly the date they
+  // see today and nothing visibly changes until the GM first advances their own clock. Migrations here are
+  // SQL-only, so this uses JSON1 (`json_valid` / `json_type` / `json_extract`), which v7 and v11 already
+  // depend on. Three guards, each proven against this build rather than assumed:
+  //   - `json_valid` FIRST, and non-negotiable: `json_extract` and `json_type` both THROW "malformed JSON"
+  //     rather than returning NULL, so without this guard a single hand-edited `calendar_json` aborts the
+  //     migration and leaves the GM's codex unopenable. Proven by mutation, not assumed.
+  //     It is a NESTED CASE rather than `json_valid(...) AND json_type(...)` because SQLite's AND
+  //     short-circuits only sometimes - measured on this build, the AND form survives here but the same
+  //     two calls joined by AND in a bare SELECT throw. Whether the guard runs first is therefore an
+  //     optimizer decision, and CASE is the construct SQLite documents as evaluating in order. The nested
+  //     form costs three extra lines and removes the question.
+  //   - `json_type(...) IN ('integer', 'real')` so a non-numeric part backfills NULL instead of writing
+  //     TEXT into an INTEGER column of a STRICT table (which is an error, not a coercion).
+  //   - `CAST(... AS INTEGER)` because a JSON `1492.0` extracts as REAL and STRICT rejects REAL in an
+  //     INTEGER column. `normalizeCalendar` truncates, so this only matters for a hand-edited file - which
+  //     is exactly the case a migration must not die on.
+  // A NULL, absent, malformed or non-numeric `currentDate` therefore backfills NULL, which `getPublishedDate`
+  // reads as "nothing published" - the same all-three-parts-or-none rule `toEntry` applies to a stored date.
+  //
+  // On a FRESH database this runs BEFORE `initialize()` seeds `codex_meta`, so the UPDATE matches no rows
+  // and the columns simply start NULL (the ordering note v13 records; the ALTERs alter the table, not a row).
+  sql: `
+    CREATE TABLE codex_journal_new (
+      id TEXT PRIMARY KEY,
+      player_text TEXT NOT NULL,
+      gm_text TEXT,
+      revealed INTEGER NOT NULL,
+      attach_marker_id TEXT,
+      attach_page_id TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('note', 'combat', 'deadline', 'downtime', 'milestone', 'standing')),
+      source_encounter_id INTEGER,
+      session_number INTEGER,
+      real_date TEXT,
+      in_world_label TEXT,
+      calendar_instant INTEGER,
+      sort_key INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      in_world_year INTEGER,
+      in_world_month INTEGER,
+      in_world_day INTEGER,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      payload_json TEXT
+    ) STRICT;
+    INSERT INTO codex_journal_new
+      (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at, in_world_year, in_world_month, in_world_day, tags_json)
+      SELECT
+       id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, sort_key, created_at, updated_at, in_world_year, in_world_month, in_world_day, tags_json
+      FROM codex_journal;
+    DROP TABLE codex_journal;
+    ALTER TABLE codex_journal_new RENAME TO codex_journal;
+    CREATE INDEX codex_journal_order ON codex_journal (calendar_instant, session_number, created_at);
+    CREATE INDEX codex_journal_marker ON codex_journal (attach_marker_id);
+    CREATE INDEX codex_journal_page ON codex_journal (attach_page_id);
+
+    ALTER TABLE codex_meta ADD COLUMN published_year INTEGER;
+    ALTER TABLE codex_meta ADD COLUMN published_month INTEGER;
+    ALTER TABLE codex_meta ADD COLUMN published_day INTEGER;
+    UPDATE codex_meta SET
+      published_year = CASE WHEN json_valid(calendar_json) THEN
+        CASE WHEN json_type(calendar_json, '$.currentDate.year') IN ('integer', 'real')
+          THEN CAST(json_extract(calendar_json, '$.currentDate.year') AS INTEGER) END END,
+      published_month = CASE WHEN json_valid(calendar_json) THEN
+        CASE WHEN json_type(calendar_json, '$.currentDate.month') IN ('integer', 'real')
+          THEN CAST(json_extract(calendar_json, '$.currentDate.month') AS INTEGER) END END,
+      published_day = CASE WHEN json_valid(calendar_json) THEN
+        CASE WHEN json_type(calendar_json, '$.currentDate.day') IN ('integer', 'real')
+          THEN CAST(json_extract(calendar_json, '$.currentDate.day') AS INTEGER) END END;
+  `
 }];
 
 /**
@@ -805,8 +949,8 @@ const SESSION_COLUMNS = "id, session_number, real_date, attendees_json, prep_bod
 type QuestRowRaw = { id: string; title: string; status: string; player_body: string; gm_body: string; objectives_json: string; entity_ids_json: string; revealed: number; rev: number; created_at: string; updated_at: string };
 /** One column list per quest read, and the INSERT's value order is bound to it - the SESSION_COLUMNS discipline. */
 const QUEST_COLUMNS = "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, rev, created_at, updated_at";
-type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; created_at: string; updated_at: string };
-const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at";
+type JournalRowRaw = { id: string; player_text: string; gm_text: string | null; revealed: number; attach_marker_id: string | null; attach_page_id: string | null; kind: string; source_encounter_id: number | null; session_number: number | null; real_date: string | null; in_world_label: string | null; calendar_instant: number | null; in_world_year: number | null; in_world_month: number | null; in_world_day: number | null; sort_key: number; tags_json: string; payload_json: string | null; created_at: string; updated_at: string };
+const JOURNAL_COLUMNS = "id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at";
 
 /** Read a stored tag array defensively — a malformed value degrades to no tags rather than throwing. */
 function parseTags(raw: string | null | undefined): readonly string[] {
@@ -1057,6 +1201,82 @@ function sessionStatus(value: string | undefined): CodexSessionStatus {
   if (value === undefined) return "planned";
   if (!SESSION_STATUSES.has(value as CodexSessionStatus)) throw new Error("A session is either planned or played.");
   return value as CodexSessionStatus;
+}
+const JOURNAL_KINDS = new Set<CodexJournalKind>(["note", "combat", "deadline", "downtime"]);
+/**
+ * A stored `kind` PARSED, not coerced. Before M11 this was inlined in `toEntry` as
+ * `row.kind === "combat" ? "combat" : "note"`, which is fine for two kinds and actively dangerous for four:
+ * a `deadline` row would have read back as an ordinary note, rendered as one, and produced ZERO compile
+ * errors anywhere - the failure would have been a GM's deadline quietly not existing.
+ *
+ * Fail-closed to `note`, the same discipline `sessionStatus`/`questStatus` use for their enums, and here it
+ * has a second job: migration v15's CHECK admits `milestone` and `standing` for M12, so a row written by a
+ * future version reads as a plain note on an older build rather than throwing. Narrowing, never throwing -
+ * a read path that can throw turns one bad row into an unopenable codex.
+ */
+function journalKind(value: string): CodexJournalKind {
+  return JOURNAL_KINDS.has(value as CodexJournalKind) ? (value as CodexJournalKind) : "note";
+}
+/** 3650 days = ten default years: long enough for "the wizard spends a decade in the tower", bounded enough to be a typo guard. */
+const MAX_DOWNTIME_DAYS = 3650;
+/**
+ * CT-10's payload on the way IN. `who` and `activity` go through `shortLabel` (trim, reject control
+ * characters, cap at 120 - the repo's one-line-of-display bound), and an empty one is legal for the reason
+ * `questObjectives` spells out: the GM's real flow is "make the record, then fill it in", and the editor
+ * autosaves, so rejecting a blank would 400 the first save.
+ *
+ * `applied` is not an input. Downtime is always created unapplied (O-3): only `applyDowntime` sets it, and
+ * only once. Accepting it here would let a caller pre-apply a record and skip the clock move entirely.
+ */
+function downtimePayload(input: Readonly<{ who: string; activity: string; days: number }>): CodexDowntimePayload {
+  const days = input?.days;
+  if (!Number.isInteger(days) || days < 0 || days > MAX_DOWNTIME_DAYS) throw new Error(`Downtime days must be a whole number from 0 to ${MAX_DOWNTIME_DAYS}.`);
+  return {
+    who: shortLabel(input.who, 120, "downtime participant") ?? "",
+    activity: shortLabel(input.activity, 120, "downtime activity") ?? "",
+    days, applied: false
+  };
+}
+/** Read a stored payload defensively - malformed JSON degrades to `null`, never a throw (`parseObjectives`' rule). */
+function parseDowntimePayload(raw: string | null | undefined): CodexDowntimePayload | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const value = parsed as { who?: unknown; activity?: unknown; days?: unknown; applied?: unknown };
+    return {
+      who: typeof value.who === "string" ? value.who : "",
+      activity: typeof value.activity === "string" ? value.activity : "",
+      days: typeof value.days === "number" && Number.isFinite(value.days) ? Math.max(0, Math.trunc(value.days)) : 0,
+      // Coerced, not trusted, exactly as `questObjectives` treats `done`: anything but exactly `true` is
+      // false, so a malformed value can never mark downtime as already applied and suppress the clock move.
+      applied: value.applied === true
+    };
+  } catch { return null; }
+}
+/**
+ * CT-5's "fires when the campaign date passes it", and **the only place that comparison is written**
+ * (D11-C). Every reader - the store, the projections, any dashboard count - goes through this one function,
+ * because two copies of a `<=` is precisely how a dashboard ends up disagreeing with the timeline it is
+ * counting.
+ *
+ * `fired` is DERIVED and never stored. K3 makes the raw date the source of truth and instants derived; a
+ * stored `fired` would be a SECOND derived cache that `setCalendar`'s reflow would then have to maintain,
+ * and a reflow that missed it would leave a deadline permanently fired on a date that no longer exists. The
+ * one behavioural consequence is that rewinding the clock un-fires a deadline, which is correct: the
+ * campaign has not reached that day.
+ *
+ * `at` is passed IN rather than read from the store, and that is a viewer-safety decision, not a style one.
+ * There are two clocks now (D11-G): the GM's `currentDate` and the players' published date. A player's
+ * `fired` MUST be computed against the published date - deriving it from the GM's clock would leak, one bit
+ * at a time, that the GM has run their prep clock past a date they have not published, which is the whole
+ * thing O-1 exists to keep private. Making the instant an argument is what stops a caller getting that
+ * wrong silently. See `campaignInstant()` and `publishedInstant()`.
+ *
+ * An undated entry never fires (it has no day to arrive at), and a non-deadline never fires at all.
+ */
+export function deadlineFired(entry: Pick<CodexJournalRow, "kind" | "calendarInstant">, at: number | null): boolean {
+  return entry.kind === "deadline" && entry.calendarInstant !== null && at !== null && entry.calendarInstant <= at;
 }
 const QUEST_STATUSES = new Set<CodexQuestStatus>(["active", "completed", "failed"]);
 /** The TS half of the quest status gate; migration v14's CHECK is the other half (see `sessionStatus`). */
@@ -1401,7 +1621,7 @@ export class CodexStore {
   }
 
   /** A full GM-only export of the whole codex for backup / round-trip (every field, both bodies). */
-  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[] }> {
+  exportBundle(): Readonly<{ pages: CodexPageRow[]; maps: CodexMapRow[]; markers: CodexMarkerRow[]; journal: CodexJournalRow[]; relationships: CodexRelationshipRow[]; sessions: CodexSessionRow[]; activeSessionId: string | null; quests: CodexQuestRow[]; publishedDate: CodexInWorldDate | null }> {
     const pages = (this.requireDatabase().prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRow[]).map((row) => this.toPage(row));
     const maps = this.listMaps();
     const markers = maps.flatMap((map) => this.listMarkers(map.id));
@@ -1413,9 +1633,20 @@ export class CodexStore {
     // time. M9 shipped without this and had to be corrected for it; a quest's `gmBody` and its objective
     // list exist nowhere else either, so an export that omitted them would look healthy in a directory
     // listing and be incomplete on restore. Appended LAST so no existing key moves.
+    //
+    // M11, third time, same reason: `publishedDate` lives in three columns on `codex_meta` and nowhere else
+    // (D11-G), so a bundle without it restores a codex where the two clocks silently agree - the party
+    // jumped forward to wherever the GM's prep had reached. A downtime's `payload` needs no key of its own:
+    // it rides on the journal rows this already carries, because it is a field on the entry.
+    //
+    // The bundle still omits the CALENDAR ITSELF, which predates M11 and is left alone here rather than
+    // fixed opportunistically - it is a real gap (a restored codex re-derives every instant against the
+    // default 12x30 calendar), but it is not this milestone's, and widening the bundle is a change every
+    // consumer of `GET /codex/export` sees.
     return {
       pages, maps, markers, journal: this.listTimeline(), relationships: this.listAllRelationships(),
-      sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests()
+      sessions: this.listSessions(), activeSessionId: this.activeSessionId, quests: this.listQuests(),
+      publishedDate: this.getPublishedDate()
     };
   }
 
@@ -1853,17 +2084,92 @@ export class CodexStore {
    */
   setCalendar(input: CodexCalendar): CodexCalendar {
     const calendar = normalizeCalendar(input);
+    this.transaction(() => this.writeCalendar(calendar));
+    return calendar;
+  }
+
+  /**
+   * `setCalendar`'s body, extracted verbatim so ONE transaction can hold a calendar write together with
+   * another write - which `applyDowntime` needs and could not otherwise have (D11-F).
+   *
+   * **Assumes it is already inside `this.transaction`, and must never open one.** `transaction()` is a bare
+   * `BEGIN IMMEDIATE` with no savepoint (F-2), so nesting it throws "cannot start a transaction within a
+   * transaction" - `insertEntry` and the old `setCalendar` each opened one, which is exactly why they could
+   * not compose. Making `transaction()` re-entrant would change every write path in this store and is a
+   * different job; extracting the leaf is the small change that solves the actual problem.
+   *
+   * Takes an ALREADY-NORMALIZED calendar: `normalizeCalendar` validates (and throws), so it stays outside
+   * the transaction where a rejection costs nothing to roll back.
+   *
+   * The `bumpRevision()` is inside deliberately, so `setCalendar` remains exactly one bump and a caller that
+   * composes this with another write is covered by it - the revision is a coarse "refetch" ping, and one per
+   * transaction is what every other write path here produces.
+   */
+  private writeCalendar(calendar: CodexCalendar): void {
+    const database = this.requireDatabase();
+    database.prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(calendar));
+    for (const table of ["codex_journal", "codex_pages"] as const) {
+      const dated = database.prepare(`SELECT id, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM ${table} WHERE in_world_year IS NOT NULL`).all() as Array<{ id: string; year: number; month: number; day: number }>;
+      const update = database.prepare(`UPDATE ${table} SET calendar_instant = ?, in_world_label = ? WHERE id = ?`);
+      for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
+    }
+    this.bumpRevision();
+  }
+
+  /**
+   * O-1's PREP CLOCK, read side: the date PLAYERS currently see.
+   *
+   * There are two clocks from M11 on. `getCalendar().currentDate` is the **GM's** - the authoritative
+   * campaign "now" that every internal reader already uses (`appendCombatEntry` dates a logged fight by it,
+   * unchanged). This is the **players'**, and it only moves when the GM explicitly publishes (D11-H).
+   * Advancing the GM clock - by hand or via `applyDowntime` - never touches it.
+   *
+   * All three parts or none, the same rule `toEntry` applies to a stored entry date: a half-written date is
+   * not a date. Migration v15 backfilled these from `currentDate`, so an existing codex starts with the two
+   * clocks in agreement and nothing visibly changes until the GM first runs ahead.
+   */
+  getPublishedDate(): CodexInWorldDate | null {
+    const row = this.requireDatabase().prepare("SELECT published_year, published_month, published_day FROM codex_meta WHERE id = 1")
+      .get() as { published_year: number | null; published_month: number | null; published_day: number | null } | undefined;
+    if (!row || row.published_year === null || row.published_month === null || row.published_day === null) return null;
+    return { year: row.published_year, month: row.published_month, day: row.published_day };
+  }
+
+  /**
+   * O-1 / D11-H: copy the GM's clock to the players'. **The only thing that publishes.** Advancing the
+   * clock does not, and neither does `applyDowntime` - a GM who runs the clock forward while prepping has
+   * not told the party anything until they say so.
+   *
+   * Publishing while the GM clock is unset CLEARS the published date rather than leaving a stale one
+   * behind: the published date means "what the GM's clock said when they last published", and if that is
+   * nothing, players are back to an undated campaign - which is the state a codex with no `currentDate` is
+   * in anyway. Returns the calendar so a caller can round-trip the result without a second read.
+   */
+  publishCampaignDate(): CodexCalendar {
+    const calendar = this.getCalendar();
+    const date = calendar.currentDate ?? null;
     this.transaction(() => {
-      const database = this.requireDatabase();
-      database.prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1").run(JSON.stringify(calendar));
-      for (const table of ["codex_journal", "codex_pages"] as const) {
-        const dated = database.prepare(`SELECT id, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM ${table} WHERE in_world_year IS NOT NULL`).all() as Array<{ id: string; year: number; month: number; day: number }>;
-        const update = database.prepare(`UPDATE ${table} SET calendar_instant = ?, in_world_label = ? WHERE id = ?`);
-        for (const row of dated) { const date = { year: row.year, month: row.month, day: row.day }; update.run(calendarInstantOf(calendar, date), formatInWorldDate(calendar, date), row.id); }
-      }
+      this.requireDatabase().prepare("UPDATE codex_meta SET published_year = ?, published_month = ?, published_day = ? WHERE id = 1")
+        .run(date ? date.year : null, date ? date.month : null, date ? date.day : null);
       this.bumpRevision();
     });
     return calendar;
+  }
+
+  /**
+   * The GM's clock as a sortable instant, or null when unset - what a GM-facing reader compares a deadline
+   * against (`deadlineFired`). Never hand this to a player projection; that is what `publishedInstant()` is
+   * for, and the two being separate calls is the point.
+   */
+  campaignInstant(): number | null {
+    const calendar = this.getCalendar();
+    return calendar.currentDate ? calendarInstantOf(calendar, calendar.currentDate) : null;
+  }
+
+  /** The PUBLISHED date as a sortable instant, or null - the only clock a player-facing reader may use. */
+  publishedInstant(): number | null {
+    const date = this.getPublishedDate();
+    return date ? calendarInstantOf(this.getCalendar(), date) : null;
   }
 
   /** Convert a stored instant back to calendar date parts, for re-editing a dated entry. */
@@ -1910,7 +2216,7 @@ export class CodexStore {
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "note",
       sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber), realDate: shortLabel(input.realDate, 40, "date"),
-      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload: null
     });
   }
 
@@ -1932,8 +2238,130 @@ export class CodexStore {
       playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
       attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "combat",
       sourceEncounterId: input.sourceEncounterId, sessionNumber: this.activeSessionNumber(), realDate: null,
-      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, payload: null
     });
+  }
+
+  /**
+   * CT-5: a DEADLINE - "the duke's ultimatum expires on the 14th". A timeline record like any other, with
+   * one extra rule and no payload at all (D11-C).
+   *
+   * The extra rule: a structured `inWorldDate` is REQUIRED. A deadline is defined by the day it fires, so
+   * one with no date is not an under-specified deadline, it is a note - and it would sit on the timeline
+   * forever in a state no clock can ever reach. A free-text `inWorldLabel` does not satisfy it: prose cannot
+   * be compared to a clock. Rejected with the store's plain validation error, which the router maps to 400.
+   *
+   * Why no payload. The spec sketched `{ what, targetDate, fired }` and all three dissolve on contact with
+   * what this record already is: `what` IS `playerText` (a deadline is its text), `targetDate` IS the
+   * entry's own date (a second date inside a JSON blob would be a second date for one record, sitting
+   * OUTSIDE `setCalendar`'s reflow - exactly the corruption K3 exists to prevent), and `fired` is derived by
+   * `deadlineFired` on every read rather than stored.
+   *
+   * Created UNREVEALED like every other record (O-2 / P2), and revealed by the ordinary reveal switch. There
+   * is deliberately no kind-based visibility rule anywhere: a revealed deadline is as visible as a revealed
+   * note, and an unrevealed one is as invisible.
+   */
+  createDeadline(input: CodexJournalCreateInput): CodexJournalRow {
+    const dated = this.resolveDate(input.inWorldDate, input.inWorldLabel);
+    if (!dated.date) throw new Error("A deadline needs an in-world date - the date is when it fires.");
+    return this.insertEntry({
+      playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
+      attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "deadline",
+      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      realDate: shortLabel(input.realDate, 40, "date"),
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload: null
+    });
+  }
+
+  /**
+   * CT-10: DOWNTIME - "Vex spends 30 days brewing poison". Carries the one payload in the journal
+   * (D11-D), and **does not move the clock** (O-3).
+   *
+   * That last point is the whole design. The GM's answer to "should downtime pass time automatically?" was
+   * "ask me to confirm", so this records the intent and `applyDowntime` is the confirmation. Creating
+   * downtime is a note about the world; advancing the campaign date is a decision about the table, and the
+   * GM makes it explicitly, having seen the date it lands on (`proposedDateFor`).
+   *
+   * Dated at the GM's clock when the caller does not say otherwise - the same rule `appendCombatEntry`
+   * already uses for a logged fight, so downtime lands where it HAPPENED rather than sinking below every
+   * dated record forever. An explicit `null` is treated as "not given" here rather than as "undated",
+   * because there is no meaningful undated downtime: with no clock set, `resolveDate` yields undated anyway.
+   *
+   * `outcome` is not stored. It is prose, and this record already has two prose layers with a reveal split
+   * between them - a third inside a JSON blob would sit outside that split (K1).
+   */
+  createDowntime(input: CodexDowntimeCreateInput): CodexJournalRow {
+    const payload = downtimePayload(input.downtime);
+    const dated = this.resolveDate(input.inWorldDate ?? this.getCalendar().currentDate ?? null, input.inWorldLabel);
+    return this.insertEntry({
+      playerText: entryText(input.playerText), gmText: entryGmText(input.gmText), revealed: input.revealedToPlayers ? 1 : 0,
+      attachMarkerId: optionalId(input.attachMarkerId), attachPageId: optionalId(input.attachPageId), kind: "downtime",
+      sourceEncounterId: null, sessionNumber: input.sessionNumber === undefined ? this.activeSessionNumber() : sessionNo(input.sessionNumber),
+      realDate: shortLabel(input.realDate, 40, "date"),
+      inWorldLabel: dated.label, calendarInstant: dated.instant, inWorldDate: dated.date, tags: input.tags, payload
+    });
+  }
+
+  /**
+   * O-3: the date the clock WOULD move to, so the GM confirms a date rather than an arithmetic promise.
+   * "Advance the campaign clock to Highsun 3, 1492" is a decision; "advance 30 days" is a request to do
+   * mental arithmetic against a calendar the GM invented.
+   *
+   * No new date maths: `dateForInstant(instant + days)` reuses the month-walking arithmetic that already
+   * rounds trips a dated entry, so month and year rollover come from the same code the rest of the calendar
+   * uses rather than a second implementation to get wrong.
+   *
+   * `null` when the record is not downtime, is already applied (there is nothing left to propose), or when
+   * the GM has no current date at all (nothing to advance FROM).
+   */
+  proposedDateFor(entry: CodexJournalRow): CodexInWorldDate | null {
+    if (entry.kind !== "downtime" || !entry.payload || entry.payload.applied) return null;
+    const from = this.campaignInstant();
+    return from === null ? null : this.dateForInstant(from + entry.payload.days);
+  }
+
+  /**
+   * O-3's confirmation: mark the downtime applied AND move the GM's clock forward by its days, in **one**
+   * transaction (D11-F). Publishing is separate and deliberate - this moves the GM's clock only, so a GM
+   * resolving downtime during prep does not thereby tell the party what day it is (O-1).
+   *
+   * The two writes are one unit because half of this is worse than neither: an applied flag with an unmoved
+   * clock silently swallows the days, and a moved clock with an unapplied flag lets the next confirmation
+   * move them again. `writeCalendar` exists precisely so both can sit under one `BEGIN IMMEDIATE` (F-2).
+   *
+   * Idempotence is a GUARD, not a no-op: applying twice throws rather than returning quietly, because the
+   * second call is a double-submit or a stale page, and silently doing nothing would tell the GM their
+   * click worked. `CodexRevisionConflictError` -> 409, which is what a stale page deserves.
+   */
+  applyDowntime(entryId: string): Readonly<{ entry: CodexJournalRow; calendar: CodexCalendar }> {
+    const database = this.requireDatabase();
+    const existing = this.getEntry(entryId);
+    if (!existing) throw new CodexNotFoundError("That journal entry no longer exists.");
+    if (existing.kind !== "downtime") throw new Error("Only a downtime record can pass time.");
+    if (!existing.payload) throw new Error("That downtime record has no activity to apply.");
+    if (existing.payload.applied) throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
+    const target = this.proposedDateFor(existing);
+    if (!target) throw new Error("Set the campaign's current date before passing time.");
+    const calendar = this.getCalendar();
+    const applied: CodexDowntimePayload = { ...existing.payload, applied: true };
+    this.transaction(() => {
+      database.prepare("UPDATE codex_journal SET payload_json = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(applied), this.stamp(), entryId);
+      // Same transaction, leaf-level: `writeCalendar` never opens one, and bumps the revision for both.
+      this.writeCalendar(normalizeCalendar({ ...calendar, currentDate: target }));
+    });
+    return { entry: this.getEntry(entryId)!, calendar: this.getCalendar() };
+  }
+
+  /**
+   * A deadline's derived state for a GM-facing reader. Delegates to `deadlineFired` rather than restating
+   * the comparison - there is exactly one `<=` in this codebase and it lives there.
+   *
+   * GM-facing on purpose: it compares against the GM's clock. A PLAYER-facing reader must call
+   * `deadlineFired(entry, publishedInstant())` instead, or a player learns from a flipped boolean that the
+   * GM has run their private prep clock past a date they have not published.
+   */
+  deadlineStatus(entry: CodexJournalRow): Readonly<{ fired: boolean }> {
+    return { fired: deadlineFired(entry, this.campaignInstant()) };
   }
 
   updateEntry(entryId: string, input: CodexJournalUpdateInput): CodexJournalRow {
@@ -2036,7 +2464,18 @@ export class CodexStore {
     return [];
   }
 
-  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[] }>): CodexJournalRow {
+  /**
+   * `payload` is a REQUIRED field rather than an optional one, so every kind's creator has to say what it
+   * carries. Three of the four say `null`, and that is the point: an optional field would let a fifth kind
+   * be added that silently stores nothing.
+   *
+   * `indexEntry` runs here, which is what makes a deadline and a downtime searchable on exactly the terms a
+   * note is - no per-kind search path, no per-kind visibility rule (O-2). Verified rather than assumed: a
+   * store test searches for a deadline's own text. A downtime's `who`/`activity` are deliberately NOT added
+   * to the index - payload search is unapproved scope, and adding it here quietly would put payload text
+   * into the PLAYER index where the reveal gate is the only thing standing between it and a reader.
+   */
+  private insertEntry(fields: Readonly<{ playerText: string; gmText: string | null; revealed: number; attachMarkerId: string | null; attachPageId: string | null; kind: CodexJournalKind; sourceEncounterId: number | null; sessionNumber: number | null; realDate: string | null; inWorldLabel: string | null; calendarInstant: number | null; inWorldDate: CodexInWorldDate | null; tags?: readonly string[]; payload: CodexDowntimePayload | null }>): CodexJournalRow {
     const database = this.requireDatabase();
     const entryId = this.freshId();
     const stamp = this.stamp();
@@ -2044,8 +2483,8 @@ export class CodexStore {
     const date = fields.inWorldDate;
     const tagsJson = JSON.stringify(tags(fields.tags));
     this.transaction(() => {
-      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, stamp, stamp);
+      database.prepare("INSERT INTO codex_journal (id, player_text, gm_text, revealed, attach_marker_id, attach_page_id, kind, source_encounter_id, session_number, real_date, in_world_label, calendar_instant, in_world_year, in_world_month, in_world_day, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(entryId, fields.playerText, fields.gmText, fields.revealed, fields.attachMarkerId, fields.attachPageId, fields.kind, fields.sourceEncounterId, fields.sessionNumber, fields.realDate, fields.inWorldLabel, fields.calendarInstant, date ? date.year : null, date ? date.month : null, date ? date.day : null, sortKey, tagsJson, fields.payload ? JSON.stringify(fields.payload) : null, stamp, stamp);
       this.indexEntry(entryId, fields.playerText, fields.gmText, tagsJson);
       this.bumpRevision();
     });
@@ -2053,13 +2492,23 @@ export class CodexStore {
   }
 
   private toEntry(row: JournalRowRaw): CodexJournalRow {
+    // PARSED, not coerced: before M11 this line read `row.kind === "combat" ? "combat" : "note"`, which
+    // silently turns any kind it does not recognise into an ordinary note - so a deadline would have
+    // rendered as a note with zero compile errors anywhere. `journalKind` still fails closed to "note", but
+    // it does so for exactly the values that are not one of the four, not for everything but "combat".
+    const kind = journalKind(row.kind);
     return {
       id: row.id, playerText: row.player_text, gmText: row.gm_text, revealedToPlayers: row.revealed === 1,
-      attachMarkerId: row.attach_marker_id, attachPageId: row.attach_page_id, kind: row.kind === "combat" ? "combat" : "note",
+      attachMarkerId: row.attach_marker_id, attachPageId: row.attach_page_id, kind,
       sourceEncounterId: row.source_encounter_id, sessionNumber: row.session_number, realDate: row.real_date,
       inWorldLabel: row.in_world_label, calendarInstant: row.calendar_instant,
       inWorldDate: row.in_world_year !== null && row.in_world_month !== null && row.in_world_day !== null ? { year: row.in_world_year, month: row.in_world_month, day: row.in_world_day } : null,
-      sortKey: row.sort_key, tags: parseTags(row.tags_json), createdAt: row.created_at, updatedAt: row.updated_at
+      sortKey: row.sort_key, tags: parseTags(row.tags_json),
+      // Read ONLY for the kind that has one. A stray payload on a note is ignored rather than surfaced, so a
+      // hand-edited or future-version row cannot smuggle a payload onto a record type that has no rules for
+      // one - and `null` here is what makes "no payload" the same value for the other three kinds.
+      payload: kind === "downtime" ? parseDowntimePayload(row.payload_json) : null,
+      createdAt: row.created_at, updatedAt: row.updated_at
     };
   }
   private journalRowRaw(entryId: string): JournalRowRaw | undefined {

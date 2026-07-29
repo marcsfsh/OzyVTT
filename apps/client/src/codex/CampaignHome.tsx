@@ -4,7 +4,8 @@ import { CodexIcon, EntityIcon } from "./icons";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
 import { sessionTitle } from "./sessions";
 import { openQuests, questProgress } from "./quests";
-import type { CodexQuestStatus } from "./api";
+import { CHRONICLE_KIND_META, deadlineStateLabel, deadlineStateTone } from "./chronicle";
+import type { CodexChronicleKind, CodexQuestStatus } from "./api";
 
 /**
  * CI-7: the Codex's landing surface. Formerly `World`; renamed `Campaign` because it answers
@@ -28,8 +29,15 @@ type CampaignEntity = Readonly<{ id: string; title: string; entityType: EntityTy
  * One journal row, in the shape BOTH projections can supply: a GM entry carries `playerText`/`gmText`
  * and a player entry carries a single already-projected `text`, so the caller flattens to this rather
  * than the dashboard branching on a role it should not know about.
+ *
+ * M11: `kind` is the CHRONICLE's kind, not the journal table's — the same vocabulary `CHRONICLE_KIND_META`
+ * is keyed on, so this row's glyph and word come from the one place that defines them instead of being
+ * restated here. Both callers now feed this from a chronicle record and pass the kind through untouched;
+ * the point of widening it past `"note" | "combat"` is that a deadline or a downtime must not arrive here
+ * disguised as a note — collapsing unknown kinds to a known one is exactly how a new kind renders as the
+ * wrong record, which is the failure this milestone had to fix on the server side as well.
  */
-export type CampaignEntry = Readonly<{ id: string; summary: string; when: string; kind: "note" | "combat" }>;
+export type CampaignEntry = Readonly<{ id: string; summary: string; when: string; kind: CodexChronicleKind }>;
 /** One atlas row. `revealedToPlayers` is GM-only knowledge and is simply absent from a player's maps. */
 export type CampaignMap = Readonly<{ id: string; name: string; revealedToPlayers?: boolean }>;
 /**
@@ -63,9 +71,23 @@ export type CampaignSession = Readonly<{ id: string; sessionNumber: number | nul
  * so the dashboard's shape is tied to the control rather than restating it.
  */
 export type CampaignQuest = Readonly<{ id: string; title: string; status: CodexQuestStatus; objectives: readonly ChecklistItem[] }>;
+/**
+ * M11's "Deadlines" card, in the shape BOTH projections can supply — every field here is on the player's
+ * chronicle record as well as the GM's.
+ *
+ * `fired` is the SERVER's derivation, carried across rather than recomputed: whether the campaign has
+ * passed a deadline is answered against the campaign clock, and the clock is not something this component
+ * is handed. A dashboard that worked it out for itself would be a second authority on it, and the one
+ * that could disagree with the timeline the card links into.
+ *
+ * **There is deliberately no `gmText` field**, exactly as `CampaignQuest` has no `gmBody` and
+ * `CampaignSession` no `prep`: this component is rendered by the player's Codex too, and the type not
+ * having the field is the guarantee.
+ */
+export type CampaignDeadline = Readonly<{ id: string; summary: string; when: string; fired: boolean }>;
 
 export function CampaignHome({
-  pages, entries = [], maps = [], today = null, session = null, quests = [],
+  pages, entries = [], maps = [], today = null, session = null, quests = [], deadlines = [],
   onPickType, onPickTag, onOpenPage, onOpenEntry, onOpenMap, onOpenSession, onOpenQuest, onCreate,
   showReveal = true, loading = false, error = null
 }: Readonly<{
@@ -89,6 +111,13 @@ export function CampaignHome({
    * field both audiences receive, so answering it twice at two call sites could only produce drift.
    */
   quests?: readonly CampaignQuest[];
+  /**
+   * M11 / CT-5: the deadlines the caller's own token was sent, ALREADY ordered — passed ones first, then
+   * approaching — by `campaignDeadlines`. Ordering is the caller's job here rather than this component's
+   * only because the caller is the one holding the chronicle records the rule reads; the rule itself
+   * lives in `chronicle.ts` and is applied identically for both audiences.
+   */
+  deadlines?: readonly CampaignDeadline[];
   onPickType: (type: EntityType) => void;
   onPickTag: (tag: string) => void;
   onOpenPage: (pageId: string) => void;
@@ -139,12 +168,18 @@ export function CampaignHome({
    * behind `onOpenQuest` (the GM's quest log, the player's quest reader), which is where every quest is.
    */
   const openQuestList = useMemo(() => openQuests(quests).slice(0, 5), [quests]);
+  /**
+   * M11: the deadlines, already ordered by the caller (`campaignDeadlines`) and sliced here for the same
+   * reason the two lists above are — this is a dashboard, and a campaign with twenty dated threats must
+   * not push everything else below the fold. The full set is on the chronicle, which every row opens.
+   */
+  const deadlineList = useMemo(() => deadlines.slice(0, 5), [deadlines]);
 
   // CF-2: settle the fetches before claiming emptiness — for either audience. A campaign with no pages
   // but a running journal or a charted atlas is NOT empty, which is why all three feeds gate this — and
   // M9 adds a fourth: a campaign whose GM has prepped a session has plainly started. M10 adds a fifth,
   // for the same reason: a campaign with a quest in it has plainly started, whatever else is missing.
-  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session && quests.length === 0;
+  const nothingYet = pages.length === 0 && entries.length === 0 && maps.length === 0 && !session && quests.length === 0 && deadlines.length === 0;
   if (loading && nothingYet) return <div className="codex-main-loading">{[0, 1, 2].map((row) => <Skeleton key={row} variant="text" />)}</div>;
   if (nothingYet) {
     return (
@@ -253,6 +288,34 @@ export function CampaignHome({
         </section>
       )}
 
+      {/* M11 / CT-5: what happens whether or not the party acts. It sits under the quest card because the
+          three together answer "where is this campaign right now" — what we are playing next, what we are
+          chasing, and what is bearing down on us. Like the two above it, it renders nothing at all when
+          there is nothing to say rather than a placeholder panel. */}
+      {deadlineList.length > 0 && (
+        <section className="codex-campaign-section">
+          {/* One heading for both audiences, like the quest card's: a revealed deadline means exactly the
+              same thing on either side of the table. Not "Upcoming deadlines" — the list deliberately
+              keeps the ones that have already passed, and each row says which it is. */}
+          <h3 className="codex-campaign-h">Deadlines</h3>
+          <nav className="codex-campaign-recent" aria-label="Deadlines">
+            {deadlineList.map((deadline) => (
+              /* R2: the same row chassis every list on this surface uses, which is also where its 44px
+                 floor comes from — `.codex-campaign-recentitem` is §4 route 1 (grow the paint). The glyph
+                 and the state WORD are imported from `chronicle.ts`, never restated here: a card that
+                 spelled its own reading rules is how a dashboard starts calling a record something the
+                 timeline it links into does not. */
+              <button key={deadline.id} type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(deadline.id)}>
+                <CodexIcon iconId={CHRONICLE_KIND_META.deadline.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
+                <span className="codex-list-title">{deadline.summary || "Untitled deadline"}</span>
+                <Badge tone={deadlineStateTone(deadline.fired)}>{deadlineStateLabel(deadline.fired)}</Badge>
+                {deadline.when && <span className="codex-campaign-deadlinewhen">{deadline.when}</span>}
+              </button>
+            ))}
+          </nav>
+        </section>
+      )}
+
       <section className="codex-campaign-section">
         <h3 className="codex-campaign-h">By type</h3>
         <div className="codex-campaign-types">
@@ -271,15 +334,23 @@ export function CampaignHome({
           <h3 className="codex-campaign-h">Recent journal activity</h3>
           <nav className="codex-campaign-recent" aria-label="Recent journal activity">
             {/* R2: the same row chassis every list on this surface uses, and a record's kind reads by
-                icon AND text — the battle glyph plus a "Battle" badge, never by colour alone. */}
-            {recentEntries.map((entry) => (
+                icon AND text — the glyph plus the kind's word, never by colour alone.
+                M11: both come from `CHRONICLE_KIND_META` now rather than from a `kind === "combat"`
+                ternary written here. The ternary was the client's copy of the very collapse that let a
+                new kind render as the wrong record on the server; with four kinds in the table it would
+                have drawn a deadline as a scroll and called it nothing at all. An ordinary entry still
+                shows no badge — its "Entry" label is what the row's text already is. */}
+            {recentEntries.map((entry) => {
+              const meta = CHRONICLE_KIND_META[entry.kind];
+              return (
               <button key={entry.id} type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(entry.id)}>
-                <CodexIcon iconId={entry.kind === "combat" ? "battle" : "scroll"} className="codex-ent-icon codex-campaign-recentglyph" />
+                <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
                 <span className="codex-list-title">{entry.summary || "Untitled entry"}</span>
-                {entry.kind === "combat" && <Badge tone="caution">Battle</Badge>}
+                {entry.kind !== "entry" && <Badge tone={meta.tone}>{meta.label}</Badge>}
                 {entry.when && <span className="codex-campaign-recentwhen">{entry.when}</span>}
               </button>
-            ))}
+              );
+            })}
           </nav>
         </section>
       )}

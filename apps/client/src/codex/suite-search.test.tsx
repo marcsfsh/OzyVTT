@@ -57,6 +57,9 @@ vi.mock("./api", async (importOriginal) => {
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
     playerCodexApi: {
       ...actual.playerCodexApi,
+      // M11: the player's own calendar read. It was `calendarApi.get` until O-1 split the two clocks;
+      // it is stubbed with the SAME mock, so what this file asserts about the date is unchanged.
+      calendar: (...a: unknown[]) => getCalendar(...a),
       search: (...a: unknown[]) => playerSearch(...a),
       listPages: (...a: unknown[]) => playerListPages(...a),
       listMaps: (...a: unknown[]) => playerListMaps(...a),
@@ -106,7 +109,7 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 const RECORD = (id: string, text: string): CodexChronicleRecord => ({
   kind: "entry", id, title: null, text, gmText: null, revealedToPlayers: false,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null,
+  tags: [], attachPageId: null, attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z"
 });
 

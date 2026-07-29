@@ -56,6 +56,9 @@ vi.mock("./api", async (importOriginal) => {
     },
     playerCodexApi: {
       ...actual.playerCodexApi,
+      // M11: the player's own calendar read. It was `calendarApi.get` until O-1 split the two clocks;
+      // it is stubbed with the SAME mock, so what this file asserts about the date is unchanged.
+      calendar: (...a: unknown[]) => getCalendar(...a),
       listPages: (...a: unknown[]) => playerListPages(...a),
       listMaps: (...a: unknown[]) => playerListMaps(...a),
       listMarkers: (...a: unknown[]) => playerListMarkers(...a),
@@ -102,7 +105,7 @@ const OTHER = summary("p2", "Strahd", "character");
 
 const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   id: "j1", playerText: "The mists closed behind them.", gmText: null, revealedToPlayers: false, kind: "note",
-  attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null,
+  attachMarkerId: null, attachPageId: "p1", sourceEncounterId: null, payload: null,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
   sortKey: 0, tags: [], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
@@ -111,7 +114,7 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry", id: "j1", title: null, text: "The mists closed behind them.", gmText: null, revealedToPlayers: false,
   sessionNumber: null, realDate: null, inWorldLabel: null, calendarInstant: null, inWorldDate: null,
-  tags: [], attachPageId: "p1", attachMarkerId: null, sourceEncounterId: null,
+  tags: [], attachPageId: "p1", attachMarkerId: null, sourceEncounterId: null, payload: null, fired: false,
   createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z", ...over
 });
 

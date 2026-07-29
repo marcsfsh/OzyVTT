@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Chip, Input, Menu, MenuItem, Modal, Select, Skeleton, Tabs, useToast } from "@vtt/ui";
 import { socket } from "../socket";
-import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, questApi, sessionApi, type CodexBacklink, type CodexCalendar, type CodexJournalEntry, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexQuest, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession } from "./api";
+import { atlasApi, calendarApi, codexApi, formatWorldDate, journalApi, pageLinkKey, questApi, sessionApi, type CodexBacklink, type CodexChronicleRecord, type CodexLinkEdge, type CodexMap, type CodexPage, type CodexPageSummary, type CodexQuest, type CodexRelationship, type CodexRelationshipEdge, type CodexSearchHit, type CodexSession, type GmCodexCalendar } from "./api";
 import { PageEditor } from "./PageEditor";
 import { AtlasView, type AtlasTarget } from "./AtlasView";
 import { JournalView } from "./JournalView";
-import { chronicleWhenLabel } from "./chronicle";
+import { campaignDeadlines, chronicleWhenLabel } from "./chronicle";
 import { CommandPalette } from "./CommandPalette";
 import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { EntityIcon } from "./icons";
-import { CampaignHome, type CampaignEntry } from "./CampaignHome";
+import { CampaignHome, type CampaignDeadline, type CampaignEntry } from "./CampaignHome";
 import { SessionsView } from "./SessionsView";
 import { SessionConsole } from "./SessionConsole";
 import { QuestsView } from "./QuestsView";
@@ -167,13 +167,18 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    * every GM on the suite's most-loaded surface to render a mode they may not open. This fetches when
    * Campaign is actually on screen, and refreshes with the rest while it stays there.
    */
-  const [campaign, setCampaign] = useState<{ entries: readonly CodexJournalEntry[]; maps: readonly CodexMap[]; calendar: CodexCalendar | null }>({ entries: [], maps: [], calendar: null });
+  const [campaign, setCampaign] = useState<{ records: readonly CodexChronicleRecord[]; maps: readonly CodexMap[]; calendar: GmCodexCalendar | null }>({ records: [], maps: [], calendar: null });
   const [campaignLoading, setCampaignLoading] = useState(true);
   const [campaignError, setCampaignError] = useState<string | null>(null);
   const loadCampaign = useCallback(async () => {
     try {
-      const [entries, maps, calendar] = await Promise.all([journalApi.timeline(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken)]);
-      setCampaign({ entries, maps, calendar }); setCampaignError(null);
+      // M11: the CHRONICLE, not the raw journal read this used to take. Two reasons, and the first alone
+      // would decide it: whether a deadline has fired is derived by the server and lives only on a
+      // chronicle record, so the deadlines card cannot be fed from `/journal` at all. The second is that
+      // the player's dashboard has always read the chronicle — one feed for one dashboard means the two
+      // audiences can no longer be looking at differently-assembled versions of the same card.
+      const [records, maps, calendar] = await Promise.all([journalApi.chronicle(gmToken), atlasApi.listMaps(gmToken), calendarApi.get(gmToken)]);
+      setCampaign({ records, maps, calendar }); setCampaignError(null);
     } catch (loadError) { setCampaignError(loadError instanceof Error ? loadError.message : "Could not load the campaign dashboard."); }
     finally { setCampaignLoading(false); }
   }, [gmToken]);
@@ -198,9 +203,23 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
    * `playerText || gmText` because a GM-only entry has no player line and would otherwise render as a
    * blank row on the GM's own dashboard.
    */
-  const campaignEntries = useMemo<readonly CampaignEntry[]>(() => [...campaign.entries]
+  const campaignEntries = useMemo<readonly CampaignEntry[]>(() => [...campaign.records]
+    // CT-11: dated `event` pages share the chronicle but not this list, exactly as on the player's
+    // dashboard — the section is "Recent journal activity" and its rows open the Journal by entry id,
+    // while an event is a wiki page already counted in the entity totals above.
+    .filter((record) => record.kind !== "event")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((entry) => ({ id: entry.id, summary: entry.playerText.trim() || (entry.gmText ?? "").trim(), when: chronicleWhenLabel(entry), kind: entry.kind })), [campaign.entries]);
+    .map((record) => ({ id: record.id, summary: record.text.trim() || (record.gmText ?? "").trim(), when: chronicleWhenLabel(record), kind: record.kind })), [campaign.records]);
+  /**
+   * M11: the deadlines, ordered by the SHARED rule (`campaignDeadlines` — passed first, then approaching)
+   * and mapped down to the keys the shared card type carries. `fired` rides across from the server's
+   * derivation untouched; `gmText` has nowhere to go, which is the point, since the player's Codex
+   * renders this same component.
+   */
+  const campaignDeadlineCards = useMemo<readonly CampaignDeadline[]>(
+    () => campaignDeadlines(campaign.records).map((record) => ({ id: record.id, summary: record.text.trim() || (record.gmText ?? "").trim(), when: chronicleWhenLabel(record), fired: record.fired })),
+    [campaign.records]
+  );
   const campaignToday = useMemo(() => (campaign.calendar?.currentDate ? formatWorldDate(campaign.calendar, campaign.calendar.currentDate) : null), [campaign.calendar]);
 
   // CI-1 / R8: the rail's search is the SUITE's search — pages, journal entries, maps and markers in one
@@ -451,6 +470,9 @@ export function CodexWorkspace({ gmToken, scenes = [], actors = [], activeSceneI
                this component is rendered by the player's Codex too. */
             quests={quests.map((quest) => ({ id: quest.id, title: quest.title, status: quest.status, objectives: quest.objectives }))}
             onOpenQuest={(questId) => { setQuestTarget(questId); setQuestsOpen(true); }}
+            /* M11: a deadline is a journal record, so its row opens through the SAME jump an ordinary
+               journal row uses (`onOpenEntry` below) — the Journal, with that record marked. */
+            deadlines={campaignDeadlineCards}
             onCreate={() => { setMode("pages"); void createPage(); }} onOpenPage={(id) => { setMode("pages"); setSelectedId(id); }}
             /* R1: both new jumps prepare their destination — the entry is marked on the timeline, the
                map is the one that opens — reusing the very latches search already lands through. */

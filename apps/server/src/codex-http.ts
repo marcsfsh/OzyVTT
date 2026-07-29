@@ -4,7 +4,7 @@ import { z } from "zod";
 import { API_VERSION } from "@vtt/api-contract";
 import type { MapAssetStore } from "./map-assets.js";
 import { CodexNotFoundError, CodexRevisionConflictError, type CodexSearchRef, type CodexStore } from "./codex-store.js";
-import { projectGmBacklinks, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
+import { projectGmBacklinks, projectGmCalendar, projectGmChronicleRecord, projectGmJournalEntry, projectGmLinkEdges, projectGmMap, projectGmMarker, projectGmPage, projectGmPageSummary, projectGmQuest, projectGmRelationships, projectGmSearchHit, projectGmSession, projectPlayerBacklinks, projectPlayerCalendar, projectPlayerChronicleRecord, projectPlayerJournalEntry, projectPlayerLinkEdges, projectPlayerMap, projectPlayerMarker, projectPlayerPage, projectPlayerPageMarker, projectPlayerPageSummary, projectPlayerQuest, projectPlayerRelationships, projectPlayerRelationshipEdges, projectPlayerSearchHit, projectPlayerSession, type CodexSearchRecord, type PlayerSessionNumberContext } from "./codex-projections.js";
 
 /**
  * The codex REST surface (`/api/v1/codex/*`), a GM-authed router mounted in `server.ts` alongside the
@@ -21,7 +21,8 @@ const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
  * A raw in-world date. Declared once and shared by the journal and page write schemas (CT-11) - two copies
  * of the same bounds is how one surface silently accepts a date the other rejects.
  */
-const InWorldDateSchema = z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) }).nullable();
+const InWorldDateFields = z.object({ year: z.number().int().min(-100_000).max(100_000), month: z.number().int().min(0).max(23), day: z.number().int().min(1).max(400) });
+const InWorldDateSchema = InWorldDateFields.nullable();
 const EntityTypeSchema = z.enum(["note", "character", "location", "faction", "item", "species", "religion", "event"]);
 const FieldsSchema = z.record(z.string().max(40), z.string().max(2000));
 const PageCreateSchema = z.object({
@@ -99,6 +100,33 @@ const JournalWriteSchema = z.object({
   inWorldLabel: z.string().max(120).nullable().optional(),
   inWorldDate: InWorldDateSchema.optional()
 }).strict();
+/**
+ * M11 deadlines (CT-5). Everything a journal entry accepts, with ONE difference: `inWorldDate` is REQUIRED
+ * and cannot be null. A deadline is "a thing that will happen at a time" and its `fired` state is derived
+ * from that date alone (D11-C), so an undated deadline is not a deadline - it is a note that can never fire.
+ * The store rejects it too; this is the early rejection, exactly as `.strict()` is everywhere else here.
+ *
+ * There is no `kind` field to send and no reveal rule of its own: `revealedToPlayers` rides in from
+ * `JournalWriteSchema` unchanged, because O-2 makes a deadline hidden-by-default and revealable exactly like
+ * any other entry - not GM-only, and not published by a switch of its own.
+ */
+const DeadlineCreateSchema = JournalWriteSchema.extend({ inWorldDate: InWorldDateFields });
+/**
+ * M11 downtime (CT-10). `days` is the spec's "timeCost", named for what it is; its bounds are the ones
+ * `CodexDowntimePayload` publishes (0 to 3650 - ten years is already far past the point where a GM would
+ * type a date instead). `who`/`activity` share the marker-label bound of 120, the same reason
+ * `SessionNumberSchema` shares the journal's: one value, one bound, in one place.
+ *
+ * `applied` is deliberately not an input. O-3 makes confirming the clock move a separate, explicit act
+ * (`POST /journal/{id}/apply-downtime`); accepting it here would let one POST both record the week off and
+ * move the campaign clock, which is the exact side effect the owner asked us to stop doing.
+ */
+const DowntimeInputSchema = z.object({
+  who: z.string().trim().min(1).max(120),
+  activity: z.string().trim().min(1).max(120),
+  days: z.number().int().min(0).max(3650)
+}).strict();
+const DowntimeCreateSchema = JournalWriteSchema.extend({ downtime: DowntimeInputSchema });
 /**
  * M9 sessions. `sessionNumber`'s bounds are the journal's verbatim, on purpose: the two are the SAME
  * number - a journal entry's `sessionNumber` resolves against a session record - and two copies of the
@@ -621,17 +649,81 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = roleOf(request);
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the chronicle.");
     const rows = store.listChronicle();
-    if (role === "gm") return envelope(response, 200, { records: rows.map(projectGmChronicleRecord) });
+    if (role === "gm") {
+      // The GM's `fired` is measured against `campaignInstant()`, the GM's OWN clock; the player branch below
+      // measures against `publishedInstant()`. Two clocks, two accessors, resolved in two separate branches on
+      // purpose (O-1 / D11-G) - one shared local would be a single careless edit away from being the leak.
+      const campaignInstant = store.campaignInstant();
+      const records = rows.map((row) => projectGmChronicleRecord(row, {
+        campaignInstant,
+        // O-3's proposal, per row: only an unapplied downtime has one, and only the GM ever sees it.
+        proposedDate: row.kind === "entry" ? store.proposedDateFor(row.entry) : null
+      }));
+      return envelope(response, 200, { records });
+    }
     // The same session context `GET /codex/journal` resolves, for the same reason: an `entry` row's
     // `sessionNumber` reaches a player through `projectPlayerJournalEntry`, which this delegates to.
     const context = playerSessionNumbers(store);
-    const records = rows.map((row) => projectPlayerChronicleRecord(row, context)).filter((record) => record !== null);
+    const publishedInstant = store.publishedInstant();
+    const records = rows.map((row) => projectPlayerChronicleRecord(row, { ...context, publishedInstant })).filter((record) => record !== null);
     return envelope(response, 200, { records });
   });
 
   router.post(`${CODEX_BASE}/journal`, requireGm, (request, response) => {
     try { const entry = store.createEntry(JournalWriteSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
     catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * M11: DEADLINES (CT-5) and DOWNTIME (CT-10) - two more journal kinds, deliberately created through their
+   * own routes rather than a `kind` field on `POST /codex/journal`, because each has a rule that entry does
+   * not: a deadline REQUIRES a structured date, and downtime requires its payload. A polymorphic body would
+   * have to accept both and enforce neither until it reached the store.
+   *
+   * Registered BEFORE the `/journal/:id` family below. There is in fact no conflict to avoid today - the only
+   * routes on `/journal/:id` are PATCH and DELETE, and the only POST under it is the two-segment
+   * `/journal/:id/reveal` - so Express could not mis-match `POST /journal/deadline` whichever order these
+   * were written in. They are placed first anyway, so that adding `POST /codex/journal/:id` later cannot
+   * quietly swallow them; order is the cheap defence and it has to be in place before it is needed.
+   *
+   * There is NO deadline/downtime reveal route: `POST /codex/journal/{id}/reveal` already works on any journal
+   * entry, and O-2 makes these records hidden-but-revealable exactly like every other one. A kind-specific
+   * reveal route would be a second gate to keep in step with the first.
+   */
+  router.post(`${CODEX_BASE}/journal/deadline`, requireGm, (request, response) => {
+    try { const entry = store.createDeadline(DeadlineCreateSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 201, { entry: projectGmJournalEntry(entry) }); }
+    catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * Creating downtime NEVER moves the clock (O-3). It answers with the date the clock WOULD move to, so the
+   * GM's confirm affordance can say what it will do before it does it; `apply-downtime` below is the only
+   * thing that moves anything.
+   */
+  router.post(`${CODEX_BASE}/journal/downtime`, requireGm, (request, response) => {
+    try {
+      const entry = store.createDowntime(DowntimeCreateSchema.parse(request.body));
+      options.notifyChanged("journal");
+      return envelope(response, 201, { entry: projectGmJournalEntry(entry), proposedDate: store.proposedDateFor(entry) });
+    } catch (error) { return codexError(response, error); }
+  });
+
+  /**
+   * O-3's confirmation: the GM says yes, and the campaign clock moves by the downtime's `days`.
+   *
+   * Answers with the entry AND the calendar, because one operation changed both and a client that refetched
+   * only the entry would render an out-of-date "Now:" until something else happened to reload it. The
+   * calendar comes back GM-projected, the same shape `GET /codex/calendar` hands a GM.
+   *
+   * Applying twice is refused by the store rather than being made a no-op here: "already applied" is a real
+   * answer the GM should see, and a silent second success is how a clock quietly gains a week.
+   */
+  router.post(`${CODEX_BASE}/journal/:id/apply-downtime`, requireGm, (request, response) => {
+    try {
+      const { entry, calendar } = store.applyDowntime(pathParam(request, "id"));
+      options.notifyChanged("journal");
+      return envelope(response, 200, { entry: projectGmJournalEntry(entry), calendar: projectGmCalendar(calendar, store.getPublishedDate()) });
+    } catch (error) { return codexError(response, error); }
   });
 
   router.patch(`${CODEX_BASE}/journal/:id`, requireGm, (request, response) => {
@@ -786,17 +878,49 @@ export function createCodexRouter(options: CodexRouterOptions) {
     catch (error) { return codexError(response, error); }
   });
 
-  // ----- Calendar (the world's own months / weekdays / era) -----
+  // ----- Calendar (the world's own months / weekdays / era, and M11's two clocks) -----
 
+  /**
+   * ROLE-PROJECTED since M11, and this route is the reason O-1 needed a server-side gate at all: it used to
+   * hand `store.getCalendar()` raw to any authenticated session, so the moment the GM advanced the clock
+   * while prepping, every player's "Now:" chip moved with it.
+   *
+   * The two roles now read two different clocks out of one route (D11-G): the GM gets their own
+   * `currentDate` plus `publishedDate` so they can see whether the party is behind them, and a player gets
+   * `currentDate` sourced ONLY from the published date. Neither branch touches the other's projection.
+   */
   router.get(`${CODEX_BASE}/calendar`, (request, response) => {
     const role = roleOf(request);
     if (!role) return failure(response, 401, "unauthenticated", "Join the table to read the calendar.");
-    return envelope(response, 200, { calendar: store.getCalendar() });
+    const calendar = store.getCalendar();
+    const publishedDate = store.getPublishedDate();
+    return envelope(response, 200, { calendar: role === "gm" ? projectGmCalendar(calendar, publishedDate) : projectPlayerCalendar(calendar, publishedDate) });
   });
 
+  /**
+   * Replacing the calendar moves the GM's clock and NOTHING else - advancing never publishes (D11-H). It
+   * answers with the GM projection, the same shape the GM's GET returns, so the console does not have to
+   * hold two spellings of one object.
+   */
   router.put(`${CODEX_BASE}/calendar`, requireGm, (request, response) => {
-    try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { calendar }); }
+    try { const calendar = store.setCalendar(CalendarSchema.parse(request.body)); options.notifyChanged("journal"); return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) }); }
     catch (error) { return malformed(response, error); }
+  });
+
+  /**
+   * O-1 / D11-H: the ONE thing that moves the players' clock. It takes no body - "publish" means exactly
+   * "the party now sees where I am", and a settable published date would be a second clock to keep in step
+   * with the first two.
+   *
+   * Registered after `GET`/`PUT /codex/calendar`; there is no param route on `/calendar` at all, so the
+   * literal `/calendar/publish` segment cannot be mis-matched.
+   */
+  router.post(`${CODEX_BASE}/calendar/publish`, requireGm, (_request, response) => {
+    try {
+      const calendar = store.publishCampaignDate();
+      options.notifyChanged("journal");
+      return envelope(response, 200, { calendar: projectGmCalendar(calendar, store.getPublishedDate()) });
+    } catch (error) { return codexError(response, error); }
   });
 
   // ----- Export (GM backup / round-trip) -----
