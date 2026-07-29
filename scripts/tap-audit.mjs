@@ -58,8 +58,16 @@ const MEASURE = `(() => {
     if (cs.visibility === "hidden" || cs.display === "none") continue;
     const af = getComputedStyle(el, "::after");
     const ah = parseFloat(af.height), aw = parseFloat(af.width);
-    const h = Math.max(r.height, Number.isFinite(ah) && af.content !== "none" ? ah : 0);
-    const w = Math.max(r.width, Number.isFinite(aw) && af.content !== "none" ? aw : 0);
+    // A control WRAPPED IN A LABEL is tapped through the label, so the label's box IS its hit area -
+    // clicking anywhere inside it activates the control. Measuring only the input's own rect reports a
+    // 20x20 checkbox as sub-floor when its label is a full 44x44, which is a false violation, and a
+    // false violation is worse than none: it sends the next session to "fix" working code. Found when
+    // M10's objective checklist became the first label-wrapped control in the Codex; verified by walking
+    // elementFromPoint outward, which reached 44px in both axes.
+    const owner = el.closest("label") ?? el;
+    const or_ = owner === el ? r : owner.getBoundingClientRect();
+    const h = Math.max(r.height, or_.height, Number.isFinite(ah) && af.content !== "none" ? ah : 0);
+    const w = Math.max(r.width, or_.width, Number.isFinite(aw) && af.content !== "none" ? aw : 0);
     // reachability: walk outward vertically from the centre until elementFromPoint leaves the control
     // Scroll into view first: elementFromPoint reads VIEWPORT coordinates, so a control below the fold
     // returns whatever is painted at that point and reports a false reach=0.
@@ -69,7 +77,9 @@ const MEASURE = `(() => {
     let reach = 0;
     for (let d = 1; d <= 30; d++) {
       const up = document.elementFromPoint(cx, cy - d), dn = document.elementFromPoint(cx, cy + d);
-      const okUp = up === el || el.contains(up), okDn = dn === el || el.contains(dn);
+      // owner: a wrapping label counts as the control (see the size note above).
+      const isOwn = (node) => node === el || el.contains(node) || node === owner || owner.contains(node);
+      const okUp = isOwn(up), okDn = isOwn(dn);
       if (!okUp && !okDn) break;
       reach = d * 2 + 1;
     }

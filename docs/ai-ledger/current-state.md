@@ -601,6 +601,60 @@ _Last seeded: 2026-07-17 (initial ledger seed from README / NEXT-STEPS / code su
 
 ## Active work
 
+- **Codex Phase 4 M10 — quests (2026-07-29).** Delivers **CT-4**. Excludes graph representation
+  (DQ-4 default: no). M11–M12 remain.
+  - **`codex_quests` (migration v14)** with a queryable `status` (indexed — the dashboard counts open
+    quests), an ordered `{text, done}` objective list, linked entities, and the two-layer body every
+    codex record carries. Kept as a table, not a 9th entity type: D-12 rejected that, because flat string
+    fields cannot hold ordered tickable objectives and status must be queryable.
+  - **Quests join the one suite-wide search index, which has THREE leak vectors — and the code's own
+    comment named only two.** The third is the text written into `codex_search_player`: `indexRecord`
+    writes two rows from separately supplied text, so a player index row carrying `gm_body` would let a
+    player *match* a GM-only phrase, and the match is the leak even though the body never travels. The
+    comment now names all three and says gate 1 has no second line of defence.
+  - **Each gate is proven alone, and I re-ran the two that matter rather than taking them on report.**
+    Weakening `PLAYER_VISIBLE_SQL`'s quest arm to `THEN 1` fails exactly one store test while **all 49
+    HTTP tests stay green**, because the projection masks it. Removing the reveal check from
+    `projectPlayerSearchHit` fails exactly one store test while **all 49 HTTP tests stay green**, because
+    the SQL masks it. That is M6's incident reproduced deliberately, in both directions: the two gates
+    mask each other perfectly, so neither point-blank test is redundant and no HTTP test replaces either.
+  - **Verified at the live boundary**, not only in tests: against a running server with a real player
+    token, the player receives exactly `body,entityIds,id,objectives,status,title`; the unrevealed quest
+    is absent; and **a player searching "phylactery" — a word that exists only in `gmBody` — gets 0 hits**,
+    while searching "Sunsword" finds the quest.
+  - **Viewer safety stays structural on the client.** `CampaignQuest` has no `gmBody` field and no `body`
+    either, so the dashboard card cannot render the GM layer for the audience that must not see it —
+    the same promise `CampaignSession` makes about prep. The one deliberate difference is `status`, which
+    **is** player-facing for a quest: "what is still open" is the entire point of the card.
+  - **`Checklist` is a new `@vtt/ui` primitive** (R9, which M10's spec names explicitly). `RowEditor` was
+    studied and rejected with reason: it requires `rowKey` to be a stable id — "never the index" is the
+    bug it exists to prevent — but an objective is exactly `{text, done}` and nothing richer is approved,
+    so there is no id to give it. It also has no read-only mode, which is the player's whole view.
+  - **A tap-floor violation older than this milestone.** `.codex-modebar-ops` gapped its buttons by
+    `--space-1` (4px), but they are route-2 `Button size="sm"`: a 44px `::after` over 32px of paint
+    overhangs 6px per side, so neighbours need 12px. Every ops button had been quietly stealing part of
+    its left neighbour's tap area since before M9. Now `--space-3`; **measured after the fix — each button
+    walks a full 61px horizontally with no neighbour intercepting.**
+  - **Two of the client tests could not fail, and the agent said so rather than shipping them:** the latch
+    tests targeted the quest that was also the log's default selection, and the ref-clearing test was
+    defeated because Back *unmounts* the view, handing a fresh ref a free `null`. Both were rebuilt to
+    bite. The viewer-safety test arms the player endpoint with a GM-shaped row, so `gmBody` genuinely
+    reaches the card's props — M9's vacuous-test mistake explicitly not repeated.
+  - **Resolved a divergence between layers:** the contract published `minLength: 1` on objective text
+    while the server accepts `""`. The contract moved, not the server — the checklist flow is
+    add-a-row-then-type, so a minimum would reject the first save after "Add item", and dropping blank
+    rows server-side would renumber the list under the GM's cursor. A published rule nobody enforces is
+    worse than an honest one.
+  - **Quests join `exportBundle`** — not in the contract, added because M9 shipped without it and had to
+    be corrected; a quest's `gmBody` and objectives exist nowhere else either.
+  - **Verified.** `check` / `test` / `build` all exit 0; **1267 passed + 1 skipped** (1232 at M9). Browser
+    pass at 375px against a populated database: **0 sub-floor controls** on the Codex default surface
+    (103 controls) and the quest log (32), no real horizontal scroll on either.
+  - **Not delivered, deliberately:** no player-side quest *reader* — a player's quest search hit lands on
+    the Campaign dashboard, and if the GM has completed that quest it is not on the "Open quests" card.
+    Inventing a player quest reader is scope M10 did not authorise; the limitation is written into the
+    `case "quest"` comment in `PlayerCodex.tsx`.
+
 - **Codex Phase 4 M9 — sessions, prep and recap (2026-07-29).** Delivers **CT-1, CT-2, CT-3** and
   **CP-9's session half** — the milestone the owner called the key part. M10–M12 remain.
   - **The session is a record.** Migration **v13** adds `codex_sessions` (two-layer: `prep_body` GM-only,

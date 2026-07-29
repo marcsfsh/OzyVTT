@@ -10,6 +10,20 @@ _Last seeded: 2026-07-17. Seeded from code survey + BUILD_PLAN gaps; not yet a l
 
 ## Known gaps
 
+- **[tooling] `scripts/tap-audit.mjs` cannot be run as committed.** It hardcodes
+  `http://localhost:5173/` and the password `testpassword123`, and navigates with
+  `p.locator("text=Codex").first().click()`, which at 375px resolves ambiguously and times out with
+  "&lt;main&gt; intercepts pointer events". Every run in M9 and M10 needed a patched copy. The tool exists so
+  the A-3 number stays checkable by the next session; as committed it is not. Wants URL/password env
+  overrides and a `getByRole("tab", { name: "Codex" })` selector — small, but outside M10's scope.
+
+- **[tooling] The tap audit over-reported label-wrapped controls — FIXED 2026-07-29 (M10).** A checkbox
+  painting 20×20 inside a 44×44 `&lt;label&gt;` was reported sub-floor, though a tap anywhere in the label
+  activates it — verified by walking `elementFromPoint` outward, which reached 44px in both axes. Both
+  the size calculation and the reach walk now treat a wrapping label as the control. M10's objective
+  checklist was the first label-wrapped control in the Codex, so the blind spot had never fired before.
+  **A false violation is worse than none: it sends the next session to "fix" working code.**
+
 - **[codex, viewer safety] Auto-linking publishes an UNREVEALED session's number to players — OPEN,
   awaiting an owner decision (2026-07-29, M9).** Reproduced live: a GM creates session 4, leaves it
   unrevealed and activates it; any revealed journal entry written during play carries `sessionNumber: 4`
